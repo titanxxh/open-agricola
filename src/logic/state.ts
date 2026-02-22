@@ -99,6 +99,19 @@ export const shuffleWithRng = (values: string[], rng: () => number) => {
   return result
 }
 
+export const dealHands = (playerCount: number, seed: number) => {
+  const rng = createRng(seed)
+  const shuffledMinor = shuffleWithRng(minorImprovementIds, rng)
+  const shuffledOccupation = shuffleWithRng(occupationIds, rng)
+  const minorHands: string[][] = []
+  const occupationHands: string[][] = []
+  for (let index = 0; index < playerCount; index += 1) {
+    minorHands.push(shuffledMinor.slice(index * 7, index * 7 + 7))
+    occupationHands.push(shuffledOccupation.slice(index * 7, index * 7 + 7))
+  }
+  return { minorHands, occupationHands }
+}
+
 export const generateRoundActionOrder = (seed: number) => {
   const rng = createRng(seed)
   const order: (string | null)[] = []
@@ -149,6 +162,12 @@ export const normalizeState = (raw: GameState): GameState => {
       takenBy: stored?.takenBy ?? null,
     }
   })
+  const needsHands = raw.players.some(
+    (player) =>
+      (player.minorHand?.length ?? 0) === 0 ||
+      (player.occupationHand?.length ?? 0) === 0,
+  )
+  const dealtHands = needsHands ? dealHands(raw.players.length, seed) : null
   const players = raw.players.map((player, index) => {
     const improvements = player.improvements ?? []
     const minorHand = player.minorHand ?? []
@@ -163,10 +182,15 @@ export const normalizeState = (raw: GameState): GameState => {
       houseType: player.houseType ?? 'wood',
       fences: player.fences ?? 0,
       improvements: improvements.length > 0 ? improvements : [],
-      minorHand: minorHand.length > 0 ? minorHand : [...minorImprovementIds],
+      minorHand:
+        minorHand.length > 0
+          ? minorHand
+          : dealtHands?.minorHands[index] ?? [],
       minorPlayed: minorPlayed.length > 0 ? minorPlayed : [],
       occupationHand:
-        occupationHand.length > 0 ? occupationHand : [...occupationIds],
+        occupationHand.length > 0
+          ? occupationHand
+          : dealtHands?.occupationHands[index] ?? [],
       occupationPlayed: occupationPlayed.length > 0 ? occupationPlayed : [],
       playedCards:
         playedCards.length > 0
@@ -310,11 +334,13 @@ export const cloneState = (state: GameState): GameState => {
   return normalizeState(raw)
 }
 
-export const createInitialPlayers = (): PlayerState[] => [
-  {
-    id: 'p1',
-    name: '玩家 A',
-    color: 'red',
+export const createInitialPlayers = (seed: number): PlayerState[] => {
+  const dealtHands = dealHands(4, seed)
+  return [
+    {
+      id: 'p1',
+      name: '玩家 A',
+      color: 'red',
     resources: { ...emptyResources, food: 2 },
     familySize: 2,
     workersAvailable: 2,
@@ -325,9 +351,9 @@ export const createInitialPlayers = (): PlayerState[] => [
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],
-    minorHand: [...minorImprovementIds],
+    minorHand: dealtHands.minorHands[0] ?? [],
     minorPlayed: [],
-    occupationHand: [...occupationIds],
+    occupationHand: dealtHands.occupationHands[0] ?? [],
     occupationPlayed: [],
     playedCards: [],
     houseAnimalType: null,
@@ -339,10 +365,10 @@ export const createInitialPlayers = (): PlayerState[] => [
     majorEffects: { wellRounds: 0 },
     startPlayer: true,
   },
-  {
-    id: 'p2',
-    name: '玩家 B',
-    color: 'blue',
+    {
+      id: 'p2',
+      name: '玩家 B',
+      color: 'blue',
     resources: { ...emptyResources, food: 2 },
     familySize: 2,
     workersAvailable: 2,
@@ -353,9 +379,9 @@ export const createInitialPlayers = (): PlayerState[] => [
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],
-    minorHand: [...minorImprovementIds],
+    minorHand: dealtHands.minorHands[1] ?? [],
     minorPlayed: [],
-    occupationHand: [...occupationIds],
+    occupationHand: dealtHands.occupationHands[1] ?? [],
     occupationPlayed: [],
     playedCards: [],
     houseAnimalType: null,
@@ -367,10 +393,10 @@ export const createInitialPlayers = (): PlayerState[] => [
     majorEffects: { wellRounds: 0 },
     startPlayer: false,
   },
-  {
-    id: 'p3',
-    name: '玩家 C',
-    color: 'black',
+    {
+      id: 'p3',
+      name: '玩家 C',
+      color: 'black',
     resources: { ...emptyResources, food: 2 },
     familySize: 2,
     workersAvailable: 2,
@@ -381,9 +407,9 @@ export const createInitialPlayers = (): PlayerState[] => [
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],
-    minorHand: [...minorImprovementIds],
+    minorHand: dealtHands.minorHands[2] ?? [],
     minorPlayed: [],
-    occupationHand: [...occupationIds],
+    occupationHand: dealtHands.occupationHands[2] ?? [],
     occupationPlayed: [],
     playedCards: [],
     houseAnimalType: null,
@@ -395,10 +421,10 @@ export const createInitialPlayers = (): PlayerState[] => [
     majorEffects: { wellRounds: 0 },
     startPlayer: false,
   },
-  {
-    id: 'p4',
-    name: '玩家 D',
-    color: 'yellow',
+    {
+      id: 'p4',
+      name: '玩家 D',
+      color: 'yellow',
     resources: { ...emptyResources, food: 2 },
     familySize: 2,
     workersAvailable: 2,
@@ -409,9 +435,9 @@ export const createInitialPlayers = (): PlayerState[] => [
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],
-    minorHand: [...minorImprovementIds],
+    minorHand: dealtHands.minorHands[3] ?? [],
     minorPlayed: [],
-    occupationHand: [...occupationIds],
+    occupationHand: dealtHands.occupationHands[3] ?? [],
     occupationPlayed: [],
     playedCards: [],
     houseAnimalType: null,
@@ -422,8 +448,9 @@ export const createInitialPlayers = (): PlayerState[] => [
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },
     startPlayer: false,
-  },
-]
+    },
+  ]
+}
 
 export const createRoundSnapshot = (state: GameState): GameState => {
   const snapshot = cloneState(state)
@@ -453,7 +480,7 @@ export const createInitialState = (): GameState => {
   const initialState: GameState = {
     round: 1,
     currentPlayerIndex: 0,
-    players: createInitialPlayers(),
+    players: createInitialPlayers(gameSeed),
     actionSpaces: createActionSpaces(),
     log: [{ key: 'log.startGame' }],
     roundStartSnapshot: null,

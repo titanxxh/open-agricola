@@ -1,23 +1,14 @@
-import type { Resource } from './types'
-import { minorImprovementsA } from '../actions/cards/A/minor-improvements'
-import { minorImprovementsB } from '../actions/cards/B/minor-improvements'
-import { minorImprovementsE } from '../actions/cards/E/minor-improvements'
+import type { MinorImprovement as MinorImprovementCard } from '../actions/cards/types'
+import {
+  minorImprovementCards,
+  minorImprovementIds,
+} from '../actions/cards/catalog'
 
-export type MinorImprovement = {
-  id: string
-  cost: Partial<Resource>
-  reward?: Partial<Resource>
-}
+export type MinorImprovement = MinorImprovementCard
 
-export const minorImprovements: MinorImprovement[] = [
-  ...minorImprovementsA,
-  ...minorImprovementsB,
-  ...minorImprovementsE,
-]
+export const minorImprovements: MinorImprovementCard[] = minorImprovementCards
 
-export const minorImprovementIds = minorImprovements.map(
-  (improvement) => improvement.id,
-)
+export { minorImprovementIds }
 
 export const getMinorImprovement = (id: string) =>
   minorImprovements.find((improvement) => improvement.id === id)

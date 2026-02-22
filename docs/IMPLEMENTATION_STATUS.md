@@ -19,11 +19,14 @@
   - 节点、树、注册表、调度器、日志与引擎执行器
   - 入口：[engine](../src/engine)
 - 小发展（minor improvement）
-  - 编号卡牌数据按字母目录拆分（A/B/C/D/E）
-  - 入口：[minor-improvements.ts](../src/game/minor-improvements.ts), [actions/cards](../src/actions/cards)
+  - 编号卡牌数据按字母目录拆分（A/B/C/D/E），每张卡独立文件
+  - 入口：[minor-improvements.ts](../src/game/minor-improvements.ts), [cards/catalog.ts](../src/actions/cards/catalog.ts)
 - 职业（occupation）
-  - 编号卡牌数据按字母目录拆分（A/B/C/D/E）
-  - 入口：[occupations.ts](../src/game/occupations.ts), [actions/cards](../src/actions/cards)
+  - 编号卡牌数据按字母目录拆分（A/B/C/D/E），每张卡独立文件
+  - 入口：[occupations.ts](../src/game/occupations.ts), [cards/catalog.ts](../src/actions/cards/catalog.ts)
+- 卡牌基础模型
+  - Occupation / MinorImprovement 基类与基础字段
+  - 入口：[cards/types.ts](../src/actions/cards/types.ts)
 - 卡牌实现清单
   - Hook 覆盖矩阵与特判卡牌索引（实现状态维护）
   - 入口：[cards_impl.md](./cards_impl.md)
@@ -57,6 +60,9 @@
 - UI 交互与布局
   - 行动区、农场区、手牌区、日志区与控制区布局
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
+- 起始手牌发放
+  - 游戏开始时按种子随机发放 7 张小发展与职业（各玩家不重复）
+  - 入口：[state.ts](../src/logic/state.ts)
 - 动物重整与待安置
   - 房屋与散落畜栏容量展示
   - 开发者模式添加动物后自动进入重整
