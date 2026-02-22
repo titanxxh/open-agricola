@@ -19,11 +19,14 @@
   - 节点、树、注册表、调度器、日志与引擎执行器
   - 入口：[engine](../src/engine)
 - 小发展（minor improvement）
-  - 编号卡牌数据按字母目录拆分（A/B/E）
+  - 编号卡牌数据按字母目录拆分（A/B/C/D/E）
   - 入口：[minor-improvements.ts](../src/game/minor-improvements.ts), [actions/cards](../src/actions/cards)
 - 职业（occupation）
-  - 编号卡牌数据按字母目录拆分（A/B/E）
+  - 编号卡牌数据按字母目录拆分（A/B/C/D/E）
   - 入口：[occupations.ts](../src/game/occupations.ts), [actions/cards](../src/actions/cards)
+- 卡牌实现清单
+  - Hook 覆盖矩阵与特判卡牌索引（实现状态维护）
+  - 入口：[cards_impl.md](./cards_impl.md)
 - 计分与计分板
   - 计分规则实现（田地/圈地/作物/牲畜/空地/房间/家庭成员/乞讨/改良与加分）
   - 计分板支持实时查看与游戏结束自动弹出（单表格：行=计分项，列=玩家）
