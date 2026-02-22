@@ -1,15 +1,20 @@
 import type { ActionChoiceOption, ActionDefinition } from '../game/types'
 import { bakeBread, canBakeBread, type BakeImprovementId } from './effects/bake-bread'
+import { collectAccumulatedResources } from './effects/collect'
 import { gainResources } from './effects/gain'
-import { canAfford, getBuildRoomCost } from './effects/house'
-import { canPayResources } from './effects/pay'
+import { canAfford, getBuildRoomCost, getRenovation, renovateHouse } from './effects/house'
+import { applyCostOverride, canPayResources } from './effects/pay'
 import { stableWoodCost } from './effects/fencing'
 import { getPlowableTiles } from './effects/plow'
 import { canSow } from './effects/sow'
-import { growFamily } from './effects/family-growth'
+import { growFamily, growFamilyWithoutRoom } from './effects/family-growth'
+import { playOccupation } from './effects/occupation'
 import { getMinorImprovement } from '../game/minor-improvements'
 import { getMinorImprovementCost, playImprovement } from './effects/improvement'
 import type { PlayerState } from '../game/types'
+import { getOccupation } from '../game/occupations'
+import { majorCardEffects } from './cards/major'
+import { gainConfigByActionId } from './factories/gain'
 
 const createBonusAction = (
   id: string,
@@ -70,7 +75,93 @@ const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
       labelKey: `minorImprovements.${improvement.id}.name`,
     }))
 
+const getLessonsCost = (player: PlayerState, spaceId: string) => {
+  const isLessons4 = spaceId === 'lessons-4'
+  const base = isLessons4
+    ? player.occupationPlayed.length <= 1
+      ? 1
+      : 2
+    : player.occupationPlayed.length === 0
+      ? 0
+      : 1
+  const discount = player.occupationPlayed.includes('B109_PaperMaker') ? 1 : 0
+  const food = Math.max(0, base - discount)
+  return food > 0 ? { food } : {}
+}
+
+const buildPlayableOccupationOptions = (
+  player: PlayerState,
+  cost: Partial<PlayerState['resources']>,
+): ActionChoiceOption[] =>
+  player.occupationHand
+    .map((id) => getOccupation(id))
+    .filter(
+      (occupation): occupation is NonNullable<typeof occupation> =>
+        !!occupation,
+    )
+    .filter(() => canPayResources(player, cost))
+    .map((occupation) => ({
+      value: occupation.id,
+      labelKey: `occupations.${occupation.id}.name`,
+    }))
+
+const buildMajorImprovementOptions = (
+  available: string[],
+  player: PlayerState,
+): ActionChoiceOption[] =>
+  majorCardEffects
+    .filter((improvement) => available.includes(improvement.id))
+    .filter((improvement) => {
+      const cost =
+        getMinorImprovementCost(player, improvement.id) ?? improvement.cost
+      return canPayResources(player, cost)
+    })
+    .map((improvement) => ({
+      value: `major:${improvement.id}`,
+      labelKey: `improvements.${improvement.id}.name`,
+    }))
+
+const buildMinorImprovementOptions = (player: PlayerState): ActionChoiceOption[] =>
+  player.minorHand
+    .map((id) => getMinorImprovement(id))
+    .filter(
+      (improvement): improvement is NonNullable<typeof improvement> =>
+        !!improvement,
+    )
+    .filter((improvement) => canPayResources(player, improvement.cost))
+    .map((improvement) => ({
+      value: `minor:${improvement.id}`,
+      labelKey: `minorImprovements.${improvement.id}.name`,
+    }))
+
 export const internalActionDefinitions: ActionDefinition[] = [
+  {
+    id: 'collect',
+    nameKey: 'actions.collect.name',
+    descriptionKey: 'actions.collect.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ player, space }) => {
+      collectAccumulatedResources(player, space)
+      return { type: 'ok' }
+    },
+  },
+  {
+    id: 'gain',
+    nameKey: 'actions.gain.name',
+    descriptionKey: 'actions.gain.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ player, space }) => {
+      const gain = gainConfigByActionId.get(space.id)
+      if (gain) {
+        gainResources(player, gain)
+      }
+      return { type: 'ok' }
+    },
+  },
   createBonusAction('bonus-wood', { wood: 1 }),
   createBonusAction('bonus-food', { food: 1 }),
   createBonusAction('bonus-grain', { grain: 1 }),
@@ -104,6 +195,107 @@ export const internalActionDefinitions: ActionDefinition[] = [
     },
     resolveChoice: ({ state, player }, choice) =>
       playImprovement(state, player, choice, 'minor'),
+  },
+  {
+    id: 'improvement-any',
+    nameKey: 'actions.major-improvement.name',
+    descriptionKey: 'actions.major-improvement.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (state, player) =>
+      buildMajorImprovementOptions(state.availableMajorImprovements, player).length >
+        0 || buildMinorImprovementOptions(player).length > 0,
+    execute: ({ state, player }) => {
+      const options = [
+        ...buildMajorImprovementOptions(state.availableMajorImprovements, player),
+        ...buildMinorImprovementOptions(player),
+      ]
+      if (options.length === 0) {
+        return { type: 'fail', logKey: 'log.improvementFail' }
+      }
+      return {
+        type: 'choice',
+        promptKey: 'ui.interactionChooseImprovement',
+        options,
+      }
+    },
+    resolveChoice: ({ state, player }, choice) =>
+      playImprovement(state, player, choice, 'any'),
+  },
+  {
+    id: 'grow-family-without-room',
+    nameKey: 'actions.urgent-wish-children.name',
+    descriptionKey: 'actions.urgent-wish-children.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ player }) => growFamilyWithoutRoom(player),
+  },
+  {
+    id: 'play-occupation',
+    nameKey: 'actions.lessons.name',
+    descriptionKey: 'actions.lessons.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ player, space }) => {
+      const cost = getLessonsCost(player, space.id)
+      const playableOptions = buildPlayableOccupationOptions(player, cost)
+      if (playableOptions.length === 0) {
+        return { type: 'ok' }
+      }
+      return {
+        type: 'choice',
+        promptKey: 'ui.interactionChooseOccupation',
+        options: playableOptions,
+      }
+    },
+    resolveChoice: ({ player, space }, choice) => {
+      const cost = getLessonsCost(player, space.id)
+      return playOccupation(player, choice, cost)
+    },
+  },
+  {
+    id: 'renovate-house',
+    nameKey: 'actions.house-redevelopment.name',
+    descriptionKey: 'actions.house-redevelopment.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (_, player) => {
+      const renovation = getRenovation(player)
+      if (!renovation) return false
+      return canPayResources(player, renovation.cost)
+    },
+    execute: ({ player, costs }) => {
+      const renovation = getRenovation(player)
+      if (!renovation) {
+        return { type: 'fail', logKey: 'log.renovationFail' }
+      }
+      const renovationCost = applyCostOverride(renovation.cost, costs)
+      if (!canPayResources(player, renovationCost)) {
+        return { type: 'fail', logKey: 'log.renovationFail' }
+      }
+      if (!renovateHouse(player, costs)) {
+        return { type: 'fail', logKey: 'log.renovationFail' }
+      }
+      return { type: 'ok' }
+    },
+  },
+  {
+    id: 'fence',
+    nameKey: 'actions.fencing.name',
+    descriptionKey: 'actions.fencing.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (_, player) => player.resources.wood > 0,
+    execute: () => ({
+      type: 'choice',
+      promptKey: 'ui.interactionFenceSelect',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+      ],
+    }),
   },
   {
     id: 'stables',

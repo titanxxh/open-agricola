@@ -5,7 +5,8 @@
 ### 1.1 功能模块清单与实现细节
 
 - 行动卡系统
-  - 基础行动卡与轮次行动卡已实现，包含累积资源与执行逻辑
+  - 基础行动卡与轮次行动卡已实现，统一通过 flow 编排原子行动
+  - 累积资源与直接获取资源分别通过 collect / gain 原子行动处理
   - 入口：[actions/index.ts](../src/actions/index.ts)
 - 原子效果（effects）
   - 收获流程：收割、喂食、繁殖
@@ -48,8 +49,8 @@
   - 入口：[hook-matrix.ts](../src/actions/hook-matrix.ts)
 - Meeting Place 行动
   - 起始玩家逻辑
-  - 二段式小发展交互：先选择是否打出，再选择具体卡牌
-  - 入口：[meeting-place.ts](../src/actions/cards/meeting-place.ts)
+  - flow 可选小发展（wrapOptional + minor-improvement）
+  - 入口：[common-meeting-place.ts](../src/actions/cards/action/common-meeting-place.ts)
 - UI 交互与布局
   - 行动区、农场区、手牌区、日志区与控制区布局
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
@@ -100,8 +101,8 @@ Persist (server/index.ts) ←→ App.tsx normalizeState/persistGame
 
 ### 1.3 核心代码片段说明
 
-- 行动执行接入 Engine.proceed
-  - [App.tsx](../src/App.tsx#L600-L760)
+- 行动执行接入 Engine.proceed 与 flow 构建
+  - [useActionEngine.ts](../src/hooks/useActionEngine.ts)
 - Hook 分发与可执行性覆盖
   - [hooks.ts](../src/actions/hooks.ts#L1-L100)
 - 小发展打出逻辑

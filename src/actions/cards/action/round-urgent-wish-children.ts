@@ -1,4 +1,3 @@
-import { growFamilyWithoutRoom } from '../../effects/family-growth'
 import type { ActionDefinition } from '../../../game/types'
 
 export const urgentWishChildren: ActionDefinition = {
@@ -8,5 +7,9 @@ export const urgentWishChildren: ActionDefinition = {
   roundAvailable: 5,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => growFamilyWithoutRoom(player),
+  execute: () => ({ type: 'ok' }),
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'grow-family-without-room' }],
+  },
 }

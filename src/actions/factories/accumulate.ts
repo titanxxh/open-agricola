@@ -19,4 +19,8 @@ export const createAccumulatingAction = (
     collectAccumulatedResources(player, space)
     return { type: 'ok' }
   },
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'collect' }],
+  },
 })

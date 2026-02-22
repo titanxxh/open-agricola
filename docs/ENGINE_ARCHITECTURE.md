@@ -30,6 +30,7 @@ Engine
 - Node：统一节点协议，定义状态与执行接口
 - ActionRegistry：actionId → ActionDefinition 映射
 - HookDispatcher：执行 before/after/computeArgs/isDoable 等阶段
+- FlowBuilder：将 ActionDefinition.flow 转换为可执行节点树
 - Snapshot/Log：回合快照与行动日志
 - PersistenceAdapter：持久化与状态还原入口
 - Scoring：计分计算与计分板展示
@@ -118,6 +119,22 @@ function proceed():
   dispatchHooks(after)
   tree.resolve(node)
   proceed()
+```
+
+### Flow 构建
+
+```
+function buildFlowNode(flow):
+  if flow.type == 'leaf':
+    return ActionNode(flow.actionId)
+  children = flow.children.map(buildFlowNode)
+  if flow.type == 'seq':
+    return SequenceNode(children)
+  if flow.type == 'parallel':
+    return ParallelNode(children)
+  if flow.type == 'xor':
+    return XorNode(children)
+  return OrNode(children)
 ```
 
 ### Hook 过滤与排序

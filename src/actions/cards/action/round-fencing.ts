@@ -7,16 +7,9 @@ export const fencing: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => player.resources.wood > 0,
-  execute: () => ({
-    type: 'choice',
-    promptKey: 'ui.interactionFenceSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
-    ],
-  }),
-  resolveChoice: (_, choice) =>
-    choice === 'cancel'
-      ? { type: 'fail', logKey: 'log.fencingFail' }
-      : { type: 'ok' },
+  execute: () => ({ type: 'ok' }),
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'fence' }],
+  },
 }

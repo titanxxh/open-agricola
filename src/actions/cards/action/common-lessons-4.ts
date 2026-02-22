@@ -5,7 +5,6 @@ import type {
   Resource,
 } from '../../../game/types'
 import { canPayResources } from '../../effects/pay'
-import { playOccupation } from '../../effects/occupation'
 import { getOccupation } from '../../../game/occupations'
 
 const getLessonsCost = (player: PlayerState): Partial<Resource> => {
@@ -42,23 +41,9 @@ export const lessons4: ActionDefinition = {
     const cost = getLessonsCost(player)
     return buildPlayableOccupationOptions(player, cost).length > 0
   },
-  execute: ({ player }) => {
-    const cost = getLessonsCost(player)
-    const playableOptions = buildPlayableOccupationOptions(player, cost)
-    if (playableOptions.length === 0) {
-      return { type: 'ok' }
-    }
-    return {
-      type: 'choice',
-      promptKey: 'ui.interactionChooseOccupation',
-      options: playableOptions,
-    }
-  },
-  resolveChoice: ({ player }, choice) => {
-    if (choice === 'skip') {
-      return { type: 'ok' }
-    }
-    const cost = getLessonsCost(player)
-    return playOccupation(player, choice, cost)
+  execute: () => ({ type: 'ok' }),
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'play-occupation' }],
   },
 }

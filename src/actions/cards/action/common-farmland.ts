@@ -8,16 +8,9 @@ export const farmland: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => getPlowableTiles(player).length > 0,
-  execute: () => ({
-    type: 'choice',
-    promptKey: 'ui.interactionPlowSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
-    ],
-  }),
-  resolveChoice: (_, choice) =>
-    choice === 'cancel'
-      ? { type: 'fail', logKey: 'log.plowFail' }
-      : { type: 'ok', logKey: 'log.plow' },
+  execute: () => ({ type: 'ok' }),
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'plow' }],
+  },
 }

@@ -1,10 +1,6 @@
-import { getMinorImprovementCost, playImprovement } from '../../effects/improvement'
+import { getMinorImprovementCost } from '../../effects/improvement'
 import { canPayResources } from '../../effects/pay'
-import type {
-  ActionChoiceOption,
-  ActionDefinition,
-  PlayerState,
-} from '../../../game/types'
+import type { ActionDefinition, ActionChoiceOption, PlayerState } from '../../../game/types'
 import { getMinorImprovement } from '../../../game/minor-improvements'
 import { majorCardEffects } from '../major'
 
@@ -46,20 +42,9 @@ export const majorImprovement: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     buildImprovementOptions(state.availableMajorImprovements, player).length >
       0 || buildMinorOptions(player).length > 0,
-  execute: ({ state, player }) => {
-    const options = [
-      ...buildImprovementOptions(state.availableMajorImprovements, player),
-      ...buildMinorOptions(player),
-    ]
-    if (options.length === 0) {
-      return { type: 'fail', logKey: 'log.improvementFail' }
-    }
-    return {
-      type: 'choice',
-      promptKey: 'ui.interactionChooseImprovement',
-      options,
-    }
+  execute: () => ({ type: 'ok' }),
+  flow: {
+    type: 'seq',
+    children: [{ type: 'leaf', actionId: 'improvement-any' }],
   },
-  resolveChoice: ({ state, player }, choice) =>
-    playImprovement(state, player, choice, 'any'),
 }
