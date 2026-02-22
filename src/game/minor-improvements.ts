@@ -1,4 +1,7 @@
 import type { Resource } from './types'
+import { minorImprovementsA } from '../actions/cards/A/minor-improvements'
+import { minorImprovementsB } from '../actions/cards/B/minor-improvements'
+import { minorImprovementsE } from '../actions/cards/E/minor-improvements'
 
 export type MinorImprovement = {
   id: string
@@ -7,20 +10,9 @@ export type MinorImprovement = {
 }
 
 export const minorImprovements: MinorImprovement[] = [
-  { id: 'small-tools', cost: { wood: 1 }, reward: { clay: 1 } },
-  { id: 'spare-bucket', cost: { reed: 1 }, reward: { food: 1 } },
-  { id: 'grain-scoop', cost: { wood: 1 }, reward: { grain: 1 } },
-  { id: 'clay-bucket', cost: { wood: 1 }, reward: { clay: 2 } },
-  { id: 'stone-bowl', cost: { clay: 1 }, reward: { stone: 1 } },
-  { id: 'extra-sack', cost: { reed: 1 }, reward: { grain: 1 } },
-  { id: 'warm-stew', cost: { grain: 1 }, reward: { food: 2 } },
-  { id: 'wood-sledge', cost: { food: 1 }, reward: { wood: 2 } },
-  { id: 'B75_WoodWorkshop', cost: { wood: 1 } },
-  { id: 'A83_ShepherdsCrook', cost: { wood: 1 } },
-  { id: 'E74_AshTrees', cost: { wood: 1 } },
-  { id: 'A65_SeedPellets', cost: { food: 1 } },
-  { id: 'A105_BarrowPusher', cost: { wood: 1 } },
-  { id: 'E53_BoarSpear', cost: { wood: 1 } },
+  ...minorImprovementsA,
+  ...minorImprovementsB,
+  ...minorImprovementsE,
 ]
 
 export const minorImprovementIds = minorImprovements.map(
