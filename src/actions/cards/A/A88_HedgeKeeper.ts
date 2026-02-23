@@ -6,7 +6,7 @@ export const A88_HedgeKeeper = new Occupation({
   deck: "A",
   number: 88,
   category: "FARM_PLANNER",
-  desc: [],
+  desc: ["Each time you take a __Build Fences__ action, you do not have to pay <WOOD> for 3 of the fences you build."],
   cost: {},
   players: "1+",
 })

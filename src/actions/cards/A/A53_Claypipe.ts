@@ -6,6 +6,6 @@ export const A53_Claypipe = new MinorImprovement({
   deck: "A",
   number: 53,
   category: "FOOD_PROVIDER",
-  desc: [],
+  desc: ["In the returning home phase of each round, if you gained at least 7 building resources in the preceding work phase, you get 2 <FOOD>."],
   cost: {"clay":1},
 })

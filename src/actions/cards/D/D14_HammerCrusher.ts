@@ -6,6 +6,6 @@ export const D14_HammerCrusher = new MinorImprovement({
   deck: "D",
   number: 14,
   category: "FARM_PLANNER",
-  desc: [],
+  desc: ["Immediately before you renovate to stone, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."],
   cost: {},
 })

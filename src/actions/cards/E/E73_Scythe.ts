@@ -5,6 +5,6 @@ export const E73_Scythe = new MinorImprovement({
   name: "Scythe",
   deck: "E",
   number: 73,
-  desc: [],
+  desc: ["During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."],
   cost: {"wood":1},
 })

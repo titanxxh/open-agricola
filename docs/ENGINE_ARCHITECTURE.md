@@ -36,6 +36,7 @@ Engine
 - Scoring：计分计算与计分板展示
 - CardCatalog：编号卡牌数据目录（A/B/C/D/E）
 - CardBase：Occupation / MinorImprovement 基础模型
+- CardView：前端使用卡牌定义的 name/desc 渲染
 
 ## 核心节点类与接口
 

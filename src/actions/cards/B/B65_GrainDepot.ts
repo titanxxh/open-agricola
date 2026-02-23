@@ -6,6 +6,6 @@ export const B65_GrainDepot = new MinorImprovement({
   deck: "B",
   number: 65,
   category: "CROP_PROVIDER",
-  desc: [],
+  desc: ["If you paid <WOOD>/<CLAY>/<STONE> for this card, place 1 <GRAIN> on each of the next 2/3/4 round spaces. At the start of these rounds, you get the <GRAIN>."],
   cost: {},
 })

@@ -6,7 +6,7 @@ export const B115_TinsmithMaster = new Occupation({
   deck: "B",
   number: 115,
   category: "CROP_PROVIDER",
-  desc: [],
+  desc: ["You can hold 1 additional animal in each pasture without a stable. Each time you sow in a field, you can place 1 additional crop of the respective type in that field."],
   cost: {},
   players: "1+",
 })

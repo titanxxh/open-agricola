@@ -6,7 +6,7 @@ export const A110_Roughcaster = new Occupation({
   deck: "A",
   number: 110,
   category: "FOOD_PROVIDER",
-  desc: [],
+  desc: ["Each time you build at least 1 clay room or renovate your house from clay to stone, you also get 3 <FOOD>."],
   cost: {},
   players: "1+",
 })

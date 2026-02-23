@@ -59,6 +59,7 @@
   - 入口：[common-meeting-place.ts](../src/actions/cards/action/common-meeting-place.ts)
 - UI 交互与布局
   - 行动区、农场区、手牌区、日志区与控制区布局
+  - 手牌与已打出卡牌显示使用卡牌定义中的 name/desc
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
 - 起始手牌发放
   - 游戏开始时按种子随机发放 7 张小发展与职业（各玩家不重复）

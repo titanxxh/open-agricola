@@ -5,7 +5,7 @@ export const E71_CowPatty = new MinorImprovement({
   name: "Cow Patty",
   deck: "E",
   number: 71,
-  desc: [],
+  desc: ["Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it."],
   cost: {},
   prerequisite: "1 Cattle",
 })

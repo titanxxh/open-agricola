@@ -574,9 +574,17 @@ export const FarmBoard = ({
           const occupation = isOccupation ? getOccupation(rawId) : null
           const major = isMajor ? getMajorCardEffect(rawId) : null
           const costText = minor
-            ? formatResources(locale, { ...emptyResources, ...minor.cost }, true)
+            ? formatResources(
+                locale,
+                { ...emptyResources, ...(minor.cost ?? {}) },
+                true,
+              )
             : occupation
-              ? formatResources(locale, { ...emptyResources, ...occupation.cost }, true)
+              ? formatResources(
+                  locale,
+                  { ...emptyResources, ...(occupation.cost ?? {}) },
+                  true,
+                )
               : major
                 ? formatResources(locale, { ...emptyResources, ...major.cost }, true)
                 : ''
@@ -585,16 +593,18 @@ export const FarmBoard = ({
             : occupation?.reward
               ? formatResources(locale, { ...emptyResources, ...occupation.reward }, true)
               : ''
-          const nameKey = isMinor
-            ? `minorImprovements.${rawId}.name`
+          const nameText = isMinor
+            ? minor?.name ?? t(locale, `minorImprovements.${rawId}.name`)
             : isOccupation
-              ? `occupations.${rawId}.name`
-              : `improvements.${rawId}.name`
-          const descriptionKey = isMinor
-            ? `minorImprovements.${rawId}.description`
+              ? occupation?.name ?? t(locale, `occupations.${rawId}.name`)
+              : t(locale, `improvements.${rawId}.name`)
+          const descriptionText = isMinor
+            ? (minor?.desc?.join(' ') ??
+              t(locale, `minorImprovements.${rawId}.description`))
             : isOccupation
-              ? `occupations.${rawId}.description`
-              : `improvements.${rawId}.description`
+              ? (occupation?.desc?.join(' ') ??
+                t(locale, `occupations.${rawId}.description`))
+              : t(locale, `improvements.${rawId}.description`)
           return (
             <div
               key={`played-${index}`}
@@ -602,8 +612,8 @@ export const FarmBoard = ({
                 isOccupation ? ' occupation' : isMinor ? ' minor' : ' major'
               }`}
             >
-              <div className="hand-title">{t(locale, nameKey)}</div>
-              <div className="hand-meta">{t(locale, descriptionKey)}</div>
+              <div className="hand-title">{nameText}</div>
+              <div className="hand-meta">{descriptionText}</div>
               <div className="hand-meta">
                 {t(locale, 'ui.handCost', {
                   cost: costText || t(locale, 'ui.noCost'),
@@ -632,12 +642,12 @@ export const FarmBoard = ({
                 displayPlayer.occupationHand.map((cardId) => {
                   const occupation = getOccupation(cardId)
                   const canPlay = occupation
-                    ? canPayResources(displayPlayer, occupation.cost)
+                    ? canPayResources(displayPlayer, occupation.cost ?? {})
                     : false
                   const costText = occupation
                     ? formatResources(
                         locale,
-                        { ...emptyResources, ...occupation.cost },
+                        { ...emptyResources, ...(occupation.cost ?? {}) },
                         true,
                       )
                     : ''
@@ -662,10 +672,11 @@ export const FarmBoard = ({
                       }}
                     >
                       <div className="hand-title">
-                        {t(locale, `occupations.${cardId}.name`)}
+                        {occupation?.name ?? t(locale, `occupations.${cardId}.name`)}
                       </div>
                       <div className="hand-meta">
-                        {t(locale, `occupations.${cardId}.description`)}
+                        {occupation?.desc?.join(' ') ??
+                          t(locale, `occupations.${cardId}.description`)}
                       </div>
                       <div className="hand-meta">
                         {t(locale, 'ui.handCost', {
@@ -692,12 +703,12 @@ export const FarmBoard = ({
                 displayPlayer.minorHand.map((cardId) => {
                   const improvement = getMinorImprovement(cardId)
                   const canPlay = improvement
-                    ? canPayResources(displayPlayer, improvement.cost)
+                    ? canPayResources(displayPlayer, improvement.cost ?? {})
                     : false
                   const costText = improvement
                     ? formatResources(
                         locale,
-                        { ...emptyResources, ...improvement.cost },
+                        { ...emptyResources, ...(improvement.cost ?? {}) },
                         true,
                       )
                     : ''
@@ -722,10 +733,12 @@ export const FarmBoard = ({
                       }}
                     >
                       <div className="hand-title">
-                        {t(locale, `minorImprovements.${cardId}.name`)}
+                        {improvement?.name ??
+                          t(locale, `minorImprovements.${cardId}.name`)}
                       </div>
                       <div className="hand-meta">
-                        {t(locale, `minorImprovements.${cardId}.description`)}
+                        {improvement?.desc?.join(' ') ??
+                          t(locale, `minorImprovements.${cardId}.description`)}
                       </div>
                       <div className="hand-meta">
                         {t(locale, 'ui.handCost', {

@@ -6,7 +6,7 @@ export const B146_Illusionist = new Occupation({
   deck: "B",
   number: 146,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: [],
+  desc: ["Each time you use a building resource accumulation space, you can discard exactly 1 card from your hand to get 1 additional building resource of the accumulating type."],
   cost: {},
   players: "3+",
 })

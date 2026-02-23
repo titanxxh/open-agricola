@@ -6,7 +6,7 @@ export const D22_WorkPermit = new MinorImprovement({
   deck: "D",
   number: 22,
   category: "ACTIONS_BOOSTER",
-  desc: [],
+  desc: ["Add 1 to the current round for each building resource you have and place 1 person from your supply on the corresponding round space. In that round, you can use the person."],
   cost: {"food":1},
   prerequisite: "At Least 1 Building Resource",
 })

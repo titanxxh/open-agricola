@@ -6,6 +6,6 @@ export const A83_ShepherdsCrook = new MinorImprovement({
   deck: "A",
   number: 83,
   category: "LIVESTOCK_PROVIDER",
-  desc: [],
+  desc: ["Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."],
   cost: {"wood":1},
 })

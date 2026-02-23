@@ -6,6 +6,6 @@ export const A28_ForestSchool = new MinorImprovement({
   deck: "A",
   number: 28,
   category: "ACTIONS_BOOSTER",
-  desc: [],
+  desc: ["You can consider the __Lessons__ action spaces not occupied. You can replace each <FOOD> that an occupation costs with <WOOD>."],
   cost: {},
 })

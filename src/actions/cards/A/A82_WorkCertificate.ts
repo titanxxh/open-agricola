@@ -6,7 +6,7 @@ export const A82_WorkCertificate = new MinorImprovement({
   deck: "A",
   number: 82,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: [],
+  desc: ["Each time after you use an action space, you can take 1 building resource from a building resource accumulation space with at least 4 building resources on it."],
   cost: {"food":1},
   occupationPrerequisites: {"min":3},
   newSet: true,
