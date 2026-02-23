@@ -34,6 +34,10 @@ Engine
 - Snapshot/Log：回合快照与行动日志
 - PersistenceAdapter：持久化与状态还原入口
 - Scoring：计分计算与计分板展示
+- CardCatalog：编号卡牌数据目录（A/B/C/D/E）
+- CardBase：Occupation / MinorImprovement 基础模型
+- CardView：前端优先使用 i18n 的 name/desc 渲染
+- I18nCatalog：卡牌名称与描述中文翻译
 
 ## 核心节点类与接口
 

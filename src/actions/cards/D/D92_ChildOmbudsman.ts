@@ -1,0 +1,12 @@
+import { MinorImprovement } from '../types'
+
+export const D92_ChildOmbudsman = new MinorImprovement({
+  id: "D92_ChildOmbudsman",
+  name: "Child Ombudsman",
+  deck: "D",
+  number: 92,
+  category: "ACTIONS_BOOSTER",
+  desc: ["From round 5 on, if you have room in your house, at the end of each person action, you can take a __Family Growth__ action with that person. If you do, you get 2 negative <SCORE>."],
+  cost: {},
+  players: "1+",
+})
