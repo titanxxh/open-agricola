@@ -1,11 +1,11 @@
-import type { GameState, PlayerState, Resource } from '../../game/types'
-import type { Locale } from '../../i18n'
-import type { HarvestSummary } from '../../logic/round'
-import { performHarvest } from '../../logic/round'
-import { breedAnimals } from '../../actions/effects/breed-animals'
-import { reap } from '../../actions/effects/reap'
-import { emptyResources } from '../../logic/state'
-import { formatResources } from '../../logic/format'
+import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { Locale } from '../../../shared/i18n'
+import type { HarvestSummary } from '../../../shared/logic/round'
+import { performHarvest } from '../../../shared/logic/round'
+import { breedAnimals } from '../../../shared/actions/effects/breed-animals'
+import { reap } from '../../../shared/actions/effects/reap'
+import { emptyResources } from '../../../shared/logic/state'
+import { formatResources } from '../../../shared/logic/format'
 
 export type HarvestFeedPending = {
   playerIndex: number

@@ -1,8 +1,8 @@
 import { useMemo, useRef } from 'react'
-import { actionDefinitions } from '../actions'
-import { internalActionDefinitions } from '../actions/internal-actions'
-import { applyIsDoableHooks, clearActionHooks } from '../actions/hooks'
-import { registerCardHooks } from '../actions/hooks/card-hooks'
+import { actionDefinitions } from '../../shared/actions'
+import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import { applyIsDoableHooks, clearActionHooks } from '../../shared/actions/hooks'
+import { registerCardHooks } from '../../shared/actions/hooks/card-hooks'
 import {
   ActionNode,
   ActionRegistry,
@@ -16,9 +16,9 @@ import {
   ParallelNode,
   SequenceNode,
   XorNode,
-} from '../engine'
-import type { EngineNode } from '../engine'
-import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../game/types'
+} from '../../shared/engine'
+import type { EngineNode } from '../../shared/engine'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 export const useActionEngine = () => {
   const engineRef = useRef<Engine | null>(null)

@@ -1,6 +1,6 @@
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
-import type { GameState } from '../../game/types'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import type { GameState } from '../../../shared/game/types'
 
 type Props = {
   locale: Locale

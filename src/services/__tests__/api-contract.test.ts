@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../../shared/game/types'
 import { persistGame } from '../api'
 
 const createState = (): GameState => ({

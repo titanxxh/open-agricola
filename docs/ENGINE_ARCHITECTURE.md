@@ -1,216 +1,97 @@
-# Open Agricola 引擎架构总结
+# Open Agricola 架构说明
 
-## 目标与边界
+## 1. 目标与边界
 
-- 目标：以回合与行动卡为核心驱动，确保行动执行、资源变化、收获结算与日志一致
-- 边界：实现现代端 Engine 树核心架构与基础模块；以可扩展 Hook/Listener 机制承载卡牌特判，不追求逐行复制 BGA PHP 内部实现
+- 目标：在前端实现可玩的农场主基础流程，保证行动执行、资源变更、回合推进、收获结算与日志一致。
+- 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果，不追求逐行复制 BGA PHP 内部实现。
+- 当前边界：大量卡牌已接入数据与部分规则，未来将持续补全行为实现。
 
-## 整体结构图
+## 2. 分层结构
 
-```
-Engine
-├─ EngineTree
-│  ├─ Node (抽象)
-│  │  ├─ ActionNode
-│  │  ├─ ChoiceNode
-│  │  ├─ SequenceNode
-│  │  └─ ParallelNode
-│  └─ Cursor/Resolver
-├─ ActionRegistry
-├─ HookDispatcher
-└─ Snapshot/Log
-```
+```text
+shared/ (前后端共用，零 React 依赖)
+  ├─ engine/          引擎核心（节点树、推进、snapshot）
+  ├─ actions/         行动定义、效果、Hook、卡牌目录
+  ├─ logic/           状态初始化/克隆、回合/收获、计分
+  ├─ game/            GameState/PlayerState 等核心类型
+  └─ i18n/            国际化
 
-注：结构图描述的是概念模型，目的是定义模块边界与职责分层。
+src/ (仅前端)
+  ├─ app/             GameContainer + UI 流程 hooks
+  ├─ components/      React UI 组件
+  ├─ hooks/           React 编排 hooks（useActionEngine 等）
+  ├─ services/        后端 API 调用
+  └─ types/           UI 类型定义
 
-## 核心模块与职责
-
-- Engine：驱动树推进、状态跳转、错误处理与日志落盘
-- EngineTree：维护节点结构与解析游标，提供下一个待执行节点
-- Node：统一节点协议，定义状态与执行接口
-- ActionRegistry：actionId → ActionDefinition 映射
-- HookDispatcher：执行 before/after/computeArgs/isDoable 等阶段
-- FlowBuilder：将 ActionDefinition.flow 转换为可执行节点树
-- Snapshot/Log：回合快照与行动日志
-- PersistenceAdapter：持久化与状态还原入口
-- Scoring：计分计算与计分板展示
-- CardCatalog：编号卡牌数据目录（A/B/C/D/E）
-- MajorCatalog：大改良卡牌定义与描述
-- CardBase：Occupation / MinorImprovement 基础模型
-- CardView：前端优先使用 i18n 的 name/desc 渲染
-- I18nCatalog：卡牌名称与描述中文翻译
-- ImprovementSelection：改良行动支持从手牌与大改良区点击选择
-- CardEffects：卡牌效果注册表与 hook 执行器
-- CardListeners：卡牌监听注册与事件分发
-- CardActivation：卡牌 hook 触发并返回 flow
-- EngineFlowCore：引擎推进核心循环（从容器中抽离）
-- RoundFlowCore：回合结束与回合推进核心逻辑
-- HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
-- AnimalReorgFlowCore：动物重整写回、分支决策 plan、Engine 进度判定 plan 与重整后 choice 参数构造
-- PayloadValidation：后端 API payload 统一校验与错误结构规范
-- FutureMeeples：未来回合资源堆叠与回合开始结算
-- ActionStackView：行动格资源堆叠显示
-- ActionCardVisibility：未开行动牌隐藏标题与描述
-- ResourceLine：资源显示统一为结构化元素
-- PlayerActionCard：可作为行动位的卡牌类型（按职业/小改进分类）
-- DevModeVisibility：开发者模式下显示手牌与未来回合行动牌信息
-- DevControls：开发者模式重开与种子输入
-
-## 核心节点类与接口
-
-```
-interface EngineNode {
-  id: string
-  type: 'action' | 'choice' | 'sequence' | 'parallel'
-  getState(): 'ready' | 'resolved' | 'blocked'
-  getArgs(): Record<string, unknown>
-  resolve(result?: unknown): void
-  isDoable(ctx: ActionExecutionContext): boolean
-}
-
-class ActionNode implements EngineNode {
-  actionId: string
-  execute(ctx: ActionExecutionContext): ActionExecutionResult
-}
-
-class ChoiceNode implements EngineNode {
-  choices: ActionChoiceOption[]
-  resolve(choice: string): void
-}
-
-class SequenceNode implements EngineNode {
-  children: EngineNode[]
-}
-
-class ParallelNode implements EngineNode {
-  children: EngineNode[]
-  resolve(policy: 'all' | 'any'): void
-}
+server/ (仅后端)
+  └─ index.ts + payload/fence/plow/sow 校验
 ```
 
-注：接口定义为文档层的契约描述，不要求与 TypeScript 运行时一一对应。
+## 3. 核心模块
 
-## 数据模型与执行上下文
+### 3.1 行动定义与行动空间
 
-- GameState：回合、当前玩家索引、行动空间列表、日志、行动顺序、可用改良、是否结束
-- PlayerState：资源、房间、家庭规模、可用工人、地块、围栏、改良、起始玩家
-- ActionSpace：ActionDefinition + 空间资源 + 占用者
-- ActionExecutionContext：state / player / space
+- `shared/actions/index.ts`：注册基础与轮次行动格，`createActionSpaces()` 生成运行时 `ActionSpace`。
 
-核心定义参考：
-- [types.ts](../src/game/types.ts)
+### 3.2 引擎执行层
 
-## 主要工作流程时序图
+- `shared/engine/engine.ts`：`Engine.proceed()` 驱动节点推进，支持 `flow` 转节点树与 snapshot/restore。
+- `shared/engine/tree.ts`：`nextUnresolved()`、`findNodeById()`、`insertAfter()`。
+- `shared/engine/nodes.ts`：`ActionNode`、`ChoiceNode`、`SequenceNode`、`ParallelNode`、`OrNode`、`XorNode`、`OptionalNode`。
 
-```
-UI → Engine.proceed
-  → EngineTree.getNextNode
-  → HookDispatcher.before
-  → ActionNode.execute
-  → HookDispatcher.during
-  → ChoiceNode? (等待输入)
-  → HookDispatcher.immediatelyAfter
-  → Log/Snapshot
-  → HookDispatcher.after
-  → EngineTree.proceed
-```
+### 3.3 Hook 与 Listener
 
-## 关键算法伪代码
+- `shared/actions/hooks.ts`：8 个相位，支持 `computeReplace` 链式替换与 `isDoable` 覆盖。
+- `shared/actions/cards/card-listeners.ts`：按 actions/phases/scope 匹配分发。
+- `shared/actions/hooks/card-hooks.ts`：内建卡牌 Hook 注册入口。
+- `shared/actions/hook-matrix.ts`：矩阵由真实注册数据动态生成。
 
-### Engine 推进
+### 3.4 原子效果层
 
-```
-function proceed():
-  node = tree.nextUnresolved()
-  if node == null:
-    confirmTurn()
-    return
-  if !node.isDoable(ctx):
-    markBlocked(node)
-    return
-  dispatchHooks(before)
-  result = node.execute(ctx)
-  dispatchHooks(during)
-  if result.type == 'choice':
-    savePendingChoice(result)
-    dispatchHooks(computeArgs)
-    return
-  dispatchHooks(immediatelyAfter)
-  appendLog()
-  dispatchHooks(after)
-  tree.resolve(node)
-  proceed()
-```
+- `shared/actions/effects/*`：collect/gain/plow/sow/fencing/renovation/stables/reap/feed-family/breed-animals 等。
 
-### Flow 构建
+### 3.5 应用编排层
 
-```
-function buildFlowNode(flow):
-  if flow.type == 'leaf':
-    return ActionNode(flow.actionId)
-  children = flow.children.map(buildFlowNode)
-  if flow.type == 'seq':
-    return SequenceNode(children)
-  if flow.type == 'parallel':
-    return ParallelNode(children)
-  if flow.type == 'xor':
-    return XorNode(children)
-  return OrNode(children)
-```
+- `src/app/GameContainer.tsx`：主 UI 编排器。
+- `src/app/hooks/*`：引擎推进、玩家轮转、回合结束、收获流程、动物重整等纯函数核心。
 
-### Hook 过滤与排序
+### 3.6 状态与规则
 
-```
-function runHooks(context):
-  candidates = hooks.filter(h => match(actionId, phase))
-  ordered = sortBy(order, id)
-  for each hook in ordered:
-    hook.handle(context)
-```
+- `shared/game/types.ts`：`GameState`、`PlayerState`、`ActionSpace` 等核心类型。
+- `shared/logic/state.ts`：初始化、克隆、回合快照、开局发牌。
+- `shared/logic/round.ts`：收获流程计算。
+- `shared/logic/scoring.ts`：计分规则。
 
-### Replace 与 Doable
+### 3.7 后端与校验
 
-```
-function applyComputeReplace():
-  for each hook in orderedHooks:
-    if hook returns actionId:
-      actionId = result.actionId
-  return actionId
+- `server/index.ts`：本地 API（保存/加载与交互校验）。
+- `server/payload-validation.ts`：统一请求体校验。
+- `server/fence-validation.ts`、`plow-validation.ts`、`sow-validation.ts`：关键动作校验。
 
-function applyIsDoable(initial):
-  doable = initial
-  for each hook in orderedHooks:
-    if hook returns doable:
-      doable = result.doable
-  return doable
-```
+## 4. 关键运行流程
 
-## 模块化设计与接入点
+### 4.1 行动执行
 
-- 行动注册与空间构建：[actions/index.ts](../src/actions/index.ts)
-- Hook 架构入口：[hooks.ts](../src/actions/hooks.ts)
-- 引擎推进核心：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts)
-- 回合与收获核心：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
-- 动物重整核心：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts)
-- 执行编排与 UI 交互：[GameContainer.tsx](../src/app/GameContainer.tsx)
-- 持久化与还原：App.tsx 内的 persist/normalize 逻辑
+1. UI 选择行动格 -> 构建或复用 Engine。
+2. `Engine.proceed()` 找到下一个可执行节点，触发 Hook。
+3. 遇到 choice 回到 UI；完成后写日志并进入下一节点。
 
-## 性能指标与约束条件
+### 4.2 回合与收获
 
-- 单次行动执行：O(H + R)（H 为匹配 Hook 数量，R 为资源变更数量）
-- EngineTree 查找下一节点：目标 O(1)~O(logN)
-- 日志与快照：每回合最多 1 个快照，行动日志线性增长
-- 并行节点：默认以小规模分支为前提，避免指数级状态膨胀
-- 目标：本地单局 14 回合内无明显卡顿（<16ms 关键交互）
+1. 工人全部用完 -> 回合结束判定。
+2. 归家（释放行动格、恢复工人）。
+3. 收获回合执行收割/喂食/繁殖。
+4. 推进下一回合。
 
-## 边界说明
+## 5. 测试覆盖
 
-- 已接入并实现大量 A/B/C/D/E 卡牌数据与部分效果，覆盖范围持续扩展
-- 不追求完整复刻 BGA PHP Engine 内部结构，但保持 action/hook/listener 的可演进接口
+- `shared/engine/__tests__/*`：引擎推进与链式插入。
+- `shared/actions/__tests__/*`：Hook 矩阵、围栏、畜栏、动物。
+- `shared/logic/__tests__/*`：计分、收获、状态克隆。
+- `src/app/__tests__/*`：engine/turn/round/harvest/reorg 编排核心。
+- `server/__tests__/*`：后端校验。
 
-## 与现有架构的兼容性
+## 6. 已知限制
 
-- ActionDefinition 与 ActionSpace 保持现有定义
-- HookDispatcher 复用 actions/hooks.ts
-- App.tsx 仍作为前端编排入口，Engine 作为抽象层补齐执行链路
-- Scoring 由 UI 直接基于 GameState 计算，游戏结束与手动入口弹出计分板
+- 部分卡牌仅完成数据接入，复杂行为待补全。
+- 多 Hook 叠加冲突处理需更多回归样例。

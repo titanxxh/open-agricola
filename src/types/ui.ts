@@ -1,5 +1,5 @@
-import type { ActionChoiceOption } from '../game/types'
-import type { FarmTilePosition, GameState } from '../game/types'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { FarmTilePosition, GameState } from '../../shared/game/types'
 
 export type PendingChoice = {
   promptKey?: string

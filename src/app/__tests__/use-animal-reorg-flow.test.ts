@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Resource } from '../../game/types'
-import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
+import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { AnimalReorgState, PendingAnimalReorg } from '../../../src/types/ui'
 import {
   applyAnimalReorgToPlayer,
   buildPostReorgPlan,

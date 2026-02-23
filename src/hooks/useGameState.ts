@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { GameState, Resource } from '../game/types'
+import type { GameState, Resource } from '../../shared/game/types'
 import type {
   AnimalReorgState,
   HistorySnapshot,
   PendingAnimalReorg,
   PendingChoice,
 } from '../types/ui'
-import { createInitialState, cloneState, normalizeState } from '../logic/state'
+import { createInitialState, cloneState, normalizeState } from '../../shared/logic/state'
 import { fetchState, persistGame } from '../services/api'
-import type { Locale } from '../i18n'
+import type { Locale } from '../../shared/i18n'
 
 export const useGameState = () => {
   const [state, setState] = useState<GameState>(() => createInitialState())

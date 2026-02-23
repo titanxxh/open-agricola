@@ -1,10 +1,10 @@
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
 import type {
   PlayerScoreSummary,
   ScoreCategoryResult,
   ScoreEntry,
-} from '../../logic/scoring'
+} from '../../../shared/logic/scoring'
 
 type Props = {
   locale: Locale
