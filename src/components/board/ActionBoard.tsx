@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
-import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../game/types'
-import { roundStageSlots } from '../../logic/state'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
+import { roundStageSlots } from '../../../shared/logic/state'
 
 type RoundSlot = {
   round: number

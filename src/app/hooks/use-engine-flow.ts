@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../../shared/game/types'
 
 type EngineLike = {
   proceed: (context: {

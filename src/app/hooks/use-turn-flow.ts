@@ -1,5 +1,5 @@
-import type { GameState } from '../../game/types'
-import { createRoundOpenById } from '../../logic/state'
+import type { GameState } from '../../../shared/game/types'
+import { createRoundOpenById } from '../../../shared/logic/state'
 
 export const getNextPlayerIndex = (state: GameState) =>
   (state.currentPlayerIndex + 1) % state.players.length

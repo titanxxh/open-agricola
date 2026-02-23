@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../../shared/game/types'
 import { runEngineStepsCore } from '../hooks/use-engine-flow'
 
 const createPlayer = (): PlayerState => ({

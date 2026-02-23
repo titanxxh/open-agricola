@@ -1,216 +1,111 @@
-# Open Agricola 引擎架构总结
+# Open Agricola 架构说明
 
-## 目标与边界
+## 1. 目标与边界
 
-- 目标：以回合与行动卡为核心驱动，确保行动执行、资源变化、收获结算与日志一致
-- 边界：实现现代端 Engine 树核心架构与基础模块；以可扩展 Hook/Listener 机制承载卡牌特判，不追求逐行复制 BGA PHP 内部实现
+- 目标：以回合与行动卡为核心驱动的农场主桌游实现，后端为权威状态源，前端仅做渲染与输入收集。
+- 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果。
+- 多人支持：WebSocket 实时同步，房间管理，支持多客户端连接同一后端。
 
-## 整体结构图
+## 2. 分层结构
 
-```
-Engine
-├─ EngineTree
-│  ├─ Node (抽象)
-│  │  ├─ ActionNode
-│  │  ├─ ChoiceNode
-│  │  ├─ SequenceNode
-│  │  └─ ParallelNode
-│  └─ Cursor/Resolver
-├─ ActionRegistry
-├─ HookDispatcher
-└─ Snapshot/Log
-```
+```text
+shared/ (前后端共用，零 React 依赖)
+  ├─ engine/          引擎核心（节点树、推进、snapshot）
+  ├─ actions/         行动定义、效果、Hook、卡牌目录
+  ├─ logic/           状态初始化/克隆、回合/收获、计分
+  ├─ game/            GameState/PlayerState 等核心类型
+  └─ i18n/            国际化
 
-注：结构图描述的是概念模型，目的是定义模块边界与职责分层。
+src/ (仅前端)
+  ├─ app/             GameContainerApi（API 驱动）+ GameContainer（本地引擎 fallback）
+  ├─ components/      React UI 组件
+  ├─ hooks/           useGameApi / useGameSync / useActionEngine 等
+  ├─ services/        后端 HTTP 调用
+  └─ types/           UI 类型定义
 
-## 核心模块与职责
-
-- Engine：驱动树推进、状态跳转、错误处理与日志落盘
-- EngineTree：维护节点结构与解析游标，提供下一个待执行节点
-- Node：统一节点协议，定义状态与执行接口
-- ActionRegistry：actionId → ActionDefinition 映射
-- HookDispatcher：执行 before/after/computeArgs/isDoable 等阶段
-- FlowBuilder：将 ActionDefinition.flow 转换为可执行节点树
-- Snapshot/Log：回合快照与行动日志
-- PersistenceAdapter：持久化与状态还原入口
-- Scoring：计分计算与计分板展示
-- CardCatalog：编号卡牌数据目录（A/B/C/D/E）
-- MajorCatalog：大改良卡牌定义与描述
-- CardBase：Occupation / MinorImprovement 基础模型
-- CardView：前端优先使用 i18n 的 name/desc 渲染
-- I18nCatalog：卡牌名称与描述中文翻译
-- ImprovementSelection：改良行动支持从手牌与大改良区点击选择
-- CardEffects：卡牌效果注册表与 hook 执行器
-- CardListeners：卡牌监听注册与事件分发
-- CardActivation：卡牌 hook 触发并返回 flow
-- EngineFlowCore：引擎推进核心循环（从容器中抽离）
-- RoundFlowCore：回合结束与回合推进核心逻辑
-- HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
-- AnimalReorgFlowCore：动物重整写回、分支决策 plan、Engine 进度判定 plan 与重整后 choice 参数构造
-- PayloadValidation：后端 API payload 统一校验与错误结构规范
-- FutureMeeples：未来回合资源堆叠与回合开始结算
-- ActionStackView：行动格资源堆叠显示
-- ActionCardVisibility：未开行动牌隐藏标题与描述
-- ResourceLine：资源显示统一为结构化元素
-- PlayerActionCard：可作为行动位的卡牌类型（按职业/小改进分类）
-- DevModeVisibility：开发者模式下显示手牌与未来回合行动牌信息
-- DevControls：开发者模式重开与种子输入
-
-## 核心节点类与接口
-
-```
-interface EngineNode {
-  id: string
-  type: 'action' | 'choice' | 'sequence' | 'parallel'
-  getState(): 'ready' | 'resolved' | 'blocked'
-  getArgs(): Record<string, unknown>
-  resolve(result?: unknown): void
-  isDoable(ctx: ActionExecutionContext): boolean
-}
-
-class ActionNode implements EngineNode {
-  actionId: string
-  execute(ctx: ActionExecutionContext): ActionExecutionResult
-}
-
-class ChoiceNode implements EngineNode {
-  choices: ActionChoiceOption[]
-  resolve(choice: string): void
-}
-
-class SequenceNode implements EngineNode {
-  children: EngineNode[]
-}
-
-class ParallelNode implements EngineNode {
-  children: EngineNode[]
-  resolve(policy: 'all' | 'any'): void
-}
+server/ (仅后端)
+  ├─ index.ts         HTTP 服务入口
+  ├─ game-session.ts  权威 GameState + Engine 持有者
+  ├─ game-router.ts   /api/game/* HTTP 端点
+  ├─ room-manager.ts  WebSocket 房间管理与实时广播
+  └─ *-validation.ts  围栏/犁地/播种等校验
 ```
 
-注：接口定义为文档层的契约描述，不要求与 TypeScript 运行时一一对应。
+## 3. 核心模块
 
-## 数据模型与执行上下文
+### 3.1 后端 GameSession（权威状态源）
 
-- GameState：回合、当前玩家索引、行动空间列表、日志、行动顺序、可用改良、是否结束
-- PlayerState：资源、房间、家庭规模、可用工人、地块、围栏、改良、起始玩家
-- ActionSpace：ActionDefinition + 空间资源 + 占用者
-- ActionExecutionContext：state / player / space
+- `server/game-session.ts`
+  - 持有唯一权威 `GameState` + `Engine` 实例。
+  - 暴露命令式方法：`takeAction`、`resolveChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`。
+  - 所有游戏逻辑（引擎推进、Hook 触发、回合结算、收获流程）均在后端执行。
 
-核心定义参考：
-- [types.ts](../src/game/types.ts)
+### 3.2 HTTP API（game-router）
 
-## 主要工作流程时序图
+- `server/game-router.ts`
+  - `GET /api/game/state` — 获取完整状态快照
+  - `POST /api/game/action` — 放置工人
+  - `POST /api/game/choice` — 解决选择分支
+  - `POST /api/game/reorg` — 确认动物重整
+  - `POST /api/game/feed` — 确认收获喂食
+  - `POST /api/game/next-player` — 确认下一玩家
+  - `POST /api/game/round-end` — 回合结束
+  - `POST /api/game/new` — 新游戏
+  - 统一响应：`{ ok, state, pending, scores?, error? }`
 
-```
-UI → Engine.proceed
-  → EngineTree.getNextNode
-  → HookDispatcher.before
-  → ActionNode.execute
-  → HookDispatcher.during
-  → ChoiceNode? (等待输入)
-  → HookDispatcher.immediatelyAfter
-  → Log/Snapshot
-  → HookDispatcher.after
-  → EngineTree.proceed
-```
+### 3.3 WebSocket 多人（room-manager）
 
-## 关键算法伪代码
+- `server/room-manager.ts`
+  - 客户端发送：`createRoom` / `joinRoom` / `action` / `choice` / `reorg` / `feed` / `nextPlayer` / `roundEnd`
+  - 服务端广播：`stateUpdate` / `gameStarted` / `playerDisconnected`
+  - 每个房间持有独立 `GameSession`。
 
-### Engine 推进
+### 3.4 共享引擎层
 
-```
-function proceed():
-  node = tree.nextUnresolved()
-  if node == null:
-    confirmTurn()
-    return
-  if !node.isDoable(ctx):
-    markBlocked(node)
-    return
-  dispatchHooks(before)
-  result = node.execute(ctx)
-  dispatchHooks(during)
-  if result.type == 'choice':
-    savePendingChoice(result)
-    dispatchHooks(computeArgs)
-    return
-  dispatchHooks(immediatelyAfter)
-  appendLog()
-  dispatchHooks(after)
-  tree.resolve(node)
-  proceed()
-```
+- `shared/engine/*`：节点树推进、flow 构建、snapshot/restore。
+- `shared/actions/*`：行动定义、Hook 分发、原子效果、卡牌目录。
+- `shared/logic/*`：状态管理、回合/收获、计分。
 
-### Flow 构建
+### 3.5 前端 UI 层
 
-```
-function buildFlowNode(flow):
-  if flow.type == 'leaf':
-    return ActionNode(flow.actionId)
-  children = flow.children.map(buildFlowNode)
-  if flow.type == 'seq':
-    return SequenceNode(children)
-  if flow.type == 'parallel':
-    return ParallelNode(children)
-  if flow.type == 'xor':
-    return XorNode(children)
-  return OrNode(children)
+- `src/app/GameContainerApi.tsx`：API 驱动容器（默认模式），通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
+- `src/app/GameContainer.tsx`：本地引擎模式（`?mode=local` 切换），保留作为 fallback。
+- `src/components/*`：纯渲染组件，不包含游戏逻辑。
+
+## 4. 运行流程
+
+### 4.1 API 模式
+
+```text
+用户点击行动格
+  → useGameApi.takeAction(playerIndex, spaceId)
+  → POST /api/game/action
+  → GameSession.takeAction() 执行引擎
+  → 返回 { state, pending }
+  → useGameSync.applyResponse() 更新 React 状态
+  → UI 重新渲染
 ```
 
-### Hook 过滤与排序
+### 4.2 WebSocket 多人模式
 
-```
-function runHooks(context):
-  candidates = hooks.filter(h => match(actionId, phase))
-  ordered = sortBy(order, id)
-  for each hook in ordered:
-    hook.handle(context)
-```
-
-### Replace 与 Doable
-
-```
-function applyComputeReplace():
-  for each hook in orderedHooks:
-    if hook returns actionId:
-      actionId = result.actionId
-  return actionId
-
-function applyIsDoable(initial):
-  doable = initial
-  for each hook in orderedHooks:
-    if hook returns doable:
-      doable = result.doable
-  return doable
+```text
+玩家A点击行动格
+  → ws.send({ type: 'action', spaceId })
+  → RoomManager → GameSession.takeAction()
+  → 广播 stateUpdate 给所有玩家
+  → 玩家A/B 同时收到新状态并渲染
 ```
 
-## 模块化设计与接入点
+## 5. 测试覆盖
 
-- 行动注册与空间构建：[actions/index.ts](../src/actions/index.ts)
-- Hook 架构入口：[hooks.ts](../src/actions/hooks.ts)
-- 引擎推进核心：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts)
-- 回合与收获核心：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
-- 动物重整核心：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts)
-- 执行编排与 UI 交互：[GameContainer.tsx](../src/app/GameContainer.tsx)
-- 持久化与还原：App.tsx 内的 persist/normalize 逻辑
+- `shared/engine/__tests__/*`：引擎推进与链式插入
+- `shared/actions/__tests__/*`：Hook 矩阵、围栏、畜栏、动物
+- `shared/logic/__tests__/*`：计分、收获、状态克隆
+- `src/app/__tests__/*`：编排核心
+- `server/__tests__/*`：后端校验
 
-## 性能指标与约束条件
+## 6. 运行方式
 
-- 单次行动执行：O(H + R)（H 为匹配 Hook 数量，R 为资源变更数量）
-- EngineTree 查找下一节点：目标 O(1)~O(logN)
-- 日志与快照：每回合最多 1 个快照，行动日志线性增长
-- 并行节点：默认以小规模分支为前提，避免指数级状态膨胀
-- 目标：本地单局 14 回合内无明显卡顿（<16ms 关键交互）
-
-## 边界说明
-
-- 已接入并实现大量 A/B/C/D/E 卡牌数据与部分效果，覆盖范围持续扩展
-- 不追求完整复刻 BGA PHP Engine 内部结构，但保持 action/hook/listener 的可演进接口
-
-## 与现有架构的兼容性
-
-- ActionDefinition 与 ActionSpace 保持现有定义
-- HookDispatcher 复用 actions/hooks.ts
-- App.tsx 仍作为前端编排入口，Engine 作为抽象层补齐执行链路
-- Scoring 由 UI 直接基于 GameState 计算，游戏结束与手动入口弹出计分板
+- 前端（API 模式）：`npm run dev` → `http://localhost:5173/`
+- 前端（本地模式）：`http://localhost:5173/?mode=local`
+- 后端：`npm run server` → HTTP `http://localhost:5175/` + WS `ws://localhost:5175/ws`

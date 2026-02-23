@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { FarmTilePosition } from '../game/types'
+import type { FarmTilePosition } from '../../shared/game/types'
 
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])

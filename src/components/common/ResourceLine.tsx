@@ -1,7 +1,7 @@
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
-import type { Resource } from '../../game/types'
-import { resourceKeyList } from '../../logic/state'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import type { Resource } from '../../../shared/game/types'
+import { resourceKeyList } from '../../../shared/logic/state'
 
 type Props = {
   locale: Locale

@@ -1,4 +1,4 @@
-import type { FarmTilePosition, GameState, Resource } from '../game/types'
+import type { FarmTilePosition, GameState, Resource } from '../../shared/game/types'
 
 const apiBase = 'http://localhost:5175'
 

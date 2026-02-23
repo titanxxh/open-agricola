@@ -1,5 +1,5 @@
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
 import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 
 type Props = {

@@ -1,6 +1,6 @@
-import type { GameState, PlayerState } from '../../game/types'
-import { applyFutureMeeples, applyRoundGrowth, createRoundSnapshot } from '../../logic/state'
-import { applyMajorEffectsToAllPlayers } from '../../actions/cards/major'
+import type { GameState, PlayerState } from '../../../shared/game/types'
+import { applyFutureMeeples, applyRoundGrowth, createRoundSnapshot } from '../../../shared/logic/state'
+import { applyMajorEffectsToAllPlayers } from '../../../shared/actions/cards/major'
 
 export const applyReturnHomePhase = (nextState: GameState) => {
   nextState.players.forEach((player) => {

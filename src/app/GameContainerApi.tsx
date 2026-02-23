@@ -1,0 +1,417 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
+import { t } from '../../shared/i18n'
+import type { Locale } from '../../shared/i18n'
+import type { AnimalReorgState } from '../types/ui'
+import { FARM_COLS, FARM_ROWS, positionKey } from '../../shared/game/farm'
+import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
+import { getBuildRoomCost } from '../../shared/actions/effects/house'
+import { stableWoodCost } from '../../shared/actions/effects/fencing'
+import { computeScores } from '../../shared/logic/scoring'
+import {
+  baseActionOrder,
+  createRoundOpenById,
+  isActionForPlayerCount,
+  roundStageSlots,
+} from '../../shared/logic/state'
+import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
+import { useGameSync } from '../hooks/useGameSync'
+import { useFarmSelection } from '../hooks/useFarmSelection'
+import { ActionBoard } from '../components/board/ActionBoard'
+import { FarmBoard } from '../components/board/FarmBoard'
+import { LogPanel } from '../components/board/LogPanel'
+import { MajorImprovements } from '../components/board/MajorImprovements'
+import { ScoringPad } from '../components/board/ScoringPad'
+import { GameControls } from '../components/controls/GameControls'
+import { GameHeader } from '../components/header/GameHeader'
+import { InteractionBar } from '../components/interaction/InteractionBar'
+import { AnytimeBar } from '../components/interaction/AnytimeBar'
+import {
+  validateFence,
+  validateRoom,
+  validateStable,
+  validatePlow,
+  validateSow,
+} from '../services/api'
+
+type RoundSlot = { round: number; action?: ActionSpace }
+
+export const GameContainerApi = () => {
+  const api = useGameApi()
+  const { state, pending, applyResponse } = useGameSync()
+  const [locale, setLocale] = useState<Locale>('zh')
+  const [viewPlayerId, setViewPlayerId] = useState<string | null>(null)
+  const [showScoringPad, setShowScoringPad] = useState(false)
+  const [devMode, setDevMode] = useState(false)
+  const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
+  const {
+    pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
+    pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
+    pendingStableTiles, setPendingStableTiles, stableError, setStableError,
+    pendingPlowTile, setPendingPlowTile, plowError, setPlowError,
+    pendingSowSelections, setPendingSowSelections, sowError, setSowError,
+    toggleFenceEdge,
+    toggleRoomTile: toggleRoomTileInternal,
+    toggleStableTile: toggleStableTileInternal,
+    togglePlowTile: togglePlowTileInternal,
+    updateSowSelection: updateSowSelectionInternal,
+  } = useFarmSelection()
+
+  useEffect(() => {
+    api.fetchState().then(applyResponse).catch(() => {})
+  }, [])
+
+  const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
+    try {
+      const resp = await promise
+      applyResponse(resp)
+      if (resp.pending.type === 'animalReorg' && resp.state) {
+        const player = resp.state.players[resp.pending.playerIndex]
+        if (player) {
+          const stableKeys = getLooseStableKeys(player)
+          setAnimalReorg({
+            zones: [
+              ...player.pastures.map((p) => ({
+                id: p.id, zoneType: 'pasture' as const,
+                animalType: p.animalType, animalCount: p.animalCount,
+              })),
+              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
+              ...stableKeys.map((key) => ({
+                id: `stable:${key}`, zoneType: 'stable' as const,
+                animalType: player.stableAnimals?.[key] ?? null,
+                animalCount: player.stableAnimals?.[key] ? 1 : 0,
+              })),
+            ],
+            confirmDiscard: false,
+          })
+        }
+      } else if (resp.pending.type !== 'choice') {
+        setAnimalReorg(null)
+      }
+      if (resp.pending.type === 'choice') {
+        setPendingFenceEdges([])
+        setFenceError(null)
+        setPendingRoomTiles([])
+        setRoomError(null)
+        setPendingStableTiles([])
+        setStableError(null)
+        setPendingPlowTile(null)
+        setPlowError(null)
+        setPendingSowSelections({})
+        setSowError(null)
+      }
+    } catch (err) {
+      console.error('API error', err)
+    }
+  }, [applyResponse, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
+
+  if (!state) return <div className="app">Loading...</div>
+
+  const currentPlayer = state.players[state.currentPlayerIndex]!
+  const viewedPlayer = state.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
+  const displayPlayer = viewPlayerId ? viewedPlayer : currentPlayer
+
+  const takeAction = (space: ActionSpace) => { void applyAndSync(api.takeAction(state.currentPlayerIndex, space.id)) }
+
+  const resolveChoice = (value: string) => {
+    if (pending.type !== 'choice') return
+    const promptKey = pending.promptKey
+    if (promptKey === 'ui.interactionFenceSelect') {
+      void validateFence(currentPlayer.id, pendingFenceEdges, 0).then((result) => {
+        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+        else setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+      })
+      return
+    }
+    if (promptKey === 'ui.interactionRoomSelect') {
+      const cost = getBuildRoomCost(currentPlayer.houseType)
+      void validateRoom(currentPlayer.id, pendingRoomTiles, cost).then((result) => {
+        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+        else setRoomError(result.error ?? 'validation failed')
+      })
+      return
+    }
+    if (promptKey === 'ui.interactionStableSelect') {
+      void validateStable(currentPlayer.id, pendingStableTiles).then((result) => {
+        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+        else setStableError(result.error ?? 'validation failed')
+      })
+      return
+    }
+    if (promptKey === 'ui.interactionPlowSelect' && pendingPlowTile) {
+      void validatePlow(currentPlayer.id, pendingPlowTile).then((result) => {
+        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+        else setPlowError(result.error ?? 'validation failed')
+      })
+      return
+    }
+    if (promptKey === 'ui.interactionSowSelect') {
+      const crops = Object.entries(pendingSowSelections).map(([key, crop]) => {
+        const [r, c] = key.split(',').map(Number)
+        return { row: r ?? 0, col: c ?? 0, crop }
+      })
+      void validateSow(currentPlayer.id, crops).then((result) => {
+        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+        else setSowError(result.error ?? 'validation failed')
+      })
+      return
+    }
+    void applyAndSync(api.resolveChoice(pending.playerIndex, value))
+  }
+
+  const confirmNextPlayer = () => { void applyAndSync(api.confirmNextPlayer()) }
+  const endRound = () => { void applyAndSync(api.performRoundEnd()) }
+  const confirmHarvestFeed = () => {
+    if (pending.type !== 'harvestFeed') return
+    void applyAndSync(api.confirmFeed(pending.playerIndex, []))
+  }
+  const confirmAnimalReorg = () => {
+    if (pending.type !== 'animalReorg' || !animalReorg) return
+    void applyAndSync(api.confirmReorg(pending.playerIndex, animalReorg.zones))
+  }
+  const resetGame = () => { void applyAndSync(api.newGame()) }
+
+  const pendingChoice = pending.type === 'choice' ? {
+    promptKey: pending.promptKey, options: pending.options,
+    playerIndex: pending.playerIndex, spaceId: pending.spaceId,
+  } : null
+  const pendingNextPlayerIndex = pending.type === 'confirmNextPlayer' ? pending.nextPlayerIndex : null
+  const pendingAnimalReorg = pending.type === 'animalReorg' ? { playerIndex: pending.playerIndex, spaceId: pending.spaceId } : null
+  const harvestPending = pending.type === 'harvestFeed' ? {
+    playerIndex: pending.playerIndex,
+    playerName: state.players[pending.playerIndex]?.name ?? '',
+    remaining: pending.remaining, foodUsed: 0,
+  } : null
+  const allWorkersUsed = state.players.every((p) => p.workersAvailable <= 0)
+
+  const roundOpenById = useMemo(() => createRoundOpenById(state.roundActionOrder), [state.roundActionOrder])
+  const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
+    if (space.takenBy) return false
+    if (!isActionForPlayerCount(space, state.players.length)) return false
+    const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
+    if (state.round < openRound) return false
+    if (currentPlayer.workersAvailable <= 0) return false
+    if (state.gameOver) return false
+    if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || harvestPending) return false
+    return true
+  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, harvestPending])
+
+  const baseActions = useMemo(() => state.actionSpaces.filter((s) => baseActionOrder.includes(s.id)), [state.actionSpaces])
+  const roundSlots: RoundSlot[] = useMemo(() => {
+    const nonBase = state.actionSpaces.filter((s) => !baseActionOrder.includes(s.id))
+    let offset = 0
+    const slots: RoundSlot[] = []
+    roundStageSlots.forEach(({ stage: _stage, count }) => {
+      for (let i = 0; i < count; i++) {
+        const action = nonBase[offset + i]
+        slots.push({ round: offset + i + 1, action })
+      }
+      offset += count
+    })
+    return slots
+  }, [state.actionSpaces])
+
+  const scoreSummaries = useMemo(() => computeScores(state), [state])
+
+  const playedCards = displayPlayer.playedCards ?? [
+    ...displayPlayer.improvements.map((id: string) => `major:${id}`),
+    ...displayPlayer.minorPlayed.map((id: string) => `minor:${id}`),
+    ...displayPlayer.occupationPlayed.map((id: string) => `occupation:${id}`),
+  ]
+
+  const isSelectingFences = pendingChoice?.promptKey === 'ui.interactionFenceSelect'
+  const isSelectingStables = pendingChoice?.promptKey === 'ui.interactionStableSelect'
+  const isSelectingRooms = pendingChoice?.promptKey === 'ui.interactionRoomSelect'
+  const isSelectingPlow = pendingChoice?.promptKey === 'ui.interactionPlowSelect'
+  const isSelectingSow = pendingChoice?.promptKey === 'ui.interactionSowSelect'
+  const isSelectingMinor = pendingChoice?.promptKey === 'ui.interactionChooseMinorImprovement' || pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
+  const isSelectingOccupation = pendingChoice?.promptKey === 'ui.interactionChooseOccupation'
+  const isSelectingImprovementAny = pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
+
+  const roomPositions = useMemo(() => new Set(displayPlayer.roomTiles.map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer.roomTiles])
+  const fieldPositions = useMemo(() => new Set(displayPlayer.fields.map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer.fields])
+  const fieldMap = useMemo(() => {
+    const map = new Map<string, { crop: 'grain' | 'vegetable' | null; remaining: number }>()
+    displayPlayer.fields.forEach((f) => { map.set(positionKey({ row: f.row, col: f.col }), { crop: f.crop, remaining: f.remaining }) })
+    return map
+  }, [displayPlayer.fields])
+  const stablePositions = useMemo(() => new Set(displayPlayer.stableTiles.map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer.stableTiles])
+  const existingFenceSet = useMemo(() => new Set(displayPlayer.fenceSegments ?? []), [displayPlayer.fenceSegments])
+  const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
+
+  const maxRoomSelections = useMemo(() => {
+    const cost = getBuildRoomCost(displayPlayer.houseType)
+    const resourceMax = Object.entries(cost).reduce((max, [key, value]) => {
+      if (typeof value !== 'number' || value <= 0) return max
+      const available = displayPlayer.resources[key as keyof Resource] ?? 0
+      return Math.min(max, Math.floor(available / value))
+    }, Number.POSITIVE_INFINITY)
+    const openTiles = FARM_ROWS * FARM_COLS - roomPositions.size - fieldPositions.size - stablePositions.size
+    return Math.min(resourceMax, openTiles)
+  }, [displayPlayer, roomPositions, fieldPositions, stablePositions])
+
+  const maxStableSelections = useMemo(() => Math.max(0, Math.floor((displayPlayer.resources.wood ?? 0) / stableWoodCost)), [displayPlayer.resources.wood])
+  const sowSelectedCount = Object.keys(pendingSowSelections).length
+  const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
+  const roomErrorText: string | null = roomError ? (typeof roomError === 'string' ? roomError : '') : null
+  const stableErrorText: string | null = stableError ? (typeof stableError === 'string' ? stableError : '') : null
+  const plowErrorText: string | null = plowError ? (typeof plowError === 'string' ? plowError : '') : null
+  const sowErrorText: string | null = sowError ? (typeof sowError === 'string' ? sowError : '') : null
+  const farmCells = useMemo(() => {
+    const rows = 7; const cols = 11
+    const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const isTile = row % 2 === 1 && col % 2 === 1
+      const isPost = row % 2 === 0 && col % 2 === 0
+      const isFenceH = row % 2 === 0 && col % 2 === 1
+      const isFenceV = row % 2 === 1 && col % 2 === 0
+      cells.push({
+        key: `${row}-${col}`, type: isTile ? 'tile' : isPost ? 'post' : isFenceH ? 'fence-h' : 'fence-v',
+        tileRow: isTile ? (row - 1) / 2 : undefined, tileCol: isTile ? (col - 1) / 2 : undefined,
+        fenceId: isFenceH ? `H-${row / 2}-${(col - 1) / 2}` : isFenceV ? `V-${(row - 1) / 2}-${col / 2}` : undefined,
+      })
+    }
+    return cells
+  }, [])
+
+  const pastureTiles = useMemo(() => {
+    const map = new Map<string, { pastureId: string; isCorner: boolean }>()
+    displayPlayer.pastures.forEach((pasture) => {
+      if (!pasture.tiles || pasture.tiles.length === 0) return
+      let corner = pasture.tiles[0]
+      pasture.tiles.forEach((tile) => {
+        if (tile.row > corner.row || (tile.row === corner.row && tile.col > corner.col)) corner = tile
+      })
+      const cornerKey = positionKey(corner)
+      pasture.tiles.forEach((tile) => {
+        map.set(positionKey(tile), { pastureId: pasture.id, isCorner: positionKey(tile) === cornerKey })
+      })
+    })
+    return map
+  }, [displayPlayer.pastures])
+  const pastureDisplayMap = useMemo(() => {
+    const map = new Map<string, { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }>()
+    displayPlayer.pastures.forEach((p) => { if (p.tiles.length > 0) map.set(positionKey(p.tiles[0]), { animalType: p.animalType, animalCount: p.animalCount }) })
+    return map
+  }, [displayPlayer.pastures])
+  const pastureCapacityMap = useMemo(() => {
+    const map = new Map<string, number>()
+    displayPlayer.pastures.forEach((p) => { if (p.tiles.length > 0) map.set(positionKey(p.tiles[0]), getPastureCapacity(p)) })
+    return map
+  }, [displayPlayer.pastures])
+  const houseDisplay = useMemo(() => ({ animalType: displayPlayer.houseAnimalType as 'sheep' | 'boar' | 'cattle' | null, animalCount: displayPlayer.houseAnimalCount }), [displayPlayer.houseAnimalType, displayPlayer.houseAnimalCount])
+  const stableDisplayMap = useMemo(() => {
+    const map = new Map<string, { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }>()
+    Object.entries(displayPlayer.stableAnimals ?? {}).forEach(([key, type]) => { map.set(key, { animalType: type as 'sheep' | 'boar' | 'cattle' | null, animalCount: type ? 1 : 0 }) })
+    return map
+  }, [displayPlayer.stableAnimals])
+
+  const isReorgActive = !!animalReorg
+  const reorgAvailable = useMemo(() => {
+    if (!animalReorg || !pendingAnimalReorg) return null
+    const player = state.players[pendingAnimalReorg.playerIndex]
+    return player ? { sheep: player.resources.sheep, boar: player.resources.boar, cattle: player.resources.cattle } : null
+  }, [animalReorg, pendingAnimalReorg, state.players])
+  const reorgTotals = useMemo(() => {
+    if (!animalReorg) return { sheep: 0, boar: 0, cattle: 0 }
+    return animalReorg.zones.reduce((acc, z) => { if (z.animalType) acc[z.animalType] += z.animalCount; return acc }, { sheep: 0, boar: 0, cattle: 0 })
+  }, [animalReorg])
+  void [reorgAvailable, reorgTotals]
+  const hasReorgOverflow = useMemo(() => {
+    if (!reorgAvailable) return false
+    return reorgTotals.sheep > reorgAvailable.sheep || reorgTotals.boar > reorgAvailable.boar || reorgTotals.cattle > reorgAvailable.cattle
+  }, [reorgAvailable, reorgTotals])
+  const reorgRemaining = reorgAvailable ? {
+    sheep: Math.max(0, reorgAvailable.sheep - reorgTotals.sheep),
+    boar: Math.max(0, reorgAvailable.boar - reorgTotals.boar),
+    cattle: Math.max(0, reorgAvailable.cattle - reorgTotals.cattle),
+  } : null
+  const hasAnytimeReorg = currentPlayer.pastures.length > 0 || Object.keys(currentPlayer.stableAnimals ?? {}).length > 0
+  const openAnytimeReorg = () => {
+    const stKeys = getLooseStableKeys(currentPlayer)
+    setAnimalReorg({ zones: [
+      ...currentPlayer.pastures.map((p) => ({ id: p.id, zoneType: 'pasture' as const, animalType: p.animalType, animalCount: p.animalCount })),
+      { id: 'house', zoneType: 'house' as const, animalType: currentPlayer.houseAnimalType ?? null, animalCount: currentPlayer.houseAnimalCount ?? 0 },
+      ...stKeys.map((key) => ({ id: `stable:${key}`, zoneType: 'stable' as const, animalType: currentPlayer.stableAnimals?.[key] ?? null, animalCount: currentPlayer.stableAnimals?.[key] ? 1 : 0 })),
+    ], confirmDiscard: false })
+  }
+  const wrappedToggleRoom = (tile: FarmTilePosition) => toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
+  const wrappedToggleStable = (tile: FarmTilePosition) => toggleStableTileInternal(tile, maxStableSelections, positionKey)
+  const wrappedTogglePlow = (tile: FarmTilePosition) => togglePlowTileInternal(tile, positionKey)
+  const wrappedUpdateSow = (tile: FarmTilePosition, value: string) => updateSowSelectionInternal(tile, value, positionKey)
+  const adjustReorgAnimal = (_zoneId: string, _animalType: 'sheep' | 'boar' | 'cattle', _delta: number) => { void _zoneId; void _animalType; void _delta }
+  const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
+  const plowSelectableSet = useMemo(() => {
+    const set = new Set<string>()
+    if (!isSelectingPlow) return set
+    for (let row = 0; row < FARM_ROWS; row++) for (let col = 0; col < FARM_COLS; col++) {
+      const key = positionKey({ row, col })
+      if (!roomPositions.has(key) && !fieldPositions.has(key) && !stablePositions.has(key)) set.add(key)
+    }
+    return set
+  }, [isSelectingPlow, roomPositions, fieldPositions, stablePositions])
+  const sowRemaining = useMemo(() => ({
+    grain: Math.max(0, displayPlayer.resources.grain - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
+    vegetable: Math.max(0, displayPlayer.resources.vegetable - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),
+  }), [displayPlayer.resources, pendingSowSelections])
+  const futureCardResources = useMemo(() => {
+    const rec: Record<string, { playerId: string; name: string; color: 'red' | 'yellow' | 'blue' | 'black'; resources: Partial<Resource> }[]> = {}
+    state.futureMeeples.forEach((fm) => {
+      if (fm.round > state.round) {
+        const key = fm.actionId ?? fm.cardId
+        if (!rec[key]) rec[key] = []
+        const player = state.players.find((p) => p.id === fm.playerId)
+        rec[key].push({ playerId: fm.playerId, name: player?.name ?? '', color: (player?.color ?? 'red') as 'red' | 'yellow' | 'blue' | 'black', resources: fm.resources })
+      }
+    })
+    return rec
+  }, [state.futureMeeples, state.round, state.players])
+
+  return (
+    <div className="app">
+      <InteractionBar
+        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
+        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
+        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
+        pendingSowSelectionsLength={sowSelectedCount}
+        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
+        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
+        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
+        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
+        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
+        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
+      />
+      {showScoringPad ? <ScoringPad locale={locale} scores={scoreSummaries} onClose={() => setShowScoringPad(false)} /> : null}
+      <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} />
+      <GameControls locale={locale} onUndo={() => {}} onUndoAction={() => {}} onUndoRound={() => {}} onEndRound={endRound} onResetGame={resetGame} onShowScoring={() => setShowScoringPad(true)} historyLength={0} hasActionStartSnapshot={false} allWorkersUsed={allWorkersUsed} isGameOver={state.gameOver} devMode={devMode} seedValue="" onSeedChange={() => {}} />
+      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} />
+      <main className="board">
+        <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+        <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
+          currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+          nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+          playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+          fieldMap={fieldMap} stablePositions={stablePositions}
+          pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
+          pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+          canSelectRooms={isSelectingRooms} canSelectStables={isSelectingStables} canSelectPlow={isSelectingPlow} canSelectSow={isSelectingSow}
+          maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
+          pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} pastureTiles={pastureTiles}
+          pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
+          stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+          hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+          existingFenceSet={existingFenceSet} canSelectFences={isSelectingFences}
+          toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+          togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
+          toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+          confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+          setViewPlayerId={setViewPlayerId} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+          isSelectingImprovementAny={isSelectingImprovementAny} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+        />
+      </main>
+      <LogPanel locale={locale} log={state.log} />
+    </div>
+  )
+}

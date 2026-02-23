@@ -1,10 +1,10 @@
-import type { Locale } from '../../i18n'
-import { t } from '../../i18n'
-import type { PlayerState, Resource } from '../../game/types'
-import { formatResources } from '../../logic/format'
-import { getMajorCardEffect } from '../../actions/cards/major'
-import { emptyResources } from '../../logic/state'
-import { canPayResources } from '../../actions/effects/pay'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import type { PlayerState, Resource } from '../../../shared/game/types'
+import { formatResources } from '../../../shared/logic/format'
+import { getMajorCardEffect } from '../../../shared/actions/cards/major'
+import { emptyResources } from '../../../shared/logic/state'
+import { canPayResources } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
 
 type Props = {

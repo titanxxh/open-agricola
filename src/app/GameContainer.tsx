@@ -6,14 +6,14 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../game/types'
-import { t } from '../i18n'
+} from '../../shared/game/types'
+import { t } from '../../shared/i18n'
 import type { AnimalReorgState, HistorySnapshot } from '../types/ui'
-import { FARM_COLS, FARM_ROWS, getAllTilePositions, positionKey } from '../game/farm'
-import { getLooseStableKeys, getPastureCapacity } from '../actions/effects/animals'
-import { getBuildRoomCost } from '../actions/effects/house'
-import { stableWoodCost } from '../actions/effects/fencing'
-import { applyMajorEffectsToAllPlayers } from '../actions/cards/major'
+import { FARM_COLS, FARM_ROWS, getAllTilePositions, positionKey } from '../../shared/game/farm'
+import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
+import { getBuildRoomCost } from '../../shared/actions/effects/house'
+import { stableWoodCost } from '../../shared/actions/effects/fencing'
+import { applyMajorEffectsToAllPlayers } from '../../shared/actions/cards/major'
 import { useActionEngine } from '../hooks/useActionEngine'
 import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'
@@ -28,10 +28,10 @@ import {
   isActionForPlayerCount,
   normalizeState,
   resourceKeyList,
-} from '../logic/state'
-import { computeFencedRegions } from '../logic/farm'
-import { formatResources } from '../logic/format'
-import type { HarvestSummary } from '../logic/round'
+} from '../../shared/logic/state'
+import { computeFencedRegions } from '../../shared/logic/farm'
+import { formatResources } from '../../shared/logic/format'
+import type { HarvestSummary } from '../../shared/logic/round'
 import {
   addResource,
   persistGame,
@@ -52,10 +52,10 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ResourceLine } from '../components/common/ResourceLine'
-import { computeScores } from '../logic/scoring'
-import { majorImprovementIds } from '../game/major-improvements'
-import { minorImprovementIds } from '../game/minor-improvements'
-import { occupationIds } from '../game/occupations'
+import { computeScores } from '../../shared/logic/scoring'
+import { majorImprovementIds } from '../../shared/game/major-improvements'
+import { minorImprovementIds } from '../../shared/game/minor-improvements'
+import { occupationIds } from '../../shared/game/occupations'
 import { runEngineStepsCore } from './hooks/use-engine-flow'
 import {
   applyAnimalReorgToPlayer,

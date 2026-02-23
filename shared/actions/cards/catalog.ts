@@ -84,6 +84,7 @@ import { C13_WoodSlideHammer } from './C/C13_WoodSlideHammer'
 import { C130_OutskirtsDirector } from './C/C130_OutskirtsDirector'
 import { C133_Soldier } from './C/C133_Soldier'
 import { C135_Constable } from './C/C135_Constable'
+import { C144_ReedRoofRenovator } from './C/C144_ReedRoofRenovator'
 import { C142_MarketCrier } from './C/C142_MarketCrier'
 import { C148_MudWallower } from './C/C148_MudWallower'
 import { C156_HoofCaregiver } from './C/C156_HoofCaregiver'
@@ -100,6 +101,7 @@ import { C29_BeerTable } from './C/C29_BeerTable'
 import { C31_WritingChamber } from './C/C31_WritingChamber'
 import { C37_DwellingMound } from './C/C37_DwellingMound'
 import { C51_FishingNet } from './C/C51_FishingNet'
+import { C52_HuntsmansHat } from './C/C52_HuntsmansHat'
 import { C57_Crudite } from './C/C57_Crudite'
 import { C63_CraftBrewery } from './C/C63_CraftBrewery'
 import { C71_Slurry } from './C/C71_Slurry'
@@ -265,6 +267,7 @@ export const minorImprovementCards = [
   C31_WritingChamber,
   C37_DwellingMound,
   C51_FishingNet,
+  C52_HuntsmansHat,
   C57_Crudite,
   C63_CraftBrewery,
   C71_Slurry,
@@ -357,6 +360,7 @@ export const occupationCards = [
   C133_Soldier,
   C135_Constable,
   C142_MarketCrier,
+  C144_ReedRoofRenovator,
   C148_MudWallower,
   C156_HoofCaregiver,
   C162_ForestOwner,
