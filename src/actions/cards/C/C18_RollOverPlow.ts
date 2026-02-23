@@ -7,5 +7,5 @@ export const C18_RollOverPlow = new MinorImprovement({
   number: 18,
   category: "FARM_PLANNER",
   desc: ["At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field."],
-  cost: {},
+  cost: {"wood":2},
 })

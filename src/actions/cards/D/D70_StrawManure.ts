@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 
 export const D70_StrawManure = new MinorImprovement({
   id: "D70_StrawManure",
-  name: "D70_StrawManure",
+  name: "Straw Manure",
   deck: "D",
   number: 70,
   category: "CROP_PROVIDER",

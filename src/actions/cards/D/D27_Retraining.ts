@@ -6,8 +6,8 @@ export const D27_Retraining = new MinorImprovement({
   deck: "D",
   number: 27,
   category: "ACTIONS_BOOSTER",
-  desc: [],
-  cost: {},
+  desc: ["At the end of each turn in which you renovate, you can exchange your __Joinery__ for the __Pottery__ or your __Pottery__ for the __Basketmaker\\"],
+  cost: {"food":1},
   prerequisite: "1 Occupation",
   occupationPrerequisites: {"min":1},
 })

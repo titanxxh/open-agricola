@@ -7,5 +7,5 @@ export const A28_ForestSchool = new MinorImprovement({
   number: 28,
   category: "ACTIONS_BOOSTER",
   desc: ["You can consider the __Lessons__ action spaces not occupied. You can replace each <FOOD> that an occupation costs with <WOOD>."],
-  cost: {},
+  cost: {"wood":1,"clay":1},
 })

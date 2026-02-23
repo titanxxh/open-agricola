@@ -7,7 +7,7 @@ export const B75_WoodWorkshop = new MinorImprovement({
   number: 75,
   category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["Each time before you play or build an improvement, you get 1 <WOOD>."],
-  cost: {},
+  cost: {"clay":1},
   prerequisite: "1 Occupation",
   occupationPrerequisites: {"min":1},
 })
