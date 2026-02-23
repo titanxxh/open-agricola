@@ -59,6 +59,7 @@ import { occupationIds } from '../game/occupations'
 import { runEngineStepsCore } from './hooks/use-engine-flow'
 import {
   applyAnimalReorgToPlayer,
+  buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
 } from './hooks/use-animal-reorg-flow'
 import {
@@ -2799,28 +2800,42 @@ export const GameContainer = () => {
     })
     setPendingAnimalReorg(null)
     setAnimalReorg(null)
-    if (reorgSource === 'anytime-reorg') {
+    const plan = buildPostReorgPlan({
+      reorgSource,
+      nextState,
+      spaceId: pendingAnimalReorg.spaceId,
+      hasPendingAnimals,
+    })
+    if (plan.type === 'anytime') {
       updateState(nextState)
       void persistGame(nextState)
       return
     }
-    if (reorgSource === 'harvest-breed') {
-      const nextPendingIndex = nextState.players.findIndex((player) =>
-        hasPendingAnimals(player),
-      )
-      if (nextPendingIndex !== -1) {
-        const nextPendingPlayer = nextState.players[nextPendingIndex]
-        if (nextPendingPlayer) {
-          setPendingHarvestFinalizeState(nextState)
-          setPendingAnimalReorg({ playerIndex: nextPendingIndex, spaceId: 'harvest-breed' })
-          setAnimalReorg(createAnimalReorgState(nextPendingPlayer))
-          setViewPlayerId(nextPendingPlayer.id)
-          updateState(nextState)
-          return
-        }
+    if (plan.type === 'harvestNextPlayer') {
+      const nextPendingPlayer = nextState.players[plan.pendingPlayerIndex]
+      if (nextPendingPlayer) {
+        setPendingHarvestFinalizeState(nextState)
+        setPendingAnimalReorg({
+          playerIndex: plan.pendingPlayerIndex,
+          spaceId: 'harvest-breed',
+        })
+        setAnimalReorg(createAnimalReorgState(nextPendingPlayer))
+        setViewPlayerId(nextPendingPlayer.id)
+        updateState(nextState)
+        return
       }
+    }
+    if (plan.type === 'harvestFinalize') {
       setPendingHarvestFinalizeState(null)
       finalizeRound(nextState)
+      return
+    }
+    if (plan.type !== 'actionSpace') {
+      updateState(nextState)
+      return
+    }
+    if (!plan.hasTargetSpace) {
+      updateState(nextState)
       return
     }
     const targetSpace = nextState.actionSpaces.find(

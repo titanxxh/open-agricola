@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState, Resource } from '../../game/types'
+import type { GameState, PlayerState, Resource } from '../../game/types'
 import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
+  buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
 } from '../hooks/use-animal-reorg-flow'
 
@@ -76,6 +77,33 @@ const animalReorgState = (): AnimalReorgState => ({
   ],
 })
 
+const gameState = (): GameState => ({
+  round: 1,
+  currentPlayerIndex: 0,
+  players: [player(), { ...player(), id: 'p2', name: 'p2', resources: { ...resources(), sheep: 1 } }],
+  actionSpaces: [
+    {
+      id: 'forest',
+      nameKey: 'actions.forest.name',
+      descriptionKey: 'actions.forest.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+      resources: resources(),
+      takenBy: null,
+    },
+  ],
+  log: [],
+  roundStartSnapshot: null,
+  roundActionOrder: Array.from({ length: 14 }).map(() => null),
+  gameSeed: 1,
+  availableMajorImprovements: [],
+  futureMeeples: [],
+  pendingFutureMeeples: [],
+  gameOver: false,
+})
+
 describe('use-animal-reorg-flow helpers', () => {
   it('applies animal assignments with pasture capacity clamp', () => {
     const target = player()
@@ -118,5 +146,31 @@ describe('use-animal-reorg-flow helpers', () => {
     )
     expect(choice.playerIndex).toBe(1)
     expect(choice.fenceExtraWood).toBe(1)
+  })
+
+  it('plans harvest reorg handoff when pending animals remain', () => {
+    const plan = buildPostReorgPlan({
+      reorgSource: 'harvest-breed',
+      nextState: gameState(),
+      spaceId: 'forest',
+      hasPendingAnimals: (candidate) => candidate.id === 'p2',
+    })
+    expect(plan.type).toBe('harvestNextPlayer')
+    if (plan.type === 'harvestNextPlayer') {
+      expect(plan.pendingPlayerIndex).toBe(1)
+    }
+  })
+
+  it('plans action-space branch with target lookup', () => {
+    const plan = buildPostReorgPlan({
+      reorgSource: 'forest',
+      nextState: gameState(),
+      spaceId: 'forest',
+      hasPendingAnimals: () => false,
+    })
+    expect(plan.type).toBe('actionSpace')
+    if (plan.type === 'actionSpace') {
+      expect(plan.hasTargetSpace).toBe(true)
+    }
   })
 })

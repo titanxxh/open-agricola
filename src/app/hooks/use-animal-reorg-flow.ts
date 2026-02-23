@@ -1,5 +1,6 @@
 import type { Pasture, PlayerState } from '../../game/types'
 import type { ActionChoiceOption } from '../../game/types'
+import type { GameState } from '../../game/types'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 
 type AnimalTotals = {
@@ -60,3 +61,32 @@ export const buildPendingChoiceFromReorgProgress = (
     pendingAnimalReorg.spaceId,
   ),
 })
+
+export type PostReorgPlan =
+  | { type: 'anytime' }
+  | { type: 'harvestNextPlayer'; pendingPlayerIndex: number }
+  | { type: 'harvestFinalize' }
+  | { type: 'actionSpace'; hasTargetSpace: boolean }
+
+export const buildPostReorgPlan = (params: {
+  reorgSource: string
+  nextState: GameState
+  spaceId: string
+  hasPendingAnimals: (player: GameState['players'][number]) => boolean
+}): PostReorgPlan => {
+  const { reorgSource, nextState, spaceId, hasPendingAnimals } = params
+  if (reorgSource === 'anytime-reorg') {
+    return { type: 'anytime' }
+  }
+  if (reorgSource === 'harvest-breed') {
+    const pendingPlayerIndex = nextState.players.findIndex((player) =>
+      hasPendingAnimals(player),
+    )
+    if (pendingPlayerIndex !== -1) {
+      return { type: 'harvestNextPlayer', pendingPlayerIndex }
+    }
+    return { type: 'harvestFinalize' }
+  }
+  const hasTargetSpace = nextState.actionSpaces.some((item) => item.id === spaceId)
+  return { type: 'actionSpace', hasTargetSpace }
+}

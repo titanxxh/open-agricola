@@ -46,7 +46,7 @@ Engine
 - EngineFlowCore：引擎推进核心循环（从容器中抽离）
 - RoundFlowCore：回合结束与回合推进核心逻辑
 - HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
-- AnimalReorgFlowCore：动物重整写回与重整后 choice 参数构造
+- AnimalReorgFlowCore：动物重整写回、分支决策 plan 与重整后 choice 参数构造
 - PayloadValidation：后端 API payload 统一校验与错误结构规范
 - FutureMeeples：未来回合资源堆叠与回合开始结算
 - ActionStackView：行动格资源堆叠显示
