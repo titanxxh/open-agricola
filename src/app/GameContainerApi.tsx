@@ -75,7 +75,7 @@ export const GameContainerApi = () => {
   } = useFarmSelection()
 
   useEffect(() => {
-    api.fetchState().then(applyResponse).catch(() => {})
+    api.fetchState().then(applyResponse).catch((e) => { console.error("fetchState failed:", e) })
   }, [])
 
   const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {

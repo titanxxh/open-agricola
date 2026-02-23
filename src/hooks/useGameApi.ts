@@ -54,8 +54,7 @@ export const useGameApi = () => {
     try { return await fn() } finally { inflight.current = false }
   }, [])
 
-  const fetchState = useCallback(() =>
-    guard(() => get('/api/game/state')), [guard])
+  const fetchState = useCallback(() => get('/api/game/state'), [])
 
   const takeAction = useCallback((playerIndex: number, spaceId: string) =>
     guard(() => post('/api/game/action', { playerIndex, spaceId })), [guard])
