@@ -11,17 +11,13 @@ import { t } from '../i18n'
 import type { AnimalReorgState, HistorySnapshot } from '../types/ui'
 import { FARM_COLS, FARM_ROWS, getAllTilePositions, positionKey } from '../game/farm'
 import { getLooseStableKeys, getPastureCapacity } from '../actions/effects/animals'
-import { breedAnimals } from '../actions/effects/breed-animals'
 import { getBuildRoomCost } from '../actions/effects/house'
-import { reap } from '../actions/effects/reap'
 import { stableWoodCost } from '../actions/effects/fencing'
 import { applyMajorEffectsToAllPlayers } from '../actions/cards/major'
 import { useActionEngine } from '../hooks/useActionEngine'
 import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import {
-  applyRoundGrowth,
-  applyFutureMeeples,
   baseActionOrder,
   cloneState,
   createInitialState,
@@ -60,27 +56,27 @@ import { computeScores } from '../logic/scoring'
 import { majorImprovementIds } from '../game/major-improvements'
 import { minorImprovementIds } from '../game/minor-improvements'
 import { occupationIds } from '../game/occupations'
-
-type HarvestFeedPending = {
-  playerIndex: number
-  playerName: string
-  remaining: number
-  foodUsed: number
-}
-
-type HarvestFeedOption = {
-  id: string
-  sourceName: string
-  resourceKey: keyof Resource
-  food: number
-}
-
-type HarvestContext = {
-  round: number
-  reap: HarvestSummary['reap']
-  feed: HarvestSummary['feed']
-  pending: HarvestFeedPending[]
-}
+import { runEngineStepsCore } from './hooks/use-engine-flow'
+import {
+  applyAnimalReorgToPlayer,
+  buildPostReorgPlan,
+  buildReorgEngineProgressPlan,
+} from './hooks/use-animal-reorg-flow'
+import {
+  applyBreedPhase as applyBreedPhaseCore,
+  buildHarvestFeedOptions as buildHarvestFeedOptionsCore,
+  buildHarvestLogEntries as buildHarvestLogEntriesCore,
+  confirmHarvestFeedCore,
+  findPendingAnimalPlayerIndex,
+  type HarvestContext,
+  startHarvestCore,
+} from './hooks/use-harvest-flow'
+import {
+  canPerformRoundEnd,
+  finalizeRoundCore,
+  nextPlayerIndex,
+  prepareRoundEndCore,
+} from './hooks/use-round-flow'
 
 export const GameContainer = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
@@ -97,6 +93,8 @@ export const GameContainer = () => {
   >({})
   const [pendingHarvestFinalizeState, setPendingHarvestFinalizeState] =
     useState<GameState | null>(null)
+  const hasPendingHarvestFinalizeState = pendingHarvestFinalizeState !== null
+  void hasPendingHarvestFinalizeState
   const {
     state,
     history,
@@ -962,15 +960,6 @@ export const GameContainer = () => {
     !(harvestContext && harvestContext.pending.length > 0) &&
     canTakeAction(state, space, player, roundOpenById, isActionForPlayerCount)
 
-  const nextPlayerIndex = (players: PlayerState[], startIndex: number) => {
-    const total = players.length
-    for (let offset = 1; offset <= total; offset += 1) {
-      const candidate = (startIndex + offset) % total
-      if (players[candidate].workersAvailable > 0) return candidate
-    }
-    return startIndex
-  }
-
   const logAction = (
     nextState: GameState,
     player: PlayerState,
@@ -1115,78 +1104,18 @@ export const GameContainer = () => {
     | { type: 'done' }
     | { type: 'fail'; logKey: string }
     | { type: 'reorg'; playerIndex: number; spaceId: string } => {
-    while (true) {
-      const beforePlayerStep = JSON.parse(JSON.stringify(player)) as PlayerState
-      const step = engine.proceed({
-        state: nextState,
-        player,
-        space: targetSpace,
-      })
-      if (step.type === 'blocked' || step.type === 'done') {
-        return { type: 'done' }
-      }
-      if (step.type === 'choice') {
-        if (step.choice.options.length === 1) {
-          const autoChoice = step.choice.options[0]
-          const autoResult = engine.resolveChoice(autoChoice.value, {
-            state: nextState,
-            player,
-            space: targetSpace,
-          })
-          if (autoResult.type === 'choice') {
-            return {
-              type: 'choice',
-              choice: autoResult.options,
-              promptKey: autoResult.promptKey,
-            }
-          }
-          if (autoResult.type === 'fail') {
-            return { type: 'fail', logKey: autoResult.logKey }
-          }
-          logAction(nextState, player, targetSpace, beforePlayerStep)
-          const beforeAnimals =
-            beforePlayerStep.resources.sheep +
-            beforePlayerStep.resources.boar +
-            beforePlayerStep.resources.cattle
-          const afterAnimals =
-            player.resources.sheep +
-            player.resources.boar +
-            player.resources.cattle
-          if (afterAnimals > beforeAnimals) {
-            return {
-              type: 'reorg',
-              playerIndex,
-              spaceId: targetSpace.id,
-            }
-          }
-          continue
-        }
-        return {
-          type: 'choice',
-          choice: step.choice.options,
-          promptKey: step.choice.promptKey,
-        }
-      }
-      if (step.type === 'ok' && step.result.type === 'fail') {
-        return { type: 'fail', logKey: step.result.logKey }
-      }
-      logAction(nextState, player, targetSpace, beforePlayerStep)
-      const beforeAnimals =
-        beforePlayerStep.resources.sheep +
-        beforePlayerStep.resources.boar +
-        beforePlayerStep.resources.cattle
-      const afterAnimals =
-        player.resources.sheep +
-        player.resources.boar +
-        player.resources.cattle
-      if (afterAnimals > beforeAnimals) {
-        return {
-          type: 'reorg',
-          playerIndex,
-          spaceId: targetSpace.id,
-        }
-      }
-    }
+    return runEngineStepsCore({
+      engine,
+      nextState,
+      player,
+      targetSpace,
+      playerIndex,
+      logAction,
+      clonePlayer: (snapshotPlayer) =>
+        typeof structuredClone === 'function'
+          ? structuredClone(snapshotPlayer)
+          : (JSON.parse(JSON.stringify(snapshotPlayer)) as PlayerState),
+    })
   }
 
   const filterCultivationOptions = (
@@ -2314,169 +2243,23 @@ export const GameContainer = () => {
     context: HarvestContext,
     breedSummary: HarvestSummary['breed'],
     nextState: GameState,
-  ) => {
-    const logEntries: GameState['log'] = []
-    logEntries.push({ key: 'log.harvestPhaseReap' })
-    context.reap.forEach((entry) => {
-      const resources = formatResources(
-        locale,
-        {
-          ...emptyResources,
-          grain: entry.grain,
-          vegetable: entry.vegetable,
-        },
-        true,
-      )
-      if (resources) {
-        logEntries.push({
-          key: 'log.harvestReapDetail',
-          params: { player: entry.player, resources },
-        })
-      }
+  ) =>
+    buildHarvestLogEntriesCore({
+      locale,
+      context,
+      breedSummary,
+      nextState,
     })
-    logEntries.push({ key: 'log.harvestPhaseFeed' })
-    context.feed.forEach((entry) => {
-      entry.conversions.forEach((conversion) => {
-        const costResources = formatResources(
-          locale,
-          {
-            ...emptyResources,
-            [conversion.resourceKey]: conversion.count,
-          },
-          true,
-        )
-        const foodResources = formatResources(
-          locale,
-          {
-            ...emptyResources,
-            food: conversion.food,
-          },
-          true,
-        )
-        if (costResources && foodResources) {
-          logEntries.push({
-            key: 'log.harvestFeedConvert',
-            params: {
-              player: entry.player,
-              source: conversion.sourceName,
-              cost: costResources,
-              food: foodResources,
-            },
-          })
-        }
-      })
-      const resources = formatResources(
-        locale,
-        {
-          ...emptyResources,
-          food: entry.food,
-          grain: entry.grain,
-          vegetable: entry.vegetable,
-          sheep: entry.sheep,
-          boar: entry.boar,
-          cattle: entry.cattle,
-          begging: entry.begging,
-        },
-        true,
-      )
-      if (resources) {
-        logEntries.push({
-          key: 'log.harvestFeedDetail',
-          params: { player: entry.player, resources },
-        })
-      }
-    })
-    logEntries.push({ key: 'log.harvestPhaseBreed' })
-    breedSummary.forEach((entry) => {
-      const resources = formatResources(
-        locale,
-        {
-          ...emptyResources,
-          sheep: entry.sheep,
-          boar: entry.boar,
-          cattle: entry.cattle,
-        },
-        true,
-      )
-      if (resources) {
-        logEntries.push({
-          key: 'log.harvestBreedDetail',
-          params: { player: entry.player, resources },
-        })
-      }
-    })
-    logEntries.push({ key: 'log.harvest', params: { round: context.round } })
-    for (let index = logEntries.length - 1; index >= 0; index -= 1) {
-      const entry = logEntries[index]
-      if (entry) {
-        nextState.log.unshift(entry)
-      }
-    }
-  }
 
-  const applyReapPhase = (nextState: GameState) => {
-    const summary: HarvestSummary['reap'] = []
-    nextState.players.forEach((player) => {
-      const beforeGrain = player.resources.grain
-      const beforeVegetable = player.resources.vegetable
-      reap(player)
-      const grain = player.resources.grain - beforeGrain
-      const vegetable = player.resources.vegetable - beforeVegetable
-      if (grain > 0 || vegetable > 0) {
-        summary.push({ player: player.name, grain, vegetable })
-      }
-    })
-    return summary
-  }
-
-  const applyBreedPhase = (nextState: GameState) => {
-    const summary: HarvestSummary['breed'] = []
-    nextState.players.forEach((player) => {
-      const beforeSheep = player.resources.sheep
-      const beforeBoar = player.resources.boar
-      const beforeCattle = player.resources.cattle
-      breedAnimals(player)
-      const sheep = player.resources.sheep - beforeSheep
-      const boar = player.resources.boar - beforeBoar
-      const cattle = player.resources.cattle - beforeCattle
-      if (sheep > 0 || boar > 0 || cattle > 0) {
-        summary.push({ player: player.name, sheep, boar, cattle })
-      }
-    })
-    return summary
-  }
-
-  const applyReturnHomePhase = (nextState: GameState) => {
-    nextState.players.forEach((player) => {
-      player.workersAvailable = player.familySize
-    })
-    nextState.actionSpaces.forEach((space) => {
-      space.takenBy = null
-    })
-  }
+  const applyBreedPhase = (nextState: GameState) => applyBreedPhaseCore(nextState)
 
   const finalizeRound = (nextState: GameState) => {
-    nextState.players.forEach((player) => {
-      player.newbornCount = 0
-    })
-    nextState.round += 1
-    if (nextState.round > 14) {
-      nextState.gameOver = true
-      nextState.log.unshift({ key: 'log.gameOver' })
+    const result = finalizeRoundCore(nextState)
+    if (result.type === 'gameOver') {
       updateState(nextState)
       void persistGame(nextState)
       return
     }
-    applyRoundGrowth(nextState)
-    applyFutureMeeples(nextState)
-    applyMajorEffectsToAllPlayers(nextState, 'onRoundStart')
-    const startIndex = nextState.players.findIndex((p) => p.startPlayer)
-    nextState.currentPlayerIndex = startIndex === -1 ? 0 : startIndex
-    nextState.log.unshift({
-      key: 'log.enterRound',
-      params: { round: nextState.round },
-    })
-    nextState.roundStartSnapshot = createRoundSnapshot(nextState)
     setViewPlayerId(nextState.players[nextState.currentPlayerIndex]?.id ?? '')
     setHistory([])
     setActionStartSnapshot(null)
@@ -2491,8 +2274,9 @@ export const GameContainer = () => {
     buildHarvestLogEntries(context, breedSummary, nextState)
     setHarvestContext(null)
     setHarvestFeedCounts({})
-    const pendingPlayerIndex = nextState.players.findIndex((player) =>
-      hasPendingAnimals(player),
+    const pendingPlayerIndex = findPendingAnimalPlayerIndex(
+      nextState,
+      hasPendingAnimals,
     )
     if (pendingPlayerIndex !== -1) {
       const pendingPlayer = nextState.players[pendingPlayerIndex]
@@ -2513,84 +2297,15 @@ export const GameContainer = () => {
     if (!alreadyPrepared) {
       pushHistorySnapshot(nextState)
     }
-    const reapSummary = applyReapPhase(nextState)
-    const feedSummary: HarvestSummary['feed'] = []
-    const pending: HarvestFeedPending[] = []
-    nextState.players.forEach((player, index) => {
-      const newbornPenalty = Math.min(player.newbornCount, player.familySize)
-      let required = Math.max(0, player.familySize * 2 - newbornPenalty)
-      const useFood = Math.min(player.resources.food, required)
-      player.resources.food -= useFood
-      required -= useFood
-      if (required > 0) {
-        const hasCookingSource = player.improvements.some(
-          (id) =>
-            id === 'Major_Fireplace1' ||
-            id === 'Major_Fireplace2' ||
-            id === 'Major_CookingHearth1' ||
-            id === 'Major_CookingHearth2',
-        )
-        const canConvert =
-          player.resources.grain > 0 ||
-          player.resources.vegetable > 0 ||
-          (hasCookingSource &&
-            (player.resources.sheep > 0 ||
-              player.resources.boar > 0 ||
-              player.resources.cattle > 0 ||
-              player.resources.vegetable > 0))
-        if (canConvert) {
-          pending.push({
-            playerIndex: index,
-            playerName: player.name,
-            remaining: required,
-            foodUsed: useFood,
-          })
-        } else {
-          player.resources.begging += required
-          feedSummary.push({
-            player: player.name,
-            food: useFood,
-            grain: 0,
-            vegetable: 0,
-            sheep: 0,
-            boar: 0,
-            cattle: 0,
-            begging: required,
-            conversions: [],
-          })
-        }
-      } else if (useFood > 0) {
-        feedSummary.push({
-          player: player.name,
-          food: useFood,
-          grain: 0,
-          vegetable: 0,
-          sheep: 0,
-          boar: 0,
-          cattle: 0,
-          begging: 0,
-          conversions: [],
-        })
-      }
-    })
+    const { context } = startHarvestCore(nextState)
     updateState(nextState)
-    if (pending.length === 0) {
-      finishHarvest(nextState, {
-        round: nextState.round,
-        reap: reapSummary,
-        feed: feedSummary,
-        pending: [],
-      })
+    if (context.pending.length === 0) {
+      finishHarvest(nextState, context)
       return
     }
-    setHarvestContext({
-      round: nextState.round,
-      reap: reapSummary,
-      feed: feedSummary,
-      pending,
-    })
+    setHarvestContext(context)
     setHarvestFeedCounts({})
-    const current = pending[0]
+    const current = context.pending[0]
     if (current) {
       const currentPlayer = nextState.players[current.playerIndex]
       if (currentPlayer) {
@@ -2601,77 +2316,28 @@ export const GameContainer = () => {
 
   const confirmHarvestFeed = (countsOverride?: Record<string, number>) => {
     if (!harvestContext) return
+    const nextState = cloneState(state)
     const current = harvestContext.pending[0]
     if (!current) return
-    const nextState = cloneState(state)
     const player = nextState.players[current.playerIndex]
     if (!player) return
-    const options = buildHarvestFeedOptions(player)
-    const costTotals: Partial<Resource> = {}
-    let foodFromConversions = 0
-    const conversions: {
-      sourceName: string
-      resourceKey: keyof Resource
-      count: number
-      food: number
-    }[] = []
-    options.forEach((option) => {
-      const count = countsOverride?.[option.id] ?? harvestFeedCounts[option.id] ?? 0
-      if (count <= 0) return
-      costTotals[option.resourceKey] =
-        (costTotals[option.resourceKey] ?? 0) + count
-      const food = count * option.food
-      foodFromConversions += food
-      conversions.push({
-        sourceName: option.sourceName,
-        resourceKey: option.resourceKey,
-        count,
-        food,
-      })
+    const options = buildHarvestFeedOptionsCore(player, locale, cardLabel)
+    const result = confirmHarvestFeedCore({
+      nextState,
+      context: harvestContext,
+      countsOverride,
+      harvestFeedCounts,
+      options,
     })
-    Object.entries(costTotals).forEach(([key, value]) => {
-      if (!value) return
-      const resourceKey = key as keyof Resource
-      player.resources[resourceKey] -= value
-    })
-    const remaining = Math.max(0, current.remaining - foodFromConversions)
-    const extraFood = Math.max(0, foodFromConversions - current.remaining)
-    if (extraFood > 0) {
-      player.resources.food += extraFood
-    }
-    player.resources.begging += remaining
-    const nextFeed = [
-      ...harvestContext.feed,
-      {
-        player: current.playerName,
-        food: current.foodUsed,
-        grain: costTotals.grain ?? 0,
-        vegetable: costTotals.vegetable ?? 0,
-        sheep: costTotals.sheep ?? 0,
-        boar: costTotals.boar ?? 0,
-        cattle: costTotals.cattle ?? 0,
-        begging: remaining,
-        conversions,
-      },
-    ]
-    const nextPending = harvestContext.pending.slice(1)
+    if (!result) return
     updateState(nextState)
-    if (nextPending.length === 0) {
-      finishHarvest(nextState, {
-        round: harvestContext.round,
-        reap: harvestContext.reap,
-        feed: nextFeed,
-        pending: [],
-      })
+    if (result.nextContext.pending.length === 0) {
+      finishHarvest(nextState, result.nextContext)
       return
     }
-    setHarvestContext({
-      ...harvestContext,
-      feed: nextFeed,
-      pending: nextPending,
-    })
+    setHarvestContext(result.nextContext)
     setHarvestFeedCounts({})
-    const nextPlayer = nextState.players[nextPending[0].playerIndex]
+    const nextPlayer = nextState.players[result.nextContext.pending[0].playerIndex]
     if (nextPlayer) {
       setViewPlayerId(nextPlayer.id)
     }
@@ -2683,7 +2349,7 @@ export const GameContainer = () => {
     if (!current) return
     const player = state.players[current.playerIndex]
     if (!player) return
-    const options = buildHarvestFeedOptions(player)
+    const options = buildHarvestFeedOptionsCore(player, locale, cardLabel)
     const option = options.find((item) => item.id === optionId)
     if (!option) return
     setHarvestFeedCounts((prev) => {
@@ -2702,12 +2368,14 @@ export const GameContainer = () => {
   }
 
   const performRoundEnd = (baseState: GameState) => {
-    if (baseState.gameOver) return
-    if (harvestContext?.pending.length) return
-    const pendingPlayerIndex = baseState.players.findIndex((player) =>
-      hasPendingAnimals(player),
-    )
-    if (pendingPlayerIndex !== -1) {
+    const result = prepareRoundEndCore({
+      baseState,
+      hasPendingAnimals,
+      cloneState,
+      harvestRounds,
+    })
+    if (result.type === 'pendingAnimals') {
+      const pendingPlayerIndex = result.pendingPlayerIndex
       const pendingPlayer = baseState.players[pendingPlayerIndex]
       setPendingAnimalReorg({
         playerIndex: pendingPlayerIndex,
@@ -2718,10 +2386,9 @@ export const GameContainer = () => {
       updateState(baseState)
       return
     }
-    const nextState = cloneState(baseState)
+    const nextState = result.nextState
     pushHistorySnapshot(nextState)
-    applyReturnHomePhase(nextState)
-    if (harvestRounds.includes(baseState.round)) {
+    if (result.type === 'startHarvest') {
       startHarvest(nextState, true)
       return
     }
@@ -2729,9 +2396,18 @@ export const GameContainer = () => {
   }
 
   const endRound = () => {
-    if (state.gameOver) return
-    if (!allWorkersUsed) return
-    if (pendingNextPlayerIndex !== null || pendingChoice || pendingAnimalReorg) return
+    if (
+      !canPerformRoundEnd({
+        state,
+        allWorkersUsed,
+        pendingNextPlayerIndex,
+        hasPendingChoice: !!pendingChoice,
+        hasPendingAnimalReorg: !!pendingAnimalReorg,
+        hasPendingHarvestFeed: !!harvestContext?.pending.length,
+      })
+    ) {
+      return
+    }
     performRoundEnd(state)
   }
 
@@ -2864,66 +2540,6 @@ export const GameContainer = () => {
   )
   const cardLabel = (id: string) =>
     t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
-  const buildHarvestFeedOptions = (player: PlayerState): HarvestFeedOption[] => {
-    const options: HarvestFeedOption[] = []
-    const addOption = (
-      sourceName: string,
-      resourceKey: keyof Resource,
-      food: number,
-      idSuffix: string,
-    ) => {
-      if (player.resources[resourceKey] <= 0) return
-      options.push({
-        id: `${idSuffix}-${resourceKey}-${food}`,
-        sourceName,
-        resourceKey,
-        food,
-      })
-    }
-    const basicSource = t(locale, 'ui.harvestFeedBasic')
-    addOption(basicSource, 'grain', 1, 'basic')
-    addOption(basicSource, 'vegetable', 1, 'basic')
-    const cookingSources = [
-      {
-        id: 'Major_Fireplace1',
-        vegetable: 2,
-        sheep: 2,
-        boar: 2,
-        cattle: 3,
-      },
-      {
-        id: 'Major_Fireplace2',
-        vegetable: 2,
-        sheep: 2,
-        boar: 2,
-        cattle: 3,
-      },
-      {
-        id: 'Major_CookingHearth1',
-        vegetable: 3,
-        sheep: 2,
-        boar: 3,
-        cattle: 4,
-      },
-      {
-        id: 'Major_CookingHearth2',
-        vegetable: 3,
-        sheep: 2,
-        boar: 3,
-        cattle: 4,
-      },
-    ]
-    cookingSources.forEach((source) => {
-      if (!player.improvements.includes(source.id)) return
-      const sourceName = cardLabel(source.id)
-      addOption(sourceName, 'vegetable', source.vegetable, source.id)
-      addOption(sourceName, 'sheep', source.sheep, source.id)
-      addOption(sourceName, 'boar', source.boar, source.id)
-      addOption(sourceName, 'cattle', source.cattle, source.id)
-    })
-    return options
-  }
-
   const applyDevResource = async () => {
     if (!devPlayerId) return
     const data = await addResource(devPlayerId, devResource, devAmount)
@@ -3176,62 +2792,50 @@ export const GameContainer = () => {
     const nextState = cloneState(state)
     const player = nextState.players[pendingAnimalReorg.playerIndex]
     if (!player) return
-    const pastureZones = animalReorg.zones.filter(
-      (zone) => zone.zoneType === 'pasture',
-    )
-    player.pastures = player.pastures.map((pasture) => {
-      const assigned = pastureZones.find((zone) => zone.id === pasture.id)
-      if (!assigned || !assigned.animalType) {
-        return { ...pasture, animalType: null, animalCount: 0 }
-      }
-      const capacity = getPastureCapacity(pasture)
-      const count = Math.max(0, Math.min(capacity, assigned.animalCount))
-      return {
-        ...pasture,
-        animalType: count > 0 ? assigned.animalType : null,
-        animalCount: count,
-      }
+    applyAnimalReorgToPlayer({
+      player,
+      animalReorg,
+      totals: reorgTotals,
+      getPastureCapacity,
     })
-    const houseZone = animalReorg.zones.find((zone) => zone.zoneType === 'house')
-    player.houseAnimalType = houseZone?.animalType ?? null
-    player.houseAnimalCount =
-      houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
-    const stableZones = animalReorg.zones.filter(
-      (zone) => zone.zoneType === 'stable',
-    )
-    const stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
-    stableZones.forEach((zone) => {
-      const key = zone.id.replace('stable:', '')
-      stableAnimals[key] = zone.animalType ?? null
-    })
-    player.stableAnimals = stableAnimals
-    player.resources.sheep = reorgTotals.sheep
-    player.resources.boar = reorgTotals.boar
-    player.resources.cattle = reorgTotals.cattle
     setPendingAnimalReorg(null)
     setAnimalReorg(null)
-    if (reorgSource === 'anytime-reorg') {
+    const plan = buildPostReorgPlan({
+      reorgSource,
+      nextState,
+      spaceId: pendingAnimalReorg.spaceId,
+      hasPendingAnimals,
+    })
+    if (plan.type === 'anytime') {
       updateState(nextState)
       void persistGame(nextState)
       return
     }
-    if (reorgSource === 'harvest-breed') {
-      const nextPendingIndex = nextState.players.findIndex((player) =>
-        hasPendingAnimals(player),
-      )
-      if (nextPendingIndex !== -1) {
-        const nextPendingPlayer = nextState.players[nextPendingIndex]
-        if (nextPendingPlayer) {
-          setPendingHarvestFinalizeState(nextState)
-          setPendingAnimalReorg({ playerIndex: nextPendingIndex, spaceId: 'harvest-breed' })
-          setAnimalReorg(createAnimalReorgState(nextPendingPlayer))
-          setViewPlayerId(nextPendingPlayer.id)
-          updateState(nextState)
-          return
-        }
+    if (plan.type === 'harvestNextPlayer') {
+      const nextPendingPlayer = nextState.players[plan.pendingPlayerIndex]
+      if (nextPendingPlayer) {
+        setPendingHarvestFinalizeState(nextState)
+        setPendingAnimalReorg({
+          playerIndex: plan.pendingPlayerIndex,
+          spaceId: 'harvest-breed',
+        })
+        setAnimalReorg(createAnimalReorgState(nextPendingPlayer))
+        setViewPlayerId(nextPendingPlayer.id)
+        updateState(nextState)
+        return
       }
+    }
+    if (plan.type === 'harvestFinalize') {
       setPendingHarvestFinalizeState(null)
       finalizeRound(nextState)
+      return
+    }
+    if (plan.type !== 'actionSpace') {
+      updateState(nextState)
+      return
+    }
+    if (!plan.hasTargetSpace) {
+      updateState(nextState)
       return
     }
     const targetSpace = nextState.actionSpaces.find(
@@ -3250,34 +2854,31 @@ export const GameContainer = () => {
       targetSpace,
       pendingAnimalReorg.playerIndex,
     )
-    if (progress.type === 'choice') {
-      if (progress.promptKey === 'ui.interactionFenceSelect') {
+    const progressPlan = buildReorgEngineProgressPlan({
+      progress,
+      pendingAnimalReorg,
+      players: nextState.players,
+      currentPlayerIndex: nextState.currentPlayerIndex,
+      nextPlayerIndex,
+    })
+    if (progressPlan.type === 'choice') {
+      if (progressPlan.resetFenceSelection) {
         setPendingFenceEdges([])
         setFenceError(null)
       }
-      if (progress.promptKey === 'ui.interactionStableSelect') {
+      if (progressPlan.resetStableSelection) {
         setPendingStableTiles([])
         setStableError(null)
       }
-      setPendingChoice({
-        promptKey: progress.promptKey,
-        options: progress.choice,
-        playerIndex: pendingAnimalReorg.playerIndex,
-        spaceId: pendingAnimalReorg.spaceId,
-        fenceExtraWood:
-          progress.promptKey === 'ui.interactionFenceSelect' &&
-          pendingAnimalReorg.spaceId === 'farm-redevelopment'
-            ? 1
-            : 0,
-      })
+      setPendingChoice(progressPlan.pendingChoice)
       updateState(nextState)
       return
     }
-    if (progress.type === 'fail') {
+    if (progressPlan.type === 'fail') {
       targetSpace.takenBy = null
       player.workersAvailable += 1
       nextState.log.unshift({
-        key: progress.logKey,
+        key: progressPlan.logKey,
         params: { player: player.name },
       })
       setActionStartSnapshot(null)
@@ -3285,21 +2886,17 @@ export const GameContainer = () => {
       updateState(nextState)
       return
     }
-    if (progress.type === 'reorg') {
+    if (progressPlan.type === 'reorg') {
       setPendingAnimalReorg({
-        playerIndex: progress.playerIndex,
-        spaceId: progress.spaceId,
+        playerIndex: progressPlan.playerIndex,
+        spaceId: progressPlan.spaceId,
       })
       setAnimalReorg(createAnimalReorgState(player))
       updateState(nextState)
       return
     }
     engineRef.current = null
-    const nextIndex = nextPlayerIndex(
-      nextState.players,
-      nextState.currentPlayerIndex,
-    )
-    setPendingNextPlayerIndex(nextIndex)
+    setPendingNextPlayerIndex(progressPlan.pendingNextPlayerIndex)
     updateState(nextState)
   }
 
@@ -3382,7 +2979,10 @@ export const GameContainer = () => {
     : null
   const harvestRemaining = harvestPending?.remaining ?? 0
   const harvestFeedOptions = useMemo(
-    () => (harvestPlayer ? buildHarvestFeedOptions(harvestPlayer) : []),
+    () =>
+      harvestPlayer
+        ? buildHarvestFeedOptionsCore(harvestPlayer, locale, cardLabel)
+        : [],
     [harvestPlayer, locale],
   )
   const harvestFeedOptionIds = useMemo(

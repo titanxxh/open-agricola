@@ -25,7 +25,11 @@ export const AnytimeBar = ({
       <div className="anytime-actions">
         <button
           onClick={openAnytimeReorg}
-          disabled={!!pendingChoice || pendingAnimalReorg !== null}
+          disabled={
+            !!pendingChoice ||
+            pendingAnimalReorg !== null ||
+            pendingNextPlayerIndex !== null
+          }
         >
           {t(locale, 'ui.anytimeReorgAnimals')}
         </button>

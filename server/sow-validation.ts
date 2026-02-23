@@ -74,8 +74,7 @@ export const validateSowSelection = (
   if (vegetableCount > (normalized.resources?.vegetable ?? 0)) {
     return { ok: false, error: { code: 'NOT_ENOUGH_SEEDS' } }
   }
-  const updatedFields = normalized.fields.map((field) => {
-    const key = positionKey({ row: field.row, col: field.col })
+  const updatedFields: FarmField[] = normalized.fields.map((field) => {
     const selection = selections.find(
       (item) => item.row === field.row && item.col === field.col,
     )

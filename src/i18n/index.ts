@@ -9,10 +9,14 @@ type Dictionary = typeof zh
 
 const getValue = (dict: Dictionary, path: string): string => {
   const parts = path.split('.')
-  let current: any = dict
+  let current: unknown = dict
   for (const part of parts) {
-    if (current && typeof current === 'object' && part in current) {
-      current = current[part]
+    if (
+      current &&
+      typeof current === 'object' &&
+      part in (current as Record<string, unknown>)
+    ) {
+      current = (current as Record<string, unknown>)[part]
     } else {
       return path
     }

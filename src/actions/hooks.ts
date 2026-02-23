@@ -66,6 +66,8 @@ export const clearActionHooks = () => {
   actionHooks.length = 0
 }
 
+export const getRegisteredActionHooks = () => [...actionHooks]
+
 const matchesHook = (
   registration: ActionHookRegistration,
   context: ActionHookContext,
@@ -128,15 +130,28 @@ export const applyComputeReplaceHooks = (
   context: ActionExecutionContext & { actionId: string },
 ) => {
   let actionId = context.actionId
-  const hookContext: ActionHookContext = {
-    ...context,
-    phase: 'computeReplace',
-  }
-  getOrderedHooks(hookContext).forEach((registration) => {
-    const result = registration.handler(hookContext)
-    if (typeof result?.actionId === 'string') {
-      actionId = result.actionId
+  const seen = new Set<string>()
+  while (!seen.has(actionId)) {
+    seen.add(actionId)
+    let replaced = false
+    getOrderedHooks({
+      ...context,
+      actionId,
+      phase: 'computeReplace',
+    }).forEach((registration) => {
+      const result = registration.handler({
+        ...context,
+        actionId,
+        phase: 'computeReplace',
+      })
+      if (typeof result?.actionId === 'string' && result.actionId !== actionId) {
+        actionId = result.actionId
+        replaced = true
+      }
+    })
+    if (!replaced) {
+      break
     }
-  })
+  }
   return actionId
 }

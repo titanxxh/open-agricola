@@ -67,7 +67,7 @@ const playMinorImprovement = (
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
-  const cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost
+  const cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
   if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }

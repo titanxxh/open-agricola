@@ -332,7 +332,16 @@ export const normalizeState = (raw: GameState): GameState => {
 }
 
 export const cloneState = (state: GameState): GameState => {
-  const raw = JSON.parse(JSON.stringify(state)) as GameState
+  let raw: GameState
+  if (typeof structuredClone === 'function') {
+    try {
+      raw = structuredClone(state)
+    } catch {
+      raw = JSON.parse(JSON.stringify(state)) as GameState
+    }
+  } else {
+    raw = JSON.parse(JSON.stringify(state)) as GameState
+  }
   return normalizeState(raw)
 }
 

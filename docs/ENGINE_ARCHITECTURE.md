@@ -3,7 +3,7 @@
 ## 目标与边界
 
 - 目标：以回合与行动卡为核心驱动，确保行动执行、资源变化、收获结算与日志一致
-- 边界：实现现代端 Engine 树核心架构与基础模块；明确不实现 ABCDE 扩展中的卡牌逻辑与监听器细节，仅保留可扩展的 Hook 接口
+- 边界：实现现代端 Engine 树核心架构与基础模块；以可扩展 Hook/Listener 机制承载卡牌特判，不追求逐行复制 BGA PHP 内部实现
 
 ## 整体结构图
 
@@ -43,6 +43,11 @@ Engine
 - CardEffects：卡牌效果注册表与 hook 执行器
 - CardListeners：卡牌监听注册与事件分发
 - CardActivation：卡牌 hook 触发并返回 flow
+- EngineFlowCore：引擎推进核心循环（从容器中抽离）
+- RoundFlowCore：回合结束与回合推进核心逻辑
+- HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
+- AnimalReorgFlowCore：动物重整写回、分支决策 plan、Engine 进度判定 plan 与重整后 choice 参数构造
+- PayloadValidation：后端 API payload 统一校验与错误结构规范
 - FutureMeeples：未来回合资源堆叠与回合开始结算
 - ActionStackView：行动格资源堆叠显示
 - ActionCardVisibility：未开行动牌隐藏标题与描述
@@ -184,7 +189,10 @@ function applyIsDoable(initial):
 
 - 行动注册与空间构建：[actions/index.ts](../src/actions/index.ts)
 - Hook 架构入口：[hooks.ts](../src/actions/hooks.ts)
-- 执行编排与 UI 交互：[App.tsx](../src/App.tsx)
+- 引擎推进核心：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts)
+- 回合与收获核心：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
+- 动物重整核心：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts)
+- 执行编排与 UI 交互：[GameContainer.tsx](../src/app/GameContainer.tsx)
 - 持久化与还原：App.tsx 内的 persist/normalize 逻辑
 
 ## 性能指标与约束条件
@@ -195,10 +203,10 @@ function applyIsDoable(initial):
 - 并行节点：默认以小规模分支为前提，避免指数级状态膨胀
 - 目标：本地单局 14 回合内无明显卡顿（<16ms 关键交互）
 
-## 排除项
+## 边界说明
 
-- 明确不实现 ABCDE 扩展中的具体卡牌逻辑
-- 不实现 BGA PHP Engine 的完整树结构与卡牌监听器细节
+- 已接入并实现大量 A/B/C/D/E 卡牌数据与部分效果，覆盖范围持续扩展
+- 不追求完整复刻 BGA PHP Engine 内部结构，但保持 action/hook/listener 的可演进接口
 
 ## 与现有架构的兼容性
 

@@ -4,6 +4,8 @@
 
 说明：每个原子行动在各 Hook 点至少给出一张卡牌示例；无示例则标记为“—”。
 
+> 说明（2026-02-23 更新）：`src/actions/hook-matrix.ts` 与 `src/actions/__tests__/hook-matrix.test.ts` 已改为基于真实注册的 action hooks / card listeners 生成覆盖矩阵。本文表格保留为“人工索引视图”，以测试输出为准。
+
 | 原子行动 | Before | During | ImmediatelyAfter | After | ComputeCosts | ComputeArgs | ComputeReplace | IsDoable |
 |---|---|---|---|---|---|---|---|---|
 | PlaceFarmer | — | Master Workman（实现状态：false） | Steam Machine（实现状态：false） | Firewood Collector（实现状态：false） | — | Master Workman（实现状态：false） | — | — |

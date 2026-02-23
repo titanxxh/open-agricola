@@ -32,6 +32,8 @@ export const clearCardListeners = () => {
   cardListeners.length = 0
 }
 
+export const getRegisteredCardListeners = () => [...cardListeners]
+
 const getPlayerCardIds = (player: PlayerState) => [
   ...player.improvements,
   ...player.minorPlayed,
@@ -47,19 +49,18 @@ const scopeMatches = (
   registration: CardListenerRegistration,
 ) => {
   if (!registration.cardIds || registration.cardIds.length === 0) return true
+  const cardIds = registration.cardIds
   const scope = registration.scope ?? 'player'
   if (scope === 'player') {
-    return playerHasAnyCard(player, registration.cardIds)
+    return playerHasAnyCard(player, cardIds)
   }
   if (scope === 'opponent') {
     return state.players.some(
       (entry) =>
-        entry.id !== player.id && playerHasAnyCard(entry, registration.cardIds),
+        entry.id !== player.id && playerHasAnyCard(entry, cardIds),
     )
   }
-  return state.players.some((entry) =>
-    playerHasAnyCard(entry, registration.cardIds),
-  )
+  return state.players.some((entry) => playerHasAnyCard(entry, cardIds))
 }
 
 const matchesListener = (

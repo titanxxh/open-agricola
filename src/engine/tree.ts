@@ -66,8 +66,15 @@ export class EngineTree {
       return true
     }
     const replacement = new SequenceNode(`chain-${node.id}`, [node, ...nodes])
-    this.root = replacement
-    return true
+    if (parent instanceof OptionalNode) {
+      parent.child = replacement
+      return true
+    }
+    if (parent instanceof OrNode || parent instanceof XorNode) {
+      parent.children[index] = replacement
+      return true
+    }
+    return false
   }
 
   private findNodeWithParent(
@@ -83,7 +90,7 @@ export class EngineTree {
         const found = this.findNodeWithParent(targetId, child)
         if (found) return found
       } else {
-        const composite = node as SequenceNode | ParallelNode
+        const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
         for (let index = 0; index < composite.children.length; index += 1) {
           const child = composite.children[index]
           if (child.id === targetId) {

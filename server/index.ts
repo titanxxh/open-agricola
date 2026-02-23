@@ -12,6 +12,11 @@ import {
 import type { PlayerFarmState } from './fence-validation.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateSowSelection } from './sow-validation.ts'
+import {
+  validateMultiTilePayload,
+  validateResourcePayload,
+  validateSingleTilePayload,
+} from './payload-validation.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dataDir = resolve(__dirname, '../data')
@@ -75,19 +80,6 @@ const parseBody = (req: IncomingMessage) =>
     })
   })
 
-const resourceKeys = new Set([
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-])
 const stableWoodCost = 2
 const maxStableCount = 4
 
@@ -246,8 +238,9 @@ const server = createServer(async (req, res) => {
       resource?: string
       amount?: number
     }
-    if (!playerId || !resource || !resourceKeys.has(resource)) {
-      sendJson(res, 400, { error: 'Invalid payload' })
+    const payloadError = validateResourcePayload({ playerId, resource, amount })
+    if (payloadError) {
+      sendJson(res, 400, { error: payloadError })
       return
     }
     const resourceKey = resource as keyof PlayerFarmState['resources']
@@ -305,10 +298,20 @@ const server = createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/room/validate') {
     const body = (await parseBody(req)) as RoomSelectionPayload
     const { playerId, rooms, costPerRoom } = body
-    if (!playerId || !Array.isArray(rooms) || !costPerRoom) {
-      sendJson(res, 400, { error: 'Invalid payload' })
+    const payloadError = validateMultiTilePayload({
+      playerId,
+      tiles: rooms as { row?: number; col?: number }[] | undefined,
+    })
+    if (payloadError || !costPerRoom) {
+      sendJson(res, 400, {
+        error: payloadError ?? {
+          code: 'INVALID_COST',
+          message: 'costPerRoom is required',
+        },
+      })
       return
     }
+    const selectedRoomsInput = rooms ?? []
     const state = await readState()
     if (!state || !Array.isArray(state.players)) {
       sendJson(res, 400, { error: 'State missing' })
@@ -320,7 +323,7 @@ const server = createServer(async (req, res) => {
       return
     }
     const player = normalizePlayerFarm(state.players[playerIndex])
-    const selection = validateRoomSelection(player, rooms)
+    const selection = validateRoomSelection(player, selectedRoomsInput)
     if (!selection.ok) {
       sendJson(res, 200, { error: { code: selection.code } })
       return
@@ -347,7 +350,7 @@ const server = createServer(async (req, res) => {
       player.resources[resourceKey] =
         (player.resources[resourceKey] ?? 0) - value
     })
-    const selectedRooms = rooms.filter((room) =>
+    const selectedRooms = selectedRoomsInput.filter((room) =>
       selection.selectedKeys.has(positionKey(room)),
     )
     player.roomTiles = [...player.roomTiles, ...selectedRooms]
@@ -361,10 +364,15 @@ const server = createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/stable/validate') {
     const body = (await parseBody(req)) as StableSelectionPayload
     const { playerId, stables } = body
-    if (!playerId || !Array.isArray(stables)) {
-      sendJson(res, 400, { error: 'Invalid payload' })
+    const payloadError = validateMultiTilePayload({
+      playerId,
+      tiles: stables as { row?: number; col?: number }[] | undefined,
+    })
+    if (payloadError) {
+      sendJson(res, 400, { error: payloadError })
       return
     }
+    const selectedStablesInput = stables ?? []
     const state = await readState()
     if (!state || !Array.isArray(state.players)) {
       sendJson(res, 400, { error: 'State missing' })
@@ -376,7 +384,7 @@ const server = createServer(async (req, res) => {
       return
     }
     const player = normalizePlayerFarm(state.players[playerIndex])
-    const selection = validateStableSelection(player, stables)
+    const selection = validateStableSelection(player, selectedStablesInput)
     if (!selection.ok) {
       sendJson(res, 200, { error: { code: selection.code } })
       return
@@ -388,7 +396,7 @@ const server = createServer(async (req, res) => {
       return
     }
     player.resources.wood = (player.resources.wood ?? 0) - woodCost
-    const selectedStables = stables.filter((stable) =>
+    const selectedStables = selectedStablesInput.filter((stable) =>
       selection.selectedKeys.has(positionKey(stable)),
     )
     player.stableTiles = [...player.stableTiles, ...selectedStables]
@@ -404,10 +412,12 @@ const server = createServer(async (req, res) => {
       playerId?: string
       tile?: { row?: number; col?: number }
     }
-    if (!playerId || !tile || typeof tile.row !== 'number' || typeof tile.col !== 'number') {
-      sendJson(res, 400, { error: 'Invalid payload' })
+    const payloadError = validateSingleTilePayload({ playerId, tile })
+    if (payloadError) {
+      sendJson(res, 400, { error: payloadError })
       return
     }
+    const selectedTile = tile as { row: number; col: number }
     const state = await readState()
     if (!state || !Array.isArray(state.players)) {
       sendJson(res, 400, { error: 'State missing' })
@@ -420,8 +430,8 @@ const server = createServer(async (req, res) => {
     }
     const player = normalizePlayerFarm(state.players[playerIndex])
     const result = validatePlowSelection(player, {
-      row: tile.row,
-      col: tile.col,
+      row: selectedTile.row,
+      col: selectedTile.col,
     })
     if (!result.ok) {
       sendJson(res, 200, { error: result.error })

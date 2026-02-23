@@ -59,8 +59,24 @@
   - Hook follow-up actions 插入 EngineTree
   - 入口：[engine.ts](../src/engine/engine.ts), [tree.ts](../src/engine/tree.ts)
 - Hook 覆盖矩阵
-  - Hook 阶段矩阵生成与测试覆盖
+  - Hook 阶段矩阵按真实注册的 hooks/listeners 生成与测试覆盖
   - 入口：[hook-matrix.ts](../src/actions/hook-matrix.ts)
+- Engine 核心修复
+  - 修复 `insertAfter` 在 Or/Xor/Optional 父节点下的树结构保持
+  - 修复 `computeReplace` 的链式替换上下文传递
+  - 入口：[tree.ts](../src/engine/tree.ts), [hooks.ts](../src/actions/hooks.ts)
+- 前后端载荷校验
+  - 新增统一 payload 校验模块，规范错误结构（code/message）
+  - 入口：[payload-validation.ts](../server/payload-validation.ts), [index.ts](../server/index.ts)
+- App 流程拆分（第一步）
+  - 抽离引擎推进核心逻辑 `runEngineStepsCore`
+  - 入口：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts), [GameContainer.tsx](../src/app/GameContainer.tsx)
+- App 流程拆分（第二步）
+  - 抽离回合推进与收获主流程：`use-round-flow.ts` / `use-harvest-flow.ts`
+  - 入口：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
+- App 流程拆分（第三步）
+  - 抽离动物重整写回、分支决策 plan、Engine 进度判定 plan、重整后 choice 构造：`use-animal-reorg-flow.ts`
+  - 入口：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts), [GameContainer.tsx](../src/app/GameContainer.tsx)
 - Meeting Place 行动
   - 起始玩家逻辑
   - flow 可选小发展（wrapOptional + minor-improvement）
@@ -145,7 +161,9 @@ Persist (server/index.ts) ←→ App.tsx normalizeState/persistGame
   - TypeScript 构建与 Vite 构建通过
   - 最近验证时间：本轮改动完成后
 - `npm test`
-  - 新增围栏校验、畜栏建造、连锁触发测试通过
+  - 引擎链路、Hook 矩阵真实性、评分、收获、状态克隆、API 契约与 payload 校验测试通过
+  - 新增回合流程 hooks 测试通过（`use-round-flow.test.ts`）
+  - 新增动物重整流程 hooks 测试通过（`use-animal-reorg-flow.test.ts`）
 
 ## 2. 缺失部分总结
 
@@ -191,7 +209,8 @@ Persist (server/index.ts) ←→ App.tsx normalizeState/persistGame
 - 在 CI 中加入文档完整性校验（例如检查关键小节是否为空）
 - 与构建步骤一起执行，失败则阻止合入
 
-## 4. 排除项
+## 4. 当前边界说明
 
-- 不实现 ABCDE 扩展中的具体卡牌逻辑
-- 不实现 BGA PHP Engine 的完整树结构与卡牌监听器细节
+- 已实现基础可玩流程，并实现了大量 A/B/C/D/E 目录卡牌数据与部分规则特判
+- Engine 仍为前端实现，目标是保证核心流程与 Hook 扩展能力，不完全复制 BGA PHP 的内部实现细节
+- 卡牌与规则仍在持续补全，当前以“可扩展 + 可回归验证”为主

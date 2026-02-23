@@ -27,7 +27,7 @@ const buildMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
       (improvement): improvement is NonNullable<typeof improvement> =>
         !!improvement,
     )
-    .filter((improvement) => canPayResources(player, improvement.cost))
+    .filter((improvement) => canPayResources(player, improvement.cost ?? {}))
     .map((improvement) => ({
       value: `minor:${improvement.id}`,
       labelKey: `minorImprovements.${improvement.id}.name`,
