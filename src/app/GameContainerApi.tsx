@@ -8,14 +8,19 @@ import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/eff
 import { getBuildRoomCost } from '../../shared/actions/effects/house'
 import { stableWoodCost } from '../../shared/actions/effects/fencing'
 import { computeScores } from '../../shared/logic/scoring'
+import { majorImprovementIds } from '../../shared/game/major-improvements'
+import { occupationIds } from '../../shared/game/occupations'
+import { normalizeState, resourceKeyList } from '../../shared/logic/state'
 import {
   baseActionOrder,
   createRoundOpenById,
   isActionForPlayerCount,
 } from '../../shared/logic/state'
+import { addResource } from '../services/api'
 import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
 import { useFarmSelection } from '../hooks/useFarmSelection'
+import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { FarmBoard } from '../components/board/FarmBoard'
 import { LogPanel } from '../components/board/LogPanel'
@@ -43,6 +48,12 @@ export const GameContainerApi = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(false)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
+  const [devPlayerId, setDevPlayerId] = useState('')
+  const [devResource, setDevResource] = useState<keyof Resource>('wood')
+  const [devAmount, setDevAmount] = useState(1)
+  const [devRound, setDevRound] = useState(1)
+  const [devCardId, setDevCardId] = useState('')
+  const [resetSeedInput, setResetSeedInput] = useState('')
   const {
     pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
@@ -375,6 +386,122 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
+  const resourceKeys = resourceKeyList
+  const majorIdSet = useMemo(() => new Set(majorImprovementIds), [])
+  const occupationIdSet = useMemo(() => new Set(occupationIds), [])
+
+  const applyDevResource = useCallback(async () => {
+    if (!devPlayerId || !state) return
+    const data = await addResource(devPlayerId, devResource, devAmount)
+    if (data?.state) {
+      const nextState = normalizeState(data.state as import('../../shared/game/types').GameState)
+      applyResponse({ ok: true, state: nextState, pending: { type: 'none' } })
+      if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
+        const playerIndex = nextState.players.findIndex((p) => p.id === devPlayerId)
+        const targetPlayer = nextState.players[playerIndex]
+        if (targetPlayer) {
+          const total = targetPlayer.resources.sheep + targetPlayer.resources.boar + targetPlayer.resources.cattle
+          const assigned = targetPlayer.pastures.reduce((s, pa) => s + pa.animalCount, 0)
+            + (targetPlayer.houseAnimalType && targetPlayer.houseAnimalCount > 0 ? targetPlayer.houseAnimalCount : 0)
+            + Object.values(targetPlayer.stableAnimals ?? {}).filter(Boolean).length
+          if (total > assigned && !pendingChoice && !pendingAnimalReorg) {
+            setAnimalReorg({
+              zones: [
+                ...targetPlayer.pastures.map((p) => ({ id: p.id, zoneType: 'pasture' as const, animalType: p.animalType, animalCount: p.animalCount })),
+                { id: 'house', zoneType: 'house' as const, animalType: targetPlayer.houseAnimalType ?? null, animalCount: targetPlayer.houseAnimalCount ?? 0 },
+                ...getLooseStableKeys(targetPlayer).map((key) => ({ id: `stable:${key}`, zoneType: 'stable' as const, animalType: targetPlayer.stableAnimals?.[key] ?? null, animalCount: targetPlayer.stableAnimals?.[key] ? 1 : 0 })),
+              ],
+              confirmDiscard: false,
+            })
+            setViewPlayerId(targetPlayer.id)
+          }
+        }
+      }
+    }
+  }, [devPlayerId, devResource, devAmount, state, applyResponse, pendingChoice, pendingAnimalReorg])
+
+  const applyDevRound = useCallback(() => {
+    if (!state || !Number.isFinite(devRound)) return
+    void applyAndSync(api.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }))
+  }, [state, devRound, api, applyAndSync])
+
+  const stripCardId = (id: string) => id.trim()
+  const getCardType = useCallback((player: import('../../shared/game/types').PlayerState, cardId: string) => {
+    if (majorIdSet.has(cardId)) return 'major'
+    if (occupationIdSet.has(cardId)) return 'occupation'
+    if (player.occupationHand.includes(cardId)) return 'occupation'
+    if (player.minorHand.includes(cardId)) return 'minor'
+    return 'minor'
+  }, [majorIdSet, occupationIdSet])
+
+  const playDevCard = useCallback(() => {
+    if (!state || !devPlayerId) return
+    const cardId = stripCardId(devCardId)
+    if (!cardId) return
+    const targetPlayer = state.players.find((p) => p.id === devPlayerId)
+    if (!targetPlayer) return
+    const cardType = getCardType(targetPlayer, cardId)
+    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
+    const cp = clone.players.find((p) => p.id === devPlayerId)!
+    clone.players.forEach((p) => {
+      p.minorHand = p.minorHand.filter((e) => e !== cardId)
+      p.occupationHand = p.occupationHand.filter((e) => e !== cardId)
+    })
+    if (cardType === 'major') {
+      clone.availableMajorImprovements = clone.availableMajorImprovements.filter((e) => e !== cardId)
+      if (!cp.improvements.includes(cardId)) cp.improvements.push(cardId)
+      cp.playedCards.push(`major:${cardId}`)
+    } else if (cardType === 'occupation') {
+      if (!cp.occupationPlayed.includes(cardId)) cp.occupationPlayed.push(cardId)
+      cp.playedCards.push(`occupation:${cardId}`)
+    } else {
+      if (!cp.minorPlayed.includes(cardId)) cp.minorPlayed.push(cardId)
+      cp.playedCards.push(`minor:${cardId}`)
+    }
+    void applyAndSync(api.loadGame(clone))
+  }, [state, devPlayerId, devCardId, getCardType, api, applyAndSync])
+
+  const drawDevCard = useCallback(() => {
+    if (!state || !devPlayerId) return
+    const cardId = stripCardId(devCardId)
+    if (!cardId) return
+    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
+    const cp = clone.players.find((p) => p.id === devPlayerId)!
+    clone.players.forEach((p) => {
+      p.minorHand = p.minorHand.filter((e) => e !== cardId)
+      p.occupationHand = p.occupationHand.filter((e) => e !== cardId)
+    })
+    if (occupationIdSet.has(cardId)) {
+      if (!cp.occupationHand.includes(cardId)) cp.occupationHand.push(cardId)
+    } else {
+      if (!cp.minorHand.includes(cardId)) cp.minorHand.push(cardId)
+    }
+    void applyAndSync(api.loadGame(clone))
+  }, [state, devPlayerId, devCardId, occupationIdSet, api, applyAndSync])
+
+  const saveDevState = useCallback(() => {
+    if (!state) return
+    const payload = JSON.stringify(state, null, 2)
+    const blob = new Blob([payload], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `open-agricola-round-${state.round}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }, [state])
+
+  const loadDevState = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (!result) return
+      const raw = JSON.parse(String(result)) as import('../../shared/game/types').GameState
+      void applyAndSync(api.loadGame(raw))
+    }
+    reader.readAsText(file)
+  }, [api, applyAndSync])
+
   if (!state || !currentPlayer || !displayPlayer) {
     return <div className="app">Loading...</div>
   }
@@ -395,9 +522,21 @@ export const GameContainerApi = () => {
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
       />
       {showScoringPad ? <ScoringPad locale={locale} scores={scoreSummaries} onClose={() => setShowScoringPad(false)} /> : null}
+      {devMode ? (
+        <DevPanel
+          locale={locale} players={state.players}
+          devPlayerId={devPlayerId} devResource={devResource} devAmount={devAmount} devRound={devRound}
+          resourceKeys={resourceKeys}
+          setDevPlayerId={setDevPlayerId} setDevResource={setDevResource} setDevAmount={setDevAmount} setDevRound={setDevRound}
+          applyDevResource={applyDevResource} applyDevRound={applyDevRound}
+          devCardId={devCardId} setDevCardId={setDevCardId}
+          playDevCard={playDevCard} drawDevCard={drawDevCard}
+          saveDevState={saveDevState} loadDevState={loadDevState}
+        />
+      ) : null}
       <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
       <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} />
-      <GameControls locale={locale} onUndo={() => {}} onUndoAction={() => {}} onUndoRound={() => {}} onEndRound={endRound} onResetGame={resetGame} onShowScoring={() => setShowScoringPad(true)} historyLength={0} hasActionStartSnapshot={false} allWorkersUsed={allWorkersUsed} isGameOver={state.gameOver} devMode={devMode} seedValue="" onSeedChange={() => {}} />
+      <GameControls locale={locale} onUndo={() => {}} onUndoAction={() => {}} onUndoRound={() => {}} onEndRound={endRound} onResetGame={resetGame} onShowScoring={() => setShowScoringPad(true)} historyLength={0} hasActionStartSnapshot={false} allWorkersUsed={allWorkersUsed} isGameOver={state.gameOver} devMode={devMode} seedValue={resetSeedInput} onSeedChange={setResetSeedInput} />
       <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} />
       <main className="board">
         <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
