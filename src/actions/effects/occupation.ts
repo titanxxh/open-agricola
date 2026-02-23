@@ -16,7 +16,7 @@ export const playOccupation = (
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
   const cost =
-    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost
+    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
   if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }

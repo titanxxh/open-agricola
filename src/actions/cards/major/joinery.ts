@@ -19,4 +19,9 @@ export const joinery: MajorCardEffect = {
       '7+': 3,
     },
   },
+  onHarvest: (_state, player) => {
+    if (player.resources.wood <= 0) return
+    player.resources.wood -= 1
+    player.resources.food += 2
+  },
 }

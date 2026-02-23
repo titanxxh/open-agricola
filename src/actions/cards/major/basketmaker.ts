@@ -19,4 +19,9 @@ export const basketmaker: MajorCardEffect = {
       '5+': 3,
     },
   },
+  onHarvest: (_state, player) => {
+    if (player.resources.reed <= 0) return
+    player.resources.reed -= 1
+    player.resources.food += 3
+  },
 }

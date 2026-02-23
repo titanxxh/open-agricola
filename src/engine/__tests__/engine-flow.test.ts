@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   ActionDefinition,
   ActionSpace,
@@ -18,6 +18,7 @@ import {
   SequenceNode,
   XorNode,
 } from '../nodes'
+import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 
 const createState = () =>
   ({
@@ -96,6 +97,10 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 })
 
 describe('Engine flow nodes', () => {
+  beforeEach(() => {
+    clearActionHooks()
+  })
+
   it('or node removes completed choice and exposes done', () => {
     const buildRooms: ActionDefinition = {
       id: 'build-rooms',
@@ -278,5 +283,169 @@ describe('Engine flow nodes', () => {
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
     expect(engine.proceed({ state, player, space }).type).toBe('done')
+  })
+
+  it('computeReplace chain uses latest action id', () => {
+    const events: string[] = []
+    const a: ActionDefinition = {
+      id: 'a',
+      nameKey: 'actions.bonus-wood.name',
+      descriptionKey: 'actions.bonus-wood.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('a')
+        return { type: 'ok' }
+      },
+    }
+    const b: ActionDefinition = {
+      id: 'b',
+      nameKey: 'actions.bonus-food.name',
+      descriptionKey: 'actions.bonus-food.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('b')
+        return { type: 'ok' }
+      },
+    }
+    const c: ActionDefinition = {
+      id: 'c',
+      nameKey: 'actions.bonus-food.name',
+      descriptionKey: 'actions.bonus-food.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('c')
+        return { type: 'ok' }
+      },
+    }
+    registerActionHook({
+      id: 'replace-a-to-b',
+      actions: ['a'],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: 'b' }),
+    })
+    registerActionHook({
+      id: 'replace-b-to-c',
+      actions: ['b'],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: 'c' }),
+    })
+    const registry = new ActionRegistry()
+    registry.register(a)
+    registry.register(b)
+    registry.register(c)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-a', 'a')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(a)
+    const result = engine.proceed({ state, player, space })
+    expect(result.type).toBe('ok')
+    expect(events).toEqual(['c'])
+  })
+
+  it('computeReplace chain stops when no further match', () => {
+    const events: string[] = []
+    const a: ActionDefinition = {
+      id: 'a',
+      nameKey: 'actions.bonus-wood.name',
+      descriptionKey: 'actions.bonus-wood.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('a')
+        return { type: 'ok' }
+      },
+    }
+    const b: ActionDefinition = {
+      id: 'b',
+      nameKey: 'actions.bonus-food.name',
+      descriptionKey: 'actions.bonus-food.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('b')
+        return { type: 'ok' }
+      },
+    }
+    registerActionHook({
+      id: 'replace-a-to-b',
+      actions: ['a'],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: 'b' }),
+    })
+    registerActionHook({
+      id: 'replace-c-to-a',
+      actions: ['c'],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: 'a' }),
+    })
+    const registry = new ActionRegistry()
+    registry.register(a)
+    registry.register(b)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-a', 'a')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(a)
+    const result = engine.proceed({ state, player, space })
+    expect(result.type).toBe('ok')
+    expect(events).toEqual(['b'])
+  })
+
+  it('computeReplace and isDoable stay consistent', () => {
+    const a: ActionDefinition = {
+      id: 'a',
+      nameKey: 'actions.bonus-wood.name',
+      descriptionKey: 'actions.bonus-wood.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const blocked: ActionDefinition = {
+      id: 'blocked',
+      nameKey: 'actions.bonus-food.name',
+      descriptionKey: 'actions.bonus-food.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    registerActionHook({
+      id: 'replace-a-to-blocked',
+      actions: ['a'],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: 'blocked' }),
+    })
+    const registry = new ActionRegistry()
+    registry.register(a)
+    registry.register(blocked)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-a', 'a')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(a)
+    const result = engine.proceed({ state, player, space })
+    expect(result.type).toBe('blocked')
   })
 })

@@ -60,6 +60,7 @@ import { computeScores } from '../logic/scoring'
 import { majorImprovementIds } from '../game/major-improvements'
 import { minorImprovementIds } from '../game/minor-improvements'
 import { occupationIds } from '../game/occupations'
+import { runEngineStepsCore } from './hooks/use-engine-flow'
 
 type HarvestFeedPending = {
   playerIndex: number
@@ -97,6 +98,8 @@ export const GameContainer = () => {
   >({})
   const [pendingHarvestFinalizeState, setPendingHarvestFinalizeState] =
     useState<GameState | null>(null)
+  const hasPendingHarvestFinalizeState = pendingHarvestFinalizeState !== null
+  void hasPendingHarvestFinalizeState
   const {
     state,
     history,
@@ -1115,78 +1118,18 @@ export const GameContainer = () => {
     | { type: 'done' }
     | { type: 'fail'; logKey: string }
     | { type: 'reorg'; playerIndex: number; spaceId: string } => {
-    while (true) {
-      const beforePlayerStep = JSON.parse(JSON.stringify(player)) as PlayerState
-      const step = engine.proceed({
-        state: nextState,
-        player,
-        space: targetSpace,
-      })
-      if (step.type === 'blocked' || step.type === 'done') {
-        return { type: 'done' }
-      }
-      if (step.type === 'choice') {
-        if (step.choice.options.length === 1) {
-          const autoChoice = step.choice.options[0]
-          const autoResult = engine.resolveChoice(autoChoice.value, {
-            state: nextState,
-            player,
-            space: targetSpace,
-          })
-          if (autoResult.type === 'choice') {
-            return {
-              type: 'choice',
-              choice: autoResult.options,
-              promptKey: autoResult.promptKey,
-            }
-          }
-          if (autoResult.type === 'fail') {
-            return { type: 'fail', logKey: autoResult.logKey }
-          }
-          logAction(nextState, player, targetSpace, beforePlayerStep)
-          const beforeAnimals =
-            beforePlayerStep.resources.sheep +
-            beforePlayerStep.resources.boar +
-            beforePlayerStep.resources.cattle
-          const afterAnimals =
-            player.resources.sheep +
-            player.resources.boar +
-            player.resources.cattle
-          if (afterAnimals > beforeAnimals) {
-            return {
-              type: 'reorg',
-              playerIndex,
-              spaceId: targetSpace.id,
-            }
-          }
-          continue
-        }
-        return {
-          type: 'choice',
-          choice: step.choice.options,
-          promptKey: step.choice.promptKey,
-        }
-      }
-      if (step.type === 'ok' && step.result.type === 'fail') {
-        return { type: 'fail', logKey: step.result.logKey }
-      }
-      logAction(nextState, player, targetSpace, beforePlayerStep)
-      const beforeAnimals =
-        beforePlayerStep.resources.sheep +
-        beforePlayerStep.resources.boar +
-        beforePlayerStep.resources.cattle
-      const afterAnimals =
-        player.resources.sheep +
-        player.resources.boar +
-        player.resources.cattle
-      if (afterAnimals > beforeAnimals) {
-        return {
-          type: 'reorg',
-          playerIndex,
-          spaceId: targetSpace.id,
-        }
-      }
-    }
+    return runEngineStepsCore({
+      engine,
+      nextState,
+      player,
+      targetSpace,
+      playerIndex,
+      logAction,
+      clonePlayer: (snapshotPlayer) =>
+        typeof structuredClone === 'function'
+          ? structuredClone(snapshotPlayer)
+          : (JSON.parse(JSON.stringify(snapshotPlayer)) as PlayerState),
+    })
   }
 
   const filterCultivationOptions = (
