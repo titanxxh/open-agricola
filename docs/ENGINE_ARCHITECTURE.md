@@ -44,6 +44,8 @@ Engine
 - CardListeners：卡牌监听注册与事件分发
 - CardActivation：卡牌 hook 触发并返回 flow
 - EngineFlowCore：引擎推进核心循环（从容器中抽离）
+- RoundFlowCore：回合结束与回合推进核心逻辑
+- HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
 - PayloadValidation：后端 API payload 统一校验与错误结构规范
 - FutureMeeples：未来回合资源堆叠与回合开始结算
 - ActionStackView：行动格资源堆叠显示
@@ -187,6 +189,7 @@ function applyIsDoable(initial):
 - 行动注册与空间构建：[actions/index.ts](../src/actions/index.ts)
 - Hook 架构入口：[hooks.ts](../src/actions/hooks.ts)
 - 引擎推进核心：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts)
+- 回合与收获核心：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
 - 执行编排与 UI 交互：[App.tsx](../src/App.tsx)
 - 持久化与还原：App.tsx 内的 persist/normalize 逻辑
 

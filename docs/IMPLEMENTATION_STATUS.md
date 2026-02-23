@@ -71,6 +71,9 @@
 - App 流程拆分（第一步）
   - 抽离引擎推进核心逻辑 `runEngineStepsCore`
   - 入口：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts), [GameContainer.tsx](../src/app/GameContainer.tsx)
+- App 流程拆分（第二步）
+  - 抽离回合推进与收获主流程：`use-round-flow.ts` / `use-harvest-flow.ts`
+  - 入口：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
 - Meeting Place 行动
   - 起始玩家逻辑
   - flow 可选小发展（wrapOptional + minor-improvement）
@@ -156,6 +159,7 @@ Persist (server/index.ts) ←→ App.tsx normalizeState/persistGame
   - 最近验证时间：本轮改动完成后
 - `npm test`
   - 引擎链路、Hook 矩阵真实性、评分、收获、状态克隆、API 契约与 payload 校验测试通过
+  - 新增回合流程 hooks 测试通过（`use-round-flow.test.ts`）
 
 ## 2. 缺失部分总结
 

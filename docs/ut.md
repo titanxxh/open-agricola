@@ -157,6 +157,21 @@
   - 覆盖场景：设置起始玩家
   - 关键断言：仅目标玩家 startPlayer=true
 
+### src/app/__tests__/use-round-flow.test.ts
+
+- use-round-flow / apply return-home phase
+  - 覆盖场景：回合结束回家阶段
+  - 关键断言：工人恢复、行动位占用清空
+- use-round-flow / finalize round to next round
+  - 覆盖场景：常规回合推进
+  - 关键断言：round+1、newborn 清零、startPlayer 生效
+- use-round-flow / finalize round game over
+  - 覆盖场景：第 14 轮后结束
+  - 关键断言：返回 gameOver 并记录结束状态
+- use-round-flow / next player index
+  - 覆盖场景：寻找下一个有可用工人的玩家
+  - 关键断言：返回正确索引
+
 ### src/app/__tests__/use-harvest-flow.test.ts
 
 - use-harvest-flow / run harvest flow
