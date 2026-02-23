@@ -59,7 +59,7 @@
   - 入口：[common-meeting-place.ts](../src/actions/cards/action/common-meeting-place.ts)
 - UI 交互与布局
   - 行动区、农场区、手牌区、日志区与控制区布局
-  - 手牌与已打出卡牌显示使用卡牌定义中的 name/desc
+  - 手牌与已打出卡牌显示优先使用 i18n，fallback 到卡牌定义
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
 - 国际化
   - 卡牌名称与描述中文翻译（保持 __Action__ 与 <RESOURCE> 标记）
