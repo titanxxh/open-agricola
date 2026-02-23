@@ -62,13 +62,15 @@ import {
   buildHarvestFeedOptions as buildHarvestFeedOptionsCore,
   buildHarvestLogEntries as buildHarvestLogEntriesCore,
   confirmHarvestFeedCore,
+  findPendingAnimalPlayerIndex,
   type HarvestContext,
   startHarvestCore,
 } from './hooks/use-harvest-flow'
 import {
-  applyReturnHomePhase as applyReturnHomePhaseCore,
+  canPerformRoundEnd,
   finalizeRoundCore,
   nextPlayerIndex,
+  prepareRoundEndCore,
 } from './hooks/use-round-flow'
 
 export const GameContainer = () => {
@@ -2246,9 +2248,6 @@ export const GameContainer = () => {
 
   const applyBreedPhase = (nextState: GameState) => applyBreedPhaseCore(nextState)
 
-  const applyReturnHomePhase = (nextState: GameState) =>
-    applyReturnHomePhaseCore(nextState)
-
   const finalizeRound = (nextState: GameState) => {
     const result = finalizeRoundCore(nextState)
     if (result.type === 'gameOver') {
@@ -2270,8 +2269,9 @@ export const GameContainer = () => {
     buildHarvestLogEntries(context, breedSummary, nextState)
     setHarvestContext(null)
     setHarvestFeedCounts({})
-    const pendingPlayerIndex = nextState.players.findIndex((player) =>
-      hasPendingAnimals(player),
+    const pendingPlayerIndex = findPendingAnimalPlayerIndex(
+      nextState,
+      hasPendingAnimals,
     )
     if (pendingPlayerIndex !== -1) {
       const pendingPlayer = nextState.players[pendingPlayerIndex]
@@ -2363,12 +2363,14 @@ export const GameContainer = () => {
   }
 
   const performRoundEnd = (baseState: GameState) => {
-    if (baseState.gameOver) return
-    if (harvestContext?.pending.length) return
-    const pendingPlayerIndex = baseState.players.findIndex((player) =>
-      hasPendingAnimals(player),
-    )
-    if (pendingPlayerIndex !== -1) {
+    const result = prepareRoundEndCore({
+      baseState,
+      hasPendingAnimals,
+      cloneState,
+      harvestRounds,
+    })
+    if (result.type === 'pendingAnimals') {
+      const pendingPlayerIndex = result.pendingPlayerIndex
       const pendingPlayer = baseState.players[pendingPlayerIndex]
       setPendingAnimalReorg({
         playerIndex: pendingPlayerIndex,
@@ -2379,10 +2381,9 @@ export const GameContainer = () => {
       updateState(baseState)
       return
     }
-    const nextState = cloneState(baseState)
+    const nextState = result.nextState
     pushHistorySnapshot(nextState)
-    applyReturnHomePhase(nextState)
-    if (harvestRounds.includes(baseState.round)) {
+    if (result.type === 'startHarvest') {
       startHarvest(nextState, true)
       return
     }
@@ -2390,9 +2391,18 @@ export const GameContainer = () => {
   }
 
   const endRound = () => {
-    if (state.gameOver) return
-    if (!allWorkersUsed) return
-    if (pendingNextPlayerIndex !== null || pendingChoice || pendingAnimalReorg) return
+    if (
+      !canPerformRoundEnd({
+        state,
+        allWorkersUsed,
+        pendingNextPlayerIndex,
+        hasPendingChoice: !!pendingChoice,
+        hasPendingAnimalReorg: !!pendingAnimalReorg,
+        hasPendingHarvestFeed: !!harvestContext?.pending.length,
+      })
+    ) {
+      return
+    }
     performRoundEnd(state)
   }
 

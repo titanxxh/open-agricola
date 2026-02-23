@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../game/types'
 import {
   applyReturnHomePhase,
+  canPerformRoundEnd,
   finalizeRoundCore,
   nextPlayerIndex,
+  prepareRoundEndCore,
 } from '../hooks/use-round-flow'
 
 const resources = (): Resource => ({
@@ -105,5 +107,43 @@ describe('use-round-flow helpers', () => {
   it('finds next player index with available worker', () => {
     const players = [player('p1', 0), player('p2', 0), player('p3', 1)]
     expect(nextPlayerIndex(players, 0)).toBe(2)
+  })
+
+  it('checks round-end guard conditions', () => {
+    const current = state()
+    expect(
+      canPerformRoundEnd({
+        state: current,
+        allWorkersUsed: true,
+        pendingNextPlayerIndex: null,
+        hasPendingChoice: false,
+        hasPendingAnimalReorg: false,
+        hasPendingHarvestFeed: false,
+      }),
+    ).toBe(true)
+    expect(
+      canPerformRoundEnd({
+        state: current,
+        allWorkersUsed: false,
+        pendingNextPlayerIndex: null,
+        hasPendingChoice: false,
+        hasPendingAnimalReorg: false,
+        hasPendingHarvestFeed: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('prepares pending-animals round-end branch', () => {
+    const base = state()
+    const plan = prepareRoundEndCore({
+      baseState: base,
+      hasPendingAnimals: (p) => p.id === 'p2',
+      cloneState: (s) => ({ ...s, players: s.players.map((p) => ({ ...p })) }),
+      harvestRounds: [4, 7, 9, 11, 13, 14],
+    })
+    expect(plan.type).toBe('pendingAnimals')
+    if (plan.type === 'pendingAnimals') {
+      expect(plan.pendingPlayerIndex).toBe(1)
+    }
   })
 })

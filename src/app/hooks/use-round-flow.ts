@@ -45,3 +45,48 @@ export const nextPlayerIndex = (players: PlayerState[], startIndex: number) => {
   }
   return startIndex
 }
+
+export const canPerformRoundEnd = (params: {
+  state: GameState
+  allWorkersUsed: boolean
+  pendingNextPlayerIndex: number | null
+  hasPendingChoice: boolean
+  hasPendingAnimalReorg: boolean
+  hasPendingHarvestFeed: boolean
+}) => {
+  const {
+    state,
+    allWorkersUsed,
+    pendingNextPlayerIndex,
+    hasPendingChoice,
+    hasPendingAnimalReorg,
+    hasPendingHarvestFeed,
+  } = params
+  if (state.gameOver) return false
+  if (!allWorkersUsed) return false
+  if (pendingNextPlayerIndex !== null) return false
+  if (hasPendingChoice || hasPendingAnimalReorg) return false
+  if (hasPendingHarvestFeed) return false
+  return true
+}
+
+export const prepareRoundEndCore = (params: {
+  baseState: GameState
+  hasPendingAnimals: (player: PlayerState) => boolean
+  cloneState: (state: GameState) => GameState
+  harvestRounds: number[]
+}) => {
+  const { baseState, hasPendingAnimals, cloneState, harvestRounds } = params
+  const pendingPlayerIndex = baseState.players.findIndex((player) =>
+    hasPendingAnimals(player),
+  )
+  if (pendingPlayerIndex !== -1) {
+    return { type: 'pendingAnimals' as const, pendingPlayerIndex }
+  }
+  const nextState = cloneState(baseState)
+  applyReturnHomePhase(nextState)
+  if (harvestRounds.includes(baseState.round)) {
+    return { type: 'startHarvest' as const, nextState }
+  }
+  return { type: 'finalizeRound' as const, nextState }
+}

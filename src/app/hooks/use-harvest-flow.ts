@@ -374,3 +374,8 @@ export const confirmHarvestFeedCore = (params: {
     } as HarvestContext,
   }
 }
+
+export const findPendingAnimalPlayerIndex = (
+  state: GameState,
+  hasPendingAnimals: (player: PlayerState) => boolean,
+) => state.players.findIndex((player) => hasPendingAnimals(player))
