@@ -17,6 +17,7 @@ import {
   validateResourcePayload,
   validateSingleTilePayload,
 } from './payload-validation.ts'
+import { handleGameRoute } from './game-router.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dataDir = resolve(__dirname, '../data')
@@ -212,6 +213,11 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/health') {
     sendJson(res, 200, { ok: true })
     return
+  }
+
+  if (req.url?.startsWith('/api/game/')) {
+    const handled = await handleGameRoute(req, res)
+    if (handled) return
   }
 
   if (req.method === 'GET' && req.url === '/api/state') {
