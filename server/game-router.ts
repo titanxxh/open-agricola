@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game-session.ts'
+import { normalizePlayerFarm, validateFenceSelection } from './fence-validation.ts'
+import { validateRoomSelection, validateStableSelection } from './index.ts'
+import { validatePlowSelection } from './plow-validation.ts'
+import { validateSowSelection } from './sow-validation.ts'
+import type { Resource } from '../shared/game/types.ts'
 
 let session: GameSession | null = null
 
@@ -125,6 +130,77 @@ export const handleGameRoute = async (
     }
     const resp = getSession().loadState(body.state)
     sendJson(res, 200, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/validate') {
+    const body = JSON.parse(await readBody(req)) as {
+      type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      playerId: string
+      payload: any
+    }
+    const state = getSession().getRawState()
+    const playerIndex = state.players.findIndex((p) => p.id === body.playerId)
+    if (playerIndex === -1) {
+      sendJson(res, 400, { valid: false, error: 'Player not found' })
+      return true
+    }
+    const player = normalizePlayerFarm(state.players[playerIndex] as any)
+
+    if (body.type === 'fence') {
+      const { edges, extraWood } = body.payload
+      const result = validateFenceSelection(player, edges, extraWood)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result })
+      return true
+    }
+    if (body.type === 'room') {
+      const { rooms, costPerRoom } = body.payload
+      const selection = validateRoomSelection(player, rooms)
+      if (!selection.ok) {
+        sendJson(res, 200, { valid: false, error: selection.code })
+        return true
+      }
+      const playerResources = player.resources || {}
+      const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
+      for (const key of costKeys) {
+        const required = (costPerRoom[key] ?? 0) * rooms.length
+        const available = playerResources[key] ?? 0
+        if (available < required) {
+          sendJson(res, 200, { valid: false, error: `Not enough ${key}` })
+          return true
+        }
+      }
+      sendJson(res, 200, { valid: true })
+      return true
+    }
+    if (body.type === 'stable') {
+      const { stables } = body.payload
+      const selection = validateStableSelection(player, stables)
+      if (!selection.ok) {
+        sendJson(res, 200, { valid: false, error: selection.code })
+        return true
+      }
+      const woodRequired = stables.length * 2
+      if ((player.resources?.wood ?? 0) < woodRequired) {
+        sendJson(res, 200, { valid: false, error: 'Not enough wood' })
+        return true
+      }
+      sendJson(res, 200, { valid: true })
+      return true
+    }
+    if (body.type === 'plow') {
+      const { tile } = body.payload
+      const result = validatePlowSelection(player, tile)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      return true
+    }
+    if (body.type === 'sow') {
+      const { crops } = body.payload
+      const result = validateSowSelection(player, crops)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      return true
+    }
+    sendJson(res, 400, { valid: false, error: 'Unknown validation type' })
     return true
   }
 

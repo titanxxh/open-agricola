@@ -145,21 +145,21 @@ export const GameContainerApi = () => {
       const cost = getBuildRoomCost(currentPlayer.houseType)
       void validateRoom(currentPlayer.id, pendingRoomTiles, cost).then((result) => {
         if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setRoomError(result.error ?? 'validation failed')
+        else setRoomError(result.error?.code ?? result.error ?? 'validation failed')
       })
       return
     }
     if (promptKey === 'ui.interactionStableSelect') {
       void validateStable(currentPlayer.id, pendingStableTiles).then((result) => {
         if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setStableError(result.error ?? 'validation failed')
+        else setStableError(result.error?.code ?? result.error ?? 'validation failed')
       })
       return
     }
     if (promptKey === 'ui.interactionPlowSelect' && pendingPlowTile) {
       void validatePlow(currentPlayer.id, pendingPlowTile).then((result) => {
         if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setPlowError(result.error ?? 'validation failed')
+        else setPlowError(result.error?.code ?? result.error ?? 'validation failed')
       })
       return
     }
@@ -170,7 +170,7 @@ export const GameContainerApi = () => {
       })
       void validateSow(currentPlayer.id, crops).then((result) => {
         if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setSowError(result.error ?? 'validation failed')
+        else setSowError(result.error?.code ?? result.error ?? 'validation failed')
       })
       return
     }

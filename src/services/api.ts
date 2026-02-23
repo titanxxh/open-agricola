@@ -27,10 +27,10 @@ export const validateFence = async (
   edges: string[],
   extraWood: number,
 ) => {
-  const response = await fetch(`${apiBase}/api/fence/validate`, {
+  const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, edges, extraWood }),
+    body: JSON.stringify({ type: 'fence', playerId, payload: { edges, extraWood } }),
   })
   return response.json()
 }
@@ -40,10 +40,10 @@ export const validateRoom = async (
   rooms: FarmTilePosition[],
   costPerRoom: Partial<Resource>,
 ) => {
-  const response = await fetch(`${apiBase}/api/room/validate`, {
+  const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, rooms, costPerRoom }),
+    body: JSON.stringify({ type: 'room', playerId, payload: { rooms, costPerRoom } }),
   })
   return response.json()
 }
@@ -52,19 +52,19 @@ export const validateStable = async (
   playerId: string,
   stables: FarmTilePosition[],
 ) => {
-  const response = await fetch(`${apiBase}/api/stable/validate`, {
+  const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, stables }),
+    body: JSON.stringify({ type: 'stable', playerId, payload: { stables } }),
   })
   return response.json()
 }
 
 export const validatePlow = async (playerId: string, tile: FarmTilePosition) => {
-  const response = await fetch(`${apiBase}/api/plow/validate`, {
+  const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, tile }),
+    body: JSON.stringify({ type: 'plow', playerId, payload: { tile } }),
   })
   return response.json()
 }
@@ -73,10 +73,10 @@ export const validateSow = async (
   playerId: string,
   crops: { row: number; col: number; crop: 'grain' | 'vegetable' }[],
 ) => {
-  const response = await fetch(`${apiBase}/api/sow/validate`, {
+  const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, crops }),
+    body: JSON.stringify({ type: 'sow', playerId, payload: { crops } }),
   })
   return response.json()
 }

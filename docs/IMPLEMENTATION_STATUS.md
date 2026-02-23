@@ -29,7 +29,8 @@
 
 ### 2.4 后端 API
 - `GameSession`：持有 GameState + Engine，暴露命令式方法。
-- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
+- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/validate/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
+- 统合了原本分散的 `/api/plow/validate` 等校验接口到 `/api/game/validate`。
 - WebSocket：`ws://localhost:5175/ws`（createRoom/joinRoom + 实时状态广播）。
 - 房间管理：每房间独立 GameSession，支持多客户端。
 

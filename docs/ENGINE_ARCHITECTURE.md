@@ -48,6 +48,7 @@ server/ (仅后端)
   - `POST /api/game/choice` — 解决选择分支
   - `POST /api/game/reorg` — 确认动物重整
   - `POST /api/game/feed` — 确认收获喂食
+  - `POST /api/game/validate` — 统合了围栏、房间、马厩、犁地、播种等前置校验
   - `POST /api/game/next-player` — 确认下一玩家
   - `POST /api/game/round-end` — 回合结束
   - `POST /api/game/new` — 新游戏
