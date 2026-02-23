@@ -150,6 +150,9 @@ export const handleGameRoute = async (
     if (body.type === 'fence') {
       const { edges, extraWood } = body.payload
       const result = validateFenceSelection(player, edges, extraWood)
+      if (result.ok) {
+        state.players[playerIndex] = result.player
+      }
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result })
       return true
     }
@@ -162,6 +165,7 @@ export const handleGameRoute = async (
       }
       const playerResources = player.resources || {}
       const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
+      let totalCost: Partial<Resource> = {}
       for (const key of costKeys) {
         const required = (costPerRoom[key] ?? 0) * rooms.length
         const available = playerResources[key] ?? 0
@@ -169,7 +173,15 @@ export const handleGameRoute = async (
           sendJson(res, 200, { valid: false, error: `Not enough ${key}` })
           return true
         }
+        totalCost[key] = required
       }
+      for (const key of costKeys) {
+        player.resources[key] = (player.resources[key] ?? 0) - (totalCost[key] ?? 0)
+      }
+      player.roomTiles = [...player.roomTiles, ...rooms]
+      player.rooms += rooms.length
+      state.players[playerIndex] = player
+
       sendJson(res, 200, { valid: true })
       return true
     }
@@ -185,18 +197,28 @@ export const handleGameRoute = async (
         sendJson(res, 200, { valid: false, error: 'Not enough wood' })
         return true
       }
+      player.resources.wood = (player.resources.wood ?? 0) - woodRequired
+      player.stableTiles = [...player.stableTiles, ...stables]
+      state.players[playerIndex] = player
+
       sendJson(res, 200, { valid: true })
       return true
     }
     if (body.type === 'plow') {
       const { tile } = body.payload
       const result = validatePlowSelection(player, tile)
+      if (result.ok) {
+        state.players[playerIndex] = result.player
+      }
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'sow') {
       const { crops } = body.payload
       const result = validateSowSelection(player, crops)
+      if (result.ok) {
+        state.players[playerIndex] = result.player
+      }
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
