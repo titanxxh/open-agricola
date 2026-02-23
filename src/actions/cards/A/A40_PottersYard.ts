@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 
 export const A40_PottersYard = new MinorImprovement({
   id: "A40_PottersYard",
-  name: "A40_PottersYard",
+  name: "Potter's Yard",
   deck: "A",
   number: 40,
   category: "GOODS_PROVIDER",

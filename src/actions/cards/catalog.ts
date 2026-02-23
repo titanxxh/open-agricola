@@ -155,9 +155,5 @@ export const minorImprovementCards = [A128_RiparianBuilder, A136_DrudgeryReeve, 
 export const occupationCards = [A105_BarrowPusher, A108_MushroomCollector, A109_SmallTrader, A110_Roughcaster, A112_ScytheWorker, A119_FirewoodCollector, A123_FrameBuilder, A126_MasterWorkman, A137_RiverineShepherd, A144_Sequestrator, A165_PigBreeder, A88_HedgeKeeper, A89_StablePlanner, A94_LazySowman, A97_Freshman, B100_Clutterer, B103_FieldMerchant, B109_PaperMaker, B115_TinsmithMaster, B146_Illusionist, B165_GameProvider, C115_Sower, C120_AgriculturalLabourer, C133_Soldier, C142_MarketCrier, C148_MudWallower, C156_HoofCaregiver, C85_DenBuilder, C87_Mason, C88_CarpentersApprentice, C96_Merchant, C99_GardenDesigner, D101_SugarBaker, D102_SampleStableMaker, D103_CanalBoatman, D107_Bellfounder, D124_Emissary, D126_FieldCultivator, D132_HideFarmer, D134_OysterEater, D137_TradeTeacher, D150_GodlySpouse, D157_PartyOrganizer, D158_BeanCounter, D167_PureBreeder, D93_SheepInspector, D94_HenpeckedHusband, D98_Transactor, E103_Wolf, E112_GrainThief, E123_ResourceHoarder, E130_Overachiever, E134_Omnifarmer, E148_Lazybones, E162_Entrepreneur, E166_Roastmaster, E167_DairyCrier, E85_MasterTanner, E86_PenBuilder]
 export const minorImprovementIds = minorImprovementCards.map((card) => card.id)
 export const occupationIds = occupationCards.map((card) => card.id)
-
-export const getMinorImprovementCard = (id: string) =>
-  minorImprovementCards.find((card) => card.id === id) ?? null
-
-export const getOccupationCard = (id: string) =>
-  occupationCards.find((card) => card.id === id) ?? null
+export const getMinorImprovementCard = (id) => minorImprovementCards.find((card) => card.id === id) ?? null
+export const getOccupationCard = (id) => occupationCards.find((card) => card.id === id) ?? null
