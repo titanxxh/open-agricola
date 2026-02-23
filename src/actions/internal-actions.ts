@@ -1,4 +1,8 @@
-import type { ActionChoiceOption, ActionDefinition } from '../game/types'
+import type {
+  ActionChoiceOption,
+  ActionDefinition,
+  ActionExecutionResult,
+} from '../game/types'
 import { bakeBread, canBakeBread, type BakeImprovementId } from './effects/bake-bread'
 import { collectAccumulatedResources } from './effects/collect'
 import { gainResources } from './effects/gain'
@@ -59,6 +63,67 @@ const bakeMaxUses: Record<BakeImprovementId, number> = {
   Major_StoneOven: 2,
 }
 
+const buildBakeBreadOptions = (player: PlayerState): ActionChoiceOption[] => {
+  const options: ActionChoiceOption[] = bakeImprovements
+    .filter((id) => canBakeBread(player, id))
+    .map((id) => ({ value: id, labelKey: bakeLabelKey[id] }))
+  options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
+  return options
+}
+
+const resolveBakeBreadChoice = (
+  player: PlayerState,
+  choice: string,
+): ActionExecutionResult => {
+  if (choice === 'cancel') {
+    return { type: 'ok' }
+  }
+  if (choice.startsWith('bulk:')) {
+    const payload = choice.replace('bulk:', '').trim()
+    if (!payload) return { type: 'ok' }
+    payload.split(',').forEach((entry) => {
+      const [improvementId, countText] = entry.split('=')
+      if (!bakeImprovements.includes(improvementId as BakeImprovementId)) {
+        return
+      }
+      const count = Number(countText)
+      if (!Number.isFinite(count) || count <= 0) return
+      const maxUse = bakeMaxUses[improvementId as BakeImprovementId]
+      const allowed = Math.min(count, maxUse)
+      if (allowed <= 0) return
+      bakeBread(player, improvementId as BakeImprovementId, allowed)
+    })
+    return { type: 'ok' }
+  }
+  if (choice.startsWith('count-')) {
+    const [, improvementId, countText] = choice.split('-')
+    if (bakeImprovements.includes(improvementId as BakeImprovementId)) {
+      const count = Number(countText)
+      return bakeBread(player, improvementId as BakeImprovementId, count)
+    }
+    return { type: 'ok' }
+  }
+  if (bakeImprovements.includes(choice as BakeImprovementId)) {
+    const improvement = choice as BakeImprovementId
+    const grain = player.resources.grain
+    const maxUse = bakeMaxUses[improvement]
+    const maxCount = Math.max(0, Math.min(grain, maxUse))
+    if (maxCount <= 1) {
+      return bakeBread(player, improvement, maxCount)
+    }
+    return {
+      type: 'choice',
+      promptKey: 'ui.interactionBakeBreadCount',
+      options: Array.from({ length: maxCount }, (_, index) => ({
+        value: `count-${improvement}-${index + 1}`,
+        labelKey: 'ui.interactionBakeBreadCountLabel',
+        labelParams: { count: index + 1 },
+      })),
+    }
+  }
+  return { type: 'ok' }
+}
+
 const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -67,7 +132,8 @@ const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
         !!improvement,
     )
     .filter((improvement) => {
-      const cost = getMinorImprovementCost(player, improvement.id) ?? improvement.cost
+      const cost =
+        getMinorImprovementCost(player, improvement.id) ?? improvement.cost ?? {}
       return canPayResources(player, cost)
     })
     .map((improvement) => ({
@@ -128,7 +194,7 @@ const buildMinorImprovementOptions = (player: PlayerState): ActionChoiceOption[]
       (improvement): improvement is NonNullable<typeof improvement> =>
         !!improvement,
     )
-    .filter((improvement) => canPayResources(player, improvement.cost))
+    .filter((improvement) => canPayResources(player, improvement.cost ?? {}))
     .map((improvement) => ({
       value: `minor:${improvement.id}`,
       labelKey: `minorImprovements.${improvement.id}.name`,
@@ -358,65 +424,33 @@ export const internalActionDefinitions: ActionDefinition[] = [
     gainPerRound: {},
     canBeExecutedByPlayer: (_, player) =>
       bakeImprovements.some((id) => canBakeBread(player, id)),
-    execute: ({ player }) => {
-      const options: ActionChoiceOption[] = bakeImprovements
-        .filter((id) => canBakeBread(player, id))
-        .map((id) => ({ value: id, labelKey: bakeLabelKey[id] }))
-      options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
-      return {
-        type: 'choice',
-        promptKey: 'ui.interactionBakeBreadChoice',
-        options,
-      }
-    },
+    execute: ({ player }) => ({
+      type: 'choice',
+      promptKey: 'ui.interactionBakeBreadChoice',
+      options: buildBakeBreadOptions(player),
+    }),
+    resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
+  },
+  {
+    id: 'bake-bread-on-buy',
+    nameKey: 'actions.bake-bread.name',
+    descriptionKey: 'actions.bake-bread.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (_, player) =>
+      player.majorEffects.pendingBake &&
+      bakeImprovements.some((id) => canBakeBread(player, id)),
+    execute: ({ player }) => ({
+      type: 'choice',
+      promptKey: 'ui.interactionBakeBreadChoice',
+      options: buildBakeBreadOptions(player),
+    }),
     resolveChoice: ({ player }, choice) => {
-      if (choice === 'cancel') {
-        return { type: 'ok' }
+      const result = resolveBakeBreadChoice(player, choice)
+      if (result.type === 'ok') {
+        player.majorEffects.pendingBake = false
       }
-      if (choice.startsWith('bulk:')) {
-        const payload = choice.replace('bulk:', '').trim()
-        if (!payload) return { type: 'ok' }
-        payload.split(',').forEach((entry) => {
-          const [improvementId, countText] = entry.split('=')
-          if (!bakeImprovements.includes(improvementId as BakeImprovementId)) {
-            return
-          }
-          const count = Number(countText)
-          if (!Number.isFinite(count) || count <= 0) return
-          const maxUse = bakeMaxUses[improvementId as BakeImprovementId]
-          const allowed = Math.min(count, maxUse)
-          if (allowed <= 0) return
-          bakeBread(player, improvementId as BakeImprovementId, allowed)
-        })
-        return { type: 'ok' }
-      }
-      if (choice.startsWith('count-')) {
-        const [, improvementId, countText] = choice.split('-')
-        if (bakeImprovements.includes(improvementId as BakeImprovementId)) {
-          const count = Number(countText)
-          return bakeBread(player, improvementId as BakeImprovementId, count)
-        }
-        return { type: 'ok' }
-      }
-      if (bakeImprovements.includes(choice as BakeImprovementId)) {
-        const improvement = choice as BakeImprovementId
-        const grain = player.resources.grain
-        const maxUse = bakeMaxUses[improvement]
-        const maxCount = Math.max(0, Math.min(grain, maxUse))
-        if (maxCount <= 1) {
-          return bakeBread(player, improvement, maxCount)
-        }
-        return {
-          type: 'choice',
-          promptKey: 'ui.interactionBakeBreadCount',
-          options: Array.from({ length: maxCount }, (_, index) => ({
-            value: `count-${improvement}-${index + 1}`,
-            labelKey: 'ui.interactionBakeBreadCountLabel',
-            labelParams: { count: index + 1 },
-          })),
-        }
-      }
-      return { type: 'ok' }
+      return result
     },
   },
   {

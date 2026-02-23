@@ -12,7 +12,7 @@ const buildImprovementOptions = (
     .filter((improvement) => available.includes(improvement.id))
     .filter((improvement) => {
       const cost =
-        getMinorImprovementCost(player, improvement.id) ?? improvement.cost
+        getMinorImprovementCost(player, improvement.id) ?? improvement.cost ?? {}
       return canPayResources(player, cost)
     })
     .map((improvement) => ({
@@ -45,6 +45,9 @@ export const majorImprovement: ActionDefinition = {
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [{ type: 'leaf', actionId: 'improvement-any' }],
+    children: [
+      { type: 'leaf', actionId: 'improvement-any' },
+      { type: 'leaf', actionId: 'bake-bread-on-buy', optional: true },
+    ],
   },
 }

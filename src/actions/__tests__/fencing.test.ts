@@ -39,7 +39,7 @@ const createPlayer = (): PlayerState => ({
   newbornCount: 0,
   pastures: [],
   fenceSegments: [],
-  majorEffects: { wellRounds: 0 },
+  majorEffects: { wellRounds: 0, pendingBake: false },
   startPlayer: false,
 })
 

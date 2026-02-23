@@ -26,6 +26,7 @@
   - 入口：[occupations.ts](../src/game/occupations.ts), [cards/catalog.ts](../src/actions/cards/catalog.ts)
 - 大改良（major improvement）
   - 烤面包改良描述与交换限制对齐
+  - 烤炉购买时可触发一次烤面包行动
   - 入口：[major](../src/actions/cards/major)
 - 卡牌基础模型
   - Occupation / MinorImprovement 基类与基础字段

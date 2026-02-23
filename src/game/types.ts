@@ -64,6 +64,7 @@ export type Pasture = {
 
 export type MajorEffectState = {
   wellRounds: number
+  pendingBake: boolean
 }
 
 export type LogEntry = {
