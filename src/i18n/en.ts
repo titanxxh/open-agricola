@@ -113,7 +113,7 @@ export const en = {
     interactionCultivationSowVegetable: 'Plow and sow vegetables',
     interactionCultivationPlowBonus: 'Plow and gain 1 food',
     interactionCultivationSelect: 'Choose plow and/or sow',
-    interactionChooseImprovement: 'Choose a major improvement',
+    interactionChooseImprovement: 'Choose a major or minor improvement',
     interactionOptionalImprovementChoice: 'You may play one improvement',
     interactionSkipImprovement: 'Skip playing an improvement',
     interactionMinorDecision: 'Play a minor improvement?',

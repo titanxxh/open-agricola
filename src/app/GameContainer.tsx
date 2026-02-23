@@ -307,9 +307,13 @@ export const GameContainer = () => {
     ...displayPlayer.minorPlayed.map((id) => `minor:${id}`),
     ...displayPlayer.occupationPlayed.map((id) => `occupation:${id}`),
   ]
+  const isSelectingImprovementAny =
+    pendingChoice?.promptKey === 'ui.interactionChooseImprovement' &&
+    pendingChoice.playerIndex === state.currentPlayerIndex
   const isSelectingMinor =
-    pendingChoice?.spaceId === 'meeting-place' &&
-    pendingChoice.promptKey === 'ui.interactionChooseMinorImprovement' &&
+    ((pendingChoice?.spaceId === 'meeting-place' &&
+      pendingChoice.promptKey === 'ui.interactionChooseMinorImprovement') ||
+      isSelectingImprovementAny) &&
     pendingChoice.playerIndex === state.currentPlayerIndex
   const isSelectingOccupation =
     (pendingChoice?.spaceId === 'lessons' ||
@@ -2162,7 +2166,7 @@ export const GameContainer = () => {
       updateState(nextState)
       return
     }
-    if (result.type === 'ok') {
+    if (result.type === 'ok' || result.type === 'flow') {
       logAction(nextState, player, targetSpace, beforePlayer)
       const progress = runEngineSteps(
         engine,
@@ -3723,6 +3727,8 @@ export const GameContainer = () => {
         locale={locale}
         availableMajorImprovements={state.availableMajorImprovements}
         currentPlayer={currentPlayer}
+        isSelectingMajor={isSelectingImprovementAny}
+        resolveChoice={resolveChoice}
       />
       <main className="board">
         <ActionBoard
@@ -3787,6 +3793,7 @@ export const GameContainer = () => {
           setViewPlayerId={setViewPlayerId}
           isSelectingMinor={isSelectingMinor}
           isSelectingOccupation={isSelectingOccupation}
+          isSelectingImprovementAny={isSelectingImprovementAny}
           resolveChoice={resolveChoice}
         />
       </main>

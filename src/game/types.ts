@@ -64,7 +64,6 @@ export type Pasture = {
 
 export type MajorEffectState = {
   wellRounds: number
-  pendingBake: boolean
 }
 
 export type LogEntry = {
@@ -107,6 +106,7 @@ export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'fail'; logKey: string }
+  | { type: 'flow'; flow: ActionFlow }
 
 export type ActionFlow =
   | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string }

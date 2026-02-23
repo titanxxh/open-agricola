@@ -432,28 +432,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
     resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
   },
   {
-    id: 'bake-bread-on-buy',
-    nameKey: 'actions.bake-bread.name',
-    descriptionKey: 'actions.bake-bread.description',
-    roundAvailable: 1,
-    gainPerRound: {},
-    canBeExecutedByPlayer: (_, player) =>
-      player.majorEffects.pendingBake &&
-      bakeImprovements.some((id) => canBakeBread(player, id)),
-    execute: ({ player }) => ({
-      type: 'choice',
-      promptKey: 'ui.interactionBakeBreadChoice',
-      options: buildBakeBreadOptions(player),
-    }),
-    resolveChoice: ({ player }, choice) => {
-      const result = resolveBakeBreadChoice(player, choice)
-      if (result.type === 'ok') {
-        player.majorEffects.pendingBake = false
-      }
-      return result
-    },
-  },
-  {
     id: 'construct',
     nameKey: 'actions.construct.name',
     descriptionKey: 'actions.construct.description',

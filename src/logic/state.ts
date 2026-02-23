@@ -211,7 +211,7 @@ export const normalizeState = (raw: GameState): GameState => {
           ? [...player.roomTiles]
           : createDefaultRoomTiles(player.rooms ?? 2),
       stableTiles: player.stableTiles ?? [],
-      majorEffects: player.majorEffects ?? { wellRounds: 0, pendingBake: false },
+      majorEffects: player.majorEffects ?? { wellRounds: 0 },
     }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
@@ -362,7 +362,7 @@ export const createInitialPlayers = (seed: number): PlayerState[] => {
     newbornCount: 0,
     pastures: [],
     fenceSegments: [],
-    majorEffects: { wellRounds: 0, pendingBake: false },
+    majorEffects: { wellRounds: 0 },
     startPlayer: true,
   },
     {
@@ -390,7 +390,7 @@ export const createInitialPlayers = (seed: number): PlayerState[] => {
     newbornCount: 0,
     pastures: [],
     fenceSegments: [],
-    majorEffects: { wellRounds: 0, pendingBake: false },
+    majorEffects: { wellRounds: 0 },
     startPlayer: false,
   },
     {
@@ -418,7 +418,7 @@ export const createInitialPlayers = (seed: number): PlayerState[] => {
     newbornCount: 0,
     pastures: [],
     fenceSegments: [],
-    majorEffects: { wellRounds: 0, pendingBake: false },
+    majorEffects: { wellRounds: 0 },
     startPlayer: false,
   },
     {
@@ -446,7 +446,7 @@ export const createInitialPlayers = (seed: number): PlayerState[] => {
     newbornCount: 0,
     pastures: [],
     fenceSegments: [],
-    majorEffects: { wellRounds: 0, pendingBake: false },
+    majorEffects: { wellRounds: 0 },
     startPlayer: false,
     },
   ]

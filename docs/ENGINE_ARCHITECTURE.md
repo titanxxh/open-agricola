@@ -39,7 +39,10 @@ Engine
 - CardBase：Occupation / MinorImprovement 基础模型
 - CardView：前端优先使用 i18n 的 name/desc 渲染
 - I18nCatalog：卡牌名称与描述中文翻译
-- BakeOnBuy：烤炉购买后触发烤面包内部动作
+- ImprovementSelection：改良行动支持从手牌与大改良区点击选择
+- CardEffects：卡牌效果注册表与 hook 执行器
+- CardListeners：卡牌监听注册与事件分发
+- CardActivation：卡牌 hook 触发并返回 flow
 - DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口

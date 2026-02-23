@@ -1,4 +1,3 @@
-import { canBakeBread } from '../../effects/bake-bread'
 import type { MajorCardEffect } from './types'
 
 export const stoneOven: MajorCardEffect = {
@@ -11,7 +10,9 @@ export const stoneOven: MajorCardEffect = {
     '<GRAIN> → 4<FOOD> (max 2)',
     '[When you build it, you can Bake immediately]',
   ],
-  onBuy: (_, player) => {
-    player.majorEffects.pendingBake = canBakeBread(player, 'Major_StoneOven')
-  },
+  onBuy: () => ({
+    type: 'leaf',
+    actionId: 'bake-bread',
+    optional: true,
+  }),
 }

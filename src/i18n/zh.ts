@@ -108,7 +108,7 @@ export const zh = {
     interactionCultivationSowVegetable: '开垦并播种蔬菜',
     interactionCultivationPlowBonus: '开垦并获得 1 食物',
     interactionCultivationSelect: '选择要开垦和/或播种的动作',
-    interactionChooseImprovement: '请选择大型改良',
+    interactionChooseImprovement: '请选择大型或小型改良',
     interactionOptionalImprovementChoice: '可选择打出 1 张改良',
     interactionSkipImprovement: '不打出改良',
     interactionMinorDecision: '是否打出一张小发展？',

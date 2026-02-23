@@ -20,7 +20,6 @@ export const houseRedevelopment: ActionDefinition = {
     children: [
       { type: 'leaf', actionId: 'renovate-house' },
       wrapOptional({ type: 'leaf', actionId: 'improvement-any' }),
-      wrapOptional({ type: 'leaf', actionId: 'bake-bread-on-buy' }),
     ],
   },
 }

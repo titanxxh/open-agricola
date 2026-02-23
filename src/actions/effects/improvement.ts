@@ -2,7 +2,8 @@ import type { ActionExecutionResult, GameState, PlayerState } from '../../game/t
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources } from './pay'
-import { applyMajorEffectForImprovement, getMajorCardEffect } from '../cards/major'
+import { getMajorCardEffect } from '../cards/major'
+import { activateCard } from './activate-card'
 
 export type ImprovementPlayMode = 'major' | 'minor' | 'any'
 
@@ -28,18 +29,18 @@ const playMajorImprovement = (
   if (!state.availableMajorImprovements.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
-  if (!canPayResources(player, improvement.cost)) {
+  if (!canPayResources(player, improvement.cost ?? {})) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
-  payResources(player, improvement.cost)
+  payResources(player, improvement.cost ?? {})
   player.improvements.push(improvement.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`major:${improvement.id}`)
-  applyMajorEffectForImprovement(state, player, improvement.id, 'onBuy')
+  const activation = activateCard(state, player, improvement.id, 'onBuy')
   state.availableMajorImprovements = state.availableMajorImprovements.filter(
     (id) => id !== improvement.id,
   )
-  return { type: 'ok' }
+  return activation.type === 'flow' ? activation : { type: 'ok' }
 }
 
 export const getMinorImprovementCost = (

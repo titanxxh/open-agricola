@@ -51,6 +51,9 @@
 - Hook 点与卡牌示例
   - Before/During/ImmediatelyAfter/After/ComputeCosts/ComputeArgs/ComputeReplace/IsDoable
   - 入口：[card-hooks.ts](../src/actions/hooks/card-hooks.ts)
+- 卡牌效果扩展机制
+  - CardEffects 与 CardListeners 允许卡牌注册监听并返回 flow
+  - 入口：[card-effects.ts](../src/actions/cards/card-effects.ts), [card-listeners.ts](../src/actions/cards/card-listeners.ts)
 - Engine 连锁触发
   - Hook follow-up actions 插入 EngineTree
   - 入口：[engine.ts](../src/engine/engine.ts), [tree.ts](../src/engine/tree.ts)
@@ -64,6 +67,7 @@
 - UI 交互与布局
   - 行动区、农场区、手牌区、日志区与控制区布局
   - 手牌与已打出卡牌显示优先使用 i18n，fallback 到卡牌定义
+  - 改良行动可直接点击 Major Improvements 或手牌小发展选择
   - 开发者模式提供重开随机种子输入
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
 - 国际化

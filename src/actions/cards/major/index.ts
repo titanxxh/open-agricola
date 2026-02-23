@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from '../../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../../game/types'
 import type { MajorCardEffect, MajorEffectHook } from './types'
 import { basketmaker } from './basketmaker'
 import { clayOven } from './clay-oven'
@@ -33,12 +33,13 @@ export const applyMajorEffectForImprovement = (
   player: PlayerState,
   improvementId: string,
   hook: MajorEffectHook,
-) => {
+): ActionFlow | null => {
   const effect = majorEffectMap.get(improvementId)
   const handler = effect?.[hook]
   if (handler) {
-    handler(state, player)
+    return handler(state, player) ?? null
   }
+  return null
 }
 
 export const applyMajorEffectsForPlayer = (

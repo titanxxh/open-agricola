@@ -860,6 +860,10 @@
   filter: grayscale(0.4);
 }
 
+.major-card.selectable {
+  cursor: pointer;
+}
+
 .hand-card.selectable {
   cursor: pointer;
 }

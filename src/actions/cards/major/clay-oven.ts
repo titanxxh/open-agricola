@@ -1,4 +1,3 @@
-import { canBakeBread } from '../../effects/bake-bread'
 import type { MajorCardEffect } from './types'
 
 export const clayOven: MajorCardEffect = {
@@ -11,7 +10,9 @@ export const clayOven: MajorCardEffect = {
     '<GRAIN> → 5<FOOD> (max 1)',
     '[When you build it, you can Bake immediately]',
   ],
-  onBuy: (_, player) => {
-    player.majorEffects.pendingBake = canBakeBread(player, 'Major_ClayOven')
-  },
+  onBuy: () => ({
+    type: 'leaf',
+    actionId: 'bake-bread',
+    optional: true,
+  }),
 }

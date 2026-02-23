@@ -76,6 +76,7 @@ type Props = {
   setViewPlayerId: (value: string) => void
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
+  isSelectingImprovementAny: boolean
   resolveChoice: (value: string) => void
 }
 
@@ -126,6 +127,7 @@ export const FarmBoard = ({
   setViewPlayerId,
   isSelectingMinor,
   isSelectingOccupation,
+  isSelectingImprovementAny,
   resolveChoice,
 }: Props) => {
   const houseLabelKey = (() => {
@@ -738,16 +740,21 @@ export const FarmBoard = ({
                         true,
                       )
                     : ''
+                  const canSelect =
+                    (isSelectingMinor || isSelectingImprovementAny) && canPlay
                   return (
                     <button
                       key={`hand-${cardId}`}
                       type="button"
                       className={`hand-card hand-card-minor${canPlay ? '' : ' disabled'}${
-                        isSelectingMinor && canPlay ? ' selectable' : ''
+                        canSelect ? ' selectable' : ''
                       }`}
                       onClick={() => {
-                        if (isSelectingMinor && canPlay) {
-                          resolveChoice(cardId)
+                        if (canSelect) {
+                          const value = isSelectingImprovementAny
+                            ? `minor:${cardId}`
+                            : cardId
+                          resolveChoice(value)
                         }
                       }}
                     >

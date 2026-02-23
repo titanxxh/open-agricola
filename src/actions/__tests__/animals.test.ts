@@ -63,7 +63,7 @@ const createPlayer = (): PlayerState => ({
     },
   ],
   fenceSegments: [],
-  majorEffects: { wellRounds: 0, pendingBake: false },
+  majorEffects: { wellRounds: 0 },
   startPlayer: false,
 })
 

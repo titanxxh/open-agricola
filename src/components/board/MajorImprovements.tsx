@@ -10,12 +10,16 @@ type Props = {
   locale: Locale
   availableMajorImprovements: string[]
   currentPlayer: PlayerState
+  isSelectingMajor: boolean
+  resolveChoice: (value: string) => void
 }
 
 export const MajorImprovements = ({
   locale,
   availableMajorImprovements,
   currentPlayer,
+  isSelectingMajor,
+  resolveChoice,
 }: Props) => (
   <section className="major-improvements">
     <h2>{t(locale, 'ui.majorImprovements')}</h2>
@@ -27,9 +31,17 @@ export const MajorImprovements = ({
           ? formatResources(locale, { ...emptyResources, ...major.cost }, true)
           : ''
         return (
-          <div
+          <button
             key={`major-${cardId}`}
-            className={`major-card${canBuy ? '' : ' disabled'}`}
+            type="button"
+            className={`major-card${canBuy ? '' : ' disabled'}${
+              isSelectingMajor && canBuy ? ' selectable' : ''
+            }`}
+            onClick={() => {
+              if (isSelectingMajor && canBuy) {
+                resolveChoice(`major:${cardId}`)
+              }
+            }}
           >
             <div className="hand-title">{t(locale, `improvements.${cardId}.name`)}</div>
             <div className="hand-meta">
@@ -40,7 +52,7 @@ export const MajorImprovements = ({
                 cost: costText || t(locale, 'ui.noCost'),
               })}
             </div>
-          </div>
+          </button>
         )
       })}
     </div>

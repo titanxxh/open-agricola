@@ -45,9 +45,6 @@ export const majorImprovement: ActionDefinition = {
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [
-      { type: 'leaf', actionId: 'improvement-any' },
-      { type: 'leaf', actionId: 'bake-bread-on-buy', optional: true },
-    ],
+    children: [{ type: 'leaf', actionId: 'improvement-any' }],
   },
 }
