@@ -5,6 +5,7 @@ import { formatResources } from '../../logic/format'
 import { getMajorCardEffect } from '../../actions/cards/major'
 import { emptyResources } from '../../logic/state'
 import { canPayResources } from '../../actions/effects/pay'
+import { ResourceLine } from '../common/ResourceLine'
 
 type Props = {
   locale: Locale
@@ -37,9 +38,9 @@ export const MajorImprovements = ({
       {availableMajorImprovements.map((cardId) => {
         const major = getMajorCardEffect(cardId)
         const canBuy = !!major && canPayResources(currentPlayer, major.cost)
-        const costText = major
-          ? formatResources(locale, { ...emptyResources, ...major.cost }, true)
-          : ''
+        const costResources = major
+          ? { ...emptyResources, ...major.cost }
+          : {}
         const futureEntries = futureCardResources[cardId] ?? []
         return (
           <button
@@ -59,9 +60,12 @@ export const MajorImprovements = ({
               {t(locale, `improvements.${cardId}.description`)}
             </div>
             <div className="hand-meta">
-              {t(locale, 'ui.handCost', {
-                cost: costText || t(locale, 'ui.noCost'),
-              })}
+              <span className="hand-label">{t(locale, 'ui.handCostLabel')}</span>
+              <ResourceLine
+                locale={locale}
+                resources={costResources}
+                emptyLabel={t(locale, 'ui.noCost')}
+              />
             </div>
             {futureEntries.length > 0 ? (
               <div className="card-future">
@@ -78,7 +82,11 @@ export const MajorImprovements = ({
                       title={`${entry.name}: ${label}`}
                     >
                       <span className={`card-future-dot meeple-${entry.color}`} />
-                      <span className="card-future-text">{label}</span>
+                      <ResourceLine
+                        locale={locale}
+                        resources={{ ...emptyResources, ...entry.resources }}
+                        className="card-future-text"
+                      />
                     </div>
                   )
                 })}

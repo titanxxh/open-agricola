@@ -97,6 +97,8 @@ export const ActionBoard = ({
               key={`stack-${action.id}-${index}`}
               className={`resource-chip resource-${item.resource}`}
               title={title}
+              data-resource={item.resource}
+              data-amount={item.amount}
             >
               {item.player ? (
                 <span className={`resource-owner meeple-${item.player.color}`} />

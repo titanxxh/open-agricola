@@ -55,6 +55,7 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
 import { DevPanel } from '../components/dev/DevPanel'
+import { ResourceLine } from '../components/common/ResourceLine'
 import { computeScores } from '../logic/scoring'
 import { majorImprovementIds } from '../game/major-improvements'
 import { minorImprovementIds } from '../game/minor-improvements'
@@ -3372,10 +3373,8 @@ export const GameContainer = () => {
     food: baseFood + bakeTotalFood,
     grain: Math.max(0, baseGrain - bakeTotalGrain),
   }
-  const bakeSummaryText =
+  const hasBakeSummary =
     summaryResources.food > 0 || summaryResources.grain > 0
-      ? formatResources(locale, summaryResources, true)
-      : ''
 
   const harvestPending = harvestContext?.pending[0] ?? null
   const harvestPlayer = harvestPending
@@ -3675,10 +3674,18 @@ export const GameContainer = () => {
                   )
                 })}
               </div>
-              <div className="exchange-footer">
-                <div className="exchange-summary">
-                  {bakeSummaryText || t(locale, 'ui.noResources')}
-                </div>
+                <div className="exchange-footer">
+                  <div className="exchange-summary">
+                  {hasBakeSummary ? (
+                    <ResourceLine
+                      locale={locale}
+                      resources={summaryResources}
+                      emptyLabel={t(locale, 'ui.noResources')}
+                    />
+                  ) : (
+                    t(locale, 'ui.noResources')
+                  )}
+                  </div>
                 <div className="exchange-actions">
                   <button
                     type="button"

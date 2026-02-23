@@ -982,6 +982,111 @@
   font-size: 12px;
   color: #4f4f4f;
   margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.hand-label {
+  font-weight: 600;
+  color: #3b3b3b;
+}
+
+.resource-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.resource-inline-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid #d7e3c6;
+  background: #f6fbef;
+  font-size: 11px;
+  color: #2e4b1e;
+}
+
+.resource-inline-item.resource-wood {
+  background: #f2e2c4;
+  border-color: #d6b58a;
+  color: #5a3d1c;
+}
+
+.resource-inline-item.resource-clay {
+  background: #f0d2c9;
+  border-color: #d3a59a;
+  color: #6b2b1a;
+}
+
+.resource-inline-item.resource-reed {
+  background: #e6f3dd;
+  border-color: #c0dcb1;
+  color: #2f5a2f;
+}
+
+.resource-inline-item.resource-stone {
+  background: #e1e7ef;
+  border-color: #c1ccd9;
+  color: #2e3b4e;
+}
+
+.resource-inline-item.resource-food {
+  background: #ffe7c6;
+  border-color: #e4c293;
+  color: #6a3b1c;
+}
+
+.resource-inline-item.resource-grain {
+  background: #fff1b8;
+  border-color: #e3c97d;
+  color: #5a4a1b;
+}
+
+.resource-inline-item.resource-vegetable {
+  background: #d6f5cc;
+  border-color: #b1dba4;
+  color: #2f5a2f;
+}
+
+.resource-inline-item.resource-sheep {
+  background: #f9f5f0;
+  border-color: #ddd6cc;
+  color: #5a4a1b;
+}
+
+.resource-inline-item.resource-boar {
+  background: #f6d9c3;
+  border-color: #d9b191;
+  color: #5a2b1a;
+}
+
+.resource-inline-item.resource-cattle {
+  background: #f5e7d0;
+  border-color: #d7c1a0;
+  color: #5a3d1c;
+}
+
+.resource-inline-item.resource-begging {
+  background: #f1f1f1;
+  border-color: #cfcfcf;
+  color: #4f4f4f;
+}
+
+.resource-inline-empty {
+  color: #6b6b6b;
+}
+
+.resource-inline-label {
+  white-space: nowrap;
+}
+
+.resource-inline-amount {
+  font-weight: 700;
 }
 
 .card-future {

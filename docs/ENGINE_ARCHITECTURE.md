@@ -46,6 +46,7 @@ Engine
 - FutureMeeples：未来回合资源堆叠与回合开始结算
 - ActionStackView：行动格资源堆叠显示
 - ActionCardVisibility：未开行动牌隐藏标题与描述
+- ResourceLine：资源显示统一为结构化元素
 - DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口

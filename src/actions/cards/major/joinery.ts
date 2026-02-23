@@ -7,9 +7,9 @@ export const joinery: MajorCardEffect = {
   extraVp: true,
   description: [
     '[Harvest]',
-    'Wood → 2 food (max 1)',
+    '1 <WOOD> → 2 <FOOD> (max 1)',
     '[Scoring]',
-    '3/5/7 wood → 1/2/3 score',
+    '3/5/7 <WOOD> → 1/2/3 <SCORE>',
   ],
   scoring: {
     resource: 'wood',
