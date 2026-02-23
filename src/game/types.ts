@@ -71,6 +71,23 @@ export type LogEntry = {
   params?: Record<string, string | number>
 }
 
+export type FutureMeeple = {
+  id: string
+  cardId: string
+  playerId: string
+  round: number
+  actionId: string | null
+  resources: Partial<Resource>
+}
+
+export type FutureMeepleRequest = {
+  cardId: string
+  playerId: string
+  startRound: number
+  count: number
+  resources: Partial<Resource>
+}
+
 export type GameState = {
   round: number
   currentPlayerIndex: number
@@ -81,6 +98,8 @@ export type GameState = {
   roundActionOrder: (string | null)[]
   gameSeed: number
   availableMajorImprovements: string[]
+  futureMeeples: FutureMeeple[]
+  pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
 }
 
@@ -106,6 +125,7 @@ export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'fail'; logKey: string }
+  | { type: 'flow'; flow: ActionFlow }
 
 export type ActionFlow =
   | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string }

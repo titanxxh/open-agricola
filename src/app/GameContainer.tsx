@@ -21,6 +21,7 @@ import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import {
   applyRoundGrowth,
+  applyFutureMeeples,
   baseActionOrder,
   cloneState,
   createInitialState,
@@ -54,6 +55,7 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
 import { DevPanel } from '../components/dev/DevPanel'
+import { ResourceLine } from '../components/common/ResourceLine'
 import { computeScores } from '../logic/scoring'
 import { majorImprovementIds } from '../game/major-improvements'
 import { minorImprovementIds } from '../game/minor-improvements'
@@ -83,6 +85,7 @@ type HarvestContext = {
 export const GameContainer = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devCardId, setDevCardId] = useState('')
+  const [resetSeedInput, setResetSeedInput] = useState('')
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<
     Record<string, number>
   >({})
@@ -306,9 +309,13 @@ export const GameContainer = () => {
     ...displayPlayer.minorPlayed.map((id) => `minor:${id}`),
     ...displayPlayer.occupationPlayed.map((id) => `occupation:${id}`),
   ]
+  const isSelectingImprovementAny =
+    pendingChoice?.promptKey === 'ui.interactionChooseImprovement' &&
+    pendingChoice.playerIndex === state.currentPlayerIndex
   const isSelectingMinor =
-    pendingChoice?.spaceId === 'meeting-place' &&
-    pendingChoice.promptKey === 'ui.interactionChooseMinorImprovement' &&
+    ((pendingChoice?.spaceId === 'meeting-place' &&
+      pendingChoice.promptKey === 'ui.interactionChooseMinorImprovement') ||
+      isSelectingImprovementAny) &&
     pendingChoice.playerIndex === state.currentPlayerIndex
   const isSelectingOccupation =
     (pendingChoice?.spaceId === 'lessons' ||
@@ -823,6 +830,44 @@ export const GameContainer = () => {
     [state.actionSpaces],
   )
   const scoreSummaries = useMemo(() => computeScores(state), [state])
+  const futureCardResources = useMemo(() => {
+    const byCard = new Map<string, Map<string, Partial<Resource>>>()
+    state.futureMeeples.forEach((entry) => {
+      let byPlayer = byCard.get(entry.cardId)
+      if (!byPlayer) {
+        byPlayer = new Map()
+        byCard.set(entry.cardId, byPlayer)
+      }
+      let resources = byPlayer.get(entry.playerId)
+      if (!resources) {
+        resources = {}
+        byPlayer.set(entry.playerId, resources)
+      }
+      Object.entries(entry.resources).forEach(([key, value]) => {
+        const amount = value ?? 0
+        if (amount <= 0) return
+        const typedKey = key as keyof Resource
+        resources[typedKey] = (resources[typedKey] ?? 0) + amount
+      })
+    })
+    const playerById = new Map(state.players.map((player) => [player.id, player]))
+    const result: Record<
+      string,
+      { playerId: string; name: string; color: PlayerState['color']; resources: Partial<Resource> }[]
+    > = {}
+    byCard.forEach((byPlayer, cardId) => {
+      result[cardId] = Array.from(byPlayer.entries()).map(([playerId, resources]) => {
+        const player = playerById.get(playerId)
+        return {
+          playerId,
+          name: player?.name ?? playerId,
+          color: player?.color ?? 'red',
+          resources,
+        }
+      })
+    })
+    return result
+  }, [state.futureMeeples, state.players])
   const roundOpenById = useMemo(
     () => createRoundOpenById(state.roundActionOrder),
     [state.roundActionOrder],
@@ -2161,7 +2206,7 @@ export const GameContainer = () => {
       updateState(nextState)
       return
     }
-    if (result.type === 'ok') {
+    if (result.type === 'ok' || result.type === 'flow') {
       logAction(nextState, player, targetSpace, beforePlayer)
       const progress = runEngineSteps(
         engine,
@@ -2423,6 +2468,7 @@ export const GameContainer = () => {
       return
     }
     applyRoundGrowth(nextState)
+    applyFutureMeeples(nextState)
     applyMajorEffectsToAllPlayers(nextState, 'onRoundStart')
     const startIndex = nextState.players.findIndex((p) => p.startPlayer)
     nextState.currentPlayerIndex = startIndex === -1 ? 0 : startIndex
@@ -2756,7 +2802,9 @@ export const GameContainer = () => {
   const sowSelectedCount = Object.keys(pendingSowSelections).length
 
   const resetGame = () => {
-    const nextState = createInitialState()
+    const parsedSeed = Number.parseInt(resetSeedInput, 10)
+    const seed = Number.isFinite(parsedSeed) ? parsedSeed : undefined
+    const nextState = createInitialState(seed)
     setHistory([])
     updateState(nextState)
     setViewPlayerId(nextState.players[0]?.id ?? '')
@@ -2779,6 +2827,7 @@ export const GameContainer = () => {
     setPlowError(null)
     setPendingSowSelections({})
     setSowError(null)
+    setResetSeedInput(String(nextState.gameSeed))
     void persistGame(nextState)
   }
 
@@ -2809,7 +2858,7 @@ export const GameContainer = () => {
       Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
       Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
       Major_ClayOven: { food: 5, max: 1 },
-      Major_StoneOven: { food: 6, max: 2 },
+      Major_StoneOven: { food: 4, max: 2 },
     }),
     [],
   )
@@ -3324,10 +3373,8 @@ export const GameContainer = () => {
     food: baseFood + bakeTotalFood,
     grain: Math.max(0, baseGrain - bakeTotalGrain),
   }
-  const bakeSummaryText =
+  const hasBakeSummary =
     summaryResources.food > 0 || summaryResources.grain > 0
-      ? formatResources(locale, summaryResources, true)
-      : ''
 
   const harvestPending = harvestContext?.pending[0] ?? null
   const harvestPlayer = harvestPending
@@ -3627,10 +3674,18 @@ export const GameContainer = () => {
                   )
                 })}
               </div>
-              <div className="exchange-footer">
-                <div className="exchange-summary">
-                  {bakeSummaryText || t(locale, 'ui.noResources')}
-                </div>
+                <div className="exchange-footer">
+                  <div className="exchange-summary">
+                  {hasBakeSummary ? (
+                    <ResourceLine
+                      locale={locale}
+                      resources={summaryResources}
+                      emptyLabel={t(locale, 'ui.noResources')}
+                    />
+                  ) : (
+                    t(locale, 'ui.noResources')
+                  )}
+                  </div>
                 <div className="exchange-actions">
                   <button
                     type="button"
@@ -3711,11 +3766,17 @@ export const GameContainer = () => {
         hasActionStartSnapshot={!!actionStartSnapshot}
         allWorkersUsed={allWorkersUsed}
         isGameOver={state.gameOver}
+        devMode={devMode}
+        seedValue={resetSeedInput}
+        onSeedChange={setResetSeedInput}
       />
       <MajorImprovements
         locale={locale}
         availableMajorImprovements={state.availableMajorImprovements}
         currentPlayer={currentPlayer}
+        isSelectingMajor={isSelectingImprovementAny}
+        resolveChoice={resolveChoice}
+        futureCardResources={futureCardResources}
       />
       <main className="board">
         <ActionBoard
@@ -3724,15 +3785,18 @@ export const GameContainer = () => {
           roundSlots={roundSlots}
           currentPlayer={currentPlayer}
           players={state.players}
+          futureMeeples={state.futureMeeples}
           canTakeAction={canTakeActionInUI}
           takeAction={takeAction}
           currentRound={state.round}
+          devMode={devMode}
         />
         <FarmBoard
           locale={locale}
           players={state.players}
           currentPlayer={currentPlayer}
           displayPlayer={displayPlayer}
+          devMode={devMode}
           currentStartPlayerId={
             state.roundStartSnapshot?.players.find((player) => player.startPlayer)
               ?.id ?? state.players.find((player) => player.startPlayer)?.id ?? ''
@@ -3780,6 +3844,8 @@ export const GameContainer = () => {
           setViewPlayerId={setViewPlayerId}
           isSelectingMinor={isSelectingMinor}
           isSelectingOccupation={isSelectingOccupation}
+          isSelectingImprovementAny={isSelectingImprovementAny}
+          futureCardResources={futureCardResources}
           resolveChoice={resolveChoice}
         />
       </main>

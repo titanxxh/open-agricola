@@ -30,6 +30,8 @@ const createState = () =>
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1,
     availableMajorImprovements: [],
+    futureMeeples: [],
+    pendingFutureMeeples: [],
     gameOver: false,
   }) as GameState
 
@@ -71,7 +73,7 @@ const createPlayer = () =>
     newbornCount: 0,
     pastures: [],
     fenceSegments: [],
-    majorEffects: { wellRounds: 0 },
+      majorEffects: { wellRounds: 0 },
     startPlayer: false,
   }) as PlayerState
 

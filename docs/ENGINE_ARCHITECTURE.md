@@ -35,9 +35,21 @@ Engine
 - PersistenceAdapter：持久化与状态还原入口
 - Scoring：计分计算与计分板展示
 - CardCatalog：编号卡牌数据目录（A/B/C/D/E）
+- MajorCatalog：大改良卡牌定义与描述
 - CardBase：Occupation / MinorImprovement 基础模型
 - CardView：前端优先使用 i18n 的 name/desc 渲染
 - I18nCatalog：卡牌名称与描述中文翻译
+- ImprovementSelection：改良行动支持从手牌与大改良区点击选择
+- CardEffects：卡牌效果注册表与 hook 执行器
+- CardListeners：卡牌监听注册与事件分发
+- CardActivation：卡牌 hook 触发并返回 flow
+- FutureMeeples：未来回合资源堆叠与回合开始结算
+- ActionStackView：行动格资源堆叠显示
+- ActionCardVisibility：未开行动牌隐藏标题与描述
+- ResourceLine：资源显示统一为结构化元素
+- PlayerActionCard：可作为行动位的卡牌类型（按职业/小改进分类）
+- DevModeVisibility：开发者模式下显示手牌与未来回合行动牌信息
+- DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口
 

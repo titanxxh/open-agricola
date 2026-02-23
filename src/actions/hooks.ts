@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionExecutionContext,
   ActionExecutionResult,
+  ActionFlow,
   Resource,
 } from '../game/types'
 
@@ -39,6 +40,7 @@ export type ActionHookResult = {
   actionId?: string
   extraOptions?: ActionChoiceOption[]
   followUpActions?: string[]
+  flow?: ActionFlow
   costs?: Partial<Resource>
 }
 

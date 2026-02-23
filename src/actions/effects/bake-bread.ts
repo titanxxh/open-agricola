@@ -6,7 +6,7 @@ const bakeTable = {
   Major_CookingHearth1: 3,
   Major_CookingHearth2: 3,
   Major_ClayOven: 5,
-  Major_StoneOven: 6,
+  Major_StoneOven: 4,
 } as const
 
 export type BakeImprovementId = keyof typeof bakeTable

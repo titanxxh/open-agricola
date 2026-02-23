@@ -46,3 +46,5 @@ export class CardBase {
 export class MinorImprovement extends CardBase {}
 
 export class Occupation extends CardBase {}
+
+export class PlayerActionCard extends CardBase {}

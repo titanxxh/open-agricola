@@ -1,9 +1,9 @@
-import type { Occupation as OccupationCard } from '../actions/cards/types'
+import type { Occupation as OccupationCard, PlayerActionCard } from '../actions/cards/types'
 import { occupationCards, occupationIds } from '../actions/cards/catalog'
 
-export type Occupation = OccupationCard
+export type Occupation = OccupationCard | PlayerActionCard
 
-export const occupations: OccupationCard[] = occupationCards
+export const occupations: Occupation[] = occupationCards
 
 export { occupationIds }
 

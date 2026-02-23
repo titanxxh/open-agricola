@@ -1,12 +1,21 @@
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
+  ActionFlow,
   ActionSpace,
   PlayerState,
   GameState,
   ActionChoiceOption,
 } from '../game/types'
-import { ActionNode, ChoiceNode, OptionalNode, OrNode, XorNode } from './nodes'
+import {
+  ActionNode,
+  ChoiceNode,
+  OptionalNode,
+  OrNode,
+  ParallelNode,
+  SequenceNode,
+  XorNode,
+} from './nodes'
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -26,6 +35,7 @@ export class Engine {
   private log: LogStore
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
+  private flowNodeCounter = 0
 
   private findActionNode(node: EngineNode): ActionNode | null {
     if (node instanceof ActionNode) return node
@@ -37,6 +47,45 @@ export class Engine {
       }
     }
     return null
+  }
+
+  private buildFlowNode(flow: ActionFlow): EngineNode {
+    const nextId = () => `flow-${this.flowNodeCounter++}`
+    if (flow.type === 'leaf') {
+      const actionNode = new ActionNode(nextId(), flow.actionId)
+      const definition = this.registry.get(flow.actionId)
+      if (definition?.resolveChoice) {
+        const sequence = new SequenceNode(nextId(), [
+          actionNode,
+          new ChoiceNode(nextId(), []),
+        ])
+        return flow.optional
+          ? new OptionalNode(nextId(), sequence, flow.promptKey)
+          : sequence
+      }
+      return flow.optional
+        ? new OptionalNode(nextId(), actionNode, flow.promptKey)
+        : actionNode
+    }
+    const children = flow.children.map((child) => this.buildFlowNode(child))
+    if (flow.type === 'seq') {
+      const sequence = new SequenceNode(nextId(), children)
+      return flow.optional
+        ? new OptionalNode(nextId(), sequence, flow.promptKey)
+        : sequence
+    }
+    if (flow.type === 'parallel') {
+      const parallel = new ParallelNode(nextId(), children)
+      return flow.optional
+        ? new OptionalNode(nextId(), parallel, flow.promptKey)
+        : parallel
+    }
+    if (flow.type === 'xor') {
+      const xor = new XorNode(nextId(), children, flow.promptKey)
+      return flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+    }
+    const or = new OrNode(nextId(), children, flow.promptKey)
+    return flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
   }
 
   private findChoiceNode(node: EngineNode): ChoiceNode | null {
@@ -302,21 +351,25 @@ export class Engine {
           this.pendingChoiceNodeId = nextNode.id
           this.pendingChoiceActionId = replacedActionId
         }
-      const argResults = this.hooks.computeArgs(
-        { ...executionContext, actionId: replacedActionId },
-        result,
-      )
-      const extraOptions = argResults
-        .flatMap((entry) => entry.extraOptions ?? [])
-        .filter((option) => option)
-      if (extraOptions.length > 0) {
-        result.options = [...result.options, ...extraOptions]
-      }
-      return {
+        const argResults = this.hooks.computeArgs(
+          { ...executionContext, actionId: replacedActionId },
+          result,
+        )
+        const extraOptions = argResults
+          .flatMap((entry) => entry.extraOptions ?? [])
+          .filter((option) => option)
+        if (extraOptions.length > 0) {
+          result.options = [...result.options, ...extraOptions]
+        }
+        return {
           type: 'choice',
           nodeId: this.pendingChoiceNodeId ?? node.id,
           choice: { promptKey: result.promptKey, options: result.options },
         }
+      }
+      if (result.type === 'flow') {
+        const flowNode = this.buildFlowNode(result.flow)
+        this.tree.insertAfter(node.id, [flowNode])
       }
       const immediateResults = this.hooks.immediatelyAfter(
         { ...executionContext, actionId: replacedActionId },
@@ -330,13 +383,20 @@ export class Engine {
         { ...executionContext, actionId: replacedActionId },
         result,
       )
+      const hookFlows = [...immediateResults, ...afterResults]
+        .map((entry) => entry.flow)
+        .filter((flow) => flow)
+        .map((flow) => this.buildFlowNode(flow as ActionFlow))
       const followUps = [...immediateResults, ...afterResults]
         .flatMap((entry) => entry.followUpActions ?? [])
         .filter((actionId) => actionId)
-      if (followUps.length > 0) {
-        const nodes = followUps.map(
-          (actionId, index) => new ActionNode(`chain-${node.id}-${index}`, actionId),
-        )
+      if (hookFlows.length > 0 || followUps.length > 0) {
+        const nodes = [
+          ...hookFlows,
+          ...followUps.map(
+            (actionId, index) => new ActionNode(`chain-${node.id}-${index}`, actionId),
+          ),
+        ]
         this.tree.insertAfter(node.id, nodes)
       }
       node.resolve(result)
@@ -442,14 +502,21 @@ export class Engine {
           { ...executionContext, actionId },
           result,
         )
+        const hookFlows = [...immediateResults, ...afterResults]
+          .map((entry) => entry.flow)
+          .filter((flow) => flow)
+          .map((flow) => this.buildFlowNode(flow as ActionFlow))
         const followUps = [...immediateResults, ...afterResults]
           .flatMap((entry) => entry.followUpActions ?? [])
           .filter((followUpAction) => followUpAction)
-        if (followUps.length > 0) {
-          const nodes = followUps.map(
-            (followUpAction, index) =>
-              new ActionNode(`chain-${child.id}-${index}`, followUpAction),
-          )
+        if (hookFlows.length > 0 || followUps.length > 0) {
+          const nodes = [
+            ...hookFlows,
+            ...followUps.map(
+              (followUpAction, index) =>
+                new ActionNode(`chain-${child.id}-${index}`, followUpAction),
+            ),
+          ]
           this.tree.insertAfter(child.id, nodes)
         }
         child.resolve(result)
@@ -488,19 +555,32 @@ export class Engine {
       this.pendingChoiceActionId = null
       return result
     }
+    if (result.type === 'flow') {
+      const flowNode = this.buildFlowNode(result.flow)
+      if (this.pendingChoiceNodeId) {
+        this.tree.insertAfter(this.pendingChoiceNodeId, [flowNode])
+      }
+    }
     const immediateResults = this.hooks.immediatelyAfter(
       { ...executionContext, actionId },
       result,
     )
     const afterResults = this.hooks.after({ ...executionContext, actionId }, result)
+    const hookFlows = [...immediateResults, ...afterResults]
+      .map((entry) => entry.flow)
+      .filter((flow) => flow)
+      .map((flow) => this.buildFlowNode(flow as ActionFlow))
     const followUps = [...immediateResults, ...afterResults]
       .flatMap((entry) => entry.followUpActions ?? [])
       .filter((actionId) => actionId)
-    if (followUps.length > 0 && this.pendingChoiceNodeId) {
-      const nodes = followUps.map(
-        (action, index) =>
-          new ActionNode(`chain-${this.pendingChoiceNodeId}-${index}`, action),
-      )
+    if ((hookFlows.length > 0 || followUps.length > 0) && this.pendingChoiceNodeId) {
+      const nodes = [
+        ...hookFlows,
+        ...followUps.map(
+          (action, index) =>
+            new ActionNode(`chain-${this.pendingChoiceNodeId}-${index}`, action),
+        ),
+      ]
       this.tree.insertAfter(this.pendingChoiceNodeId, nodes)
     }
     if (this.pendingChoiceNodeId) {

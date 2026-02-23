@@ -47,7 +47,7 @@ const createPlayer = (): PlayerState => ({
   newbornCount: 0,
   pastures: [],
   fenceSegments: [],
-  majorEffects: { wellRounds: 0 },
+    majorEffects: { wellRounds: 0 },
   startPlayer: false,
 })
 
@@ -85,6 +85,8 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: [],
+  futureMeeples: [],
+  pendingFutureMeeples: [],
   gameOver: false,
 })
 

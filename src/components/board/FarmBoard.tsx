@@ -1,6 +1,6 @@
 import type { Locale } from '../../i18n'
 import { t } from '../../i18n'
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { FarmTilePosition, PlayerState, Resource } from '../../game/types'
 import { formatAnimalCounts, formatResources } from '../../logic/format'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { getOccupation } from '../../game/occupations'
@@ -8,6 +8,7 @@ import { getMajorCardEffect } from '../../actions/cards/major'
 import { canPayResources } from '../../actions/effects/pay'
 import { emptyResources } from '../../logic/state'
 import type { AnimalReorgState } from '../../types/ui'
+import { ResourceLine } from '../common/ResourceLine'
 
 type FarmCell = {
   key: string
@@ -24,6 +25,7 @@ type Props = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
   playedCards: string[]
@@ -76,6 +78,16 @@ type Props = {
   setViewPlayerId: (value: string) => void
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
+  isSelectingImprovementAny: boolean
+  futureCardResources: Record<
+    string,
+    {
+      playerId: string
+      name: string
+      color: PlayerState['color']
+      resources: Partial<Resource>
+    }[]
+  >
   resolveChoice: (value: string) => void
 }
 
@@ -126,8 +138,12 @@ export const FarmBoard = ({
   setViewPlayerId,
   isSelectingMinor,
   isSelectingOccupation,
+  isSelectingImprovementAny,
+  futureCardResources,
   resolveChoice,
+  devMode,
 }: Props) => {
+  const canInteractHand = displayPlayer.id === currentPlayer.id
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -154,8 +170,11 @@ export const FarmBoard = ({
         <h2>{t(locale, 'ui.farmTitle')}</h2>
         <div className="player-summary">{displayPlayer.name}</div>
         <div className="player-resources">
-          {formatResources(locale, displayPlayer.resources, true) ||
-            t(locale, 'ui.noResources')}
+          <ResourceLine
+            locale={locale}
+            resources={displayPlayer.resources}
+            emptyLabel={t(locale, 'ui.noResources')}
+          />
         </div>
       </div>
       <div className="player-tabs">
@@ -577,26 +596,18 @@ export const FarmBoard = ({
           const minor = isMinor ? getMinorImprovement(rawId) : null
           const occupation = isOccupation ? getOccupation(rawId) : null
           const major = isMajor ? getMajorCardEffect(rawId) : null
-          const costText = minor
-            ? formatResources(
-                locale,
-                { ...emptyResources, ...(minor.cost ?? {}) },
-                true,
-              )
-            : occupation
-              ? formatResources(
-                  locale,
-                  { ...emptyResources, ...(occupation.cost ?? {}) },
-                  true,
-                )
+          const costResources = minor?.cost
+            ? { ...emptyResources, ...minor.cost }
+            : occupation?.cost
+              ? { ...emptyResources, ...occupation.cost }
               : major
-                ? formatResources(locale, { ...emptyResources, ...major.cost }, true)
-                : ''
-          const rewardText = minor?.reward
-            ? formatResources(locale, { ...emptyResources, ...minor.reward }, true)
+                ? { ...emptyResources, ...major.cost }
+                : {}
+          const rewardResources = minor?.reward
+            ? { ...emptyResources, ...minor.reward }
             : occupation?.reward
-              ? formatResources(locale, { ...emptyResources, ...occupation.reward }, true)
-              : ''
+              ? { ...emptyResources, ...occupation.reward }
+              : {}
           const nameText = isMinor
             ? translateIfAvailable(
                 `minorImprovements.${rawId}.name`,
@@ -619,6 +630,7 @@ export const FarmBoard = ({
                   occupation?.desc?.join(' ') ?? '',
                 )
               : t(locale, `improvements.${rawId}.description`)
+          const futureEntries = futureCardResources[rawId] ?? []
           return (
             <div
               key={`played-${index}`}
@@ -629,15 +641,46 @@ export const FarmBoard = ({
               <div className="hand-title">{nameText}</div>
               <div className="hand-meta">{descriptionText}</div>
               <div className="hand-meta">
-                {t(locale, 'ui.handCost', {
-                  cost: costText || t(locale, 'ui.noCost'),
-                })}
+                <span className="hand-label">{t(locale, 'ui.handCostLabel')}</span>
+                <ResourceLine
+                  locale={locale}
+                  resources={costResources}
+                  emptyLabel={t(locale, 'ui.noCost')}
+                />
               </div>
               <div className="hand-meta">
-                {t(locale, 'ui.handEffect', {
-                  effect: rewardText || t(locale, 'ui.noEffect'),
-                })}
+                <span className="hand-label">{t(locale, 'ui.handEffectLabel')}</span>
+                <ResourceLine
+                  locale={locale}
+                  resources={rewardResources}
+                  emptyLabel={t(locale, 'ui.noEffect')}
+                />
               </div>
+              {futureEntries.length > 0 ? (
+                <div className="card-future">
+                  {futureEntries.map((entry, entryIndex) => {
+                    const label = formatResources(
+                      locale,
+                      { ...emptyResources, ...entry.resources },
+                      true,
+                    )
+                    return (
+                      <div
+                        key={`future-${rawId}-${entry.playerId}-${entryIndex}`}
+                        className="card-future-item"
+                        title={`${entry.name}: ${label}`}
+                      >
+                        <span className={`card-future-dot meeple-${entry.color}`} />
+                        <ResourceLine
+                          locale={locale}
+                          resources={{ ...emptyResources, ...entry.resources }}
+                          className="card-future-text"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
           )
         })}
@@ -645,7 +688,7 @@ export const FarmBoard = ({
     </div>
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === currentPlayer.id ? (
+      {displayPlayer.id === currentPlayer.id || devMode ? (
         <div className="hand-sections">
           <div className="hand-section occupation">
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
@@ -658,32 +701,28 @@ export const FarmBoard = ({
                   const canPlay = occupation
                     ? canPayResources(displayPlayer, occupation.cost ?? {})
                     : false
-                  const costText = occupation
-                    ? formatResources(
-                        locale,
-                        { ...emptyResources, ...(occupation.cost ?? {}) },
-                        true,
-                      )
-                    : ''
-                  const rewardText = occupation?.reward
-                    ? formatResources(
-                        locale,
-                        { ...emptyResources, ...occupation.reward },
-                        true,
-                      )
-                    : ''
+                  const canInteract = canInteractHand && canPlay
+                  const costResources = occupation?.cost
+                    ? { ...emptyResources, ...occupation.cost }
+                    : {}
+                  const rewardResources = occupation?.reward
+                    ? { ...emptyResources, ...occupation.reward }
+                    : {}
                   return (
                     <button
                       key={`occupation-${cardId}`}
                       type="button"
                       className={`hand-card hand-card-occupation${
-                        canPlay ? '' : ' disabled'
-                      }${isSelectingOccupation && canPlay ? ' selectable' : ''}`}
+                        canInteract ? '' : ' disabled'
+                      }${
+                        isSelectingOccupation && canInteract ? ' selectable' : ''
+                      }`}
                       onClick={() => {
-                        if (isSelectingOccupation && canPlay) {
+                        if (isSelectingOccupation && canInteract) {
                           resolveChoice(cardId)
                         }
                       }}
+                      disabled={!canInteractHand}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(
@@ -698,14 +737,24 @@ export const FarmBoard = ({
                         )}
                       </div>
                       <div className="hand-meta">
-                        {t(locale, 'ui.handCost', {
-                          cost: costText || t(locale, 'ui.noCost'),
-                        })}
+                        <span className="hand-label">
+                          {t(locale, 'ui.handCostLabel')}
+                        </span>
+                        <ResourceLine
+                          locale={locale}
+                          resources={costResources}
+                          emptyLabel={t(locale, 'ui.noCost')}
+                        />
                       </div>
                       <div className="hand-meta">
-                        {t(locale, 'ui.handEffect', {
-                          effect: rewardText || t(locale, 'ui.noEffect'),
-                        })}
+                        <span className="hand-label">
+                          {t(locale, 'ui.handEffectLabel')}
+                        </span>
+                        <ResourceLine
+                          locale={locale}
+                          resources={rewardResources}
+                          emptyLabel={t(locale, 'ui.noEffect')}
+                        />
                       </div>
                     </button>
                   )
@@ -724,32 +773,31 @@ export const FarmBoard = ({
                   const canPlay = improvement
                     ? canPayResources(displayPlayer, improvement.cost ?? {})
                     : false
-                  const costText = improvement
-                    ? formatResources(
-                        locale,
-                        { ...emptyResources, ...(improvement.cost ?? {}) },
-                        true,
-                      )
-                    : ''
-                  const rewardText = improvement?.reward
-                    ? formatResources(
-                        locale,
-                        { ...emptyResources, ...improvement.reward },
-                        true,
-                      )
-                    : ''
+                  const canInteract = canInteractHand && canPlay
+                  const costResources = improvement?.cost
+                    ? { ...emptyResources, ...improvement.cost }
+                    : {}
+                  const rewardResources = improvement?.reward
+                    ? { ...emptyResources, ...improvement.reward }
+                    : {}
+                  const canSelect =
+                    (isSelectingMinor || isSelectingImprovementAny) && canInteract
                   return (
                     <button
                       key={`hand-${cardId}`}
                       type="button"
-                      className={`hand-card hand-card-minor${canPlay ? '' : ' disabled'}${
-                        isSelectingMinor && canPlay ? ' selectable' : ''
-                      }`}
+                      className={`hand-card hand-card-minor${
+                        canInteract ? '' : ' disabled'
+                      }${canSelect ? ' selectable' : ''}`}
                       onClick={() => {
-                        if (isSelectingMinor && canPlay) {
-                          resolveChoice(cardId)
+                        if (canSelect) {
+                          const value = isSelectingImprovementAny
+                            ? `minor:${cardId}`
+                            : cardId
+                          resolveChoice(value)
                         }
                       }}
+                      disabled={!canInteractHand}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(
@@ -764,14 +812,24 @@ export const FarmBoard = ({
                         )}
                       </div>
                       <div className="hand-meta">
-                        {t(locale, 'ui.handCost', {
-                          cost: costText || t(locale, 'ui.noCost'),
-                        })}
+                        <span className="hand-label">
+                          {t(locale, 'ui.handCostLabel')}
+                        </span>
+                        <ResourceLine
+                          locale={locale}
+                          resources={costResources}
+                          emptyLabel={t(locale, 'ui.noCost')}
+                        />
                       </div>
                       <div className="hand-meta">
-                        {t(locale, 'ui.handEffect', {
-                          effect: rewardText || t(locale, 'ui.noEffect'),
-                        })}
+                        <span className="hand-label">
+                          {t(locale, 'ui.handEffectLabel')}
+                        </span>
+                        <ResourceLine
+                          locale={locale}
+                          resources={rewardResources}
+                          emptyLabel={t(locale, 'ui.noEffect')}
+                        />
                       </div>
                     </button>
                   )

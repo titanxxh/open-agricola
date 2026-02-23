@@ -1,13 +1,9 @@
-import type { GameState, PlayerState, Resource } from '../../../game/types'
+import type { Resource } from '../../../game/types'
+import type { CardEffect, CardEffectHook } from '../card-effects'
 
-export type MajorEffectHook =
-  | 'onBuy'
-  | 'onRoundStart'
-  | 'onHarvest'
-  | 'onRoundEnd'
+export type MajorEffectHook = CardEffectHook
 
-export type MajorCardEffect = {
-  id: string
+export type MajorCardEffect = CardEffect & {
   cost: Partial<Resource>
   vp: number
   extraVp: boolean
@@ -16,8 +12,4 @@ export type MajorCardEffect = {
     resource: keyof Resource
     map: Record<string, number>
   }
-  onBuy?: (state: GameState, player: PlayerState) => void
-  onRoundStart?: (state: GameState, player: PlayerState) => void
-  onHarvest?: (state: GameState, player: PlayerState) => void
-  onRoundEnd?: (state: GameState, player: PlayerState) => void
 }

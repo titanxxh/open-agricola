@@ -1,14 +1,15 @@
 import { t, type Locale } from '../i18n'
 import type { Resource } from '../game/types'
+import { resourceKeyList } from './state'
 
 export const formatResources = (
   locale: Locale,
   resources: Resource,
   hideZero = false,
 ) =>
-  (Object.keys(resources) as (keyof Resource)[])
-    .filter((key) => !hideZero || resources[key] > 0)
-    .map((key) => `${t(locale, `resources.${key}`)} ${resources[key]}`)
+  resourceKeyList
+    .filter((key) => !hideZero || (resources[key] ?? 0) > 0)
+    .map((key) => `${t(locale, `resources.${key}`)} ${resources[key] ?? 0}`)
     .join(' · ')
 
 export const formatAnimalCounts = (
