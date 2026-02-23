@@ -1,1 +1,12 @@
-export const D36_BreedRegistry = { id: 'D36_BreedRegistry' }
+import { MinorImprovement } from '../types'
+
+export const D36_BreedRegistry = new MinorImprovement({
+  id: "D36_BreedRegistry",
+  name: "Breed Registry",
+  deck: "D",
+  number: 36,
+  category: "POINTS_PROVIDER",
+  desc: ["During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any sheep into food, you get 3 bonus <SCORE>."],
+  cost: {},
+  prerequisite: "No Sheep",
+})
