@@ -58,6 +58,10 @@ import { minorImprovementIds } from '../game/minor-improvements'
 import { occupationIds } from '../game/occupations'
 import { runEngineStepsCore } from './hooks/use-engine-flow'
 import {
+  applyAnimalReorgToPlayer,
+  buildPendingChoiceFromReorgProgress,
+} from './hooks/use-animal-reorg-flow'
+import {
   applyBreedPhase as applyBreedPhaseCore,
   buildHarvestFeedOptions as buildHarvestFeedOptionsCore,
   buildHarvestLogEntries as buildHarvestLogEntriesCore,
@@ -2787,38 +2791,12 @@ export const GameContainer = () => {
     const nextState = cloneState(state)
     const player = nextState.players[pendingAnimalReorg.playerIndex]
     if (!player) return
-    const pastureZones = animalReorg.zones.filter(
-      (zone) => zone.zoneType === 'pasture',
-    )
-    player.pastures = player.pastures.map((pasture) => {
-      const assigned = pastureZones.find((zone) => zone.id === pasture.id)
-      if (!assigned || !assigned.animalType) {
-        return { ...pasture, animalType: null, animalCount: 0 }
-      }
-      const capacity = getPastureCapacity(pasture)
-      const count = Math.max(0, Math.min(capacity, assigned.animalCount))
-      return {
-        ...pasture,
-        animalType: count > 0 ? assigned.animalType : null,
-        animalCount: count,
-      }
+    applyAnimalReorgToPlayer({
+      player,
+      animalReorg,
+      totals: reorgTotals,
+      getPastureCapacity,
     })
-    const houseZone = animalReorg.zones.find((zone) => zone.zoneType === 'house')
-    player.houseAnimalType = houseZone?.animalType ?? null
-    player.houseAnimalCount =
-      houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
-    const stableZones = animalReorg.zones.filter(
-      (zone) => zone.zoneType === 'stable',
-    )
-    const stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
-    stableZones.forEach((zone) => {
-      const key = zone.id.replace('stable:', '')
-      stableAnimals[key] = zone.animalType ?? null
-    })
-    player.stableAnimals = stableAnimals
-    player.resources.sheep = reorgTotals.sheep
-    player.resources.boar = reorgTotals.boar
-    player.resources.cattle = reorgTotals.cattle
     setPendingAnimalReorg(null)
     setAnimalReorg(null)
     if (reorgSource === 'anytime-reorg') {
@@ -2870,17 +2848,9 @@ export const GameContainer = () => {
         setPendingStableTiles([])
         setStableError(null)
       }
-      setPendingChoice({
-        promptKey: progress.promptKey,
-        options: progress.choice,
-        playerIndex: pendingAnimalReorg.playerIndex,
-        spaceId: pendingAnimalReorg.spaceId,
-        fenceExtraWood:
-          progress.promptKey === 'ui.interactionFenceSelect' &&
-          pendingAnimalReorg.spaceId === 'farm-redevelopment'
-            ? 1
-            : 0,
-      })
+      setPendingChoice(
+        buildPendingChoiceFromReorgProgress(progress, pendingAnimalReorg),
+      )
       updateState(nextState)
       return
     }

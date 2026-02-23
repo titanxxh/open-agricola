@@ -74,6 +74,9 @@
 - App 流程拆分（第二步）
   - 抽离回合推进与收获主流程：`use-round-flow.ts` / `use-harvest-flow.ts`
   - 入口：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
+- App 流程拆分（第三步）
+  - 抽离动物重整写回与重整后 choice 构造：`use-animal-reorg-flow.ts`
+  - 入口：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts), [GameContainer.tsx](../src/app/GameContainer.tsx)
 - Meeting Place 行动
   - 起始玩家逻辑
   - flow 可选小发展（wrapOptional + minor-improvement）
@@ -160,6 +163,7 @@ Persist (server/index.ts) ←→ App.tsx normalizeState/persistGame
 - `npm test`
   - 引擎链路、Hook 矩阵真实性、评分、收获、状态克隆、API 契约与 payload 校验测试通过
   - 新增回合流程 hooks 测试通过（`use-round-flow.test.ts`）
+  - 新增动物重整流程 hooks 测试通过（`use-animal-reorg-flow.test.ts`）
 
 ## 2. 缺失部分总结
 

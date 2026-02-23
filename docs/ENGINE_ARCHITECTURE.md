@@ -46,6 +46,7 @@ Engine
 - EngineFlowCore：引擎推进核心循环（从容器中抽离）
 - RoundFlowCore：回合结束与回合推进核心逻辑
 - HarvestFlowCore：收获阶段（收割/喂食/繁殖）核心逻辑
+- AnimalReorgFlowCore：动物重整写回与重整后 choice 参数构造
 - PayloadValidation：后端 API payload 统一校验与错误结构规范
 - FutureMeeples：未来回合资源堆叠与回合开始结算
 - ActionStackView：行动格资源堆叠显示
@@ -190,7 +191,8 @@ function applyIsDoable(initial):
 - Hook 架构入口：[hooks.ts](../src/actions/hooks.ts)
 - 引擎推进核心：[use-engine-flow.ts](../src/app/hooks/use-engine-flow.ts)
 - 回合与收获核心：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
-- 执行编排与 UI 交互：[App.tsx](../src/App.tsx)
+- 动物重整核心：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts)
+- 执行编排与 UI 交互：[GameContainer.tsx](../src/app/GameContainer.tsx)
 - 持久化与还原：App.tsx 内的 persist/normalize 逻辑
 
 ## 性能指标与约束条件
