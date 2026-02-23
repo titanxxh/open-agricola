@@ -44,6 +44,7 @@ Engine
 - CardListeners：卡牌监听注册与事件分发
 - CardActivation：卡牌 hook 触发并返回 flow
 - FutureMeeples：未来回合资源堆叠与回合开始结算
+- ActionStackView：行动格资源堆叠显示
 - DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口

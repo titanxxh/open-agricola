@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import type { Locale } from '../../i18n'
 import { t } from '../../i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../game/types'
-import { formatResources } from '../../logic/format'
 import { roundStageSlots } from '../../logic/state'
 
 type RoundSlot = {
@@ -140,10 +139,6 @@ export const ActionBoard = ({
           <div className="action-title">{t(locale, action.nameKey)}</div>
           <div className="action-desc">{t(locale, action.descriptionKey)}</div>
           {renderStack(action)}
-          <div className="action-res">
-            {formatResources(locale, action.resources, true) ||
-              t(locale, 'ui.noAccumulation')}
-          </div>
           <div className="action-meta">
             {isOpen
               ? t(locale, 'ui.roundOpen', { round: slot.round })
@@ -178,10 +173,6 @@ export const ActionBoard = ({
                 <div className="action-title">{t(locale, space.nameKey)}</div>
                 <div className="action-desc">{t(locale, space.descriptionKey)}</div>
                 {renderStack(space)}
-                <div className="action-res">
-                  {formatResources(locale, space.resources, true) ||
-                    t(locale, 'ui.noAccumulation')}
-                </div>
                 <div className="action-meta">{t(locale, 'ui.baseActions')}</div>
                 {takenPlayer ? (
                   <div className={`meeple meeple-${takenPlayer.color}`}>
