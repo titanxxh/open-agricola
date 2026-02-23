@@ -1,6 +1,6 @@
-import { MinorImprovement } from '../types'
+import { PlayerActionCard } from '../types'
 
-export const A162_ForestTallyman = new MinorImprovement({
+export const A162_ForestTallyman = new PlayerActionCard({
   id: "A162_ForestTallyman",
   name: "Forest Tallyman",
   deck: "A",

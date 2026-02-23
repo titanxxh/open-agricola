@@ -30,7 +30,7 @@
   - 井与未来回合资源堆叠 flow
   - 入口：[major](../src/actions/cards/major)
 - 卡牌基础模型
-  - Occupation / MinorImprovement 基类与基础字段
+  - Occupation / MinorImprovement / PlayerActionCard 基类与基础字段
   - 入口：[cards/types.ts](../src/actions/cards/types.ts)
 - 卡牌实现清单
   - Hook 覆盖矩阵与特判卡牌索引（实现状态维护）

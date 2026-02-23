@@ -47,6 +47,7 @@ Engine
 - ActionStackView：行动格资源堆叠显示
 - ActionCardVisibility：未开行动牌隐藏标题与描述
 - ResourceLine：资源显示统一为结构化元素
+- PlayerActionCard：可作为行动位的卡牌类型（按职业/小改进分类）
 - DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口

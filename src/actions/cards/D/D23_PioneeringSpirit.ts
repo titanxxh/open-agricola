@@ -1,6 +1,6 @@
-import { MinorImprovement } from '../types'
+import { PlayerActionCard } from '../types'
 
-export const D23_PioneeringSpirit = new MinorImprovement({
+export const D23_PioneeringSpirit = new PlayerActionCard({
   id: "D23_PioneeringSpirit",
   name: "Pioneering Spirit",
   deck: "D",

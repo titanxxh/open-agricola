@@ -1,12 +1,15 @@
-import type { MinorImprovement as MinorImprovementCard } from '../actions/cards/types'
+import type {
+  MinorImprovement as MinorImprovementCard,
+  PlayerActionCard,
+} from '../actions/cards/types'
 import {
   minorImprovementCards,
   minorImprovementIds,
 } from '../actions/cards/catalog'
 
-export type MinorImprovement = MinorImprovementCard
+export type MinorImprovement = MinorImprovementCard | PlayerActionCard
 
-export const minorImprovements: MinorImprovementCard[] = minorImprovementCards
+export const minorImprovements: MinorImprovement[] = minorImprovementCards
 
 export { minorImprovementIds }
 
