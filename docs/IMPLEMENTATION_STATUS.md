@@ -75,7 +75,7 @@
   - 抽离回合推进与收获主流程：`use-round-flow.ts` / `use-harvest-flow.ts`
   - 入口：[use-round-flow.ts](../src/app/hooks/use-round-flow.ts), [use-harvest-flow.ts](../src/app/hooks/use-harvest-flow.ts)
 - App 流程拆分（第三步）
-  - 抽离动物重整写回、分支决策 plan、重整后 choice 构造：`use-animal-reorg-flow.ts`
+  - 抽离动物重整写回、分支决策 plan、Engine 进度判定 plan、重整后 choice 构造：`use-animal-reorg-flow.ts`
   - 入口：[use-animal-reorg-flow.ts](../src/app/hooks/use-animal-reorg-flow.ts), [GameContainer.tsx](../src/app/GameContainer.tsx)
 - Meeting Place 行动
   - 起始玩家逻辑

@@ -2,6 +2,7 @@ import type { Pasture, PlayerState } from '../../game/types'
 import type { ActionChoiceOption } from '../../game/types'
 import type { GameState } from '../../game/types'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
+import type { EngineProgress } from './use-engine-flow'
 
 type AnimalTotals = {
   sheep: number
@@ -89,4 +90,51 @@ export const buildPostReorgPlan = (params: {
   }
   const hasTargetSpace = nextState.actionSpaces.some((item) => item.id === spaceId)
   return { type: 'actionSpace', hasTargetSpace }
+}
+
+export type ReorgEngineProgressPlan =
+  | {
+      type: 'choice'
+      resetFenceSelection: boolean
+      resetStableSelection: boolean
+      pendingChoice: PendingChoice
+    }
+  | { type: 'fail'; logKey: string }
+  | { type: 'reorg'; playerIndex: number; spaceId: string }
+  | { type: 'advance'; pendingNextPlayerIndex: number }
+
+export const buildReorgEngineProgressPlan = (params: {
+  progress: EngineProgress
+  pendingAnimalReorg: PendingAnimalReorg
+  players: GameState['players']
+  currentPlayerIndex: number
+  nextPlayerIndex: (
+    players: GameState['players'],
+    currentIndex: number,
+  ) => number
+}): ReorgEngineProgressPlan => {
+  const { progress, pendingAnimalReorg, players, currentPlayerIndex, nextPlayerIndex } =
+    params
+  if (progress.type === 'choice') {
+    return {
+      type: 'choice',
+      resetFenceSelection: progress.promptKey === 'ui.interactionFenceSelect',
+      resetStableSelection: progress.promptKey === 'ui.interactionStableSelect',
+      pendingChoice: buildPendingChoiceFromReorgProgress(progress, pendingAnimalReorg),
+    }
+  }
+  if (progress.type === 'fail') {
+    return { type: 'fail', logKey: progress.logKey }
+  }
+  if (progress.type === 'reorg') {
+    return {
+      type: 'reorg',
+      playerIndex: progress.playerIndex,
+      spaceId: progress.spaceId,
+    }
+  }
+  return {
+    type: 'advance',
+    pendingNextPlayerIndex: nextPlayerIndex(players, currentPlayerIndex),
+  }
 }

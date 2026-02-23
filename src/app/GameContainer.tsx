@@ -60,7 +60,7 @@ import { runEngineStepsCore } from './hooks/use-engine-flow'
 import {
   applyAnimalReorgToPlayer,
   buildPostReorgPlan,
-  buildPendingChoiceFromReorgProgress,
+  buildReorgEngineProgressPlan,
 } from './hooks/use-animal-reorg-flow'
 import {
   applyBreedPhase as applyBreedPhaseCore,
@@ -2854,26 +2854,31 @@ export const GameContainer = () => {
       targetSpace,
       pendingAnimalReorg.playerIndex,
     )
-    if (progress.type === 'choice') {
-      if (progress.promptKey === 'ui.interactionFenceSelect') {
+    const progressPlan = buildReorgEngineProgressPlan({
+      progress,
+      pendingAnimalReorg,
+      players: nextState.players,
+      currentPlayerIndex: nextState.currentPlayerIndex,
+      nextPlayerIndex,
+    })
+    if (progressPlan.type === 'choice') {
+      if (progressPlan.resetFenceSelection) {
         setPendingFenceEdges([])
         setFenceError(null)
       }
-      if (progress.promptKey === 'ui.interactionStableSelect') {
+      if (progressPlan.resetStableSelection) {
         setPendingStableTiles([])
         setStableError(null)
       }
-      setPendingChoice(
-        buildPendingChoiceFromReorgProgress(progress, pendingAnimalReorg),
-      )
+      setPendingChoice(progressPlan.pendingChoice)
       updateState(nextState)
       return
     }
-    if (progress.type === 'fail') {
+    if (progressPlan.type === 'fail') {
       targetSpace.takenBy = null
       player.workersAvailable += 1
       nextState.log.unshift({
-        key: progress.logKey,
+        key: progressPlan.logKey,
         params: { player: player.name },
       })
       setActionStartSnapshot(null)
@@ -2881,21 +2886,17 @@ export const GameContainer = () => {
       updateState(nextState)
       return
     }
-    if (progress.type === 'reorg') {
+    if (progressPlan.type === 'reorg') {
       setPendingAnimalReorg({
-        playerIndex: progress.playerIndex,
-        spaceId: progress.spaceId,
+        playerIndex: progressPlan.playerIndex,
+        spaceId: progressPlan.spaceId,
       })
       setAnimalReorg(createAnimalReorgState(player))
       updateState(nextState)
       return
     }
     engineRef.current = null
-    const nextIndex = nextPlayerIndex(
-      nextState.players,
-      nextState.currentPlayerIndex,
-    )
-    setPendingNextPlayerIndex(nextIndex)
+    setPendingNextPlayerIndex(progressPlan.pendingNextPlayerIndex)
     updateState(nextState)
   }
 

@@ -5,6 +5,7 @@ import {
   applyAnimalReorgToPlayer,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
+  buildReorgEngineProgressPlan,
 } from '../hooks/use-animal-reorg-flow'
 
 const resources = (): Resource => ({
@@ -171,6 +172,44 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(plan.type).toBe('actionSpace')
     if (plan.type === 'actionSpace') {
       expect(plan.hasTargetSpace).toBe(true)
+    }
+  })
+
+  it('maps engine choice progress to reset flags and pending choice', () => {
+    const pending: PendingAnimalReorg = {
+      playerIndex: 0,
+      spaceId: 'farm-redevelopment',
+    }
+    const plan = buildReorgEngineProgressPlan({
+      progress: {
+        type: 'choice',
+        promptKey: 'ui.interactionFenceSelect',
+        choice: [{ value: 'a', labelKey: 'a' }],
+      },
+      pendingAnimalReorg: pending,
+      players: gameState().players,
+      currentPlayerIndex: 0,
+      nextPlayerIndex: () => 1,
+    })
+    expect(plan.type).toBe('choice')
+    if (plan.type === 'choice') {
+      expect(plan.resetFenceSelection).toBe(true)
+      expect(plan.resetStableSelection).toBe(false)
+      expect(plan.pendingChoice.fenceExtraWood).toBe(1)
+    }
+  })
+
+  it('maps engine done progress to next-player advance plan', () => {
+    const plan = buildReorgEngineProgressPlan({
+      progress: { type: 'done' },
+      pendingAnimalReorg: { playerIndex: 0, spaceId: 'forest' },
+      players: gameState().players,
+      currentPlayerIndex: 0,
+      nextPlayerIndex: () => 1,
+    })
+    expect(plan.type).toBe('advance')
+    if (plan.type === 'advance') {
+      expect(plan.pendingNextPlayerIndex).toBe(1)
     }
   })
 })
