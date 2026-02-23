@@ -326,6 +326,8 @@ export const normalizeState = (raw: GameState): GameState => {
     gameSeed: seed,
     roundActionOrder,
     availableMajorImprovements,
+    futureMeeples: raw.futureMeeples ?? [],
+    pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
   }
 }
 
@@ -472,6 +474,24 @@ export const applyRoundGrowth = (state: GameState) => {
   })
 }
 
+export const applyFutureMeeples = (state: GameState) => {
+  if (state.futureMeeples.length === 0) return
+  const remaining: GameState['futureMeeples'] = []
+  state.futureMeeples.forEach((entry) => {
+    if (entry.round !== state.round) {
+      remaining.push(entry)
+      return
+    }
+    const player = state.players.find((item) => item.id === entry.playerId)
+    if (!player) return
+    Object.entries(entry.resources).forEach(([key, value]) => {
+      const amount = value ?? 0
+      player.resources[key as keyof Resource] += amount
+    })
+  })
+  state.futureMeeples = remaining
+}
+
 export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 export const createInitialState = (seed?: number): GameState => {
@@ -490,6 +510,8 @@ export const createInitialState = (seed?: number): GameState => {
     roundActionOrder,
     gameSeed,
     availableMajorImprovements: [...majorImprovementIds],
+    futureMeeples: [],
+    pendingFutureMeeples: [],
     gameOver: false,
   }
   applyRoundGrowth(initialState)

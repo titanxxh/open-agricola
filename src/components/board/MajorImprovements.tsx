@@ -1,6 +1,6 @@
 import type { Locale } from '../../i18n'
 import { t } from '../../i18n'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState, Resource } from '../../game/types'
 import { formatResources } from '../../logic/format'
 import { getMajorCardEffect } from '../../actions/cards/major'
 import { emptyResources } from '../../logic/state'
@@ -12,6 +12,15 @@ type Props = {
   currentPlayer: PlayerState
   isSelectingMajor: boolean
   resolveChoice: (value: string) => void
+  futureCardResources: Record<
+    string,
+    {
+      playerId: string
+      name: string
+      color: PlayerState['color']
+      resources: Partial<Resource>
+    }[]
+  >
 }
 
 export const MajorImprovements = ({
@@ -20,6 +29,7 @@ export const MajorImprovements = ({
   currentPlayer,
   isSelectingMajor,
   resolveChoice,
+  futureCardResources,
 }: Props) => (
   <section className="major-improvements">
     <h2>{t(locale, 'ui.majorImprovements')}</h2>
@@ -30,6 +40,7 @@ export const MajorImprovements = ({
         const costText = major
           ? formatResources(locale, { ...emptyResources, ...major.cost }, true)
           : ''
+        const futureEntries = futureCardResources[cardId] ?? []
         return (
           <button
             key={`major-${cardId}`}
@@ -52,6 +63,27 @@ export const MajorImprovements = ({
                 cost: costText || t(locale, 'ui.noCost'),
               })}
             </div>
+            {futureEntries.length > 0 ? (
+              <div className="card-future">
+                {futureEntries.map((entry, index) => {
+                  const label = formatResources(
+                    locale,
+                    { ...emptyResources, ...entry.resources },
+                    true,
+                  )
+                  return (
+                    <div
+                      key={`future-${cardId}-${entry.playerId}-${index}`}
+                      className="card-future-item"
+                      title={`${entry.name}: ${label}`}
+                    >
+                      <span className={`card-future-dot meeple-${entry.color}`} />
+                      <span className="card-future-text">{label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
           </button>
         )
       })}

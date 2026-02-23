@@ -251,7 +251,8 @@ export const zh = {
     begging: '乞讨',
   },
   actions: {
-    fishing: { name: '捕鱼', description: '获取食物' },
+    'future-meeples': { name: '未来资源', description: '将资源放置到未来回合' },
+    fishing: { name: '捕鱼', description: '获得食物' },
     'day-laborer': { name: '打零工', description: '立即获得 2 食物' },
     'meeting-place': { name: '集会所', description: '成为起始玩家并可打出 1 张改良' },
     lessons: { name: '课程', description: '打出 1 张职业（首次免费）' },

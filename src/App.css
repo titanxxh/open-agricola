@@ -280,6 +280,10 @@
   animation: action-pop 0.15s ease-out;
 }
 
+.action-card.locked {
+  border-style: dashed;
+}
+
 
 .reorg-error {
   margin-top: 6px;
@@ -367,6 +371,102 @@
   font-size: 13px;
   color: #4a4a4a;
   margin-bottom: 8px;
+}
+
+.action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.resource-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  border: 1px solid #c9dcb8;
+  background: #f0f7e6;
+  color: #2e4b1e;
+}
+
+.resource-chip.resource-wood {
+  background: #f2e2c4;
+  border-color: #d6b58a;
+  color: #5a3d1c;
+}
+
+.resource-chip.resource-clay {
+  background: #f0d2c9;
+  border-color: #d3a59a;
+  color: #6b2b1a;
+}
+
+.resource-chip.resource-reed {
+  background: #e6f3dd;
+  border-color: #c0dcb1;
+  color: #2f5a2f;
+}
+
+.resource-chip.resource-stone {
+  background: #e1e7ef;
+  border-color: #c1ccd9;
+  color: #2e3b4e;
+}
+
+.resource-chip.resource-food {
+  background: #ffe7c6;
+  border-color: #e4c293;
+  color: #6a3b1c;
+}
+
+.resource-chip.resource-grain {
+  background: #fff1b8;
+  border-color: #e3c97d;
+  color: #5a4a1b;
+}
+
+.resource-chip.resource-vegetable {
+  background: #d6f5cc;
+  border-color: #b1dba4;
+  color: #2f5a2f;
+}
+
+.resource-chip.resource-sheep {
+  background: #f9f5f0;
+  border-color: #ddd6cc;
+  color: #5a4a1b;
+}
+
+.resource-chip.resource-boar {
+  background: #f6d9c3;
+  border-color: #d9b191;
+  color: #5a2b1a;
+}
+
+.resource-chip.resource-cattle {
+  background: #f5e7d0;
+  border-color: #d7c1a0;
+  color: #5a3d1c;
+}
+
+.resource-chip.resource-begging {
+  background: #f1f1f1;
+  border-color: #cfcfcf;
+  color: #4f4f4f;
+}
+
+.resource-owner {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.resource-chip-text {
+  white-space: nowrap;
 }
 
 .action-res {
@@ -882,6 +982,35 @@
   font-size: 12px;
   color: #4f4f4f;
   margin-top: 2px;
+}
+
+.card-future {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.card-future-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f8f4ee;
+  border: 1px solid #e0d2c0;
+  font-size: 11px;
+  color: #5a3d1c;
+}
+
+.card-future-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.card-future-text {
+  white-space: nowrap;
 }
 
 .hand-empty,

@@ -21,6 +21,7 @@ import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import {
   applyRoundGrowth,
+  applyFutureMeeples,
   baseActionOrder,
   cloneState,
   createInitialState,
@@ -828,6 +829,44 @@ export const GameContainer = () => {
     [state.actionSpaces],
   )
   const scoreSummaries = useMemo(() => computeScores(state), [state])
+  const futureCardResources = useMemo(() => {
+    const byCard = new Map<string, Map<string, Partial<Resource>>>()
+    state.futureMeeples.forEach((entry) => {
+      let byPlayer = byCard.get(entry.cardId)
+      if (!byPlayer) {
+        byPlayer = new Map()
+        byCard.set(entry.cardId, byPlayer)
+      }
+      let resources = byPlayer.get(entry.playerId)
+      if (!resources) {
+        resources = {}
+        byPlayer.set(entry.playerId, resources)
+      }
+      Object.entries(entry.resources).forEach(([key, value]) => {
+        const amount = value ?? 0
+        if (amount <= 0) return
+        const typedKey = key as keyof Resource
+        resources[typedKey] = (resources[typedKey] ?? 0) + amount
+      })
+    })
+    const playerById = new Map(state.players.map((player) => [player.id, player]))
+    const result: Record<
+      string,
+      { playerId: string; name: string; color: PlayerState['color']; resources: Partial<Resource> }[]
+    > = {}
+    byCard.forEach((byPlayer, cardId) => {
+      result[cardId] = Array.from(byPlayer.entries()).map(([playerId, resources]) => {
+        const player = playerById.get(playerId)
+        return {
+          playerId,
+          name: player?.name ?? playerId,
+          color: player?.color ?? 'red',
+          resources,
+        }
+      })
+    })
+    return result
+  }, [state.futureMeeples, state.players])
   const roundOpenById = useMemo(
     () => createRoundOpenById(state.roundActionOrder),
     [state.roundActionOrder],
@@ -2428,6 +2467,7 @@ export const GameContainer = () => {
       return
     }
     applyRoundGrowth(nextState)
+    applyFutureMeeples(nextState)
     applyMajorEffectsToAllPlayers(nextState, 'onRoundStart')
     const startIndex = nextState.players.findIndex((p) => p.startPlayer)
     nextState.currentPlayerIndex = startIndex === -1 ? 0 : startIndex
@@ -3729,6 +3769,7 @@ export const GameContainer = () => {
         currentPlayer={currentPlayer}
         isSelectingMajor={isSelectingImprovementAny}
         resolveChoice={resolveChoice}
+        futureCardResources={futureCardResources}
       />
       <main className="board">
         <ActionBoard
@@ -3737,6 +3778,7 @@ export const GameContainer = () => {
           roundSlots={roundSlots}
           currentPlayer={currentPlayer}
           players={state.players}
+          futureMeeples={state.futureMeeples}
           canTakeAction={canTakeActionInUI}
           takeAction={takeAction}
           currentRound={state.round}
@@ -3794,6 +3836,7 @@ export const GameContainer = () => {
           isSelectingMinor={isSelectingMinor}
           isSelectingOccupation={isSelectingOccupation}
           isSelectingImprovementAny={isSelectingImprovementAny}
+          futureCardResources={futureCardResources}
           resolveChoice={resolveChoice}
         />
       </main>

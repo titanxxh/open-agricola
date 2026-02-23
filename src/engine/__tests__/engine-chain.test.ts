@@ -85,6 +85,8 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: [],
+  futureMeeples: [],
+  pendingFutureMeeples: [],
   gameOver: false,
 })
 

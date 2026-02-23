@@ -43,6 +43,7 @@ Engine
 - CardEffects：卡牌效果注册表与 hook 执行器
 - CardListeners：卡牌监听注册与事件分发
 - CardActivation：卡牌 hook 触发并返回 flow
+- FutureMeeples：未来回合资源堆叠与回合开始结算
 - DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口

@@ -27,6 +27,7 @@
 - 大改良（major improvement）
   - 烤面包改良描述与交换限制对齐
   - 烤炉购买时可触发一次烤面包行动
+  - 井与未来回合资源堆叠 flow
   - 入口：[major](../src/actions/cards/major)
 - 卡牌基础模型
   - Occupation / MinorImprovement 基类与基础字段
@@ -68,6 +69,7 @@
   - 行动区、农场区、手牌区、日志区与控制区布局
   - 手牌与已打出卡牌显示优先使用 i18n，fallback 到卡牌定义
   - 改良行动可直接点击 Major Improvements 或手牌小发展选择
+  - 行动格资源堆叠区支持多资源与未来资源展示
   - 开发者模式提供重开随机种子输入
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
 - 国际化

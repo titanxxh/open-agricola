@@ -262,6 +262,7 @@ export const en = {
     begging: 'Begging',
   },
   actions: {
+    'future-meeples': { name: 'Future Resources', description: 'Place future resources on upcoming rounds' },
     fishing: { name: 'Fishing', description: 'Gain food' },
     'day-laborer': { name: 'Day Laborer', description: 'Gain 2 food' },
     'meeting-place': {

@@ -1,6 +1,7 @@
+import { useMemo } from 'react'
 import type { Locale } from '../../i18n'
 import { t } from '../../i18n'
-import type { ActionSpace, PlayerState } from '../../game/types'
+import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../game/types'
 import { formatResources } from '../../logic/format'
 import { roundStageSlots } from '../../logic/state'
 
@@ -15,6 +16,7 @@ type Props = {
   roundSlots: RoundSlot[]
   currentPlayer: PlayerState
   players: PlayerState[]
+  futureMeeples: FutureMeeple[]
   canTakeAction: (space: ActionSpace, player: PlayerState) => boolean
   takeAction: (space: ActionSpace) => void
   currentRound: number
@@ -26,6 +28,7 @@ export const ActionBoard = ({
   roundSlots,
   currentPlayer,
   players,
+  futureMeeples,
   canTakeAction,
   takeAction,
   currentRound,
@@ -40,6 +43,73 @@ export const ActionBoard = ({
     return groups
   })()
 
+  const playerById = useMemo(
+    () => new Map(players.map((player) => [player.id, player])),
+    [players],
+  )
+
+  const buildStackItems = (action: ActionSpace) => {
+    const items = new Map<
+      string,
+      { resource: keyof Resource; amount: number; player?: PlayerState }
+    >()
+    const addItem = (
+      resource: keyof Resource,
+      amount: number,
+      player?: PlayerState,
+    ) => {
+      if (amount <= 0) return
+      const key = `${player?.id ?? 'none'}:${resource}`
+      const existing = items.get(key)
+      if (existing) {
+        existing.amount += amount
+        return
+      }
+      items.set(key, { resource, amount, player })
+    }
+    Object.entries(action.resources).forEach(([key, value]) => {
+      const amount = value ?? 0
+      if (amount <= 0) return
+      addItem(key as keyof Resource, amount)
+    })
+    futureMeeples
+      .filter((entry) => entry.actionId === action.id)
+      .forEach((entry) => {
+        const owner = playerById.get(entry.playerId)
+        Object.entries(entry.resources).forEach(([key, value]) => {
+          const amount = value ?? 0
+          if (amount <= 0) return
+          addItem(key as keyof Resource, amount, owner)
+        })
+      })
+    return Array.from(items.values())
+  }
+
+  const renderStack = (action: ActionSpace) => {
+    const items = buildStackItems(action)
+    if (items.length === 0) return null
+    return (
+      <div className="action-stack">
+        {items.map((item, index) => {
+          const label = `${t(locale, `resources.${item.resource}`)} ${item.amount}`
+          const title = item.player ? `${item.player.name}: ${label}` : label
+          return (
+            <div
+              key={`stack-${action.id}-${index}`}
+              className={`resource-chip resource-${item.resource}`}
+              title={title}
+            >
+              {item.player ? (
+                <span className={`resource-owner meeple-${item.player.color}`} />
+              ) : null}
+              <span className="resource-chip-text">{label}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   const renderRoundSlot = (slot: RoundSlot) => {
     const isOpen = currentRound >= slot.round
     const action = slot.action
@@ -53,17 +123,7 @@ export const ActionBoard = ({
         </div>
       )
     }
-    if (!isOpen) {
-      return (
-        <div key={`round-${slot.round}`} className="round-slot">
-          <div className="round-label">
-            {t(locale, 'ui.roundLabel', { round: slot.round })}
-          </div>
-          <div className="round-card locked">{t(locale, 'ui.roundLocked')}</div>
-        </div>
-      )
-    }
-    const canUse = canTakeAction(action, currentPlayer)
+    const canUse = isOpen && canTakeAction(action, currentPlayer)
     const takenPlayer = players.find((player) => player.id === action.takenBy)
     return (
       <div key={`round-${slot.round}`} className="round-slot">
@@ -71,18 +131,23 @@ export const ActionBoard = ({
           {t(locale, 'ui.roundLabel', { round: slot.round })}
         </div>
         <button
-          className={`action-card ${action.takenBy ? 'taken' : ''}`}
+          className={`action-card ${action.takenBy ? 'taken' : ''}${
+            isOpen ? '' : ' locked'
+          }`}
           onClick={() => takeAction(action)}
           disabled={!canUse}
         >
           <div className="action-title">{t(locale, action.nameKey)}</div>
           <div className="action-desc">{t(locale, action.descriptionKey)}</div>
+          {renderStack(action)}
           <div className="action-res">
             {formatResources(locale, action.resources, true) ||
               t(locale, 'ui.noAccumulation')}
           </div>
           <div className="action-meta">
-            {t(locale, 'ui.roundOpen', { round: slot.round })}
+            {isOpen
+              ? t(locale, 'ui.roundOpen', { round: slot.round })
+              : t(locale, 'ui.roundLocked')}
           </div>
           {takenPlayer ? (
             <div className={`meeple meeple-${takenPlayer.color}`}>
@@ -112,6 +177,7 @@ export const ActionBoard = ({
               >
                 <div className="action-title">{t(locale, space.nameKey)}</div>
                 <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+                {renderStack(space)}
                 <div className="action-res">
                   {formatResources(locale, space.resources, true) ||
                     t(locale, 'ui.noAccumulation')}

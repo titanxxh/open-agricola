@@ -1,6 +1,6 @@
 import type { Locale } from '../../i18n'
 import { t } from '../../i18n'
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { FarmTilePosition, PlayerState, Resource } from '../../game/types'
 import { formatAnimalCounts, formatResources } from '../../logic/format'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { getOccupation } from '../../game/occupations'
@@ -77,6 +77,15 @@ type Props = {
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
   isSelectingImprovementAny: boolean
+  futureCardResources: Record<
+    string,
+    {
+      playerId: string
+      name: string
+      color: PlayerState['color']
+      resources: Partial<Resource>
+    }[]
+  >
   resolveChoice: (value: string) => void
 }
 
@@ -128,6 +137,7 @@ export const FarmBoard = ({
   isSelectingMinor,
   isSelectingOccupation,
   isSelectingImprovementAny,
+  futureCardResources,
   resolveChoice,
 }: Props) => {
   const houseLabelKey = (() => {
@@ -621,6 +631,7 @@ export const FarmBoard = ({
                   occupation?.desc?.join(' ') ?? '',
                 )
               : t(locale, `improvements.${rawId}.description`)
+          const futureEntries = futureCardResources[rawId] ?? []
           return (
             <div
               key={`played-${index}`}
@@ -640,6 +651,27 @@ export const FarmBoard = ({
                   effect: rewardText || t(locale, 'ui.noEffect'),
                 })}
               </div>
+              {futureEntries.length > 0 ? (
+                <div className="card-future">
+                  {futureEntries.map((entry, entryIndex) => {
+                    const label = formatResources(
+                      locale,
+                      { ...emptyResources, ...entry.resources },
+                      true,
+                    )
+                    return (
+                      <div
+                        key={`future-${rawId}-${entry.playerId}-${entryIndex}`}
+                        className="card-future-item"
+                        title={`${entry.name}: ${label}`}
+                      >
+                        <span className={`card-future-dot meeple-${entry.color}`} />
+                        <span className="card-future-text">{label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
           )
         })}

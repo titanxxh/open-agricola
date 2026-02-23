@@ -23,6 +23,8 @@ const createState = () =>
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1,
     availableMajorImprovements: [],
+    futureMeeples: [],
+    pendingFutureMeeples: [],
     gameOver: false,
   }) as GameState
 

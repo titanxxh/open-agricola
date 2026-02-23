@@ -19,6 +19,7 @@ import type { PlayerState } from '../game/types'
 import { getOccupation } from '../game/occupations'
 import { majorCardEffects } from './cards/major'
 import { gainConfigByActionId } from './factories/gain'
+import { resolveFutureMeepleRequests } from './effects/future-meeples'
 
 const createBonusAction = (
   id: string,
@@ -201,6 +202,18 @@ const buildMinorImprovementOptions = (player: PlayerState): ActionChoiceOption[]
     }))
 
 export const internalActionDefinitions: ActionDefinition[] = [
+  {
+    id: 'future-meeples',
+    nameKey: 'actions.future-meeples.name',
+    descriptionKey: 'actions.future-meeples.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ state }) => {
+      resolveFutureMeepleRequests(state)
+      return { type: 'ok' }
+    },
+  },
   {
     id: 'collect',
     nameKey: 'actions.collect.name',
