@@ -71,6 +71,8 @@
   - 改良行动可直接点击 Major Improvements 或手牌小发展选择
   - 行动格资源堆叠区支持多资源与未来资源展示
   - 行动格资源文本已移除，仅显示堆叠区
+  - 未来回合行动牌保持隐藏，仅显示堆叠
+  - 行动格提示文案已精简（移除 Base Actions/Opens in Round）
   - 开发者模式提供重开随机种子输入
   - 入口：[App.tsx](../src/App.tsx), [App.css](../src/App.css)
 - 国际化

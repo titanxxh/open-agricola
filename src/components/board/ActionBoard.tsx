@@ -136,14 +136,13 @@ export const ActionBoard = ({
           onClick={() => takeAction(action)}
           disabled={!canUse}
         >
-          <div className="action-title">{t(locale, action.nameKey)}</div>
-          <div className="action-desc">{t(locale, action.descriptionKey)}</div>
+          {isOpen ? (
+            <>
+              <div className="action-title">{t(locale, action.nameKey)}</div>
+              <div className="action-desc">{t(locale, action.descriptionKey)}</div>
+            </>
+          ) : null}
           {renderStack(action)}
-          <div className="action-meta">
-            {isOpen
-              ? t(locale, 'ui.roundOpen', { round: slot.round })
-              : t(locale, 'ui.roundLocked')}
-          </div>
           {takenPlayer ? (
             <div className={`meeple meeple-${takenPlayer.color}`}>
               <span className="meeple-text">{takenPlayer.name}</span>
@@ -173,7 +172,6 @@ export const ActionBoard = ({
                 <div className="action-title">{t(locale, space.nameKey)}</div>
                 <div className="action-desc">{t(locale, space.descriptionKey)}</div>
                 {renderStack(space)}
-                <div className="action-meta">{t(locale, 'ui.baseActions')}</div>
                 {takenPlayer ? (
                   <div className={`meeple meeple-${takenPlayer.color}`}>
                     <span className="meeple-text">{takenPlayer.name}</span>
