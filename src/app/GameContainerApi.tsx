@@ -53,6 +53,14 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
+
+  useEffect(() => {
+    if (state && viewPlayerId) {
+      setDevPlayerId(viewPlayerId)
+    } else if (state) {
+      setDevPlayerId(state.players[state.currentPlayerIndex]?.id ?? '')
+    }
+  }, [state?.currentPlayerIndex, viewPlayerId])
   const {
     pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
