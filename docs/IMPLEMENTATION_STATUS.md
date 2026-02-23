@@ -24,6 +24,9 @@
 - 职业（occupation）
   - 编号卡牌数据按字母目录拆分（A/B/C/D/E），每张卡独立文件
   - 入口：[occupations.ts](../src/game/occupations.ts), [cards/catalog.ts](../src/actions/cards/catalog.ts)
+- 大改良（major improvement）
+  - 烤面包改良描述与交换限制对齐
+  - 入口：[major](../src/actions/cards/major)
 - 卡牌基础模型
   - Occupation / MinorImprovement 基类与基础字段
   - 入口：[cards/types.ts](../src/actions/cards/types.ts)
