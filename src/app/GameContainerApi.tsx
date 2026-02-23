@@ -12,7 +12,6 @@ import {
   baseActionOrder,
   createRoundOpenById,
   isActionForPlayerCount,
-  roundStageSlots,
 } from '../../shared/logic/state'
 import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
@@ -198,21 +197,24 @@ export const GameContainerApi = () => {
     return true
   }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, harvestPending])
 
-  const baseActions = useMemo(() => state?.actionSpaces.filter((s) => baseActionOrder.includes(s.id)) ?? [], [state?.actionSpaces])
+  const actionMap = useMemo(() => {
+    if (!state) return new Map<string, ActionSpace>()
+    return new Map(state.actionSpaces.map((s) => [s.id, s]))
+  }, [state?.actionSpaces])
+  const playerCount = state?.players.length ?? 0
   const roundSlots: RoundSlot[] = useMemo(() => {
     if (!state) return []
-    const nonBase = state.actionSpaces.filter((s) => !baseActionOrder.includes(s.id))
-    let offset = 0
-    const slots: RoundSlot[] = []
-    roundStageSlots.forEach(({ stage: _stage, count }) => {
-      for (let i = 0; i < count; i++) {
-        const action = nonBase[offset + i]
-        slots.push({ round: offset + i + 1, action })
+    return state.roundActionOrder.map((id, index) => {
+      const action = id ? actionMap.get(id) : undefined
+      return {
+        round: index + 1,
+        action: action && isActionForPlayerCount(action, playerCount) ? action : undefined,
       }
-      offset += count
     })
-    return slots
-  }, [state?.actionSpaces])
+  }, [state?.roundActionOrder, actionMap, playerCount])
+  const baseActions = useMemo(() =>
+    baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s && isActionForPlayerCount(s, playerCount)),
+  [actionMap, playerCount])
 
   const scoreSummaries = useMemo(() => state ? computeScores(state) : [], [state])
 
