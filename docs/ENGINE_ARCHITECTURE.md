@@ -39,6 +39,7 @@ Engine
 - CardBase：Occupation / MinorImprovement 基础模型
 - CardView：前端优先使用 i18n 的 name/desc 渲染
 - I18nCatalog：卡牌名称与描述中文翻译
+- DevControls：开发者模式重开与种子输入
 
 ## 核心节点类与接口
 

@@ -48,6 +48,8 @@ export const en = {
     undoRound: 'Undo Round',
     endRound: 'End Round',
     resetGame: 'Reset',
+    resetSeed: 'Seed',
+    resetSeedPlaceholder: 'Random seed',
     noAccumulation: 'No accumulation',
     noResources: 'No resources',
     languageZh: '中文',

@@ -13,6 +13,9 @@ type Props = {
   hasActionStartSnapshot: boolean
   allWorkersUsed: boolean
   isGameOver: boolean
+  devMode: boolean
+  seedValue: string
+  onSeedChange: (value: string) => void
 }
 
 export const GameControls = ({
@@ -27,6 +30,9 @@ export const GameControls = ({
   hasActionStartSnapshot,
   allWorkersUsed,
   isGameOver,
+  devMode,
+  seedValue,
+  onSeedChange,
 }: Props) => (
   <div className="controls">
     <button onClick={onUndo} disabled={historyLength === 0}>
@@ -42,6 +48,17 @@ export const GameControls = ({
       {t(locale, 'ui.endRound')}
     </button>
     <button onClick={onShowScoring}>{t(locale, 'ui.scoringPadButton')}</button>
+    {devMode ? (
+      <label className="seed-input">
+        {t(locale, 'ui.resetSeed')}
+        <input
+          type="number"
+          value={seedValue}
+          placeholder={t(locale, 'ui.resetSeedPlaceholder')}
+          onChange={(event) => onSeedChange(event.target.value)}
+        />
+      </label>
+    ) : null}
     <button onClick={onResetGame}>{t(locale, 'ui.resetGame')}</button>
   </div>
 )

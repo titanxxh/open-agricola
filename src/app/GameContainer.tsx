@@ -83,6 +83,7 @@ type HarvestContext = {
 export const GameContainer = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devCardId, setDevCardId] = useState('')
+  const [resetSeedInput, setResetSeedInput] = useState('')
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<
     Record<string, number>
   >({})
@@ -2756,7 +2757,9 @@ export const GameContainer = () => {
   const sowSelectedCount = Object.keys(pendingSowSelections).length
 
   const resetGame = () => {
-    const nextState = createInitialState()
+    const parsedSeed = Number.parseInt(resetSeedInput, 10)
+    const seed = Number.isFinite(parsedSeed) ? parsedSeed : undefined
+    const nextState = createInitialState(seed)
     setHistory([])
     updateState(nextState)
     setViewPlayerId(nextState.players[0]?.id ?? '')
@@ -2779,6 +2782,7 @@ export const GameContainer = () => {
     setPlowError(null)
     setPendingSowSelections({})
     setSowError(null)
+    setResetSeedInput(String(nextState.gameSeed))
     void persistGame(nextState)
   }
 
@@ -2809,7 +2813,7 @@ export const GameContainer = () => {
       Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
       Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
       Major_ClayOven: { food: 5, max: 1 },
-      Major_StoneOven: { food: 6, max: 2 },
+      Major_StoneOven: { food: 4, max: 2 },
     }),
     [],
   )
@@ -3711,6 +3715,9 @@ export const GameContainer = () => {
         hasActionStartSnapshot={!!actionStartSnapshot}
         allWorkersUsed={allWorkersUsed}
         isGameOver={state.gameOver}
+        devMode={devMode}
+        seedValue={resetSeedInput}
+        onSeedChange={setResetSeedInput}
       />
       <MajorImprovements
         locale={locale}

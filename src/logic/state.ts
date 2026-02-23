@@ -474,8 +474,11 @@ export const applyRoundGrowth = (state: GameState) => {
 
 export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-export const createInitialState = (): GameState => {
-  const gameSeed = createSeed()
+export const createInitialState = (seed?: number): GameState => {
+  const gameSeed =
+    typeof seed === 'number' && Number.isFinite(seed)
+      ? Math.floor(seed)
+      : createSeed()
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const initialState: GameState = {
     round: 1,
