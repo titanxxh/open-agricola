@@ -25,6 +25,7 @@ type Props = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
   playedCards: string[]
@@ -140,7 +141,9 @@ export const FarmBoard = ({
   isSelectingImprovementAny,
   futureCardResources,
   resolveChoice,
+  devMode,
 }: Props) => {
+  const canInteractHand = displayPlayer.id === currentPlayer.id
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -685,7 +688,7 @@ export const FarmBoard = ({
     </div>
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === currentPlayer.id ? (
+      {displayPlayer.id === currentPlayer.id || devMode ? (
         <div className="hand-sections">
           <div className="hand-section occupation">
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
@@ -698,6 +701,7 @@ export const FarmBoard = ({
                   const canPlay = occupation
                     ? canPayResources(displayPlayer, occupation.cost ?? {})
                     : false
+                  const canInteract = canInteractHand && canPlay
                   const costResources = occupation?.cost
                     ? { ...emptyResources, ...occupation.cost }
                     : {}
@@ -709,13 +713,16 @@ export const FarmBoard = ({
                       key={`occupation-${cardId}`}
                       type="button"
                       className={`hand-card hand-card-occupation${
-                        canPlay ? '' : ' disabled'
-                      }${isSelectingOccupation && canPlay ? ' selectable' : ''}`}
+                        canInteract ? '' : ' disabled'
+                      }${
+                        isSelectingOccupation && canInteract ? ' selectable' : ''
+                      }`}
                       onClick={() => {
-                        if (isSelectingOccupation && canPlay) {
+                        if (isSelectingOccupation && canInteract) {
                           resolveChoice(cardId)
                         }
                       }}
+                      disabled={!canInteractHand}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(
@@ -766,6 +773,7 @@ export const FarmBoard = ({
                   const canPlay = improvement
                     ? canPayResources(displayPlayer, improvement.cost ?? {})
                     : false
+                  const canInteract = canInteractHand && canPlay
                   const costResources = improvement?.cost
                     ? { ...emptyResources, ...improvement.cost }
                     : {}
@@ -773,14 +781,14 @@ export const FarmBoard = ({
                     ? { ...emptyResources, ...improvement.reward }
                     : {}
                   const canSelect =
-                    (isSelectingMinor || isSelectingImprovementAny) && canPlay
+                    (isSelectingMinor || isSelectingImprovementAny) && canInteract
                   return (
                     <button
                       key={`hand-${cardId}`}
                       type="button"
-                      className={`hand-card hand-card-minor${canPlay ? '' : ' disabled'}${
-                        canSelect ? ' selectable' : ''
-                      }`}
+                      className={`hand-card hand-card-minor${
+                        canInteract ? '' : ' disabled'
+                      }${canSelect ? ' selectable' : ''}`}
                       onClick={() => {
                         if (canSelect) {
                           const value = isSelectingImprovementAny
@@ -789,6 +797,7 @@ export const FarmBoard = ({
                           resolveChoice(value)
                         }
                       }}
+                      disabled={!canInteractHand}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(

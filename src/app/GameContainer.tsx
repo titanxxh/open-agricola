@@ -3789,12 +3789,14 @@ export const GameContainer = () => {
           canTakeAction={canTakeActionInUI}
           takeAction={takeAction}
           currentRound={state.round}
+          devMode={devMode}
         />
         <FarmBoard
           locale={locale}
           players={state.players}
           currentPlayer={currentPlayer}
           displayPlayer={displayPlayer}
+          devMode={devMode}
           currentStartPlayerId={
             state.roundStartSnapshot?.players.find((player) => player.startPlayer)
               ?.id ?? state.players.find((player) => player.startPlayer)?.id ?? ''

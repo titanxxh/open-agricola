@@ -19,6 +19,7 @@ type Props = {
   canTakeAction: (space: ActionSpace, player: PlayerState) => boolean
   takeAction: (space: ActionSpace) => void
   currentRound: number
+  devMode: boolean
 }
 
 export const ActionBoard = ({
@@ -31,6 +32,7 @@ export const ActionBoard = ({
   canTakeAction,
   takeAction,
   currentRound,
+  devMode,
 }: Props) => {
   const stageGroups = (() => {
     const groups: { stage: number; slots: RoundSlot[] }[] = []
@@ -112,7 +114,7 @@ export const ActionBoard = ({
   }
 
   const renderRoundSlot = (slot: RoundSlot) => {
-    const isOpen = currentRound >= slot.round
+    const isOpen = devMode || currentRound >= slot.round
     const action = slot.action
     if (!action) {
       return (
