@@ -2,9 +2,9 @@
 
 ## 1. 目标与边界
 
-- 目标：在前端实现可玩的农场主基础流程，保证行动执行、资源变更、回合推进、收获结算与日志一致。
-- 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果，不追求逐行复制 BGA PHP 内部实现。
-- 当前边界：大量卡牌已接入数据与部分规则，未来将持续补全行为实现。
+- 目标：以回合与行动卡为核心驱动的农场主桌游实现，后端为权威状态源，前端仅做渲染与输入收集。
+- 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果。
+- 多人支持：WebSocket 实时同步，房间管理，支持多客户端连接同一后端。
 
 ## 2. 分层结构
 
@@ -17,81 +17,95 @@ shared/ (前后端共用，零 React 依赖)
   └─ i18n/            国际化
 
 src/ (仅前端)
-  ├─ app/             GameContainer + UI 流程 hooks
+  ├─ app/             GameContainerApi（API 驱动）+ GameContainer（本地引擎 fallback）
   ├─ components/      React UI 组件
-  ├─ hooks/           React 编排 hooks（useActionEngine 等）
-  ├─ services/        后端 API 调用
+  ├─ hooks/           useGameApi / useGameSync / useActionEngine 等
+  ├─ services/        后端 HTTP 调用
   └─ types/           UI 类型定义
 
 server/ (仅后端)
-  └─ index.ts + payload/fence/plow/sow 校验
+  ├─ index.ts         HTTP 服务入口
+  ├─ game-session.ts  权威 GameState + Engine 持有者
+  ├─ game-router.ts   /api/game/* HTTP 端点
+  ├─ room-manager.ts  WebSocket 房间管理与实时广播
+  └─ *-validation.ts  围栏/犁地/播种等校验
 ```
 
 ## 3. 核心模块
 
-### 3.1 行动定义与行动空间
+### 3.1 后端 GameSession（权威状态源）
 
-- `shared/actions/index.ts`：注册基础与轮次行动格，`createActionSpaces()` 生成运行时 `ActionSpace`。
+- `server/game-session.ts`
+  - 持有唯一权威 `GameState` + `Engine` 实例。
+  - 暴露命令式方法：`takeAction`、`resolveChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`。
+  - 所有游戏逻辑（引擎推进、Hook 触发、回合结算、收获流程）均在后端执行。
 
-### 3.2 引擎执行层
+### 3.2 HTTP API（game-router）
 
-- `shared/engine/engine.ts`：`Engine.proceed()` 驱动节点推进，支持 `flow` 转节点树与 snapshot/restore。
-- `shared/engine/tree.ts`：`nextUnresolved()`、`findNodeById()`、`insertAfter()`。
-- `shared/engine/nodes.ts`：`ActionNode`、`ChoiceNode`、`SequenceNode`、`ParallelNode`、`OrNode`、`XorNode`、`OptionalNode`。
+- `server/game-router.ts`
+  - `GET /api/game/state` — 获取完整状态快照
+  - `POST /api/game/action` — 放置工人
+  - `POST /api/game/choice` — 解决选择分支
+  - `POST /api/game/reorg` — 确认动物重整
+  - `POST /api/game/feed` — 确认收获喂食
+  - `POST /api/game/next-player` — 确认下一玩家
+  - `POST /api/game/round-end` — 回合结束
+  - `POST /api/game/new` — 新游戏
+  - 统一响应：`{ ok, state, pending, scores?, error? }`
 
-### 3.3 Hook 与 Listener
+### 3.3 WebSocket 多人（room-manager）
 
-- `shared/actions/hooks.ts`：8 个相位，支持 `computeReplace` 链式替换与 `isDoable` 覆盖。
-- `shared/actions/cards/card-listeners.ts`：按 actions/phases/scope 匹配分发。
-- `shared/actions/hooks/card-hooks.ts`：内建卡牌 Hook 注册入口。
-- `shared/actions/hook-matrix.ts`：矩阵由真实注册数据动态生成。
+- `server/room-manager.ts`
+  - 客户端发送：`createRoom` / `joinRoom` / `action` / `choice` / `reorg` / `feed` / `nextPlayer` / `roundEnd`
+  - 服务端广播：`stateUpdate` / `gameStarted` / `playerDisconnected`
+  - 每个房间持有独立 `GameSession`。
 
-### 3.4 原子效果层
+### 3.4 共享引擎层
 
-- `shared/actions/effects/*`：collect/gain/plow/sow/fencing/renovation/stables/reap/feed-family/breed-animals 等。
+- `shared/engine/*`：节点树推进、flow 构建、snapshot/restore。
+- `shared/actions/*`：行动定义、Hook 分发、原子效果、卡牌目录。
+- `shared/logic/*`：状态管理、回合/收获、计分。
 
-### 3.5 应用编排层
+### 3.5 前端 UI 层
 
-- `src/app/GameContainer.tsx`：主 UI 编排器。
-- `src/app/hooks/*`：引擎推进、玩家轮转、回合结束、收获流程、动物重整等纯函数核心。
+- `src/app/GameContainerApi.tsx`：API 驱动容器（默认模式），通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
+- `src/app/GameContainer.tsx`：本地引擎模式（`?mode=local` 切换），保留作为 fallback。
+- `src/components/*`：纯渲染组件，不包含游戏逻辑。
 
-### 3.6 状态与规则
+## 4. 运行流程
 
-- `shared/game/types.ts`：`GameState`、`PlayerState`、`ActionSpace` 等核心类型。
-- `shared/logic/state.ts`：初始化、克隆、回合快照、开局发牌。
-- `shared/logic/round.ts`：收获流程计算。
-- `shared/logic/scoring.ts`：计分规则。
+### 4.1 API 模式
 
-### 3.7 后端与校验
+```text
+用户点击行动格
+  → useGameApi.takeAction(playerIndex, spaceId)
+  → POST /api/game/action
+  → GameSession.takeAction() 执行引擎
+  → 返回 { state, pending }
+  → useGameSync.applyResponse() 更新 React 状态
+  → UI 重新渲染
+```
 
-- `server/index.ts`：本地 API（保存/加载与交互校验）。
-- `server/payload-validation.ts`：统一请求体校验。
-- `server/fence-validation.ts`、`plow-validation.ts`、`sow-validation.ts`：关键动作校验。
+### 4.2 WebSocket 多人模式
 
-## 4. 关键运行流程
-
-### 4.1 行动执行
-
-1. UI 选择行动格 -> 构建或复用 Engine。
-2. `Engine.proceed()` 找到下一个可执行节点，触发 Hook。
-3. 遇到 choice 回到 UI；完成后写日志并进入下一节点。
-
-### 4.2 回合与收获
-
-1. 工人全部用完 -> 回合结束判定。
-2. 归家（释放行动格、恢复工人）。
-3. 收获回合执行收割/喂食/繁殖。
-4. 推进下一回合。
+```text
+玩家A点击行动格
+  → ws.send({ type: 'action', spaceId })
+  → RoomManager → GameSession.takeAction()
+  → 广播 stateUpdate 给所有玩家
+  → 玩家A/B 同时收到新状态并渲染
+```
 
 ## 5. 测试覆盖
 
-- `shared/engine/__tests__/*`：引擎推进与链式插入。
-- `shared/actions/__tests__/*`：Hook 矩阵、围栏、畜栏、动物。
-- `shared/logic/__tests__/*`：计分、收获、状态克隆。
-- `src/app/__tests__/*`：engine/turn/round/harvest/reorg 编排核心。
-- `server/__tests__/*`：后端校验。
+- `shared/engine/__tests__/*`：引擎推进与链式插入
+- `shared/actions/__tests__/*`：Hook 矩阵、围栏、畜栏、动物
+- `shared/logic/__tests__/*`：计分、收获、状态克隆
+- `src/app/__tests__/*`：编排核心
+- `server/__tests__/*`：后端校验
 
-## 6. 已知限制
+## 6. 运行方式
 
-- 部分卡牌仅完成数据接入，复杂行为待补全。
-- 多 Hook 叠加冲突处理需更多回归样例。
+- 前端（API 模式）：`npm run dev` → `http://localhost:5173/`
+- 前端（本地模式）：`http://localhost:5173/?mode=local`
+- 后端：`npm run server` → HTTP `http://localhost:5175/` + WS `ws://localhost:5175/ws`

@@ -18,6 +18,7 @@ import {
   validateSingleTilePayload,
 } from './payload-validation.ts'
 import { handleGameRoute } from './game-router.ts'
+import { createWsServer, getRooms } from './room-manager.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dataDir = resolve(__dirname, '../data')
@@ -212,6 +213,11 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/api/health') {
     sendJson(res, 200, { ok: true })
+    return
+  }
+
+  if (req.method === 'GET' && req.url === '/api/rooms') {
+    sendJson(res, 200, { ok: true, rooms: getRooms() })
     return
   }
 
@@ -491,6 +497,9 @@ const server = createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' })
 })
 
+createWsServer(server)
+
 server.listen(5175, () => {
   console.log('Server listening on http://localhost:5175')
+  console.log('WebSocket available at ws://localhost:5175/ws')
 })

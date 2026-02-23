@@ -1,81 +1,59 @@
 # 实现情况总结
 
-## 1. 项目结构
+## 1. 架构
 
-纯游戏逻辑已移至 `shared/` 目录（零 React 依赖），前端 `src/` 仅保留 UI 组件与编排层，后端 `server/` 保留持久化与校验。
+前后端职责已分离：后端持有唯一权威 `GameState`，前端仅做渲染与输入收集。
 
-| 目录 | 职责 | 行数 |
-|---|---|---|
-| `shared/engine/` | 引擎核心 | ~1,100 |
-| `shared/actions/` | 行动定义、效果、Hook、卡牌 | ~5,200 |
-| `shared/logic/` | 状态、回合、计分 | ~1,035 |
-| `shared/game/` | 类型与常量 | ~240 |
-| `shared/i18n/` | 国际化 | ~1,500 |
-| `src/` | React UI + 编排层 | ~6,500 |
-| `server/` | 持久化 + 校验 | ~1,170 |
+| 目录 | 职责 |
+|---|---|
+| `shared/` | 引擎、行动、效果、Hook、卡牌、状态、计分、i18n（前后端共用） |
+| `server/` | GameSession（权威状态）、HTTP API、WebSocket 房间管理、校验 |
+| `src/` | React UI、API 调用 hook、渲染组件 |
 
-## 2. 已实现能力
+## 2. 当前能力
 
 ### 2.1 核心流程
+- 1~14 回合主流程、行动轮转、回合结束、游戏结束。
+- 收获三阶段：收割、喂食、繁殖。
+- 动物重整与待安置处理。
 
-- 1~14 回合主流程、行动轮转、行动格开放、回合结束、游戏结束判定。
-- 收获三阶段：收割、喂食、繁殖，含待补喂食与动物重整分支。
-- 基础回退快照（history + engine snapshot）与日志。
-
-### 2.2 行动系统与引擎
-
-- 行动定义：基础行动格 + 轮次行动格，统一通过 flow 编排原子行动。
-- 引擎：支持 flow 节点树（leaf/seq/parallel/or/xor/optional）与 choice 分支。
-- Hook：8 个相位已接入，含 isDoable 覆盖与 computeReplace 链式改写。
+### 2.2 引擎与 Hook
+- Flow 节点树：leaf/seq/parallel/or/xor/optional。
+- 8 个 Hook 相位：before/during/immediatelyAfter/after/computeCosts/computeArgs/computeReplace/isDoable。
+- Hook 覆盖矩阵由真实注册数据动态生成。
 
 ### 2.3 卡牌
+- 248 个卡牌定义文件（A/B/C/D/E）。
+- 大改良核心卡已接入主要效果。
+- 详见 `docs/cards_impl.md`。
 
-- 248 个卡牌定义文件（A/B/C/D/E），均已接入主数据模型。
-- 大改良核心卡（Fireplace/Cooking Hearth/Well/Joinery/Pottery/Basketmaker）已接入主要效果。
-- Hook 覆盖矩阵与实现状态清单维护在 `docs/cards_impl.md`。
+### 2.4 后端 API
+- `GameSession`：持有 GameState + Engine，暴露命令式方法。
+- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
+- WebSocket：`ws://localhost:5175/ws`（createRoom/joinRoom + 实时状态广播）。
+- 房间管理：每房间独立 GameSession，支持多客户端。
 
-### 2.4 后端
+### 2.5 前端
+- `GameContainerApi`（默认）：API 驱动，不运行本地引擎。
+- `GameContainer`（`?mode=local`）：本地引擎模式，保留作为 fallback。
+- 两种模式共用同一套 UI 组件。
 
-- 本地服务端支持保存/加载与围栏/犁地/播种校验。
-- payload 校验集中到独立模块。
-
-### 2.5 UI
-
-- React + Vite 前端，中文国际化，开发者调试模式。
-
-## 3. 最近结构性改造
-
-### 3.1 shared/ 分离
-
-- 将 `engine/`、`actions/`、`logic/`、`game/`、`i18n/` 从 `src/` 移至 `shared/`。
-- 前后端均可 import，为后续后端引擎执行奠定基础。
-- TypeScript 编译配置已更新，测试与构建通过。
-
-### 3.2 GameContainer 拆分
-
-- 引擎推进、回合结束、收获流程、动物重整等核心逻辑已抽离为纯函数。
-- GameContainer 仅负责 UI 编排与副作用落地。
-
-### 3.3 引擎与 Hook 稳定性
-
-- 修复 `EngineTree.insertAfter` 在 Optional/Or/Xor 父节点下的替换行为。
-- `computeReplace` 改为链式执行。
-- Hook 覆盖矩阵改为真实注册数据驱动。
-
-## 4. 测试与质量
+## 3. 测试与质量
 
 - 单测框架：vitest。
 - 20 个测试文件，67 个用例全部通过。
-- 覆盖：引擎推进、Hook 矩阵、应用流程 hook、规则逻辑、后端校验。
+- `npm run build` 全量通过。
 
-## 5. 已知边界与缺口
+## 4. 已知边界
 
-- 部分卡牌处于"数据接入已完成、复杂行为未完全实现"的状态。
-- 多卡叠加冲突处理需要更多回归样例。
-- GameContainer 仍有 UI 编排复杂度，可进一步下沉。
+- 部分卡牌仅完成数据接入，复杂行为待补全。
+- WebSocket 多人流程尚未端到端测试。
+- 撤销功能在 API 模式下暂未实现。
+- `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
 
-## 6. 下一阶段方向
+## 5. 下一步方向
 
-- 后端 GameSession：将引擎执行搬入后端，前端仅做渲染与输入收集。
-- 多人支持：WebSocket 实时同步与房间管理。
-- 卡牌行为补全：优先影响行动可执行性的高频卡牌。
+- 完善 WebSocket 多人端到端流程（创建房间 → 加入 → 对局 → 结算）。
+- 为 GameSession 增加撤销/回退 API。
+- 持续补全高频卡牌行为。
+- 逐步废弃本地引擎模式，最终只保留 API 驱动。
