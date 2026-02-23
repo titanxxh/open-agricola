@@ -10,13 +10,12 @@ import { stableWoodCost } from '../../shared/actions/effects/fencing'
 import { computeScores } from '../../shared/logic/scoring'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
 import { occupationIds } from '../../shared/game/occupations'
-import { normalizeState, resourceKeyList } from '../../shared/logic/state'
+import { resourceKeyList } from '../../shared/logic/state'
 import {
   baseActionOrder,
   createRoundOpenById,
   isActionForPlayerCount,
 } from '../../shared/logic/state'
-import { addResource } from '../services/api'
 import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
 import { useFarmSelection } from '../hooks/useFarmSelection'
@@ -392,33 +391,13 @@ export const GameContainerApi = () => {
 
   const applyDevResource = useCallback(async () => {
     if (!devPlayerId || !state) return
-    const data = await addResource(devPlayerId, devResource, devAmount)
-    if (data?.state) {
-      const nextState = normalizeState(data.state as import('../../shared/game/types').GameState)
-      applyResponse({ ok: true, state: nextState, pending: { type: 'none' } })
-      if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
-        const playerIndex = nextState.players.findIndex((p) => p.id === devPlayerId)
-        const targetPlayer = nextState.players[playerIndex]
-        if (targetPlayer) {
-          const total = targetPlayer.resources.sheep + targetPlayer.resources.boar + targetPlayer.resources.cattle
-          const assigned = targetPlayer.pastures.reduce((s, pa) => s + pa.animalCount, 0)
-            + (targetPlayer.houseAnimalType && targetPlayer.houseAnimalCount > 0 ? targetPlayer.houseAnimalCount : 0)
-            + Object.values(targetPlayer.stableAnimals ?? {}).filter(Boolean).length
-          if (total > assigned && !pendingChoice && !pendingAnimalReorg) {
-            setAnimalReorg({
-              zones: [
-                ...targetPlayer.pastures.map((p) => ({ id: p.id, zoneType: 'pasture' as const, animalType: p.animalType, animalCount: p.animalCount })),
-                { id: 'house', zoneType: 'house' as const, animalType: targetPlayer.houseAnimalType ?? null, animalCount: targetPlayer.houseAnimalCount ?? 0 },
-                ...getLooseStableKeys(targetPlayer).map((key) => ({ id: `stable:${key}`, zoneType: 'stable' as const, animalType: targetPlayer.stableAnimals?.[key] ?? null, animalCount: targetPlayer.stableAnimals?.[key] ? 1 : 0 })),
-              ],
-              confirmDiscard: false,
-            })
-            setViewPlayerId(targetPlayer.id)
-          }
-        }
-      }
-    }
-  }, [devPlayerId, devResource, devAmount, state, applyResponse, pendingChoice, pendingAnimalReorg])
+    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
+    const player = clone.players.find((p) => p.id === devPlayerId)
+    if (!player) return
+    const delta = Number(devAmount ?? 0)
+    player.resources[devResource] = Math.max(0, (player.resources[devResource] ?? 0) + delta)
+    void applyAndSync(api.loadGame(clone))
+  }, [devPlayerId, devResource, devAmount, state, api, applyAndSync])
 
   const applyDevRound = useCallback(() => {
     if (!state || !Number.isFinite(devRound)) return
