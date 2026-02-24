@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
@@ -10,7 +10,7 @@ import { stableWoodCost } from '../../shared/actions/effects/fencing'
 import { computeScores } from '../../shared/logic/scoring'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
 import { occupationIds } from '../../shared/game/occupations'
-import { resourceKeyList } from '../../shared/logic/state'
+import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import {
   baseActionOrder,
   createRoundOpenById,
@@ -29,6 +29,7 @@ import { GameControls } from '../components/controls/GameControls'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
+import { ResourceLine } from '../components/common/ResourceLine'
 import {
   validateFence,
   validateRoom,
@@ -48,6 +49,7 @@ export const GameContainerApi = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(false)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
+  const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [devPlayerId, setDevPlayerId] = useState('')
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -190,6 +192,36 @@ export const GameContainerApi = () => {
     void applyAndSync(api.resolveChoice(pending.playerIndex, value))
   }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, api, applyAndSync, setFenceError, setRoomError, setStableError, setPlowError, setSowError])
 
+  const updateBakeExchangeCount = (id: string, delta: number) => {
+    if (!bakeExchangePlayer) return
+    setBakeExchangeCounts((prev) => {
+      const current = prev[id] ?? 0
+      const maxUse = bakeExchangeInfo[id]?.max ?? 0
+      const totalSelected = Object.values(prev).reduce(
+        (sum, value) => sum + value,
+        0,
+      )
+      const availableGrain = bakeExchangePlayer.resources.grain
+      const remaining = Math.max(0, availableGrain - totalSelected)
+      const limit = Math.min(maxUse, current + remaining)
+      const nextValue = Math.max(0, Math.min(current + delta, limit))
+      if (nextValue === current) return prev
+      return { ...prev, [id]: nextValue }
+    })
+  }
+
+  const confirmBakeExchange = () => {
+    if (!pendingChoice || !isBakeExchange) return
+    const entries = Object.entries(bakeExchangeCounts)
+      .filter(([, count]) => count > 0)
+      .map(([id, count]) => `${id}=${count}`)
+    if (entries.length === 0) {
+      resolveChoice('cancel')
+      return
+    }
+    resolveChoice(`bulk:${entries.join(',')}`)
+  }
+
   const confirmNextPlayer = useCallback(() => { void applyAndSync(api.confirmNextPlayer()) }, [api, applyAndSync])
   const endRound = useCallback(() => { void applyAndSync(api.performRoundEnd()) }, [api, applyAndSync])
   const confirmHarvestFeed = useCallback(() => {
@@ -264,6 +296,86 @@ export const GameContainerApi = () => {
   const isSelectingOccupation = pendingChoice?.promptKey === 'ui.interactionChooseOccupation'
   const isSelectingImprovementAny = pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
 
+  const bakeExchangeInfo = useMemo<Record<string, { food: number; max: number }>>(
+    () => ({
+      Major_Fireplace1: { food: 2, max: Number.POSITIVE_INFINITY },
+      Major_Fireplace2: { food: 2, max: Number.POSITIVE_INFINITY },
+      Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
+      Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
+      Major_ClayOven: { food: 5, max: 1 },
+      Major_StoneOven: { food: 4, max: 2 },
+    }),
+    [],
+  )
+  const cardLabel = (id: string) =>
+    t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
+
+  const isBakeExchange =
+    pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
+  const bakeExchangePlayer =
+    isBakeExchange && pendingChoice && state
+      ? state.players[pendingChoice.playerIndex]
+      : null
+  const bakeExchangeOptions = useMemo(
+    () =>
+      isBakeExchange
+        ? (pendingChoice?.options ?? []).filter(
+            (option) => !!bakeExchangeInfo[option.value],
+          )
+        : [],
+    [isBakeExchange, pendingChoice?.options, bakeExchangeInfo],
+  )
+  const bakeExchangeOptionIds = useMemo(
+    () => bakeExchangeOptions.map((option) => option.value),
+    [bakeExchangeOptions],
+  )
+  const bakeExchangeKey = useMemo(
+    () => bakeExchangeOptionIds.join('|'),
+    [bakeExchangeOptionIds],
+  )
+  const bakeExchangeKeyRef = useRef('')
+
+  useEffect(() => {
+    if (!isBakeExchange || bakeExchangeOptionIds.length === 0) {
+      if (Object.keys(bakeExchangeCounts).length > 0) {
+        setBakeExchangeCounts({})
+      }
+      bakeExchangeKeyRef.current = ''
+      return
+    }
+    if (bakeExchangeKeyRef.current === bakeExchangeKey) return
+    const nextCounts: Record<string, number> = {}
+    bakeExchangeOptionIds.forEach((value) => {
+      nextCounts[value] = 0
+    })
+    bakeExchangeKeyRef.current = bakeExchangeKey
+    setBakeExchangeCounts(nextCounts)
+  }, [
+    isBakeExchange,
+    bakeExchangeKey,
+    bakeExchangeOptionIds,
+    bakeExchangeCounts,
+  ])
+
+  const bakeTotalGrain = Object.values(bakeExchangeCounts).reduce(
+    (sum, value) => sum + value,
+    0,
+  )
+  const bakeTotalFood = Object.entries(bakeExchangeCounts).reduce(
+    (sum, [id, count]) =>
+      sum + (bakeExchangeInfo[id]?.food ?? 0) * count,
+    0,
+  )
+  const baseFood = bakeExchangePlayer?.resources.food ?? 0
+  const baseGrain = bakeExchangePlayer?.resources.grain ?? 0
+  const summaryResources = {
+    ...emptyResources,
+    food: baseFood + bakeTotalFood,
+    grain: Math.max(0, baseGrain - bakeTotalGrain),
+  }
+  const hasBakeSummary =
+    summaryResources.food > 0 || summaryResources.grain > 0
+
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
   const fieldMap = useMemo(() => {
@@ -286,6 +398,14 @@ export const GameContainerApi = () => {
     const openTiles = FARM_ROWS * FARM_COLS - roomPositions.size - fieldPositions.size - stablePositions.size
     return Math.min(resourceMax, openTiles)
   }, [displayPlayer, roomPositions, fieldPositions, stablePositions])
+
+  const resetBakeExchangeCounts = () => {
+    const nextCounts: Record<string, number> = {}
+    bakeExchangeOptionIds.forEach((id) => {
+      nextCounts[id] = 0
+    })
+    setBakeExchangeCounts(nextCounts)
+  }
 
   const maxStableSelections = useMemo(() => Math.max(0, Math.floor((displayPlayer?.resources.wood ?? 0) / stableWoodCost)), [displayPlayer?.resources.wood])
   const sowSelectedCount = Object.keys(pendingSowSelections).length
@@ -521,6 +641,99 @@ export const GameContainerApi = () => {
         resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
       />
+      {isBakeExchange && pendingChoice ? (
+        <div className="exchange-overlay">
+          <div className="exchange-modal">
+            <div className="exchange-header">
+              <div className="exchange-title">
+                {t(locale, 'ui.bakeBreadTitle')}
+              </div>
+              <div className="exchange-subtitle">
+                {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+              </div>
+            </div>
+            <div className="exchange-content">
+              <div className="exchange-options">
+                {bakeExchangeOptions.map((option) => {
+                  const info = bakeExchangeInfo[option.value] ?? {
+                    food: 0,
+                    max: 0,
+                  }
+                  const current = bakeExchangeCounts[option.value] ?? 0
+                  const availableGrain = bakeExchangePlayer?.resources.grain ?? 0
+                  const remaining = Math.max(0, availableGrain - bakeTotalGrain)
+                  const limit = Math.min(info.max, current + remaining)
+                  const canAdd =
+                    availableGrain > bakeTotalGrain && current < limit
+                  const canSubtract = current > 0
+                  const rateText = Number.isFinite(info.max)
+                    ? t(locale, 'ui.bakeBreadRateLimited', {
+                        max: info.max,
+                        food: info.food,
+                      })
+                    : t(locale, 'ui.bakeBreadRate', { food: info.food })
+                  return (
+                    <div key={option.value} className="exchange-row">
+                      <div className="exchange-name">
+                        {cardLabel(option.value)}
+                      </div>
+                      <div className="exchange-rate">{rateText}</div>
+                      <div className="exchange-steps">
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateBakeExchangeCount(option.value, -1)}
+                          disabled={!canSubtract}
+                        >
+                          -
+                        </button>
+                        <div className="exchange-count">{current}</div>
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateBakeExchangeCount(option.value, 1)}
+                          disabled={!canAdd}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="exchange-footer">
+                <div className="exchange-summary">
+                {hasBakeSummary ? (
+                  <ResourceLine
+                    locale={locale}
+                    resources={summaryResources}
+                    emptyLabel={t(locale, 'ui.noResources')}
+                  />
+                ) : (
+                  t(locale, 'ui.noResources')
+                )}
+                </div>
+                <div className="exchange-actions">
+                  <button
+                    type="button"
+                    className="exchange-cancel"
+                    onClick={resetBakeExchangeCounts}
+                  >
+                    {t(locale, 'ui.exchangeReset')}
+                  </button>
+                  <button
+                    type="button"
+                    className="exchange-confirm"
+                    onClick={confirmBakeExchange}
+                  >
+                    {t(locale, 'ui.interactionConfirmButton')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {showScoringPad ? <ScoringPad locale={locale} scores={scoreSummaries} onClose={() => setShowScoringPad(false)} /> : null}
       {devMode ? (
         <DevPanel
