@@ -11,11 +11,17 @@ export const LogPanel = ({ locale, log }: Props) => (
   <section className="log log-bottom">
     <h3>{t(locale, 'ui.actionLog')}</h3>
     <ul>
-      {log.map((entry, index) => (
-        <li key={`${entry.key}-${index}`}>
-          {t(locale, entry.key, entry.params)}
-        </li>
-      ))}
+      {log.map((entry, index) => {
+        const params = entry.params ? { ...entry.params } : undefined
+        if (params && typeof params.action === 'string') {
+          params.action = t(locale, params.action)
+        }
+        return (
+          <li key={`${entry.key}-${index}`}>
+            {t(locale, entry.key, params)}
+          </li>
+        )
+      })}
     </ul>
   </section>
 )

@@ -142,7 +142,7 @@ export const InteractionBar = ({
         </div>
         <div className="interaction-actions">
           <button onClick={confirmNextPlayer}>
-            {t(locale, 'ui.interactionConfirmButton')}
+            {t(locale, 'ui.interactionConfirmSwitch')}
           </button>
         </div>
       </>
