@@ -89,6 +89,7 @@ type Props = {
     }[]
   >
   resolveChoice: (value: string) => void
+  isInteractive: boolean
 }
 
 export const FarmBoard = ({
@@ -142,8 +143,9 @@ export const FarmBoard = ({
   futureCardResources,
   resolveChoice,
   devMode,
+  isInteractive,
 }: Props) => {
-  const canInteractHand = displayPlayer.id === currentPlayer.id
+  const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
   const isOwnBoard = displayPlayer.id === currentPlayer.id
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
@@ -184,6 +186,7 @@ export const FarmBoard = ({
             key={player.id}
             className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
             onClick={() => setViewPlayerId(player.id)}
+            disabled={!isInteractive}
           >
             <span className="player-tab-label">
               {player.name}
@@ -250,26 +253,26 @@ export const FarmBoard = ({
           const isField = fieldPositions.has(tileKey)
           const isStable = stablePositions.has(tileKey)
           const isRoomSelectable =
-            isOwnBoard &&
+            isInteractive &&
             canSelectRooms &&
             !isRoom &&
             !isField &&
             !isStable &&
             !pastureTiles.has(tileKey)
-          const isRoomSelected = isOwnBoard && pendingRoomSet.has(tileKey)
-          const isStableSelected = isOwnBoard && pendingStableSet.has(tileKey)
+          const isRoomSelected = isInteractive && pendingRoomSet.has(tileKey)
+          const isStableSelected = isInteractive && pendingStableSet.has(tileKey)
           const maxStableReached = pendingStableSet.size >= maxStableSelections
           const isStableSelectable =
-            isOwnBoard &&
+            isInteractive &&
             canSelectStables &&
             !isRoom &&
             !isField &&
             !isStable &&
             (!maxStableReached || isStableSelected)
           const isPlowSelectable =
-            isOwnBoard && canSelectPlow && plowSelectableSet.has(tileKey)
+            isInteractive && canSelectPlow && plowSelectableSet.has(tileKey)
           const isPlowSelected =
-            isOwnBoard && pendingPlowTile
+            isInteractive && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
             : false
           const isTileSelectable =
@@ -282,8 +285,8 @@ export const FarmBoard = ({
             fieldInfo?.crop && fieldInfo.remaining > 0
               ? `${t(locale, `resources.${fieldInfo.crop}`)} ${fieldInfo.remaining}`
               : ''
-          const isSowSelectable = isOwnBoard && canSelectSow && isEmptyField
-          const currentSowChoice = isOwnBoard ? (pendingSowSelections[tileKey] ?? '') : ''
+          const isSowSelectable = isInteractive && canSelectSow && isEmptyField
+          const currentSowChoice = isInteractive ? (pendingSowSelections[tileKey] ?? '') : ''
           const availableGrain =
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
           const availableVegetable =
@@ -370,6 +373,7 @@ export const FarmBoard = ({
                   onChange={(event) =>
                     updateSowSelection({ row: tileRow, col: tileCol }, event.target.value)
                   }
+                  disabled={!isInteractive}
                 >
                   <option value="">{t(locale, 'ui.sowSelectNone')}</option>
                   {availableGrain > 0 ? (
@@ -404,7 +408,7 @@ export const FarmBoard = ({
                               onClick={() =>
                                 adjustReorgAnimal(pastureInfo.pastureId, animalType, -1)
                               }
-                              disabled={!canDecrease}
+                              disabled={!isInteractive || !canDecrease}
                             >
                               -
                             </button>
@@ -413,7 +417,7 @@ export const FarmBoard = ({
                               onClick={() =>
                                 adjustReorgAnimal(pastureInfo.pastureId, animalType, 1)
                               }
-                              disabled={!canIncrease}
+                              disabled={!isInteractive || !canIncrease}
                             >
                               +
                             </button>
@@ -448,14 +452,14 @@ export const FarmBoard = ({
                               onClick={() =>
                                 adjustReorgAnimal('house', animalType, -1)
                               }
-                              disabled={!canDecrease}
+                              disabled={!isInteractive || !canDecrease}
                             >
                               -
                             </button>
                             <span className="pasture-control-value">{count}</span>
                             <button
                               onClick={() => adjustReorgAnimal('house', animalType, 1)}
-                              disabled={!canIncrease}
+                              disabled={!isInteractive || !canIncrease}
                             >
                               +
                             </button>
@@ -490,7 +494,7 @@ export const FarmBoard = ({
                               onClick={() =>
                                 adjustReorgAnimal(`stable:${tileKey}`, animalType, -1)
                               }
-                              disabled={!canDecrease}
+                              disabled={!isInteractive || !canDecrease}
                             >
                               -
                             </button>
@@ -499,7 +503,7 @@ export const FarmBoard = ({
                               onClick={() =>
                                 adjustReorgAnimal(`stable:${tileKey}`, animalType, 1)
                               }
-                              disabled={!canIncrease}
+                              disabled={!isInteractive || !canIncrease}
                             >
                               +
                             </button>
@@ -518,7 +522,7 @@ export const FarmBoard = ({
           const isExisting = edgeId && existingFenceSet.has(edgeId)
           const isPending = edgeId && pendingFenceSet.has(edgeId)
           const isActive = isExisting || isPending
-          const isSelectable = canSelectFences && edgeId && !isExisting
+          const isSelectable = isInteractive && canSelectFences && edgeId && !isExisting
           return (
             <div
               key={cell.key}
@@ -570,17 +574,17 @@ export const FarmBoard = ({
               })}
             </div>
             <div className="reorg-actions">
-              <button onClick={cancelAnimalDiscardPrompt}>
+              <button onClick={cancelAnimalDiscardPrompt} disabled={!isInteractive}>
                 {t(locale, 'ui.reorgAdjustMore')}
               </button>
-              <button onClick={confirmAnimalReorg}>
+              <button onClick={confirmAnimalReorg} disabled={!isInteractive}>
                 {t(locale, 'ui.reorgDiscardConfirm')}
               </button>
             </div>
           </div>
         ) : (
           <div className="reorg-actions">
-            <button onClick={confirmAnimalReorg} disabled={hasReorgOverflow}>
+            <button onClick={confirmAnimalReorg} disabled={!isInteractive || hasReorgOverflow}>
               {t(locale, 'ui.reorgConfirm')}
             </button>
           </div>

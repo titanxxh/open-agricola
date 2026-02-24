@@ -137,25 +137,30 @@ export const GameContainerApi = () => {
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
+  const isInteractive = !!(currentPlayer && displayPlayer && currentPlayer.id === displayPlayer.id)
 
   const takeAction = useCallback((space: ActionSpace) => {
-    if (!state) return
+    if (!state || !isInteractive) return
     void applyAndSync(api.takeAction(state.currentPlayerIndex, space.id))
-  }, [state, api, applyAndSync])
+  }, [state, api, applyAndSync, isInteractive])
 
   const undoStep = useCallback(() => {
+    if (!isInteractive) return
     void applyAndSync(api.undoStep())
-  }, [api, applyAndSync])
+  }, [api, applyAndSync, isInteractive])
 
   const undoAction = useCallback(() => {
+    if (!isInteractive) return
     void applyAndSync(api.undoAction())
-  }, [api, applyAndSync])
+  }, [api, applyAndSync, isInteractive])
 
   const undoRound = useCallback(() => {
+    if (!isInteractive) return
     void applyAndSync(api.undoRound())
-  }, [api, applyAndSync])
+  }, [api, applyAndSync, isInteractive])
 
   const resolveChoice = useCallback((value: string) => {
+    if (!isInteractive) return
     if (pending.type !== 'choice' || !currentPlayer) return
     const promptKey = pending.promptKey
     if (promptKey === 'ui.interactionFenceSelect') {
@@ -208,7 +213,7 @@ export const GameContainerApi = () => {
       return
     }
     void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, api, applyAndSync, setFenceError, setRoomError, setStableError, setPlowError, setSowError])
+  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, api, applyAndSync, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -240,17 +245,28 @@ export const GameContainerApi = () => {
     resolveChoice(`bulk:${entries.join(',')}`)
   }
 
-  const confirmNextPlayer = useCallback(() => { void applyAndSync(api.confirmNextPlayer()) }, [api, applyAndSync])
-  const endRound = useCallback(() => { void applyAndSync(api.performRoundEnd()) }, [api, applyAndSync])
+  const confirmNextPlayer = useCallback(() => {
+    if (!isInteractive) return
+    void applyAndSync(api.confirmNextPlayer())
+  }, [api, applyAndSync, isInteractive])
+  const endRound = useCallback(() => {
+    if (!isInteractive) return
+    void applyAndSync(api.performRoundEnd())
+  }, [api, applyAndSync, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
+    if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
     void applyAndSync(api.confirmFeed(pending.playerIndex, []))
-  }, [pending, api, applyAndSync])
+  }, [pending, api, applyAndSync, isInteractive])
   const confirmAnimalReorg = useCallback(() => {
+    if (!isInteractive) return
     if (pending.type !== 'animalReorg' || !animalReorg) return
     void applyAndSync(api.confirmReorg(pending.playerIndex, animalReorg.zones))
-  }, [pending, animalReorg, api, applyAndSync])
-  const resetGame = useCallback(() => { void applyAndSync(api.newGame()) }, [api, applyAndSync])
+  }, [pending, animalReorg, api, applyAndSync, isInteractive])
+  const resetGame = useCallback(() => {
+    if (!isInteractive) return
+    void applyAndSync(api.newGame())
+  }, [api, applyAndSync, isInteractive])
 
   const pendingChoice = pending.type === 'choice' ? {
     promptKey: pending.promptKey, options: pending.options,
@@ -267,7 +283,7 @@ export const GameContainerApi = () => {
 
   const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
-    if (!state || !currentPlayer) return false
+    if (!state || !currentPlayer || !isInteractive) return false
     if (space.takenBy) return false
     if (!isActionForPlayerCount(space, state.players.length)) return false
     const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
@@ -276,7 +292,7 @@ export const GameContainerApi = () => {
     if (state.gameOver) return false
     if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || harvestPending) return false
     return true
-  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, harvestPending])
+  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, harvestPending, isInteractive])
 
   const actionMap = useMemo(() => {
     if (!state) return new Map<string, ActionSpace>()
@@ -666,6 +682,7 @@ export const GameContainerApi = () => {
         isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
         resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
+        isInteractive={isInteractive}
       />
       {isBakeExchange && pendingChoice ? (
         <div className="exchange-overlay">
@@ -761,7 +778,7 @@ export const GameContainerApi = () => {
         </div>
       ) : null}
       {showScoringPad ? <ScoringPad locale={locale} scores={scoreSummaries} onClose={() => setShowScoringPad(false)} /> : null}
-      {devMode ? (
+      {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}
           devPlayerId={devPlayerId} devResource={devResource} devAmount={devAmount} devRound={devRound}
@@ -774,7 +791,7 @@ export const GameContainerApi = () => {
         />
       ) : null}
       <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} />
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} isInteractive={isInteractive} />
       <GameControls
         locale={locale}
         onUndo={undoStep}
@@ -787,11 +804,12 @@ export const GameContainerApi = () => {
         hasActionStartSnapshot={hasActionStartSnapshot}
         allWorkersUsed={allWorkersUsed}
         isGameOver={state.gameOver}
+        isInteractive={isInteractive}
         devMode={devMode}
         seedValue={resetSeedInput}
         onSeedChange={setResetSeedInput}
       />
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} />
+      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} />
       <main className="board">
         <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
         <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
@@ -814,6 +832,7 @@ export const GameContainerApi = () => {
           confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
           setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
           isSelectingImprovementAny={isSelectingImprovementAny} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+          isInteractive={isInteractive}
         />
       </main>
       <LogPanel locale={locale} log={state.log} />

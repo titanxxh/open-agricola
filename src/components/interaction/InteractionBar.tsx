@@ -22,6 +22,7 @@ type Props = {
   isSelectingStables: boolean
   isSelectingPlow: boolean
   isSelectingSow: boolean
+  isInteractive: boolean
   resolveChoice: (value: string) => void
   confirmNextPlayer: () => void
   harvestFeedPlayerName: string | null
@@ -48,6 +49,7 @@ export const InteractionBar = ({
   isSelectingStables,
   isSelectingPlow,
   isSelectingSow,
+  isInteractive,
   resolveChoice,
   confirmNextPlayer,
   harvestFeedPlayerName,
@@ -69,7 +71,7 @@ export const InteractionBar = ({
           {t(locale, 'ui.harvestFeedConfirm')}
         </div>
         <div className="interaction-actions">
-          <button onClick={confirmHarvestFeed}>
+          <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
             {t(locale, 'ui.interactionConfirmButton')}
           </button>
         </div>
@@ -124,9 +126,10 @@ export const InteractionBar = ({
                 key={option.value}
                 onClick={() => resolveChoice(option.value)}
                 disabled={
-                  pendingChoice.promptKey === 'ui.interactionSowSelect' &&
-                  option.value === 'confirm' &&
-                  (pendingSowSelectionsLength ?? 0) === 0
+                  !isInteractive ||
+                  (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
+                    option.value === 'confirm' &&
+                    (pendingSowSelectionsLength ?? 0) === 0)
                 }
               >
                 {t(locale, option.labelKey, option.labelParams)}
@@ -141,7 +144,7 @@ export const InteractionBar = ({
           {t(locale, 'ui.interactionConfirmNext')}
         </div>
         <div className="interaction-actions">
-          <button onClick={confirmNextPlayer}>
+          <button onClick={confirmNextPlayer} disabled={!isInteractive}>
             {t(locale, 'ui.interactionConfirmSwitch')}
           </button>
         </div>

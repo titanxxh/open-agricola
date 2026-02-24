@@ -78,6 +78,7 @@ server/ (仅后端)
 
 - `src/app/GameContainerApi.tsx`：API 驱动容器，通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
 - 通过 `?player=1..4` 或 `?player=p1..p4` 锁定玩家视角，每个窗口代表一名玩家。
+- 非当前玩家窗口为只读视图，交互按钮全部禁用。
 - `src/components/*`：纯渲染组件，不包含游戏逻辑。
 
 ## 4. 运行流程
