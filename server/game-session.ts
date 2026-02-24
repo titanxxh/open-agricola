@@ -227,6 +227,14 @@ export class GameSession {
     this.actionStartIndex = null
   }
 
+  private buildRoundSnapshot(state: GameState): GameState {
+    const snapshot = cloneState(state)
+    snapshot.players.forEach((p) => { p.workersAvailable = p.familySize })
+    snapshot.actionSpaces.forEach((space) => { space.takenBy = null })
+    snapshot.roundStartSnapshot = null
+    return snapshot
+  }
+
   private runEngineSteps(): void {
     if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
     const player = this.state.players[this.activePlayerIndex]
@@ -554,7 +562,7 @@ export class GameSession {
     const startIdx = this.state.players.findIndex((p) => p.startPlayer)
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
-    this.state.roundStartSnapshot = createRoundSnapshot(this.state)
+    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.pending = { type: 'none' }
     this.engine = null
     this.activeSpaceId = null
@@ -564,6 +572,9 @@ export class GameSession {
 
   loadState(raw: unknown): SessionResponse {
     this.state = normalizeState(raw as GameState)
+    if (!this.state.roundStartSnapshot) {
+      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    }
     this.engine = null
     this.pending = { type: 'none' }
     this.history = []
@@ -596,9 +607,11 @@ export class GameSession {
   undoRound(): SessionResponse {
     const roundSnapshot = this.state.roundStartSnapshot
       ? cloneState(this.state.roundStartSnapshot)
-      : createRoundSnapshot(this.state)
+      : this.buildRoundSnapshot(this.state)
     this.state = roundSnapshot
-    this.state.roundStartSnapshot = createRoundSnapshot(this.state)
+    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
+    this.state.actionSpaces.forEach((space) => { space.takenBy = null })
+    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.pending = { type: 'none' }
     this.engine = null
     this.activeSpaceId = null

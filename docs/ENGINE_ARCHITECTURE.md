@@ -38,6 +38,7 @@ server/ (仅后端)
 - `server/game-session.ts`
   - 持有唯一权威 `GameState` + `Engine` 实例。
   - 暴露命令式方法：`takeAction`、`resolveChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`。
+  - 撤销回合使用回合快照并清空行动格占用。
   - 所有游戏逻辑（引擎推进、Hook 触发、回合结算、收获流程）均在后端执行。
 
 ### 3.2 HTTP API（game-router）

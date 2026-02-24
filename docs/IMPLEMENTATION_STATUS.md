@@ -49,7 +49,7 @@
 
 - 部分卡牌仅完成数据接入，复杂行为待补全。
 - WebSocket 多人流程尚未端到端测试。
-- 撤销功能已支持 API 模式。
+- 撤销功能已支持 API 模式（撤销回合会清空行动格占用）。
 - `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
 
 ## 5. 下一步方向
