@@ -10,8 +10,8 @@ export type PlowValidationError = {
   code: 'NO_SELECTION' | 'INVALID_POSITION' | 'OCCUPIED' | 'NOT_ADJACENT' | 'FENCED'
 }
 
-export type PlowValidationResult =
-  | { ok: true; player: PlayerFarmState }
+export type PlowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
+  | { ok: true; player: T }
   | { ok: false; error: PlowValidationError }
 
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
@@ -30,10 +30,10 @@ const getFencedTileKeys = (player: PlayerFarmState) => {
   return fencedKeys
 }
 
-export const validatePlowSelection = (
-  player: PlayerFarmState,
+export const validatePlowSelection = <T extends PlayerFarmState>(
+  player: T,
   tile?: FarmTilePosition,
-): PlowValidationResult => {
+): PlowValidationResult<T> => {
   if (!tile) {
     return { ok: false, error: { code: 'NO_SELECTION' } }
   }
@@ -73,12 +73,12 @@ export const validatePlowSelection = (
       return { ok: false, error: { code: 'NOT_ADJACENT' } }
     }
   }
-  const updated: PlayerFarmState = {
+  const updated = {
     ...normalized,
     fields: [
       ...normalized.fields,
       { crop: null, remaining: 0, row: tile.row, col: tile.col },
     ],
   }
-  return { ok: true, player: updated }
+  return { ok: true, player: updated as T }
 }
