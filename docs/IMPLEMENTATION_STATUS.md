@@ -55,6 +55,10 @@
 - 非当前玩家窗口为只读视图，交互按钮全部禁用。
 - `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
 
+### 2.6 行动卡映射 (Action Card Mapping)
+- 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
+- 该映射用于辅助测试用例的结构化编写，涵盖资源变化、状态校验与 Flow 节点逻辑。
+
 ## 5. 下一步方向
 
 - 完善 WebSocket 多人端到端流程（创建房间 → 加入 → 对局 → 结算）。
