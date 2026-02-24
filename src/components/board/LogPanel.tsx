@@ -1,6 +1,8 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { GameState } from '../../../shared/game/types'
+import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import { formatResources } from '../../../shared/logic/format'
+import { emptyResources } from '../../../shared/logic/state'
 
 type Props = {
   locale: Locale
@@ -16,9 +18,149 @@ export const LogPanel = ({ locale, log }: Props) => (
         if (params && typeof params.action === 'string') {
           params.action = t(locale, params.action)
         }
+        if (
+          params &&
+          (entry.key === 'log.playImprovement' || entry.key === 'log.playMinorImprovement')
+        ) {
+          const raw = params.improvements
+          const ids = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
+          const names = ids
+            .map((id) =>
+              t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
+            )
+            .filter((name) => name)
+          params.improvements = names.join('、')
+        }
+        if (params && params.detailParts && entry.key === 'log.actionDetail') {
+          const detailParts = params.detailParts as {
+            gains?: Resource
+            costs?: Resource
+            effects?: {
+              buildRoom?: number
+              growFamily?: number
+              plow?: number
+              sowGrain?: number
+              sowVegetable?: number
+              renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
+              fencing?: number
+              improvements?: string[]
+              minorImprovements?: string[]
+              startPlayer?: boolean
+              bakeBread?: { count: number; food: number }
+            }
+          }
+          const gainsText = formatResources(
+            locale,
+            detailParts.gains ?? emptyResources,
+            true,
+          )
+          const costText = formatResources(
+            locale,
+            detailParts.costs ?? emptyResources,
+            true,
+          )
+          const effects: string[] = []
+          const effectData = detailParts.effects ?? {}
+          if (effectData.buildRoom) {
+            effects.push(
+              t(locale, 'log.effectBuildRoom', { count: effectData.buildRoom }),
+            )
+          }
+          if (effectData.growFamily) {
+            effects.push(
+              t(locale, 'log.effectGrowFamily', { count: effectData.growFamily }),
+            )
+          }
+          if (effectData.plow) {
+            effects.push(t(locale, 'log.effectPlow', { count: effectData.plow }))
+          }
+          if (effectData.sowGrain) {
+            effects.push(
+              t(locale, 'log.effectSowGrain', { count: effectData.sowGrain }),
+            )
+          }
+          if (effectData.sowVegetable) {
+            effects.push(
+              t(locale, 'log.effectSowVegetable', {
+                count: effectData.sowVegetable,
+              }),
+            )
+          }
+          if (effectData.renovate) {
+            const houseLabel = (type: PlayerState['houseType']) => {
+              if (type === 'clay') return t(locale, 'ui.houseClay')
+              if (type === 'stone') return t(locale, 'ui.houseStone')
+              return t(locale, 'ui.houseWood')
+            }
+            effects.push(
+              t(locale, 'log.effectRenovate', {
+                from: houseLabel(effectData.renovate.from),
+                to: houseLabel(effectData.renovate.to),
+              }),
+            )
+          }
+          if (effectData.fencing) {
+            effects.push(
+              t(locale, 'log.effectFencing', { count: effectData.fencing }),
+            )
+          }
+          if (effectData.improvements && effectData.improvements.length > 0) {
+            const names = effectData.improvements
+              .map((id) =>
+                t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
+              )
+              .filter((name) => name)
+            effects.push(
+              t(locale, 'log.effectImprovement', {
+                improvements: names.join('、'),
+              }),
+            )
+          }
+          if (effectData.minorImprovements && effectData.minorImprovements.length > 0) {
+            const names = effectData.minorImprovements
+              .map((id) =>
+                t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
+              )
+              .filter((name) => name)
+            effects.push(
+              t(locale, 'log.effectMinorImprovement', {
+                improvements: names.join('、'),
+              }),
+            )
+          }
+          if (effectData.startPlayer) {
+            effects.push(t(locale, 'log.effectStartPlayer'))
+          }
+          if (effectData.bakeBread) {
+            effects.push(
+              t(locale, 'log.effectBakeBread', {
+                count: effectData.bakeBread.count,
+                food: effectData.bakeBread.food,
+              }),
+            )
+          }
+          const segments: string[] = []
+          if (gainsText) {
+            segments.push(t(locale, 'log.gains', { resources: gainsText }))
+          }
+          if (costText) {
+            segments.push(t(locale, 'log.costs', { resources: costText }))
+          }
+          if (effects.length > 0) {
+            segments.push(t(locale, 'log.effects', { effects: effects.join(' · ') }))
+          }
+          params.detail = segments.length > 0 ? ` · ${segments.join(' · ')}` : ''
+        }
+        const textParams = params
+          ? (Object.fromEntries(
+              Object.entries(params).filter(
+                ([, value]) => typeof value === 'string' || typeof value === 'number',
+              ),
+            ) as Record<string, string | number>)
+          : undefined
         return (
           <li key={`${entry.key}-${index}`}>
-            {t(locale, entry.key, params)}
+            {t(locale, entry.key, textParams)}
           </li>
         )
       })}

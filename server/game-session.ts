@@ -29,9 +29,11 @@ import {
   createRoundOpenById,
   createRoundSnapshot,
   cloneState,
+  emptyResources,
   harvestRounds,
   isActionForPlayerCount,
   normalizeState,
+  resourceKeyList,
   applyRoundGrowth,
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
@@ -75,6 +77,10 @@ export class GameSession {
   private pending: PendingAction = { type: 'none' }
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
+  private actionStartPlayerSnapshot: PlayerState | null = null
+  private usedBakeBreadThisAction = false
+  private loggedImprovementThisAction = false
+  private loggedBakeBreadThisAction = false
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -235,6 +241,144 @@ export class GameSession {
     return snapshot
   }
 
+  private buildActionDetailParts(before: PlayerState, player: PlayerState) {
+    const gains: Resource = { ...emptyResources }
+    const costs: Resource = { ...emptyResources }
+    resourceKeyList.forEach((key) => {
+      const delta = player.resources[key] - before.resources[key]
+      if (delta > 0) gains[key] = delta
+      if (delta < 0) costs[key] = Math.abs(delta)
+    })
+    const effects: {
+      buildRoom?: number
+      growFamily?: number
+      plow?: number
+      sowGrain?: number
+      sowVegetable?: number
+      renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
+      fencing?: number
+      improvements?: string[]
+      minorImprovements?: string[]
+      startPlayer?: boolean
+      bakeBread?: { count: number; food: number }
+    } = {}
+    if (player.rooms > before.rooms) {
+      effects.buildRoom = player.rooms - before.rooms
+    }
+    if (player.familySize > before.familySize) {
+      effects.growFamily = player.familySize - before.familySize
+    }
+    if (player.fields.length > before.fields.length) {
+      effects.plow = player.fields.length - before.fields.length
+    }
+    let sowGrain = 0
+    let sowVegetable = 0
+    player.fields.forEach((field, index) => {
+      const beforeField = before.fields[index]
+      if (!beforeField || beforeField.crop) return
+      if (field.crop === 'grain') sowGrain += 1
+      if (field.crop === 'vegetable') sowVegetable += 1
+    })
+    if (sowGrain > 0) effects.sowGrain = sowGrain
+    if (sowVegetable > 0) effects.sowVegetable = sowVegetable
+    if (player.houseType !== before.houseType) {
+      effects.renovate = { from: before.houseType, to: player.houseType }
+    }
+    if (player.fences > before.fences) {
+      effects.fencing = player.fences - before.fences
+    }
+    const newImprovements = player.improvements.filter(
+      (id) => !before.improvements.includes(id),
+    )
+    if (newImprovements.length > 0) {
+      effects.improvements = newImprovements
+    }
+    const newMinorImprovements = player.minorPlayed.filter(
+      (id) => !before.minorPlayed.includes(id),
+    )
+    if (newMinorImprovements.length > 0) {
+      effects.minorImprovements = newMinorImprovements
+    }
+    if (!before.startPlayer && player.startPlayer) {
+      effects.startPlayer = true
+    }
+    const bakedGrain = costs.grain ?? 0
+    const bakedFood = gains.food ?? 0
+    if (bakedGrain > 0 && bakedFood > 0) {
+      effects.bakeBread = { count: bakedGrain, food: bakedFood }
+    }
+    return { gains, costs, effects }
+  }
+
+  private logActionDetail(before: PlayerState, player: PlayerState) {
+    if (!this.activeSpaceId) return
+    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    if (!space) return
+    const detailParts = this.buildActionDetailParts(before, player)
+    this.state.log.unshift({
+      key: 'log.actionDetail',
+      params: {
+        player: player.name,
+        action: space.nameKey,
+        detailParts,
+      },
+    })
+  }
+
+  private logImprovementDelta(before: PlayerState, player: PlayerState) {
+    if (this.loggedImprovementThisAction) return
+    const newImprovements = player.improvements.filter(
+      (id) => !before.improvements.includes(id),
+    )
+    const newMinorImprovements = player.minorPlayed.filter(
+      (id) => !before.minorPlayed.includes(id),
+    )
+    if (newImprovements.length > 0) {
+      this.state.log.unshift({
+        key: 'log.playImprovement',
+        params: { player: player.name, improvements: newImprovements.join(',') },
+      })
+      this.loggedImprovementThisAction = true
+    }
+    if (newMinorImprovements.length > 0) {
+      this.state.log.unshift({
+        key: 'log.playMinorImprovement',
+        params: { player: player.name, improvements: newMinorImprovements.join(',') },
+      })
+      this.loggedImprovementThisAction = true
+    }
+  }
+
+  private logBakeBreadDelta(before: PlayerState, player: PlayerState) {
+    if (this.loggedBakeBreadThisAction) return
+    const grainUsed = Math.max(0, before.resources.grain - player.resources.grain)
+    const foodGained = Math.max(0, player.resources.food - before.resources.food)
+    if (grainUsed > 0 && foodGained > 0) {
+      this.state.log.unshift({
+        key: 'log.bakeBread',
+        params: { player: player.name, count: grainUsed, food: foodGained },
+      })
+      this.loggedBakeBreadThisAction = true
+    }
+  }
+
+  private finalizeActionLog(player: PlayerState) {
+    const before = this.actionStartPlayerSnapshot
+    if (before) {
+      this.logActionDetail(before, player)
+    }
+    if (before && !this.loggedImprovementThisAction) {
+      this.logImprovementDelta(before, player)
+    }
+    if (before && !this.loggedBakeBreadThisAction && this.usedBakeBreadThisAction) {
+      this.logBakeBreadDelta(before, player)
+    }
+    this.actionStartPlayerSnapshot = null
+    this.usedBakeBreadThisAction = false
+    this.loggedImprovementThisAction = false
+    this.loggedBakeBreadThisAction = false
+  }
+
   private runEngineSteps(): void {
     if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
     const player = this.state.players[this.activePlayerIndex]
@@ -247,6 +391,7 @@ export class GameSession {
 
       if (step.type === 'blocked' || step.type === 'done') {
         this.engine = null
+        this.finalizeActionLog(player)
         const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
         this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
         return
@@ -256,6 +401,16 @@ export class GameSession {
         if (step.choice.options.length === 1) {
           const auto = step.choice.options[0]
           const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+          const isBakeChoice =
+            step.choice.promptKey === 'ui.interactionBakeBreadChoice' ||
+            step.choice.promptKey === 'ui.interactionBakeBreadCount'
+          if (isBakeChoice && auto.value !== 'cancel' && auto.value !== '__skip__') {
+            this.usedBakeBreadThisAction = true
+          }
+          this.logImprovementDelta(before, player)
+          if (isBakeChoice) {
+            this.logBakeBreadDelta(before, player)
+          }
           if (result.type === 'choice') {
             this.pending = {
               type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
@@ -288,6 +443,8 @@ export class GameSession {
         this.engine = null
         this.pending = { type: 'none' }
         this.actionStartIndex = null
+        this.actionStartPlayerSnapshot = null
+        this.usedBakeBreadThisAction = false
         return
       }
 
@@ -330,6 +487,8 @@ export class GameSession {
     if (!space || space.takenBy) return this.respond(false, 'space unavailable')
 
     this.pushHistory(true)
+    this.actionStartPlayerSnapshot = this.clonePlayer(player)
+    this.usedBakeBreadThisAction = false
     space.takenBy = player.id
     player.workersAvailable -= 1
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
@@ -350,8 +509,27 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
+    if (
+      this.pending.promptKey === 'ui.interactionBakeBreadChoice' ||
+      this.pending.promptKey === 'ui.interactionBakeBreadCount'
+    ) {
+      if (value !== 'cancel' && value !== '__skip__') {
+        this.usedBakeBreadThisAction = true
+      }
+    }
     this.pushHistory()
+    const before = this.clonePlayer(player)
+    const isBakeChoice =
+      this.pending.promptKey === 'ui.interactionBakeBreadChoice' ||
+      this.pending.promptKey === 'ui.interactionBakeBreadCount'
+    if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
+      this.usedBakeBreadThisAction = true
+    }
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
+    this.logImprovementDelta(before, player)
+    if (isBakeChoice) {
+      this.logBakeBreadDelta(before, player)
+    }
     if (result.type === 'choice') {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
@@ -363,6 +541,8 @@ export class GameSession {
       this.pending = { type: 'none' }
       this.engine = null
       this.actionStartIndex = null
+      this.actionStartPlayerSnapshot = null
+      this.usedBakeBreadThisAction = false
       return this.respond()
     }
     this.runEngineSteps()
@@ -421,6 +601,7 @@ export class GameSession {
     if (this.engine) {
       this.runEngineSteps()
     } else {
+      this.finalizeActionLog(player)
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
       this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
     }

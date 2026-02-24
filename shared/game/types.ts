@@ -68,7 +68,7 @@ export type MajorEffectState = {
 
 export type LogEntry = {
   key: string
-  params?: Record<string, string | number>
+  params?: Record<string, unknown>
 }
 
 export type FutureMeeple = {
