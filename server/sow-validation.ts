@@ -15,8 +15,8 @@ export type SowValidationError = {
   code: 'NO_SELECTION' | 'INVALID_POSITION' | 'NOT_EMPTY' | 'NOT_ENOUGH_SEEDS' | 'INVALID_CROP'
 }
 
-export type SowValidationResult =
-  | { ok: true; player: PlayerFarmState }
+export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
+  | { ok: true; player: T }
   | { ok: false; error: SowValidationError }
 
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
@@ -32,10 +32,10 @@ const buildFieldMap = (fields: FarmField[]) => {
   return map
 }
 
-export const validateSowSelection = (
-  player: PlayerFarmState,
+export const validateSowSelection = <T extends PlayerFarmState>(
+  player: T,
   selections: SowSelection[],
-): SowValidationResult => {
+): SowValidationResult<T> => {
   if (!Array.isArray(selections) || selections.length === 0) {
     return { ok: false, error: { code: 'NO_SELECTION' } }
   }
@@ -84,7 +84,7 @@ export const validateSowSelection = (
     }
     return { ...field, crop: 'vegetable', remaining: 2 }
   })
-  const updated: PlayerFarmState = {
+  const updated = {
     ...normalized,
     fields: updatedFields,
     resources: {
@@ -93,5 +93,5 @@ export const validateSowSelection = (
       vegetable: (normalized.resources?.vegetable ?? 0) - vegetableCount,
     },
   }
-  return { ok: true, player: updated }
+  return { ok: true, player: updated as T }
 }

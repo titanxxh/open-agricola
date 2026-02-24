@@ -14,6 +14,8 @@ export type GameApiResponse = {
   ok: boolean
   state: GameState
   pending: PendingAction
+  historyLength: number
+  hasActionStartSnapshot: boolean
   scores?: Record<string, unknown>
   error?: string
 }
@@ -54,8 +56,7 @@ export const useGameApi = () => {
     try { return await fn() } finally { inflight.current = false }
   }, [])
 
-  const fetchState = useCallback(() =>
-    guard(() => get('/api/game/state')), [guard])
+  const fetchState = useCallback(() => get('/api/game/state'), [])
 
   const takeAction = useCallback((playerIndex: number, spaceId: string) =>
     guard(() => post('/api/game/action', { playerIndex, spaceId })), [guard])
@@ -75,6 +76,15 @@ export const useGameApi = () => {
   const performRoundEnd = useCallback(() =>
     guard(() => post('/api/game/round-end')), [guard])
 
+  const undoStep = useCallback(() =>
+    guard(() => post('/api/game/undo')), [guard])
+
+  const undoAction = useCallback(() =>
+    guard(() => post('/api/game/undo-action')), [guard])
+
+  const undoRound = useCallback(() =>
+    guard(() => post('/api/game/undo-round')), [guard])
+
   const newGame = useCallback(() =>
     guard(() => post('/api/game/new')), [guard])
 
@@ -89,6 +99,9 @@ export const useGameApi = () => {
     confirmFeed,
     confirmNextPlayer,
     performRoundEnd,
+    undoStep,
+    undoAction,
+    undoRound,
     newGame,
     loadGame,
   }

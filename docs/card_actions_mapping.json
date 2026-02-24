@@ -1,0 +1,486 @@
+{
+  "clay-pit": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "clay": 1
+      }
+    }
+  },
+  "day-laborer": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "gain",
+      "gain": {
+        "food": 2
+      }
+    }
+  },
+  "major-improvement": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can pay for at least one available major improvement or a minor improvement in hand"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "improvement-any"
+          }
+        ]
+      }
+    }
+  },
+  "cultivation": {
+    "preconditions": {
+      "roundAvailable": 5,
+      "custom": "Can plow at least one tile or can sow"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "or",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "plow"
+          },
+          {
+            "type": "leaf",
+            "actionId": "sow"
+          }
+        ]
+      }
+    }
+  },
+  "reed-bank": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "reed": 1
+      }
+    }
+  },
+  "meeting-place": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        2,
+        3,
+        4
+      ]
+    },
+    "behavior": {
+      "type": "execute",
+      "effects": [
+        "Set current player as first player"
+      ],
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "optional",
+            "actionId": "minor-improvement"
+          }
+        ]
+      }
+    }
+  },
+  "urgent-wish-children": {
+    "preconditions": {
+      "roundAvailable": 5
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "grow-family-without-room"
+          }
+        ]
+      }
+    }
+  },
+  "fencing": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "resources": {
+        "wood": "> 0"
+      }
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "fence"
+          }
+        ]
+      }
+    }
+  },
+  "western-quarry": {
+    "preconditions": {
+      "roundAvailable": 2
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "stone": 1
+      }
+    }
+  },
+  "grain-utilization": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can sow or has a major improvement that allows baking bread"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "or",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "sow"
+          },
+          {
+            "type": "leaf",
+            "actionId": "bake-bread"
+          }
+        ]
+      }
+    }
+  },
+  "eastern-quarry": {
+    "preconditions": {
+      "roundAvailable": 4
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "stone": 1
+      }
+    }
+  },
+  "lessons": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        2,
+        3,
+        4
+      ],
+      "custom": "Can pay for at least one occupation in hand (Cost: 0 for 1st, 1 for others; -1 with Paper Maker)"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "play-occupation"
+          }
+        ]
+      }
+    }
+  },
+  "house-redevelopment": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can renovate house (Wood -> Clay or Clay -> Stone)"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "renovate-house"
+          },
+          {
+            "type": "optional",
+            "actionId": "improvement-any"
+          }
+        ]
+      }
+    }
+  },
+  "traveling-players": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        4
+      ]
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "food": 1
+      }
+    }
+  },
+  "vegetable-seeds": {
+    "preconditions": {
+      "roundAvailable": 3
+    },
+    "behavior": {
+      "type": "gain",
+      "gain": {
+        "vegetable": 1
+      }
+    }
+  },
+  "resource-market-4": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        4
+      ]
+    },
+    "behavior": {
+      "type": "gain",
+      "gain": {
+        "reed": 1,
+        "stone": 1,
+        "food": 1
+      }
+    }
+  },
+  "cattle-market": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "cattle": 1
+      }
+    }
+  },
+  "wish-children": {
+    "preconditions": {
+      "roundAvailable": 2,
+      "custom": "rooms > familySize"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "wish-children-growth"
+          },
+          {
+            "type": "optional",
+            "actionId": "minor-improvement"
+          }
+        ]
+      }
+    }
+  },
+  "sheep-market": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "sheep": 1
+      }
+    }
+  },
+  "pig-market": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "boar": 1
+      }
+    }
+  },
+  "farm-redevelopment": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can renovate house"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "renovate-house"
+          },
+          {
+            "type": "optional",
+            "actionId": "fence"
+          }
+        ]
+      }
+    }
+  },
+  "fishing": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "food": 1
+      }
+    }
+  },
+  "grain-seeds": {
+    "preconditions": {
+      "roundAvailable": 1
+    },
+    "behavior": {
+      "type": "gain",
+      "gain": {
+        "grain": 1
+      }
+    }
+  },
+  "grove": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        3,
+        4
+      ]
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "wood": 2
+      }
+    }
+  },
+  "copse": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        4
+      ]
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "wood": 1
+      }
+    }
+  },
+  "forest": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        2,
+        3,
+        4
+      ]
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "wood": 3
+      }
+    }
+  },
+  "hollow-4": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        4
+      ]
+    },
+    "behavior": {
+      "type": "accumulate",
+      "gainPerRound": {
+        "clay": 2
+      }
+    }
+  },
+  "farmland": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can plow at least one tile"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "plow"
+          }
+        ]
+      }
+    }
+  },
+  "lessons-4": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "players": [
+        4
+      ],
+      "custom": "Can pay for at least one occupation in hand (Cost: 1 for 1st/2nd, 2 for others; -1 with Paper Maker)"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "seq",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "play-occupation"
+          }
+        ]
+      }
+    }
+  },
+  "farm-expansion": {
+    "preconditions": {
+      "roundAvailable": 1,
+      "custom": "Can build a room or a stable"
+    },
+    "behavior": {
+      "type": "flow",
+      "flow": {
+        "type": "or",
+        "children": [
+          {
+            "type": "leaf",
+            "actionId": "construct"
+          },
+          {
+            "type": "leaf",
+            "actionId": "stables"
+          }
+        ]
+      }
+    }
+  }
+}

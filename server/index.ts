@@ -95,7 +95,7 @@ type RoomSelectionResult =
   | { ok: true; selectedKeys: Set<string> }
   | { ok: false; code: string }
 
-const validateRoomSelection = (
+export const validateRoomSelection = (
   player: PlayerFarmState,
   rooms: { row: number; col: number }[],
 ): RoomSelectionResult => {
@@ -160,7 +160,7 @@ type StableSelectionResult =
   | { ok: true; selectedKeys: Set<string> }
   | { ok: false; code: string }
 
-const validateStableSelection = (
+export const validateStableSelection = (
   player: PlayerFarmState,
   stables: { row: number; col: number }[],
 ): StableSelectionResult => {

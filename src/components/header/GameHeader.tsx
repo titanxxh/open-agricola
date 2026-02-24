@@ -10,6 +10,7 @@ type Props = {
   allWorkersUsed: boolean
   devMode: boolean
   setDevMode: (value: boolean) => void
+  isInteractive: boolean
 }
 
 export const GameHeader = ({
@@ -20,6 +21,7 @@ export const GameHeader = ({
   allWorkersUsed,
   devMode,
   setDevMode,
+  isInteractive,
 }: Props) => (
   <header className="header">
     <div>
@@ -40,12 +42,14 @@ export const GameHeader = ({
         <button
           className={locale === 'zh' ? 'active' : ''}
           onClick={() => setLocale('zh')}
+          disabled={!isInteractive}
         >
           {t(locale, 'ui.languageZh')}
         </button>
         <button
           className={locale === 'en' ? 'active' : ''}
           onClick={() => setLocale('en')}
+          disabled={!isInteractive}
         >
           {t(locale, 'ui.languageEn')}
         </button>
@@ -56,6 +60,7 @@ export const GameHeader = ({
             type="checkbox"
             checked={devMode}
             onChange={(event) => setDevMode(event.target.checked)}
+            disabled={!isInteractive}
           />
           {t(locale, 'ui.devMode')}
         </label>

@@ -25,6 +25,8 @@ export const useGameSync = () => {
   const [pending, setPending] = useState<SyncedPending>({ type: 'none' })
   const [scores, setScores] = useState<Record<string, unknown> | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [historyLength, setHistoryLength] = useState(0)
+  const [hasActionStartSnapshot, setHasActionStartSnapshot] = useState(false)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -39,7 +41,9 @@ export const useGameSync = () => {
     setPending(resp.pending)
     setScores(resp.scores ?? null)
     setError(resp.ok ? null : (resp.error ?? 'unknown error'))
+    setHistoryLength(resp.historyLength ?? 0)
+    setHasActionStartSnapshot(resp.hasActionStartSnapshot ?? false)
   }, [])
 
-  return { state, pending, scores, error, applyResponse }
+  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, applyResponse }
 }

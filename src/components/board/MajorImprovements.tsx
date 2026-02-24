@@ -12,6 +12,7 @@ type Props = {
   availableMajorImprovements: string[]
   currentPlayer: PlayerState
   isSelectingMajor: boolean
+  isInteractive: boolean
   resolveChoice: (value: string) => void
   futureCardResources: Record<
     string,
@@ -29,6 +30,7 @@ export const MajorImprovements = ({
   availableMajorImprovements,
   currentPlayer,
   isSelectingMajor,
+  isInteractive,
   resolveChoice,
   futureCardResources,
 }: Props) => (
@@ -38,6 +40,7 @@ export const MajorImprovements = ({
       {availableMajorImprovements.map((cardId) => {
         const major = getMajorCardEffect(cardId)
         const canBuy = !!major && canPayResources(currentPlayer, major.cost)
+        const canInteract = isInteractive && isSelectingMajor && canBuy
         const costResources = major
           ? { ...emptyResources, ...major.cost }
           : {}
@@ -50,10 +53,11 @@ export const MajorImprovements = ({
               isSelectingMajor && canBuy ? ' selectable' : ''
             }`}
             onClick={() => {
-              if (isSelectingMajor && canBuy) {
+              if (canInteract) {
                 resolveChoice(`major:${cardId}`)
               }
             }}
+            disabled={!isInteractive}
           >
             <div className="hand-title">{t(locale, `improvements.${cardId}.name`)}</div>
             <div className="hand-meta">

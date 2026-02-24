@@ -58,8 +58,8 @@ export type FenceValidationError = {
   newEdges: string[]
 }
 
-export type FenceValidationResult =
-  | { ok: true; player: PlayerFarmState }
+export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
+  | { ok: true; player: T }
   | { ok: false; error: FenceValidationError }
 
 export const FARM_ROWS = 3
@@ -88,7 +88,7 @@ const createDefaultRoomTiles = (rooms: number) => {
   return positions.slice(0, Math.max(0, rooms))
 }
 
-export const normalizePlayerFarm = (player: PlayerFarmState): PlayerFarmState => {
+export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   const desiredRooms = player.rooms ?? 2
   const roomTiles =
     player.roomTiles && player.roomTiles.length > 0
@@ -312,11 +312,11 @@ const enforceAnimalCapacity = (player: PlayerFarmState) => {
     .reduce((sum, pasture) => sum + pasture.animalCount, 0)
 }
 
-export const validateFenceSelection = (
-  player: PlayerFarmState,
+export const validateFenceSelection = <T extends PlayerFarmState>(
+  player: T,
   edges: string[],
   extraWood = 0,
-): FenceValidationResult => {
+): FenceValidationResult<T> => {
   const extraCost = Number.isFinite(extraWood) ? Math.max(0, extraWood) : 0
   const normalized = normalizePlayerFarm(player)
   const parsedEdges = edges.map((edge) => parseEdgeId(edge))
@@ -415,5 +415,5 @@ export const validateFenceSelection = (
     pastures,
   }
   enforceAnimalCapacity(updated)
-  return { ok: true, player: updated }
+  return { ok: true, player: updated as T }
 }

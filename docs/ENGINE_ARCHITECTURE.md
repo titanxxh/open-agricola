@@ -3,6 +3,7 @@
 ## 1. 目标与边界
 
 - 目标：以回合与行动卡为核心驱动的农场主桌游实现，后端为权威状态源，前端仅做渲染与输入收集。
+- 前端以 4 个浏览器窗口模拟 4 位玩家视角（`?player=1..4` 或 `?player=p1..p4`）。
 - 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果。
 - 多人支持：WebSocket 实时同步，房间管理，支持多客户端连接同一后端。
 
@@ -17,7 +18,7 @@ shared/ (前后端共用，零 React 依赖)
   └─ i18n/            国际化
 
 src/ (仅前端)
-  ├─ app/             GameContainerApi（API 驱动）+ GameContainer（本地引擎 fallback）
+  ├─ app/             GameContainerApi（API 驱动）
   ├─ components/      React UI 组件
   ├─ hooks/           useGameApi / useGameSync / useActionEngine 等
   ├─ services/        后端 HTTP 调用
@@ -38,6 +39,9 @@ server/ (仅后端)
 - `server/game-session.ts`
   - 持有唯一权威 `GameState` + `Engine` 实例。
   - 暴露命令式方法：`takeAction`、`resolveChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`。
+  - 撤销回合使用回合快照并清空行动格占用。
+  - 动作完成后生成结构化行动日志，前端负责本地化渲染（播种支持新开垦田地且无选择禁用确认）。
+  - 前端仅对当前玩家展示行动选择高亮与播种控件。
   - 所有游戏逻辑（引擎推进、Hook 触发、回合结算、收获流程）均在后端执行。
 
 ### 3.2 HTTP API（game-router）
@@ -48,10 +52,14 @@ server/ (仅后端)
   - `POST /api/game/choice` — 解决选择分支
   - `POST /api/game/reorg` — 确认动物重整
   - `POST /api/game/feed` — 确认收获喂食
+  - `POST /api/game/validate` — 统合了围栏、房间、马厩、犁地、播种等前置校验
   - `POST /api/game/next-player` — 确认下一玩家
   - `POST /api/game/round-end` — 回合结束
+  - `POST /api/game/undo` — 撤销一步
+  - `POST /api/game/undo-action` — 撤销整次行动
+  - `POST /api/game/undo-round` — 撤销回合
   - `POST /api/game/new` — 新游戏
-  - 统一响应：`{ ok, state, pending, scores?, error? }`
+  - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
 
 ### 3.3 WebSocket 多人（room-manager）
 
@@ -68,9 +76,13 @@ server/ (仅后端)
 
 ### 3.5 前端 UI 层
 
-- `src/app/GameContainerApi.tsx`：API 驱动容器（默认模式），通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
-- `src/app/GameContainer.tsx`：本地引擎模式（`?mode=local` 切换），保留作为 fallback。
+- `src/app/GameContainerApi.tsx`：API 驱动容器，通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
+- 通过 `?player=1..4` 或 `?player=p1..p4` 锁定玩家视角，每个窗口代表一名玩家。
+- 非当前玩家窗口为只读视图，交互按钮全部禁用。
 - `src/components/*`：纯渲染组件，不包含游戏逻辑。
+
+### 3.6 行动卡映射数据
+- `docs/card_actions_mapping.json`：结构化描述了所有行动卡的前置校验逻辑与执行流，作为测试编写的权威参考。
 
 ## 4. 运行流程
 
@@ -103,6 +115,7 @@ server/ (仅后端)
 - `shared/logic/__tests__/*`：计分、收获、状态克隆
 - `src/app/__tests__/*`：编排核心
 - `server/__tests__/*`：后端校验
+- `e2e-tests/actions.spec.ts`：Playwright 端到端行动卡测试，验证核心行动逻辑与撤销功能。
 
 ## 6. 运行方式
 

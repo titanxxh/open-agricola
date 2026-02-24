@@ -3116,6 +3116,7 @@ export const GameContainer = () => {
         confirmNextPlayer={confirmNextPlayer}
         harvestFeedPlayerName={harvestPending?.playerName ?? null}
         confirmHarvestFeed={confirmHarvestFeed}
+        isInteractive={true}
       />
       {harvestPending && harvestPlayer ? (
         <div className="exchange-overlay">
@@ -3353,6 +3354,7 @@ export const GameContainer = () => {
         allWorkersUsed={allWorkersUsed}
         devMode={devMode}
         setDevMode={setDevMode}
+        isInteractive={true}
       />
       <GameControls
         locale={locale}
@@ -3366,6 +3368,7 @@ export const GameContainer = () => {
         hasActionStartSnapshot={!!actionStartSnapshot}
         allWorkersUsed={allWorkersUsed}
         isGameOver={state.gameOver}
+        isInteractive={true}
         devMode={devMode}
         seedValue={resetSeedInput}
         onSeedChange={setResetSeedInput}
@@ -3377,6 +3380,7 @@ export const GameContainer = () => {
         isSelectingMajor={isSelectingImprovementAny}
         resolveChoice={resolveChoice}
         futureCardResources={futureCardResources}
+        isInteractive={true}
       />
       <main className="board">
         <ActionBoard
@@ -3447,6 +3451,7 @@ export const GameContainer = () => {
           isSelectingImprovementAny={isSelectingImprovementAny}
           futureCardResources={futureCardResources}
           resolveChoice={resolveChoice}
+          isInteractive={true}
         />
       </main>
       <LogPanel locale={locale} log={state.log} />
