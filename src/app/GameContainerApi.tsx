@@ -41,7 +41,8 @@ type RoundSlot = { round: number; action?: ActionSpace }
 
 export const GameContainerApi = () => {
   const api = useGameApi()
-  const { state, pending, applyResponse } = useGameSync()
+  const { state, pending, historyLength, hasActionStartSnapshot, applyResponse } =
+    useGameSync()
   const [locale, setLocale] = useState<Locale>('zh')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(null)
   const [showScoringPad, setShowScoringPad] = useState(false)
@@ -130,6 +131,18 @@ export const GameContainerApi = () => {
     if (!state) return
     void applyAndSync(api.takeAction(state.currentPlayerIndex, space.id))
   }, [state, api, applyAndSync])
+
+  const undoStep = useCallback(() => {
+    void applyAndSync(api.undoStep())
+  }, [api, applyAndSync])
+
+  const undoAction = useCallback(() => {
+    void applyAndSync(api.undoAction())
+  }, [api, applyAndSync])
+
+  const undoRound = useCallback(() => {
+    void applyAndSync(api.undoRound())
+  }, [api, applyAndSync])
 
   const resolveChoice = useCallback((value: string) => {
     if (pending.type !== 'choice' || !currentPlayer) return
@@ -523,7 +536,22 @@ export const GameContainerApi = () => {
       ) : null}
       <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
       <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} />
-      <GameControls locale={locale} onUndo={() => {}} onUndoAction={() => {}} onUndoRound={() => {}} onEndRound={endRound} onResetGame={resetGame} onShowScoring={() => setShowScoringPad(true)} historyLength={0} hasActionStartSnapshot={false} allWorkersUsed={allWorkersUsed} isGameOver={state.gameOver} devMode={devMode} seedValue={resetSeedInput} onSeedChange={setResetSeedInput} />
+      <GameControls
+        locale={locale}
+        onUndo={undoStep}
+        onUndoAction={undoAction}
+        onUndoRound={undoRound}
+        onEndRound={endRound}
+        onResetGame={resetGame}
+        onShowScoring={() => setShowScoringPad(true)}
+        historyLength={historyLength}
+        hasActionStartSnapshot={hasActionStartSnapshot}
+        allWorkersUsed={allWorkersUsed}
+        isGameOver={state.gameOver}
+        devMode={devMode}
+        seedValue={resetSeedInput}
+        onSeedChange={setResetSeedInput}
+      />
       <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} />
       <main className="board">
         <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />

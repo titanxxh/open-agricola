@@ -114,6 +114,24 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/undo') {
+    const resp = getSession().undoStep()
+    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/undo-action') {
+    const resp = getSession().undoAction()
+    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/undo-round') {
+    const resp = getSession().undoRound()
+    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
   if (req.method === 'GET' && req.url?.startsWith('/api/game/actions')) {
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')

@@ -28,6 +28,7 @@ import {
   createInitialState,
   createRoundOpenById,
   createRoundSnapshot,
+  cloneState,
   harvestRounds,
   isActionForPlayerCount,
   normalizeState,
@@ -47,10 +48,21 @@ type PendingAction =
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'none' }
 
+type HistoryEntry = {
+  state: GameState
+  pending: PendingAction
+  activeSpaceId: string | null
+  activePlayerIndex: number | null
+  engineSnapshot: ReturnType<Engine['snapshot']> | null
+  actionStart: boolean
+}
+
 export type SessionResponse = {
   ok: boolean
   state: GameState
   pending: PendingAction
+  historyLength: number
+  hasActionStartSnapshot: boolean
   scores?: ReturnType<typeof computeScores>
   error?: string
 }
@@ -61,6 +73,8 @@ export class GameSession {
   private activeSpaceId: string | null = null
   private activePlayerIndex: number | null = null
   private pending: PendingAction = { type: 'none' }
+  private history: HistoryEntry[] = []
+  private actionStartIndex: number | null = null
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -150,12 +164,67 @@ export class GameSession {
   }
 
   private respond(ok = true, error?: string): SessionResponse {
-    const resp: SessionResponse = { ok, state: this.state, pending: this.pending }
+    const resp: SessionResponse = {
+      ok,
+      state: this.state,
+      pending: this.pending,
+      historyLength: this.history.length,
+      hasActionStartSnapshot: this.actionStartIndex !== null,
+    }
     if (this.state.gameOver) {
       resp.scores = computeScores(this.state)
     }
     if (error) resp.error = error
     return resp
+  }
+
+  private clonePending(pending: PendingAction): PendingAction {
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(pending)
+      } catch {
+        return JSON.parse(JSON.stringify(pending)) as PendingAction
+      }
+    }
+    return JSON.parse(JSON.stringify(pending)) as PendingAction
+  }
+
+  private pushHistory(actionStart = false) {
+    const entry: HistoryEntry = {
+      state: cloneState(this.state),
+      pending: this.clonePending(this.pending),
+      activeSpaceId: this.activeSpaceId,
+      activePlayerIndex: this.activePlayerIndex,
+      engineSnapshot: this.engine?.snapshot() ?? null,
+      actionStart,
+    }
+    this.history.push(entry)
+    if (actionStart) {
+      this.actionStartIndex = this.history.length - 1
+    }
+  }
+
+  private restoreHistory(entry: HistoryEntry) {
+    this.state = cloneState(entry.state)
+    this.pending = this.clonePending(entry.pending)
+    this.activeSpaceId = entry.activeSpaceId
+    this.activePlayerIndex = entry.activePlayerIndex
+    if (entry.engineSnapshot && entry.activeSpaceId) {
+      this.engine = this.createEngine(entry.activeSpaceId)
+      this.engine.restore(entry.engineSnapshot)
+    } else {
+      this.engine = null
+    }
+  }
+
+  private recomputeActionStartIndex() {
+    for (let i = this.history.length - 1; i >= 0; i -= 1) {
+      if (this.history[i]?.actionStart) {
+        this.actionStartIndex = i
+        return
+      }
+    }
+    this.actionStartIndex = null
   }
 
   private runEngineSteps(): void {
@@ -188,6 +257,8 @@ export class GameSession {
           }
           if (result.type === 'fail') {
             this.pending = { type: 'none' }
+            this.engine = null
+            this.actionStartIndex = null
             return
           }
           if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
@@ -208,6 +279,7 @@ export class GameSession {
         player.workersAvailable += 1
         this.engine = null
         this.pending = { type: 'none' }
+        this.actionStartIndex = null
         return
       }
 
@@ -249,6 +321,7 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space || space.takenBy) return this.respond(false, 'space unavailable')
 
+    this.pushHistory(true)
     space.takenBy = player.id
     player.workersAvailable -= 1
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
@@ -269,6 +342,7 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
+    this.pushHistory()
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
     if (result.type === 'choice') {
       this.pending = {
@@ -279,6 +353,8 @@ export class GameSession {
     }
     if (result.type === 'fail') {
       this.pending = { type: 'none' }
+      this.engine = null
+      this.actionStartIndex = null
       return this.respond()
     }
     this.runEngineSteps()
@@ -292,6 +368,7 @@ export class GameSession {
     if (this.pending.type !== 'animalReorg' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending reorg')
     }
+    this.pushHistory()
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
@@ -346,6 +423,7 @@ export class GameSession {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
     }
+    this.pushHistory()
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
@@ -390,11 +468,13 @@ export class GameSession {
 
   confirmNextPlayer(): SessionResponse {
     if (this.pending.type !== 'confirmNextPlayer') return this.respond(false, 'no pending transition')
+    this.pushHistory()
     this.state.currentPlayerIndex = this.pending.nextPlayerIndex
     this.pending = { type: 'none' }
     this.engine = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
+    this.actionStartIndex = null
     return this.respond()
   }
 
@@ -409,6 +489,7 @@ export class GameSession {
       return this.respond()
     }
 
+    this.pushHistory()
     this.applyReturnHome()
     if (harvestRounds.includes(this.state.round)) {
       return this.startHarvest()
@@ -485,10 +566,45 @@ export class GameSession {
     this.state = normalizeState(raw as GameState)
     this.engine = null
     this.pending = { type: 'none' }
+    this.history = []
+    this.actionStartIndex = null
     return this.respond()
   }
 
   getRawState(): GameState {
     return this.state
+  }
+
+  undoStep(): SessionResponse {
+    const entry = this.history.pop()
+    if (!entry) return this.respond(false, 'no history to undo')
+    this.restoreHistory(entry)
+    this.recomputeActionStartIndex()
+    return this.respond()
+  }
+
+  undoAction(): SessionResponse {
+    if (this.actionStartIndex === null) return this.respond(false, 'no action snapshot')
+    const entry = this.history[this.actionStartIndex]
+    if (!entry) return this.respond(false, 'no action snapshot')
+    this.restoreHistory(entry)
+    this.history = this.history.slice(0, this.actionStartIndex)
+    this.actionStartIndex = null
+    return this.respond()
+  }
+
+  undoRound(): SessionResponse {
+    const roundSnapshot = this.state.roundStartSnapshot
+      ? cloneState(this.state.roundStartSnapshot)
+      : createRoundSnapshot(this.state)
+    this.state = roundSnapshot
+    this.state.roundStartSnapshot = createRoundSnapshot(this.state)
+    this.pending = { type: 'none' }
+    this.engine = null
+    this.activeSpaceId = null
+    this.activePlayerIndex = null
+    this.history = []
+    this.actionStartIndex = null
+    return this.respond()
   }
 }
