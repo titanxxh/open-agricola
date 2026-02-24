@@ -42,6 +42,7 @@ import { computeScores } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
+import { positionKey } from '../shared/game/farm.ts'
 
 type PendingAction =
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
@@ -273,8 +274,13 @@ export class GameSession {
     }
     let sowGrain = 0
     let sowVegetable = 0
-    player.fields.forEach((field, index) => {
-      const beforeField = before.fields[index]
+    const beforeFieldMap = new Map(
+      before.fields.map((field) => [positionKey({ row: field.row, col: field.col }), field]),
+    )
+    player.fields.forEach((field) => {
+      const beforeField = beforeFieldMap.get(
+        positionKey({ row: field.row, col: field.col }),
+      )
       if (!beforeField || beforeField.crop) return
       if (field.crop === 'grain') sowGrain += 1
       if (field.crop === 'vegetable') sowVegetable += 1
