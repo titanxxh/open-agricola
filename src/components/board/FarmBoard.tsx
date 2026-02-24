@@ -144,6 +144,7 @@ export const FarmBoard = ({
   devMode,
 }: Props) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id
+  const isOwnBoard = displayPlayer.id === currentPlayer.id
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -249,22 +250,26 @@ export const FarmBoard = ({
           const isField = fieldPositions.has(tileKey)
           const isStable = stablePositions.has(tileKey)
           const isRoomSelectable =
+            isOwnBoard &&
             canSelectRooms &&
             !isRoom &&
             !isField &&
             !isStable &&
             !pastureTiles.has(tileKey)
-          const isRoomSelected = pendingRoomSet.has(tileKey)
-          const isStableSelected = pendingStableSet.has(tileKey)
+          const isRoomSelected = isOwnBoard && pendingRoomSet.has(tileKey)
+          const isStableSelected = isOwnBoard && pendingStableSet.has(tileKey)
           const maxStableReached = pendingStableSet.size >= maxStableSelections
           const isStableSelectable =
+            isOwnBoard &&
             canSelectStables &&
             !isRoom &&
             !isField &&
             !isStable &&
             (!maxStableReached || isStableSelected)
-          const isPlowSelectable = canSelectPlow && plowSelectableSet.has(tileKey)
-          const isPlowSelected = pendingPlowTile
+          const isPlowSelectable =
+            isOwnBoard && canSelectPlow && plowSelectableSet.has(tileKey)
+          const isPlowSelected =
+            isOwnBoard && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
             : false
           const isTileSelectable =
@@ -277,8 +282,8 @@ export const FarmBoard = ({
             fieldInfo?.crop && fieldInfo.remaining > 0
               ? `${t(locale, `resources.${fieldInfo.crop}`)} ${fieldInfo.remaining}`
               : ''
-          const isSowSelectable = canSelectSow && isEmptyField
-          const currentSowChoice = pendingSowSelections[tileKey] ?? ''
+          const isSowSelectable = isOwnBoard && canSelectSow && isEmptyField
+          const currentSowChoice = isOwnBoard ? (pendingSowSelections[tileKey] ?? '') : ''
           const availableGrain =
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
           const availableVegetable =
