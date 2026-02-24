@@ -179,10 +179,19 @@ export const GameContainerApi = () => {
       return
     }
     if (promptKey === 'ui.interactionSowSelect') {
-      const crops = Object.entries(pendingSowSelections).map(([key, crop]) => {
-        const [r, c] = key.split(',').map(Number)
-        return { row: r ?? 0, col: c ?? 0, crop }
-      })
+      const crops = Object.entries(pendingSowSelections)
+        .map(([key, crop]) => {
+          const [rowText, colText] = key.split('-')
+          const row = Number(rowText)
+          const col = Number(colText)
+          if (!Number.isFinite(row) || !Number.isFinite(col)) return null
+          return { row, col, crop }
+        })
+        .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
+      if (value === 'confirm' && crops.length === 0) {
+        setSowError('NO_SELECTION')
+        return
+      }
       void validateSow(currentPlayer.id, crops).then((result) => {
         if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
         else setSowError(result.error?.code ?? result.error ?? 'validation failed')
