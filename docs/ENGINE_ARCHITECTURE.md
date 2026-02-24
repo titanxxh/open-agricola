@@ -115,6 +115,7 @@ server/ (仅后端)
 - `shared/logic/__tests__/*`：计分、收获、状态克隆
 - `src/app/__tests__/*`：编排核心
 - `server/__tests__/*`：后端校验
+- `scripts/test-actions.spec.ts`：Playwright 端到端行动卡测试模板
 
 ## 6. 运行方式
 

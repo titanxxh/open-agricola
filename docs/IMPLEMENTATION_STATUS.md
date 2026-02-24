@@ -51,6 +51,7 @@
 - WebSocket 多人流程尚未端到端测试。
 - 撤销功能已支持 API 模式（撤销回合会清空行动格占用）。
 - API 模式行动日志已覆盖资源变化、播种与改良/烤面包记录（播种支持新开垦田地且无选择禁用确认）。
+- 新增 Playwright 端到端测试模板 `scripts/test-actions.spec.ts`，用于自动化验证行动卡逻辑与撤销功能。
 - 非当前玩家视角不显示可选高亮与播种控件。
 - 非当前玩家窗口为只读视图，交互按钮全部禁用。
 - `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
