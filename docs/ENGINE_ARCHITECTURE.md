@@ -3,6 +3,7 @@
 ## 1. 目标与边界
 
 - 目标：以回合与行动卡为核心驱动的农场主桌游实现，后端为权威状态源，前端仅做渲染与输入收集。
+- 前端以 4 个浏览器窗口模拟 4 位玩家视角（`?player=1..4` 或 `?player=p1..p4`）。
 - 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果。
 - 多人支持：WebSocket 实时同步，房间管理，支持多客户端连接同一后端。
 
@@ -17,7 +18,7 @@ shared/ (前后端共用，零 React 依赖)
   └─ i18n/            国际化
 
 src/ (仅前端)
-  ├─ app/             GameContainerApi（API 驱动）+ GameContainer（本地引擎 fallback）
+  ├─ app/             GameContainerApi（API 驱动）
   ├─ components/      React UI 组件
   ├─ hooks/           useGameApi / useGameSync / useActionEngine 等
   ├─ services/        后端 HTTP 调用
@@ -75,8 +76,8 @@ server/ (仅后端)
 
 ### 3.5 前端 UI 层
 
-- `src/app/GameContainerApi.tsx`：API 驱动容器（默认模式），通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
-- `src/app/GameContainer.tsx`：本地引擎模式（`?mode=local` 切换），保留作为 fallback。
+- `src/app/GameContainerApi.tsx`：API 驱动容器，通过 `useGameApi` 发送命令、`useGameSync` 接收状态。
+- 通过 `?player=1..4` 或 `?player=p1..p4` 锁定玩家视角，每个窗口代表一名玩家。
 - `src/components/*`：纯渲染组件，不包含游戏逻辑。
 
 ## 4. 运行流程

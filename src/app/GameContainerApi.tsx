@@ -45,7 +45,16 @@ export const GameContainerApi = () => {
   const { state, pending, historyLength, hasActionStartSnapshot, applyResponse } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>('zh')
-  const [viewPlayerId, setViewPlayerId] = useState<string | null>(null)
+  const lockedViewPlayerId = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    const raw = params.get('player') ?? params.get('playerId')
+    if (!raw) return null
+    if (/^p[1-4]$/.test(raw)) return raw
+    const index = Number(raw)
+    if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
+    return null
+  }, [])
+  const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(false)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
@@ -502,10 +511,18 @@ export const GameContainerApi = () => {
       ...stKeys.map((key) => ({ id: `stable:${key}`, zoneType: 'stable' as const, animalType: currentPlayer.stableAnimals?.[key] ?? null, animalCount: currentPlayer.stableAnimals?.[key] ? 1 : 0 })),
     ], confirmDiscard: false })
   }
-  const wrappedToggleRoom = (tile: FarmTilePosition) => toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
-  const wrappedToggleStable = (tile: FarmTilePosition) => toggleStableTileInternal(tile, maxStableSelections, positionKey)
-  const wrappedTogglePlow = (tile: FarmTilePosition) => togglePlowTileInternal(tile, positionKey)
-  const wrappedUpdateSow = (tile: FarmTilePosition, value: string) => updateSowSelectionInternal(tile, value, positionKey)
+  const wrappedToggleRoom = (tile: FarmTilePosition) =>
+    toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
+  const wrappedToggleStable = (tile: FarmTilePosition) =>
+    toggleStableTileInternal(tile, maxStableSelections, positionKey)
+  const wrappedTogglePlow = (tile: FarmTilePosition) =>
+    togglePlowTileInternal(tile, positionKey)
+  const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
+    updateSowSelectionInternal(tile, value, positionKey)
+  const setViewPlayerIdSafe = useCallback((value: string) => {
+    if (lockedViewPlayerId) return
+    setViewPlayerId(value)
+  }, [lockedViewPlayerId])
   const adjustReorgAnimal = (_zoneId: string, _animalType: 'sheep' | 'boar' | 'cattle', _delta: number) => { void _zoneId; void _animalType; void _delta }
   const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
   const plowSelectableSet = useMemo(() => {
@@ -795,7 +812,7 @@ export const GameContainerApi = () => {
           togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
           toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
           confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-          setViewPlayerId={setViewPlayerId} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+          setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
           isSelectingImprovementAny={isSelectingImprovementAny} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
         />
       </main>
