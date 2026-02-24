@@ -281,7 +281,7 @@ export class GameSession {
       const beforeField = beforeFieldMap.get(
         positionKey({ row: field.row, col: field.col }),
       )
-      if (!beforeField || beforeField.crop) return
+      if (beforeField && beforeField.crop) return
       if (field.crop === 'grain') sowGrain += 1
       if (field.crop === 'vegetable') sowVegetable += 1
     })
