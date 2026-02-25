@@ -27,7 +27,6 @@ import type { EngineNode } from '../shared/engine/index.ts'
 import {
   createInitialState,
   createRoundOpenById,
-  createRoundSnapshot,
   cloneState,
   emptyResources,
   harvestRounds,
@@ -252,6 +251,7 @@ export class GameSession {
     })
     const effects: {
       buildRoom?: number
+      buildStables?: number
       growFamily?: number
       plow?: number
       sowGrain?: number
@@ -292,6 +292,11 @@ export class GameSession {
     }
     if (player.fences > before.fences) {
       effects.fencing = player.fences - before.fences
+    }
+    const stablesBefore = before.stableTiles?.length ?? 0
+    const stablesAfter = player.stableTiles?.length ?? 0
+    if (stablesAfter > stablesBefore) {
+      effects.buildStables = stablesAfter - stablesBefore
     }
     const newImprovements = player.improvements.filter(
       (id) => !before.improvements.includes(id),
@@ -787,23 +792,6 @@ export class GameSession {
     if (!entry) return this.respond(false, 'no action snapshot')
     this.restoreHistory(entry)
     this.history = this.history.slice(0, this.actionStartIndex)
-    this.actionStartIndex = null
-    return this.respond()
-  }
-
-  undoRound(): SessionResponse {
-    const roundSnapshot = this.state.roundStartSnapshot
-      ? cloneState(this.state.roundStartSnapshot)
-      : this.buildRoundSnapshot(this.state)
-    this.state = roundSnapshot
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((space) => { space.takenBy = null })
-    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    this.pending = { type: 'none' }
-    this.engine = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
-    this.history = []
     this.actionStartIndex = null
     return this.respond()
   }

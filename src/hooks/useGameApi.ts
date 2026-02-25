@@ -82,9 +82,6 @@ export const useGameApi = () => {
   const undoAction = useCallback(() =>
     guard(() => post('/api/game/undo-action')), [guard])
 
-  const undoRound = useCallback(() =>
-    guard(() => post('/api/game/undo-round')), [guard])
-
   const newGame = useCallback(() =>
     guard(() => post('/api/game/new')), [guard])
 
@@ -101,7 +98,6 @@ export const useGameApi = () => {
     performRoundEnd,
     undoStep,
     undoAction,
-    undoRound,
     newGame,
     loadGame,
   }

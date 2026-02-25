@@ -57,7 +57,6 @@ server/ (仅后端)
   - `POST /api/game/round-end` — 回合结束
   - `POST /api/game/undo` — 撤销一步
   - `POST /api/game/undo-action` — 撤销整次行动
-  - `POST /api/game/undo-round` — 撤销回合
   - `POST /api/game/new` — 新游戏
   - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
 
