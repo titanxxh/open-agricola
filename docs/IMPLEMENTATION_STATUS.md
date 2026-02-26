@@ -155,6 +155,16 @@ public static function useResource($player_id, $resourceType, $amount)
 
 ### 6.4 改进方向
 
+**已完成（2026-02-26）**：
+- ✅ 实现 `ComplexCost` 类型结构（fee, fees, trades, cards, bonuses）
+- ✅ 实现 `PaymentSolution` 类型结构（resourcesPaid, tradesUsed, bonusUsed）
+- ✅ 实现 `computeAllBuyableCombinations` 算法
+- ✅ 实现 `keepOnlyOptimals` Pareto 优化过滤
+- ✅ 实现 `canPayCost` 支持 ComplexCost（向后兼容简单成本）
+- ✅ 实现 `exchange.ts` 交易系统（canAffordTrade, applyTrade, convertResources 等）
+- ✅ 新增 70 个单元测试覆盖支付系统（exchange.test.ts + pay.test.ts）
+- ✅ 更新 docs/ut.md 测试覆盖文档
+
 **短期（当前系统可支持）**：
 - 扩展 `applyCostOverride` 支持更复杂的成本修改规则
 - 增加卡牌抵换机制（参考 BGA 的 `cards` 成本结构）
