@@ -12,6 +12,68 @@ import {
   hasValidResources,
 } from './exchange'
 
+// ============================================================
+// LRU Cache for payment computation (major performance boost)
+// ============================================================
+class LRUCache<K, V> {
+  private cache = new Map<K, V>()
+  constructor(private maxSize: number) {}
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined
+    const value = this.cache.get(key)!
+    this.cache.delete(key)
+    this.cache.set(key, value)
+    return value
+  }
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key)
+    } else if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value
+      this.cache.delete(firstKey)
+    }
+    this.cache.set(key, value)
+  }
+  clear(): void {
+    this.cache.clear()
+  }
+}
+
+const solutionCache = new LRUCache<string, PaymentSolution[]>(100)
+
+// Hash function for PaymentSolution - O(1) deduplication
+const RESOURCE_ID: Record<string, number> = {
+  wood: 1, food: 2, reed: 3, clay: 4, stone: 5,
+  sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10
+}
+
+function hashSolution(solution: PaymentSolution): number {
+  let h = 0
+  const paid = solution.resourcesPaid
+  for (const [res, amount] of Object.entries(paid)) {
+    const resId = RESOURCE_ID[res] || 0
+    h = ((h + resId * 17 + ((amount ?? 0) * 31)) * 31) >>> 0
+  }
+  // Include trades in hash
+  for (const { trade, times } of solution.tradesUsed) {
+    h = ((h + (trade.from?.wood ?? 0) * 13 + times * 7) * 31) >>> 0
+  }
+  // Include bonus
+  if (solution.bonusUsed) {
+    h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
+  }
+  return h
+}
+
+function makeCacheKey(player: PlayerState, cost: ComplexCost): string {
+  const reserveKey = Object.entries(player.resources)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(',')
+  const costKey = JSON.stringify(cost)
+  return `${reserveKey}|${costKey}`
+}
+
 export const payResources = (
   player: PlayerState,
   cost: Partial<PlayerState['resources']>,
@@ -187,8 +249,13 @@ export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
 ): PaymentSolution[] => {
+  const cacheKey = makeCacheKey(player, cost)
+  const cached = solutionCache.get(cacheKey)
+  if (cached) return cached
+
   const playerResources: Partial<Resource> = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
+  const solutionHashes = new Set<number>()
 
   const baseFees: Partial<Resource>[] = cost.fees && cost.fees.length > 0
     ? cost.fees
@@ -226,13 +293,26 @@ export const computeAllBuyableCombinations = (
     }
   }
 
-  const paymentSolutions: PaymentSolution[] = rawSolutions.map((sol) => ({
-    resourcesPaid: subtractResources(playerResources, sol.resourcesRemaining),
-    tradesUsed: sol.tradesUsed,
-    bonusUsed: sol.bonusUsed,
-  }))
+  const paymentSolutions: PaymentSolution[] = []
+  const seenHashes = new Set<number>()
 
-  return keepOnlyOptimals(paymentSolutions)
+  for (const sol of rawSolutions) {
+    const solution: PaymentSolution = {
+      resourcesPaid: subtractResources(playerResources, sol.resourcesRemaining),
+      tradesUsed: sol.tradesUsed,
+      bonusUsed: sol.bonusUsed,
+    }
+
+    const hash = hashSolution(solution)
+    if (!seenHashes.has(hash)) {
+      seenHashes.add(hash)
+      paymentSolutions.push(solution)
+    }
+  }
+
+  const result = keepOnlyOptimals(paymentSolutions)
+  solutionCache.set(cacheKey, result)
+  return result
 }
 
 export const canPayCost = (
@@ -271,4 +351,8 @@ export const getCheapestSolution = (
       .reduce((sum, val) => sum + (val ?? 0), 0)
     return currentTotal < cheapestTotal ? current : cheapest
   })
+}
+
+export const clearPaymentCache = () => {
+  solutionCache.clear()
 }
