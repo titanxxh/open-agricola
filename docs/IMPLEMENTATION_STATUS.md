@@ -67,3 +67,103 @@
 - 持续完善撤销覆盖范围与异常场景。
 - 持续补全高频卡牌行为。
 - 已移除本地引擎模式，仅保留 API 驱动。
+
+## 6. BGA-Agricola 资源支付系统参考
+
+### 6.1 当前实现 (pay.ts)
+
+当前实现的资源支付逻辑较为简单：
+
+```typescript
+// shared/actions/effects/pay.ts
+payResources(player, cost)  // 直接扣减数值
+canPayResources(player, cost)  // 验证资源是否足够
+applyCostOverride(base, override)  // 成本覆盖（用于卡牌效果）
+```
+
+**特点**：
+- 资源以数值形式存储 (`player.resources.wood = 5`)
+- 直接加减数值，无木块追踪
+- 成本结构简单，仅支持固定成本
+
+### 6.2 BGA 版本实现 (Pay.php)
+
+BGA 版本有完整的支付系统，核心文件：`modules/php/Actions/Pay.php`
+
+#### 成本结构 (Cost Format)
+
+```php
+$costs = [
+    'fee' => [resource => amount],      // 必付费用
+    'fees' => [fee1, fee2, ...],        // 多选一费用
+    'trades' => [                       // 可重复的交易选项
+        ['max' => maxTimes, 'nb' => units, resource => amount, ...]
+    ],
+    'cards' => [type => X, list => [...]],  // 卡牌抵换
+    'bonuses' => [                     // 一次性折扣
+        ['optional' => bool, resourceType => amount, ...]
+    ]
+]
+```
+
+#### 组合计算算法
+
+`computeAllBuyableCombinations()` - 计算玩家所有可用支付组合：
+1. 遍历 `fees` 作为基础
+2. 迭代所有 `trades` 组合
+3. 应用 `bonuses` 折扣
+4. 过滤资源不足组合
+5. 移除被其他组合"支配"的不优解
+
+#### 资源模型
+
+BGA 以**单个木块 (meeple)** 追踪资源：
+
+```php
+// Meeples.php
+public static function useResource($player_id, $resourceType, $amount)
+{
+    $resource = self::getResourceOfType($player_id, $resourceType);
+    foreach ($resource as $id => $res) {
+        $deleted[] = $res;  // 保存完整对象用于通知
+        self::DB()->delete($id);
+    }
+    return $deleted;
+}
+```
+
+#### 支付类型
+
+| 类型 | 方法 | 说明 |
+|------|------|------|
+| 普通支付 | `useResource()` | 从玩家储备中删除 |
+| 支付给其他玩家 | `payResourceTo()` | 转移资源到另一玩家 |
+| 从田地支付 | `payResourcesFromFields()` | 从田地中取资源 |
+| 从卡牌支付 | `payResourcesFromCards()` | 归还卡牌抵换 |
+| 卡牌抵换 | 支付卡牌代替资源 | 支持 Major 改良卡 |
+
+### 6.3 对比总结
+
+| 特性 | open-agricola | bga-agricola |
+|------|---------------|---------------|
+| 复杂度 | 简单直接 | 完整状态机 |
+| 资源模型 | 数值计数 | 逐个木块追踪 |
+| 支付组合 | 无 | 智能计算可用组合 |
+| 成本结构 | 固定成本 | fees + trades + bonuses + cards |
+| 卡牌抵换 | 无 | 完整支持 |
+| 玩家间支付 | 无 | 完整支持 |
+
+### 6.4 改进方向
+
+**短期（当前系统可支持）**：
+- 扩展 `applyCostOverride` 支持更复杂的成本修改规则
+- 增加卡牌抵换机制（参考 BGA 的 `cards` 成本结构）
+
+**中期（需要架构调整）**：
+- 实现 `computeAllBuyableCombinations` 算法，支持多选一费用和 trades
+- 扩展 bonuses 支持一次性折扣
+
+**长期（重大重构）**：
+- 将资源模型从数值改为木块追踪
+- 实现玩家间资源转移
+- 实现从田地/卡牌支付资源
