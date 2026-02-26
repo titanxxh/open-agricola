@@ -369,6 +369,72 @@ BGA-aligned 支付系统测试，覆盖 ComplexCost、PaymentSolution、Pareto �
   - 覆盖场景：房屋升级成本
   - 关键断言：正确处理费用+材料组合
 
+### tests/pay-optimizations.test.ts
+
+支付系统性能优化测试，验证 LRU 缓存和哈希去重的正确性与性能提升。
+
+- LRU Cache / caches identical queries
+  - 覆盖场景：相同查询命中缓存
+  - 关键断言：第二次查询直接返回缓存结果
+- LRU Cache / invalidates on resource change
+  - 覆盖场景：资源变化后缓存失效
+  - 关键断言：新资源生成新缓存键
+- LRU Cache / respects max size limit
+  - 覆盖场景：缓存达到上限时淘汰旧条目
+  - 关键断言：LRU 淘汰策略正确执行
+- Hash Deduplication / removes duplicate solutions
+  - 覆盖场景：哈希去重移除重复解
+  - 关键断言：O(1) 时间复杂度去重
+- clearPaymentCache / resets cache state
+  - 覆盖场景：手动清空缓存
+  - 关键断言：缓存被完全清空
+- Benchmark: Simple cost
+  - 覆盖场景：简单成本计算性能
+  - 关键断言：优化版与基准版结果一致
+- Benchmark: Multiple fees
+  - 覆盖场景：多选一费用计算性能
+  - 关键断言：优化版显著快于基准版
+- Benchmark: Complex trades
+  - 覆盖场景：复杂交易组合性能
+  - 关键断言：缓存命中时 10x+ 加速
+
+### tests/pay-dp.test.ts
+
+动态规划支付算法基准测试，对比不同实现策略的性能。
+
+- DP vs Recursive / produces same results
+  - 覆盖场景：DP 和递归算法结果一致性
+  - 关键断言：两种实现返回相同解集
+- DP Optimization / avoids redundant computation
+  - 覆盖场景：DP 避免重复计算
+  - 关键断言：时间复杂度从指数降为多项式
+- Benchmark: Single fee
+  - 覆盖场景：单一费用基准测试
+  - 关键断言：记录各版本耗时
+- Benchmark: Multiple fees
+  - 覆盖场景：多选一费用基准测试
+  - 关键断言：对比 Baseline/Optimized/DP/Cache 四种实现
+- Benchmark: Complex
+  - 覆盖场景：复杂支付场景（多交易+多折扣）
+  - 关键断言：缓存版本达到 738x 加速
+- Benchmark: With target
+  - 覆盖场景：带目标资源的支付计算
+  - 关键断言：验证目标导向优化效果
+
+### tests/dp-trace.test.ts
+
+动态规划算法追踪测试，验证 DP 状态转移正确性。
+
+- DP Trace / tracks state transitions
+  - 覆盖场景：DP 状态转移记录
+  - 关键断言：每个状态转移可追溯
+- DP Trace / handles edge cases
+  - 覆盖场景：边界条件（零资源、最大交易次数）
+  - 关键断言：正确处理边界情况
+- DP Trace / validates memoization
+  - 覆盖场景：记忆化验证
+  - 关键断言：已计算状态不重复计算
+
 ## 最近变更提醒
 
 - 计分板与计分计算为 UI 逻辑与纯函数计算，当前未新增 UT
