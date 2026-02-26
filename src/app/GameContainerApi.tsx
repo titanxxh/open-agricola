@@ -154,11 +154,6 @@ export const GameContainerApi = () => {
     void applyAndSync(api.undoAction())
   }, [api, applyAndSync, isInteractive])
 
-  const undoRound = useCallback(() => {
-    if (!isInteractive) return
-    void applyAndSync(api.undoRound())
-  }, [api, applyAndSync, isInteractive])
-
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (pending.type !== 'choice' || !currentPlayer) return
@@ -796,7 +791,6 @@ export const GameContainerApi = () => {
         locale={locale}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onUndoRound={undoRound}
         onEndRound={endRound}
         onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}

@@ -12,6 +12,40 @@ export type Resource = {
   begging: number
 }
 
+export type ResourceKey = keyof Resource
+
+export type Trade = {
+  from: Partial<Resource>
+  to: Partial<Resource>
+  max?: number
+  source?: string
+  sourceId?: string
+}
+
+export type Bonus = {
+  discount: Partial<Resource>
+  optional?: boolean
+  sources?: string[]
+  conditions?: Record<string, number>
+}
+
+export type ComplexCost = {
+  fee?: Partial<Resource>
+  fees?: Partial<Resource>[]
+  trades?: Trade[]
+  cards?: { type: string; list: string[]; cost?: Partial<Resource> }
+  bonuses?: Bonus[]
+}
+
+export type PaymentSolution = {
+  resourcesPaid: Partial<Resource>
+  tradesUsed: { trade: Trade; times: number }[]
+  cardUsed?: string
+  bonusUsed?: string
+}
+
+export type PaymentSource = 'reserve' | 'field' | 'card'
+
 export type Field = {
   crop: 'grain' | 'vegetable' | null
   remaining: number

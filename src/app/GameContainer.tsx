@@ -22,7 +22,6 @@ import {
   cloneState,
   createInitialState,
   createRoundOpenById,
-  createRoundSnapshot,
   emptyResources,
   harvestRounds,
   isActionForPlayerCount,
@@ -2448,33 +2447,6 @@ export const GameContainer = () => {
     })
   }
 
-  const undoRound = () => {
-    if (!actionStartSnapshot) return
-    pushHistorySnapshot(state)
-    const snapshot = createRoundSnapshot(actionStartSnapshot)
-    setPendingNextPlayerIndex(null)
-    setPendingChoice(null)
-    setPendingAnimalReorg(null)
-    setAnimalReorg(null)
-    setHarvestContext(null)
-    setHarvestFeedCounts({})
-    setPendingHarvestFinalizeState(null)
-    setActionStartSnapshot(null)
-    setPendingFenceEdges([])
-    setFenceError(null)
-    setPendingRoomTiles([])
-    setRoomError(null)
-    setPendingStableTiles([])
-    setStableError(null)
-    setPendingPlowTile(null)
-    setPlowError(null)
-    setPendingSowSelections({})
-    setSowError(null)
-    engineRef.current = null
-    updateState(snapshot)
-    void persistGame(snapshot)
-  }
-
   const sowSelectedCount = Object.keys(pendingSowSelections).length
 
   const resetGame = () => {
@@ -3360,7 +3332,6 @@ export const GameContainer = () => {
         locale={locale}
         onUndo={undo}
         onUndoAction={undoAction}
-        onUndoRound={undoRound}
         onEndRound={endRound}
         onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}

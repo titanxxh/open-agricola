@@ -1,7 +1,7 @@
-import type { ActionExecutionResult, GameState, PlayerState } from '../../game/types'
+import type { ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
-import { canPayResources, payResources } from './pay'
+import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard } from './pay'
 import { getMajorCardEffect } from '../cards/major'
 import { activateCard } from './activate-card'
 
@@ -17,10 +17,16 @@ const parseImprovementChoice = (choice: string) => {
   return { kind: null, id: choice }
 }
 
+const isComplexCost = (cost: Partial<Resource> | ComplexCost | undefined): cost is ComplexCost => {
+  if (!cost) return false
+  return 'fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost
+}
+
 const playMajorImprovement = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
+  paymentChoice?: string,
 ): ActionExecutionResult => {
   const improvement = getMajorCardEffect(improvementId)
   if (!improvement) {
@@ -29,10 +35,75 @@ const playMajorImprovement = (
   if (!state.availableMajorImprovements.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
-  if (!canPayResources(player, improvement.cost ?? {})) {
+
+  const cost = improvement.cost ?? {}
+  
+  if (isComplexCost(cost)) {
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    
+    if (solutions.length === 0) {
+      return { type: 'fail', logKey: 'log.improvementFail' }
+    }
+    
+    if (solutions.length === 1) {
+      const solution = solutions[0]
+      const cardUsed = executePaymentSolution(player, solution)
+      if (cardUsed) {
+        returnCardToBoard(player, cardUsed)
+        state.availableMajorImprovements.push(cardUsed)
+      }
+      player.improvements.push(improvement.id)
+      player.playedCards = player.playedCards ?? []
+      player.playedCards.push(`major:${improvement.id}`)
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (id) => id !== improvement.id,
+      )
+      const activation = activateCard(state, player, improvement.id, 'onBuy')
+      return activation.type === 'flow' ? activation : { type: 'ok' }
+    }
+    
+    if (paymentChoice) {
+      const choiceIndex = parseInt(paymentChoice, 10)
+      const solution = solutions[choiceIndex]
+      if (!solution) {
+        return { type: 'fail', logKey: 'log.improvementFail' }
+      }
+      const cardUsed = executePaymentSolution(player, solution)
+      if (cardUsed) {
+        returnCardToBoard(player, cardUsed)
+        state.availableMajorImprovements.push(cardUsed)
+      }
+      player.improvements.push(improvement.id)
+      player.playedCards = player.playedCards ?? []
+      player.playedCards.push(`major:${improvement.id}`)
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (id) => id !== improvement.id,
+      )
+      const activation = activateCard(state, player, improvement.id, 'onBuy')
+      return activation.type === 'flow' ? activation : { type: 'ok' }
+    }
+    
+    return {
+      type: 'choice',
+      promptKey: 'prompt.selectPayment',
+      options: solutions.map((sol, idx) => {
+        const resourcesDesc = Object.entries(sol.resourcesPaid)
+          .filter(([, v]) => (v ?? 0) > 0)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(', ')
+        const cardDesc = sol.cardUsed ? ` (return ${sol.cardUsed})` : ''
+        return {
+          value: `pay:${improvementId}:${idx}`,
+          labelKey: resourcesDesc + cardDesc,
+        }
+      }),
+    }
+  }
+
+  if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
-  payResources(player, improvement.cost ?? {})
+  payResources(player, cost)
   player.improvements.push(improvement.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`major:${improvement.id}`)
@@ -87,7 +158,20 @@ export const playImprovement = (
   player: PlayerState,
   improvementId: string,
   mode: ImprovementPlayMode = 'major',
+  paymentChoice?: string,
 ): ActionExecutionResult => {
+  if (paymentChoice?.startsWith('pay:')) {
+    const parts = paymentChoice.split(':')
+    const targetId = parts[1]
+    const choiceIdx = parts[2]
+    if (targetId && choiceIdx !== undefined) {
+      const parsed = parseImprovementChoice(targetId)
+      if (parsed.kind === 'major' || getMajorCardEffect(parsed.id)) {
+        return playMajorImprovement(state, player, parsed.kind === 'major' ? parsed.id : parsed.id, choiceIdx)
+      }
+    }
+  }
+
   const parsed = parseImprovementChoice(improvementId)
   const allowMajor = mode === 'major' || mode === 'any'
   const allowMinor = mode === 'minor' || mode === 'any'

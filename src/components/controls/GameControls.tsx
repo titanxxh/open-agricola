@@ -5,7 +5,6 @@ type Props = {
   locale: Locale
   onUndo: () => void
   onUndoAction: () => void
-  onUndoRound: () => void
   onEndRound: () => void
   onResetGame: () => void
   onShowScoring: () => void
@@ -23,7 +22,6 @@ export const GameControls = ({
   locale,
   onUndo,
   onUndoAction,
-  onUndoRound,
   onEndRound,
   onResetGame,
   onShowScoring,
@@ -42,9 +40,6 @@ export const GameControls = ({
     </button>
     <button onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot}>
       {t(locale, 'ui.undoAction')}
-    </button>
-    <button onClick={onUndoRound} disabled={!isInteractive || !hasActionStartSnapshot}>
-      {t(locale, 'ui.undoRound')}
     </button>
     <button onClick={onEndRound} disabled={!isInteractive || !allWorkersUsed || isGameOver}>
       {t(locale, 'ui.endRound')}

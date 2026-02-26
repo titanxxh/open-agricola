@@ -206,6 +206,265 @@
 
 - `npm test`
 
+### shared/actions/effects/__tests__/exchange.test.ts
+
+BGA-aligned 资源交易系统测试，覆盖 Trade 机制的完整功能。
+
+- canAffordTrade / returns true when player has exact resources for trade
+  - 覆盖场景：玩家资源刚好满足交易需求
+  - 关键断言：返回 true
+- canAffordTrade / returns true when player has more than required resources
+  - 覆盖场景：玩家资源超过交易需求
+  - 关键断言：返回 true
+- canAffordTrade / returns false when player lacks resources
+  - 覆盖场景：玩家资源不足
+  - 关键断言：返回 false
+- canAffordTrade / handles multiple resource types in trade
+  - 覆盖场景：交易涉及多种资源类型
+  - 关键断言：所有资源满足才返回 true
+- canAffordTrade / respects times parameter
+  - 覆盖场景：多次执行交易的资源验证
+  - 关键断言：times 超出可支付范围返回 false
+
+- getMaxTradeTimes / calculates max based on available resources
+  - 覆盖场景：根据玩家资源计算最大交易次数
+  - 关键断言：返回资源允许的最大次数
+- getMaxTradeTimes / respects trade max limit
+  - 覆盖场景：交易有 max 限制时
+  - 关键断言：不超过 trade.max
+- getMaxTradeTimes / handles multiple resource constraints
+  - 覆盖场景：交易消耗多种资源
+  - 关键断言：取所有资源约束的最小值
+
+- applyTrade / deducts from resources and adds to resources
+  - 覆盖场景：执行交易后资源变化
+  - 关键断言：from 扣除、to 增加
+- applyTrade / applies trade multiple times
+  - 覆盖场景：多次执行同一交易
+  - 关键断言：资源变化按 times 倍增
+- applyTrade / handles zero times gracefully
+  - 覆盖场景：times=0 时不执行交易
+  - 关键断言：资源不变
+
+- convertResources / returns new resources without mutation
+  - 覆盖场景：纯函数转换资源，不修改原对象
+  - 关键断言：原对象不变，返回新对象
+- convertResources / handles negative results (overdraft)
+  - 覆盖场景：资源不足时的转换结果
+  - 关键断言：允许负值（由调用方验证）
+
+- hasValidResources / returns true for all non-negative resources
+  - 覆盖场景：所有资源非负
+  - 关键断言：返回 true
+- hasValidResources / returns false for any negative resource
+  - 覆盖场景：存在负资源
+  - 关键断言：返回 false
+
+- getPossibleTradeTimes / returns array from 0 to max times
+  - 覆盖场景：生成所有可能的交易次数
+  - 关键断言：返回 [0, 1, ..., max]
+
+- reverseTrade / swaps from and to
+  - 覆盖场景：反转交易方向
+  - 关键断言：from/to 互换
+- reverseTrade / preserves max, source, sourceId
+  - 覆盖场景：反转时保留元数据
+  - 关键断言：max/source/sourceId 不变
+
+- exchangeResources (legacy) / exchanges resources correctly
+  - 覆盖场景：向后兼容的旧版交换函数
+  - 关键断言：资源正确交换
+
+### shared/actions/effects/__tests__/pay.test.ts
+
+BGA-aligned 支付系统测试，覆盖 ComplexCost、PaymentSolution、Pareto 优化等核心算法。
+
+- payResources (legacy) / deducts resources from player
+  - 覆盖场景：旧版直接扣减资源
+  - 关键断言：资源正确扣除
+- payResources (legacy) / ignores zero or negative costs
+  - 覆盖场景：零或负成本不扣减
+  - 关键断言：资源不变
+
+- applyCostOverride / returns base when no override provided
+  - 覆盖场景：无覆盖时返回原成本
+  - 关键断言：返回 base
+- applyCostOverride / applies negative overrides (discounts)
+  - 覆盖场景：负值覆盖实现折扣
+  - 关键断言：成本减少
+- applyCostOverride / clamps to zero minimum
+  - 覆盖场景：折扣超过成本
+  - 关键断言：最小为 0
+
+- canPayResources (legacy) / returns true when player has enough resources
+  - 覆盖场景：资源充足
+  - 关键断言：返回 true
+- canPayResources (legacy) / returns false when player lacks resources
+  - 覆盖场景：资源不足
+  - 关键断言：返回 false
+
+- keepOnlyOptimals / removes dominated solutions
+  - 覆盖场景：Pareto 优化过滤被支配解
+  - 关键断言：仅保留最优解
+- keepOnlyOptimals / keeps solutions that are optimal in different resources
+  - 覆盖场景：多维度各有优势的解
+  - 关键断言：保留所有非被支配解
+- keepOnlyOptimals / removes solution dominated in all dimensions
+  - 覆盖场景：某解在所有维度都被支配
+  - 关键断言：该解被移除
+
+- computeAllBuyableCombinations / returns empty array when cannot afford fee
+  - 覆盖场景：无法支付费用
+  - 关键断言：返回空数组
+- computeAllBuyableCombinations / returns solution when can afford exact fee
+  - 覆盖场景：资源刚好满足费用
+  - 关键断言：返回有效解
+- computeAllBuyableCombinations / handles fees array (choose one)
+  - 覆盖场景：多选一费用（fees 数组）
+  - 关键断言：返回可支付的选项解
+- computeAllBuyableCombinations / uses trades to convert resources before payment
+  - 覆盖场景：通过交易转换资源后支付
+  - 关键断言：交易后能支付费用
+- computeAllBuyableCombinations / applies bonus discounts
+  - 覆盖场景：折扣降低实际成本
+  - 关键断言：支付资源减少
+- computeAllBuyableCombinations / handles multiple trades
+  - 覆盖场景：多个交易选项组合
+  - 关键断言：生成所有有效组合
+- computeAllBuyableCombinations / handles empty cost (free)
+  - 覆盖场景：无成本（免费）
+  - 关键断言：返回零支付解
+- computeAllBuyableCombinations / filters to optimal solutions only
+  - 覆盖场景：自动过滤非最优解
+  - 关键断言：结果仅含 Pareto 最优解
+
+- canPayCost / handles simple Resource cost (backward compatible)
+  - 覆盖场景：向后兼容简单成本格式
+  - 关键断言：与 canPayResources 行为一致
+- canPayCost / handles ComplexCost with fee
+  - 覆盖场景：ComplexCost 格式
+  - 关键断言：正确判断可支付性
+- canPayCost / handles ComplexCost with trades
+  - 覆盖场景：含交易的 ComplexCost
+  - 关键断言：考虑交易转换后判断
+
+- executePaymentSolution / deducts resources from player
+  - 覆盖场景：执行支付方案扣减资源
+  - 关键断言：资源正确扣除
+
+- getCheapestSolution / returns solution with minimum total resources
+  - 覆盖场景：从多个解中选择总资源最少的
+  - 关键断言：返回总支付量最小的解
+
+- Integration: Complex payment scenarios / handles bakery scenario: grain to food
+  - 覆盖场景：烤面包（谷物换食物）
+  - 关键断言：交易后能支付食物成本
+- Integration: Complex payment scenarios / handles fireplace scenario: animal to food
+  - 覆盖场景：壁炉（动物换食物）
+  - 关键断言：交易后能支付食物成本
+- Integration: Complex payment scenarios / handles multiple fees choice
+  - 覆盖场景：多选一费用
+  - 关键断言：能选择可支付的选项
+- Integration: Complex payment scenarios / handles renovation cost with material trade
+  - 覆盖场景：房屋升级成本
+  - 关键断言：正确处理费用+材料组合
+
+- Card-based payment / generates card payment solution when player has required card
+  - 覆盖场景：玩家拥有所需卡牌时生成卡牌支付方案
+  - 关键断言：方案包含 cardUsed 字段
+- Card-based payment / does not generate card solution when player lacks required card
+  - 覆盖场景：玩家缺少所需卡牌时不生成卡牌支付方案
+  - 关键断言：方案不包含 cardUsed 字段
+- Card-based payment / returns cardUsed from executePaymentSolution
+  - 覆盖场景：执行支付方案返回使用的卡牌
+  - 关键断言：返回 cardUsed 并正确扣减资源
+
+- returnCardToBoard / removes card from improvements
+  - 覆盖场景：从大改良列表移除卡牌
+  - 关键断言：卡牌从 improvements 中移除
+- returnCardToBoard / removes card from minorPlayed
+  - 覆盖场景：从小改良列表移除卡牌
+  - 关键断言：卡牌从 minorPlayed 中移除
+- returnCardToBoard / handles non-existent card gracefully
+  - 覆盖场景：处理不存在的卡牌
+  - 关键断言：不抛出错误
+
+- Integration: Cooking Hearth upgrade scenario / can pay clay cost without Fireplace
+  - 覆盖场景：无壁炉时支付全额粘土成本
+  - 关键断言：生成纯资源支付方案
+- Integration: Cooking Hearth upgrade scenario / can upgrade from Fireplace with reduced clay cost
+  - 覆盖场景：从壁炉升级支付折扣价
+  - 关键断言：生成包含 cardUsed 的方案
+- Integration: Cooking Hearth upgrade scenario / generates resource-only solutions when player lacks required card
+  - 覆盖场景：玩家缺少所需卡牌时仅生成资源方案
+  - 关键断言：无卡牌支付方案
+
+### tests/pay-optimizations.test.ts
+
+支付系统性能优化测试，验证 LRU 缓存和哈希去重的正确性与性能提升。
+
+- LRU Cache / caches identical queries
+  - 覆盖场景：相同查询命中缓存
+  - 关键断言：第二次查询直接返回缓存结果
+- LRU Cache / invalidates on resource change
+  - 覆盖场景：资源变化后缓存失效
+  - 关键断言：新资源生成新缓存键
+- LRU Cache / respects max size limit
+  - 覆盖场景：缓存达到上限时淘汰旧条目
+  - 关键断言：LRU 淘汰策略正确执行
+- Hash Deduplication / removes duplicate solutions
+  - 覆盖场景：哈希去重移除重复解
+  - 关键断言：O(1) 时间复杂度去重
+- clearPaymentCache / resets cache state
+  - 覆盖场景：手动清空缓存
+  - 关键断言：缓存被完全清空
+- Benchmark: Simple cost
+  - 覆盖场景：简单成本计算性能
+  - 关键断言：优化版与基准版结果一致
+- Benchmark: Multiple fees
+  - 覆盖场景：多选一费用计算性能
+  - 关键断言：优化版显著快于基准版
+- Benchmark: Complex trades
+  - 覆盖场景：复杂交易组合性能
+  - 关键断言：缓存命中时 10x+ 加速
+
+### tests/pay-dp.test.ts
+
+动态规划支付算法基准测试，对比不同实现策略的性能。
+
+- DP vs Recursive / produces same results
+  - 覆盖场景：DP 和递归算法结果一致性
+  - 关键断言：两种实现返回相同解集
+- DP Optimization / avoids redundant computation
+  - 覆盖场景：DP 避免重复计算
+  - 关键断言：时间复杂度从指数降为多项式
+- Benchmark: Single fee
+  - 覆盖场景：单一费用基准测试
+  - 关键断言：记录各版本耗时
+- Benchmark: Multiple fees
+  - 覆盖场景：多选一费用基准测试
+  - 关键断言：对比 Baseline/Optimized/DP/Cache 四种实现
+- Benchmark: Complex
+  - 覆盖场景：复杂支付场景（多交易+多折扣）
+  - 关键断言：缓存版本达到 738x 加速
+- Benchmark: With target
+  - 覆盖场景：带目标资源的支付计算
+  - 关键断言：验证目标导向优化效果
+
+### tests/dp-trace.test.ts
+
+动态规划算法追踪测试，验证 DP 状态转移正确性。
+
+- DP Trace / tracks state transitions
+  - 覆盖场景：DP 状态转移记录
+  - 关键断言：每个状态转移可追溯
+- DP Trace / handles edge cases
+  - 覆盖场景：边界条件（零资源、最大交易次数）
+  - 关键断言：正确处理边界情况
+- DP Trace / validates memoization
+  - 覆盖场景：记忆化验证
+  - 关键断言：已计算状态不重复计算
+
 ## 最近变更提醒
 
 - 计分板与计分计算为 UI 逻辑与纯函数计算，当前未新增 UT

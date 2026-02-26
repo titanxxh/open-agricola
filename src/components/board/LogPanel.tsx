@@ -24,9 +24,10 @@ export const LogPanel = ({ locale, log }: Props) => (
         ) {
           const raw = params.improvements
           const ids = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
+          const prefix = entry.key === 'log.playMinorImprovement' ? 'minorImprovements' : 'improvements'
           const names = ids
             .map((id) =>
-              t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
+              t(locale, `${prefix}.${id}.name`).replace(/\s*[（(].*$/, ''),
             )
             .filter((name) => name)
           params.improvements = names.join('、')
@@ -37,6 +38,7 @@ export const LogPanel = ({ locale, log }: Props) => (
             costs?: Resource
             effects?: {
               buildRoom?: number
+              buildStables?: number
               growFamily?: number
               plow?: number
               sowGrain?: number
@@ -64,6 +66,11 @@ export const LogPanel = ({ locale, log }: Props) => (
           if (effectData.buildRoom) {
             effects.push(
               t(locale, 'log.effectBuildRoom', { count: effectData.buildRoom }),
+            )
+          }
+          if (effectData.buildStables) {
+            effects.push(
+              t(locale, 'log.effectBuildStables', { count: effectData.buildStables }),
             )
           }
           if (effectData.growFamily) {
@@ -119,7 +126,7 @@ export const LogPanel = ({ locale, log }: Props) => (
           if (effectData.minorImprovements && effectData.minorImprovements.length > 0) {
             const names = effectData.minorImprovements
               .map((id) =>
-                t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
+                t(locale, `minorImprovements.${id}.name`).replace(/\s*[（(].*$/, ''),
               )
               .filter((name) => name)
             effects.push(

@@ -27,7 +27,6 @@ import type { EngineNode } from '../shared/engine/index.ts'
 import {
   createInitialState,
   createRoundOpenById,
-  createRoundSnapshot,
   cloneState,
   emptyResources,
   harvestRounds,
@@ -47,7 +46,7 @@ import { positionKey } from '../shared/game/farm.ts'
 type PendingAction =
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number }
+  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'none' }
 
@@ -252,6 +251,7 @@ export class GameSession {
     })
     const effects: {
       buildRoom?: number
+      buildStables?: number
       growFamily?: number
       plow?: number
       sowGrain?: number
@@ -292,6 +292,11 @@ export class GameSession {
     }
     if (player.fences > before.fences) {
       effects.fencing = player.fences - before.fences
+    }
+    const stablesBefore = before.stableTiles?.length ?? 0
+    const stablesAfter = player.stableTiles?.length ?? 0
+    if (stablesAfter > stablesBefore) {
+      effects.buildStables = stablesAfter - stablesBefore
     }
     const newImprovements = player.improvements.filter(
       (id) => !before.improvements.includes(id),
@@ -636,29 +641,19 @@ export class GameSession {
       player.resources.begging += deficit
     }
 
-    const nextFeedPlayer = this.state.players.findIndex((p, idx) => {
-      if (idx <= playerIndex) return false
-      const newborn = Math.min(p.newbornCount, p.familySize)
-      const req = Math.max(0, p.familySize * 2 - newborn)
-      return req > p.resources.food
-    })
-    if (nextFeedPlayer !== -1) {
-      const p = this.state.players[nextFeedPlayer]!
-      const newborn = Math.min(p.newbornCount, p.familySize)
-      const req = Math.max(0, p.familySize * 2 - newborn)
-      const useFood = Math.min(p.resources.food, req)
-      p.resources.food -= useFood
-      this.pending = { type: 'harvestFeed', playerIndex: nextFeedPlayer, remaining: req - useFood }
+    const feedQueue = this.pending.feedQueue ?? []
+    if (feedQueue.length > 0) {
+      const next = feedQueue[0]!
+      this.pending = { 
+        type: 'harvestFeed', 
+        playerIndex: next.index, 
+        remaining: next.remaining,
+        feedQueue: feedQueue.slice(1)
+      }
       return this.respond()
     }
 
-    this.applyBreedPhase()
-    const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
-    if (pendingAnimal !== -1) {
-      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
-      return this.respond()
-    }
-    return this.finalizeRound()
+    return this.startBreedPhase()
   }
 
   confirmNextPlayer(): SessionResponse {
@@ -701,6 +696,8 @@ export class GameSession {
     this.state.players.forEach((p) => reap(p))
     applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
 
+    const feedQueue: { index: number; remaining: number }[] = []
+    
     for (let i = 0; i < this.state.players.length; i++) {
       const p = this.state.players[i]!
       const newborn = Math.min(p.newbornCount, p.familySize)
@@ -708,20 +705,38 @@ export class GameSession {
       const useFood = Math.min(p.resources.food, required)
       p.resources.food -= useFood
       const remaining = required - useFood
+      
       if (remaining > 0) {
         const hasCooking = p.improvements.some((id) =>
           id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
         const canConvert = p.resources.grain > 0 || p.resources.vegetable > 0 ||
           (hasCooking && (p.resources.sheep > 0 || p.resources.boar > 0 || p.resources.cattle > 0))
+        
         if (canConvert) {
-          this.pending = { type: 'harvestFeed', playerIndex: i, remaining }
-          return this.respond()
+          feedQueue.push({ index: i, remaining })
+        } else {
+          p.resources.begging += remaining
         }
-        p.resources.begging += remaining
       }
     }
 
+    if (feedQueue.length > 0) {
+      const first = feedQueue[0]!
+      this.pending = { 
+        type: 'harvestFeed', 
+        playerIndex: first.index, 
+        remaining: first.remaining,
+        feedQueue: feedQueue.slice(1)
+      }
+      return this.respond()
+    }
+
+    return this.startBreedPhase()
+  }
+
+  private startBreedPhase(): SessionResponse {
     this.applyBreedPhase()
+    
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
       this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
@@ -787,23 +802,6 @@ export class GameSession {
     if (!entry) return this.respond(false, 'no action snapshot')
     this.restoreHistory(entry)
     this.history = this.history.slice(0, this.actionStartIndex)
-    this.actionStartIndex = null
-    return this.respond()
-  }
-
-  undoRound(): SessionResponse {
-    const roundSnapshot = this.state.roundStartSnapshot
-      ? cloneState(this.state.roundStartSnapshot)
-      : this.buildRoundSnapshot(this.state)
-    this.state = roundSnapshot
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((space) => { space.takenBy = null })
-    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    this.pending = { type: 'none' }
-    this.engine = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
-    this.history = []
     this.actionStartIndex = null
     return this.respond()
   }

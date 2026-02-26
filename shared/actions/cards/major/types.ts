@@ -1,13 +1,14 @@
-import type { Resource } from '../../../game/types'
+import type { Resource, ComplexCost } from '../../../game/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
 
 export type MajorEffectHook = CardEffectHook
 
 export type MajorCardEffect = CardEffect & {
-  cost: Partial<Resource>
+  cost: Partial<Resource> | ComplexCost
   vp: number
   extraVp: boolean
   description: string[]
+  returnCards?: string[]
   scoring?: {
     resource: keyof Resource
     map: Record<string, number>
