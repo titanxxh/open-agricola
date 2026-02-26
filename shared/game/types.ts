@@ -33,7 +33,7 @@ export type ComplexCost = {
   fee?: Partial<Resource>
   fees?: Partial<Resource>[]
   trades?: Trade[]
-  cards?: { type: string; list: string[] }
+  cards?: { type: string; list: string[]; cost?: Partial<Resource> }
   bonuses?: Bonus[]
 }
 

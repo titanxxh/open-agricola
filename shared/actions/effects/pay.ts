@@ -248,6 +248,7 @@ const canCoverCost = (
 export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
+  playedCards?: string[],
 ): PaymentSolution[] => {
   const cacheKey = makeCacheKey(player, cost)
   const cached = solutionCache.get(cacheKey)
@@ -255,7 +256,6 @@ export const computeAllBuyableCombinations = (
 
   const playerResources: Partial<Resource> = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
-  const solutionHashes = new Set<number>()
 
   const baseFees: Partial<Resource>[] = cost.fees && cost.fees.length > 0
     ? cost.fees
@@ -310,6 +310,20 @@ export const computeAllBuyableCombinations = (
     }
   }
 
+  // Add card-based payment solutions if cards are specified
+  if (cost.cards?.list && cost.cards.list.length > 0 && playedCards) {
+    for (const cardId of cost.cards.list) {
+      if (playedCards.includes(cardId)) {
+        const cardSolution: PaymentSolution = {
+          resourcesPaid: cost.cards.cost ?? {},
+          tradesUsed: [],
+          cardUsed: cardId,
+        }
+        paymentSolutions.push(cardSolution)
+      }
+    }
+  }
+
   const result = keepOnlyOptimals(paymentSolutions)
   solutionCache.set(cacheKey, result)
   return result
@@ -331,11 +345,26 @@ export const canPayCost = (
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
-): void => {
+): string | undefined => {
   const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
   for (const key of paidKeys) {
     const amount = solution.resourcesPaid[key] ?? 0
     player.resources[key] -= amount
+  }
+  return solution.cardUsed
+}
+
+export const returnCardToBoard = (
+  player: PlayerState,
+  cardId: string,
+): void => {
+  const improvementIndex = player.improvements.indexOf(cardId)
+  if (improvementIndex > -1) {
+    player.improvements.splice(improvementIndex, 1)
+  }
+  const minorPlayedIndex = player.minorPlayed.indexOf(cardId)
+  if (minorPlayedIndex > -1) {
+    player.minorPlayed.splice(minorPlayedIndex, 1)
   }
 }
 

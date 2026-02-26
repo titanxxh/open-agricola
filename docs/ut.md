@@ -369,6 +369,36 @@ BGA-aligned 支付系统测试，覆盖 ComplexCost、PaymentSolution、Pareto �
   - 覆盖场景：房屋升级成本
   - 关键断言：正确处理费用+材料组合
 
+- Card-based payment / generates card payment solution when player has required card
+  - 覆盖场景：玩家拥有所需卡牌时生成卡牌支付方案
+  - 关键断言：方案包含 cardUsed 字段
+- Card-based payment / does not generate card solution when player lacks required card
+  - 覆盖场景：玩家缺少所需卡牌时不生成卡牌支付方案
+  - 关键断言：方案不包含 cardUsed 字段
+- Card-based payment / returns cardUsed from executePaymentSolution
+  - 覆盖场景：执行支付方案返回使用的卡牌
+  - 关键断言：返回 cardUsed 并正确扣减资源
+
+- returnCardToBoard / removes card from improvements
+  - 覆盖场景：从大改良列表移除卡牌
+  - 关键断言：卡牌从 improvements 中移除
+- returnCardToBoard / removes card from minorPlayed
+  - 覆盖场景：从小改良列表移除卡牌
+  - 关键断言：卡牌从 minorPlayed 中移除
+- returnCardToBoard / handles non-existent card gracefully
+  - 覆盖场景：处理不存在的卡牌
+  - 关键断言：不抛出错误
+
+- Integration: Cooking Hearth upgrade scenario / can pay clay cost without Fireplace
+  - 覆盖场景：无壁炉时支付全额粘土成本
+  - 关键断言：生成纯资源支付方案
+- Integration: Cooking Hearth upgrade scenario / can upgrade from Fireplace with reduced clay cost
+  - 覆盖场景：从壁炉升级支付折扣价
+  - 关键断言：生成包含 cardUsed 的方案
+- Integration: Cooking Hearth upgrade scenario / generates resource-only solutions when player lacks required card
+  - 覆盖场景：玩家缺少所需卡牌时仅生成资源方案
+  - 关键断言：无卡牌支付方案
+
 ### tests/pay-optimizations.test.ts
 
 支付系统性能优化测试，验证 LRU 缓存和哈希去重的正确性与性能提升。

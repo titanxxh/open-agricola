@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   payResources,
   applyCostOverride,
@@ -8,7 +8,13 @@ import {
   canPayCost,
   executePaymentSolution,
   getCheapestSolution,
+  returnCardToBoard,
+  clearPaymentCache,
 } from '../pay'
+
+beforeEach(() => {
+  clearPaymentCache()
+})
 import type { PlayerState, Resource, ComplexCost, PaymentSolution, Trade } from '../../../game/types'
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
@@ -376,5 +382,102 @@ describe('Integration: Complex payment scenarios', () => {
     const solutions = computeAllBuyableCombinations(player, cost)
     expect(solutions.length).toBeGreaterThan(0)
     expect(solutions.some(s => s.resourcesPaid.wood === 2)).toBe(true)
+  })
+})
+
+describe('Card-based payment', () => {
+  it('generates card payment solution when player has required card', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_Fireplace1']
+    const cost: ComplexCost = {
+      fees: [{ clay: 4 }, { clay: 2 }],
+      cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'], cost: { clay: 2 } },
+    }
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    expect(solutions.some(s => s.cardUsed === 'Major_Fireplace1')).toBe(true)
+  })
+
+  it('does not generate card solution when player lacks required card', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = []
+    const cost: ComplexCost = {
+      fees: [{ clay: 4 }, { clay: 2 }],
+      cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'], cost: { clay: 2 } },
+    }
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    expect(solutions.every(s => !s.cardUsed)).toBe(true)
+  })
+
+  it('returns cardUsed from executePaymentSolution', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_Fireplace1']
+    const solution: PaymentSolution = {
+      resourcesPaid: { clay: 2 },
+      tradesUsed: [],
+      cardUsed: 'Major_Fireplace1',
+    }
+    const cardUsed = executePaymentSolution(player, solution)
+    expect(cardUsed).toBe('Major_Fireplace1')
+    expect(player.resources.clay).toBe(0)
+  })
+})
+
+describe('returnCardToBoard', () => {
+  it('removes card from improvements', () => {
+    const player = createMockPlayer({})
+    player.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    returnCardToBoard(player, 'Major_Fireplace1')
+    expect(player.improvements).toEqual(['Major_Joinery'])
+  })
+
+  it('removes card from minorPlayed', () => {
+    const player = createMockPlayer({})
+    player.minorPlayed = ['A3_PaperKnife', 'B75_WoodWorkshop']
+    returnCardToBoard(player, 'A3_PaperKnife')
+    expect(player.minorPlayed).toEqual(['B75_WoodWorkshop'])
+  })
+
+  it('handles non-existent card gracefully', () => {
+    const player = createMockPlayer({})
+    player.improvements = ['Major_Fireplace1']
+    returnCardToBoard(player, 'Major_NonExistent')
+    expect(player.improvements).toEqual(['Major_Fireplace1'])
+  })
+})
+
+describe('Integration: Cooking Hearth upgrade scenario', () => {
+  it('can pay clay cost without Fireplace', () => {
+    const player = createMockPlayer({ clay: 4 })
+    player.improvements = []
+    const cost: ComplexCost = {
+      fees: [{ clay: 4 }, { clay: 2 }],
+      cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'], cost: { clay: 2 } },
+    }
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    expect(solutions.length).toBeGreaterThan(0)
+    expect(solutions.some(s => !s.cardUsed)).toBe(true)
+  })
+
+  it('can upgrade from Fireplace with reduced clay cost', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_Fireplace1']
+    const cost: ComplexCost = {
+      fees: [{ clay: 4 }, { clay: 2 }],
+      cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'], cost: { clay: 2 } },
+    }
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    expect(solutions.some(s => s.cardUsed === 'Major_Fireplace1')).toBe(true)
+  })
+
+  it('generates resource-only solutions when player lacks required card', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = []
+    const cost: ComplexCost = {
+      fees: [{ clay: 4 }, { clay: 2 }],
+      cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'], cost: { clay: 2 } },
+    }
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    const cardSolutions = solutions.filter(s => s.cardUsed)
+    expect(cardSolutions).toHaveLength(0)
   })
 })

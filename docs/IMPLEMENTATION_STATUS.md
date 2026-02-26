@@ -42,7 +42,7 @@
 ## 3. 测试与质量
 
 - 单测框架：vitest。
-- 25 个测试文件，168 个用例全部通过（含 Playwright e2e 测试）。
+- 25 个测试文件，177 个用例全部通过（含 Playwright e2e 测试）。
 - `npm run build` 全量通过。
 
 ## 4. 已知边界
@@ -157,7 +157,7 @@ public static function useResource($player_id, $resourceType, $amount)
 
 **已完成（2026-02-26）**：
 - ✅ 实现 `ComplexCost` 类型结构（fee, fees, trades, cards, bonuses）
-- ✅ 实现 `PaymentSolution` 类型结构（resourcesPaid, tradesUsed, bonusUsed）
+- ✅ 实现 `PaymentSolution` 类型结构（resourcesPaid, tradesUsed, bonusUsed, cardUsed）
 - ✅ 实现 `computeAllBuyableCombinations` 算法
 - ✅ 实现 `keepOnlyOptimals` Pareto 优化过滤
 - ✅ 实现 `canPayCost` 支持 ComplexCost（向后兼容简单成本）
@@ -171,15 +171,24 @@ public static function useResource($player_id, $resourceType, $amount)
 - ✅ 基准测试验证：复杂支付场景 738x 加速
 - ✅ 新增 `clearPaymentCache()` 导出用于测试清理
 
+**卡牌抵换机制（2026-02-27）**：
+- ✅ 扩展 `ComplexCost.cards` 支持 `cost` 字段（支付额外资源）
+- ✅ 扩展 `MajorCardEffect` 支持 `ComplexCost` 类型和 `returnCards` 字段
+- ✅ 实现 `computeAllBuyableCombinations` 生成卡牌支付方案
+- ✅ 实现 `executePaymentSolution` 返回 `cardUsed` 标识
+- ✅ 实现 `returnCardToBoard` 归还卡牌到供应堆
+- ✅ 更新 `improvement.ts` 支持多支付方式选择
+- ✅ 更新 `Major_CookingHearth1/2` 支持从 Fireplace 升级（归还卡牌+支付折扣价）
+- ✅ 新增卡牌支付场景单元测试
+
 **短期（当前系统可支持）**：
 - 扩展 `applyCostOverride` 支持更复杂的成本修改规则
-- 增加卡牌抵换机制（参考 BGA 的 `cards` 成本结构）
+- 实现更多支持卡牌升级的大改良（如 Stone Oven 从 Clay Oven 升级）
 
 **中期（需要架构调整）**：
-- 实现 `computeAllBuyableCombinations` 算法，支持多选一费用和 trades
-- 扩展 bonuses 支持一次性折扣
+- 实现玩家间资源转移（参考 BGA 的 `payResourceTo`）
+- 实现从田地支付资源（参考 BGA 的 `payResourcesFromFields`）
 
 **长期（重大重构）**：
 - 将资源模型从数值改为木块追踪
-- 实现玩家间资源转移
-- 实现从田地/卡牌支付资源
+- 实现完整的卡牌/资源位置追踪系统
