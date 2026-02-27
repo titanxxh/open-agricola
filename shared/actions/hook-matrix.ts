@@ -1,9 +1,9 @@
 import type { ActionDefinition } from '../game/types'
 import { actionHookPhases } from './hooks'
 import type { ActionHookPhase, ActionHookRegistration } from './hooks'
-import type { CardListenerRegistration } from './cards/card-listeners'
+import type { CardListenerRegistration } from '../cards/card-listeners'
 import { getRegisteredActionHooks } from './hooks'
-import { getRegisteredCardListeners } from './cards/card-listeners'
+import { getRegisteredCardListeners } from '../cards/card-listeners'
 
 export type HookMatrixEntry = {
   actionId: string

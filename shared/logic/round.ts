@@ -1,4 +1,4 @@
-import { applyMajorEffectsToAllPlayers } from '../actions/cards/major'
+import { applyMajorEffectsToAllPlayers } from '../cards/major'
 import { breedAnimals } from '../actions/effects/breed-animals'
 import { feedFamily } from '../actions/effects/feed-family'
 import { reap } from '../actions/effects/reap'

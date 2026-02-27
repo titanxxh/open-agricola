@@ -11,7 +11,7 @@ import {
   clearCardListeners,
   registerCardListener,
   type CardListenerRegistration,
-} from '../cards/card-listeners'
+} from '../../cards/card-listeners'
 
 describe('hook matrix', () => {
   beforeEach(() => {

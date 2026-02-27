@@ -1137,6 +1137,33 @@
   font-size: 14px;
 }
 
+.dev-player-row {
+  background: #e8f0d8;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #c8d8b8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dev-player-row .dev-field {
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.dev-target-hint {
+  font-size: 11px;
+  color: #5a7a3a;
+  font-style: italic;
+}
+
+.dev-section {
+  border-top: 1px dashed #c8d8b8;
+  padding-top: 8px;
+}
+
 .dev-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

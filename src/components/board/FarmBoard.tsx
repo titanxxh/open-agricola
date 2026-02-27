@@ -4,7 +4,7 @@ import type { FarmTilePosition, PlayerState, Resource } from '../../../shared/ga
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
-import { getMajorCardEffect } from '../../../shared/actions/cards/major'
+import { getMajorCardEffect } from '../../../shared/cards/major'
 import { canPayResources } from '../../../shared/actions/effects/pay'
 import { emptyResources } from '../../../shared/logic/state'
 import type { AnimalReorgState } from '../../types/ui'
@@ -186,7 +186,6 @@ export const FarmBoard = ({
             key={player.id}
             className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
             onClick={() => setViewPlayerId(player.id)}
-            disabled={!isInteractive}
           >
             <span className="player-tab-label">
               {player.name}

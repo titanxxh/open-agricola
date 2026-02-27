@@ -29,6 +29,27 @@ export type Bonus = {
   conditions?: Record<string, number>
 }
 
+export type CostModifierType = 'construct' | 'renovation' | 'occupation' | 'fencing' | 'stables' | 'plow'
+
+export type TradeModifier = {
+  type: 'trade'
+  cardId: string
+  appliesTo: CostModifierType[]
+  from: Partial<Resource>
+  to: Partial<Resource>
+  max?: number
+}
+
+export type BonusModifier = {
+  type: 'bonus'
+  cardId: string
+  appliesTo: CostModifierType[]
+  discount: Partial<Resource>
+  optional?: boolean
+}
+
+export type CostModifier = TradeModifier | BonusModifier
+
 export type ComplexCost = {
   fee?: Partial<Resource>
   fees?: Partial<Resource>[]
@@ -80,6 +101,7 @@ export type PlayerState = {
   fenceSegments: string[]
   majorEffects: MajorEffectState
   startPlayer: boolean
+  activeModifiers: CostModifier[]
 }
 
 export type FarmTilePosition = {

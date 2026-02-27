@@ -1,6 +1,6 @@
 import type { ActionExecutionResult, GameState, PlayerState } from '../../game/types'
-import { runCardEffectHook } from '../cards/card-effects'
-import type { CardEffectHook } from '../cards/card-effects'
+import { runCardEffectHook } from '../../cards/card-effects'
+import type { CardEffectHook } from '../../cards/card-effects'
 
 export const activateCard = (
   state: GameState,

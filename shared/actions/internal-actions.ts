@@ -17,7 +17,7 @@ import { getMinorImprovement } from '../game/minor-improvements'
 import { getMinorImprovementCost, playImprovement } from './effects/improvement'
 import type { PlayerState } from '../game/types'
 import { getOccupation } from '../game/occupations'
-import { majorCardEffects } from './cards/major'
+import { majorCardEffects } from '../cards/major'
 import { gainConfigByActionId } from './factories/gain'
 import { resolveFutureMeepleRequests } from './effects/future-meeples'
 

@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../game/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { computeFencedRegions } from './farm'
-import { getMajorCardEffect } from '../actions/cards/major'
+import { getMajorCardEffect } from '../cards/major'
 
 type ScoreCategoryKey =
   | 'fields'

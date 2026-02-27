@@ -44,7 +44,7 @@ export const GameContainerApi = () => {
   const api = useGameApi()
   const { state, pending, historyLength, hasActionStartSnapshot, applyResponse } =
     useGameSync()
-  const [locale, setLocale] = useState<Locale>('zh')
+  const [locale, setLocale] = useState<Locale>('en')
   const lockedViewPlayerId = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
     const raw = params.get('player') ?? params.get('playerId')
@@ -56,7 +56,7 @@ export const GameContainerApi = () => {
   }, [])
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
-  const [devMode, setDevMode] = useState(false)
+  const [devMode, setDevMode] = useState(true)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [devPlayerId, setDevPlayerId] = useState('')

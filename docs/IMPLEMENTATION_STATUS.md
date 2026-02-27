@@ -181,6 +181,22 @@ public static function useResource($player_id, $resourceType, $amount)
 - ✅ 更新 `Major_CookingHearth1/2` 支持从 Fireplace 升级（归还卡牌+支付折扣价）
 - ✅ 新增卡牌支付场景单元测试
 
+**支付卡牌修改器系统（2026-02-27）**：
+- ✅ 新增 `CostModifierType` 类型：construct, renovation, occupation, fencing, stables, plow
+- ✅ 新增 `TradeModifier` 类型：定义资源转换规则（如 2 Clay → 1 Wood）
+- ✅ 新增 `BonusModifier` 类型：定义资源折扣（如 -1 Wood）
+- ✅ `PlayerState` 新增 `activeModifiers` 字段追踪已生效的修改器
+- ✅ 新增 `applyCostModifiers()` 函数：将修改器应用到 ComplexCost
+- ✅ 新增 `getModifiersForCostType()` 函数：获取指定成本类型的修改器
+- ✅ `computeAllBuyableCombinations` 新增 `costType` 参数支持应用修改器
+- ✅ 新增 `card-modifiers.ts` 注册表，包含 30+ 支付相关卡牌：
+  - 建筑类：A123_FrameBuilder, A143_Stonecutter, B145_BrushwoodCollector, B126_Carpenter, B13_CarpentersParlor, C88_CarpentersApprentice, C122_Bricklayer, D15_ClaySupports, A149_HouseArtist, A128_RiparianBuilder, E150_RockBeater, D81_RoofLadder, C128_WoodenHutExtender, D154_ChimneySweep, A14_CarpentersHammer
+  - 围栏类：D82_HuntingTrophy, B15_CarpentersBench, A16_RammedClay, A88_HedgeKeeper, D88_Millwright
+  - 翻新类：D13_Trowel, B128_Plumber, E87_MasterRenovator, C14_StrawThatchedRoof, C13_WoodSlideHammer, D121_ClayPlasterer
+  -  occupation类：A28_ForestSchool, E60_WorkingGloves, B155_ArtTeacher
+  - 其他类：C56_FeedFence (马厩), C37_DwellingMound (开垦)
+- ✅ 新增支付卡牌修改器单元测试
+
 **短期（当前系统可支持）**：
 - 扩展 `applyCostOverride` 支持更复杂的成本修改规则
 - 实现更多支持卡牌升级的大改良（如 Stone Oven 从 Clay Oven 升级）
