@@ -13,7 +13,7 @@ import { FARM_COLS, FARM_ROWS, getAllTilePositions, positionKey } from '../../sh
 import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
 import { getBuildRoomCost } from '../../shared/actions/effects/house'
 import { stableWoodCost } from '../../shared/actions/effects/fencing'
-import { applyMajorEffectsToAllPlayers } from '../../shared/actions/cards/major'
+import { applyMajorEffectsToAllPlayers } from '../../shared/cards/major'
 import { useActionEngine } from '../hooks/useActionEngine'
 import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'

@@ -367,15 +367,15 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 | 卡牌 | 可升级自 | 升级成本 |
 |------|----------|----------|
-| [Major_CookingHearth1](../shared/actions/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 2 Clay |
-| [Major_CookingHearth2](../shared/actions/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 3 Clay |
+| [Major_CookingHearth1](../shared/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 2 Clay |
+| [Major_CookingHearth2](../shared/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 3 Clay |
 
 ## 相关核心文件
 
 ### 类型定义
 - [types.ts](../shared/game/types.ts) - 游戏类型定义（ComplexCost, PaymentSolution, TradeModifier, BonusModifier）
 - [cards/types.ts](../shared/cards/types.ts) - 卡牌类型定义
-- [cards/card-modifiers.ts](../shared/actions/cards/card-modifiers.ts) - 卡牌修改器注册表
+- [cards/card-modifiers.ts](../shared/cards/card-modifiers.ts) - 卡牌修改器注册表
 
 ### 行动效果
 - [pay.ts](../shared/actions/effects/pay.ts) - 支付系统核心（computeAllBuyableCombinations, executePaymentSolution）

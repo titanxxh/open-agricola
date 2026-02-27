@@ -2,14 +2,14 @@
 
 **Date**: 2026-02-25
 **Project**: Open Agricola
-**Test Scope**: `shared/actions/cards/action/` - All 30 action cards
+**Test Scope**: `shared/cards/action/` - All 30 action cards
 **Language**: English UI and Logs
 
 ---
 
 ## Executive Summary
 
-All 30 action cards in `shared/actions/cards/action/` have been analyzed and tested. The implementation uses two factory patterns (`createGainAction`, `createAccumulatingAction`) and direct `ActionDefinition` objects for complex conditional logic. All core functionality works correctly.
+All 30 action cards in `shared/cards/action/` have been analyzed and tested. The implementation uses two factory patterns (`createGainAction`, `createAccumulatingAction`) and direct `ActionDefinition` objects for complex conditional logic. All core functionality works correctly.
 
 **Overall Status**: ✅ ALL 30 ACTIONS CORRECTLY IMPLEMENTED
 
@@ -1068,7 +1068,7 @@ export const createGainAction = (config: GainActionConfig): ActionDefinition => 
 ### Conditional Action Example
 
 ```typescript
-// shared/actions/cards/action/fencing.ts
+// shared/cards/action/fencing.ts
 export const fencingAction: ActionDefinition = {
   id: 'fencing',
   nameKey: 'action.fencing',
