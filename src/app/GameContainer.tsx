@@ -1376,6 +1376,7 @@ export const GameContainer = () => {
     nextState.currentPlayerIndex = pendingNextPlayerIndex
     setViewPlayerId(nextState.players[nextState.currentPlayerIndex]?.id ?? '')
     setPendingNextPlayerIndex(null)
+    setHistory([])
     setActionStartSnapshot(null)
     if (nextState.players.every((player) => player.workersAvailable === 0)) {
       performRoundEnd(nextState)
