@@ -4,9 +4,10 @@
 遇到不确定的实现，优先参考 ../bga-agricola 项目中的实现，除非在 docs/ENGINE_ARCHITECTURE.md 中有明确说明需要不一样的实现方式。
 
 ## 变更约定
+- 新增卡牌功能需要有UT和集成测试。
 - 每次修改代码后，自动运行单元测试（npm test）。
 - 每次修改代码后，自动重启前端与后端服务。
-- 每次修改代码后，更新文档：docs/IMPLEMENTATION_STATUS.md 与 docs/ENGINE_ARCHITECTURE.md
+- 每次修改代码后，更新文档：docs/IMPLEMENTATION_STATUS.md docs/ENGINE_ARCHITECTURE.md docs/cards_impl.md
 - 提交代码到 Git 仓库，commit 标题需要符合规范：
   - 格式：`feat: 新增功能描述` 或 `fix: 修复问题描述` 或 `refactor: 代码重构描述`
   - 描述：简洁明了，避免使用中文
@@ -16,31 +17,6 @@
 
 ### 1. Modifier 定义位置
 卡牌的 payment modifier（TradeModifier、BonusModifier）必须定义在卡牌自己的文件中，不可放在集中的注册表中。
-
-正确做法：
-```typescript
-// shared/actions/cards/A/A123_FrameBuilder.ts
-export const A123_FrameBuilder = new Occupation({
-  id: "A123_FrameBuilder",
-  ...
-  modifier: {
-    type: 'trade',
-    cardId: 'A123_FrameBuilder',
-    appliesTo: ['construct', 'renovation'],
-    from: { clay: 2 },
-    to: { wood: 1 },
-  } as TradeModifier,
-})
-```
-
-错误做法：
-```typescript
-// 不要这样做！
-// shared/actions/cards/card-modifiers.ts
-export const CARD_MODIFIERS = {
-  A123_FrameBuilder: [...],
-}
-```
 
 ### 2. 扩展原则
 无特殊原因不要改动主路径（如 pay.ts、improvement.ts 等核心文件），而是通过以下通用方式扩展：
