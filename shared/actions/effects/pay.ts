@@ -6,6 +6,10 @@ import type {
   Trade,
   Bonus,
   ResourceKey,
+  CostModifierType,
+  CostModifier,
+  TradeModifier,
+  BonusModifier,
 } from '../../game/types'
 import {
   convertResources,
@@ -65,13 +69,14 @@ function hashSolution(solution: PaymentSolution): number {
   return h
 }
 
-function makeCacheKey(player: PlayerState, cost: ComplexCost): string {
+function makeCacheKey(player: PlayerState, cost: ComplexCost, costType?: CostModifierType): string {
   const reserveKey = Object.entries(player.resources)
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([k, v]) => `${k}:${v}`)
     .join(',')
   const costKey = JSON.stringify(cost)
-  return `${reserveKey}|${costKey}`
+  const typeKey = costType ?? 'none'
+  return `${reserveKey}|${costKey}|${typeKey}`
 }
 
 export const payResources = (
@@ -245,43 +250,149 @@ const canCoverCost = (
   return keys.every((key) => (resources[key] ?? 0) >= (cost[key] ?? 0))
 }
 
+const applyTradeModifier = (
+  baseTrades: Trade[],
+  modifier: TradeModifier,
+): Trade[] => {
+  const modifiedTrades: Trade[] = []
+  const sources = modifier.source ?? modifier.cardId
+
+  for (const baseTrade of baseTrades) {
+    modifiedTrades.push({ ...baseTrade })
+  }
+
+  const newTrade: Trade = {
+    from: modifier.from,
+    to: modifier.to,
+    max: modifier.max ?? 1,
+    source: sources,
+    sourceId: modifier.cardId,
+  }
+  modifiedTrades.push(newTrade)
+
+  return modifiedTrades
+}
+
+const applyBonusModifier = (
+  baseBonuses: Bonus[],
+  modifier: BonusModifier,
+): Bonus[] => {
+  const modifiedBonuses: Bonus[] = [...baseBonuses]
+  
+  const newBonus: Bonus = {
+    discount: modifier.discount,
+    optional: modifier.optional ?? true,
+    sources: [modifier.cardId],
+  }
+  modifiedBonuses.push(newBonus)
+
+  return modifiedBonuses
+}
+
+export const getEffectiveCost = (
+  baseCost: ComplexCost,
+  costType: CostModifierType,
+): ComplexCost => {
+  const result: ComplexCost = { ...baseCost }
+
+  if (!result.trades) result.trades = []
+  if (!result.bonuses) result.bonuses = []
+
+  return result
+}
+
+export const getModifiersForCostType = (
+  player: PlayerState,
+  costType: CostModifierType,
+): CostModifier[] => {
+  return player.activeModifiers?.filter((m) => 
+    m.appliesTo.includes(costType)
+  ) ?? []
+}
+
+export const applyCostModifiers = (
+  baseCost: ComplexCost,
+  modifiers: CostModifier[],
+): ComplexCost => {
+  let result: ComplexCost = { ...baseCost }
+  
+  if (!result.trades) result.trades = []
+  if (!result.bonuses) result.bonuses = []
+
+  const effectiveTrades: Trade[] = [...result.trades]
+  const effectiveBonuses: Bonus[] = [...result.bonuses]
+
+  for (const mod of modifiers) {
+    if (mod.type === 'trade') {
+      const tradeMod = mod as TradeModifier
+      effectiveTrades.push({
+        from: tradeMod.from,
+        to: tradeMod.to,
+        max: tradeMod.max ?? 1,
+        source: tradeMod.cardId,
+        sourceId: tradeMod.cardId,
+      })
+    } else if (mod.type === 'bonus') {
+      const bonusMod = mod as BonusModifier
+      effectiveBonuses.push({
+        discount: bonusMod.discount,
+        optional: bonusMod.optional ?? true,
+        sources: [bonusMod.cardId],
+      })
+    }
+  }
+
+  result = {
+    ...result,
+    trades: effectiveTrades,
+    bonuses: effectiveBonuses,
+  }
+
+  return result
+}
+
 export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
   playedCards?: string[],
+  costType?: CostModifierType,
 ): PaymentSolution[] => {
-  const cacheKey = makeCacheKey(player, cost)
+  const effectiveCost = costType
+    ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
+    : cost
+
+  const cacheKey = makeCacheKey(player, effectiveCost)
   const cached = solutionCache.get(cacheKey)
   if (cached) return cached
 
   const playerResources: Partial<Resource> = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
 
-  const baseFees: Partial<Resource>[] = cost.fees && cost.fees.length > 0
-    ? cost.fees
-    : cost.fee
-      ? [cost.fee]
+  const baseFees: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
+    ? effectiveCost.fees
+    : effectiveCost.fee
+      ? [effectiveCost.fee]
       : [{}]
 
   for (const baseFee of baseFees) {
-    const tradeCombos = cost.trades && cost.trades.length > 0
-      ? generateTradeCombinations(cost.trades, playerResources)
+    const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
+      ? generateTradeCombinations(effectiveCost.trades, playerResources)
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
-      const bonuses = cost.bonuses ?? [undefined]
+      const bonuses = effectiveCost.bonuses ?? [undefined]
       
       for (const bonus of bonuses) {
-        let effectiveCost = baseFee
+        let effectiveCostFee = baseFee
         let bonusId: string | undefined
 
         if (bonus) {
-          effectiveCost = applyBonus(baseFee, bonus)
+          effectiveCostFee = applyBonus(baseFee, bonus)
           bonusId = bonus.sources?.join(',') ?? 'unknown'
         }
 
-        if (canCoverCost(tradeCombo.result, effectiveCost)) {
-          const remaining = subtractResources(tradeCombo.result, effectiveCost)
+        if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
+          const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
           
           rawSolutions.push({
             resourcesRemaining: remaining,
@@ -332,13 +443,14 @@ export const computeAllBuyableCombinations = (
 export const canPayCost = (
   player: PlayerState,
   cost: ComplexCost | Partial<Resource>,
+  costType?: CostModifierType,
 ): boolean => {
   if (!('fee' in cost) && !('fees' in cost) && !('trades' in cost)) {
     return canPayResources(player, cost as Partial<Resource>)
   }
 
   const complexCost = cost as ComplexCost
-  const solutions = computeAllBuyableCombinations(player, complexCost)
+  const solutions = computeAllBuyableCombinations(player, complexCost, undefined, costType)
   return solutions.length > 0
 }
 
