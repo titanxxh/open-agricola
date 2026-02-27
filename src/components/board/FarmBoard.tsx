@@ -186,7 +186,6 @@ export const FarmBoard = ({
             key={player.id}
             className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
             onClick={() => setViewPlayerId(player.id)}
-            disabled={!isInteractive}
           >
             <span className="player-tab-label">
               {player.name}
