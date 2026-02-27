@@ -9,6 +9,7 @@ import { canPayResources } from '../../../shared/actions/effects/pay'
 import { emptyResources } from '../../../shared/logic/state'
 import type { AnimalReorgState } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { CardWithCopy } from '../common/CardWithCopy'
 
 type FarmCell = {
   key: string
@@ -640,8 +641,10 @@ export const FarmBoard = ({
               : t(locale, `improvements.${rawId}.description`)
           const futureEntries = futureCardResources[rawId] ?? []
           return (
-            <div
+            <CardWithCopy
               key={`played-${index}`}
+              locale={locale}
+              cardId={rawId}
               className={`played-card${
                 isOccupation ? ' occupation' : isMinor ? ' minor' : ' major'
               }`}
@@ -689,7 +692,7 @@ export const FarmBoard = ({
                   })}
                 </div>
               ) : null}
-            </div>
+            </CardWithCopy>
           )
         })}
       </div>
@@ -717,20 +720,21 @@ export const FarmBoard = ({
                     ? { ...emptyResources, ...occupation.reward }
                     : {}
                   return (
-                    <button
+                    <CardWithCopy
                       key={`occupation-${cardId}`}
-                      type="button"
-                      className={`hand-card hand-card-occupation${
-                        canInteract ? '' : ' disabled'
-                      }${
-                        isSelectingOccupation && canInteract ? ' selectable' : ''
-                      }`}
+                      locale={locale}
+                      cardId={cardId}
                       onClick={() => {
                         if (isSelectingOccupation && canInteract) {
                           resolveChoice(cardId)
                         }
                       }}
                       disabled={!canInteractHand}
+                      className={`hand-card hand-card-occupation${
+                        canInteract ? '' : ' disabled'
+                      }${
+                        isSelectingOccupation && canInteract ? ' selectable' : ''
+                      }`}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(
@@ -764,7 +768,7 @@ export const FarmBoard = ({
                           emptyLabel={t(locale, 'ui.noEffect')}
                         />
                       </div>
-                    </button>
+                    </CardWithCopy>
                   )
                 })
               )}
@@ -791,12 +795,10 @@ export const FarmBoard = ({
                   const canSelect =
                     (isSelectingMinor || isSelectingImprovementAny) && canInteract
                   return (
-                    <button
+                    <CardWithCopy
                       key={`hand-${cardId}`}
-                      type="button"
-                      className={`hand-card hand-card-minor${
-                        canInteract ? '' : ' disabled'
-                      }${canSelect ? ' selectable' : ''}`}
+                      locale={locale}
+                      cardId={cardId}
                       onClick={() => {
                         if (canSelect) {
                           const value = isSelectingImprovementAny
@@ -806,6 +808,9 @@ export const FarmBoard = ({
                         }
                       }}
                       disabled={!canInteractHand}
+                      className={`hand-card hand-card-minor${
+                        canInteract ? '' : ' disabled'
+                      }${canSelect ? ' selectable' : ''}`}
                     >
                       <div className="hand-title">
                         {translateIfAvailable(
@@ -839,7 +844,7 @@ export const FarmBoard = ({
                           emptyLabel={t(locale, 'ui.noEffect')}
                         />
                       </div>
-                    </button>
+                    </CardWithCopy>
                   )
                 })
               )}

@@ -6,6 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
 import { canPayResources } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
+import { CardWithCopy } from '../common/CardWithCopy'
 
 type Props = {
   locale: Locale
@@ -46,18 +47,19 @@ export const MajorImprovements = ({
           : {}
         const futureEntries = futureCardResources[cardId] ?? []
         return (
-          <button
+          <CardWithCopy
             key={`major-${cardId}`}
-            type="button"
-            className={`major-card${canBuy ? '' : ' disabled'}${
-              isSelectingMajor && canBuy ? ' selectable' : ''
-            }`}
+            locale={locale}
+            cardId={cardId}
             onClick={() => {
               if (canInteract) {
                 resolveChoice(`major:${cardId}`)
               }
             }}
             disabled={!isInteractive}
+            className={`major-card${canBuy ? '' : ' disabled'}${
+              isSelectingMajor && canBuy ? ' selectable' : ''
+            }`}
           >
             <div className="hand-title">{t(locale, `improvements.${cardId}.name`)}</div>
             <div className="hand-meta">
@@ -96,7 +98,7 @@ export const MajorImprovements = ({
                 })}
               </div>
             ) : null}
-          </button>
+          </CardWithCopy>
         )
       })}
     </div>

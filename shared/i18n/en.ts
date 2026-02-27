@@ -239,6 +239,8 @@ export const en = {
     devPlayCard: 'Play Card',
     devDrawCard: 'Draw Card',
     devTargetHint: '↓ Actions below target this player',
+    cardCopy: 'Copy ID',
+    cardCopied: 'Copied!',
     exchangeCenterTitle: 'Exchange Center',
     bakeBreadTitle: 'Bake Bread',
     bakeBreadRate: '1 grain → {food} food',
