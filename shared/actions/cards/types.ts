@@ -1,4 +1,4 @@
-import type { Resource } from '../../game/types'
+import type { Resource, CostModifier } from '../../game/types'
 
 export type CardPrerequisites = {
   min?: number
@@ -20,6 +20,7 @@ export type CardDefinition = {
   players?: string
   passing?: boolean
   newSet?: boolean
+  modifier?: CostModifier
 }
 
 export class CardBase {
@@ -37,6 +38,7 @@ export class CardBase {
   players?: string
   passing?: boolean
   newSet?: boolean
+  modifier?: CostModifier
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)

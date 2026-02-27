@@ -1,4 +1,5 @@
 import { MinorImprovement } from '../types'
+import type { BonusModifier } from '../../game/types'
 
 export const C13_WoodSlideHammer = new MinorImprovement({
   id: "C13_WoodSlideHammer",
@@ -9,4 +10,10 @@ export const C13_WoodSlideHammer = new MinorImprovement({
   desc: ["On your first renovation, if you have at least 5 wood rooms, you can renovate to stone directly and you get a discount of 2 <STONE> on the renovation cost."],
   cost: {"wood":1},
   newSet: true,
+  modifier: {
+    type: 'bonus',
+    cardId: 'C13_WoodSlideHammer',
+    appliesTo: ['renovation'],
+    discount: { stone: 1 },
+  } as BonusModifier,
 })

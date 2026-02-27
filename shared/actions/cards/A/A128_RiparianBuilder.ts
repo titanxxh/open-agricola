@@ -1,4 +1,5 @@
 import { MinorImprovement } from '../types'
+import type { BonusModifier } from '../../game/types'
 
 export const A128_RiparianBuilder = new MinorImprovement({
   id: "A128_RiparianBuilder",
@@ -10,4 +11,10 @@ export const A128_RiparianBuilder = new MinorImprovement({
   cost: {},
   players: "3+",
   newSet: true,
+  modifier: {
+    type: 'bonus',
+    cardId: 'A128_RiparianBuilder',
+    appliesTo: ['construct'],
+    discount: { food: 1 },
+  } as BonusModifier,
 })

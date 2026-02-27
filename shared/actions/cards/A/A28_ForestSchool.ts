@@ -1,4 +1,5 @@
 import { MinorImprovement } from '../types'
+import type { TradeModifier } from '../../game/types'
 
 export const A28_ForestSchool = new MinorImprovement({
   id: "A28_ForestSchool",
@@ -8,4 +9,12 @@ export const A28_ForestSchool = new MinorImprovement({
   category: "ACTIONS_BOOSTER",
   desc: ["You can consider the __Lessons__ action spaces not occupied. You can replace each <FOOD> that an occupation costs with <WOOD>."],
   cost: {"wood":1,"clay":1},
+  modifier: {
+    type: 'trade',
+    cardId: 'A28_ForestSchool',
+    appliesTo: ['occupation'],
+    from: { wood: 1 },
+    to: { food: 1 },
+    max: 1,
+  } as TradeModifier,
 })
