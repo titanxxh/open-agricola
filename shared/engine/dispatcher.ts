@@ -4,7 +4,7 @@ import {
   applyIsDoableHooks,
   runActionHooks,
 } from '../actions/hooks'
-import { runCardListeners } from '../actions/cards/card-listeners'
+import { runCardListeners } from '../cards/card-listeners'
 
 export class HookDispatcher {
   applyComputeReplace(context: ActionExecutionContext & { actionId: string }) {

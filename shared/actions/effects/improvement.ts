@@ -2,7 +2,7 @@ import type { ActionExecutionResult, GameState, PlayerState, ComplexCost, Resour
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard } from './pay'
-import { getMajorCardEffect } from '../cards/major'
+import { getMajorCardEffect } from '../../cards/major'
 import { activateCard } from './activate-card'
 
 export type ImprovementPlayMode = 'major' | 'minor' | 'any'

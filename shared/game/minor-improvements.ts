@@ -1,11 +1,11 @@
 import type {
   MinorImprovement as MinorImprovementCard,
   PlayerActionCard,
-} from '../actions/cards/types'
+} from '../cards/types'
 import {
   minorImprovementCards,
   minorImprovementIds,
-} from '../actions/cards/catalog'
+} from '../cards/catalog'
 
 export type MinorImprovement = MinorImprovementCard | PlayerActionCard
 

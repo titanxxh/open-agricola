@@ -1,5 +1,5 @@
-import type { Occupation as OccupationCard, PlayerActionCard } from '../actions/cards/types'
-import { occupationCards, occupationIds } from '../actions/cards/catalog'
+import type { Occupation as OccupationCard, PlayerActionCard } from '../cards/types'
+import { occupationCards, occupationIds } from '../cards/catalog'
 
 export type Occupation = OccupationCard | PlayerActionCard
 
