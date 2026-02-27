@@ -227,6 +227,7 @@ export const zh = {
     devCardPlaceholder: 'card-id',
     devPlayCard: '打出卡牌',
     devDrawCard: '摸牌',
+    devTargetHint: '↓ 以下操作针对该玩家',
     exchangeCenterTitle: '交换中心',
     bakeBreadTitle: '烤面包',
     bakeBreadRate: '1 谷物 → {food} 食物',

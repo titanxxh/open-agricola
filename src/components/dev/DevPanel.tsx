@@ -49,7 +49,7 @@ export const DevPanel = ({
 }: Props) => (
   <div className="dev-panel">
     <h3>{t(locale, 'ui.devPanelTitle')}</h3>
-    <div className="dev-row">
+    <div className="dev-row dev-player-row">
       <div className="dev-field">
         <span>{t(locale, 'ui.devPlayer')}</span>
         <select value={devPlayerId} onChange={(event) => setDevPlayerId(event.target.value)}>
@@ -60,62 +60,67 @@ export const DevPanel = ({
           ))}
         </select>
       </div>
-      <div className="dev-field">
-        <span>{t(locale, 'ui.devResource')}</span>
-        <select
-          value={devResource}
-          onChange={(event) => setDevResource(event.target.value as keyof Resource)}
-        >
-          {resourceKeys.map((key) => (
-            <option key={key} value={key}>
-              {t(locale, `resources.${key}`)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="dev-field">
-        <span>{t(locale, 'ui.devAmount')}</span>
-        <input
-          type="number"
-          value={devAmount}
-          onChange={(event) => setDevAmount(Number(event.target.value))}
-        />
-      </div>
-      <button className="dev-apply" onClick={applyDevResource}>
-        {t(locale, 'ui.devApply')}
-      </button>
+      <span className="dev-target-hint">{t(locale, 'ui.devTargetHint')}</span>
     </div>
-    <div className="dev-row">
-      <div className="dev-field">
-        <span>{t(locale, 'ui.devRound')}</span>
-        <input
-          type="number"
-          min={1}
-          max={14}
-          value={devRound}
-          onChange={(event) => setDevRound(Number(event.target.value))}
-        />
+    <div className="dev-section">
+      <div className="dev-row">
+        <div className="dev-field">
+          <span>{t(locale, 'ui.devResource')}</span>
+          <select
+            value={devResource}
+            onChange={(event) => setDevResource(event.target.value as keyof Resource)}
+          >
+            {resourceKeys.map((key) => (
+              <option key={key} value={key}>
+                {t(locale, `resources.${key}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="dev-field">
+          <span>{t(locale, 'ui.devAmount')}</span>
+          <input
+            type="number"
+            value={devAmount}
+            onChange={(event) => setDevAmount(Number(event.target.value))}
+          />
+        </div>
+        <button className="dev-apply" onClick={applyDevResource}>
+          {t(locale, 'ui.devApply')}
+        </button>
       </div>
-      <button className="dev-apply" onClick={applyDevRound}>
-        {t(locale, 'ui.devAdvanceRound')}
-      </button>
-    </div>
-    <div className="dev-row">
-      <div className="dev-field">
-        <span>{t(locale, 'ui.devCardId')}</span>
-        <input
-          type="text"
-          value={devCardId}
-          onChange={(event) => setDevCardId(event.target.value)}
-          placeholder={t(locale, 'ui.devCardPlaceholder')}
-        />
+      <div className="dev-row">
+        <div className="dev-field">
+          <span>{t(locale, 'ui.devRound')}</span>
+          <input
+            type="number"
+            min={1}
+            max={14}
+            value={devRound}
+            onChange={(event) => setDevRound(Number(event.target.value))}
+          />
+        </div>
+        <button className="dev-apply" onClick={applyDevRound}>
+          {t(locale, 'ui.devAdvanceRound')}
+        </button>
       </div>
-      <button className="dev-apply" onClick={playDevCard}>
-        {t(locale, 'ui.devPlayCard')}
-      </button>
-      <button className="dev-apply" onClick={drawDevCard}>
-        {t(locale, 'ui.devDrawCard')}
-      </button>
+      <div className="dev-row">
+        <div className="dev-field">
+          <span>{t(locale, 'ui.devCardId')}</span>
+          <input
+            type="text"
+            value={devCardId}
+            onChange={(event) => setDevCardId(event.target.value)}
+            placeholder={t(locale, 'ui.devCardPlaceholder')}
+          />
+        </div>
+        <button className="dev-apply" onClick={playDevCard}>
+          {t(locale, 'ui.devPlayCard')}
+        </button>
+        <button className="dev-apply" onClick={drawDevCard}>
+          {t(locale, 'ui.devDrawCard')}
+        </button>
+      </div>
     </div>
     <DevStateActions locale={locale} saveDevState={saveDevState} loadDevState={loadDevState} />
   </div>
