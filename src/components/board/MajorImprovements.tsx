@@ -24,6 +24,7 @@ type Props = {
       resources: Partial<Resource>
     }[]
   >
+  devMode: boolean
 }
 
 export const MajorImprovements = ({
@@ -34,6 +35,7 @@ export const MajorImprovements = ({
   isInteractive,
   resolveChoice,
   futureCardResources,
+  devMode,
 }: Props) => (
   <section className="major-improvements">
     <h2>{t(locale, 'ui.majorImprovements')}</h2>
@@ -51,6 +53,7 @@ export const MajorImprovements = ({
             key={`major-${cardId}`}
             locale={locale}
             cardId={cardId}
+            devMode={devMode}
             onClick={() => {
               if (canInteract) {
                 resolveChoice(`major:${cardId}`)

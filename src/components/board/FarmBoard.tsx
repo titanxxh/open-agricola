@@ -645,6 +645,7 @@ export const FarmBoard = ({
               key={`played-${index}`}
               locale={locale}
               cardId={rawId}
+              devMode={devMode}
               className={`played-card${
                 isOccupation ? ' occupation' : isMinor ? ' minor' : ' major'
               }`}
@@ -724,6 +725,7 @@ export const FarmBoard = ({
                       key={`occupation-${cardId}`}
                       locale={locale}
                       cardId={cardId}
+                      devMode={devMode}
                       onClick={() => {
                         if (isSelectingOccupation && canInteract) {
                           resolveChoice(cardId)
@@ -799,6 +801,7 @@ export const FarmBoard = ({
                       key={`hand-${cardId}`}
                       locale={locale}
                       cardId={cardId}
+                      devMode={devMode}
                       onClick={() => {
                         if (canSelect) {
                           const value = isSelectingImprovementAny

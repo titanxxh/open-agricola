@@ -9,9 +9,10 @@ type Props = {
   className?: string
   onClick?: () => void
   disabled?: boolean
+  devMode?: boolean
 }
 
-export const CardWithCopy = ({ locale, cardId, children, className = '', onClick, disabled }: Props) => {
+export const CardWithCopy = ({ locale, cardId, children, className = '', onClick, disabled, devMode = false }: Props) => {
   const [showCopy, setShowCopy] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -42,6 +43,18 @@ export const CardWithCopy = ({ locale, cardId, children, className = '', onClick
     if (target.closest('.card-copy-overlay')) return
     onClick?.()
   }, [onClick])
+
+  if (!devMode) {
+    return (
+      <div
+        className={className}
+        onClick={handleClick}
+        aria-disabled={disabled}
+      >
+        {children}
+      </div>
+    )
+  }
 
   return (
     <div
