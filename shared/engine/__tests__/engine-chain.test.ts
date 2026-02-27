@@ -9,6 +9,7 @@ import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { clearCardListeners } from '../../cards/card-listeners'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -47,8 +48,9 @@ const createPlayer = (): PlayerState => ({
   newbornCount: 0,
   pastures: [],
   fenceSegments: [],
-    majorEffects: { wellRounds: 0 },
+  majorEffects: { wellRounds: 0 },
   startPlayer: false,
+  activeModifiers: [],
 })
 
 const createSpace = (id: string): ActionSpace => {
@@ -93,6 +95,7 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
 describe('engine follow-up actions', () => {
   beforeEach(() => {
     clearActionHooks()
+    clearCardListeners()
   })
 
   it('inserts follow-up actions after hooks', () => {

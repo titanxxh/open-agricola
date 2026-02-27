@@ -17,6 +17,7 @@ const OVEN_IMPROVEMENTS = [
 
 const firewoodReturnHomeListener: CardListenerRegistration = {
   id: 'C75-firewood-return-home',
+  cardIds: ['C75_Firewood'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     return {
