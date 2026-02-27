@@ -251,20 +251,141 @@
 - [E166_Roastmaster](../shared/cards/E/E166_Roastmaster.ts)
 - [E167_DairyCrier](../shared/cards/E/E167_DairyCrier.ts)
 
+## 支付系统 (Payment System)
+
+### 概述
+
+支付系统支持复杂的资源支付场景，包括：
+- 多选一费用 (fees)
+- 可重复交易 (trades)
+- 一次性折扣 (bonuses)
+- 卡牌抵换 (cards)
+- 卡牌修改器 (modifiers)
+
+### ComplexCost 类型
+
+```typescript
+type ComplexCost = {
+  fee?: Partial<Resource>           // 单一必付费用
+  fees?: Partial<Resource>[]        // 多选一费用（任选其一）
+  trades?: Trade[]                  // 可重复的交易选项
+  cards?: {                         // 卡牌抵换
+    type: string                    // 卡牌类型 (Major/Minor/Occ)
+    list: string[]                  // 可用的卡牌 ID 列表
+    cost?: Partial<Resource>        // 归还卡牌时额外支付的资源
+  }
+  bonuses?: Bonus[]                 // 一次性折扣
+}
+```
+
+### PaymentSolution 类型
+
+```typescript
+type PaymentSolution = {
+  resourcesPaid: Partial<Resource>  // 实际支付的资源
+  tradesUsed?: Trade[]              // 使用的交易
+  bonusUsed?: Bonus                 // 使用的折扣
+  cardUsed?: string                 // 使用的卡牌 ID（用于抵换）
+}
+```
+
+### 支付流程
+
+1. **canPayCost**: 检查玩家是否能支付 ComplexCost
+2. **computeAllBuyableCombinations**: 计算所有可行的支付方案
+3. **executePaymentSolution**: 执行选定的支付方案
+
+### 卡牌修改器系统
+
+卡牌可以通过 `modifier` 字段修改支付成本：
+
+#### TradeModifier（资源转换）
+
+```typescript
+// 示例：C88_CarpentersApprentice - 建造房间时 2 Clay → 1 Wood
+modifier: {
+  costType: CostModifierType.Construct,
+  trades: [{ max: 1, wood: 1, clay: -2 }]
+}
+```
+
+#### BonusModifier（资源折扣）
+
+```typescript
+// 示例：A88_HedgeKeeper - 围栏时 -1 Wood
+modifier: {
+  costType: CostModifierType.Fencing,
+  bonuses: [{ optional: false, wood: -1 }]
+}
+```
+
+### 卡牌抵换机制
+
+大改良支持从其他大改良升级（归还旧卡 + 支付折扣价）：
+
+```typescript
+// Major_CookingHearth1 - 从 Fireplace1/2 升级
+const Major_CookingHearth1: MajorCardDefinition = {
+  id: 'Major_CookingHearth1',
+  effect: {
+    cost: {
+      fees: [{ clay: 4 }],  // 全价：4 Clay
+      cards: {
+        type: 'Major',
+        list: ['Major_Fireplace1', 'Major_Fireplace2'],
+        cost: { clay: 2 }   // 升级价：2 Clay + 归还 Fireplace
+      }
+    },
+    returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],  // 可归还的卡牌
+  }
+}
+```
+
+### 支付相关卡牌索引
+
+#### 资源转换卡 (TradeModifier)
+
+| 卡牌 | 成本类型 | 转换规则 |
+|------|----------|----------|
+| [A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) | 房间建造 | 1 Reed → 2 Wood |
+| [A143_Stonecutter](../shared/cards/A/A143_Stonecutter.ts) | 房间建造 | 2 Stone → 1 Wood |
+| [B126_Carpenter](../shared/cards/B/B126_Carpenter.ts) | 房间建造 | 2 Reed → 1 Wood |
+| [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | 房间建造 | 2 Clay → 1 Wood |
+| [D154_ChimneySweep](../shared/cards/D/D154_ChimneySweep.ts) | 房间建造 | 2 Stone → 1 Clay |
+
+#### 资源折扣卡 (BonusModifier)
+
+| 卡牌 | 成本类型 | 折扣 |
+|------|----------|------|
+| [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | -1 Wood |
+| [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | -1 Reed |
+| [B15_CarpentersBench](../shared/cards/B/B15_CarpentersBench.ts) | 围栏 | -2 Wood |
+| [D13_Trowel](../shared/cards/D/D13_Trowel.ts) | 翻新 | -1 Reed |
+| [E87_MasterRenovator](../shared/cards/E/E87_MasterRenovator.ts) | 翻新 | -1 Reed |
+
+#### 卡牌升级类 (returnCards)
+
+| 卡牌 | 可升级自 | 升级成本 |
+|------|----------|----------|
+| [Major_CookingHearth1](../shared/actions/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 2 Clay |
+| [Major_CookingHearth2](../shared/actions/cards/major/cooking-hearth.ts) | Major_Fireplace1/2 | 3 Clay |
+
 ## 相关核心文件
 
 ### 类型定义
-- [types.ts](../shared/game/types.ts) - 游戏类型定义
+- [types.ts](../shared/game/types.ts) - 游戏类型定义（ComplexCost, PaymentSolution, TradeModifier, BonusModifier）
 - [cards/types.ts](../shared/cards/types.ts) - 卡牌类型定义
+- [cards/card-modifiers.ts](../shared/actions/cards/card-modifiers.ts) - 卡牌修改器注册表
 
 ### 行动效果
-- [pay.ts](../shared/actions/effects/pay.ts) - 支付系统
+- [pay.ts](../shared/actions/effects/pay.ts) - 支付系统核心（computeAllBuyableCombinations, executePaymentSolution）
+- [exchange.ts](../shared/actions/effects/exchange.ts) - 交易系统（canAffordTrade, applyTrade）
 - [house.ts](../shared/actions/effects/house.ts) - 建筑系统
 - [fencing.ts](../shared/actions/effects/fencing.ts) - 围栏系统
 - [plow.ts](../shared/actions/effects/plow.ts) - 犁地系统
 - [sow.ts](../shared/actions/effects/sow.ts) - 播种系统
 - [stables.ts](../shared/actions/effects/stables.ts) - 马厩系统
-- [improvement.ts](../shared/actions/effects/improvement.ts) - 改良系统
+- [improvement.ts](../shared/actions/effects/improvement.ts) - 改良系统（支持多支付方式选择）
 
 ### 游戏逻辑
 - [scoring.ts](../shared/logic/scoring.ts) - 计分系统
@@ -275,3 +396,7 @@
 - [hooks.ts](../shared/actions/hooks.ts) - Hook 定义
 - [card-listeners.ts](../shared/cards/card-listeners.ts) - 卡牌监听器
 - [card-effects.ts](../shared/cards/card-effects.ts) - 卡牌效果
+
+### 测试文件
+- [pay.test.ts](../shared/actions/effects/__tests__/pay.test.ts) - 支付系统测试
+- [exchange.test.ts](../shared/actions/effects/__tests__/exchange.test.ts) - 交易系统测试
