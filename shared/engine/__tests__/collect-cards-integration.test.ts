@@ -1,0 +1,252 @@
+import { describe, expect, it, beforeEach } from 'vitest'
+import { ActionRegistry } from '../registry'
+import { ActionNode, SequenceNode, XorNode } from '../nodes'
+import { Engine } from '../engine'
+import { EngineTree } from '../tree'
+import { HookDispatcher } from '../dispatcher'
+import { LogStore } from '../log-store'
+import { actionDefinitions } from '../../actions'
+import { internalActionDefinitions } from '../../actions/internal-actions'
+import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { clearCardListeners, registerCardListener } from '../../cards/card-listeners'
+
+const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
+  id: 'p1',
+  name: 'P1',
+  color: 'red',
+  resources: {
+    wood: 0,
+    clay: 0,
+    reed: 0,
+    stone: 0,
+    food: 0,
+    grain: 0,
+    vegetable: 0,
+    sheep: 0,
+    boar: 0,
+    cattle: 0,
+    begging: 0,
+  },
+  familySize: 2,
+  workersAvailable: 2,
+  rooms: 2,
+  houseType: 'wood',
+  fields: [],
+  fences: 0,
+  roomTiles: [],
+  stableTiles: [],
+  improvements: [],
+  minorHand: [],
+  minorPlayed: [],
+  occupationHand: [],
+  occupationPlayed: [],
+  playedCards: [],
+  houseAnimalType: null,
+  houseAnimalCount: 0,
+  stableAnimals: {},
+  newbornCount: 0,
+  pastures: [],
+  fenceSegments: [],
+  majorEffects: { wellRounds: 0 },
+  startPlayer: false,
+  activeModifiers: [],
+  ...overrides,
+})
+
+const createSpace = (id: string, overrides: Partial<ActionSpace> = {}): ActionSpace => {
+  const action = actionDefinitions.find((item) => item.id === id)
+  if (!action) {
+    throw new Error(`Action not found: ${id}`)
+  }
+  return {
+    ...action,
+    resources: {
+      wood: 0,
+      clay: 0,
+      reed: 0,
+      stone: 0,
+      food: 0,
+      grain: 0,
+      vegetable: 0,
+      sheep: 0,
+      boar: 0,
+      cattle: 0,
+      begging: 0,
+    },
+    takenBy: null,
+    ...overrides,
+  }
+}
+
+const createState = (space: ActionSpace, player: PlayerState): GameState => ({
+  round: 1,
+  currentPlayerIndex: 0,
+  players: [player],
+  actionSpaces: [space],
+  log: [],
+  roundStartSnapshot: null,
+  roundActionOrder: [],
+  gameSeed: 1,
+  availableMajorImprovements: [],
+  futureMeeples: [],
+  pendingFutureMeeples: [],
+  gameOver: false,
+})
+
+describe('Collect action card listeners integration', () => {
+  beforeEach(() => {
+    clearActionHooks()
+    clearCardListeners()
+  })
+
+  it('E53_BoarSpear: registers during listener for collect action', () => {
+    const boarSpearListener = {
+      id: 'E53-boar-spear-during',
+      phases: ['during' as const],
+      actions: ['collect'],
+      handler: (context: any) => {
+        const obtainedBoar = context.result?.resourcesGained?.boar ?? 0
+        if (obtainedBoar <= 0) return
+        
+        return {
+          flow: {
+            type: 'xor' as const,
+            children: [
+              { type: 'leaf' as const, actionId: 'exchange', optional: true },
+            ],
+          },
+        }
+      },
+    }
+    registerCardListener(boarSpearListener)
+
+    const registry = new ActionRegistry()
+    actionDefinitions.forEach((action) => registry.register(action))
+    internalActionDefinitions.forEach((action) => registry.register(action))
+    
+    const hooks = new HookDispatcher()
+    const log = new LogStore()
+    
+    const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
+    const engine = new Engine({ tree, registry, hooks, log })
+    
+    const player = createPlayer()
+    const space = createSpace('sheep-market', { resources: { sheep: 2, boar: 0, cattle: 0, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, begging: 0 } })
+    const state = createState(space, player)
+
+    const result = engine.proceed({ state, player, space })
+    
+    expect(result.type).toBe('ok')
+  })
+
+  it('A108_MushroomCollector: registers immediatelyAfter listener for collect action', () => {
+    const mushroomCollectorListener = {
+      id: 'A108-mushroom-collector-immediately-after',
+      phases: ['immediatelyAfter' as const],
+      actions: ['collect'],
+      handler: () => ({
+        flow: {
+          type: 'xor' as const,
+          children: [
+            { type: 'leaf' as const, actionId: 'exchange', optional: true },
+          ],
+        },
+      }),
+    }
+    registerCardListener(mushroomCollectorListener)
+
+    const registry = new ActionRegistry()
+    actionDefinitions.forEach((action) => registry.register(action))
+    internalActionDefinitions.forEach((action) => registry.register(action))
+    
+    const hooks = new HookDispatcher()
+    const log = new LogStore()
+    
+    const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
+    const engine = new Engine({ tree, registry, hooks, log })
+    
+    const player = createPlayer()
+    const space = createSpace('forest', { resources: { wood: 3, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 } })
+    const state = createState(space, player)
+
+    const result = engine.proceed({ state, player, space })
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(3)
+  })
+
+  it('A17_ReclamationPlow: registers after listener for collect action', () => {
+    const reclamationPlowListener = {
+      id: 'A17-reclamation-plow-after',
+      phases: ['after' as const],
+      actions: ['collect'],
+      handler: () => ({
+        flow: {
+          type: 'xor' as const,
+          children: [
+            { type: 'leaf' as const, actionId: 'plow', optional: true },
+          ],
+        },
+      }),
+    }
+    registerCardListener(reclamationPlowListener)
+
+    const registry = new ActionRegistry()
+    actionDefinitions.forEach((action) => registry.register(action))
+    internalActionDefinitions.forEach((action) => registry.register(action))
+    
+    const hooks = new HookDispatcher()
+    const log = new LogStore()
+    
+    const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
+    const engine = new Engine({ tree, registry, hooks, log })
+    
+    const player = createPlayer({
+      houseAnimalType: 'sheep',
+      houseAnimalCount: 1,
+      rooms: 2,
+    })
+    const space = createSpace('sheep-market', { resources: { sheep: 1, boar: 0, cattle: 0, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, begging: 0 } })
+    const state = createState(space, player)
+
+    const result = engine.proceed({ state, player, space })
+    expect(result.type).toBe('ok')
+    expect(player.resources.sheep).toBe(1)
+  })
+
+  it('card listener does not trigger for non-collect actions', () => {
+    const boarSpearListener = {
+      id: 'E53-boar-spear-during',
+      phases: ['during' as const],
+      actions: ['collect'],
+      handler: () => ({
+        flow: {
+          type: 'xor' as const,
+          children: [
+            { type: 'leaf' as const, actionId: 'exchange', optional: true },
+          ],
+        },
+      }),
+    }
+    registerCardListener(boarSpearListener)
+
+    const registry = new ActionRegistry()
+    actionDefinitions.forEach((action) => registry.register(action))
+    internalActionDefinitions.forEach((action) => registry.register(action))
+    
+    const hooks = new HookDispatcher()
+    const log = new LogStore()
+    
+    const tree = new EngineTree(new ActionNode('action-gain', 'gain'))
+    const engine = new Engine({ tree, registry, hooks, log })
+    
+    const player = createPlayer()
+    const space = createSpace('day-laborer')
+    const state = createState(space, player)
+
+    const result = engine.proceed({ state, player, space })
+    
+    expect(result.type).toBe('ok')
+    expect(player.resources.food).toBe(2)
+  })
+})
