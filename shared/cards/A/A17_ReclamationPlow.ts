@@ -3,9 +3,14 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
-const ANIMAL_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
-
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+const isAnimalAccumulationSpace = (space: any): boolean => {
+  const gainPerRound = space.gainPerRound ?? {}
+  return (gainPerRound.sheep ?? 0) > 0 || 
+         (gainPerRound.boar ?? 0) > 0 || 
+         (gainPerRound.cattle ?? 0) > 0
+}
 
 const getAnimalCountByType = (player: any): Record<AnimalType, number> => {
   return {
@@ -28,7 +33,7 @@ const reclamationPlowDuringListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { space, player } = context
     
-    if (!ANIMAL_SPACES.includes(space.id)) return
+    if (!isAnimalAccumulationSpace(space.id)) return
     
     const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
     if (cardState.flagged) return
@@ -47,7 +52,7 @@ const reclamationPlowAfterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { space, player, extraData } = context
     
-    if (!ANIMAL_SPACES.includes(space.id)) return
+    if (!isAnimalAccumulationSpace(space.id)) return
     
     const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
     if (cardState.flagged) return

@@ -3,18 +3,18 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
-const WOOD_SPACES = ['forest', 'copse', 'grove']
+const isWoodAccumulationSpace = (space: any): boolean => {
+  return (space.gainPerRound?.wood ?? 0) > 0
+}
 
 const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
   id: 'A108-mushroom-collector-immediately-after',
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, result } = context
+    const { space } = context
     
-    if (!WOOD_SPACES.includes(space.id)) return
-    
-    const obtainedWood = result?.resourcesGained?.wood ?? 0
+    if (!isWoodAccumulationSpace(space)) return
     
     return {
       flow: {
