@@ -68,6 +68,7 @@ describe('Collect action card listeners', () => {
       sewn: [],
       animals: { sheep: 0, boar: 0, cattle: 0 },
       score: 0,
+      cardStates: {},
     }
 
     const defaultSpace: ActionSpace = {
@@ -360,6 +361,150 @@ describe('Collect action card listeners', () => {
           houseAnimalCount: 0,
           rooms: 0,
           stableTiles: {},
+        },
+      })
+
+      const result = listener?.handler(context as any)
+      expect(result).toBeUndefined()
+    })
+  })
+
+  describe('A53_Claypipe', () => {
+    const claypipeImmediatelyAfterListener: any = {
+      id: 'A53-claypipe-immediately-after',
+      phases: ['immediatelyAfter' as ActionHookPhase],
+      actions: ['collect', 'gain'],
+      handler: (context: any): ActionHookResult | void => {
+        const { player, result } = context
+        
+        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        if (result?.type !== 'ok') return
+        
+        const gainedResources = result.resourcesGained ?? {}
+        const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+        let buildingGained = 0
+        for (const res of BUILDING_RESOURCES) {
+          buildingGained += gainedResources[res] ?? 0
+        }
+        
+        if (buildingGained <= 0) return
+        
+        return {
+          extraData: { incrementBuildingCount: buildingGained },
+        }
+      },
+    }
+
+    const claypipeAfterListener: any = {
+      id: 'A53-claypipe-after',
+      phases: ['after' as ActionHookPhase],
+      actions: ['collect', 'gain'],
+      handler: (context: any): ActionHookResult | void => {
+        const { player } = context
+        
+        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        
+        const cardState = player.cardStates?.['A53_Claypipe'] ?? {}
+        const buildingCount = cardState.counters?.['buildingResources'] ?? 0
+        
+        if (buildingCount >= 7) {
+          return {
+            flow: {
+              type: 'seq',
+              children: [
+                { type: 'leaf', actionId: 'gain-food', optional: false },
+              ],
+            },
+          }
+        }
+      },
+    }
+
+    beforeEach(() => {
+      registerCardListener(claypipeImmediatelyAfterListener)
+      registerCardListener(claypipeAfterListener)
+    })
+
+    it('registers immediatelyAfter and after listeners', () => {
+      const listeners = getRegisteredCardListeners()
+      const claypipeListeners = listeners.filter(l => l.id.startsWith('A53'))
+      expect(claypipeListeners.length).toBe(2)
+      expect(claypipeListeners.some(l => l.phases?.includes('immediatelyAfter'))).toBe(true)
+      expect(claypipeListeners.some(l => l.phases?.includes('after'))).toBe(true)
+    })
+
+    it('increments building resource count when gaining building resources', () => {
+      const listeners = getRegisteredCardListeners()
+      const listener = listeners.find(l => l.id === 'A53-claypipe-immediately-after')
+      
+      const context = createMockContext({
+        actionId: 'gain',
+        phase: 'immediatelyAfter',
+        result: { type: 'ok', resourcesGained: { wood: 2, clay: 3 } },
+        player: {
+          minorPlayed: ['A53_Claypipe'],
+          cardStates: {},
+        },
+      })
+
+      const result = listener?.handler(context as any)
+      expect(result).toBeDefined()
+      expect(result?.extraData?.incrementBuildingCount).toBe(5)
+    })
+
+    it('does not trigger when player does not have Claypipe', () => {
+      const listeners = getRegisteredCardListeners()
+      const listener = listeners.find(l => l.id === 'A53-claypipe-immediately-after')
+      
+      const context = createMockContext({
+        actionId: 'gain',
+        phase: 'immediatelyAfter',
+        result: { type: 'ok', resourcesGained: { wood: 2 } },
+        player: {
+          minorPlayed: [],
+          cardStates: {},
+        },
+      })
+
+      const result = listener?.handler(context as any)
+      expect(result).toBeUndefined()
+    })
+
+    it('grants food when building resources >= 7', () => {
+      const listeners = getRegisteredCardListeners()
+      const listener = listeners.find(l => l.id === 'A53-claypipe-after')
+      
+      const context = createMockContext({
+        actionId: 'gain',
+        phase: 'after',
+        result: { type: 'ok' },
+        player: {
+          minorPlayed: ['A53_Claypipe'],
+          cardStates: {
+            'A53_Claypipe': { counters: { buildingResources: 7 } },
+          },
+        },
+      })
+
+      const result = listener?.handler(context as any)
+      expect(result).toBeDefined()
+      expect(result?.flow).toBeDefined()
+      expect(result?.flow?.type).toBe('seq')
+    })
+
+    it('does not grant food when building resources < 7', () => {
+      const listeners = getRegisteredCardListeners()
+      const listener = listeners.find(l => l.id === 'A53-claypipe-after')
+      
+      const context = createMockContext({
+        actionId: 'gain',
+        phase: 'after',
+        result: { type: 'ok' },
+        player: {
+          minorPlayed: ['A53_Claypipe'],
+          cardStates: {
+            'A53_Claypipe': { counters: { buildingResources: 5 } },
+          },
         },
       })
 

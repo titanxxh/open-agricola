@@ -222,8 +222,15 @@ export const internalActionDefinitions: ActionDefinition[] = [
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
     execute: ({ player, space }) => {
+      const gained: Record<string, number> = {}
+      const resources = space.resources
+      ;(['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const).forEach((key) => {
+        if (resources[key] > 0) {
+          gained[key] = resources[key]
+        }
+      })
       collectAccumulatedResources(player, space)
-      return { type: 'ok' }
+      return { type: 'ok' as const, resourcesGained: gained }
     },
   },
   {
@@ -235,10 +242,17 @@ export const internalActionDefinitions: ActionDefinition[] = [
     canBeExecutedByPlayer: () => true,
     execute: ({ player, space }) => {
       const gain = gainConfigByActionId.get(space.id)
+      const gained: Record<string, number> = {}
       if (gain) {
+        Object.keys(gain).forEach((key) => {
+          const amount = gain[key as keyof typeof gain] ?? 0
+          if (amount > 0) {
+            gained[key] = amount
+          }
+        })
         gainResources(player, gain)
       }
-      return { type: 'ok' }
+      return { type: 'ok' as const, resourcesGained: gained }
     },
   },
   createBonusAction('bonus-wood', { wood: 1 }),

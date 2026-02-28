@@ -166,6 +166,7 @@ export type GameState = {
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
+  workPhaseObtainedResources: Record<string, Partial<Resource>>
 }
 
 export type CanBeExecutedByPlayer = (
@@ -187,7 +188,7 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource> }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }

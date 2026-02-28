@@ -51,6 +51,7 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
   activeModifiers: [],
+  cardStates: {},
   ...overrides,
 })
 
@@ -241,6 +242,53 @@ describe('Collect action card listeners integration', () => {
     const engine = new Engine({ tree, registry, hooks, log })
     
     const player = createPlayer()
+    const space = createSpace('day-laborer')
+    const state = createState(space, player)
+
+    const result = engine.proceed({ state, player, space })
+    
+    expect(result.type).toBe('ok')
+    expect(player.resources.food).toBe(2)
+  })
+
+  it('A53_Claypipe: tracks building resources gained during gain action', () => {
+    const claypipeListener = {
+      id: 'A53-claypipe-immediately-after',
+      phases: ['immediatelyAfter' as const],
+      actions: ['gain'],
+      handler: (context: any) => {
+        const { player, result } = context
+        
+        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        if (result?.type !== 'ok') return
+        
+        const gainedResources = result.resourcesGained ?? {}
+        const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+        let buildingGained = 0
+        for (const res of BUILDING_RESOURCES) {
+          buildingGained += gainedResources[res] ?? 0
+        }
+        
+        if (buildingGained <= 0) return
+        
+        return {
+          extraData: { incrementBuildingCount: buildingGained },
+        }
+      },
+    }
+    registerCardListener(claypipeListener)
+
+    const registry = new ActionRegistry()
+    actionDefinitions.forEach((action) => registry.register(action))
+    internalActionDefinitions.forEach((action) => registry.register(action))
+    
+    const hooks = new HookDispatcher()
+    const log = new LogStore()
+    
+    const tree = new EngineTree(new ActionNode('action-gain', 'gain'))
+    const engine = new Engine({ tree, registry, hooks, log })
+    
+    const player = createPlayer({ minorPlayed: ['A53_Claypipe'], cardStates: {} })
     const space = createSpace('day-laborer')
     const state = createState(space, player)
 
