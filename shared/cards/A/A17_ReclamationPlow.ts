@@ -58,10 +58,16 @@ const reclamationPlowAfterListener: CardListenerRegistration = {
     
     return {
       flow: {
-        type: 'seq',
+        type: 'xor',
         children: [
-          { type: 'leaf', actionId: 'plow', optional: true },
-          { type: 'leaf', actionId: 'special-effect', optional: false },
+          { 
+            type: 'seq', 
+            children: [
+              { type: 'leaf', actionId: 'plow', optional: false },
+              { type: 'leaf', actionId: 'special-effect', optional: false },
+            ]
+          },
+          { type: 'leaf', actionId: 'pass', optional: false },
         ],
       },
     }
