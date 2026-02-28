@@ -3,41 +3,72 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
-const RECLAMATION_PLOW_FLAG = 'reclamation-plow-pending'
+const ANIMAL_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
+
+const getAnimalCount = (player: any): number => {
+  return (player.houseAnimalCount ?? 0) + 
+    Object.values(player.stableAnimals ?? {}).filter((a: any) => a !== null).length +
+    Object.values(player.pastures ?? []).reduce((sum: number, p: any) => sum + (p.animalCount ?? 0), 0)
+}
+
+const reclamationPlowDuringListener: CardListenerRegistration = {
+  id: 'A17-reclamation-plow-during',
+  phases: ['during' as ActionHookPhase],
+  actions: ['collect'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const { space, player } = context
+    
+    if (!ANIMAL_SPACES.includes(space.id)) return
+    
+    const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
+    if (cardState.flagged) return
+    
+    const currentAnimals = getAnimalCount(player)
+    return {
+      extraData: { animalsBeforeCollecting: currentAnimals },
+    }
+  },
+}
 
 const reclamationPlowAfterListener: CardListenerRegistration = {
   id: 'A17-reclamation-plow-after',
   phases: ['after' as ActionHookPhase],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { actionId, result, player } = context
+    const { space, player, extraData } = context
     
-    if (actionId !== 'collect') return
+    if (!ANIMAL_SPACES.includes(space.id)) return
     
-    const animals = ['sheep', 'boar', 'cattle'] as const
-    let totalObtained = 0
-    for (const animal of animals) {
-      totalObtained += result?.resourcesGained?.[animal] ?? 0
-    }
+    const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
+    if (cardState.flagged) return
     
-    if (totalObtained <= 0) return
+    const animalsBeforeCollecting = extraData?.['animalsBeforeCollecting'] as number | undefined
+    if (animalsBeforeCollecting === undefined) return
     
-    const canAccommodate = 
-      (player.houseAnimalType !== null && player.houseAnimalCount < player.rooms * 2) ||
-      Object.values(player.stableTiles).some(t => t === null)
+    const obtainedAnimals = (context.result?.resourcesGained?.sheep ?? 0) +
+      (context.result?.resourcesGained?.boar ?? 0) +
+      (context.result?.resourcesGained?.cattle ?? 0)
+    
+    if (obtainedAnimals <= 0) return
+    
+    const animalsAfterCollecting = getAnimalCount(player)
+    const canAccommodate = animalsAfterCollecting >= animalsBeforeCollecting + obtainedAnimals
     
     if (!canAccommodate) return
     
     return {
       flow: {
-        type: 'xor',
+        type: 'seq',
         children: [
           { type: 'leaf', actionId: 'plow', optional: true },
+          { type: 'leaf', actionId: 'special-effect', optional: false },
         ],
       },
     }
   },
 }
 
+registerCardListener(reclamationPlowDuringListener)
 registerCardListener(reclamationPlowAfterListener)
 
 export const A17_ReclamationPlow = new MinorImprovement({

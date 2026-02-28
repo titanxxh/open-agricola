@@ -102,6 +102,7 @@ export type PlayerState = {
   majorEffects: MajorEffectState
   startPlayer: boolean
   activeModifiers: CostModifier[]
+  cardStates: CardStates
 }
 
 export type FarmTilePosition = {
@@ -121,6 +122,14 @@ export type Pasture = {
 export type MajorEffectState = {
   wellRounds: number
 }
+
+export type CardState = {
+  flagged?: boolean
+  counters?: Record<string, number>
+  extraData?: Record<string, unknown>
+}
+
+export type CardStates = Record<string, CardState>
 
 export type LogEntry = {
   key: string
