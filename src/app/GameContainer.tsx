@@ -3353,6 +3353,7 @@ export const GameContainer = () => {
         resolveChoice={resolveChoice}
         futureCardResources={futureCardResources}
         isInteractive={true}
+        devMode={devMode}
       />
       <main className="board">
         <ActionBoard

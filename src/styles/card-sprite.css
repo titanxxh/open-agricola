@@ -1,0 +1,315 @@
+/* BGA-Style Card Rendering System */
+/* Uses sprite images from BGA-Agricola project */
+
+:root {
+  --agricola-card-width: 188px;
+  --agricola-card-height: 299px;
+  --agricola-card-scale: 1;
+  --bga-img-base: '../../bga-agricola/img';
+}
+
+/* Card container */
+.player-card {
+  transition: transform 0.8s;
+  transform: scale(1);
+  width: var(--agricola-card-width);
+  height: var(--agricola-card-height);
+  position: relative;
+}
+
+.player-card.mini {
+  height: var(--agricola-card-width);
+}
+
+.player-card.selectable {
+  cursor: pointer;
+}
+
+.player-card.selectable:hover {
+  transform: scale(1.1);
+}
+
+.player-card.selected {
+  transform: scale(1.1);
+  border: 3px dashed #000;
+}
+
+.player-card.unselectable {
+  cursor: not-allowed;
+  filter: grayscale(70%);
+}
+
+.player-card.usable {
+  border-radius: 15.5px;
+  border: 3px solid #144f91;
+}
+
+/* Card resizable wrapper */
+.player-card-resizable {
+  transform: scale(var(--agricola-card-scale));
+  transform-origin: top left;
+  width: 235px;
+}
+
+/* Card inner container */
+.player-card-inner {
+  width: 235px;
+  height: 374px;
+  background-size: 100%;
+  position: relative;
+  border-radius: 19.5px;
+  overflow: hidden;
+}
+
+/* Card frame layer - background sprite */
+.card-frame {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  border-radius: 19.5px;
+  box-shadow: 2px 2px 5px -1px rgba(0, 0, 0, 0.5);
+  border: 4px solid white;
+  box-sizing: border-box;
+}
+
+/* Card frame positions by type */
+.player-card.major .card-frame {
+  background-image: url('/bga-img/card_frames.jpg');
+  background-position-x: 0%;
+}
+
+.player-card.minor .card-frame {
+  background-image: url('/bga-img/card_frames.jpg');
+  background-position-x: 50%;
+}
+
+.player-card.occupation .card-frame {
+  background-image: url('/bga-img/card_frames.jpg');
+  background-position-x: 100%;
+}
+
+/* Card icon layer */
+.card-icon {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Major improvement icon */
+.player-card.major .card-icon {
+  width: 65%;
+  height: 66%;
+  top: 21%;
+  left: 18%;
+  background-image: url('/bga-img/majors_icons.jpg');
+  background-size: 500% 200%;
+  clip-path: polygon(0% 54.4%, 24% 11%, 74% 11%, 99% 55%, 74% 98%, 24% 98%, 0% 55%);
+}
+
+/* Minor improvement icon */
+.player-card.minor .card-icon {
+  width: 77.5%;
+  height: 80.85%;
+  top: 15.75%;
+  left: 11.5%;
+  background-size: contain;
+  background-position: center;
+}
+
+/* Occupation icon */
+.player-card.occupation .card-icon {
+  width: 77%;
+  height: 80.7%;
+  top: 15.75%;
+  left: 11.5%;
+  background-size: contain;
+  background-position: center;
+}
+
+/* Card title */
+.card-title {
+  position: absolute;
+  left: 29%;
+  right: 29%;
+  top: 10px;
+  height: 43px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #333;
+  text-shadow: 0 0 3px white, 0 0 3px white;
+}
+
+.player-card.major .card-title {
+  color: #5a3d1c;
+}
+
+.player-card.minor .card-title {
+  color: #3a5a2c;
+}
+
+.player-card.occupation .card-title {
+  left: 10%;
+  right: 10%;
+  height: 47px;
+  color: #1a3a6a;
+}
+
+/* Card numbering */
+.card-numbering {
+  position: absolute;
+  left: 9px;
+  top: 92px;
+  width: 24px;
+  height: 12px;
+  font-size: 11px;
+  text-align: center;
+  color: #666;
+}
+
+/* Card score */
+.card-score {
+  position: absolute;
+  left: 9px;
+  top: 165px;
+  width: 40px;
+  height: 40px;
+  font-weight: bold;
+  font-size: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  border-radius: 50%;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Card deck indicator */
+.card-deck {
+  position: absolute;
+  top: 159px;
+  width: 36px;
+  height: 36px;
+  right: 12px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.card-deck[data-deck="A"] {
+  background-image: url('/bga-img/deckA/deckA.png');
+}
+
+.card-deck[data-deck="B"] {
+  background-image: url('/bga-img/deckB/deckB.png');
+}
+
+.card-deck[data-deck="C"] {
+  background-image: url('/bga-img/deckC/deckC.png');
+}
+
+.card-deck[data-deck="D"] {
+  background-image: url('/bga-img/deckD/deckD.png');
+}
+
+.card-deck[data-deck="E"] {
+  background-image: url('/bga-img/deckE/deckE.png');
+}
+
+/* Card category icon */
+.card-category {
+  position: absolute;
+  right: 12px;
+  bottom: 30px;
+  width: 26px;
+  height: 26px;
+  background-image: url('/bga-img/card_categories.png');
+  background-size: 800% 100%;
+}
+
+.card-category[data-category="BoosterCategory"] { background-position-x: 0%; }
+.card-category[data-category="LivestockCategory"] { background-position-x: 14.28%; }
+.card-category[data-category="ResourceCategory"] { background-position-x: 28.57%; }
+.card-category[data-category="FarmCategory"] { background-position-x: 42.85%; }
+.card-category[data-category="CropCategory"] { background-position-x: 57.14%; }
+.card-category[data-category="FoodCategory"] { background-position-x: 71.42%; }
+.card-category[data-category="GoodsCategory"] { background-position-x: 85.71%; }
+.card-category[data-category="PointsCategory"] { background-position-x: 100%; }
+
+/* Card cost area */
+.card-cost {
+  position: absolute;
+  right: 12px;
+  top: 60px;
+  width: 60px;
+  text-align: right;
+  font-weight: bold;
+  font-size: 18px;
+  text-shadow: -1px 0 white, 0 -1px white, 1px 0 white, 0 1px white;
+}
+
+/* Card description area */
+.card-desc {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(255,255,255,0.95));
+  border-bottom-left-radius: 15.5px;
+  border-bottom-right-radius: 15.5px;
+  font-size: 12px;
+  line-height: 14px;
+  color: #333;
+  text-align: center;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.card-desc-scroller {
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+/* Card cost text area */
+.card-cost-text {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+
+
+/* Major improvement specific icon positions */
+/* 5x2 grid: 5 columns, 2 rows */
+.player-card.major[data-id="Major_Fireplace1"] .card-icon { background-position: 0% 0%; }
+.player-card.major[data-id="Major_Fireplace2"] .card-icon { background-position: 25% 0%; }
+.player-card.major[data-id="Major_CookingHearth1"] .card-icon { background-position: 50% 0%; }
+.player-card.major[data-id="Major_CookingHearth2"] .card-icon { background-position: 75% 0%; }
+.player-card.major[data-id="Major_ClayOven"] .card-icon { background-position: 100% 0%; }
+.player-card.major[data-id="Major_StoneOven"] .card-icon { background-position: 0% 100%; }
+.player-card.major[data-id="Major_Joinery"] .card-icon { background-position: 25% 100%; }
+.player-card.major[data-id="Major_Pottery"] .card-icon { background-position: 50% 100%; }
+.player-card.major[data-id="Major_Basket"] .card-icon { background-position: 75% 100%; }
+.player-card.major[data-id="Major_Well"] .card-icon { background-position: 100% 100%; }
+
+/* Card with copy overlay integration */
+.player-card .card-copy-overlay {
+  border-radius: 15.5px;
+}

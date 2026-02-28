@@ -4,12 +4,11 @@ import type { FarmTilePosition, PlayerState, Resource } from '../../../shared/ga
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
-import { getMajorCardEffect } from '../../../shared/cards/major'
 import { canPayResources } from '../../../shared/actions/effects/pay'
 import { emptyResources } from '../../../shared/logic/state'
 import type { AnimalReorgState } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
-import { CardWithCopy } from '../common/CardWithCopy'
+import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type FarmCell = {
   key: string
@@ -147,7 +146,6 @@ export const FarmBoard = ({
   isInteractive,
 }: Props) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
-  const isOwnBoard = displayPlayer.id === currentPlayer.id
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -162,10 +160,6 @@ export const FarmBoard = ({
     })
     return `${target.row}-${target.col}`
   })()
-  const translateIfAvailable = (key: string, fallback: string) => {
-    const value = t(locale, key)
-    return value === key ? fallback : value
-  }
 
   return (
     <section className="center">
@@ -601,73 +595,17 @@ export const FarmBoard = ({
             : ['', cardId]
           const isMinor = kind === 'minor'
           const isOccupation = kind === 'occupation'
-          const isMajor = kind === 'major'
-          const minor = isMinor ? getMinorImprovement(rawId) : null
-          const occupation = isOccupation ? getOccupation(rawId) : null
-          const major = isMajor ? getMajorCardEffect(rawId) : null
-          const costResources = minor?.cost
-            ? { ...emptyResources, ...minor.cost }
-            : occupation?.cost
-              ? { ...emptyResources, ...occupation.cost }
-              : major
-                ? { ...emptyResources, ...major.cost }
-                : {}
-          const rewardResources = minor?.reward
-            ? { ...emptyResources, ...minor.reward }
-            : occupation?.reward
-              ? { ...emptyResources, ...occupation.reward }
-              : {}
-          const nameText = isMinor
-            ? translateIfAvailable(
-                `minorImprovements.${rawId}.name`,
-                minor?.name ?? rawId,
-              )
-            : isOccupation
-              ? translateIfAvailable(
-                  `occupations.${rawId}.name`,
-                  occupation?.name ?? rawId,
-                )
-              : t(locale, `improvements.${rawId}.name`)
-          const descriptionText = isMinor
-            ? translateIfAvailable(
-                `minorImprovements.${rawId}.description`,
-                minor?.desc?.join(' ') ?? '',
-              )
-            : isOccupation
-              ? translateIfAvailable(
-                  `occupations.${rawId}.description`,
-                  occupation?.desc?.join(' ') ?? '',
-                )
-              : t(locale, `improvements.${rawId}.description`)
+          const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
           return (
-            <CardWithCopy
-              key={`played-${index}`}
-              locale={locale}
-              cardId={rawId}
-              devMode={devMode}
-              className={`played-card${
-                isOccupation ? ' occupation' : isMinor ? ' minor' : ' major'
-              }`}
-            >
-              <div className="hand-title">{nameText}</div>
-              <div className="hand-meta">{descriptionText}</div>
-              <div className="hand-meta">
-                <span className="hand-label">{t(locale, 'ui.handCostLabel')}</span>
-                <ResourceLine
-                  locale={locale}
-                  resources={costResources}
-                  emptyLabel={t(locale, 'ui.noCost')}
-                />
-              </div>
-              <div className="hand-meta">
-                <span className="hand-label">{t(locale, 'ui.handEffectLabel')}</span>
-                <ResourceLine
-                  locale={locale}
-                  resources={rewardResources}
-                  emptyLabel={t(locale, 'ui.noEffect')}
-                />
-              </div>
+            <div key={`played-${index}`} className="played-card-wrapper">
+              <PlayerCard
+                locale={locale}
+                cardId={rawId}
+                cardType={cardType}
+                devMode={devMode}
+                className="played-card"
+              />
               {futureEntries.length > 0 ? (
                 <div className="card-future">
                   {futureEntries.map((entry, entryIndex) => {
@@ -693,7 +631,7 @@ export const FarmBoard = ({
                   })}
                 </div>
               ) : null}
-            </CardWithCopy>
+            </div>
           )
         })}
       </div>
@@ -714,63 +652,22 @@ export const FarmBoard = ({
                     ? canPayResources(displayPlayer, occupation.cost ?? {})
                     : false
                   const canInteract = canInteractHand && canPlay
-                  const costResources = occupation?.cost
-                    ? { ...emptyResources, ...occupation.cost }
-                    : {}
-                  const rewardResources = occupation?.reward
-                    ? { ...emptyResources, ...occupation.reward }
-                    : {}
                   return (
-                    <CardWithCopy
+                    <PlayerCard
                       key={`occupation-${cardId}`}
                       locale={locale}
                       cardId={cardId}
+                      cardType="occupation"
                       devMode={devMode}
                       onClick={() => {
                         if (isSelectingOccupation && canInteract) {
                           resolveChoice(cardId)
                         }
                       }}
-                      disabled={!canInteractHand}
-                      className={`hand-card hand-card-occupation${
-                        canInteract ? '' : ' disabled'
-                      }${
-                        isSelectingOccupation && canInteract ? ' selectable' : ''
-                      }`}
-                    >
-                      <div className="hand-title">
-                        {translateIfAvailable(
-                          `occupations.${cardId}.name`,
-                          occupation?.name ?? cardId,
-                        )}
-                      </div>
-                      <div className="hand-meta">
-                        {translateIfAvailable(
-                          `occupations.${cardId}.description`,
-                          occupation?.desc?.join(' ') ?? '',
-                        )}
-                      </div>
-                      <div className="hand-meta">
-                        <span className="hand-label">
-                          {t(locale, 'ui.handCostLabel')}
-                        </span>
-                        <ResourceLine
-                          locale={locale}
-                          resources={costResources}
-                          emptyLabel={t(locale, 'ui.noCost')}
-                        />
-                      </div>
-                      <div className="hand-meta">
-                        <span className="hand-label">
-                          {t(locale, 'ui.handEffectLabel')}
-                        </span>
-                        <ResourceLine
-                          locale={locale}
-                          resources={rewardResources}
-                          emptyLabel={t(locale, 'ui.noEffect')}
-                        />
-                      </div>
-                    </CardWithCopy>
+                      disabled={!canInteract}
+                      selectable={isSelectingOccupation && canInteract}
+                      className="hand-card hand-card-occupation"
+                    />
                   )
                 })
               )}
@@ -788,19 +685,14 @@ export const FarmBoard = ({
                     ? canPayResources(displayPlayer, improvement.cost ?? {})
                     : false
                   const canInteract = canInteractHand && canPlay
-                  const costResources = improvement?.cost
-                    ? { ...emptyResources, ...improvement.cost }
-                    : {}
-                  const rewardResources = improvement?.reward
-                    ? { ...emptyResources, ...improvement.reward }
-                    : {}
                   const canSelect =
                     (isSelectingMinor || isSelectingImprovementAny) && canInteract
                   return (
-                    <CardWithCopy
+                    <PlayerCard
                       key={`hand-${cardId}`}
                       locale={locale}
                       cardId={cardId}
+                      cardType="minor"
                       devMode={devMode}
                       onClick={() => {
                         if (canSelect) {
@@ -810,44 +702,10 @@ export const FarmBoard = ({
                           resolveChoice(value)
                         }
                       }}
-                      disabled={!canInteractHand}
-                      className={`hand-card hand-card-minor${
-                        canInteract ? '' : ' disabled'
-                      }${canSelect ? ' selectable' : ''}`}
-                    >
-                      <div className="hand-title">
-                        {translateIfAvailable(
-                          `minorImprovements.${cardId}.name`,
-                          improvement?.name ?? cardId,
-                        )}
-                      </div>
-                      <div className="hand-meta">
-                        {translateIfAvailable(
-                          `minorImprovements.${cardId}.description`,
-                          improvement?.desc?.join(' ') ?? '',
-                        )}
-                      </div>
-                      <div className="hand-meta">
-                        <span className="hand-label">
-                          {t(locale, 'ui.handCostLabel')}
-                        </span>
-                        <ResourceLine
-                          locale={locale}
-                          resources={costResources}
-                          emptyLabel={t(locale, 'ui.noCost')}
-                        />
-                      </div>
-                      <div className="hand-meta">
-                        <span className="hand-label">
-                          {t(locale, 'ui.handEffectLabel')}
-                        </span>
-                        <ResourceLine
-                          locale={locale}
-                          resources={rewardResources}
-                          emptyLabel={t(locale, 'ui.noEffect')}
-                        />
-                      </div>
-                    </CardWithCopy>
+                      disabled={!canInteract}
+                      selectable={canSelect}
+                      className="hand-card hand-card-minor"
+                    />
                   )
                 })
               )}

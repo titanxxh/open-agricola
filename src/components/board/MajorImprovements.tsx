@@ -6,7 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
 import { canPayResources } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
-import { CardWithCopy } from '../common/CardWithCopy'
+import { PlayerCard } from '../common/PlayerCard'
 
 type Props = {
   locale: Locale
@@ -44,38 +44,23 @@ export const MajorImprovements = ({
         const major = getMajorCardEffect(cardId)
         const canBuy = !!major && canPayResources(currentPlayer, major.cost)
         const canInteract = isInteractive && isSelectingMajor && canBuy
-        const costResources = major
-          ? { ...emptyResources, ...major.cost }
-          : {}
         const futureEntries = futureCardResources[cardId] ?? []
         return (
-          <CardWithCopy
-            key={`major-${cardId}`}
-            locale={locale}
-            cardId={cardId}
-            devMode={devMode}
-            onClick={() => {
-              if (canInteract) {
-                resolveChoice(`major:${cardId}`)
-              }
-            }}
-            disabled={!isInteractive}
-            className={`major-card${canBuy ? '' : ' disabled'}${
-              isSelectingMajor && canBuy ? ' selectable' : ''
-            }`}
-          >
-            <div className="hand-title">{t(locale, `improvements.${cardId}.name`)}</div>
-            <div className="hand-meta">
-              {t(locale, `improvements.${cardId}.description`)}
-            </div>
-            <div className="hand-meta">
-              <span className="hand-label">{t(locale, 'ui.handCostLabel')}</span>
-              <ResourceLine
-                locale={locale}
-                resources={costResources}
-                emptyLabel={t(locale, 'ui.noCost')}
-              />
-            </div>
+          <div key={`major-${cardId}`} className="major-card-wrapper">
+            <PlayerCard
+              locale={locale}
+              cardId={cardId}
+              cardType="major"
+              devMode={devMode}
+              onClick={() => {
+                if (canInteract) {
+                  resolveChoice(`major:${cardId}`)
+                }
+              }}
+              disabled={!canBuy}
+              selectable={isSelectingMajor && canBuy}
+              className={canBuy ? '' : 'disabled'}
+            />
             {futureEntries.length > 0 ? (
               <div className="card-future">
                 {futureEntries.map((entry, index) => {
@@ -101,7 +86,7 @@ export const MajorImprovements = ({
                 })}
               </div>
             ) : null}
-          </CardWithCopy>
+          </div>
         )
       })}
     </div>
