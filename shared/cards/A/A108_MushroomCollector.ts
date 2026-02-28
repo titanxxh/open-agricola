@@ -1,4 +1,34 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+
+const isWoodAccumulationSpace = (space: any): boolean => {
+  return (space.gainPerRound?.wood ?? 0) > 0
+}
+
+const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
+  id: 'A108-mushroom-collector-immediately-after',
+  phases: ['immediatelyAfter' as ActionHookPhase],
+  actions: ['collect'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const { space } = context
+    
+    if (!isWoodAccumulationSpace(space)) return
+    
+    return {
+      flow: {
+        type: 'seq',
+        optional: true,
+        children: [
+          { type: 'leaf', actionId: 'special-effect', optional: false },
+        ],
+      },
+    }
+  },
+}
+
+registerCardListener(mushroomCollectorImmediatelyAfterListener)
 
 export const A108_MushroomCollector = new Occupation({
   id: "A108_MushroomCollector",

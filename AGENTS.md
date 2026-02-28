@@ -39,8 +39,8 @@
 ### 3. 新增 Modifier 类型流程
 如果需要新增 modifier 类型（如新的效果类型），流程如下：
 1. 在 `shared/game/types.ts` 中新增类型定义
-2. 更新 `shared/actions/cards/types.ts` 的 CardDefinition
-3. 更新 `shared/actions/cards/card-modifiers.ts` 的查找函数
+2. 更新 `shared/cards/types.ts` 的 CardDefinition
+3. 更新 `shared/cards/card-modifiers.ts` 的查找函数
 4. 在对应的卡牌文件中使用新类型
 
 ### 4. 命名规范

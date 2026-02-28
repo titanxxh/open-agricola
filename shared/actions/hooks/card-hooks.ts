@@ -2,11 +2,27 @@ import { registerActionHook } from '../hooks'
 import { gainResources } from '../effects/gain'
 import { getRenovation } from '../effects/house'
 import { applyCostOverride, canPayResources } from '../effects/pay'
+import { trackWorkPhaseBuildingResources } from '../../logic/state'
+
+const BUILDING_RESOURCES_ACTION = ['gain', 'receive', 'collect', 'exchange'] as const
 
 const hasMinor = (ids: string[], id: string) => ids.includes(id)
 const hasOccupation = (ids: string[], id: string) => ids.includes(id)
 
 export const registerCardHooks = () => {
+  registerActionHook({
+    id: 'track-building-resources',
+    actions: [...BUILDING_RESOURCES_ACTION],
+    phases: ['immediatelyAfter'],
+    handler: ({ state, player, result }) => {
+      if (result?.type !== 'ok') return
+      if (!result.resourcesGained) return
+      // Only track for players who have A53_Claypipe
+      if (!player.minorPlayed.includes('A53_Claypipe')) return
+      trackWorkPhaseBuildingResources(state, player.id, result.resourcesGained)
+    },
+  })
+
   registerActionHook({
     id: 'minor-ash-trees',
     actions: ['fencing'],

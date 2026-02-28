@@ -13,7 +13,7 @@ import { FARM_COLS, FARM_ROWS, getAllTilePositions, positionKey } from '../../sh
 import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
 import { getBuildRoomCost } from '../../shared/actions/effects/house'
 import { stableWoodCost } from '../../shared/actions/effects/fencing'
-import { applyMajorEffectsToAllPlayers } from '../../shared/actions/cards/major'
+import { applyMajorEffectsToAllPlayers } from '../../shared/cards/major'
 import { useActionEngine } from '../hooks/useActionEngine'
 import { useGameState } from '../hooks/useGameState'
 import { useFarmSelection } from '../hooks/useFarmSelection'
@@ -1376,6 +1376,7 @@ export const GameContainer = () => {
     nextState.currentPlayerIndex = pendingNextPlayerIndex
     setViewPlayerId(nextState.players[nextState.currentPlayerIndex]?.id ?? '')
     setPendingNextPlayerIndex(null)
+    setHistory([])
     setActionStartSnapshot(null)
     if (nextState.players.every((player) => player.workersAvailable === 0)) {
       performRoundEnd(nextState)
@@ -3352,6 +3353,7 @@ export const GameContainer = () => {
         resolveChoice={resolveChoice}
         futureCardResources={futureCardResources}
         isInteractive={true}
+        devMode={devMode}
       />
       <main className="board">
         <ActionBoard

@@ -102,6 +102,7 @@ export type PlayerState = {
   majorEffects: MajorEffectState
   startPlayer: boolean
   activeModifiers: CostModifier[]
+  cardStates: CardStates
 }
 
 export type FarmTilePosition = {
@@ -121,6 +122,14 @@ export type Pasture = {
 export type MajorEffectState = {
   wellRounds: number
 }
+
+export type CardState = {
+  flagged?: boolean
+  counters?: Record<string, number>
+  extraData?: Record<string, unknown>
+}
+
+export type CardStates = Record<string, CardState>
 
 export type LogEntry = {
   key: string
@@ -157,6 +166,7 @@ export type GameState = {
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
+  workPhaseObtainedResources: Record<string, Partial<Resource>>
 }
 
 export type CanBeExecutedByPlayer = (
@@ -178,7 +188,7 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource> }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }

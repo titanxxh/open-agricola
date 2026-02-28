@@ -6,6 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
 import { canPayResources } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
+import { PlayerCard } from '../common/PlayerCard'
 
 type Props = {
   locale: Locale
@@ -23,6 +24,7 @@ type Props = {
       resources: Partial<Resource>
     }[]
   >
+  devMode: boolean
 }
 
 export const MajorImprovements = ({
@@ -33,6 +35,7 @@ export const MajorImprovements = ({
   isInteractive,
   resolveChoice,
   futureCardResources,
+  devMode,
 }: Props) => (
   <section className="major-improvements">
     <h2>{t(locale, 'ui.majorImprovements')}</h2>
@@ -41,36 +44,23 @@ export const MajorImprovements = ({
         const major = getMajorCardEffect(cardId)
         const canBuy = !!major && canPayResources(currentPlayer, major.cost)
         const canInteract = isInteractive && isSelectingMajor && canBuy
-        const costResources = major
-          ? { ...emptyResources, ...major.cost }
-          : {}
         const futureEntries = futureCardResources[cardId] ?? []
         return (
-          <button
-            key={`major-${cardId}`}
-            type="button"
-            className={`major-card${canBuy ? '' : ' disabled'}${
-              isSelectingMajor && canBuy ? ' selectable' : ''
-            }`}
-            onClick={() => {
-              if (canInteract) {
-                resolveChoice(`major:${cardId}`)
-              }
-            }}
-            disabled={!isInteractive}
-          >
-            <div className="hand-title">{t(locale, `improvements.${cardId}.name`)}</div>
-            <div className="hand-meta">
-              {t(locale, `improvements.${cardId}.description`)}
-            </div>
-            <div className="hand-meta">
-              <span className="hand-label">{t(locale, 'ui.handCostLabel')}</span>
-              <ResourceLine
-                locale={locale}
-                resources={costResources}
-                emptyLabel={t(locale, 'ui.noCost')}
-              />
-            </div>
+          <div key={`major-${cardId}`} className="major-card-wrapper">
+            <PlayerCard
+              locale={locale}
+              cardId={cardId}
+              cardType="major"
+              devMode={devMode}
+              onClick={() => {
+                if (canInteract) {
+                  resolveChoice(`major:${cardId}`)
+                }
+              }}
+              disabled={!canBuy}
+              selectable={isSelectingMajor && canBuy}
+              className={canBuy ? '' : 'disabled'}
+            />
             {futureEntries.length > 0 ? (
               <div className="card-future">
                 {futureEntries.map((entry, index) => {
@@ -96,7 +86,7 @@ export const MajorImprovements = ({
                 })}
               </div>
             ) : null}
-          </button>
+          </div>
         )
       })}
     </div>

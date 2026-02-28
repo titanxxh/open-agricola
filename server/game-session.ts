@@ -36,7 +36,7 @@ import {
   applyRoundGrowth,
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
-import { applyMajorEffectsToAllPlayers } from '../shared/actions/cards/major/index.ts'
+import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { computeScores } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
