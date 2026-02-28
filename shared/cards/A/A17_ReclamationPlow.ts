@@ -5,10 +5,20 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const ANIMAL_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
 
-const getAnimalCount = (player: any): number => {
-  return (player.houseAnimalCount ?? 0) + 
-    Object.values(player.stableAnimals ?? {}).filter((a: any) => a !== null).length +
-    Object.values(player.pastures ?? []).reduce((sum: number, p: any) => sum + (p.animalCount ?? 0), 0)
+type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+const getAnimalCountByType = (player: any): Record<AnimalType, number> => {
+  return {
+    sheep: (player.houseAnimalType === 'sheep' ? player.houseAnimalCount : 0) +
+      Object.values(player.stableAnimals ?? {}).filter((a: any) => a === 'sheep').length +
+      (player.pastures ?? []).reduce((sum: number, p: any) => sum + (p.animalType === 'sheep' ? p.animalCount : 0), 0),
+    boar: (player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0) +
+      Object.values(player.stableAnimals ?? {}).filter((a: any) => a === 'boar').length +
+      (player.pastures ?? []).reduce((sum: number, p: any) => sum + (p.animalType === 'boar' ? p.animalCount : 0), 0),
+    cattle: (player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0) +
+      Object.values(player.stableAnimals ?? {}).filter((a: any) => a === 'cattle').length +
+      (player.pastures ?? []).reduce((sum: number, p: any) => sum + (p.animalType === 'cattle' ? p.animalCount : 0), 0),
+  }
 }
 
 const reclamationPlowDuringListener: CardListenerRegistration = {
@@ -23,7 +33,7 @@ const reclamationPlowDuringListener: CardListenerRegistration = {
     const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
     if (cardState.flagged) return
     
-    const currentAnimals = getAnimalCount(player)
+    const currentAnimals = getAnimalCountByType(player)
     return {
       extraData: { animalsBeforeCollecting: currentAnimals },
     }
@@ -42,17 +52,37 @@ const reclamationPlowAfterListener: CardListenerRegistration = {
     const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
     if (cardState.flagged) return
     
-    const animalsBeforeCollecting = extraData?.['animalsBeforeCollecting'] as number | undefined
-    if (animalsBeforeCollecting === undefined) return
+    const animalsBeforeCollecting = extraData?.['animalsBeforeCollecting'] as Record<AnimalType, number> | undefined
+    if (!animalsBeforeCollecting) return
     
-    const obtainedAnimals = (context.result?.resourcesGained?.sheep ?? 0) +
-      (context.result?.resourcesGained?.boar ?? 0) +
-      (context.result?.resourcesGained?.cattle ?? 0)
+    const obtainedAnimals: Record<AnimalType, number> = {
+      sheep: context.result?.resourcesGained?.sheep ?? 0,
+      boar: context.result?.resourcesGained?.boar ?? 0,
+      cattle: context.result?.resourcesGained?.cattle ?? 0,
+    }
     
-    if (obtainedAnimals <= 0) return
+    const totalObtained = obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
+    if (totalObtained <= 0) return
     
-    const animalsAfterCollecting = getAnimalCount(player)
-    const canAccommodate = animalsAfterCollecting >= animalsBeforeCollecting + obtainedAnimals
+    const animalsAfterCollecting = getAnimalCountByType(player)
+    
+    let canAccommodate = true
+    let hasCooking = false
+    
+    for (const animalType of ['sheep', 'boar', 'cattle'] as AnimalType[]) {
+      const before = animalsBeforeCollecting[animalType]
+      const after = animalsAfterCollecting[animalType]
+      const obtained = obtainedAnimals[animalType]
+      
+      if (after < obtained) {
+        canAccommodate = false
+        break
+      }
+      
+      if (after < before + obtained) {
+        hasCooking = true
+      }
+    }
     
     if (!canAccommodate) return
     
