@@ -349,7 +349,18 @@ export class Engine {
           const resourceKey = key as keyof PlayerState['resources']
           if (value < 0) {
             // Negative cost = gain resource
-            context.player.resources[resourceKey] += Math.abs(value)
+            const gain = Math.abs(value)
+            context.player.resources[resourceKey] += gain
+            if (entry.sourceCard) {
+              this.log.append({
+                key: 'log.cardEffectGain',
+                params: {
+                  player: context.player.name,
+                  cardId: entry.sourceCard,
+                  gain: `${gain} ${resourceKey.toUpperCase()}`,
+                },
+              })
+            }
           }
         })
       })

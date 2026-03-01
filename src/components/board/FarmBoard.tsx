@@ -304,7 +304,7 @@ export const FarmBoard = ({
             : null
           const houseLabel =
             tileKey === houseLabelKey
-              ? houseDisplay.animalType
+              ? houseDisplay.animalCount > 0
                 ? `${houseDisplay.animalCount}${t(
                     locale,
                     `resources.${houseDisplay.animalType}`,
@@ -537,26 +537,20 @@ export const FarmBoard = ({
     {isReorgActive ? (
       <div className="reorg-panel">
         <div className="reorg-panel-title">{t(locale, 'ui.reorgPendingTitle')}</div>
-        {displayPlayer.pastures.length === 0 ? (
-          <div className="reorg-panel-empty">
-            {t(locale, 'ui.interactionReorgAnimalsNoPasture')}
+        <div className="reorg-panel-summary">
+          <div className="reorg-panel-row">
+            <span>{t(locale, 'ui.reorgPending')}</span>
+            <span>
+              {formatAnimalCounts(
+                locale,
+                reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+              )}
+            </span>
           </div>
-        ) : (
-          <div className="reorg-panel-summary">
-            <div className="reorg-panel-row">
-              <span>{t(locale, 'ui.reorgPending')}</span>
-              <span>
-                {formatAnimalCounts(
-                  locale,
-                  reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
-                )}
-              </span>
-            </div>
-            {hasReorgOverflow ? (
-              <div className="reorg-error">{t(locale, 'ui.reorgOverAssign')}</div>
-            ) : null}
-          </div>
-        )}
+          {hasReorgOverflow ? (
+            <div className="reorg-error">{t(locale, 'ui.reorgOverAssign')}</div>
+          ) : null}
+        </div>
         {animalReorg?.confirmDiscard ? (
           <div className="reorg-warning">
             <div>

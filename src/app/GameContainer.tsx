@@ -2702,11 +2702,18 @@ export const GameContainer = () => {
     animalType: 'sheep' | 'boar' | 'cattle',
     delta: number,
   ) => {
-    if (!reorgAvailable) return
+    console.log('[adjustReorgAnimal] called with:', { zoneId, animalType, delta, reorgAvailable })
+    if (!reorgAvailable) {
+      console.log('[adjustReorgAnimal] early return: no reorgAvailable')
+      return
+    }
     setAnimalReorg((prev) => {
+      console.log('[adjustReorgAnimal] inside setAnimalReorg, prev:', prev)
       if (!prev) return prev
       const capacity = reorgZoneMap.get(zoneId)?.capacity ?? 0
+      console.log('[adjustReorgAnimal] capacity:', capacity, 'reorgZoneMap:', Array.from(reorgZoneMap.entries()))
       const current = prev.zones.find((zone) => zone.id === zoneId)
+      console.log('[adjustReorgAnimal] current zone:', current)
       if (!current) return prev
       const totals = prev.zones.reduce(
         (acc, zone) => {
@@ -2716,17 +2723,23 @@ export const GameContainer = () => {
         },
         { sheep: 0, boar: 0, cattle: 0 },
       )
+      console.log('[adjustReorgAnimal] totals:', totals)
       if (delta > 0) {
         const baseTotals = { ...totals }
         if (current.animalType) {
           baseTotals[current.animalType] -= current.animalCount
         }
         const remaining = reorgAvailable[animalType] - baseTotals[animalType]
-        if (remaining <= 0) return prev
+        console.log('[adjustReorgAnimal] baseTotals:', baseTotals, 'remaining:', remaining)
+        if (remaining <= 0) {
+          console.log('[adjustReorgAnimal] early return: remaining <= 0')
+          return prev
+        }
         const nextCount =
           current.animalType === animalType
             ? Math.min(capacity, current.animalCount + 1)
             : Math.min(capacity, 1)
+        console.log('[adjustReorgAnimal] nextCount:', nextCount)
         if (nextCount <= 0) return prev
         const zones = prev.zones.map((zone) => {
           if (zone.id !== zoneId) return zone
@@ -2736,6 +2749,7 @@ export const GameContainer = () => {
             animalCount: nextCount,
           }
         })
+        console.log('[adjustReorgAnimal] returning new state with zones:', zones)
         return { ...prev, zones, confirmDiscard: false }
       }
       if (current.animalType !== animalType || current.animalCount <= 0) {

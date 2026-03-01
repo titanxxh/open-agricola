@@ -373,6 +373,17 @@ export class GameSession {
     }
   }
 
+  private flushEngineLog() {
+    const entries = this.engineLog.all()
+    if (entries.length > 0) {
+      const toAdd = entries.filter((e) => e.key !== 'log.action')
+      for (let i = toAdd.length - 1; i >= 0; i--) {
+        this.state.log.unshift(toAdd[i])
+      }
+      this.engineLog.clear()
+    }
+  }
+
   private finalizeActionLog(player: PlayerState) {
     const before = this.actionStartPlayerSnapshot
     if (before) {
@@ -399,6 +410,7 @@ export class GameSession {
     while (true) {
       const before = this.clonePlayer(player)
       const step = this.engine.proceed({ state: this.state, player, space })
+      this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
         this.engine = null
@@ -412,6 +424,7 @@ export class GameSession {
         if (step.choice.options.length === 1) {
           const auto = step.choice.options[0]
           const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+          this.flushEngineLog()
           const isBakeChoice =
             step.choice.promptKey === 'ui.interactionBakeBreadChoice' ||
             step.choice.promptKey === 'ui.interactionBakeBreadCount'
@@ -537,6 +550,7 @@ export class GameSession {
       this.usedBakeBreadThisAction = true
     }
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
+    this.flushEngineLog()
     this.logImprovementDelta(before, player)
     if (isBakeChoice) {
       this.logBakeBreadDelta(before, player)

@@ -569,6 +569,7 @@ export const zh = {
     effectMinorImprovement: '小改良：{improvements}',
     effectStartPlayer: '成为起始玩家',
     effectBakeBread: '烤面包：{count} 谷物 → {food} 食物',
+    cardEffectGain: '{player} 通过 {cardId} 获得了 {gain}',
     wellFood: '{player} 从水井获得 1 食物',
     playImprovement: '{player} 打出改良：{improvements}',
     playMinorImprovement: '{player} 打出小改良：{improvements}',

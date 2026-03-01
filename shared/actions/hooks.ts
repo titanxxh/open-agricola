@@ -42,6 +42,7 @@ export type ActionHookResult = {
   followUpActions?: string[]
   flow?: ActionFlow
   costs?: Partial<Resource>
+  sourceCard?: string
 }
 
 export type ActionHookHandler = (
