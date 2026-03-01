@@ -45,91 +45,91 @@
 以下卡牌在 Hook 覆盖矩阵中被选为代表性示例（无重复）：
 
 ### Before Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| B75_WoodWorkshop | Improvement | 打改良前获得木材 |
-| A65_SeedPellets | Sow | 播种前获得谷物 |
-| D14_HammerCrusher | Renovation | 翻新前获得资源 |
-| E74_AshTrees | Fencing | 围栏前获得资源 |
-| B67_HandTruck | Exchange | 交易前获得谷物 |
-| E101_Blighter | Occupation | 打职业前效果 |
-| B34_SpecialFood | SpecialEffect | 特殊效果前 |
-| A166_Haydryer | Harvest | 收获前效果 |
-| C133_Soldier | EndOfGame | 游戏结束时 |
-| B70_NewPurchase | StartOfTurn | 回合开始时 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| B75_WoodWorkshop | Improvement | 打改良前获得木材 | 🔧 |
+| A65_SeedPellets | Sow | 播种前获得谷物 | 🔧 |
+| D14_HammerCrusher | Renovation | 翻新前获得资源 | 🔧 |
+| E74_AshTrees | Fencing | 围栏前获得资源 | 🔧 |
+| B67_HandTruck | Exchange | 交易前获得谷物 | 🔧 |
+| E101_Blighter | Occupation | 打职业前效果 | ❌ |
+| B34_SpecialFood | SpecialEffect | 特殊效果前 | 🔧 |
+| A166_Haydryer | Harvest | 收获前效果 | ❌ |
+| C133_Soldier | EndOfGame | 游戏结束时 | 🔧 |
+| B70_NewPurchase | StartOfTurn | 回合开始时 | ❌ |
 
 ### During Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| A126_MasterWorkman | PlaceFarmer | 放置农夫时获得资源 |
-| E53_BoarSpear | Collect | 收取时交换资源 |
-| A55_JunkRoom | Improvement | 打改良时获得食物 |
-| E33_BeaverColony | Gain | 获得资源时 |
-| C52_HuntsmansHat | PlaceFarmer | 替换放置农夫 |
-| C120_AgriculturalLabourer | Receive | 接收资源时 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| A126_MasterWorkman | PlaceFarmer | 放置农夫时获得资源 | ✅ |
+| E53_BoarSpear | Collect | 收取时交换资源 | ✅ |
+| A55_JunkRoom | Improvement | 打改良时获得食物 | 🔧 |
+| E33_BeaverColony | Gain | 获得资源时 | 🔧 |
+| C52_HuntsmansHat | PlaceFarmer | 替换放置农夫 | ✅ |
+| C120_AgriculturalLabourer | Receive | 接收资源时 | 🔧 |
 
 ### ImmediatelyAfter Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| C25_SteamMachine | PlaceFarmer | 放置后立即烤面包 |
-| A108_MushroomCollector | Collect | 收取后立即交换 |
-| C96_Merchant | Improvement | 打改良后可再行动 |
-| A83_ShepherdsCrook | Fencing | 围栏后放置农夫 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| C25_SteamMachine | PlaceFarmer | 放置后立即烤面包 | ✅ |
+| A108_MushroomCollector | Collect | 收取后立即交换 | ✅ |
+| C96_Merchant | Improvement | 打改良后可再行动 | 🔧 |
+| A83_ShepherdsCrook | Fencing | 围栏后放置农夫 | 🔧 |
 
 ### After Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| C75_Firewood | Improvement | 打改良后获得木材 |
-| A17_ReclamationPlow | Collect | 收取后获得动物 |
-| A53_Claypipe | Gain/Receive | 获得/接收后交换 |
-| A110_Roughcaster | Construct/Renovation | 建造/翻新后 |
-| A105_BarrowPusher | Plow | 犁地后 |
-| A109_SmallTrader | Improvement | 打改良后 |
-| A79_GardenHoe | Sow | 播种后 |
-| A74_StableTree | Stables | 建马厩后 |
-| A37_Bucksaw | Renovation | 翻新后 |
-| A144_Sequestrator | Fencing | 围栏后 |
-| D150_GodlySpouse | WishChildren | 生孩子后 |
-| B65_GrainDepot | Pay | 支付后 |
-| C71_SlurrySpreader | Reorganize | 重组后 |
-| B100_Clutterer | Occupation | 打职业后 |
-| A64_BarleyMill | Reap | 收割后 |
-| D99_EarthenwarePotter | Harvest | 收获后 |
-| E128_Saddler | Receive | 接收后 |
-| E57_CheeseFondue | Exchange | 交易后 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| C75_Firewood | Improvement | 打改良后获得木材 | ✅ |
+| A17_ReclamationPlow | Collect | 收取后获得动物 | ✅ |
+| A53_Claypipe | Gain/Receive | 获得/接收后交换 | ✅ |
+| A110_Roughcaster | Construct/Renovation | 建造/翻新后 | 🔧 |
+| A105_BarrowPusher | Plow | 犁地后 | 🔧 |
+| A109_SmallTrader | Improvement | 打改良后 | 🔧 |
+| A79_GardenHoe | Sow | 播种后 | 🔧 |
+| A74_StableTree | Stables | 建马厩后 | 🔧 |
+| A37_Bucksaw | Renovation | 翻新后 | 🔧 |
+| A144_Sequestrator | Fencing | 围栏后 | 🔧 |
+| D150_GodlySpouse | WishChildren | 生孩子后 | 🔧 |
+| B65_GrainDepot | Pay | 支付后 | 🔧 |
+| C71_SlurrySpreader | Reorganize | 重组后 | 🔧 |
+| B100_Clutterer | Occupation | 打职业后 | 🔧 |
+| A64_BarleyMill | Reap | 收割后 | 🔧 |
+| D99_EarthenwarePotter | Harvest | 收获后 | ❌ |
+| E128_Saddler | Receive | 接收后 | ❌ |
+| E57_CheeseFondue | Exchange | 交易后 | ❌ |
 
 ### ComputeCosts Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| A128_RiparianBuilder | Construct | 建造成本折扣 |
-| C37_DwellingMound | Plow | 犁地成本折扣 |
-| C88_CarpentersApprentice | Construct | 建造成本转换 |
-| A123_FrameBuilder | Renovation/Construct | 翻新/建造成本 |
-| A88_HedgeKeeper | Fencing | 围栏成本折扣 |
-| A28_ForestSchool | Occupation | 职业成本折扣 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| A128_RiparianBuilder | Construct | 建造成本折扣 | 🔧 |
+| C37_DwellingMound | Plow | 犁地成本折扣 | 🔧 |
+| C88_CarpentersApprentice | Construct | 建造成本转换 | 🔧 |
+| A123_FrameBuilder | Renovation/Construct | 翻新/建造成本 | 🔧 |
+| A88_HedgeKeeper | Fencing | 围栏成本折扣 | 🔧 |
+| A28_ForestSchool | Occupation | 职业成本折扣 | 🔧 |
 
 ### ComputeArgs Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| E21_SheepRug | PlaceFarmer | 修改放置参数 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| E21_SheepRug | PlaceFarmer | 修改放置参数 | ✅ |
 
 ### ComputeReplace Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| B103_FieldMerchant | Improvement | 替换改良行动 |
-| A94_LazySowman | Sow | 替换播种行动 |
-| A97_Freshman | Exchange | 替换交易行动 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| B103_FieldMerchant | Improvement | 替换改良行动 | 🔧 |
+| A94_LazySowman | Sow | 替换播种行动 | 🔧 |
+| A97_Freshman | Exchange | 替换交易行动 | 🔧 |
 
 ### IsDoable Hook
-| 卡牌 | 行动 | 说明 |
-|------|------|------|
-| D49_Bookshelf | Improvement | 放宽改良条件 |
-| C60_SmallPottersOven | Sow | 放宽播种条件 |
-| D152_Patron | Occupation | 放宽职业条件 |
-| B94_StockProtector | Fencing | 放宽围栏条件 |
-| E130_Overachiever | WishChildren | 放宽生孩子条件 |
-| D119_WoodBarterer | Exchange | 放宽交易条件 |
-| B109_PaperMaker | Occupation | 放宽职业条件 |
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| D49_Bookshelf | Improvement | 放宽改良条件 | ❌ |
+| C60_SmallPottersOven | Sow | 放宽播种条件 | ❌ |
+| D152_Patron | Occupation | 放宽职业条件 | ❌ |
+| B94_StockProtector | Fencing | 放宽围栏条件 | 🔧 |
+| E130_Overachiever | WishChildren | 放宽生孩子条件 | 🔧 |
+| D119_WoodBarterer | Exchange | 放宽交易条件 | ❌ |
+| B109_PaperMaker | Occupation | 放宽职业条件 | 🔧 |
 
 ---
 
@@ -313,7 +313,7 @@
 
 ---
 
-## E Deck 已实现卡牌 (41/168)
+## E Deck 已实现卡牌 (42/168)
 
 | ID | Hook 覆盖 |
 |----|-----------|
@@ -321,6 +321,7 @@
 | E5_NightLoot | - |
 | E10_StrawHat | - |
 | E16_BriarHedge | - |
+| E21_SheepRug | ComputeArgs(PlaceFarmer) |
 | E22_GuestRoom | - |
 | E27_PiggyBank | - |
 | E30_ChildsToy | - |
