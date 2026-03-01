@@ -5,6 +5,7 @@ export const stoneOven: MajorCardEffect = {
   cost: { clay: 1, stone: 3 },
   vp: 3,
   extraVp: false,
+  isBaking: true,
   description: [
     '[__Bake Bread__ action:]',
     '<GRAIN> → 4<FOOD> (max 2)',

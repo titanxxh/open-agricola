@@ -21,7 +21,8 @@ import {
 // ============================================================
 class LRUCache<K, V> {
   private cache = new Map<K, V>()
-  constructor(private maxSize: number) {}
+  private maxSize: number;
+  constructor(maxSize: number) { this.maxSize = maxSize }
   get(key: K): V | undefined {
     if (!this.cache.has(key)) return undefined
     const value = this.cache.get(key)!
@@ -34,7 +35,7 @@ class LRUCache<K, V> {
       this.cache.delete(key)
     } else if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value
-      this.cache.delete(firstKey)
+      if (firstKey !== undefined) this.cache.delete(firstKey)
     }
     this.cache.set(key, value)
   }
@@ -250,12 +251,12 @@ const canCoverCost = (
   return keys.every((key) => (resources[key] ?? 0) >= (cost[key] ?? 0))
 }
 
-const applyTradeModifier = (
+export const applyTradeModifier = (
   baseTrades: Trade[],
   modifier: TradeModifier,
 ): Trade[] => {
   const modifiedTrades: Trade[] = []
-  const sources = modifier.source ?? modifier.cardId
+  const sources = modifier.cardId
 
   for (const baseTrade of baseTrades) {
     modifiedTrades.push({ ...baseTrade })
@@ -273,7 +274,7 @@ const applyTradeModifier = (
   return modifiedTrades
 }
 
-const applyBonusModifier = (
+export const applyBonusModifier = (
   baseBonuses: Bonus[],
   modifier: BonusModifier,
 ): Bonus[] => {

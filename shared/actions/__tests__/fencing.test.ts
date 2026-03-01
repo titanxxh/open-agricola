@@ -40,7 +40,7 @@ const createPlayer = (): PlayerState => ({
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
-  startPlayer: false,
+  startPlayer: false, activeModifiers: [], cardStates: {},
 })
 
 describe('fencing pasture', () => {

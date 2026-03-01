@@ -43,7 +43,7 @@ const createPlayer = (wood: number): PlayerState => ({
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
-  startPlayer: false,
+  startPlayer: false, activeModifiers: [], cardStates: {},
 })
 
 describe('stables', () => {

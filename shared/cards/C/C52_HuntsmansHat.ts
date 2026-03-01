@@ -23,7 +23,7 @@ const huntsmansHatListener: CardListenerRegistration = {
     
     if (actionId === 'pig-market') {
       const pigMarketSpace = state.actionSpaces.find(s => s.id === 'pig-market')
-      const pigsAvailable = pigMarketSpace?.resources.boar ?? 0
+      const _pigsAvailable = pigMarketSpace?.resources.boar ?? 0
       return {
         flow: {
           type: 'seq',

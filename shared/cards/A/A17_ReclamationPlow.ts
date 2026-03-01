@@ -40,7 +40,7 @@ const reclamationPlowDuringListener: CardListenerRegistration = {
     
     const currentAnimals = getAnimalCountByType(player)
     return {
-      extraData: { animalsBeforeCollecting: currentAnimals },
+      extraData_IGNORED: { animalsBeforeCollecting: currentAnimals },
     }
   },
 }

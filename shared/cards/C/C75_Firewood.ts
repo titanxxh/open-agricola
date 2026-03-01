@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
-const OVEN_IMPROVEMENTS = [
+const _OVEN_IMPROVEMENTS = [
   'Major_Fireplace1',
   'Major_Fireplace2', 
   'Major_CookingHearth1',

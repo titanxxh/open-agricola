@@ -8,6 +8,8 @@ export type MajorCardEffect = CardEffect & {
   vp: number
   extraVp: boolean
   description: string[]
+  isCookery?: boolean
+  isBaking?: boolean
   returnCards?: string[]
   scoring?: {
     resource: keyof Resource

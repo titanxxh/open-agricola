@@ -604,7 +604,6 @@ export const FarmBoard = ({
                 cardId={rawId}
                 cardType={cardType}
                 devMode={devMode}
-                className="played-card"
               />
               {futureEntries.length > 0 ? (
                 <div className="card-future">
@@ -666,7 +665,6 @@ export const FarmBoard = ({
                       }}
                       disabled={!canInteract}
                       selectable={isSelectingOccupation && canInteract}
-                      className="hand-card hand-card-occupation"
                     />
                   )
                 })
@@ -704,7 +702,6 @@ export const FarmBoard = ({
                       }}
                       disabled={!canInteract}
                       selectable={canSelect}
-                      className="hand-card hand-card-minor"
                     />
                   )
                 })

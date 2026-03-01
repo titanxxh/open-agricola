@@ -5,6 +5,7 @@
 
 ## 变更约定
 - 新增卡牌功能需要有UT和集成测试。
+- 修改和前端显示有关的功能后，一定需要通过playwright截图，查看界面是否符合预期，验证的截图文件保存在output目录。
 - 每次修改代码后，自动运行单元测试（npm test）。
 - 每次修改代码后，自动重启前端与后端服务。
 - 每次修改代码后，更新文档：docs/IMPLEMENTATION_STATUS.md docs/ENGINE_ARCHITECTURE.md docs/cards_impl.md

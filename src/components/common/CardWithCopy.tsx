@@ -58,7 +58,7 @@ export const CardWithCopy = ({ locale, cardId, children, className = '', onClick
 
   return (
     <div
-      className={`card-with-copy ${className}`}
+      className={`card-with-copy dev-mode ${className}`}
       onMouseEnter={() => setShowCopy(true)}
       onMouseLeave={() => {
         setShowCopy(false)

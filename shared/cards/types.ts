@@ -14,7 +14,10 @@ export type CardDefinition = {
   desc: string[]
   cost?: Partial<Resource>
   reward?: Partial<Resource>
+  vp?: number
   prerequisite?: string
+  isCookery?: boolean
+  isBaking?: boolean
   occupationPrerequisites?: CardPrerequisites
   improvementPrerequisites?: CardPrerequisites
   players?: string
@@ -32,7 +35,10 @@ export class CardBase {
   desc!: string[]
   cost?: Partial<Resource>
   reward?: Partial<Resource>
+  vp?: number
   prerequisite?: string
+  isCookery?: boolean
+  isBaking?: boolean
   occupationPrerequisites?: CardPrerequisites
   improvementPrerequisites?: CardPrerequisites
   players?: string

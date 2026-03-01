@@ -49,16 +49,16 @@ const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   return positions[cardId] || { x: '0%', y: '0%' }
 }
 
-const formatCost = (cost: Partial<Resource>): string => {
-  const parts: string[] = []
-  if (cost.wood) parts.push(`${cost.wood}W`)
-  if (cost.clay) parts.push(`${cost.clay}C`)
-  if (cost.reed) parts.push(`${cost.reed}R`)
-  if (cost.stone) parts.push(`${cost.stone}S`)
-  if (cost.grain) parts.push(`${cost.grain}G`)
-  if (cost.vegetable) parts.push(`${cost.vegetable}V`)
-  if (cost.food) parts.push(`${cost.food}F`)
-  return parts.join(' ') || '-'
+const renderCost = (cost: Partial<Resource>, locale: Locale) => {
+  const parts = []
+  if (cost.wood) parts.push(<div key="wood" className="card-cost-item">{cost.wood} <span className="card-res-icon wood" title={t(locale, 'resources.wood')}/></div>)
+  if (cost.clay) parts.push(<div key="clay" className="card-cost-item">{cost.clay} <span className="card-res-icon clay" title={t(locale, 'resources.clay')}/></div>)
+  if (cost.reed) parts.push(<div key="reed" className="card-cost-item">{cost.reed} <span className="card-res-icon reed" title={t(locale, 'resources.reed')}/></div>)
+  if (cost.stone) parts.push(<div key="stone" className="card-cost-item">{cost.stone} <span className="card-res-icon stone" title={t(locale, 'resources.stone')}/></div>)
+  if (cost.grain) parts.push(<div key="grain" className="card-cost-item">{cost.grain} <span className="card-res-icon grain" title={t(locale, 'resources.grain')}/></div>)
+  if (cost.vegetable) parts.push(<div key="vegetable" className="card-cost-item">{cost.vegetable} <span className="card-res-icon vegetable" title={t(locale, 'resources.vegetable')}/></div>)
+  if (cost.food) parts.push(<div key="food" className="card-cost-item">{cost.food} <span className="card-res-icon food" title={t(locale, 'resources.food')}/></div>)
+  return parts.length > 0 ? <div className="card-cost-text">{parts}</div> : null
 }
 
 export const PlayerCard = ({
@@ -82,6 +82,8 @@ export const PlayerCard = ({
             description: major.description.join(' '),
             cost: { ...emptyResources, ...major.cost },
             vp: major.vp,
+            isCookery: major.isCookery,
+            isBaking: major.isBaking,
           }
         : null
     } else if (cardType === 'minor') {
@@ -93,6 +95,11 @@ export const PlayerCard = ({
             cost: { ...emptyResources, ...minor.cost },
             deck: minor.deck,
             category: minor.category,
+            vp: minor.vp,
+            prerequisite: minor.prerequisite,
+            players: minor.players,
+            isCookery: minor.isCookery,
+            isBaking: minor.isBaking,
           }
         : null
     } else {
@@ -104,6 +111,10 @@ export const PlayerCard = ({
             cost: { ...emptyResources, ...occupation.cost },
             deck: occupation.deck,
             category: occupation.category,
+            prerequisite: occupation.prerequisite,
+            players: occupation.players,
+            isCookery: occupation.isCookery,
+            isBaking: occupation.isBaking,
           }
         : null
     }
@@ -146,6 +157,8 @@ export const PlayerCard = ({
     .filter(Boolean)
     .join(' ')
 
+  const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => v && v > 0)
+
   return (
     <CardWithCopy
       locale={locale}
@@ -155,23 +168,56 @@ export const PlayerCard = ({
       disabled={disabled}
       className={classes}
     >
-      <div className="player-card-inner" data-id={cardId} data-numbering={numbering}>
+      <div 
+        className="player-card-inner" 
+        data-id={cardId} 
+        data-numbering={numbering}
+        data-cook={cardData.isCookery ? 'true' : undefined}
+        data-bread={cardData.isBaking ? 'true' : undefined}
+      >
         <div className="card-frame" />
         <div className="card-icon" style={iconStyle} />
+        
+        {'prerequisite' in cardData && cardData.prerequisite && (
+          <div className="card-prerequisite">
+            <div className="prerequisite-text">{cardData.prerequisite}</div>
+          </div>
+        )}
+
         <div className="card-title">{cardData.name}</div>
-        {cardType === 'major' && 'vp' in cardData && (
+        
+        {'vp' in cardData && cardData.vp !== undefined && cardData.vp > 0 && (
           <div className="card-score">{cardData.vp}</div>
         )}
+
+        {'players' in cardData && cardData.players && (
+          <div className="card-players" data-n={cardData.players} />
+        )}
+
         {deck && cardType !== 'major' && (
           <div className="card-deck" data-deck={deck} />
         )}
-        <div className="card-cost">{formatCost(cardData.cost)}</div>
-        {cardType === 'major' && (
-          <div className="card-numbering">{numbering}</div>
+        
+        {'category' in cardData && cardData.category && (
+          <div className="card-category" data-category={cardData.category} />
         )}
+        
+        {hasCost && (
+          <div className="card-cost">
+            {renderCost(cardData.cost, locale)}
+          </div>
+        )}
+
+        <div className="card-numbering">{numbering}</div>
+
         <div className="card-desc">
-          <div className="card-desc-scroller">{cardData.description}</div>
+          <div className="card-desc-scroller">
+            <div>{cardData.description}</div>
+          </div>
         </div>
+
+        {cardData.isCookery && <div className="card-bottom-left-corner" />}
+        {cardData.isBaking && <div className="card-bottom-right-corner" />}
       </div>
     </CardWithCopy>
   )
