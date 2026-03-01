@@ -100,6 +100,7 @@ export const PlayerCard = ({
             players: minor.players,
             isCookery: minor.isCookery,
             isBaking: minor.isBaking,
+            passing: minor.passing,
           }
         : null
     } else {
@@ -176,6 +177,12 @@ export const PlayerCard = ({
         data-bread={cardData.isBaking ? 'true' : undefined}
       >
         <div className="card-frame" />
+        {cardType === 'minor' && !('passing' in cardData && cardData.passing) && (
+          <>
+            <div className="card-frame-left-leaves" />
+            <div className="card-frame-right-leaves" />
+          </>
+        )}
         <div className="card-icon" style={iconStyle} />
         
         {'prerequisite' in cardData && cardData.prerequisite && (

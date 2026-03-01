@@ -109,6 +109,28 @@
   background-position: center;
 }
 
+/* Leaves overlay for minor cards to hide passing arrows */
+.card-frame-left-leaves,
+.card-frame-right-leaves {
+  position: absolute;
+  top: 112px;
+  width: 53px;
+  height: 40px;
+  background-size: 100% 100%;
+}
+.player-card.minor .card-frame-left-leaves {
+  background-position: 73.2741% 14.9254%;
+  background-size: 1505.88%;
+  background-image: url('/bga-img/meeples.png');
+  left: 1px;
+}
+.player-card.minor .card-frame-right-leaves {
+  background-position: 80.91% 14.91%;
+  background-size: 1505.88%;
+  background-image: url('/bga-img/meeples.png');
+  right: 1px;
+}
+
 /* Major improvement icon */
 .player-card.major .card-icon {
   width: 152.75px;
