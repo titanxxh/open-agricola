@@ -499,7 +499,8 @@ const server = createServer(async (req, res) => {
 
 createWsServer(server)
 
-server.listen(5175, () => {
-  console.log('Server listening on http://localhost:5175')
-  console.log('WebSocket available at ws://localhost:5175/ws')
+const PORT = Number(process.env.BACKEND_PORT) || 5175
+server.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`)
+  console.log(`WebSocket available at ws://localhost:${PORT}/ws`)
 })

@@ -1,6 +1,6 @@
 import type { FarmTilePosition, GameState, Resource } from '../../shared/game/types'
 
-const apiBase = 'http://localhost:5175'
+const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:5175'
 
 export const fetchState = async () => {
   const response = await fetch(`${apiBase}/api/state`)
