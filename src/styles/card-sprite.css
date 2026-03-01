@@ -241,32 +241,36 @@
 /* Card deck indicator */
 .card-deck {
   position: absolute;
-  top: 160.975px;
-  width: 35.25px;
-  height: 35.25px;
+  top: 158.625px;
+  width: 35.8375px;
+  height: 35.8375px;
   right: 4.5%;
-  background-size: contain;
-  background-repeat: no-repeat;
+  background-image: url('/bga-img/meeples.png');
 }
 
 .card-deck[data-deck="A"] {
-  background-image: url('/bga-img/deckA/deckA.png');
+  background-position: 59.7624% 14.9793%;
+  background-size: 1828.57%;
 }
 
 .card-deck[data-deck="B"] {
-  background-image: url('/bga-img/deckB/deckB.png');
+  background-position: 66.064% 14.9793%;
+  background-size: 1828.57%;
 }
 
 .card-deck[data-deck="C"] {
   background-image: url('/bga-img/deckC/deckC.png');
+  background-size: contain;
 }
 
 .card-deck[data-deck="D"] {
   background-image: url('/bga-img/deckD/deckD.png');
+  background-size: contain;
 }
 
 .card-deck[data-deck="E"] {
   background-image: url('/bga-img/deckE/deckE.png');
+  background-size: contain;
 }
 
 /* Card category icon */
