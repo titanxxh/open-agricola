@@ -285,14 +285,14 @@
   left: 73%;
 }
 
-.card-category[data-category="BoosterCategory"] { background-position-x: 0%; }
-.card-category[data-category="LivestockCategory"] { background-position-x: 14.28%; }
-.card-category[data-category="ResourceCategory"] { background-position-x: 28.57%; }
-.card-category[data-category="FarmCategory"] { background-position-x: 42.85%; }
-.card-category[data-category="CropCategory"] { background-position-x: 57.14%; }
-.card-category[data-category="FoodCategory"] { background-position-x: 71.42%; }
-.card-category[data-category="GoodsCategory"] { background-position-x: 85.71%; }
-.card-category[data-category="PointsCategory"] { background-position-x: 100%; }
+.card-category[data-category="ACTIONS_BOOSTER"] { background-position-x: 0%; }
+.card-category[data-category="LIVESTOCK_PROVIDER"] { background-position-x: 14.28%; }
+.card-category[data-category="BUILDING_RESOURCE_PROVIDER"] { background-position-x: 28.57%; }
+.card-category[data-category="FARM_PLANNER"] { background-position-x: 42.85%; }
+.card-category[data-category="CROP_PROVIDER"] { background-position-x: 57.14%; }
+.card-category[data-category="FOOD_PROVIDER"], .card-category[data-category="FOOD"] { background-position-x: 71.42%; }
+.card-category[data-category="GOODS_PROVIDER"] { background-position-x: 85.71%; }
+.card-category[data-category="POINTS_PROVIDER"] { background-position-x: 100%; }
 
 /* Card cost area */
 .card-cost {
