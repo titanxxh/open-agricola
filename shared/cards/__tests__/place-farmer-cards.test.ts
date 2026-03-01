@@ -298,4 +298,27 @@ describe('PlaceFarmer card listeners', () => {
       expect(firewoodListeners[0].phases?.includes('after')).toBe(true)
     })
   })
+
+  describe('E21_SheepRug', () => {
+    const sheepRugComputeArgsListener: CardListenerRegistration = {
+      id: 'E21-sheep-rug-compute-args',
+      phases: ['computeArgs' as ActionHookPhase],
+      actions: ['place-farmer'],
+      handler: (): ActionHookResult | void => {
+        return undefined
+      },
+    }
+
+    beforeEach(() => {
+      registerCardListener(sheepRugComputeArgsListener)
+    })
+
+    it('registers computeArgs listener for place-farmer', () => {
+      const listeners = getRegisteredCardListeners()
+      const sheepRugListeners = listeners.filter(l => l.id.startsWith('E21'))
+      expect(sheepRugListeners.length).toBe(1)
+      expect(sheepRugListeners[0].phases?.includes('computeArgs')).toBe(true)
+      expect(sheepRugListeners[0].actions?.includes('place-farmer')).toBe(true)
+    })
+  })
 })

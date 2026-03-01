@@ -188,6 +188,7 @@ import { D7_Trident } from './D/D7_Trident'
 import { D8_FernSeeds } from './D/D8_FernSeeds'
 import { D9_GameTrade } from './D/D9_GameTrade'
 import { E10_StrawHat } from './E/E10_StrawHat'
+import { E21_SheepRug } from './E/E21_SheepRug'
 import { E103_Wolf } from './E/E103_Wolf'
 import { E109_BraidMaker } from './E/E109_BraidMaker'
 import { E112_GrainThief } from './E/E112_GrainThief'
@@ -363,7 +364,8 @@ export const minorImprovementCards = [
   D7_Trident,
   D8_FernSeeds,
   D9_GameTrade,
-  E10_StrawHat,
+ E10_StrawHat,
+  E21_SheepRug,
   E16_BriarHedge,
   E22_GuestRoom,
   E27_PiggyBank,
