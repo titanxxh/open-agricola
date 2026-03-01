@@ -9,4 +9,5 @@ export const B6_ExcursiontotheQuarry = new MinorImprovement({
   desc: ["Immediately take 1 <STONE> from the general supply."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

@@ -9,4 +9,5 @@ export const B1_UpscaleLifestyle = new MinorImprovement({
   desc: ["Immediately receive 1 <FOOD> for every 3 <STONE> in your supply."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

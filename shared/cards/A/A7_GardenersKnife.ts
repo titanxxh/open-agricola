@@ -9,4 +9,5 @@ export const A7_GardenersKnife = new MinorImprovement({
   desc: ["Immediately get 1 <GRAIN> from the general supply."],
   cost: { wood: 1 },
   passing: true,
+  implemented: false,
 })

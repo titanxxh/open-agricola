@@ -8,4 +8,5 @@ export const D3_Furrows = new MinorImprovement({
   desc: ["Immediately plow 1 field."],
   cost: {},
   passing: true,
+  implemented: false,
 })

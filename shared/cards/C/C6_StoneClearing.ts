@@ -9,4 +9,5 @@ export const C6_StoneClearing = new MinorImprovement({
   desc: ["Immediately get 1 <STONE> for every 2 unfenced farmyard spaces you have."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

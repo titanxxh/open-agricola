@@ -9,4 +9,5 @@ export const C3_CarriageTrip = new MinorImprovement({
   desc: ["You immediately get 2 <WOOD>, 2 <CLAY>, 2 <REED>, 2 <STONE>, and 2 <FOOD>."],
   cost: { food: 3 },
   passing: true,
+  implemented: false,
 })

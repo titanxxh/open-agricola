@@ -8,4 +8,5 @@ export const D4_CrossCutWood = new MinorImprovement({
   desc: ["If you have a Clay/Stone Oven, Cooking Hearth, Stone Oven, Pottery, or Basketmaker's Workshop, you you you immediately get 1 <WOOD>."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

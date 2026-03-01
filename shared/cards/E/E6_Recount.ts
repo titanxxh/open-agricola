@@ -8,4 +8,5 @@ export const E6_Recount = new MinorImprovement({
   desc: ["When you play this, each harvest, then get 1 additional <VP>."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

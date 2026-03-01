@@ -9,4 +9,5 @@ export const A9_YoungAnimalMarket = new MinorImprovement({
   desc: ["Immediately take 1 <SHEEP> or 1 <BOAR> from the animal track. (You may take an animal that has run out.)"],
   cost: {},
   passing: true,
+  implemented: false,
 })

@@ -8,4 +8,5 @@ export const D5_FieldClay = new MinorImprovement({
   desc: ["Immediately get 1 <CLAY> for each field you have."],
   cost: {},
   passing: true,
+  implemented: false,
 })

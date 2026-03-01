@@ -9,4 +9,5 @@ export const A8_FoodBasket = new MinorImprovement({
   desc: ["You immediately get 1 <GRAIN> and 1 <VEGETABLE>."],
   cost: {},
   passing: true,
+  implemented: false,
 })

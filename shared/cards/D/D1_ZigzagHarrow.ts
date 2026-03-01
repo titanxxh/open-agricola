@@ -9,4 +9,5 @@ export const D1_ZigzagHarrow = new MinorImprovement({
   desc: ["Immediately plow 1 field."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

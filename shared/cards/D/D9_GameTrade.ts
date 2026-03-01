@@ -8,4 +8,5 @@ export const D9_GameTrade = new MinorImprovement({
   desc: ["You may trade resources with your neighbors. For each resource, the neighbor's board has at least 1 more of this resource than you1 of your supply, you you get 1 additional <FOOD>."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

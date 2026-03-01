@@ -8,4 +8,5 @@ export const D8_FernSeeds = new MinorImprovement({
   desc: ["Immediately get 1 <GRAIN> for each empty field you have."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

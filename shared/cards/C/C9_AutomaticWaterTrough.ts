@@ -9,4 +9,5 @@ export const C9_AutomaticWaterTrough = new MinorImprovement({
   desc: ["Your animals can be kept in the stable and farmyard. (The stable has space for 3 animals of 1 type.)"],
   cost: { wood: 2, clay: 1 },
   passing: true,
+  implemented: false,
 })

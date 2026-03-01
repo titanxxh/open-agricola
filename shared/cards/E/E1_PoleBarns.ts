@@ -8,4 +8,5 @@ export const E1_PoleBarns = new MinorImprovement({
   desc: ["Immediately build 1 stable for free. You also stable is wooden stables. (Stables on the do not count toward the limit of 4 stables.)"],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

@@ -8,4 +8,5 @@ export const D6_PetrifiedWood = new MinorImprovement({
   desc: ["You immediately get 1 <WOOD> for each 3 <WOOD> in your supply."],
   cost: {},
   passing: true,
+  implemented: false,
 })

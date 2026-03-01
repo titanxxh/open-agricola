@@ -24,6 +24,7 @@ export type CardDefinition = {
   passing?: boolean
   newSet?: boolean
   modifier?: CostModifier
+  implemented?: boolean
 }
 
 export class CardBase {
@@ -45,6 +46,7 @@ export class CardBase {
   passing?: boolean
   newSet?: boolean
   modifier?: CostModifier
+  implemented?: boolean
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)

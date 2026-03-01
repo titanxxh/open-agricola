@@ -9,4 +9,5 @@ export const A2_ShiftingCultivation = new MinorImprovement({
   desc: ["Immediately plow 1 field."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

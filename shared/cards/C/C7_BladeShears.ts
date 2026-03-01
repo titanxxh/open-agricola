@@ -9,4 +9,5 @@ export const C7_BladeShears = new MinorImprovement({
   desc: ["Immediately shear 1 <SHEEP> for 1 <FOOD> or 1 <CATTLE> for 3 <FOOD>."],
   cost: { food: 1 },
   passing: true,
+  implemented: false,
 })

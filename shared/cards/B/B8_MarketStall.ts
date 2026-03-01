@@ -9,4 +9,5 @@ export const B8_MarketStall = new MinorImprovement({
   desc: ["Immediately get 1 <FOOD> for each <GRAIN> and each <VEGETABLE> in your supply."],
   cost: { wood: 1 },
   passing: true,
+  implemented: false,
 })

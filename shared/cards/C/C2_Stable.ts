@@ -9,4 +9,5 @@ export const C2_Stable = new MinorImprovement({
   desc: ["Immediately build 1 stable for free."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

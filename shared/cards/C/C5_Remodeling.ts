@@ -9,4 +9,5 @@ export const C5_Remodeling = new MinorImprovement({
   desc: ["You immediately get 1 <WOOD> and 1 <CLAY> for each room you have."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

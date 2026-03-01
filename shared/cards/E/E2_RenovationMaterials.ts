@@ -8,4 +8,5 @@ export const E2_RenovationMaterials = new MinorImprovement({
   desc: ["Immediately get 1 <WOOD> and 1 <REED> for each room of your house."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

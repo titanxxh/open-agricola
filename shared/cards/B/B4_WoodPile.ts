@@ -9,4 +9,5 @@ export const B4_WoodPile = new MinorImprovement({
   desc: ["You immediately get 3 <WOOD>."],
   cost: { food: 2 },
   passing: true,
+  implemented: false,
 })

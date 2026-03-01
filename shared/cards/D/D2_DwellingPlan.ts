@@ -9,4 +9,5 @@ export const D2_DwellingPlan = new MinorImprovement({
   desc: ["Immediately renov your house for free."],
   cost: {},
   passing: true,
+  implemented: false,
 })

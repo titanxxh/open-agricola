@@ -8,4 +8,5 @@ export const E8_FarmersMarket = new MinorImprovement({
   desc: ["Immediately get 1 <FOOD> for each <VEGETABLE> in your supply."],
   cost: {},
   passing: true,
+  implemented: false,
 })

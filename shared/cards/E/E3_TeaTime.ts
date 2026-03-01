@@ -8,4 +8,5 @@ export const E3_TeaTime = new MinorImprovement({
   desc: ["When you play this, each harvest, you get 1 <GRAIN> and 1 <VEGETABLE>."],
   cost: { food: 3 },
   passing: true,
+  implemented: false,
 })

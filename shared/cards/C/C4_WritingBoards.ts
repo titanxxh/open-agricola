@@ -9,4 +9,5 @@ export const C4_WritingBoards = new MinorImprovement({
   desc: ["At the end of the game, you get 1 <SCORE> for each improvement and occupation card you have played."],
   cost: { wood: 2 },
   passing: true,
+  implemented: false,
 })

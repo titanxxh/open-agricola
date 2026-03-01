@@ -8,4 +8,5 @@ export const D7_Trident = new MinorImprovement({
   desc: ["Immediately get 1 <FOOD> for each <CATTLE> and <SHEEP> in your supply."],
   cost: {},
   passing: true,
+  implemented: false,
 })

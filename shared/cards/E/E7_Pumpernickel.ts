@@ -8,4 +8,5 @@ export const E7_Pumpernickel = new MinorImprovement({
   desc: ["When you take this, immediately bake 3 <GRAIN> into 10 <FOOD>."],
   cost: { clay: 1 },
   passing: true,
+  implemented: false,
 })

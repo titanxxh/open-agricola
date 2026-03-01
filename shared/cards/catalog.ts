@@ -485,9 +485,20 @@ export const occupationCards = [
   E92_FieldDoctor,
   E93_Motivator,
 ]
-export const minorImprovementIds = minorImprovementCards.map((card) => card.id)
-export const occupationIds = occupationCards.map((card) => card.id)
+
+// All cards for reference and developer mode
+export const allMinorImprovementCards = minorImprovementCards
+export const allOccupationCards = occupationCards
+
+// Only implemented cards for normal game dealing
+const isImplemented = (card: { implemented?: boolean }) => card.implemented !== false
+
+export const implementedMinorImprovementCards = minorImprovementCards.filter(isImplemented)
+export const implementedOccupationCards = occupationCards.filter(isImplemented)
+
+export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
+export const occupationIds = implementedOccupationCards.map((card) => card.id)
 export const getMinorImprovementCard = (id: string) =>
-  minorImprovementCards.find((card) => card.id === id) ?? null
+  allMinorImprovementCards.find((card) => card.id === id) ?? null
 export const getOccupationCard = (id: string) =>
-  occupationCards.find((card) => card.id === id) ?? null
+  allOccupationCards.find((card) => card.id === id) ?? null
