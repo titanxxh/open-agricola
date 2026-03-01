@@ -14,13 +14,17 @@ export type CardDefinition = {
   desc: string[]
   cost?: Partial<Resource>
   reward?: Partial<Resource>
+  vp?: number
   prerequisite?: string
+  isCookery?: boolean
+  isBaking?: boolean
   occupationPrerequisites?: CardPrerequisites
   improvementPrerequisites?: CardPrerequisites
   players?: string
   passing?: boolean
   newSet?: boolean
   modifier?: CostModifier
+  implemented?: boolean
 }
 
 export class CardBase {
@@ -32,13 +36,17 @@ export class CardBase {
   desc!: string[]
   cost?: Partial<Resource>
   reward?: Partial<Resource>
+  vp?: number
   prerequisite?: string
+  isCookery?: boolean
+  isBaking?: boolean
   occupationPrerequisites?: CardPrerequisites
   improvementPrerequisites?: CardPrerequisites
   players?: string
   passing?: boolean
   newSet?: boolean
   modifier?: CostModifier
+  implemented?: boolean
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)

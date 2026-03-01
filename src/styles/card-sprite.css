@@ -12,13 +12,15 @@
 .player-card {
   transition: transform 0.8s;
   transform: scale(1);
-  width: var(--agricola-card-width);
-  height: var(--agricola-card-height);
+  width: 100%;
+  max-width: var(--agricola-card-width);
+  aspect-ratio: 188 / 299;
   position: relative;
+  container-type: inline-size;
 }
 
 .player-card.mini {
-  height: var(--agricola-card-width);
+  aspect-ratio: 1;
 }
 
 .player-card.selectable {
@@ -56,9 +58,12 @@
   width: 235px;
   height: 374px;
   background-size: 100%;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   border-radius: 19.5px;
-  overflow: hidden;
+  transform: scale(calc(100cqi / 235px));
+  transform-origin: top left;
 }
 
 /* Card frame layer - background sprite */
@@ -104,12 +109,34 @@
   background-position: center;
 }
 
+/* Leaves overlay for minor cards to hide passing arrows */
+.card-frame-left-leaves,
+.card-frame-right-leaves {
+  position: absolute;
+  top: 112px;
+  width: 53px;
+  height: 40px;
+  background-size: 100% 100%;
+}
+.player-card.minor .card-frame-left-leaves {
+  background-position: 73.2741% 14.9254%;
+  background-size: 1505.88%;
+  background-image: url('/bga-img/meeples.png');
+  left: 1px;
+}
+.player-card.minor .card-frame-right-leaves {
+  background-position: 80.91% 14.91%;
+  background-size: 1505.88%;
+  background-image: url('/bga-img/meeples.png');
+  right: 1px;
+}
+
 /* Major improvement icon */
 .player-card.major .card-icon {
-  width: 65%;
-  height: 66%;
-  top: 21%;
-  left: 18%;
+  width: 152.75px;
+  height: 155.1px;
+  top: 49.35px;
+  left: 42.3px;
   background-image: url('/bga-img/majors_icons.jpg');
   background-size: 500% 200%;
   clip-path: polygon(0% 54.4%, 24% 11%, 74% 11%, 99% 55%, 74% 98%, 24% 98%, 0% 55%);
@@ -117,9 +144,9 @@
 
 /* Minor improvement icon */
 .player-card.minor .card-icon {
-  width: 77.5%;
-  height: 80.85%;
-  top: 15.75%;
+  width: 182.125px;
+  height: 189.9975px;
+  top: 37.0125px;
   left: 11.5%;
   background-size: contain;
   background-position: center;
@@ -127,9 +154,9 @@
 
 /* Occupation icon */
 .player-card.occupation .card-icon {
-  width: 77%;
-  height: 80.7%;
-  top: 15.75%;
+  width: 180.95px;
+  height: 189.645px;
+  top: 37.0125px;
   left: 11.5%;
   background-size: contain;
   background-position: center;
@@ -140,17 +167,15 @@
   position: absolute;
   left: 29%;
   right: 29%;
-  top: 10px;
+  top: 10.34px;
   height: 43px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 18px;
-  font-weight: 600;
   display: flex;
   justify-content: center;
   align-items: center;
   text-align: center;
   color: #333;
-  text-shadow: 0 0 3px white, 0 0 3px white;
 }
 
 .player-card.major .card-title {
@@ -171,127 +196,333 @@
 /* Card numbering */
 .card-numbering {
   position: absolute;
-  left: 9px;
-  top: 92px;
-  width: 24px;
-  height: 12px;
+  left: 3.7%;
+  top: 91.65px;
+  width: 23.5px;
+  height: 11.75px;
   font-size: 11px;
   text-align: center;
-  color: #666;
+  color: #333;
 }
 
 /* Card score */
 .card-score {
   position: absolute;
-  left: 9px;
-  top: 165px;
-  width: 40px;
-  height: 40px;
+  left: 4%;
+  top: 164.5px;
+  width: 39.95px;
+  height: 39.95px;
   font-weight: bold;
   font-size: 24px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 53.3644% 15.0026%;
+  background-size: 1765.52%;
   display: flex;
   justify-content: center;
   align-items: center;
   text-align: center;
-  background: linear-gradient(135deg, #ffd700, #ffaa00);
-  border-radius: 50%;
   color: #333;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
+
+/* Players req */
+.card-players {
+  position: absolute;
+  top: 160.975px;
+  width: 35.8375px;
+  height: 35.8375px;
+  left: 4.5%;
+  background-image: url('/bga-img/meeples.png');
+}
+.card-players[data-n="1+"] { background-position: 99.3846% 0.512821%; background-size: 2089.8%; }
+.card-players[data-n='2+'] { background-position: 86.8205% 14.8718%; background-size: 2089.8%; }
+.card-players[data-n='3+'] { background-position: 92.359% 14.8718%; background-size: 2089.8%; }
+.card-players[data-n='4+'] { background-position: 97.8974% 14.8718%; background-size: 2089.8%; }
 
 /* Card deck indicator */
 .card-deck {
   position: absolute;
-  top: 159px;
-  width: 36px;
-  height: 36px;
-  right: 12px;
-  background-size: contain;
-  background-repeat: no-repeat;
+  top: 158.625px;
+  width: 35.8375px;
+  height: 35.8375px;
+  right: 4.5%;
+  background-image: url('/bga-img/meeples.png');
 }
 
 .card-deck[data-deck="A"] {
-  background-image: url('/bga-img/deckA/deckA.png');
+  background-position: 59.7624% 14.9793%;
+  background-size: 1828.57%;
 }
 
 .card-deck[data-deck="B"] {
-  background-image: url('/bga-img/deckB/deckB.png');
+  background-position: 66.064% 14.9793%;
+  background-size: 1828.57%;
 }
 
 .card-deck[data-deck="C"] {
   background-image: url('/bga-img/deckC/deckC.png');
+  background-size: contain;
 }
 
 .card-deck[data-deck="D"] {
   background-image: url('/bga-img/deckD/deckD.png');
+  background-size: contain;
 }
 
 .card-deck[data-deck="E"] {
   background-image: url('/bga-img/deckE/deckE.png');
+  background-size: contain;
 }
 
 /* Card category icon */
 .card-category {
   position: absolute;
-  right: 12px;
-  bottom: 30px;
-  width: 26px;
-  height: 26px;
+  left: 71.5%;
+  top: 183.3px;
+  width: 25.85px;
+  height: 25.85px;
   background-image: url('/bga-img/card_categories.png');
   background-size: 800% 100%;
 }
 
-.card-category[data-category="BoosterCategory"] { background-position-x: 0%; }
-.card-category[data-category="LivestockCategory"] { background-position-x: 14.28%; }
-.card-category[data-category="ResourceCategory"] { background-position-x: 28.57%; }
-.card-category[data-category="FarmCategory"] { background-position-x: 42.85%; }
-.card-category[data-category="CropCategory"] { background-position-x: 57.14%; }
-.card-category[data-category="FoodCategory"] { background-position-x: 71.42%; }
-.card-category[data-category="GoodsCategory"] { background-position-x: 85.71%; }
-.card-category[data-category="PointsCategory"] { background-position-x: 100%; }
+.player-card.major .card-category {
+  filter: invert(85%);
+  left: 73%;
+}
+
+.card-category[data-category="ACTIONS_BOOSTER"] { background-position-x: 0%; }
+.card-category[data-category="LIVESTOCK_PROVIDER"] { background-position-x: 14.28%; }
+.card-category[data-category="BUILDING_RESOURCE_PROVIDER"] { background-position-x: 28.57%; }
+.card-category[data-category="FARM_PLANNER"] { background-position-x: 42.85%; }
+.card-category[data-category="CROP_PROVIDER"] { background-position-x: 57.14%; }
+.card-category[data-category="FOOD_PROVIDER"], .card-category[data-category="FOOD"] { background-position-x: 71.42%; }
+.card-category[data-category="GOODS_PROVIDER"] { background-position-x: 85.71%; }
+.card-category[data-category="POINTS_PROVIDER"] { background-position-x: 100%; }
 
 /* Card cost area */
 .card-cost {
   position: absolute;
-  right: 12px;
-  top: 60px;
-  width: 60px;
+  left: 68%;
+  right: 3.5%;
+  top: 8.225px;
+  height: 96.35px;
   text-align: right;
-  font-weight: bold;
+  font-weight: bolder;
   font-size: 18px;
-  text-shadow: -1px 0 white, 0 -1px white, 1px 0 white, 0 1px white;
+}
+.player-card.minor .card-cost-text {
+  background-image: url('/bga-img/meeples.png');
+  background-position: 83.4881% 0.526316%;
+  background-size: 1861.82%;
+}
+.player-card.major .card-cost-text {
+  background-image: url('/bga-img/meeples.png');
+  background-position: 76.3186% 0.52687%;
+  background-size: 1106.89% 1328%;
+}
+
+/* Prerequisite area */
+.card-prerequisite {
+  position: absolute;
+  right: 68%;
+  left: 3.5%;
+  top: 8.225px;
+  height: 96.35px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 89.6801% 0.526316%;
+  background-size: 1861.82%;
+}
+.prerequisite-text {
+  height: 86%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 15px 2px 6px;
+  font-size: 12px;
+  line-height: 13px;
+  text-align: left;
+  word-wrap: anywhere;
 }
 
 /* Card description area */
 .card-desc {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 8px 12px;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(255,255,255,0.95));
-  border-bottom-left-radius: 15.5px;
-  border-bottom-right-radius: 15.5px;
+  top: 211.5px;
+  bottom: 8.225px;
+  left: 4%;
+  right: 4%;
+  padding: 0;
+  background-image: url('/bga-img/action_frame_bg.jpg');
+  background-size: 100%;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
   font-size: 12px;
   line-height: 14px;
   color: #333;
   text-align: center;
-  max-height: 80px;
   overflow: hidden;
 }
 
+.player-card-inner[data-cook="true"] .card-desc::before {
+  content: "";
+  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 29px;
+  height: 20px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 82.0225% 21.6886%;
+  background-size: 2275.56%;
+  z-index: 1;
+}
+
+.card-bottom-left-corner {
+  position: absolute;
+  bottom: 8px;
+  left: 9px;
+  width: 24px;
+  height: 17px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 13.3132% 26.2165%;
+  background-size: 3150.77%;
+  z-index: 2;
+}
+
+.player-card-inner[data-bread="true"] .card-desc::after {
+  content: "";
+  display: block;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 20px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 87.1297% 21.6886%;
+  background-size: 2275.56%;
+  z-index: 1;
+}
+
+.card-bottom-right-corner {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  width: 21px;
+  height: 18px;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 17.0266% 26.1905%;
+  background-size: 3592.98%;
+  z-index: 2;
+}
+
 .card-desc-scroller {
-  max-height: 60px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-flow: column;
+}
+
+.card-desc-scroller > div {
+  margin: auto;
+  width: 100%;
+  white-space: normal;
+  word-wrap: break-word;
+  word-break: normal;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.card-desc-scroller::-webkit-scrollbar {
+  width: 4px;
+}
+
+.card-desc-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-desc-scroller::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 /* Card cost text area */
 .card-cost-text {
-  padding: 4px 8px;
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 4px;
-  margin-bottom: 4px;
+  height: 80%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-direction: column;
+  text-align: right;
+  padding: 2px 6px 2px 15px;
+  font-size: 26px;
+  line-height: 26px;
+  font-weight: bold;
+  font-family: "CalibriB", sans-serif;
+}
+.player-card.minor .card-cost-text {
+  text-shadow: -1px 0px 0px white, 0px -1px 0px white, 1px 0px 0px white, 0px 1px 0px white;
+  color: black;
+}
+.player-card.major .card-cost-text {
+  color: white;
+  text-shadow: -1px 0px 0px black, 0px -1px 0px black, 1px 0px 0px black, 0px 1px 0px black;
+}
+.card-cost-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-res-icon {
+  display: inline-block;
+  background-image: url('/bga-img/meeples.png');
+  background-repeat: no-repeat;
+  font-size: 26px; /* 1em = 26px for meeples */
+}
+.card-res-icon.wood {
+  width: 0.6em;
+  height: 0.78em;
+  background-position: 58.4507% 21.7766%;
+  background-size: 3413.33%;
+}
+.card-res-icon.clay {
+  width: 0.64em;
+  height: 0.74em;
+  background-position: 97.127% 8.61196%;
+  background-size: 3200%;
+}
+.card-res-icon.reed {
+  width: 0.72em;
+  height: 0.82em;
+  background-position: 14.1194% 21.821%;
+  background-size: 2844.44%;
+}
+.card-res-icon.stone {
+  width: 0.64em;
+  height: 0.8em;
+  background-position: 36.9456% 21.7988%;
+  background-size: 3200%;
+}
+.card-res-icon.grain {
+  width: 0.75em;
+  height: 0.79em;
+  background-position: 54.5869% 21.7877%;
+  background-size: 2730.67%;
+}
+.card-res-icon.vegetable {
+  width: 0.82em;
+  height: 0.8em;
+  background-position: 77.0791% 21.7325%;
+  background-size: 2694.74%;
+}
+.card-res-icon.food {
+  width: 0.8em;
+  height: 0.8em;
+  background-position: 41.0061% 21.7988%;
+  background-size: 2560%;
 }
 
 

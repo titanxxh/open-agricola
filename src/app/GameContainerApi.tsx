@@ -3,7 +3,7 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
-import { FARM_COLS, FARM_ROWS, positionKey } from '../../shared/game/farm'
+import { FARM_COLS, FARM_ROWS, positionKey, getAllTilePositions } from '../../shared/game/farm'
 import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
 import { getBuildRoomCost } from '../../shared/actions/effects/house'
 import { stableWoodCost } from '../../shared/actions/effects/fencing'
@@ -537,14 +537,36 @@ export const GameContainerApi = () => {
   const adjustReorgAnimal = (_zoneId: string, _animalType: 'sheep' | 'boar' | 'cattle', _delta: number) => { void _zoneId; void _animalType; void _delta }
   const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
   const plowSelectableSet = useMemo(() => {
-    const set = new Set<string>()
-    if (!isSelectingPlow) return set
-    for (let row = 0; row < FARM_ROWS; row++) for (let col = 0; col < FARM_COLS; col++) {
-      const key = positionKey({ row, col })
-      if (!roomPositions.has(key) && !fieldPositions.has(key) && !stablePositions.has(key)) set.add(key)
+    const occupied = new Set<string>()
+    roomPositions.forEach((key) => occupied.add(key))
+    fieldPositions.forEach((key) => occupied.add(key))
+    stablePositions.forEach((key) => occupied.add(key))
+    pastureTiles.forEach((_, key) => occupied.add(key))
+    if (fieldPositions.size === 0) {
+      const result = new Set<string>()
+      getAllTilePositions().forEach((pos) => {
+        const key = positionKey(pos)
+        if (!occupied.has(key)) result.add(key)
+      })
+      return result
     }
-    return set
-  }, [isSelectingPlow, roomPositions, fieldPositions, stablePositions])
+    const deltas = [
+      { dr: -1, dc: 0 },
+      { dr: 1, dc: 0 },
+      { dr: 0, dc: -1 },
+      { dr: 0, dc: 1 },
+    ]
+    const result = new Set<string>()
+    getAllTilePositions().forEach((pos) => {
+      const key = positionKey(pos)
+      if (occupied.has(key)) return
+      const adjacent = deltas.some((delta) =>
+        fieldPositions.has(`${pos.row + delta.dr}-${pos.col + delta.dc}`),
+      )
+      if (adjacent) result.add(key)
+    })
+    return result
+  }, [isSelectingPlow, roomPositions, fieldPositions, stablePositions, pastureTiles])
   const sowRemaining = useMemo(() => ({
     grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
     vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),

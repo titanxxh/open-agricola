@@ -22,7 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.oh-my-opencode.json
 
 *.pdf
 data/
 .env
+output/
+artifacts/

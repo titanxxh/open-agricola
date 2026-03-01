@@ -11,6 +11,8 @@ export const cookingHearth1: MajorCardEffect = {
   },
   vp: 1,
   extraVp: false,
+  isCookery: true,
+  isBaking: true,
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
   description: [
     '[Anytime]',

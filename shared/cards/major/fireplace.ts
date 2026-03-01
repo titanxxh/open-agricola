@@ -5,6 +5,8 @@ export const fireplace1: MajorCardEffect = {
   cost: { clay: 2 },
   vp: 1,
   extraVp: false,
+  isCookery: true,
+  isBaking: true,
   description: [
     '[Anytime]',
     'Vegetable → 2 food',

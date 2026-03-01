@@ -48,6 +48,14 @@ import { A89_StablePlanner } from './A/A89_StablePlanner'
 import { A92_AdoptiveParents } from './A/A92_AdoptiveParents'
 import { A94_LazySowman } from './A/A94_LazySowman'
 import { A97_Freshman } from './A/A97_Freshman'
+import { A1_Shelter } from './A/A1_Shelter'
+import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
+import { A4_Baseboards } from './A/A4_Baseboards'
+import { A5_ClayEmbankment } from './A/A5_ClayEmbankment'
+import { A6_StorageBarn } from './A/A6_StorageBarn'
+import { A7_GardenersKnife } from './A/A7_GardenersKnife'
+import { A8_FoodBasket } from './A/A8_FoodBasket'
+import { A9_YoungAnimalMarket } from './A/A9_YoungAnimalMarket'
 import { B10_Caravan } from './B/B10_Caravan'
 import { B100_Clutterer } from './B/B100_Clutterer'
 import { B103_FieldMerchant } from './B/B103_FieldMerchant'
@@ -75,6 +83,13 @@ import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B94_StockProtector } from './B/B94_StockProtector'
+import { B1_UpscaleLifestyle } from './B/B1_UpscaleLifestyle'
+import { B4_WoodPile } from './B/B4_WoodPile'
+import { B5_StoreofExperience } from './B/B5_StoreofExperience'
+import { B6_ExcursiontotheQuarry } from './B/B6_ExcursiontotheQuarry'
+import { B7_Wage } from './B/B7_Wage'
+import { B8_MarketStall } from './B/B8_MarketStall'
+import { B9_BeatingRod } from './B/B9_BeatingRod'
 import { C1_Overhaul } from './C/C1_Overhaul'
 import { C10_BunkBeds } from './C/C10_BunkBeds'
 import { C104_Collector } from './C/C104_Collector'
@@ -116,6 +131,13 @@ import { C88_CarpentersApprentice } from './C/C88_CarpentersApprentice'
 import { C93_InnerDistrictsDirector } from './C/C93_InnerDistrictsDirector'
 import { C96_Merchant } from './C/C96_Merchant'
 import { C99_GardenDesigner } from './C/C99_GardenDesigner'
+import { C2_Stable } from './C/C2_Stable'
+import { C3_CarriageTrip } from './C/C3_CarriageTrip'
+import { C4_WritingBoards } from './C/C4_WritingBoards'
+import { C5_Remodeling } from './C/C5_Remodeling'
+import { C6_StoneClearing } from './C/C6_StoneClearing'
+import { C7_BladeShears } from './C/C7_BladeShears'
+import { C9_AutomaticWaterTrough } from './C/C9_AutomaticWaterTrough'
 import { D10_StorksNest } from './D/D10_StorksNest'
 import { D100_LordoftheManor } from './D/D100_LordoftheManor'
 import { D101_SugarBaker } from './D/D101_SugarBaker'
@@ -156,7 +178,17 @@ import { D92_ChildOmbudsman } from './D/D92_ChildOmbudsman'
 import { D93_SheepInspector } from './D/D93_SheepInspector'
 import { D94_HenpeckedHusband } from './D/D94_HenpeckedHusband'
 import { D98_Transactor } from './D/D98_Transactor'
+import { D1_ZigzagHarrow } from './D/D1_ZigzagHarrow'
+import { D2_DwellingPlan } from './D/D2_DwellingPlan'
+import { D3_Furrows } from './D/D3_Furrows'
+import { D4_CrossCutWood } from './D/D4_CrossCutWood'
+import { D5_FieldClay } from './D/D5_FieldClay'
+import { D6_PetrifiedWood } from './D/D6_PetrifiedWood'
+import { D7_Trident } from './D/D7_Trident'
+import { D8_FernSeeds } from './D/D8_FernSeeds'
+import { D9_GameTrade } from './D/D9_GameTrade'
 import { E10_StrawHat } from './E/E10_StrawHat'
+import { E21_SheepRug } from './E/E21_SheepRug'
 import { E103_Wolf } from './E/E103_Wolf'
 import { E109_BraidMaker } from './E/E109_BraidMaker'
 import { E112_GrainThief } from './E/E112_GrainThief'
@@ -201,6 +233,13 @@ import { E90_DungCollector } from './E/E90_DungCollector'
 import { E91_PlowBuilder } from './E/E91_PlowBuilder'
 import { E92_FieldDoctor } from './E/E92_FieldDoctor'
 import { E93_Motivator } from './E/E93_Motivator'
+import { E1_PoleBarns } from './E/E1_PoleBarns'
+import { E2_RenovationMaterials } from './E/E2_RenovationMaterials'
+import { E3_TeaTime } from './E/E3_TeaTime'
+import { E6_Recount } from './E/E6_Recount'
+import { E7_Pumpernickel } from './E/E7_Pumpernickel'
+import { E8_FarmersMarket } from './E/E8_FarmersMarket'
+import { E9_BarteringHut } from './E/E9_BarteringHut'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -233,6 +272,14 @@ export const minorImprovementCards = [
   A83_ShepherdsCrook,
   A84_Silage,
   A92_AdoptiveParents,
+  A1_Shelter,
+  A2_ShiftingCultivation,
+  A4_Baseboards,
+  A5_ClayEmbankment,
+  A6_StorageBarn,
+  A7_GardenersKnife,
+  A8_FoodBasket,
+  A9_YoungAnimalMarket,
   B10_Caravan,
   B124_Trimmer,
   B15_CarpentersBench,
@@ -251,6 +298,13 @@ export const minorImprovementCards = [
   B76_Ceilings,
   B81_Handcart,
   B94_StockProtector,
+  B1_UpscaleLifestyle,
+  B4_WoodPile,
+  B5_StoreofExperience,
+  B6_ExcursiontotheQuarry,
+  B7_Wage,
+  B8_MarketStall,
+  B9_BeatingRod,
   C1_Overhaul,
   C10_BunkBeds,
   C13_WoodSlideHammer,
@@ -276,6 +330,13 @@ export const minorImprovementCards = [
   C8_PlantFertilizer,
   C84_PerennialRye,
   C93_InnerDistrictsDirector,
+  C2_Stable,
+  C3_CarriageTrip,
+  C4_WritingBoards,
+  C5_Remodeling,
+  C6_StoneClearing,
+  C7_BladeShears,
+  C9_AutomaticWaterTrough,
   D10_StorksNest,
   D115_FodderPlanter,
   D14_HammerCrusher,
@@ -294,8 +355,17 @@ export const minorImprovementCards = [
   D71_Changeover,
   D72_StableManure,
   D74_RoyalWood,
-  D92_ChildOmbudsman,
-  E10_StrawHat,
+  D1_ZigzagHarrow,
+  D2_DwellingPlan,
+  D3_Furrows,
+  D4_CrossCutWood,
+  D5_FieldClay,
+  D6_PetrifiedWood,
+  D7_Trident,
+  D8_FernSeeds,
+  D9_GameTrade,
+ E10_StrawHat,
+  E21_SheepRug,
   E16_BriarHedge,
   E22_GuestRoom,
   E27_PiggyBank,
@@ -317,6 +387,13 @@ export const minorImprovementCards = [
   E81_AlchemistsLab,
   E82_Profiteering,
   E84_DollysMother,
+  E1_PoleBarns,
+  E2_RenovationMaterials,
+  E3_TeaTime,
+  E6_Recount,
+  E7_Pumpernickel,
+  E8_FarmersMarket,
+  E9_BarteringHut,
 ]
 export const occupationCards = [
   A105_BarrowPusher,
@@ -382,6 +459,7 @@ export const occupationCards = [
   D158_BeanCounter,
   D167_PureBreeder,
   D85_Reader,
+  D92_ChildOmbudsman,
   D93_SheepInspector,
   D94_HenpeckedHusband,
   D98_Transactor,
@@ -409,9 +487,20 @@ export const occupationCards = [
   E92_FieldDoctor,
   E93_Motivator,
 ]
-export const minorImprovementIds = minorImprovementCards.map((card) => card.id)
-export const occupationIds = occupationCards.map((card) => card.id)
+
+// All cards for reference and developer mode
+export const allMinorImprovementCards = minorImprovementCards
+export const allOccupationCards = occupationCards
+
+// Only implemented cards for normal game dealing
+const isImplemented = (card: { implemented?: boolean }) => card.implemented !== false
+
+export const implementedMinorImprovementCards = minorImprovementCards.filter(isImplemented)
+export const implementedOccupationCards = occupationCards.filter(isImplemented)
+
+export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
+export const occupationIds = implementedOccupationCards.map((card) => card.id)
 export const getMinorImprovementCard = (id: string) =>
-  minorImprovementCards.find((card) => card.id === id) ?? null
+  allMinorImprovementCards.find((card) => card.id === id) ?? null
 export const getOccupationCard = (id: string) =>
-  occupationCards.find((card) => card.id === id) ?? null
+  allOccupationCards.find((card) => card.id === id) ?? null

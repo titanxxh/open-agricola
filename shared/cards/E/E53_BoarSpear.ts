@@ -72,7 +72,7 @@ const boarSpearAfterListener: CardListenerRegistration = {
           },
         ],
       },
-      extraData: { 
+      extraData_IGNORED: { 
         convertBoar: convertCount,
         previousConverted,
       },

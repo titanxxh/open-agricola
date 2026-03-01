@@ -827,9 +827,15 @@
 }
 
 .played-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: clamp(6px, 1.2vw, 8px);
+}
+
+.played-row > * {
+  flex: 0 1 calc(33.333% - 8px);
+  max-width: 188px;
 }
 
 .played-card {
@@ -878,14 +884,21 @@
   pointer-events: none;
 }
 
+/* In dev mode, always allow pointer events for card ID copy functionality */
+.card-with-copy.dev-mode {
+  pointer-events: auto;
+}
+
 .card-copy-overlay {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 235px;
+  height: 374px;
+  transform: scale(calc(100cqi / 235px));
+  transform-origin: top left;
   background: rgba(0, 0, 0, 0.75);
-  border-radius: inherit;
+  border-radius: 19.5px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -923,9 +936,15 @@
 }
 
 .hand-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: clamp(6px, 1.2vw, 8px);
+}
+
+.hand-row > * {
+  flex: 0 1 calc(33.333% - 8px);
+  max-width: 188px;
 }
 
 .hand-sections {
@@ -994,9 +1013,15 @@
 }
 
 .major-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: clamp(6px, 1.2vw, 10px);
+}
+
+.major-row > * {
+  flex: 0 1 calc(33.333% - 10px);
+  max-width: 188px;
 }
 
 .major-card {
@@ -1279,7 +1304,7 @@
   font-size: 13px;
 }
 
-.player-card {
+.players .player-card {
   background: #f8fff2;
   border-radius: 12px;
   padding: 12px;
@@ -1287,7 +1312,7 @@
   margin-bottom: 10px;
 }
 
-.player-card.active {
+.players .player-card.active {
   border-color: #3a5a2c;
 }
 

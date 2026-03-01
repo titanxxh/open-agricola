@@ -34,14 +34,14 @@ describe('Collect action card listeners', () => {
       availableMajorImprovements: [],
       futureMeeples: [],
       pendingFutureMeeples: [],
-      gameOver: false,
+      gameOver: false, workPhaseObtainedResources: {},
     }
 
     const defaultPlayer: PlayerState = {
       id: 'player1',
       name: 'Player 1',
       workersAvailable: 1,
-      familyMembers: [],
+      familySize: [],
       resources: {
         wood: 0,
         clay: 0,
