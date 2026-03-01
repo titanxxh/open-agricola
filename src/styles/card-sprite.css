@@ -350,13 +350,13 @@
   bottom: 8.225px;
   left: 4%;
   right: 4%;
-  padding: 0 0.5rem;
+  padding: 0;
   background-image: url('/bga-img/action_frame_bg.jpg');
   background-size: 100%;
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-  font-size: 13px;
-  line-height: 15px;
+  font-size: 12px;
+  line-height: 14px;
   color: #333;
   text-align: center;
   overflow: hidden;
@@ -373,6 +373,7 @@
   background-image: url('/bga-img/meeples.png');
   background-position: 82.0225% 21.6886%;
   background-size: 2275.56%;
+  z-index: 1;
 }
 
 .card-bottom-left-corner {
@@ -384,6 +385,7 @@
   background-image: url('/bga-img/meeples.png');
   background-position: 13.3132% 26.2165%;
   background-size: 3150.77%;
+  z-index: 2;
 }
 
 .player-card-inner[data-bread="true"] .card-desc::after {
@@ -397,6 +399,7 @@
   background-image: url('/bga-img/meeples.png');
   background-position: 87.1297% 21.6886%;
   background-size: 2275.56%;
+  z-index: 1;
 }
 
 .card-bottom-right-corner {
@@ -408,17 +411,42 @@
   background-image: url('/bga-img/meeples.png');
   background-position: 17.0266% 26.1905%;
   background-size: 3592.98%;
+  z-index: 2;
 }
 
 .card-desc-scroller {
-  height: 142.2925px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-flow: column;
 }
 
 .card-desc-scroller > div {
   margin: auto;
+  width: 100%;
+  white-space: normal;
+  word-wrap: break-word;
+  word-break: normal;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.card-desc-scroller::-webkit-scrollbar {
+  width: 4px;
+}
+
+.card-desc-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-desc-scroller::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 /* Card cost text area */

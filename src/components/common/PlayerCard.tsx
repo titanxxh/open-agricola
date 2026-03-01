@@ -79,7 +79,7 @@ export const PlayerCard = ({
       return major
         ? {
             name: t(locale, `improvements.${cardId}.name`),
-            description: major.description.join(' '),
+            description: major.description.join('\n'),
             cost: { ...emptyResources, ...major.cost },
             vp: major.vp,
             isCookery: major.isCookery,
@@ -91,7 +91,7 @@ export const PlayerCard = ({
       return minor
         ? {
             name: minor.name,
-            description: minor.desc.join(' '),
+            description: minor.desc.join('\n'),
             cost: { ...emptyResources, ...minor.cost },
             deck: minor.deck,
             category: minor.category,
@@ -108,7 +108,7 @@ export const PlayerCard = ({
       return occupation
         ? {
             name: occupation.name,
-            description: occupation.desc.join(' '),
+            description: occupation.desc.join('\n'),
             cost: { ...emptyResources, ...occupation.cost },
             deck: occupation.deck,
             category: occupation.category,
@@ -219,7 +219,7 @@ export const PlayerCard = ({
 
         <div className="card-desc">
           <div className="card-desc-scroller">
-            <div>{cardData.description}</div>
+            <div dangerouslySetInnerHTML={{ __html: cardData.description.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />') }} />
           </div>
         </div>
 

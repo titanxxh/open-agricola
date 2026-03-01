@@ -2,19 +2,20 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
+import type { Resource, ActionSpace } from '../../game/types'
 
 const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-const masterWorkmanDuringListener: CardListenerRegistration = {
-  id: 'A126-master-workman-during',
-  phases: ['during' as ActionHookPhase],
+const masterWorkmanBeforeListener: CardListenerRegistration = {
+  id: 'A126-master-workman-before',
+  cardIds: ['A126_MasterWorkman'],
+  phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { state, space } = context
-    const round = state.round
+    const { space } = context
+    const turn = (space as ActionSpace).roundAvailable
     
-    if (round >= 1 && round <= 4 && space.roundAvailable) {
-      const resource = RESOURCE_MAP[round - 1]
+    if (turn >= 1 && turn <= 4) {
+      const resource = RESOURCE_MAP[turn - 1]
       return { costs: { [resource]: -1 } }
     }
   },
@@ -22,26 +23,24 @@ const masterWorkmanDuringListener: CardListenerRegistration = {
 
 const masterWorkmanComputeArgsListener: CardListenerRegistration = {
   id: 'A126-master-workman-compute-args',
+  cardIds: ['A126_MasterWorkman'],
   phases: ['computeArgs' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { state } = context
-    const round = state.round
     
-    if (round >= 1 && round <= 4) {
-      return {
-        extraOptions: state.actionSpaces
-          .filter(space => space.roundAvailable >= 1 && space.roundAvailable <= 4)
-          .map(space => ({
-            value: space.id,
-            labelKey: space.nameKey,
-            labelParams: { resources: 'ignore' },
-          })),
-      }
+    return {
+      extraOptions: state.actionSpaces
+        .filter((space: ActionSpace) => space.roundAvailable >= 1 && space.roundAvailable <= 4)
+        .map((space: ActionSpace) => ({
+          value: space.id,
+          labelKey: space.nameKey,
+          labelParams: { resources: 'ignore' },
+        })),
     }
   },
 }
 
-registerCardListener(masterWorkmanDuringListener)
+registerCardListener(masterWorkmanBeforeListener)
 registerCardListener(masterWorkmanComputeArgsListener)
 
 export const A126_MasterWorkman = new Occupation({

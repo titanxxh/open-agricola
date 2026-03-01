@@ -340,7 +340,19 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
-      this.hooks.before({ ...executionContext, actionId: replacedActionId })
+      const beforeResults = this.hooks.before({ ...executionContext, actionId: replacedActionId })
+      // Process before hook costs: negative values mean gain resources
+      beforeResults.forEach((entry) => {
+        if (!entry.costs) return
+        Object.entries(entry.costs).forEach(([key, value]) => {
+          if (typeof value !== 'number') return
+          const resourceKey = key as keyof PlayerState['resources']
+          if (value < 0) {
+            // Negative cost = gain resource
+            context.player.resources[resourceKey] += Math.abs(value)
+          }
+        })
+      })
       const result = action.execute(executionContext)
       this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
       if (result.type === 'choice') {
