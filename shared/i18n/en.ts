@@ -591,11 +591,8 @@ export const en = {
     playImprovement: '{player} plays improvement: {improvements}',
     playMinorImprovement: '{player} plays minor improvement: {improvements}',
     bakeBread: '{player} bakes bread: {count} grain → {food} food',
+    cardGrantedAction: '{player} gains {actionId} action from {cardId}',
+    bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
-    renovationFail: '{player} failed to renovate',
-    fencingFail: '{player} failed to build fences',
-    minorImprovementFail: '{player} failed to play a minor improvement',
-    occupationFail: '{player} failed to play an occupation',
-    unknownError: 'Unknown error',
   },
 }

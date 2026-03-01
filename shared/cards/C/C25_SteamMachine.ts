@@ -23,7 +23,7 @@ const steamMachineListener: CardListenerRegistration = {
     }
 
     return {
-      followUpActions: ['bake-bread'],
+      followUpActions: [{ actionId: 'bake-bread', sourceCard: 'C25_SteamMachine' }],
     }
   },
 }

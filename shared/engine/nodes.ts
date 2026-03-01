@@ -43,10 +43,12 @@ abstract class BaseNode implements EngineNode {
 
 export class ActionNode extends BaseNode {
   public actionId: string
+  public sourceCard?: string
 
-  constructor(id: string, actionId: string) {
+  constructor(id: string, actionId: string, sourceCard?: string) {
     super(id, 'action')
     this.actionId = actionId
+    this.sourceCard = sourceCard
   }
 
   execute(
