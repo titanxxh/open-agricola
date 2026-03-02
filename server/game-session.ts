@@ -790,6 +790,8 @@ console.log(`[resolveChoice] result type=${result.type}, isBakeChoice=${isBakeCh
     this.engine = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
+    this.history = []
+    this.actionStartIndex = null
     return this.respond()
   }
 

@@ -591,6 +591,9 @@ export const FarmBoard = ({
           const isOccupation = kind === 'occupation'
           const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
+          const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
+          const hasCounters = Object.values(cardStateCounters).some((count) => count > 0)
+          
           return (
             <div key={`played-${index}`} className="played-card-wrapper">
               <PlayerCard
@@ -599,8 +602,24 @@ export const FarmBoard = ({
                 cardType={cardType}
                 devMode={devMode}
               />
-              {futureEntries.length > 0 ? (
+              {futureEntries.length > 0 || hasCounters ? (
                 <div className="card-future">
+                  {Object.entries(cardStateCounters).map(([resKey, count]) => {
+                    if (count <= 0) return null
+                    return (
+                      <div
+                        key={`state-${rawId}-${resKey}`}
+                        className="card-future-item"
+                        title={`${count} ${t(locale, `resources.${resKey}`)}`}
+                      >
+                        <ResourceLine
+                          locale={locale}
+                          resources={{ ...emptyResources, [resKey]: count }}
+                          className="card-future-text"
+                        />
+                      </div>
+                    )
+                  })}
                   {futureEntries.map((entry, entryIndex) => {
                     const label = formatResources(
                       locale,
