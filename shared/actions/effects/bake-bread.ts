@@ -32,7 +32,7 @@ export const bakeBread = (
   return {
     type: 'ok',
     logKey: 'log.bakeBreadResult',
-    params: {
+    logParams: {
       grainUsed: bakeTimes,
       foodGained,
       improvement,
