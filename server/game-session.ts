@@ -37,11 +37,7 @@ import {
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
-import { computeScores } from '../shared/logic/scoring.ts'
-import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
-import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
-import { reap } from '../shared/actions/effects/reap.ts'
-import { positionKey } from '../shared/game/farm.ts'
+import { runReturnHomeHooks } from '../shared/cards/card-effects.ts'
 
 type PendingAction =
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
@@ -711,6 +707,8 @@ console.log(`[resolveChoice] result type=${result.type}, isBakeChoice=${isBakeCh
   }
 
   private applyReturnHome() {
+    // Run onReturnHome hooks for all players' cards before workers return
+    this.state.players.forEach((p) => runReturnHomeHooks(this.state, p))
     this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
     this.state.actionSpaces.forEach((s) => { s.takenBy = null })
   }
