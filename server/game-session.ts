@@ -415,8 +415,11 @@ export class GameSession {
       if (step.type === 'blocked' || step.type === 'done') {
         this.engine = null
         this.finalizeActionLog(player)
-        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-        this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+        if (!allWorkersUsed) {
+          const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        }
         return
       }
 
@@ -629,8 +632,11 @@ console.log(`[resolveChoice] result type=${result.type}, isBakeChoice=${isBakeCh
       this.runEngineSteps()
     } else {
       this.finalizeActionLog(player)
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+      if (!allWorkersUsed) {
+        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+        this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      }
     }
     return this.respond()
   }
