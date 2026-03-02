@@ -525,8 +525,10 @@ export class GameSession {
   }
 
   resolveChoice(playerIndex: number, value: string): SessionResponse {
-      return this.respond(false, 'no pending choice for this player')
+    if (!this.pending || this.pending.playerIndex !== playerIndex) {
+return this.respond(false, 'no pending choice for this player')
     }
+    if (!this.engine) return this.respond(false, 'no active engine')
     if (!this.engine) return this.respond(false, 'no active engine')
     const player = this.state.players[playerIndex]
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
