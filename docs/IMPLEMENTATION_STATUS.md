@@ -42,8 +42,7 @@
 ## 3. 测试与质量
 
 - 单测框架：vitest。
-- 25 个测试文件，177 个用例全部通过（含 Playwright e2e 测试）。
-- `npm run build` 全量通过。
+- 30 个测试文件，219 个用例全部通过（含 Playwright e2e 测试）。
 
 ## 4. 已知边界
 
@@ -55,10 +54,7 @@
 - ✅ 修复 C25_SteamMachine 烤面包日志显示问题（bake-bread.ts 中 params -> logParams）
 - ✅ 修复 C25_SteamMachine 烤面包后续选择解析问题（engine.ts 中正确跟踪 pendingChoiceNodeId/pendingChoiceActionId）
 - ✅ 修复 resolveChoice 缺少条件检查导致的选择解析失败（game-session.ts 中恢复 pending 类型检查）
-- 新增 Playwright 端到端测试 `e2e-tests/harvest.spec.ts`，用于验证收获阶段执行顺序正确性。
-- 非当前玩家视角不显示可选高亮与播种控件。
-- 非当前玩家窗口为只读视图，交互按钮全部禁用。
-- `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
+- ✅ 修复玩家切换后 undo 历史未清空问题（confirmNextPlayer 时清空 history 数组，新增 server/__tests__/undo-history.test.ts 单测）
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
