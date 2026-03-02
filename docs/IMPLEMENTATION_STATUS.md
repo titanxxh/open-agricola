@@ -56,7 +56,8 @@
 - ✅ 修复 resolveChoice 缺少条件检查导致的选择解析失败（game-session.ts 中恢复 pending 类型检查）
 - ✅ 修复玩家切换后 undo 历史未清空问题（confirmNextPlayer 时清空 history 数组，新增 server/__tests__/undo-history.test.ts 单测）
 - ✅ 修复回合结束后无法进入下一轮问题（所有工人使用后不再设置 confirmNextPlayer pending，允许 End Round 按钮生效）
-- ⚠️ C75_Firewood 实现不完整：当前使用 'after' action hook，但应在 "returning home phase" 触发。需要新增 onReturnHome hook 基础设施。
+- ✅ 实现 C75_Firewood 卡牌：新增 onReturnHome hook，在 returning home phase 触发放置木材效果，购买烤箱后可将卡上木材移至供应堆
+
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
 - 该映射用于辅助测试用例的结构化编写，涵盖资源变化、状态校验与 Flow 节点逻辑。
