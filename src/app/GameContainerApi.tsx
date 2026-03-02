@@ -140,7 +140,7 @@ export const GameContainerApi = () => {
       } else if (resp.pending.type !== 'choice') {
         setAnimalReorg(null)
       }
-      if (resp.pending.type === 'choice') {
+      if (resp.ok) {
         setPendingFenceEdges([])
         setFenceError(null)
         setPendingRoomTiles([])

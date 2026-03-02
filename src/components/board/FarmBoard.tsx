@@ -514,7 +514,7 @@ export const FarmBoard = ({
         if (cell.type === 'fence-h' || cell.type === 'fence-v') {
           const edgeId = cell.fenceId ?? ''
           const isExisting = edgeId && existingFenceSet.has(edgeId)
-          const isPending = edgeId && pendingFenceSet.has(edgeId)
+          const isPending = isInteractive && edgeId && pendingFenceSet.has(edgeId)
           const isActive = isExisting || isPending
           const isSelectable = isInteractive && canSelectFences && edgeId && !isExisting
           return (
