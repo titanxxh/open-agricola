@@ -299,6 +299,15 @@ export const GameContainerApi = () => {
   } : null
   const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
 
+  // Auto-end round when all workers are used and no pending actions
+  useEffect(() => {
+    if (!state || state.gameOver) return
+    if (!allWorkersUsed) return
+    if (pending.type !== 'none') return
+    // Auto-trigger round end
+    void applyAndSync(api.performRoundEnd())
+  }, [allWorkersUsed, pending.type, state?.gameOver, api, applyAndSync])
+
   const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
