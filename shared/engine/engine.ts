@@ -396,29 +396,33 @@ export class Engine {
       })
       const result = action.execute(executionContext)
       this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
-      if (result.type === 'choice') {
-        node.resolve(result)
-        const nextNode = this.tree.nextUnresolved()
-        if (nextNode instanceof ChoiceNode) {
-          nextNode.setChoice(result.promptKey, result.options)
-          this.pendingChoiceNodeId = nextNode.id
+if (result.type === 'choice') {
+node.resolve(result)
+const argResults = this.hooks.computeArgs(
+{ ...executionContext, actionId: replacedActionId },
+result,
+)
+const extraOptions = argResults
+.flatMap((entry) => entry.extraOptions ?? [])
+.filter((option) => option)
+if (extraOptions.length > 0) {
+result.options = [...result.options, ...extraOptions]
+        }
+        // Check if there's a ChoiceNode in the tree to handle this choice
+        const choiceNode = this.findChoiceNode(this.tree.root)
+        if (choiceNode) {
+          choiceNode.setChoice(result.promptKey, result.options)
+          this.pendingChoiceNodeId = choiceNode.id
+          this.pendingChoiceActionId = replacedActionId
+        } else {
+          // No ChoiceNode - action will handle choice via resolveChoice
           this.pendingChoiceActionId = replacedActionId
         }
-        const argResults = this.hooks.computeArgs(
-          { ...executionContext, actionId: replacedActionId },
-          result,
-        )
-        const extraOptions = argResults
-          .flatMap((entry) => entry.extraOptions ?? [])
-          .filter((option) => option)
-        if (extraOptions.length > 0) {
-          result.options = [...result.options, ...extraOptions]
-        }
-        return {
-          type: 'choice',
-          nodeId: this.pendingChoiceNodeId ?? node.id,
-          choice: { promptKey: result.promptKey, options: result.options },
-        }
+return {
+type: 'choice',
+nodeId: this.pendingChoiceNodeId ?? node.id,
+choice: { promptKey: result.promptKey, options: result.options },
+}
       }
       if (result.type === 'flow') {
         const flowNode = this.buildFlowNode(result.flow)
@@ -616,7 +620,7 @@ export class Engine {
         }
       }
       this.pendingChoiceNodeId = null
-      this.pendingChoiceActionId = null
+      // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
     if (result.type === 'flow') {

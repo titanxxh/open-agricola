@@ -525,7 +525,6 @@ export class GameSession {
   }
 
   resolveChoice(playerIndex: number, value: string): SessionResponse {
-    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
     if (!this.engine) return this.respond(false, 'no active engine')
@@ -550,6 +549,7 @@ export class GameSession {
       this.usedBakeBreadThisAction = true
     }
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
+console.log(`[resolveChoice] result type=${result.type}, isBakeChoice=${isBakeChoice}`)
     this.flushEngineLog()
     this.logImprovementDelta(before, player)
     if (isBakeChoice) {
