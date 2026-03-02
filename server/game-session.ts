@@ -681,6 +681,7 @@ console.log(`[resolveChoice] result type=${result.type}, isBakeChoice=${isBakeCh
     this.activeSpaceId = null
     this.activePlayerIndex = null
     this.actionStartIndex = null
+    this.history = [] // Clear undo history when switching players
     return this.respond()
   }
 
