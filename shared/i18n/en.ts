@@ -325,7 +325,7 @@ export const en = {
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
     'house-redevelopment': { name: 'House Redevelopment', description: 'Renovate and optionally improve' },
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
-    'firewood-exchange': { name: 'Get Firewood', description: 'Take wood from Firewood card' },
+    'card-choice': { name: 'Card Choice', description: 'Make a choice from card options' },
   },
   improvements: {
     Major_Fireplace1: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },
