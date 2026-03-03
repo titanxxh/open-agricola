@@ -564,6 +564,17 @@ choice: { promptKey: result.promptKey, options: result.options },
           result,
           choice,
         )
+        
+        // Process logKey from hook results
+        ;[...immediateResults, ...afterResults].forEach((entry) => {
+          if (entry.logKey) {
+            this.log.append({
+              key: entry.logKey,
+              params: { player: context.player.name, ...entry.logParams },
+            })
+          }
+        })
+        
         const hookFlows = [...immediateResults, ...afterResults]
           .map((entry) => entry.flow)
           .filter((flow) => flow)
@@ -629,6 +640,17 @@ choice: { promptKey: result.promptKey, options: result.options },
     }
     const immediateResults = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterResults = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
+    
+    // Process logKey from hook results
+    ;[...immediateResults, ...afterResults].forEach((entry) => {
+      if (entry.logKey) {
+        this.log.append({
+          key: entry.logKey,
+          params: { player: context.player.name, ...entry.logParams },
+        })
+      }
+    })
+    
     const hookFlows = [...immediateResults, ...afterResults]
       .map((entry) => entry.flow)
       .filter((flow) => flow)
