@@ -3,29 +3,43 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
+const CARD_ID = 'E21_SheepRug'
+
+/**
+ * E21_SheepRug: You can use any Wish for Children action space, 
+ * even if it is occupied by another player's person.
+ * 
+ * Implementation: Use ComputeArgs hook to allow using occupied wish-children spaces
+ * by not adding any restrictions when the space is occupied.
+ */
 const sheepRugComputeArgsListener: CardListenerRegistration = {
   id: 'E21-sheep-rug-compute-args',
+  cardIds: [CARD_ID],
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, player, state } = context
+    const { space, player } = context
     
-    const spaceId = space.id
-    const wishForChildrenSpaces = ['wish-children', 'wish-children-1', 'wish-children-2', 'wish-children-3', 'wish-children-4', 'wish-children-5']
+    // Only apply to wish-children spaces
+    const wishForChildrenSpaces = [
+      'wish-children', 
+      'wish-children-1', 
+      'wish-children-2', 
+      'wish-children-3', 
+      'wish-children-4', 
+      'wish-children-5'
+    ]
     
-    if (!wishForChildrenSpaces.includes(spaceId)) return
+    if (!wishForChildrenSpaces.includes(space.id)) return
     
-    const occupiedByOther = state.players.some(
-      (p) => p.id !== player.id && p.workersAvailable === 0,
-    )
+    // Check if player has this card
+    if (!player.minorPlayed.includes(CARD_ID)) return
     
-    if (!occupiedByOther) return
-    
-    if ((player.resources.food ?? 0) < 1) return
-    if ((player.resources.sheep ?? 0) < 1) return
-    
+    // The card allows using occupied wish-children spaces
+    // No extra cost required by card description
+    // Just return empty to indicate this player can use this space
     return {
-      costs: { food: -1, sheep: -1 },
+      // No additional costs - the card simply allows using occupied spaces
     }
   },
 }
@@ -33,13 +47,12 @@ const sheepRugComputeArgsListener: CardListenerRegistration = {
 registerCardListener(sheepRugComputeArgsListener)
 
 export const E21_SheepRug = new MinorImprovement({
-  id: "E21_SheepRug",
+  id: CARD_ID,
   name: "Sheep Rug",
   deck: "E",
   number: 21,
-  category: "FOOD_PROVIDER",
-  desc: ["You can use any __Wish for Children__ action space, even if it is occupied by another player\'s person."],
+  category: "FAMILY_GROWTH",
+  desc: ["You can use any __Wish for Children__ action space, even if it is occupied by another player's person."],
   cost: { sheep: 1 },
   prerequisite: "4 Sheep",
-  implemented: true,
 })
