@@ -598,7 +598,7 @@ export const en = {
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
-    firewoodGain: '{player} moves {count} wood from Firewood to supply',
+    firewoodGain: '{player} gains {count} wood from C75_Firewood',
     firewoodPlace: '{player} places 1 wood on Firewood',
   },
 }

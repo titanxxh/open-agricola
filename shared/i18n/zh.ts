@@ -581,7 +581,7 @@ export const zh = {
     cardGrantedAction: '{player} 获得来自 {cardId} 的 {actionId} 行动',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',
-    firewoodGain: '{player} 从柴火卡移动 {count} 木材到供应堆',
+    firewoodGain: '{player} 从 C75_Firewood 获得 {count} 木材',
     firewoodPlace: '{player} 在柴火卡上放置 1 木材',
   },
 }
