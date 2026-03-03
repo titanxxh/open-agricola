@@ -3,7 +3,7 @@ import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState, ActionChoiceOption } from '../../game/types'
 
 const OVEN_IMPROVEMENTS = [
   'Major_Fireplace1',
@@ -18,6 +18,44 @@ const OVEN_IMPROVEMENTS = [
 ]
 
 const CARD_ID = 'C75_Firewood'
+
+/**
+ * Helper function to generate options for firewood exchange
+ * This is called by the card listener and also used by internal action
+ */
+export const generateFirewoodOptions = (woodOnCard: number): ActionChoiceOption[] => {
+  const maxWood = Math.min(4, woodOnCard)
+  if (maxWood <= 0) return []
+  
+  const options: ActionChoiceOption[] = []
+  // Add skip option
+  options.push({ value: '0', labelKey: 'ui.interactionFirewoodExchangeSkip' })
+  // Add options for 1 to maxWood
+  for (let i = 1; i <= maxWood; i++) {
+    options.push({
+      value: String(i),
+      labelKey: 'ui.interactionFirewoodExchangeCount',
+      labelParams: { count: i },
+    })
+  }
+  return options
+}
+
+/**
+ * Helper function to store pending options in card state
+ */
+const storePendingOptions = (player: PlayerState, options: ActionChoiceOption[]): void => {
+  if (!player.cardStates) {
+    player.cardStates = {}
+  }
+  if (!player.cardStates[CARD_ID]) {
+    player.cardStates[CARD_ID] = { counters: {} }
+  }
+  if (!player.cardStates[CARD_ID].extraData) {
+    player.cardStates[CARD_ID].extraData = {}
+  }
+  player.cardStates[CARD_ID].extraData!.pendingOptions = options
+}
 
 /**
  * C75_Firewood: In the returning home phase of each round, place 1 wood on this card.
@@ -67,6 +105,12 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
     // Check if there's wood on this card
     const woodOnCard = player.cardStates?.[CARD_ID]?.counters?.['wood'] ?? 0
     if (woodOnCard <= 0) return
+    
+    // Generate options and store them in card state
+    const options = generateFirewoodOptions(woodOnCard)
+    if (options.length === 0) return
+    
+    storePendingOptions(player, options)
     
     return {
       flow: {
