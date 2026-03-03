@@ -102,7 +102,7 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   id: 'C75-firewood-after-build',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['buy-major', 'buy-minor'],
+  actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, args } = context
     
