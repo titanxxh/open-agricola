@@ -45,6 +45,8 @@
 | ComputeReplace | 判断行动替代时 | 允许用其他行动替代当前行动 |
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
 
+注：如 C75_Firewood 的 After Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
+
 ## 行动卡 Hook 示例
 
 | Hook 类型 | 示例卡牌 | 说明 |

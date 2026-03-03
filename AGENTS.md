@@ -11,20 +11,21 @@
   - 需要断点会输出哪些日志。
 - 不要引入循环依赖
 - 新增卡牌功能需要有e2e测试，按照之前提供的预期测试说明来写。
-  - 一定需要通过playwright截图，headless模式，查看界面是否符合预期，浏览器窗口宽度至少为1920，验证的截图文件保存在output目录。
+  - 一定需要通过playwright截图，headless模式，查看界面是否符合预期，浏览器窗口宽度至少为1920，验证的每一步的截图文件保存在output目录。
   - 每一次调用后端后，state发生的改变需要记录在不同的文件中，方便后续人工debug。
-  - 验证通过后需要删除测试时的临时文件。
+  - 验证时需要将本次产生的截图文件发我，我会人工检查是否符合预期。
+  - 我确认后，可以产生临时文件。
 - 每次修改代码后，自动运行单元测试（npm test）。
 - 每次修改代码后，自动重启前端与后端服务。
 - 每次修改代码后，更新文档：docs/IMPLEMENTATION_STATUS.md docs/ENGINE_ARCHITECTURE.md docs/cards_impl.md docs/card_progress.md
 - 提交代码到 Git 仓库，commit 标题需要符合规范：
   - 格式：`feat: 新增功能描述` 或 `fix: 修复问题描述` 或 `refactor: 代码重构描述`
   - 描述：简洁明了，避免使用中文
-- 最后git push到remote仓库
+- 最后git push到remote仓库，如果远端代码更新，需要向我确认如何操作。
 
 ## 卡牌实现规范
 
-总体规范：卡牌相关的能力尽可能在卡牌文件内部闭环，不能扩散。
+**总体规范：卡牌相关的能力尽可能在卡牌文件内部闭环，不能扩散。**
 
 ### 1. Modifier 定义位置
 卡牌的 payment modifier（TradeModifier、BonusModifier）必须定义在卡牌自己的文件中，不可放在集中的注册表中。
@@ -59,5 +60,4 @@
 - 类型导出：卡牌名作为常量名（如 A123_FrameBuilder）
 
 ## 启动命令
-- 前端：npm run dev，注意测试时只需要需要启动2个玩家的游戏。
-- 后端：npm run server
+可以用restart.sh重启。注意测试时只需要需要启动2个玩家的游戏。

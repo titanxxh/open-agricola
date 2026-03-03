@@ -45,6 +45,8 @@ export type ActionHookResult = {
   flow?: ActionFlow
   costs?: Partial<Resource>
   sourceCard?: string
+  logKey?: string
+  logParams?: Record<string, unknown>
 }
 
 export type ActionHookHandler = (

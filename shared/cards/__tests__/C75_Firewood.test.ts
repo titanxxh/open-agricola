@@ -133,8 +133,8 @@ const firewoodProcessChoiceListener: CardListenerRegistration = {
         player.resources.wood += actualCount
 
         return {
-          logKey: 'log.firewoodGain',
-          logParams: { count: actualCount },
+          logKey: 'log.cardEffectGain',
+          logParams: { gain: { wood: actualCount }, cardId: CARD_ID },
         }
       }
     }
@@ -164,6 +164,7 @@ const createMockContext = (
     futureMeeples: [],
     pendingFutureMeeples: [],
     gameOver: false,
+    workPhaseObtainedResources: {},
   }
 
   const defaultPlayer: PlayerState = {
@@ -197,12 +198,6 @@ const createMockContext = (
     occupationHand: [],
     occupationPlayed: [],
     playedCards: [],
-    houses: 1,
-    fenced: 0,
-    stables: 0,
-    plowed: 0,
-    sewn: [],
-    animals: { sheep: 0, boar: 0, cattle: 0 },
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
@@ -217,7 +212,6 @@ const createMockContext = (
         counters: { wood: 1 },
       },
     },
-    score: 0,
   }
 
   const defaultSpace: ActionSpace = {
@@ -375,8 +369,8 @@ describe('C75_Firewood', () => {
       const result = listener?.handler(context as any)
 
       expect(result).toBeDefined()
-      expect(result?.logKey).toBe('log.firewoodGain')
-      expect(result?.logParams?.count).toBe(1)
+      expect(result?.logKey).toBe('log.cardEffectGain')
+      expect(result?.logParams?.gain).toEqual({ wood: 1 })
       expect(player.cardStates?.[CARD_ID]?.counters?.['wood']).toBe(1)
       expect(player.resources?.wood).toBe(1)
     })

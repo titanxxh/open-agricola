@@ -31,6 +31,17 @@ export const LogPanel = ({ locale, log }: Props) => (
             )
             .filter((name) => name)
           params.improvements = names.join('、')
+          const costResources = params.costResources as Partial<Resource> | undefined
+          if (costResources && typeof costResources === 'object') {
+            const costText = formatResources(
+              locale,
+              { ...emptyResources, ...costResources },
+              true,
+            )
+            params.cost = costText
+              ? ` ${t(locale, 'log.costs', { resources: costText })}`
+              : ''
+          }
         }
         if (params && params.cardId && entry.key === 'log.cardEffectGain') {
           const id = String(params.cardId)
@@ -52,6 +63,15 @@ export const LogPanel = ({ locale, log }: Props) => (
             }
           }
           params.cardId = name
+        }
+        if (params && entry.key === 'log.cardEffectGain' && typeof params.gain === 'object') {
+          const gainResources = params.gain as Partial<Resource>
+          const gainText = formatResources(
+            locale,
+            { ...emptyResources, ...gainResources },
+            true,
+          )
+          params.gain = gainText
         }
         if (params && params.detailParts && entry.key === 'log.actionDetail') {
           const detailParts = params.detailParts as {

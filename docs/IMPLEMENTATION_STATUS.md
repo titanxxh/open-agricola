@@ -42,7 +42,7 @@
 ## 3. 测试与质量
 
 - 单测框架：vitest。
-- 30 个测试文件，219 个用例全部通过（含 Playwright e2e 测试）。
+- 32 个测试文件，229 个用例全部通过（含 Playwright e2e 测试）。
 
 ## 4. 已知边界
 
@@ -57,6 +57,7 @@
 - ✅ 修复玩家切换后 undo 历史未清空问题（confirmNextPlayer 时清空 history 数组，新增 server/__tests__/undo-history.test.ts 单测）
 - ✅ 修复回合结束后无法进入下一轮问题（所有工人使用后不再设置 confirmNextPlayer pending，允许 End Round 按钮生效）
 - ✅ 实现 C75_Firewood 卡牌：新增 onReturnHome hook，在 returning home phase 触发放置木材效果，购买烤箱后可将卡上木材移至供应堆
+- ✅ 修复 Firewood 与改良日志展示：使用通用 cardEffectGain 记录卡牌来源，改良日志输出支付资源且改良行动不再输出 actionDetail
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
@@ -209,3 +210,10 @@ public static function useResource($player_id, $resourceType, $amount)
 **长期（重大重构）**：
 - 将资源模型从数值改为木块追踪
 - 实现完整的卡牌/资源位置追踪系统
+
+# 7. 前端改进
+1. action 卡牌没有图片显示
+2. 资源堆叠使用图标
+3. 卡牌上的关键字使用图标
+4. log中提到的卡牌需要增加hover后的卡牌显示
+5. reset 随机数种子都移动到 开发者模式中。

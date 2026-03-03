@@ -2,7 +2,6 @@ import type { ActionExecutionResult, GameState, PlayerState, ComplexCost, Resour
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard } from './pay'
-import { formatResources } from '../../logic/format'
 import { getMajorCardEffect } from '../../cards/major'
 import { activateCard } from './activate-card'
 
@@ -117,7 +116,7 @@ const playMajorImprovement = (
   const result: ActionExecutionResult = activation.type === 'flow' ? activation : { type: 'ok' }
   if (result.type === 'ok') {
     result.logKey = 'log.playImprovement'
-    result.logParams = { improvements: improvement.id, cost: formatResources(cost) }
+    result.logParams = { improvements: improvement.id, costResources: cost }
   }
   return result
 }
@@ -162,7 +161,7 @@ const playMinorImprovement = (
   return {
     type: 'ok',
     logKey: 'log.playMinorImprovement',
-    logParams: { improvements: improvement.id, cost: formatResources(cost) },
+    logParams: { improvements: improvement.id, costResources: cost },
   }
 }
 

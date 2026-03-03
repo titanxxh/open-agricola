@@ -183,16 +183,10 @@ const firewoodProcessChoiceListener: CardListenerRegistration = {
         player.cardStates[CARD_ID].counters!['wood'] = woodOnCard - actualCount
         player.resources.wood += actualCount
         
-        // Return logKey for separate log entry
         return {
-          logKey: 'log.firewoodGain',
-          logParams: { count: actualCount },
+          logKey: 'log.cardEffectGain',
+          logParams: { gain: { wood: actualCount }, cardId: CARD_ID },
         }
-        player.cardStates[CARD_ID].counters!['wood'] = woodOnCard - actualCount
-        player.resources.wood += actualCount
-        
-        // Don't return logKey here - the wood gain is already tracked in actionDetail
-        // Returning logKey would cause duplicate log entries
       }
     }
   },
