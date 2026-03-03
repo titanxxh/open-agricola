@@ -933,8 +933,6 @@ export const GameContainerApi = () => {
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
-        allWorkersUsed={allWorkersUsed}
-        isGameOver={state.gameOver}
         isInteractive={isInteractive}
         devMode={devMode}
         seedValue={resetSeedInput}

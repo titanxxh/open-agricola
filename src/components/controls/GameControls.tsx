@@ -9,8 +9,6 @@ type Props = {
   onShowScoring: () => void
   historyLength: number
   hasActionStartSnapshot: boolean
-  allWorkersUsed: boolean
-  isGameOver: boolean
   isInteractive: boolean
   devMode: boolean
   seedValue: string
@@ -25,8 +23,6 @@ export const GameControls = ({
   onShowScoring,
   historyLength,
   hasActionStartSnapshot,
-  allWorkersUsed,
-  isGameOver,
   isInteractive,
   devMode,
   seedValue,

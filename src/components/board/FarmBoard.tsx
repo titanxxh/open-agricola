@@ -175,34 +175,58 @@ export const FarmBoard = ({
           />
         </div>
       </div>
-      <div className="player-tabs">
-        {players.map((player) => (
-          <button
-            key={player.id}
-            className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
-            onClick={() => setViewPlayerId(player.id)}
-          >
-            <span className="player-tab-label">
-              {player.name}
-              {currentStartPlayerId === player.id ? (
-                <span
-                  className="start-marker current"
-                  title={t(locale, 'ui.startPlayer')}
-                >
-                  ★
-                </span>
-              ) : null}
-              {nextStartPlayerId === player.id ? (
-                <span
-                  className="start-marker next"
-                  title={t(locale, 'ui.nextStartPlayer')}
-                >
-                  ➜
-                </span>
-              ) : null}
-            </span>
-          </button>
-        ))}
+      <div className="player-tabs-container">
+        <div className="player-tabs">
+          {players.map((player) => (
+            <button
+              key={player.id}
+              className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
+              onClick={() => setViewPlayerId(player.id)}
+            >
+              <span className="player-tab-label">
+                {player.name}
+                {currentPlayer.id === player.id ? (
+                  <span
+                    className="turn-marker"
+                    title={t(locale, 'ui.activePlayer')}
+                  >
+                    ◀
+                  </span>
+                ) : null}
+                {currentStartPlayerId === player.id ? (
+                  <span
+                    className="start-marker current"
+                    title={t(locale, 'ui.startPlayer')}
+                  >
+                    ★
+                  </span>
+                ) : null}
+                {nextStartPlayerId === player.id ? (
+                  <span
+                    className="start-marker next"
+                    title={t(locale, 'ui.nextStartPlayer')}
+                  >
+                    ➜
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="player-tabs-legend">
+          <div className="legend-item">
+            <span className="turn-marker">◀</span>
+            <span className="legend-text">{t(locale, 'ui.legendActive')}</span>
+          </div>
+          <div className="legend-item">
+            <span className="start-marker current">★</span>
+            <span className="legend-text">{t(locale, 'ui.legendStart')}</span>
+          </div>
+          <div className="legend-item">
+            <span className="start-marker next">➜</span>
+            <span className="legend-text">{t(locale, 'ui.legendNextStart')}</span>
+          </div>
+        </div>
       </div>
     </div>
     <div className="farm-stats">

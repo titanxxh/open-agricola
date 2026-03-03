@@ -3334,8 +3334,6 @@ export const GameContainer = () => {
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={history.length > 0 ? history.length : actionStartSnapshot ? 1 : 0}
         hasActionStartSnapshot={!!actionStartSnapshot}
-        allWorkersUsed={allWorkersUsed}
-        isGameOver={state.gameOver}
         isInteractive={true}
         devMode={devMode}
         seedValue={resetSeedInput}

@@ -158,7 +158,7 @@ export const PlayerCard = ({
     .filter(Boolean)
     .join(' ')
 
-  const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => v && v > 0)
+  const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => typeof v === 'number' && (v as number) > 0)
 
   return (
     <CardWithCopy
