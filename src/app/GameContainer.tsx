@@ -34,6 +34,15 @@ import type { HarvestSummary } from '../../shared/logic/round'
 import {
   addResource,
   persistGame,
+  setResource,
+  validateFence,
+  validatePlow,
+  validateRoom,
+  validateStable,
+  validateSow,
+} from '../services/api'
+  addResource,
+  persistGame,
   validateFence,
   validatePlow,
   validateRoom,
@@ -2498,6 +2507,9 @@ export const GameContainer = () => {
     t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
   const applyDevResource = async () => {
     if (!devPlayerId) return
+    const data = await setResource(devPlayerId, devResource, devAmount)
+    if (data?.state) {
+    if (!devPlayerId) return
     const data = await addResource(devPlayerId, devResource, devAmount)
     if (data?.state) {
       const nextState = normalizeState(data.state as GameState)
@@ -2668,6 +2680,32 @@ export const GameContainer = () => {
       void persistGame(nextState)
     }
     reader.readAsText(file)
+  }
+
+  const createDevPasture = () => {
+    const nextState = cloneState(state)
+    const targetPlayer = nextState.players.find((player) => player.id === devPlayerId)
+    if (!targetPlayer) return
+    
+    // Create a 2x2 pasture at top-left corner (tiles 0,0; 0,1; 1,0; 1,1)
+    // Need 4 edges: H-0-0, H-0-1, H-2-0, H-2-1 (horizontal)
+    //               V-0-0, V-0-1, V-0-2, V-1-0, V-1-1, V-1-2 (vertical)
+    // Simplified: just add a basic set of fence edges
+    const newEdges = [
+      'H-0-0', 'H-0-1',  // top horizontal
+      'H-2-0', 'H-2-1',  // bottom horizontal
+      'V-0-0', 'V-0-1', 'V-0-2',  // left verticals
+      'V-1-0', 'V-1-1', 'V-1-2',  // right verticals
+    ]
+    
+    newEdges.forEach((edge) => {
+      if (!targetPlayer.fenceSegments.includes(edge)) {
+        targetPlayer.fenceSegments.push(edge)
+      }
+    })
+    
+    updateState(nextState)
+    void persistGame(nextState)
   }
 
   const openAnytimeReorg = () => {
@@ -3305,6 +3343,9 @@ export const GameContainer = () => {
           playDevCard={playDevCard}
           drawDevCard={drawDevCard}
           saveDevState={saveDevState}
+          loadDevState={loadDevState}
+          createDevPasture={createDevPasture}
+        />
           loadDevState={loadDevState}
         />
       ) : null}

@@ -245,6 +245,7 @@ export const en = {
     devCardPlaceholder: 'card-id',
     devPlayCard: 'Play Card',
     devDrawCard: 'Draw Card',
+    devCreatePasture: 'Create Pasture',
     devTargetHint: '↓ Actions below target this player',
     cardCopy: 'Copy ID',
     cardCopied: 'Copied!',

@@ -274,6 +274,40 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  if (req.method === 'POST' && req.url === '/api/dev/set-resource') {
+    const body = await parseBody(req)
+    const { playerId, resource, amount } = body as {
+      playerId?: string
+      resource?: string
+      amount?: number
+    }
+    const payloadError = validateResourcePayload({ playerId, resource, amount })
+    if (payloadError) {
+      sendJson(res, 400, { error: payloadError })
+      return
+    }
+    const resourceKey = resource as keyof PlayerFarmState['resources']
+    const state = await readState()
+    if (!state || !Array.isArray(state.players)) {
+      sendJson(res, 400, { error: 'State missing' })
+      return
+    }
+    const player = state.players.find((p) => p.id === playerId)
+    if (!player || !player.resources) {
+      sendJson(res, 400, { error: 'Player not found' })
+      return
+    }
+    const nextValue = Math.max(0, Number(amount ?? 0))
+    player.resources[resourceKey] = nextValue
+    await writeState(state)
+    sendJson(res, 200, { state })
+    return
+  }
+
+  if (req.method === 'POST' && req.url === '/api/fence/validate') {
+    return
+  }
+
   if (req.method === 'POST' && req.url === '/api/fence/validate') {
     const body = await parseBody(req)
     const { playerId, edges, extraWood } = body as {

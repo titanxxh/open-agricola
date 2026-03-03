@@ -93,3 +93,16 @@ export const addResource = async (
   })
   return response.json()
 }
+
+export const setResource = async (
+  playerId: string,
+  resource: keyof Resource,
+  amount: number,
+) => {
+  const response = await fetch(`${apiBase}/api/dev/set-resource`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId, resource, amount }),
+  })
+  return response.json()
+}

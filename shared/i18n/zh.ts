@@ -234,6 +234,7 @@ export const zh = {
     devCardPlaceholder: 'card-id',
     devPlayCard: '打出卡牌',
     devDrawCard: '摸牌',
+    devCreatePasture: '创建圈地',
     devTargetHint: '↓ 以下操作针对该玩家',
     cardCopy: '复制ID',
     cardCopied: '已复制!',
