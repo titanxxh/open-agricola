@@ -104,10 +104,11 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { player, args } = context
+    const { player, choice } = context
     
-    // Check if the built card is an oven
-    const builtCardId = args?.cardId as string | undefined
+    // Parse choice to get the actual improvement ID
+    // Choice format is 'major:Major_Fireplace1' or 'minor:E01_SomeCard'
+    const builtCardId = choice ? choice.replace(/^major:/, '').replace(/^minor:/, '') : undefined
     if (!builtCardId || !OVEN_IMPROVEMENTS.includes(builtCardId)) return
     
     // Check if there's wood on this card

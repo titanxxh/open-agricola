@@ -447,6 +447,7 @@ choice: { promptKey: result.promptKey, options: result.options },
       const afterResults = this.hooks.after(
         { ...executionContext, actionId: replacedActionId },
         result,
+        undefined,
       )
       const hookFlows = [...immediateResults, ...afterResults]
         .map((entry) => entry.flow)
@@ -554,24 +555,14 @@ choice: { promptKey: result.promptKey, options: result.options },
           return result
         }
         const immediateResults = this.hooks.immediatelyAfter(
-          { ...executionContext, actionId },
+          { ...executionContext, actionId, choice },
           result,
+          choice,
         )
-        // Use result's logKey if present, otherwise use generic action log
-        if (result.type === 'ok' && result.logKey) {
-          this.log.append({
-            key: result.logKey,
-            params: { player: context.player.name, ...result.logParams },
-          })
-        } else {
-          this.log.append({
-            key: 'log.action',
-            params: { actionId },
-          })
-        }
         const afterResults = this.hooks.after(
-          { ...executionContext, actionId },
+          { ...executionContext, actionId, choice },
           result,
+          choice,
         )
         const hookFlows = [...immediateResults, ...afterResults]
           .map((entry) => entry.flow)
@@ -636,8 +627,8 @@ choice: { promptKey: result.promptKey, options: result.options },
         params: { player: context.player.name, ...result.logParams },
       })
     }
-    const immediateResults = this.hooks.immediatelyAfter({ ...executionContext, actionId }, result)
-    const afterResults = this.hooks.after({ ...executionContext, actionId }, result)
+    const immediateResults = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
+    const afterResults = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
     const hookFlows = [...immediateResults, ...afterResults]
       .map((entry) => entry.flow)
       .filter((flow) => flow)

@@ -59,20 +59,22 @@ export class HookDispatcher {
   immediatelyAfter(
     context: ActionExecutionContext & { actionId: string },
     result: ActionExecutionResult,
+    choice?: string,
   ) {
     return [
-      ...runActionHooks({ ...context, phase: 'immediatelyAfter', result }),
-      ...runCardListeners({ ...context, phase: 'immediatelyAfter', result }),
+      ...runActionHooks({ ...context, phase: 'immediatelyAfter', result, choice }),
+      ...runCardListeners({ ...context, phase: 'immediatelyAfter', result, choice }),
     ]
   }
 
   after(
     context: ActionExecutionContext & { actionId: string },
     result: ActionExecutionResult,
+    choice?: string,
   ) {
     return [
-      ...runActionHooks({ ...context, phase: 'after', result }),
-      ...runCardListeners({ ...context, phase: 'after', result }),
+      ...runActionHooks({ ...context, phase: 'after', result, choice }),
+      ...runCardListeners({ ...context, phase: 'after', result, choice }),
     ]
   }
 
