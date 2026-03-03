@@ -44,9 +44,7 @@ export const C52_HuntsmansHat = new MinorImprovement({
   deck: "C",
   number: 52,
   category: "FOOD_PROVIDER",
-  desc: [
-    "For each new <BOAR> you get from the effect of an action space, you also get 1 <FOOD>.",
-  ],
+  desc: ["For each new <PIG> you get from the effect of an action space, you also get 1 <FOOD>."],
   cost: { reed: 1 },
   prerequisite: "Cooking Improvement",
   newSet: true,

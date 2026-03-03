@@ -6,7 +6,7 @@ export const D2_DwellingPlan = new MinorImprovement({
   deck: "D",
   number: 2,
   category: "FARM_PLANNER",
-  desc: ["Immediately renov your house for free."],
+  desc: ["You can immediately take a __Renovation__ action."],
   cost: {},
   passing: true,
   implemented: false,

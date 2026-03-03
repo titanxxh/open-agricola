@@ -6,7 +6,7 @@ export const C4_WritingBoards = new MinorImprovement({
   deck: "C",
   number: 4,
   category: "ACTIONS_BOOSTER",
-  desc: ["At the end of the game, you get 1 <SCORE> for each improvement and occupation card you have played."],
+  desc: ["You immediately get 1 <WOOD> for each occupation you have in front of you."],
   cost: { wood: 2 },
   passing: true,
   implemented: false,

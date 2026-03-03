@@ -5,7 +5,7 @@ export const D4_CrossCutWood = new MinorImprovement({
   deck: "D",
   number: 4,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["If you have a Clay/Stone Oven, Cooking Hearth, Stone Oven, Pottery, or Basketmaker's Workshop, you you you immediately get 1 <WOOD>."],
+  desc: ["You immediately get a number of <WOOD> equal to the number of <STONE> in your supply."],
   cost: { food: 2 },
   passing: true,
   implemented: false,

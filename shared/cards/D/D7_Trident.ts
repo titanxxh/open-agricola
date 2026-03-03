@@ -5,7 +5,7 @@ export const D7_Trident = new MinorImprovement({
   deck: "D",
   number: 7,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately get 1 <FOOD> for each <CATTLE> and <SHEEP> in your supply."],
+  desc: ["If you play this card in round 3/6/9/12, you immediately get 3/4/5/6 <FOOD>."],
   cost: {},
   passing: true,
   implemented: false,

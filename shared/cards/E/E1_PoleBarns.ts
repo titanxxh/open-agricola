@@ -5,7 +5,7 @@ export const E1_PoleBarns = new MinorImprovement({
   deck: "E",
   number: 1,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately build 1 stable for free. You also stable is wooden stables. (Stables on the do not count toward the limit of 4 stables.)"],
+  desc: ["You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)"],
   cost: { food: 2 },
   passing: true,
   implemented: false,

@@ -6,7 +6,7 @@ export const C3_CarriageTrip = new MinorImprovement({
   deck: "C",
   number: 3,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["You immediately get 2 <WOOD>, 2 <CLAY>, 2 <REED>, 2 <STONE>, and 2 <FOOD>."],
+  desc: ["If you play this card in the work phase, you can immediately place another person."],
   cost: { food: 3 },
   passing: true,
   implemented: false,

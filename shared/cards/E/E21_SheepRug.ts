@@ -38,7 +38,7 @@ export const E21_SheepRug = new MinorImprovement({
   deck: "E",
   number: 21,
   category: "FOOD_PROVIDER",
-  desc: ["You you can use any __Wish for Children__ action space, even if it is occupied by another player. Instead of paying 1 <FOOD>, you pay 1 <SHEEP>."],
+  desc: ["You can use any __Wish for Children__ action space, even if it is occupied by another player\'s person."],
   cost: { sheep: 1 },
   prerequisite: "4 Sheep",
   implemented: true,

@@ -6,7 +6,7 @@ export const A9_YoungAnimalMarket = new MinorImprovement({
   deck: "A",
   number: 9,
   category: "LIVESTOCK_BREEDER",
-  desc: ["Immediately take 1 <SHEEP> or 1 <BOAR> from the animal track. (You may take an animal that has run out.)"],
+  desc: ["You immediately get 1 <CATTLE>. (Effectively, you are exchanging 1 <SHEEP> for 1 <CATTLE>.)"],
   cost: {},
   passing: true,
   implemented: false,
