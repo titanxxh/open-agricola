@@ -42,8 +42,7 @@
 ## 3. 测试与质量
 
 - 单测框架：vitest。
-- 25 个测试文件，177 个用例全部通过（含 Playwright e2e 测试）。
-- `npm run build` 全量通过。
+- 32 个测试文件，229 个用例全部通过（含 Playwright e2e 测试）。
 
 ## 4. 已知边界
 
@@ -51,11 +50,14 @@
 - WebSocket 多人流程尚未端到端测试。
 - 撤销功能支持 API 模式（撤销步骤、撤销行动）；撤销回合功能已移除以避免混淆。
 - API 模式行动日志已覆盖资源变化、播种与改良/烤面包记录（播种支持新开垦田地且无选择禁用确认）。
-- 新增 Playwright 端到端测试 `e2e-tests/actions.spec.ts`，用于自动化验证行动卡逻辑与撤销功能。已修复开发者面板选择器不匹配导致的超时问题。
-- 新增 Playwright 端到端测试 `e2e-tests/harvest.spec.ts`，用于验证收获阶段执行顺序正确性。
-- 非当前玩家视角不显示可选高亮与播种控件。
-- 非当前玩家窗口为只读视图，交互按钮全部禁用。
-- `GameContainerApi` 的动物重整 UI 交互（adjustReorgAnimal）待完善。
+- 卡牌给予行动日志支持：显示来源卡牌、获得的行动、资源转换数量（如 C25_SteamMachine 触发烤面包）
+- ✅ 修复 C25_SteamMachine 烤面包日志显示问题（bake-bread.ts 中 params -> logParams）
+- ✅ 修复 C25_SteamMachine 烤面包后续选择解析问题（engine.ts 中正确跟踪 pendingChoiceNodeId/pendingChoiceActionId）
+- ✅ 修复 resolveChoice 缺少条件检查导致的选择解析失败（game-session.ts 中恢复 pending 类型检查）
+- ✅ 修复玩家切换后 undo 历史未清空问题（confirmNextPlayer 时清空 history 数组，新增 server/__tests__/undo-history.test.ts 单测）
+- ✅ 修复回合结束后无法进入下一轮问题（所有工人使用后不再设置 confirmNextPlayer pending，允许 End Round 按钮生效）
+- ✅ 实现 C75_Firewood 卡牌：新增 onReturnHome hook，在 returning home phase 触发放置木材效果，购买烤箱后可将卡上木材移至供应堆
+- ✅ 修复 Firewood 与改良日志展示：使用通用 cardEffectGain 记录卡牌来源，改良日志输出支付资源且改良行动不再输出 actionDetail
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
@@ -208,3 +210,10 @@ public static function useResource($player_id, $resourceType, $amount)
 **长期（重大重构）**：
 - 将资源模型从数值改为木块追踪
 - 实现完整的卡牌/资源位置追踪系统
+
+# 7. 前端改进
+1. action 卡牌没有图片显示
+2. 资源堆叠使用图标
+3. 卡牌上的关键字使用图标
+4. log中提到的卡牌需要增加hover后的卡牌显示
+5. reset 随机数种子都移动到 开发者模式中。

@@ -175,34 +175,58 @@ export const FarmBoard = ({
           />
         </div>
       </div>
-      <div className="player-tabs">
-        {players.map((player) => (
-          <button
-            key={player.id}
-            className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
-            onClick={() => setViewPlayerId(player.id)}
-          >
-            <span className="player-tab-label">
-              {player.name}
-              {currentStartPlayerId === player.id ? (
-                <span
-                  className="start-marker current"
-                  title={t(locale, 'ui.startPlayer')}
-                >
-                  ★
-                </span>
-              ) : null}
-              {nextStartPlayerId === player.id ? (
-                <span
-                  className="start-marker next"
-                  title={t(locale, 'ui.nextStartPlayer')}
-                >
-                  ➜
-                </span>
-              ) : null}
-            </span>
-          </button>
-        ))}
+      <div className="player-tabs-container">
+        <div className="player-tabs">
+          {players.map((player) => (
+            <button
+              key={player.id}
+              className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
+              onClick={() => setViewPlayerId(player.id)}
+            >
+              <span className="player-tab-label">
+                {player.name}
+                {currentPlayer.id === player.id ? (
+                  <span
+                    className="turn-marker"
+                    title={t(locale, 'ui.activePlayer')}
+                  >
+                    ◀
+                  </span>
+                ) : null}
+                {currentStartPlayerId === player.id ? (
+                  <span
+                    className="start-marker current"
+                    title={t(locale, 'ui.startPlayer')}
+                  >
+                    ★
+                  </span>
+                ) : null}
+                {nextStartPlayerId === player.id ? (
+                  <span
+                    className="start-marker next"
+                    title={t(locale, 'ui.nextStartPlayer')}
+                  >
+                    ➜
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="player-tabs-legend">
+          <div className="legend-item">
+            <span className="turn-marker">◀</span>
+            <span className="legend-text">{t(locale, 'ui.legendActive')}</span>
+          </div>
+          <div className="legend-item">
+            <span className="start-marker current">★</span>
+            <span className="legend-text">{t(locale, 'ui.legendStart')}</span>
+          </div>
+          <div className="legend-item">
+            <span className="start-marker next">➜</span>
+            <span className="legend-text">{t(locale, 'ui.legendNextStart')}</span>
+          </div>
+        </div>
       </div>
     </div>
     <div className="farm-stats">
@@ -304,7 +328,7 @@ export const FarmBoard = ({
             : null
           const houseLabel =
             tileKey === houseLabelKey
-              ? houseDisplay.animalType
+              ? houseDisplay.animalCount > 0
                 ? `${houseDisplay.animalCount}${t(
                     locale,
                     `resources.${houseDisplay.animalType}`,
@@ -514,7 +538,7 @@ export const FarmBoard = ({
         if (cell.type === 'fence-h' || cell.type === 'fence-v') {
           const edgeId = cell.fenceId ?? ''
           const isExisting = edgeId && existingFenceSet.has(edgeId)
-          const isPending = edgeId && pendingFenceSet.has(edgeId)
+          const isPending = isInteractive && edgeId && pendingFenceSet.has(edgeId)
           const isActive = isExisting || isPending
           const isSelectable = isInteractive && canSelectFences && edgeId && !isExisting
           return (
@@ -537,26 +561,20 @@ export const FarmBoard = ({
     {isReorgActive ? (
       <div className="reorg-panel">
         <div className="reorg-panel-title">{t(locale, 'ui.reorgPendingTitle')}</div>
-        {displayPlayer.pastures.length === 0 ? (
-          <div className="reorg-panel-empty">
-            {t(locale, 'ui.interactionReorgAnimalsNoPasture')}
+        <div className="reorg-panel-summary">
+          <div className="reorg-panel-row">
+            <span>{t(locale, 'ui.reorgPending')}</span>
+            <span>
+              {formatAnimalCounts(
+                locale,
+                reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+              )}
+            </span>
           </div>
-        ) : (
-          <div className="reorg-panel-summary">
-            <div className="reorg-panel-row">
-              <span>{t(locale, 'ui.reorgPending')}</span>
-              <span>
-                {formatAnimalCounts(
-                  locale,
-                  reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
-                )}
-              </span>
-            </div>
-            {hasReorgOverflow ? (
-              <div className="reorg-error">{t(locale, 'ui.reorgOverAssign')}</div>
-            ) : null}
-          </div>
-        )}
+          {hasReorgOverflow ? (
+            <div className="reorg-error">{t(locale, 'ui.reorgOverAssign')}</div>
+          ) : null}
+        </div>
         {animalReorg?.confirmDiscard ? (
           <div className="reorg-warning">
             <div>
@@ -597,6 +615,9 @@ export const FarmBoard = ({
           const isOccupation = kind === 'occupation'
           const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
+          const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
+          const hasCounters = Object.values(cardStateCounters).some((count) => count > 0)
+          
           return (
             <div key={`played-${index}`} className="played-card-wrapper">
               <PlayerCard
@@ -605,8 +626,24 @@ export const FarmBoard = ({
                 cardType={cardType}
                 devMode={devMode}
               />
-              {futureEntries.length > 0 ? (
+              {futureEntries.length > 0 || hasCounters ? (
                 <div className="card-future">
+                  {Object.entries(cardStateCounters).map(([resKey, count]) => {
+                    if (count <= 0) return null
+                    return (
+                      <div
+                        key={`state-${rawId}-${resKey}`}
+                        className="card-future-item"
+                        title={`${count} ${t(locale, `resources.${resKey}`)}`}
+                      >
+                        <ResourceLine
+                          locale={locale}
+                          resources={{ ...emptyResources, [resKey]: count }}
+                          className="card-future-text"
+                        />
+                      </div>
+                    )
+                  })}
                   {futureEntries.map((entry, entryIndex) => {
                     const label = formatResources(
                       locale,

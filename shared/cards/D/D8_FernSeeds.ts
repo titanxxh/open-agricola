@@ -5,7 +5,7 @@ export const D8_FernSeeds = new MinorImprovement({
   deck: "D",
   number: 8,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately get 1 <GRAIN> for each empty field you have."],
+  desc: ["You get 2 <FOOD> and 1 <GRAIN>, which you must sow immediately."],
   cost: { food: 1 },
   passing: true,
   implemented: false,

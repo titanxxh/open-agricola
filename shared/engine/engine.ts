@@ -7,6 +7,7 @@ import type {
   GameState,
   ActionChoiceOption,
 } from '../game/types'
+import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,
   ChoiceNode,
@@ -37,6 +38,35 @@ export class Engine {
   private pendingChoiceActionId: string | null = null
   private flowNodeCounter = 0
 
+  private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
+    if (typeof followUp === 'string') {
+      return { actionId: followUp }
+    }
+    return followUp
+  }
+
+  private buildFollowUpNodes(
+    followUps: FollowUpAction[],
+    baseId: string,
+    player: PlayerState,
+  ): EngineNode[] {
+    return followUps
+      .filter((followUp) => followUp)
+      .map((followUp, index) => {
+        const { actionId, sourceCard } = this.parseFollowUpAction(followUp)
+        if (sourceCard) {
+          this.log.append({
+            key: 'log.cardGrantedAction',
+            params: {
+              player: player.name,
+              actionId,
+              cardId: sourceCard,
+            },
+          })
+        }
+        return new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      })
+  }
   private findActionNode(node: EngineNode): ActionNode | null {
     if (node instanceof ActionNode) return node
     if ('children' in node) {
@@ -349,35 +379,50 @@ export class Engine {
           const resourceKey = key as keyof PlayerState['resources']
           if (value < 0) {
             // Negative cost = gain resource
-            context.player.resources[resourceKey] += Math.abs(value)
+            const gain = Math.abs(value)
+            context.player.resources[resourceKey] += gain
+            if (entry.sourceCard) {
+              this.log.append({
+                key: 'log.cardEffectGain',
+                params: {
+                  player: context.player.name,
+                  cardId: entry.sourceCard,
+                  gain: `${gain} ${resourceKey.toUpperCase()}`,
+                },
+              })
+            }
           }
         })
       })
       const result = action.execute(executionContext)
       this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
-      if (result.type === 'choice') {
-        node.resolve(result)
-        const nextNode = this.tree.nextUnresolved()
-        if (nextNode instanceof ChoiceNode) {
-          nextNode.setChoice(result.promptKey, result.options)
-          this.pendingChoiceNodeId = nextNode.id
+if (result.type === 'choice') {
+node.resolve(result)
+const argResults = this.hooks.computeArgs(
+{ ...executionContext, actionId: replacedActionId },
+result,
+)
+const extraOptions = argResults
+.flatMap((entry) => entry.extraOptions ?? [])
+.filter((option) => option)
+if (extraOptions.length > 0) {
+result.options = [...result.options, ...extraOptions]
+        }
+        // Check if there's a ChoiceNode in the tree to handle this choice
+        const choiceNode = this.findChoiceNode(this.tree.root)
+        if (choiceNode) {
+          choiceNode.setChoice(result.promptKey, result.options)
+          this.pendingChoiceNodeId = choiceNode.id
+          this.pendingChoiceActionId = replacedActionId
+        } else {
+          // No ChoiceNode - action will handle choice via resolveChoice
           this.pendingChoiceActionId = replacedActionId
         }
-        const argResults = this.hooks.computeArgs(
-          { ...executionContext, actionId: replacedActionId },
-          result,
-        )
-        const extraOptions = argResults
-          .flatMap((entry) => entry.extraOptions ?? [])
-          .filter((option) => option)
-        if (extraOptions.length > 0) {
-          result.options = [...result.options, ...extraOptions]
-        }
-        return {
-          type: 'choice',
-          nodeId: this.pendingChoiceNodeId ?? node.id,
-          choice: { promptKey: result.promptKey, options: result.options },
-        }
+return {
+type: 'choice',
+nodeId: this.pendingChoiceNodeId ?? node.id,
+choice: { promptKey: result.promptKey, options: result.options },
+}
       }
       if (result.type === 'flow') {
         const flowNode = this.buildFlowNode(result.flow)
@@ -387,13 +432,22 @@ export class Engine {
         { ...executionContext, actionId: replacedActionId },
         result,
       )
-      this.log.append({
-        key: 'log.action',
-        params: { actionId: replacedActionId },
-      })
+      // Use result's logKey if present, otherwise use generic action log
+      if (result.type === 'ok' && result.logKey) {
+        this.log.append({
+          key: result.logKey,
+          params: { player: context.player.name, ...result.logParams },
+        })
+      } else {
+        this.log.append({
+          key: 'log.action',
+          params: { actionId: replacedActionId },
+        })
+      }
       const afterResults = this.hooks.after(
         { ...executionContext, actionId: replacedActionId },
         result,
+        undefined,
       )
       const hookFlows = [...immediateResults, ...afterResults]
         .map((entry) => entry.flow)
@@ -401,13 +455,11 @@ export class Engine {
         .map((flow) => this.buildFlowNode(flow as ActionFlow))
       const followUps = [...immediateResults, ...afterResults]
         .flatMap((entry) => entry.followUpActions ?? [])
-        .filter((actionId) => actionId)
+        .filter((action) => action)
       if (hookFlows.length > 0 || followUps.length > 0) {
         const nodes = [
           ...hookFlows,
-          ...followUps.map(
-            (actionId, index) => new ActionNode(`chain-${node.id}-${index}`, actionId),
-          ),
+          ...this.buildFollowUpNodes(followUps, node.id, context.player),
         ]
         this.tree.insertAfter(node.id, nodes)
       }
@@ -503,31 +555,37 @@ export class Engine {
           return result
         }
         const immediateResults = this.hooks.immediatelyAfter(
-          { ...executionContext, actionId },
+          { ...executionContext, actionId, choice },
           result,
+          choice,
         )
-        this.log.append({
-          key: 'log.action',
-          params: { actionId },
-        })
         const afterResults = this.hooks.after(
-          { ...executionContext, actionId },
+          { ...executionContext, actionId, choice },
           result,
+          choice,
         )
+        
+        // Process logKey from hook results
+        ;[...immediateResults, ...afterResults].forEach((entry) => {
+          if (entry.logKey) {
+            this.log.append({
+              key: entry.logKey,
+              params: { player: context.player.name, ...entry.logParams },
+            })
+          }
+        })
+        
         const hookFlows = [...immediateResults, ...afterResults]
           .map((entry) => entry.flow)
           .filter((flow) => flow)
           .map((flow) => this.buildFlowNode(flow as ActionFlow))
         const followUps = [...immediateResults, ...afterResults]
           .flatMap((entry) => entry.followUpActions ?? [])
-          .filter((followUpAction) => followUpAction)
+          .filter((action) => action)
         if (hookFlows.length > 0 || followUps.length > 0) {
           const nodes = [
             ...hookFlows,
-            ...followUps.map(
-              (followUpAction, index) =>
-                new ActionNode(`chain-${child.id}-${index}`, followUpAction),
-            ),
+            ...this.buildFollowUpNodes(followUps, child.id, context.player),
           ]
           this.tree.insertAfter(child.id, nodes)
         }
@@ -564,7 +622,7 @@ export class Engine {
         }
       }
       this.pendingChoiceNodeId = null
-      this.pendingChoiceActionId = null
+      // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
     if (result.type === 'flow') {
@@ -573,25 +631,37 @@ export class Engine {
         this.tree.insertAfter(this.pendingChoiceNodeId, [flowNode])
       }
     }
-    const immediateResults = this.hooks.immediatelyAfter(
-      { ...executionContext, actionId },
-      result,
-    )
-    const afterResults = this.hooks.after({ ...executionContext, actionId }, result)
+    // Use result's logKey if present, otherwise use generic action log
+    if (result.type === 'ok' && result.logKey) {
+      this.log.append({
+        key: result.logKey,
+        params: { player: context.player.name, ...result.logParams },
+      })
+    }
+    const immediateResults = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
+    const afterResults = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
+    
+    // Process logKey from hook results
+    ;[...immediateResults, ...afterResults].forEach((entry) => {
+      if (entry.logKey) {
+        this.log.append({
+          key: entry.logKey,
+          params: { player: context.player.name, ...entry.logParams },
+        })
+      }
+    })
+    
     const hookFlows = [...immediateResults, ...afterResults]
       .map((entry) => entry.flow)
       .filter((flow) => flow)
       .map((flow) => this.buildFlowNode(flow as ActionFlow))
     const followUps = [...immediateResults, ...afterResults]
       .flatMap((entry) => entry.followUpActions ?? [])
-      .filter((actionId) => actionId)
+      .filter((action) => action)
     if ((hookFlows.length > 0 || followUps.length > 0) && this.pendingChoiceNodeId) {
       const nodes = [
         ...hookFlows,
-        ...followUps.map(
-          (action, index) =>
-            new ActionNode(`chain-${this.pendingChoiceNodeId}-${index}`, action),
-        ),
+        ...this.buildFollowUpNodes(followUps, this.pendingChoiceNodeId, context.player),
       ]
       this.tree.insertAfter(this.pendingChoiceNodeId, nodes)
     }

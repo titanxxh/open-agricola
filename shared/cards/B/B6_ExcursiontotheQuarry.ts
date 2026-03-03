@@ -6,7 +6,7 @@ export const B6_ExcursiontotheQuarry = new MinorImprovement({
   deck: "B",
   number: 6,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately take 1 <STONE> from the general supply."],
+  desc: ["You immediately get a number of <STONE> equal to the number of people you have."],
   cost: { food: 1 },
   passing: true,
   implemented: false,

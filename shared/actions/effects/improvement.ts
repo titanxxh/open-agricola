@@ -111,7 +111,14 @@ const playMajorImprovement = (
   state.availableMajorImprovements = state.availableMajorImprovements.filter(
     (id) => id !== improvement.id,
   )
-  return activation.type === 'flow' ? activation : { type: 'ok' }
+  
+  // Return with logKey to record the improvement play with payment info
+  const result: ActionExecutionResult = activation.type === 'flow' ? activation : { type: 'ok' }
+  if (result.type === 'ok') {
+    result.logKey = 'log.playImprovement'
+    result.logParams = { improvements: improvement.id, costResources: cost }
+  }
+  return result
 }
 
 export const getMinorImprovementCost = (
@@ -150,7 +157,12 @@ const playMinorImprovement = (
   player.minorPlayed.push(improvement.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`minor:${improvement.id}`)
-  return { type: 'ok' }
+  // Return with logKey to record the improvement play with payment info
+  return {
+    type: 'ok',
+    logKey: 'log.playMinorImprovement',
+    logParams: { improvements: improvement.id, costResources: cost },
+  }
 }
 
 export const playImprovement = (

@@ -31,6 +31,47 @@ export const LogPanel = ({ locale, log }: Props) => (
             )
             .filter((name) => name)
           params.improvements = names.join('、')
+          const costResources = params.costResources as Partial<Resource> | undefined
+          if (costResources && typeof costResources === 'object') {
+            const costText = formatResources(
+              locale,
+              { ...emptyResources, ...costResources },
+              true,
+            )
+            params.cost = costText
+              ? ` ${t(locale, 'log.costs', { resources: costText })}`
+              : ''
+          }
+        }
+        if (params && params.cardId && entry.key === 'log.cardEffectGain') {
+          const id = String(params.cardId)
+          let name = id
+          if (id.startsWith('A') || id.startsWith('B') || id.startsWith('C') || id.startsWith('D') || id.startsWith('E')) {
+            if (id.includes('_')) {
+              // Probably an occupation
+              name = t(locale, `occupations.${id}.name`).replace(/\s*[（(].*$/, '')
+            }
+          }
+          if (name === id || name.includes('.name')) {
+            // Try major or minor improvements
+            let temp = t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
+            if (temp.includes('.name')) {
+              temp = t(locale, `minorImprovements.${id}.name`).replace(/\s*[（(].*$/, '')
+            }
+            if (!temp.includes('.name')) {
+              name = temp
+            }
+          }
+          params.cardId = name
+        }
+        if (params && entry.key === 'log.cardEffectGain' && typeof params.gain === 'object') {
+          const gainResources = params.gain as Partial<Resource>
+          const gainText = formatResources(
+            locale,
+            { ...emptyResources, ...gainResources },
+            true,
+          )
+          params.gain = gainText
         }
         if (params && params.detailParts && entry.key === 'log.actionDetail') {
           const detailParts = params.detailParts as {

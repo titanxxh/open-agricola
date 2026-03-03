@@ -10,4 +10,8 @@ export class LogStore {
   all() {
     return [...this.entries]
   }
+
+  clear() {
+    this.entries = []
+  }
 }

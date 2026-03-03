@@ -14,6 +14,11 @@ const steamMachineListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, space } = context
     
+    // Check if player has this card
+    if (!player.minorPlayed.includes('C25_SteamMachine')) {
+      return
+    }
+    
     if (player.workersAvailable > 0) {
       return
     }
@@ -23,7 +28,7 @@ const steamMachineListener: CardListenerRegistration = {
     }
 
     return {
-      followUpActions: ['bake-bread'],
+      followUpActions: [{ actionId: 'bake-bread', sourceCard: 'C25_SteamMachine' }],
     }
   },
 }

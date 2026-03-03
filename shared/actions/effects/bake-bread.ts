@@ -26,7 +26,17 @@ export const bakeBread = (
   if (bakeTimes === 0) {
     return { type: 'ok' }
   }
+  const foodGained = bakeTable[improvement] * bakeTimes
   player.resources.grain -= bakeTimes
-  player.resources.food += bakeTable[improvement] * bakeTimes
-  return { type: 'ok' }
+  player.resources.food += foodGained
+  return {
+    type: 'ok',
+    logKey: 'log.bakeBreadResult',
+    logParams: {
+      grainUsed: bakeTimes,
+      foodGained,
+      improvement,
+    },
+  }
+
 }

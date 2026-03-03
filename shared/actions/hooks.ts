@@ -35,13 +35,18 @@ export type ActionHookContext = ActionExecutionContext & {
   doable?: boolean
 }
 
+export type FollowUpAction = string | { actionId: string; sourceCard?: string }
+
 export type ActionHookResult = {
   doable?: boolean
   actionId?: string
   extraOptions?: ActionChoiceOption[]
-  followUpActions?: string[]
+  followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
+  sourceCard?: string
+  logKey?: string
+  logParams?: Record<string, unknown>
 }
 
 export type ActionHookHandler = (

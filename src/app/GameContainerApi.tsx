@@ -87,7 +87,30 @@ export const GameContainerApi = () => {
   } = useFarmSelection()
 
   useEffect(() => {
-    api.fetchState().then(applyResponse).catch((e) => { console.error("fetchState failed:", e) })
+    api.fetchState().then((resp) => {
+      applyResponse(resp)
+      if (resp.pending.type === 'animalReorg' && resp.state) {
+        const player = resp.state.players[resp.pending.playerIndex]
+        if (player) {
+          const stableKeys = getLooseStableKeys(player)
+          setAnimalReorg({
+            zones: [
+              ...player.pastures.map((p) => ({
+                id: p.id, zoneType: 'pasture' as const,
+                animalType: p.animalType, animalCount: p.animalCount,
+              })),
+              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
+              ...stableKeys.map((key) => ({
+                id: `stable:${key}`, zoneType: 'stable' as const,
+                animalType: player.stableAnimals?.[key] ?? null,
+                animalCount: player.stableAnimals?.[key] ? 1 : 0,
+              })),
+            ],
+            confirmDiscard: false,
+          })
+        }
+      }
+    }).catch((e) => { console.error("fetchState failed:", e) })
   }, [])
 
   const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
@@ -117,7 +140,7 @@ export const GameContainerApi = () => {
       } else if (resp.pending.type !== 'choice') {
         setAnimalReorg(null)
       }
-      if (resp.pending.type === 'choice') {
+      if (resp.ok) {
         setPendingFenceEdges([])
         setFenceError(null)
         setPendingRoomTiles([])
@@ -244,10 +267,6 @@ export const GameContainerApi = () => {
     if (!isInteractive) return
     void applyAndSync(api.confirmNextPlayer())
   }, [api, applyAndSync, isInteractive])
-  const endRound = useCallback(() => {
-    if (!isInteractive) return
-    void applyAndSync(api.performRoundEnd())
-  }, [api, applyAndSync, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
@@ -275,6 +294,15 @@ export const GameContainerApi = () => {
     remaining: pending.remaining, foodUsed: 0,
   } : null
   const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
+
+  // Auto-end round when all workers are used and no pending actions
+  useEffect(() => {
+    if (!state || state.gameOver) return
+    if (!allWorkersUsed) return
+    if (pending.type !== 'none') return
+    // Auto-trigger round end
+    void applyAndSync(api.performRoundEnd())
+  }, [allWorkersUsed, pending.type, state?.gameOver, api, applyAndSync])
 
   const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
@@ -485,19 +513,32 @@ export const GameContainerApi = () => {
     ;(displayPlayer?.pastures ?? []).forEach((p) => { if (p.tiles.length > 0) map.set(positionKey(p.tiles[0]), getPastureCapacity(p)) })
     return map
   }, [displayPlayer?.pastures])
-  const houseDisplay = useMemo(() => ({ animalType: (displayPlayer?.houseAnimalType ?? null) as 'sheep' | 'boar' | 'cattle' | null, animalCount: displayPlayer?.houseAnimalCount ?? 0 }), [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount])
+  const isReorgActive = !!animalReorg
+
+  const houseDisplay = useMemo(() => {
+    if (isReorgActive && animalReorg) {
+      const zone = animalReorg.zones.find((entry) => entry.zoneType === 'house')
+      return {
+        animalType: zone?.animalType ?? null,
+        animalCount: zone?.animalCount ?? 0,
+      }
+    }
+    return { 
+      animalType: (displayPlayer?.houseAnimalType ?? null) as 'sheep' | 'boar' | 'cattle' | null, 
+      animalCount: displayPlayer?.houseAnimalCount ?? 0 
+    }
+  }, [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount, isReorgActive, animalReorg])
   const stableDisplayMap = useMemo(() => {
     const map = new Map<string, { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }>()
     Object.entries(displayPlayer?.stableAnimals ?? {}).forEach(([key, type]) => { map.set(key, { animalType: type as 'sheep' | 'boar' | 'cattle' | null, animalCount: type ? 1 : 0 }) })
     return map
   }, [displayPlayer?.stableAnimals])
 
-  const isReorgActive = !!animalReorg
   const reorgAvailable = useMemo(() => {
-    if (!animalReorg || !pendingAnimalReorg || !state) return null
+    if (!pendingAnimalReorg || !state) return null
     const player = state.players[pendingAnimalReorg.playerIndex]
     return player ? { sheep: player.resources.sheep, boar: player.resources.boar, cattle: player.resources.cattle } : null
-  }, [animalReorg, pendingAnimalReorg, state?.players])
+  }, [pendingAnimalReorg, state?.players])
   const reorgTotals = useMemo(() => {
     if (!animalReorg) return { sheep: 0, boar: 0, cattle: 0 }
     return animalReorg.zones.reduce((acc, z) => { if (z.animalType) acc[z.animalType] += z.animalCount; return acc }, { sheep: 0, boar: 0, cattle: 0 })
@@ -534,7 +575,82 @@ export const GameContainerApi = () => {
     if (lockedViewPlayerId) return
     setViewPlayerId(value)
   }, [lockedViewPlayerId])
-  const adjustReorgAnimal = (_zoneId: string, _animalType: 'sheep' | 'boar' | 'cattle', _delta: number) => { void _zoneId; void _animalType; void _delta }
+
+  const adjustReorgAnimal = (zoneId: string, animalType: 'sheep' | 'boar' | 'cattle', delta: number) => {
+    setAnimalReorg((prev) => {
+      if (!prev || !pendingAnimalReorg || !state) return prev
+      const player = state.players[pendingAnimalReorg.playerIndex]
+      if (!player) return prev
+      
+      let capacity = 0
+      if (zoneId === 'house') {
+        capacity = 1
+      } else if (zoneId.startsWith('stable:')) {
+        capacity = 1
+      } else {
+        const pasture = player.pastures.find((p) => p.id === zoneId)
+        if (pasture) capacity = getPastureCapacity(pasture)
+      }
+
+      const current = prev.zones.find((zone) => zone.id === zoneId)
+      if (!current) return prev
+
+      const totals = prev.zones.reduce(
+        (acc, zone) => {
+          if (!zone.animalType) return acc
+          acc[zone.animalType] += zone.animalCount
+          return acc
+        },
+        { sheep: 0, boar: 0, cattle: 0 },
+      )
+
+      const available = {
+        sheep: player.resources.sheep,
+        boar: player.resources.boar,
+        cattle: player.resources.cattle,
+      }
+
+      if (delta > 0) {
+        const baseTotals = { ...totals }
+        if (current.animalType) {
+          baseTotals[current.animalType] -= current.animalCount
+        }
+        const remaining = available[animalType] - baseTotals[animalType]
+        if (remaining <= 0) return prev
+
+        const nextCount =
+          current.animalType === animalType
+            ? Math.min(capacity, current.animalCount + 1)
+            : Math.min(capacity, 1)
+
+        if (nextCount <= 0) return prev
+
+        const zones = prev.zones.map((zone) => {
+          if (zone.id !== zoneId) return zone
+          return {
+            ...zone,
+            animalType,
+            animalCount: nextCount,
+          }
+        })
+        return { ...prev, zones, confirmDiscard: false }
+      }
+
+      if (current.animalType !== animalType || current.animalCount <= 0) {
+        return prev
+      }
+      const nextCount = Math.max(0, current.animalCount - 1)
+      const zones = prev.zones.map((zone) => {
+        if (zone.id !== zoneId) return zone
+        return {
+          ...zone,
+          animalType: nextCount > 0 ? animalType : null,
+          animalCount: nextCount,
+        }
+      })
+      return { ...prev, zones, confirmDiscard: false }
+    })
+  }
   const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
   const plowSelectableSet = useMemo(() => {
     const occupied = new Set<string>()
@@ -813,13 +929,10 @@ export const GameContainerApi = () => {
         locale={locale}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onEndRound={endRound}
         onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
-        allWorkersUsed={allWorkersUsed}
-        isGameOver={state.gameOver}
         isInteractive={isInteractive}
         devMode={devMode}
         seedValue={resetSeedInput}

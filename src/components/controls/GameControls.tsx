@@ -5,13 +5,10 @@ type Props = {
   locale: Locale
   onUndo: () => void
   onUndoAction: () => void
-  onEndRound: () => void
   onResetGame: () => void
   onShowScoring: () => void
   historyLength: number
   hasActionStartSnapshot: boolean
-  allWorkersUsed: boolean
-  isGameOver: boolean
   isInteractive: boolean
   devMode: boolean
   seedValue: string
@@ -22,13 +19,10 @@ export const GameControls = ({
   locale,
   onUndo,
   onUndoAction,
-  onEndRound,
   onResetGame,
   onShowScoring,
   historyLength,
   hasActionStartSnapshot,
-  allWorkersUsed,
-  isGameOver,
   isInteractive,
   devMode,
   seedValue,
@@ -40,9 +34,6 @@ export const GameControls = ({
     </button>
     <button onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot}>
       {t(locale, 'ui.undoAction')}
-    </button>
-    <button onClick={onEndRound} disabled={!isInteractive || !allWorkersUsed || isGameOver}>
-      {t(locale, 'ui.endRound')}
     </button>
     <button onClick={onShowScoring} disabled={!isInteractive}>
       {t(locale, 'ui.scoringPadButton')}

@@ -6,7 +6,7 @@ export const B9_BeatingRod = new MinorImprovement({
   deck: "B",
   number: 9,
   category: "LIVESTOCK_BREEDER",
-  desc: ["Immediately take 1 <CATTLE> or 1 <BOAR> from the animal track. (You may take an animal that has run out.)"],
+  desc: ["You can immediately choose to either get 1 <REED> or exchange 1 <REED> for 1 <CATTLE>."],
   cost: { wood: 1 },
   passing: true,
   implemented: false,

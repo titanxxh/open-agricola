@@ -188,11 +188,10 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource> }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }
-
 export type ActionFlow =
   | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string }
   | {

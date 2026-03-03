@@ -37,12 +37,12 @@ import {
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
+import { runReturnHomeHooks } from '../shared/cards/card-effects.ts'
+import { positionKey } from '../shared/game/farm.ts'
 import { computeScores } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
-import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
-import { positionKey } from '../shared/game/farm.ts'
-
+import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 type PendingAction =
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
@@ -326,6 +326,11 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!space) return
     const detailParts = this.buildActionDetailParts(before, player)
+    const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
+    const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
+    const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
+    if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) return
+    if (!hasGains && !hasCosts && !hasEffects) return
     this.state.log.unshift({
       key: 'log.actionDetail',
       params: {
@@ -344,17 +349,18 @@ export class GameSession {
     const newMinorImprovements = player.minorPlayed.filter(
       (id) => !before.minorPlayed.includes(id),
     )
+    const { costs } = this.buildActionDetailParts(before, player)
     if (newImprovements.length > 0) {
       this.state.log.unshift({
         key: 'log.playImprovement',
-        params: { player: player.name, improvements: newImprovements.join(',') },
+        params: { player: player.name, improvements: newImprovements.join(','), costResources: costs },
       })
       this.loggedImprovementThisAction = true
     }
     if (newMinorImprovements.length > 0) {
       this.state.log.unshift({
         key: 'log.playMinorImprovement',
-        params: { player: player.name, improvements: newMinorImprovements.join(',') },
+        params: { player: player.name, improvements: newMinorImprovements.join(','), costResources: costs },
       })
       this.loggedImprovementThisAction = true
     }
@@ -373,10 +379,26 @@ export class GameSession {
     }
   }
 
+  private flushEngineLog() {
+    const entries = this.engineLog.all()
+    if (entries.length > 0) {
+      const toAdd = entries.filter((e) => e.key !== 'log.action')
+      if (toAdd.some((e) => e.key === 'log.playImprovement' || e.key === 'log.playMinorImprovement')) {
+        this.loggedImprovementThisAction = true
+      }
+      for (let i = toAdd.length - 1; i >= 0; i--) {
+        this.state.log.unshift(toAdd[i])
+      }
+      this.engineLog.clear()
+    }
+  }
+
   private finalizeActionLog(player: PlayerState) {
     const before = this.actionStartPlayerSnapshot
     if (before) {
-      this.logActionDetail(before, player)
+      if (!this.loggedImprovementThisAction && !this.usedBakeBreadThisAction) {
+        this.logActionDetail(before, player)
+      }
     }
     if (before && !this.loggedImprovementThisAction) {
       this.logImprovementDelta(before, player)
@@ -399,12 +421,16 @@ export class GameSession {
     while (true) {
       const before = this.clonePlayer(player)
       const step = this.engine.proceed({ state: this.state, player, space })
+      this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
         this.engine = null
         this.finalizeActionLog(player)
-        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-        this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+        if (!allWorkersUsed) {
+          const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        }
         return
       }
 
@@ -412,13 +438,13 @@ export class GameSession {
         if (step.choice.options.length === 1) {
           const auto = step.choice.options[0]
           const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+          this.flushEngineLog()
           const isBakeChoice =
             step.choice.promptKey === 'ui.interactionBakeBreadChoice' ||
             step.choice.promptKey === 'ui.interactionBakeBreadCount'
           if (isBakeChoice && auto.value !== 'cancel' && auto.value !== '__skip__') {
             this.usedBakeBreadThisAction = true
           }
-          this.logImprovementDelta(before, player)
           if (isBakeChoice) {
             this.logBakeBreadDelta(before, player)
           }
@@ -512,7 +538,8 @@ export class GameSession {
   }
 
   resolveChoice(playerIndex: number, value: string): SessionResponse {
-    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
+    const pending = this.pending
+    if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
     if (!this.engine) return this.respond(false, 'no active engine')
@@ -520,24 +547,17 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
-    if (
-      this.pending.promptKey === 'ui.interactionBakeBreadChoice' ||
-      this.pending.promptKey === 'ui.interactionBakeBreadCount'
-    ) {
-      if (value !== 'cancel' && value !== '__skip__') {
-        this.usedBakeBreadThisAction = true
-      }
-    }
+    const promptKey = pending.promptKey
     this.pushHistory()
     const before = this.clonePlayer(player)
     const isBakeChoice =
-      this.pending.promptKey === 'ui.interactionBakeBreadChoice' ||
-      this.pending.promptKey === 'ui.interactionBakeBreadCount'
+      promptKey === 'ui.interactionBakeBreadChoice' ||
+      promptKey === 'ui.interactionBakeBreadCount'
     if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
       this.usedBakeBreadThisAction = true
     }
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
-    this.logImprovementDelta(before, player)
+    this.flushEngineLog()
     if (isBakeChoice) {
       this.logBakeBreadDelta(before, player)
     }
@@ -613,8 +633,11 @@ export class GameSession {
       this.runEngineSteps()
     } else {
       this.finalizeActionLog(player)
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+      if (!allWorkersUsed) {
+        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+        this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      }
     }
     return this.respond()
   }
@@ -665,6 +688,7 @@ export class GameSession {
     this.activeSpaceId = null
     this.activePlayerIndex = null
     this.actionStartIndex = null
+    this.history = [] // Clear undo history when switching players
     return this.respond()
   }
 
@@ -688,6 +712,8 @@ export class GameSession {
   }
 
   private applyReturnHome() {
+    // Run onReturnHome hooks for all players' cards before workers return
+    this.state.players.forEach((p) => runReturnHomeHooks(this.state, p))
     this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
     this.state.actionSpaces.forEach((s) => { s.takenBy = null })
   }
@@ -769,6 +795,8 @@ export class GameSession {
     this.engine = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
+    this.history = []
+    this.actionStartIndex = null
     return this.respond()
   }
 

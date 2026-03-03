@@ -79,7 +79,7 @@
 ### After Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| C75_Firewood | Improvement | 打改良后获得木材 | ✅ |
+| C75_Firewood | Improvement | 打改良后触发搬木并记录 cardEffectGain 日志 | ✅ |
 | A17_ReclamationPlow | Collect | 收取后获得动物 | ✅ |
 | A53_Claypipe | Gain/Receive | 获得/接收后交换 | ✅ |
 | A110_Roughcaster | Construct/Renovation | 建造/翻新后 | 🔧 |

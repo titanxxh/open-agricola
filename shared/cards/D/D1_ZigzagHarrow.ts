@@ -6,7 +6,7 @@ export const D1_ZigzagHarrow = new MinorImprovement({
   deck: "D",
   number: 1,
   category: "FARM_PLANNER",
-  desc: ["Immediately plow 1 field."],
+  desc: ["You can immediately plow 1 field such that it completes a \"zigzag\" pattern."],
   cost: { food: 1 },
   passing: true,
   implemented: false,

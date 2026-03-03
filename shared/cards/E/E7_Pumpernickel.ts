@@ -5,7 +5,7 @@ export const E7_Pumpernickel = new MinorImprovement({
   deck: "E",
   number: 7,
   category: "COOKING",
-  desc: ["When you take this, immediately bake 3 <GRAIN> into 10 <FOOD>."],
+  desc: ["You immediately get 4 <FOOD>. (Effectively, you are turning 1 <GRAIN> into 4 <FOOD>.)"],
   cost: { clay: 1 },
   passing: true,
   implemented: false,

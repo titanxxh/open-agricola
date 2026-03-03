@@ -5,7 +5,7 @@ export const D6_PetrifiedWood = new MinorImprovement({
   deck: "D",
   number: 6,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["You immediately get 1 <WOOD> for each 3 <WOOD> in your supply."],
+  desc: ["Immediately exchange up to 3 <WOOD> for 1 <STONE> each."],
   cost: {},
   passing: true,
   implemented: false,
