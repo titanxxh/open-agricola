@@ -575,7 +575,7 @@ export const zh = {
     effectBakeBread: '烤面包：{count} 谷物 → {food} 食物',
     cardEffectGain: '{player} 通过 {cardId} 获得了 {gain}',
     wellFood: '{player} 从水井获得 1 食物',
-    playImprovement: '{player} 打出改良：{improvements}',
+    playImprovement: '{player} 打出改良：{improvements} {cost}',    playMinorImprovement: '{player} 打出小改良：{improvements} {cost}',
     playMinorImprovement: '{player} 打出小改良：{improvements}',
     bakeBread: '{player} 烤面包: {count} 谷物 → {food} 食物',
     cardGrantedAction: '{player} 获得来自 {cardId} 的 {actionId} 行动',
