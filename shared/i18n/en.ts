@@ -153,6 +153,9 @@ export const en = {
     interactionPlowSelect: 'Select a tile to plow',
     interactionPlowConfirm: 'Confirm plow',
     interactionPlowCancel: 'Cancel',
+    interactionFirewoodExchange: 'Select how much wood to take from Firewood',
+    interactionFirewoodExchangeCount: 'Take {count} wood',
+    interactionFirewoodExchangeSkip: 'Do not take wood',
     interactionSowSelect: 'Select crops for each empty field',
     interactionSowConfirm: 'Confirm sowing',
     interactionSowCancel: 'Cancel',
@@ -322,6 +325,7 @@ export const en = {
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
     'house-redevelopment': { name: 'House Redevelopment', description: 'Renovate and optionally improve' },
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
+    'firewood-exchange': { name: 'Get Firewood', description: 'Take wood from Firewood card' },
   },
   improvements: {
     Major_Fireplace1: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },

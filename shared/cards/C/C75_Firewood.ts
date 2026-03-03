@@ -68,27 +68,11 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
     const woodOnCard = player.cardStates?.[CARD_ID]?.counters?.['wood'] ?? 0
     if (woodOnCard <= 0) return
     
-    // Move up to 4 wood from card to supply
-    const woodToMove = Math.min(woodOnCard, 4)
-    
-    // Update card state
-    if (!player.cardStates) player.cardStates = {}
-    if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = { counters: {} }
-    if (!player.cardStates[CARD_ID].counters) player.cardStates[CARD_ID].counters = {}
-    player.cardStates[CARD_ID].counters!['wood'] = woodOnCard - woodToMove
-    
-    // Add wood to player's supply
-    player.resources.wood += woodToMove
-    
-    // Log the effect
     return {
       flow: {
-        type: 'seq',
-        children: [
-          { type: 'leaf', actionId: 'special-effect', optional: false },
-        ],
+        type: 'leaf',
+        actionId: 'firewood-exchange',
       },
-      log: { key: 'log.firewoodGain', params: { count: woodToMove } },
     }
   },
 }

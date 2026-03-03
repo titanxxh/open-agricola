@@ -147,6 +147,9 @@ export const zh = {
     interactionPlowSelect: '选择要开垦的田地',
     interactionPlowConfirm: '确认开垦',
     interactionPlowCancel: '取消',
+    interactionFirewoodExchange: '选择要从柴火卡上拿取的木材数量',
+    interactionFirewoodExchangeCount: '拿走 {count} 木材',
+    interactionFirewoodExchangeSkip: '不拿木材',
     interactionSowSelect: '为每块空田选择播种作物',
     interactionSowConfirm: '确认播种',
     interactionSowCancel: '取消',
@@ -305,6 +308,7 @@ export const zh = {
     'bake-bread': { name: '烤面包', description: '使用改良烤面包' },
     'house-redevelopment': { name: '住宅改建', description: '改建并可追加改良' },
     'farm-redevelopment': { name: '农场改建', description: '改建房屋' },
+    'firewood-exchange': { name: '获取柴火', description: '从柴火卡上拿取木材' },
   },
   improvements: {
     Major_Fireplace1: { name: '壁炉', description: '烤面包：1 谷物 → 2 食物' },

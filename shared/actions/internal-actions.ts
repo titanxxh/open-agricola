@@ -476,4 +476,49 @@ export const internalActionDefinitions: ActionDefinition[] = [
     }),
     resolveChoice: () => ({ type: 'ok' }),
   },
+  {
+    id: 'firewood-exchange',
+    nameKey: 'actions.firewood-exchange.name',
+    descriptionKey: 'actions.firewood-exchange.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ player }) => {
+      const woodOnCard = player.cardStates?.['C75_Firewood']?.counters?.['wood'] ?? 0
+      const maxWood = Math.min(4, woodOnCard)
+      if (maxWood <= 0) return { type: 'ok' }
+
+      const options: ActionChoiceOption[] = []
+      options.push({ value: '0', labelKey: 'ui.interactionFirewoodExchangeSkip' })
+      for (let i = 1; i <= maxWood; i++) {
+        options.push({
+          value: String(i),
+          labelKey: 'ui.interactionFirewoodExchangeCount',
+          labelParams: { count: i },
+        })
+      }
+      return {
+        type: 'choice',
+        promptKey: 'ui.interactionFirewoodExchange',
+        options,
+      }
+    },
+    resolveChoice: ({ player }, choice) => {
+      const count = Number(choice)
+      if (Number.isFinite(count) && count > 0) {
+        const woodOnCard = player.cardStates?.['C75_Firewood']?.counters?.['wood'] ?? 0
+        const actualCount = Math.min(count, woodOnCard, 4)
+        if (actualCount > 0) {
+          if (!player.cardStates) player.cardStates = {}
+          if (!player.cardStates['C75_Firewood']) player.cardStates['C75_Firewood'] = { counters: {} }
+          if (!player.cardStates['C75_Firewood'].counters) player.cardStates['C75_Firewood'].counters = {}
+          
+          player.cardStates['C75_Firewood'].counters['wood'] = woodOnCard - actualCount
+          player.resources.wood += actualCount
+          return { type: 'ok', logKey: 'log.firewoodGain', logParams: { count: actualCount } }
+        }
+      }
+      return { type: 'ok' }
+    },
+  },
 ]
