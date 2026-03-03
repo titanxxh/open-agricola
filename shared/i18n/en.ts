@@ -594,7 +594,6 @@ export const en = {
     wellFood: '{player} gains 1 food from the Well',
     playImprovement: '{player} plays improvement: {improvements} {cost}',
     playMinorImprovement: '{player} plays minor improvement: {improvements} {cost}',
-    playMinorImprovement: '{player} plays minor improvement: {improvements}',
     bakeBread: '{player} bakes bread: {count} grain → {food} food',
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',

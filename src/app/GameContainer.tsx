@@ -71,7 +71,6 @@ import {
   startHarvestCore,
 } from './hooks/use-harvest-flow'
 import {
-  canPerformRoundEnd,
   finalizeRoundCore,
   nextPlayerIndex,
   prepareRoundEndCore,
@@ -2395,22 +2394,6 @@ export const GameContainer = () => {
     finalizeRound(nextState)
   }
 
-  const endRound = () => {
-    if (
-      !canPerformRoundEnd({
-        state,
-        allWorkersUsed,
-        pendingNextPlayerIndex,
-        hasPendingChoice: !!pendingChoice,
-        hasPendingAnimalReorg: !!pendingAnimalReorg,
-        hasPendingHarvestFeed: !!harvestContext?.pending.length,
-      })
-    ) {
-      return
-    }
-    performRoundEnd(state)
-  }
-
   const undo = () => {
     setHistory((prev) => {
       if (prev.length === 0) {
@@ -3347,7 +3330,6 @@ export const GameContainer = () => {
         locale={locale}
         onUndo={undo}
         onUndoAction={undoAction}
-        onEndRound={endRound}
         onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={history.length > 0 ? history.length : actionStartSnapshot ? 1 : 0}

@@ -267,10 +267,6 @@ export const GameContainerApi = () => {
     if (!isInteractive) return
     void applyAndSync(api.confirmNextPlayer())
   }, [api, applyAndSync, isInteractive])
-  const endRound = useCallback(() => {
-    if (!isInteractive) return
-    void applyAndSync(api.performRoundEnd())
-  }, [api, applyAndSync, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
@@ -579,23 +575,6 @@ export const GameContainerApi = () => {
     if (lockedViewPlayerId) return
     setViewPlayerId(value)
   }, [lockedViewPlayerId])
-  const reorgZoneMap = useMemo(() => {
-    const map = new Map<string, { capacity: number; zoneType: string }>()
-    const reorgPlayer = pendingAnimalReorg && state ? state.players[pendingAnimalReorg.playerIndex] : null
-    reorgPlayer?.pastures.forEach((pasture) => {
-      map.set(pasture.id, {
-        capacity: getPastureCapacity(pasture),
-        zoneType: 'pasture',
-      })
-    })
-    if (reorgPlayer) {
-      map.set('house', { capacity: 1, zoneType: 'house' })
-      getLooseStableKeys(reorgPlayer).forEach((key) => {
-        map.set(`stable:${key}`, { capacity: 1, zoneType: 'stable' })
-      })
-    }
-    return map
-  }, [pendingAnimalReorg, state])
 
   const adjustReorgAnimal = (zoneId: string, animalType: 'sheep' | 'boar' | 'cattle', delta: number) => {
     setAnimalReorg((prev) => {
@@ -950,7 +929,6 @@ export const GameContainerApi = () => {
         locale={locale}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onEndRound={endRound}
         onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
