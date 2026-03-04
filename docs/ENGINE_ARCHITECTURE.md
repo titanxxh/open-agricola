@@ -59,7 +59,28 @@ server/ (仅后端)
   - `POST /api/game/round-end` — 回合结束
   - `POST /api/game/undo` — 撤销一步
   - `POST /api/game/undo-action` — 撤销整次行动
-  - `POST /api/game/new` — 新游戏
+- `POST /api/game/new` — 新游戏
+  - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
+
+### 开发者模式 API
+
+- `POST /api/game/dev/play-card` — 为指定玩家添加卡牌到已打出区
+  - Body: `{ playerIndex: number, cardId: string }`
+  - 用途：E2E 测试时快速设置卡牌状态
+- `POST /api/game/dev/set-space-taken` — 设置行动格占用状态
+  - Body: `{ spaceId: string, playerId: string | null }`
+  - 用途：E2E 测试时模拟行动格被占据
+- `POST /api/game/dev/set-current-player` — 设置当前玩家
+  - Body: `{ playerIndex: number }`
+  - 用途：E2E 测试时切换当前玩家
+- `POST /api/game/dev/set-resources` — 设置玩家资源
+  - Body: `{ playerIndex: number, resources: Record<string, number> }`
+  - 用途：E2E 测试时设置特定资源数量
+- `POST /api/game/dev/create-pasture` — 创建圈地（围栏选择模式）
+  - Body: `{ playerIndex: number }`
+  - 用途：开发者模式快速创建圈地
+
+### 3.3 WebSocket 多人（room-manager）
   - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
 
 ### 3.3 WebSocket 多人（room-manager）

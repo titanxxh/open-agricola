@@ -62,6 +62,10 @@
 - ✅ 补充 C52_HuntsmansHat i18n：cardEffectGain 日志显示卡牌名
 - ✅ 默认开局玩家数调整为 2 人，方便 e2e 与人工回归
 - ✅ 修复开发者模式 Create Pasture：不消耗行动，且可进入围栏选择并确认
+- ✅ 新增开发者模式 API 端点：play-card, set-space-taken, set-current-player, set-resources（支持 E2E 测试状态设置）
+- ✅ E21_SheepRug 卡牌效果实现：允许玩家使用被占据的 Wish for Children 行动格
+
+### 2.6 行动卡映射 (Action Card Mapping)
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
