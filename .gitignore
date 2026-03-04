@@ -29,4 +29,5 @@ data/
 .env
 output/
 artifacts/
+test-results/
 *.traineddata

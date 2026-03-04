@@ -21,7 +21,7 @@
 - 提交代码到 Git 仓库，commit 标题需要符合规范：
   - 格式：`feat: 新增功能描述` 或 `fix: 修复问题描述` 或 `refactor: 代码重构描述`
   - 描述：简洁明了，避免使用中文
-- 最后git push到remote仓库，如果远端代码更新，需要向我确认如何操作。
+- 首先git fetch更新远端代码，如果远端代码更新，导致不能fast-forward push，列出commit差异，并向我确认。否则可以push到远端。
 
 ## 卡牌实现规范
 

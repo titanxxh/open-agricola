@@ -6,8 +6,8 @@
 
 | 原子行动 | Before | During | ImmediatelyAfter | After | ComputeCosts | ComputeArgs | ComputeReplace | IsDoable |
 |---|---|---|---|---|---|---|---|---|
-| PlaceFarmer | — | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | [C75_Firewood](../shared/cards/C/C75_Firewood.ts) | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts) | [C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | — |
-| Collect | — | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts) | — | — | — | — |
+| PlaceFarmer | — | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | [C75_Firewood](../shared/cards/C/C75_Firewood.ts) | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts) | — | — |
+| Collect | — | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts)、[C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts) | — | — | — | — |
 | Gain | — | [E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts) | — | [A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
 | Construct | — | — | — | [A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | — | — | — |
 | Plow | — | — | — | [A105_BarrowPusher](../shared/cards/A/A105_BarrowPusher.ts) | [C37_DwellingMound](../shared/cards/C/C37_DwellingMound.ts) | — | — | — |
@@ -46,6 +46,7 @@
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
 
 注：如 C75_Firewood 的 After Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
+注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。
 
 ## 行动卡 Hook 示例
 
