@@ -61,6 +61,7 @@
 - ✅ 修复 C52_HuntsmansHat：仅在 pig-market 收取猪时按数量获得食物并记录 cardEffectGain
 - ✅ 补充 C52_HuntsmansHat i18n：cardEffectGain 日志显示卡牌名
 - ✅ 默认开局玩家数调整为 2 人，方便 e2e 与人工回归
+- ✅ 修复开发者模式 Create Pasture：不消耗行动，且可进入围栏选择并确认
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。

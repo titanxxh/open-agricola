@@ -88,6 +88,9 @@ export const useGameApi = () => {
   const loadGame = useCallback((state: unknown) =>
     guard(() => post('/api/game/load', { state })), [guard])
 
+  const devCreatePasture = useCallback((playerIndex: number) =>
+    guard(() => post('/api/game/dev/create-pasture', { playerIndex })), [guard])
+
   return {
     fetchState,
     takeAction,
@@ -100,5 +103,6 @@ export const useGameApi = () => {
     undoAction,
     newGame,
     loadGame,
+    devCreatePasture,
   }
 }

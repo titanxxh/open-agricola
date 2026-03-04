@@ -774,6 +774,19 @@ export const GameContainerApi = () => {
     void applyAndSync(api.loadGame(clone))
   }, [state, devPlayerId, devCardId, occupationIdSet, api, applyAndSync])
 
+  const createDevPasture = useCallback(async () => {
+    if (!state || !isInteractive || !devPlayerId) return
+    const playerIndex = state.currentPlayerIndex
+    const current = state.players[playerIndex]
+    if (!current || current.id !== devPlayerId) return
+    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
+    const cp = clone.players.find((p) => p.id === devPlayerId)
+    if (!cp) return
+    cp.resources.wood = Math.max(0, 6)
+    await applyAndSync(api.loadGame(clone))
+    await applyAndSync(api.devCreatePasture(playerIndex))
+  }, [state, isInteractive, devPlayerId, api, applyAndSync])
+
   const saveDevState = useCallback(() => {
     if (!state) return
     const payload = JSON.stringify(state, null, 2)
@@ -920,6 +933,7 @@ export const GameContainerApi = () => {
           applyDevResource={applyDevResource} applyDevRound={applyDevRound}
           devCardId={devCardId} setDevCardId={setDevCardId}
           playDevCard={playDevCard} drawDevCard={drawDevCard}
+          createDevPasture={createDevPasture}
           saveDevState={saveDevState} loadDevState={loadDevState}
         />
       ) : null}

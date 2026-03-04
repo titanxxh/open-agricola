@@ -2698,7 +2698,10 @@ export const GameContainer = () => {
     // Set pending choice for fencing action
     setPendingChoice({
       promptKey: 'ui.interactionFenceSelect',
-      options: [],
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionConfirmButton' },
+        { value: 'cancel', labelKey: 'ui.interactionCancelButton' },
+      ],
       playerIndex,
       spaceId: 'fencing',
       fenceExtraWood: 0,

@@ -542,7 +542,13 @@ export class GameSession {
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
-    if (!this.engine) return this.respond(false, 'no active engine')
+    if (!this.engine) {
+      if (pending.promptKey === 'ui.interactionFenceSelect') {
+        this.pending = { type: 'none' }
+        return this.respond()
+      }
+      return this.respond(false, 'no active engine')
+    }
     const player = this.state.players[playerIndex]
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
@@ -577,6 +583,25 @@ export class GameSession {
       return this.respond()
     }
     this.runEngineSteps()
+    return this.respond()
+  }
+
+  startDevFenceSelect(playerIndex: number): SessionResponse {
+    if (this.state.gameOver) return this.respond(false, 'game is over')
+    if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    if (this.pending.type !== 'none') return this.respond(false, 'pending action exists')
+    this.pending = {
+      type: 'choice',
+      playerIndex,
+      spaceId: 'dev-create-pasture',
+      promptKey: 'ui.interactionFenceSelect',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+      ],
+    }
     return this.respond()
   }
 

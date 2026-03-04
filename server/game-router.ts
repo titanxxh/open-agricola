@@ -145,6 +145,17 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/dev/create-pasture') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number }
+    if (typeof body.playerIndex !== 'number') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const resp = getSession().startDevFenceSelect(body.playerIndex)
+    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/validate') {
     const body = JSON.parse(await readBody(req)) as {
       type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
