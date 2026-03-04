@@ -2682,30 +2682,31 @@ export const GameContainer = () => {
     reader.readAsText(file)
   }
 
-  const createDevPasture = () => {
-    const nextState = cloneState(state)
-    const targetPlayer = nextState.players.find((player) => player.id === devPlayerId)
-    if (!targetPlayer) return
+  const createDevPasture = async () => {
+    // Give player 6 wood for building a 2-tile pasture
+    const woodData = await setResource(devPlayerId, 'wood', 6)
+    if (!woodData?.state) return
     
-    // Create a 2x2 pasture at top-left corner (tiles 0,0; 0,1; 1,0; 1,1)
-    // Need 4 edges: H-0-0, H-0-1, H-2-0, H-2-1 (horizontal)
-    //               V-0-0, V-0-1, V-0-2, V-1-0, V-1-1, V-1-2 (vertical)
-    // Simplified: just add a basic set of fence edges
-    const newEdges = [
-      'H-0-0', 'H-0-1',  // top horizontal
-      'H-2-0', 'H-2-1',  // bottom horizontal
-      'V-0-0', 'V-0-1', 'V-0-2',  // left verticals
-      'V-1-0', 'V-1-1', 'V-1-2',  // right verticals
-    ]
+    const nextState = normalizeState(woodData.state as GameState)
+    updateState(nextState)
     
-    newEdges.forEach((edge) => {
-      if (!targetPlayer.fenceSegments.includes(edge)) {
-        targetPlayer.fenceSegments.push(edge)
-      }
+    // Use current player index (must match devPlayerId)
+    const playerIndex = nextState.currentPlayerIndex
+    const currentPlayer = nextState.players[playerIndex]
+    if (currentPlayer?.id !== devPlayerId) return
+    
+    // Set pending choice for fencing action
+    setPendingChoice({
+      promptKey: 'ui.interactionFenceSelect',
+      options: [],
+      playerIndex,
+      spaceId: 'fencing',
+      fenceExtraWood: 0,
     })
     
-    updateState(nextState)
-    void persistGame(nextState)
+    // Clear any previous fence selections
+    setPendingFenceEdges([])
+    setFenceError(null)
   }
 
   const openAnytimeReorg = () => {

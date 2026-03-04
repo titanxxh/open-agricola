@@ -58,6 +58,38 @@ test.describe('E21_SheepRug E2E Tests', () => {
     console.log('Step 2: Create pasture')
     await devPanel.locator('button:has-text("Create Pasture")').click()
     await page.waitForTimeout(2000)
+    
+    // Build a 2-tile pasture (need 6 wood, 3 per tile)
+    // Click on farm tiles to build fences - build a 2-tile pasture
+    // Click tile (0,0) and (0,1) to build two adjacent pastures
+    const farmBoard = page.locator('.farm-board').first()
+    
+    // Click on tile at row 0, col 0 (top-left area, empty green tile)
+    const tile00 = farmBoard.locator('[data-row="0"][data-col="0"]').first()
+    if (await tile00.isVisible().catch(() => false)) {
+      await tile00.click()
+      await page.waitForTimeout(1000)
+    }
+    
+    // Click on tile at row 0, col 1 (adjacent tile)
+    const tile01 = farmBoard.locator('[data-row="0"][data-col="1"]').first()
+    if (await tile01.isVisible().catch(() => false)) {
+      await tile01.click()
+      await page.waitForTimeout(1000)
+    }
+    
+    // Confirm the fence building if there's a confirm button
+    const confirmButton = page.locator('button:has-text("Confirm")').first()
+    if (await confirmButton.isVisible().catch(() => false)) {
+      await confirmButton.click()
+      await page.waitForTimeout(2000)
+    }
+    
+    await page.screenshot({ path: 'output/E21_S02_pasture_created.png', fullPage: true })
+    console.log('Pasture created (check screenshot for fence segments)')
+    console.log('Step 2: Create pasture')
+    await devPanel.locator('button:has-text("Create Pasture")').click()
+    await page.waitForTimeout(2000)
     await page.screenshot({ path: 'output/E21_S02_pasture_created.png', fullPage: true })
     console.log('Pasture created (check screenshot for fence segments)')
     
