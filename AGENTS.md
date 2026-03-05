@@ -61,3 +61,26 @@
 
 ## 启动命令
 可以用restart.sh重启。注意测试时只需要需要启动2个玩家的游戏。
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+The `canvas` npm package requires native C libraries. These are pre-installed in the VM snapshot: `libcairo2-dev`, `libpango1.0-dev`, `libjpeg-dev`, `libgif-dev`, `librsvg2-dev`, `libpixman-1-dev`. If `npm install` fails with canvas build errors, reinstall them via `sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`.
+
+### Services
+- **Backend** (port 5175): `npm run server` — runs `tsx server/index.ts`, HTTP + WebSocket game engine
+- **Frontend** (port 5173): `npm run dev` — Vite dev server for React SPA
+- Both can be started together via `./restart.sh` (uses `nohup` + background processes)
+- No database or external services required; game state is stored in memory / `data/game-state.json`
+
+### Common commands
+See `package.json` scripts. Key ones:
+- `npm test` — vitest unit tests (excludes e2e-tests)
+- `npm run lint` — ESLint (pre-existing `@typescript-eslint/no-explicit-any` warnings exist)
+- `npm run build` — `tsc -b && vite build` (pre-existing TS type errors in test files; does not affect dev mode)
+- E2E tests require Playwright browsers: `npx playwright install`
+
+### Gotchas
+- `npm run build` fails due to pre-existing TypeScript strict-mode errors in test files. Dev mode (`npm run dev` / `npm run server`) is unaffected.
+- The Vite config has a plugin that serves card images from `../bga-agricola/img`. This sibling directory does not exist in the cloud VM, so card sprite images will be missing — this is cosmetic only and does not affect functionality.
+- Access player views via `http://localhost:5173/?player=p1` and `?player=p2`.
