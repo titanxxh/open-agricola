@@ -331,5 +331,24 @@ export const handleGameRoute = async (
     return true
   }
 
-  return false
+  if (req.method === 'POST' && req.url === '/api/game/dev/add-rooms') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; rooms?: Array<{ row: number; col: number }> }
+    if (typeof body.playerIndex !== 'number' || !Array.isArray(body.rooms)) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    const player = state.players[body.playerIndex]
+    if (!player) {
+      sendJson(res, 400, { ok: false, error: 'player not found' })
+      return true
+    }
+    // Add room tiles
+    player.roomTiles = [...player.roomTiles, ...body.rooms]
+    player.rooms = (player.rooms || 0) + body.rooms.length
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+return false
 }
