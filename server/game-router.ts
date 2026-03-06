@@ -350,5 +350,18 @@ export const handleGameRoute = async (
     return true
   }
 
+  // Dev: Set round
+  if (req.method === 'POST' && req.url === '/api/game/dev/set-round') {
+    const body = JSON.parse(await readBody(req)) as { round?: number }
+    if (typeof body.round !== 'number') {
+      sendJson(res, 400, { ok: false, error: 'invalid round' })
+      return true
+    }
+    const state = getSession().getRawState()
+    state.round = body.round
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
 return false
 }

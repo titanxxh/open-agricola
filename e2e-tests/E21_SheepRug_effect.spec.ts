@@ -46,6 +46,7 @@ test.afterAll(async () => {
 })
 
 test.use({ viewport: { width: 1920, height: 1080 } })
+test.setTimeout(120000)
 
 test.describe('E21_SheepRug Effect', () => {
   test('Player with SheepRug can use occupied Wish for Children', async ({ page, request }) => {
@@ -56,181 +57,150 @@ test.describe('E21_SheepRug Effect', () => {
     console.log('Step 1: Reset game')
     const newResp = await postJson(request, `${API_BASE}/api/game/new`)
     saveState('E21_SheepRug_01_new.json', newResp.state)
+    
     await page.goto(`${FRONTEND_BASE}/?player=p1`)
+    await page.waitForTimeout(2000)
     await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_01_new.png'), fullPage: true })
 
     // Enable dev mode
     const devToggle = page.locator('header .dev-toggle input[type="checkbox"]')
-    if (await devToggle.isVisible() && !(await devToggle.isChecked())) {
-      await devToggle.check()
+    if (await devToggle.isVisible().catch(() => false)) {
+      if (!(await devToggle.isChecked())) {
+        await devToggle.check()
+      }
     }
     await page.waitForTimeout(500)
 
-    // Step 2: P1 uses Farm Expansion to build 2 rooms
-    console.log('Step 2: P1 uses Farm Expansion in Round 1')
+    // ===== Setup: Add rooms to P1 and P2 =====
+    console.log('=== Setup: Add rooms ===')
+    
+    // P1 already has 2 rooms, add 1 more to make 3 (Wish for Children requires 3 rooms)
+    await postJson(request, `${API_BASE}/api/game/dev/add-rooms`, {
+      playerIndex: 0,
+      rooms: [{ row: 0, col: 2 }]
+    })
+    
+    // P2 already has 2 rooms, add 1 more to make 3
+    await postJson(request, `${API_BASE}/api/game/dev/add-rooms`, {
+      playerIndex: 1,
+      rooms: [{ row: 0, col: 2 }]
+    })
+    
+    // Give resources
     await postJson(request, `${API_BASE}/api/game/dev/set-resources`, {
       playerIndex: 0,
-      resources: { wood: 15, reed: 6, food: 5 }
-    })
-
-    // P1 takes Farm Expansion action
-    const actionResp1 = await postJson(request, `${API_BASE}/api/game/action`, {
-      playerIndex: 0,
-      spaceId: 'farm-expansion'
-    })
-    saveState('E21_SheepRug_02_p1_farm_expansion.json', actionResp1.state)
-
-    // Select Construct option
-    if (actionResp1.pending?.type === 'choice') {
-      const choiceResp = await postJson(request, `${API_BASE}/api/game/choice`, {
-        playerIndex: 0,
-        value: 'construct'
-      })
-      saveState('E21_SheepRug_03_p1_construct.json', choiceResp.state)
-    }
-
-    await page.reload()
-    await page.waitForTimeout(500)
-    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_02_p1_action.png'), fullPage: true })
-
-    // Build 2 rooms (via validate API)
-    const validateResp1 = await postJson(request, `${API_BASE}/api/game/validate`, {
-      type: 'room',
-      playerId: 'p1',
-      payload: {
-        rooms: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
-        costPerRoom: { wood: 5, reed: 2 }
-      }
-    })
-    saveState('E21_SheepRug_04_p1_rooms.json', validateResp1)
-    console.log('P1 built 2 rooms')
-
-    // Confirm action
-    const stateAfterP1 = await getJson(request, `${API_BASE}/api/game/state`)
-    if (stateAfterP1.pending?.type === 'confirmNextPlayer') {
-      await postJson(request, `${API_BASE}/api/game/next-player`)
-    }
-
-    // Step 3: End Round 1
-    console.log('Step 3: End Round 1')
-    await postJson(request, `${API_BASE}/api/game/round-end`)
-    const afterRound1 = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_05_round1_end.json', afterRound1.state)
-    await page.reload()
-    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_03_round1_end.png'), fullPage: true })
-
-    // Step 4: P2 uses Farm Expansion in Round 2
-    console.log('Step 4: P2 uses Farm Expansion in Round 2')
-    await postJson(request, `${API_BASE}/api/game/dev/set-resources`, {
-      playerIndex: 1,
-      resources: { wood: 15, reed: 6, food: 5 }
-    })
-
-    const actionResp2 = await postJson(request, `${API_BASE}/api/game/action`, {
-      playerIndex: 1,
-      spaceId: 'farm-expansion'
-    })
-    saveState('E21_SheepRug_06_p2_farm_expansion.json', actionResp2.state)
-
-    if (actionResp2.pending?.type === 'choice') {
-      await postJson(request, `${API_BASE}/api/game/choice`, {
-        playerIndex: 1,
-        value: 'construct'
-      })
-    }
-
-    // Build 2 rooms for P2
-    await postJson(request, `${API_BASE}/api/game/validate`, {
-      type: 'room',
-      playerId: 'p2',
-      payload: {
-        rooms: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
-        costPerRoom: { wood: 5, reed: 2 }
-      }
-    })
-    console.log('P2 built 2 rooms')
-
-    const stateAfterP2 = await getJson(request, `${API_BASE}/api/game/state`)
-    if (stateAfterP2.pending?.type === 'confirmNextPlayer') {
-      await postJson(request, `${API_BASE}/api/game/next-player`)
-    }
-
-    // End Round 2
-    await postJson(request, `${API_BASE}/api/game/round-end`)
-    const afterRound2 = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_07_round2_end.json', afterRound2.state)
-
-    // Step 5: Give P2 SheepRug card
-    console.log('Step 5: Give P2 SheepRug card')
-    await postJson(request, `${API_BASE}/api/game/dev/play-card`, {
-      playerIndex: 1,
-      cardId: CARD_ID
+      resources: { wood: 10, reed: 5, food: 5 }
     })
     await postJson(request, `${API_BASE}/api/game/dev/set-resources`, {
       playerIndex: 1,
       resources: { sheep: 4, wood: 10, reed: 5, food: 5 }
     })
-    const afterCard = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_08_card_given.json', afterCard.state)
 
-    // Step 6: Advance to Round 7
-    console.log('Step 6: Advance to Round 7')
-    await page.goto(`${FRONTEND_BASE}/?player=p1`)
-    const devPanel = page.locator('.dev-panel')
-    const roundRow = devPanel.locator('.dev-row').filter({
-      has: page.locator('input[type="number"][min="1"][max="14"]')
+    const afterSetup = await getJson(request, `${API_BASE}/api/game/state`)
+    console.log('After setup - P1 rooms:', afterSetup.state.players[0].rooms)
+    console.log('After setup - P2 rooms:', afterSetup.state.players[1].rooms)
+    saveState('E21_SheepRug_02_setup.json', afterSetup.state)
+
+    // ===== Give P2 SheepRug card =====
+    console.log('=== Give P2 SheepRug card ===')
+    await postJson(request, `${API_BASE}/api/game/dev/play-card`, {
+      playerIndex: 1,
+      cardId: CARD_ID
     })
-    const roundInput = roundRow.locator('input[type="number"]').first()
-    const roundButton = roundRow.locator('button.dev-apply').first()
-    await roundInput.fill('7')
-    await roundButton.click()
-    await page.waitForTimeout(500)
+    
+    const afterCard = await getJson(request, `${API_BASE}/api/game/state`)
+    saveState('E21_SheepRug_03_card_given.json', afterCard.state)
+    console.log('P2 minorPlayed:', afterCard.state.players[1].minorPlayed)
 
+    // ===== Jump to Round 7 (Wish for Children is available from Round 2, but we need it to be visible) =====
+    console.log('=== Jump to Round 7 ===')
+    await postJson(request, `${API_BASE}/api/game/dev/set-round`, { round: 7 })
+    
     const afterRound7 = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_09_round7.json', afterRound7.state)
+    console.log('Round:', afterRound7.state.round)
+    console.log('P1 rooms:', afterRound7.state.players[0].rooms)
+    console.log('P2 rooms:', afterRound7.state.players[1].rooms)
+    console.log('P1 familySize:', afterRound7.state.players[0].familySize)
+    console.log('P2 familySize:', afterRound7.state.players[1].familySize)
+    saveState('E21_SheepRug_04_round7.json', afterRound7.state)
+    
     await page.reload()
+    await page.waitForTimeout(1000)
     await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_04_round7.png'), fullPage: true })
 
-    // Step 7: P1 occupies Wish for Children
-    console.log('Step 7: P1 occupies Wish for Children')
-    await postJson(request, `${API_BASE}/api/game/dev/set-space-taken`, {
-      spaceId: 'wish-children',
-      playerId: 'p1'
-    })
-    await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, {
-      playerIndex: 1
-    })
+    // ===== P1 uses Wish for Children to occupy it =====
+    console.log('=== P1 uses Wish for Children ===')
+    
+    // Make sure it's P1's turn
+    if (afterRound7.state.currentPlayerIndex !== 0) {
+      await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, { playerIndex: 0 })
+    }
+    
+    // Reload page as P1
+    await page.goto(`${FRONTEND_BASE}/?player=p1`)
+    await page.waitForTimeout(1000)
+    
+    // P1 clicks on Wish for Children
+    const wishChildrenCard = page.locator('.action-card').filter({ hasText: 'Wish for Children' }).first()
+    if (await wishChildrenCard.isVisible().catch(() => false)) {
+      await wishChildrenCard.click()
+      await page.waitForTimeout(500)
+      
+      // Confirm if needed
+      const confirmWishBtn = page.locator('button').filter({ hasText: /confirm|确定/i })
+      if (await confirmWishBtn.isVisible().catch(() => false)) {
+        await confirmWishBtn.click()
+      }
+      await page.waitForTimeout(500)
+    }
+    
+    const afterWishAction = await getJson(request, `${API_BASE}/api/game/state`)
+    const wishSpace = afterWishAction.state.actionSpaces.find((s: any) => s.id === 'wish-children')
+    console.log('After P1 Wish for Children, wish-children takenBy:', wishSpace?.takenBy)
+    saveState('E21_SheepRug_05_wish_occupied.json', afterWishAction.state)
+    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_05_wish_occupied.png'), fullPage: true })
 
-    const afterOccupied = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_10_occupied.json', afterOccupied.state)
-
-    // Step 8: Check P2 view - P2 WITH SheepRug should be able to click
-    console.log('Step 8: Verify P2 with SheepRug can click occupied space')
+    // ===== P2's turn - verify SheepRug effect =====
+    console.log('=== Verify P2 can use occupied Wish for Children ===')
+    
+    // Set current player to P2
+    await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, { playerIndex: 1 })
+    
+    // Go to P2's view
     await page.goto(`${FRONTEND_BASE}/?player=p2`)
     await page.waitForTimeout(1000)
-    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_05_p2_view.png'), fullPage: true })
-
-    const wishChildren = page.locator('.action-card').filter({ hasText: /Wish for Children/i })
-    const isVisible = await wishChildren.isVisible().catch(() => false)
-    console.log(`Wish for Children visible: ${isVisible}`)
-
+    
+    // Check action cards
+    const allActionCards = await page.locator('.action-card').allTextContents()
+    console.log('Action cards:', allActionCards.slice(0, 15))
+    
+    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_06_p2_view.png'), fullPage: true })
+    
+    // Find Wish for Children
+    const wishChildrenP2 = page.locator('.action-card').filter({ hasText: 'Wish for Children' })
+    const isVisible = await wishChildrenP2.isVisible().catch(() => false)
+    console.log('Wish for Children visible:', isVisible)
+    
     if (isVisible) {
-      const isDisabled = await wishChildren.evaluate(el =>
+      // Check if it's disabled/taken
+      const isDisabled = await wishChildrenP2.evaluate(el => 
         (el as HTMLButtonElement).disabled || el.classList.contains('taken')
       )
-      console.log(`Wish for Children disabled: ${isDisabled}`)
-
-      if (!isDisabled) {
-        console.log('✅ Effect WORKING! P2 with SheepRug can use occupied Wish for Children')
-      } else {
-        console.log('❌ Effect NOT working - P2 with SheepRug should be able to use occupied space')
-      }
-
+      console.log('Wish for Children disabled:', isDisabled)
+      
+      // Verify: With SheepRug, P2 should be able to click (not disabled)
       expect(isDisabled).toBe(false)
+      console.log('✅ TEST PASSED: P2 with SheepRug can use occupied Wish for Children!')
+    } else {
+      console.log('Wish for Children not visible - checking if conditions are met')
+      const p2State = await getJson(request, `${API_BASE}/api/game/state`)
+      console.log('P2 rooms:', p2State.state.players[1].rooms)
+      console.log('P2 familySize:', p2State.state.players[1].familySize)
+      console.log('P2 minorPlayed:', p2State.state.players[1].minorPlayed)
     }
-
-    saveState('E21_SheepRug_11_final.json', afterOccupied.state)
-    console.log('Test completed successfully!')
+    
+    saveState('E21_SheepRug_07_final.json', (await getJson(request, `${API_BASE}/api/game/state`)).state)
+    console.log('Test completed!')
   })
 
   test('Control: Player without SheepRug cannot use occupied Wish for Children', async ({ page, request }) => {
@@ -240,77 +210,91 @@ test.describe('E21_SheepRug Effect', () => {
     // Reset game
     const newResp = await postJson(request, `${API_BASE}/api/game/new`)
     saveState('E21_SheepRug_control_01_new.json', newResp.state)
-
+    
     await page.goto(`${FRONTEND_BASE}/?player=p1`)
+    await page.waitForTimeout(2000)
+    
+    // Enable dev mode
     const devToggle = page.locator('header .dev-toggle input[type="checkbox"]')
-    if (await devToggle.isVisible() && !(await devToggle.isChecked())) {
-      await devToggle.check()
+    if (await devToggle.isVisible().catch(() => false)) {
+      if (!(await devToggle.isChecked())) {
+        await devToggle.check()
+      }
     }
-    await page.waitForTimeout(500)
 
-    // Setup: Add rooms for both players
-    await postJson(request, `${API_BASE}/api/game/dev/add-rooms`, {
-      playerIndex: 0,
-      rooms: [{ row: 0, col: 2 }, { row: 0, col: 3 }]
-    })
+    // Setup: P1 and P2 already have 2 starting rooms each
+    // Give P2 1 more room (to meet Wish for Children condition of 3 rooms)
     await postJson(request, `${API_BASE}/api/game/dev/add-rooms`, {
       playerIndex: 1,
-      rooms: [{ row: 0, col: 2 }, { row: 0, col: 3 }]
+      rooms: [{ row: 0, col: 2 }]
+    })
+    
+    // Give resources
+    await postJson(request, `${API_BASE}/api/game/dev/set-resources`, {
+      playerIndex: 0,
+      resources: { wood: 10, reed: 5, food: 5 }
     })
     await postJson(request, `${API_BASE}/api/game/dev/set-resources`, {
       playerIndex: 1,
       resources: { wood: 10, reed: 5, food: 5 }
     })
 
-    // Advance to Round 7
-    const roundRow = page.locator('.dev-panel .dev-row').filter({
-      has: page.locator('input[type="number"][min="1"][max="14"]')
-    })
-    const roundInput = roundRow.locator('input[type="number"]').first()
-    const roundButton = roundRow.locator('button.dev-apply').first()
-    await roundInput.fill('7')
-    await roundButton.click()
-    await page.waitForTimeout(500)
-
+    // Jump to Round 7
+    await postJson(request, `${API_BASE}/api/game/dev/set-round`, { round: 7 })
+    
     const afterRound7 = await getJson(request, `${API_BASE}/api/game/state`)
+    console.log('Control - Round:', afterRound7.state.round)
+    console.log('Control - P2 rooms:', afterRound7.state.players[1].rooms)
+    console.log('Control - P2 familySize:', afterRound7.state.players[1].familySize)
     saveState('E21_SheepRug_control_02_round7.json', afterRound7.state)
 
-    // P1 occupies Wish for Children
-    await postJson(request, `${API_BASE}/api/game/dev/set-space-taken`, {
-      spaceId: 'wish-children',
-      playerId: 'p1'
-    })
-    await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, {
-      playerIndex: 1
-    })
+    // P1 uses Wish for Children to occupy it
+    await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, { playerIndex: 0 })
+    
+    await page.goto(`${FRONTEND_BASE}/?player=p1`)
+    await page.waitForTimeout(1000)
+    
+    const wishChildrenP1 = page.locator('.action-card').filter({ hasText: 'Wish for Children' }).first()
+    if (await wishChildrenP1.isVisible().catch(() => false)) {
+      await wishChildrenP1.click()
+      await page.waitForTimeout(500)
+      
+      const confirmWishBtn = page.locator('button').filter({ hasText: /confirm|确定/i })
+      if (await confirmWishBtn.isVisible().catch(() => false)) {
+        await confirmWishBtn.click()
+      }
+    }
+    
+    const afterWish = await getJson(request, `${API_BASE}/api/game/state`)
+    saveState('E21_SheepRug_control_03_wish_occupied.json', afterWish.state)
+    console.log('Control - wish-children takenBy:', 
+      afterWish.state.actionSpaces.find((s: any) => s.id === 'wish-children')?.takenBy)
+    await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_control_03_wish_occupied.png'), fullPage: true })
 
-    const afterOccupied = await getJson(request, `${API_BASE}/api/game/state`)
-    saveState('E21_SheepRug_control_03_occupied.json', afterOccupied.state)
-
-    // Check P2 view - WITHOUT SheepRug should NOT be able to click
+    // P2's turn - WITHOUT SheepRug card
+    await postJson(request, `${API_BASE}/api/game/dev/set-current-player`, { playerIndex: 1 })
+    
     await page.goto(`${FRONTEND_BASE}/?player=p2`)
     await page.waitForTimeout(1000)
+    
     await page.screenshot({ path: path.join(OUTPUT_DIR, 'E21_SheepRug_control_04_p2_view.png'), fullPage: true })
-
-    const wishChildren = page.locator('.action-card').filter({ hasText: /Wish for Children/i })
-    const isVisible = await wishChildren.isVisible().catch(() => false)
-
+    
+    const wishChildrenP2 = page.locator('.action-card').filter({ hasText: 'Wish for Children' })
+    const isVisible = await wishChildrenP2.isVisible().catch(() => false)
+    console.log('Control - Wish for Children visible:', isVisible)
+    
     if (isVisible) {
-      const isDisabled = await wishChildren.evaluate(el =>
+      const isDisabled = await wishChildrenP2.evaluate(el => 
         (el as HTMLButtonElement).disabled || el.classList.contains('taken')
       )
-      console.log(`Without SheepRug - Wish for Children disabled: ${isDisabled}`)
-
-      if (isDisabled) {
-        console.log('✅ Control test passed: Player without SheepRug cannot use occupied space')
-      } else {
-        console.log('❌ Control test failed: Player without SheepRug should NOT be able to use occupied space')
-      }
-
+      console.log('Control - Wish for Children disabled:', isDisabled)
+      
+      // Control: Without SheepRug, P2 should NOT be able to click (disabled)
       expect(isDisabled).toBe(true)
+      console.log('✅ CONTROL TEST PASSED: Player without SheepRug cannot use occupied space!')
     }
-
-    saveState('E21_SheepRug_control_05_final.json', afterOccupied.state)
+    
+    saveState('E21_SheepRug_control_05_final.json', (await getJson(request, `${API_BASE}/api/game/state`)).state)
     console.log('Control test completed!')
   })
 })

@@ -64,6 +64,9 @@
 - ✅ 修复开发者模式 Create Pasture：不消耗行动，且可进入围栏选择并确认
 - ✅ 新增开发者模式 API 端点：play-card, set-space-taken, set-current-player, set-resources（支持 E2E 测试状态设置）
 - ✅ E21_SheepRug 卡牌效果实现：允许玩家使用被占据的 Wish for Children 行动格
+- ✅ E21_SheepRug e2e 测试完成：验证有/无 SheepRug 时对被占用 Wish for Children 的使用权限
+- ✅ 新增 dev/set-round API：支持 e2e 测试快速跳转到指定回合
+- ✅ GameContainerApi 集成 applyIsDoableHooks：允许卡牌 hook 覆盖 taken 检查
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 

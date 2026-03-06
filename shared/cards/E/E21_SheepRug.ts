@@ -9,42 +9,27 @@ const CARD_ID = 'E21_SheepRug'
  * E21_SheepRug: You can use any Wish for Children action space, 
  * even if it is occupied by another player's person.
  * 
- * Implementation: Use ComputeArgs hook to allow using occupied wish-children spaces
- * by not adding any restrictions when the space is occupied.
+ * Implementation: Use isDoable hook to allow using occupied wish-children spaces.
  */
-const sheepRugComputeArgsListener: CardListenerRegistration = {
-  id: 'E21-sheep-rug-compute-args',
+const sheepRugIsDoableListener: CardListenerRegistration = {
+  id: 'E21-sheep-rug-is-doable',
   cardIds: [CARD_ID],
-  phases: ['computeArgs' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['wish-children', 'wish-children-1', 'wish-children-2', 'wish-children-3', 'wish-children-4', 'wish-children-5', 'urgent-wish-children', 'urgent-wish-children-1', 'urgent-wish-children-2', 'urgent-wish-children-3', 'urgent-wish-children-4', 'urgent-wish-children-5'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { space, player } = context
     
-    // Only apply to wish-children spaces
-    const wishForChildrenSpaces = [
-      'wish-children', 
-      'wish-children-1', 
-      'wish-children-2', 
-      'wish-children-3', 
-      'wish-children-4', 
-      'wish-children-5'
-    ]
-    
-    if (!wishForChildrenSpaces.includes(space.id)) return
-    
-    // Check if player has this card
+    // Check if player has this card played
     if (!player.minorPlayed.includes(CARD_ID)) return
     
     // The card allows using occupied wish-children spaces
-    // No extra cost required by card description
-    // Just return empty to indicate this player can use this space
     return {
-      // No additional costs - the card simply allows using occupied spaces
+      doable: true,
     }
   },
 }
 
-registerCardListener(sheepRugComputeArgsListener)
+registerCardListener(sheepRugIsDoableListener)
 
 export const E21_SheepRug = new MinorImprovement({
   id: CARD_ID,

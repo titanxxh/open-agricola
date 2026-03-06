@@ -130,6 +130,7 @@
 | E130_Overachiever | WishChildren | 放宽生孩子条件 | 🔧 |
 | D119_WoodBarterer | Exchange | 放宽交易条件 | ❌ |
 | B109_PaperMaker | Occupation | 放宽职业条件 | 🔧 |
+| E21_SheepRug | WishChildren | 允许使用被占用的 Wish for Children | ✅ |
 
 ---
 

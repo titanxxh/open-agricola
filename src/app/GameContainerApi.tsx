@@ -8,6 +8,7 @@ import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/eff
 import { getBuildRoomCost } from '../../shared/actions/effects/house'
 import { stableWoodCost } from '../../shared/actions/effects/fencing'
 import { computeScores } from '../../shared/logic/scoring'
+import { applyIsDoableHooks } from '../../shared/actions/hooks'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
 import { occupationIds } from '../../shared/game/occupations'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state'
@@ -307,7 +308,14 @@ export const GameContainerApi = () => {
   const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
-    if (space.takenBy) return false
+    if (space.takenBy) {
+      // Allow card hooks to override the taken check (e.g., SheepRug)
+      const canUseWhenTaken = applyIsDoableHooks(
+        { state, player: currentPlayer, space, actionId: space.id },
+        false, // Default: cannot use when taken
+      )
+      if (!canUseWhenTaken) return false
+    }
     if (!isActionForPlayerCount(space, state.players.length)) return false
     const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
     if (state.round < openRound) return false
