@@ -22,8 +22,7 @@
 - Flow 节点树：leaf/seq/parallel/or/xor/optional。
 - 8 个 Hook 相位：before/during/immediatelyAfter/after/computeCosts/computeArgs/computeReplace/isDoable。
 - Hook 覆盖矩阵由真实注册数据动态生成。
-
-### 2.3 卡牌
+- **OptionalNode 修复**： 当 `OptionalNode.active=true` 时，引擎返回 `ok` 而非 `blocked`，允许子节点继续执行（例如 Meeting Place 的 optional minor improvement）。"}
 - 248 个卡牌定义文件（A/B/C/D/E）。
 - 大改良核心卡已接入主要效果。
 - 详见 `docs/cards_impl.md`。
