@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
@@ -8,15 +8,8 @@ const BOARD_H = 795
 
 type Pos = { top: number; left: number; width: number; height: number; size: 's' | 'std' }
 
-/*
- * BGA uses 3 boards side-by-side: left-board | add-board | central-board(830px).
- * We merge them into one 1000px-wide board. The central.png background is
- * offset to x=170 so the leftmost 170px acts as the side-board area.
- * All BGA central-board coordinates get +170 added to their x.
- */
-const CX = 170 // central-board x-offset
+const CX = 170
 
-// Side-board actions (BGA add-board / left-board)
 const SIDE_ACTIONS: Record<string, Pos> = {
   'copse':             { top: 18,  left: 5,   width: 60,  height: 83,  size: 's' },
   'grove':             { top: 110, left: 5,   width: 60,  height: 86,  size: 's' },
@@ -26,7 +19,6 @@ const SIDE_ACTIONS: Record<string, Pos> = {
   'traveling-players': { top: 516, left: 53,  width: 65,  height: 84,  size: 's' },
 }
 
-// Central-board actions (BGA central board, x offset by CX)
 const CENTRAL_ACTIONS: Record<string, Pos> = {
   'farm-expansion': { top: -3,  left: 30 + CX,  width: 115, height: 134, size: 'std' },
   'meeting-place':  { top: 134, left: 31 + CX,  width: 115, height: 72,  size: 'std' },
@@ -72,6 +64,63 @@ const HARVEST_POS: Record<number, SlotPos> = {
   14: { top: 688, left: 617 + CX },
 }
 
+const ACCUMULATE_DIR: Record<string, 'left' | 'right' | 'bottom'> = {
+  'forest': 'left',
+  'reed-bank': 'left',
+  'grove': 'left',
+  'traveling-players': 'left',
+  'clay-pit': 'right',
+  'fishing': 'right',
+  'hollow-4': 'right',
+  'copse': 'right',
+  'sheep-market': 'bottom',
+  'western-quarry': 'bottom',
+  'eastern-quarry': 'bottom',
+  'pig-market': 'bottom',
+  'cattle-market': 'bottom',
+}
+
+const RESOURCE_OFFSET: Record<string, React.CSSProperties> = {
+  'forest':            { left: -54, bottom: 5 },
+  'reed-bank':         { left: -75, bottom: 7 },
+  'clay-pit':          { bottom: 5, left: 92 },
+  'fishing':           { bottom: 10, left: 98 },
+  'grove':             { left: -51, bottom: 3 },
+  'hollow-4':          { left: 87, bottom: 9 },
+  'traveling-players': { left: -54, bottom: 1 },
+  'copse':             { left: 87, bottom: 5 },
+}
+
+const ACTION_SPRITE: Record<string, string> = {
+  'fencing': '0% 0%',
+  'sheep-market': '25% 0%',
+  'grain-utilization': '50% 0%',
+  'major-improvement': '75% 0%',
+  'western-quarry': '100% 0%',
+  'pig-market': '0% 50%',
+  'vegetable-seeds': '25% 50%',
+  'eastern-quarry': '50% 50%',
+  'cattle-market': '75% 50%',
+  'wish-children': '100% 50%',
+  'urgent-wish-children': '0% 100%',
+  'cultivation': '25% 100%',
+  'house-redevelopment': '50% 100%',
+  'farm-redevelopment': '75% 100%',
+}
+
+const STAGE_LABELS: Record<number, string> = {
+  1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
+}
+
+function getStage(round: number): number {
+  if (round <= 4) return 1
+  if (round <= 7) return 2
+  if (round <= 9) return 3
+  if (round <= 11) return 4
+  if (round <= 13) return 5
+  return 6
+}
+
 type RoundSlot = { round: number; action?: ActionSpace }
 
 type Props = {
@@ -87,12 +136,22 @@ type Props = {
   devMode: boolean
 }
 
+type TooltipInfo = {
+  actionId: string
+  nameKey: string
+  descKey: string
+  spritePos: string
+  x: number
+  y: number
+}
+
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
+  const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
 
   const updateScale = useCallback(() => {
     const el = wrapperRef.current
@@ -115,13 +174,15 @@ export const ActionBoard = ({
   )
 
   const buildStackItems = (action: ActionSpace) => {
-    const items = new Map<string, { resource: keyof Resource; amount: number; player?: PlayerState }>()
+    const items: { resource: keyof Resource; amount: number; player?: PlayerState }[] = []
+    const seen = new Map<string, number>()
     const add = (resource: keyof Resource, amount: number, player?: PlayerState) => {
       if (amount <= 0) return
       const key = `${player?.id ?? 'none'}:${resource}`
-      const prev = items.get(key)
-      if (prev) { prev.amount += amount; return }
-      items.set(key, { resource, amount, player })
+      const idx = seen.get(key)
+      if (idx !== undefined) { items[idx].amount += amount; return }
+      seen.set(key, items.length)
+      items.push({ resource, amount, player })
     }
     for (const [k, v] of Object.entries(action.resources)) {
       if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0)
@@ -133,34 +194,56 @@ export const ActionBoard = ({
         if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0, owner)
       }
     }
-    return Array.from(items.values())
+    return items
   }
 
-  const renderStack = (action: ActionSpace) => {
-    const items = buildStackItems(action)
+  const renderResourceHolder = (space: ActionSpace, isRound = false) => {
+    const items = buildStackItems(space)
     if (!items.length) return null
+    const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
+    const offset: React.CSSProperties = RESOURCE_OFFSET[space.id]
+      ?? (isRound ? { bottom: 6, right: 30 } : {})
     return (
-      <div className="action-stack">
-        {items.map((item, i) => {
-          const label = `${t(locale, `resources.${item.resource}`)} ${item.amount}`
-          const title = item.player ? `${item.player.name}: ${label}` : label
-          return (
-            <div key={`s-${action.id}-${i}`} className={`resource-chip resource-${item.resource}`} title={title} data-resource={item.resource} data-amount={item.amount}>
-              {item.player && <span className={`resource-owner meeple-${item.player.color}`} />}
-              <span className={`res-icon res-icon-${item.resource}`} />
-              <span className="resource-chip-text">{item.amount}</span>
-            </div>
-          )
-        })}
+      <div className="resource-holder" data-n={totalCount} style={offset}>
+        {items.flatMap((item) =>
+          Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
+            <span key={`${item.resource}-${i}`} className={`res-icon res-icon-${item.resource}`} />
+          ))
+        )}
       </div>
     )
   }
 
-  const renderMeeple = (action: ActionSpace) => {
-    const p = players.find((pl) => pl.id === action.takenBy)
+  const renderFarmerHolder = (space: ActionSpace) => {
+    const p = players.find((pl) => pl.id === space.takenBy)
     if (!p) return null
-    return <div className={`meeple meeple-${p.color}`}><span className="meeple-text">{p.name}</span></div>
+    return (
+      <div className="farmer-holder">
+        <div className={`meeple meeple-${p.color}`}>
+          <span className="meeple-text">{p.name}</span>
+        </div>
+      </div>
+    )
   }
+
+  const showTooltip = (e: MouseEvent, action: ActionSpace) => {
+    const spritePos = ACTION_SPRITE[action.id]
+    if (!spritePos) return
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const tooltipW = 360
+    const rightSpace = window.innerWidth - rect.right
+    const x = rightSpace > tooltipW + 16 ? rect.right + 8 : rect.left - tooltipW - 8
+    setTooltip({
+      actionId: action.id,
+      nameKey: action.nameKey,
+      descKey: action.descriptionKey,
+      spritePos,
+      x,
+      y: rect.top,
+    })
+  }
+
+  const hideTooltip = () => setTooltip(null)
 
   return (
     <section className="actions">
@@ -168,63 +251,83 @@ export const ActionBoard = ({
       <div className="action-board-wrapper" ref={wrapperRef} style={{ height: BOARD_H * scale }}>
         <div className="action-board" style={{ transform: `scale(${scale})`, width: BOARD_W, height: BOARD_H }}>
 
-          {/* Base actions */}
           {baseActions.map((space) => {
             const pos = BASE_POS[space.id]
             if (!pos) return null
+            const accDir = ACCUMULATE_DIR[space.id]
             return (
-              <button
+              <div
                 key={space.id}
-                className={`action-card base-action ${space.takenBy ? 'taken' : ''}`}
+                className={[
+                  'action-card-holder',
+                  accDir && `accumulate-${accDir}`,
+                  space.takenBy && 'taken',
+                ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
-                data-card-size={pos.size}
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
-                onClick={() => takeAction(space)}
-                disabled={!canTakeAction(space, currentPlayer)}
               >
-                <div className="action-title">{t(locale, space.nameKey)}</div>
-                <div className="action-desc">{t(locale, space.descriptionKey)}</div>
-                {renderStack(space)}
-                {renderMeeple(space)}
-              </button>
+                <button
+                  className={`action-card action-${pos.size}`}
+                  onClick={() => takeAction(space)}
+                  disabled={!canTakeAction(space, currentPlayer)}
+                >
+                  <h4 className="action-header">{t(locale, space.nameKey)}</h4>
+                  <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+                  <div className="action-footer" />
+                </button>
+                {renderResourceHolder(space)}
+                {renderFarmerHolder(space)}
+              </div>
             )
           })}
 
-          {/* Round action slots */}
           {roundSlots.map((slot) => {
             const pos = ROUND_POS[slot.round]
             if (!pos) return null
             const isOpen = devMode || currentRound >= slot.round
             const action = slot.action
+            const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
+            const spritePos = action ? ACTION_SPRITE[action.id] : undefined
             return (
               <div
                 key={`r-${slot.round}`}
-                className="round-slot"
+                className="turn-action-container"
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: ROUND_SLOT_SIZE, height: ROUND_SLOT_SIZE }}
               >
                 {action && isOpen ? (
-                  <button
-                    className={`action-card round-action ${action.takenBy ? 'taken' : ''}`}
+                  <div
+                    className={[
+                      'action-card-holder round',
+                      accDir && `accumulate-${accDir}`,
+                      action.takenBy && 'taken',
+                    ].filter(Boolean).join(' ')}
                     data-action-id={action.id}
-                    onClick={() => takeAction(action)}
-                    disabled={!canTakeAction(action, currentPlayer)}
+                    onMouseEnter={(e) => showTooltip(e, action)}
+                    onMouseLeave={hideTooltip}
                   >
-                    <div className="action-title">{t(locale, action.nameKey)}</div>
-                    <div className="action-desc">{t(locale, action.descriptionKey)}</div>
-                    {renderStack(action)}
-                    {renderMeeple(action)}
-                  </button>
+                    <button
+                      className="action-card"
+                      onClick={() => takeAction(action)}
+                      disabled={!canTakeAction(action, currentPlayer)}
+                    >
+                      <h4 className="action-header">{t(locale, action.nameKey)}</h4>
+                      <div className="action-desc">{t(locale, action.descriptionKey)}</div>
+                      <div className="action-footer" />
+                    </button>
+                    {renderResourceHolder(action, true)}
+                    {renderFarmerHolder(action)}
+                  </div>
                 ) : (
-                  <div className={`round-placeholder ${currentRound >= slot.round ? 'past' : ''}`}>
-                    <span className="round-number">{slot.round}</span>
-                    <span className="round-q">?</span>
+                  <div className="turn-number-placeholder">
+                    <span className="turn-stage">{STAGE_LABELS[getStage(slot.round)] ?? ''}</span>
+                    <span className="turn-round">{slot.round}</span>
+                    <span className="turn-q">?</span>
                   </div>
                 )}
               </div>
             )
           })}
 
-          {/* Harvest markers */}
           {Object.entries(HARVEST_POS).map(([r, hp]) => (
             <div
               key={`h-${r}`}
@@ -237,6 +340,19 @@ export const ActionBoard = ({
           ))}
         </div>
       </div>
+
+      {tooltip && (
+        <div
+          className="round-action-tooltip"
+          style={{ top: tooltip.y, left: tooltip.x }}
+        >
+          <div className="tooltip-card-img" style={{ backgroundPosition: tooltip.spritePos }} />
+          <div className="tooltip-text">
+            <strong>{t(locale, tooltip.nameKey)}</strong>
+            <p>{t(locale, tooltip.descKey)}</p>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

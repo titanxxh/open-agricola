@@ -243,7 +243,8 @@
   position: relative;
   background:
     url('/bga-img/central.png') 170px 0 / 830px 795px no-repeat,
-    linear-gradient(135deg, #4d6e28 0%, #5a7d2e 40%, #6a8f36 100%);
+    url('/bga-img/add_2p.png') 7px 0 / 156px auto no-repeat,
+    #4a6f2e;
   border-radius: 12px;
   transform-origin: top left;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -261,209 +262,333 @@
   border-radius: 2px;
 }
 
-/* --- Shared action card base --- */
+/* --- Action card holder (wrapper) --- */
 
-.action-card {
-  box-sizing: border-box;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  overflow: hidden;
-  transition: filter 0.15s;
-  z-index: 1;
+.action-card-holder {
+  position: absolute;
+  z-index: 10;
 }
 
-.action-card:hover {
-  filter: brightness(1.08);
-  z-index: 2;
+.action-card-holder:not(.taken):hover .action-card {
+  transform: scale(1.08);
+  z-index: 20;
+}
+
+.action-card-holder.taken .action-card {
+  filter: grayscale(75%);
+}
+
+/* --- Action card (3-section frame) --- */
+
+.action-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-flow: column;
+  position: relative;
+  z-index: 10;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  box-sizing: border-box;
+  transition: transform 0.12s;
 }
 
 .action-card:disabled {
   cursor: not-allowed;
-  filter: grayscale(0.4) brightness(0.9);
+  filter: grayscale(40%) brightness(0.9);
 }
 
-.action-card.taken {
-  filter: saturate(0.5) brightness(0.85);
-}
-
-.action-card .action-title {
-  font-weight: 700;
-  color: #2a1a00;
+/* Standard card frame sections */
+.action-card .action-header {
+  flex-shrink: 0;
+  margin: 0;
   text-align: center;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 4px 0;
+  background-image: url('/bga-img/action_frame.png');
+  background-size: 100% 160px;
+  background-repeat: no-repeat;
+  height: 32px;
+  color: #2a1a00;
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .action-card .action-desc {
+  flex-grow: 1;
+  display: flex;
+  flex-flow: column;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  font-size: 13px;
+  position: relative;
+  background-image: url('/bga-img/action_frame.png');
+  background-size: 100% 160px;
+  background-position: 0 -40px;
+  background-repeat: no-repeat;
   color: #3d2a00;
   text-align: center;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.7);
-  line-height: 1.2;
+  line-height: 1.15;
+  padding: 2px 4px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* --- Base action cards (absolute positioned, use action_frame) --- */
-
-.action-card.base-action {
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.action-card.base-action[data-card-size="std"] {
+.action-card .action-footer {
+  flex-shrink: 0;
+  position: relative;
+  height: 10px;
   background-image: url('/bga-img/action_frame.png');
-  padding: 4px 6px 2px;
+  background-size: 100% 160px;
+  background-position: 0px 10px;
+  background-repeat: no-repeat;
 }
 
-.action-card.base-action[data-card-size="s"] {
+/* Small card frame sections (action-s) */
+.action-card.action-s .action-header {
   background-image: url('/bga-img/action_frame_s.png');
-  padding: 3px 4px 2px;
-}
-
-.action-card.base-action[data-card-size="std"] .action-title {
-  font-size: 10px;
-  max-height: 22px;
-}
-
-.action-card.base-action[data-card-size="std"] .action-desc {
-  font-size: 9px;
-  max-height: 36px;
-}
-
-.action-card.base-action[data-card-size="s"] .action-title {
+  background-size: 100% 143px;
+  height: 30px;
   font-size: 8px;
-  max-height: 16px;
 }
 
-.action-card.base-action[data-card-size="s"] .action-desc {
-  font-size: 7px;
-  max-height: 24px;
+.action-card.action-s .action-desc {
+  background-image: url('/bga-img/action_frame_s.png');
+  background-size: 100% 109px;
+  background-position: 0 -32px;
+  font-size: 12px;
 }
 
-.action-card.base-action .action-stack {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  justify-content: center;
+.action-card.action-s .action-footer {
+  background-image: url('/bga-img/action_frame_s.png');
+  background-size: 100% 109px;
+  background-position: 0px 10px;
 }
 
-.action-card.base-action .resource-chip {
-  font-size: 10px;
-  padding: 1px 3px;
-  gap: 2px;
-}
+/* --- Accumulate arrows (action_frame_arrow.png) --- */
 
-.action-card.base-action .res-icon {
-  width: 12px;
-  height: 12px;
-}
-
-.action-card.base-action .meeple {
+.action-card-holder.accumulate-bottom .action-footer::before {
+  content: '';
   position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
+  width: 26px;
+  height: 30px;
+  background-image: url('/bga-img/action_frame_arrow.png');
+  background-size: 100%;
+  background-repeat: no-repeat;
+  top: 7px;
+  left: calc(50% - 13px);
+  z-index: 11;
 }
 
-/* --- Round action cards (inside round-slot, use actions_background.png sprite) --- */
-
-.round-slot {
-  overflow: hidden;
-  border-radius: 8px;
+.action-card-holder.accumulate-left .action-desc::before {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 30px;
+  background-image: url('/bga-img/action_frame_arrow.png');
+  background-size: 100%;
+  background-repeat: no-repeat;
+  left: -23px;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  z-index: 11;
 }
 
-.action-card.round-action {
+.action-card-holder.accumulate-right .action-desc::before {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 30px;
+  background-image: url('/bga-img/action_frame_arrow.png');
+  background-size: 100%;
+  background-repeat: no-repeat;
+  right: -23px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  z-index: 11;
+}
+
+/* --- Resource holder (accumulated resources with orange badge) --- */
+
+.resource-holder {
+  position: absolute;
+  padding: 4px;
+  background-color: rgba(230, 216, 142, 0.9);
+  border: 1px solid #222;
+  border-radius: 5px;
+  display: flex;
+  flex-flow: column-reverse;
+  z-index: 12;
+}
+
+.resource-holder::before {
+  content: attr(data-n);
+  display: block;
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  bottom: -12px;
+  right: -12px;
+  background-color: #f9a63b;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 20px;
+  color: #fff;
+  border: 1px solid #222;
+  z-index: 13;
+}
+
+.resource-holder .res-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.resource-holder .res-icon + .res-icon {
+  margin-bottom: -10px;
+}
+
+/* --- Farmer holder (meeple overlay when action taken) --- */
+
+.action-card-holder .farmer-holder {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* --- Round action cards (actions_background.png sprite behind frame) --- */
+
+.action-card-holder.round {
+  width: 100%;
+  height: 100%;
+  position: relative;
   border-radius: 8px;
+  overflow: visible;
   background-image: url('/bga-img/actions_background.png');
   background-size: 500% 300%;
   background-repeat: no-repeat;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 6px 4px;
 }
 
-.action-card.round-action .action-title {
-  font-size: 12px;
-  max-height: 30px;
-}
-
-.action-card.round-action .action-desc {
+.action-card-holder.round .action-header {
+  height: 26px;
   font-size: 10px;
-  max-height: 40px;
 }
 
-.action-card.round-action .action-stack {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  justify-content: center;
+.action-card-holder.round .action-desc {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.action-card.round-action .meeple {
+/* Round action sprite positions (5x3 grid) on the holder */
+.action-card-holder.round[data-action-id="fencing"]             { background-position: 0% 0%; }
+.action-card-holder.round[data-action-id="sheep-market"]         { background-position: 25% 0%; }
+.action-card-holder.round[data-action-id="grain-utilization"]    { background-position: 50% 0%; }
+.action-card-holder.round[data-action-id="major-improvement"]    { background-position: 75% 0%; }
+.action-card-holder.round[data-action-id="western-quarry"]       { background-position: 100% 0%; }
+.action-card-holder.round[data-action-id="pig-market"]           { background-position: 0% 50%; }
+.action-card-holder.round[data-action-id="vegetable-seeds"]      { background-position: 25% 50%; }
+.action-card-holder.round[data-action-id="eastern-quarry"]       { background-position: 50% 50%; }
+.action-card-holder.round[data-action-id="cattle-market"]        { background-position: 75% 50%; }
+.action-card-holder.round[data-action-id="wish-children"]        { background-position: 100% 50%; }
+.action-card-holder.round[data-action-id="urgent-wish-children"] { background-position: 0% 100%; }
+.action-card-holder.round[data-action-id="cultivation"]          { background-position: 25% 100%; }
+.action-card-holder.round[data-action-id="house-redevelopment"]  { background-position: 50% 100%; }
+.action-card-holder.round[data-action-id="farm-redevelopment"]   { background-position: 75% 100%; }
+
+/* --- Turn number placeholder (unrevealed rounds) --- */
+
+.turn-action-container {
   position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
 }
 
-/* Round action sprite positions (5x3 grid) */
-.action-card[data-action-id="fencing"]             { background-position: 0% 0%; }
-.action-card[data-action-id="sheep-market"]         { background-position: 25% 0%; }
-.action-card[data-action-id="grain-utilization"]    { background-position: 50% 0%; }
-.action-card[data-action-id="major-improvement"]    { background-position: 75% 0%; }
-.action-card[data-action-id="western-quarry"]       { background-position: 100% 0%; }
-.action-card[data-action-id="pig-market"]           { background-position: 0% 50%; }
-.action-card[data-action-id="vegetable-seeds"]      { background-position: 25% 50%; }
-.action-card[data-action-id="eastern-quarry"]       { background-position: 50% 50%; }
-.action-card[data-action-id="cattle-market"]        { background-position: 75% 50%; }
-.action-card[data-action-id="wish-children"]        { background-position: 100% 50%; }
-.action-card[data-action-id="urgent-wish-children"] { background-position: 0% 100%; }
-.action-card[data-action-id="cultivation"]          { background-position: 25% 100%; }
-.action-card[data-action-id="house-redevelopment"]  { background-position: 50% 100%; }
-.action-card[data-action-id="farm-redevelopment"]   { background-position: 75% 100%; }
-.action-card[data-action-id="farm-expansion"]       { background-position: 100% 100%; }
-
-/* --- Round placeholder (unrevealed) --- */
-
-.round-placeholder {
+.turn-number-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.12);
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.55);
   font-weight: 700;
   user-select: none;
+  gap: 2px;
 }
 
-.round-placeholder.past {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.round-number {
-  font-size: 32px;
+.turn-stage {
+  font-size: 48px;
   line-height: 1;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: 2px 3px 6px rgba(0, 0, 0, 0.25);
+  opacity: 0.35;
 }
 
-.round-q {
-  font-size: 18px;
+.turn-round {
+  font-size: 16px;
   opacity: 0.6;
+}
+
+.turn-q {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+/* --- Round action hover tooltip (actions.jpg) --- */
+
+.round-action-tooltip {
+  position: fixed;
+  z-index: 200;
+  background: #fffef5;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+}
+
+.tooltip-card-img {
+  width: 180px;
+  height: 280px;
+  background-image: url('/bga-img/actions.jpg');
+  background-size: 500% 300%;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+
+.tooltip-text {
+  padding: 10px;
+  width: 180px;
+  white-space: normal;
+  font-size: 12px;
+  color: #3a3a3a;
+  line-height: 1.45;
+}
+
+.tooltip-text strong {
+  display: block;
+  font-size: 14px;
+  color: #2a1a00;
+  margin-bottom: 4px;
+}
+
+.tooltip-text p {
+  margin: 0;
+  color: #555;
 }
 
 /* --- Harvest markers --- */
@@ -566,23 +691,6 @@
   white-space: nowrap;
 }
 
-.action-title {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.action-desc {
-  font-size: 13px;
-  color: #4a4a4a;
-  margin-bottom: 8px;
-}
-
-.action-stack {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
 
 .resource-chip {
   display: inline-flex;
