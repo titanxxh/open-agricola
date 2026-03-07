@@ -391,9 +391,11 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 ## 前端展示 (UI)
 
-- **行动卡背景**：`ActionBoard.tsx` 为行动卡按钮增加 `data-action-id`，`.action-card` 使用 `/bga-img/action_frame_bg.jpg` 背景图，回合行动卡按阶段边框高亮，text-shadow 保证可读性。
+- **行动卡背景**：`ActionBoard.tsx` 为行动卡按钮增加 `data-action-id`。Round 行动卡使用 `actions_background.png` sprite 精确映射 14 张行动（5×3 网格），base 行动卡使用 `action_frame_bg.jpg` parchment 背景。阶段边框高亮，text-shadow 保证可读性。
 - **资源图标**：`ResourceLine.tsx` 使用 BGA meeple sprite 图标（`res-icon-*`）替代文字标签，`ActionBoard` 资源 chip 显示图标+数量。
 - **日志卡牌 hover**：`LogPanel.tsx` 检测日志中的卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
+- **卡牌关键字图标**：`PlayerCard.tsx` 的 `.card-category` 图标增加中英文 tooltip（8 个类别）。Passing 小牌增加 `.card-passing-badge` 可视标识。
+- **对局状态指示**：`GameHeader.tsx` 增加"轮到你了"/"等待对方"状态徽章（pulse 动画），显示玩家身份，回合进度（N/14）。My-turn 时 header 绿色高亮，not-my-turn 时 action 区域变暗并禁用交互。
 
 ## 相关核心文件
 

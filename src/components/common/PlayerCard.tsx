@@ -10,6 +10,31 @@ import { CardWithCopy } from './CardWithCopy'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
+const CATEGORY_LABELS: Record<string, Record<string, string>> = {
+  en: {
+    ACTIONS_BOOSTER: 'Actions Booster',
+    LIVESTOCK_PROVIDER: 'Livestock Provider',
+    BUILDING_RESOURCE_PROVIDER: 'Building Resource',
+    FARM_PLANNER: 'Farm Planner',
+    CROP_PROVIDER: 'Crop Provider',
+    FOOD_PROVIDER: 'Food Provider',
+    FOOD: 'Food Provider',
+    GOODS_PROVIDER: 'Goods Provider',
+    POINTS_PROVIDER: 'Points Provider',
+  },
+  zh: {
+    ACTIONS_BOOSTER: '行动强化',
+    LIVESTOCK_PROVIDER: '畜牧提供',
+    BUILDING_RESOURCE_PROVIDER: '建筑资源',
+    FARM_PLANNER: '农场规划',
+    CROP_PROVIDER: '作物提供',
+    FOOD_PROVIDER: '食物提供',
+    FOOD: '食物提供',
+    GOODS_PROVIDER: '货物提供',
+    POINTS_PROVIDER: '分数提供',
+  },
+}
+
 type PlayerCardProps = {
   locale: Locale
   cardId: string
@@ -206,7 +231,11 @@ export const PlayerCard = ({
         )}
         
         {'category' in cardData && cardData.category && (
-          <div className="card-category" data-category={cardData.category} />
+          <div className="card-category" data-category={cardData.category} title={CATEGORY_LABELS[locale]?.[cardData.category] ?? cardData.category} />
+        )}
+
+        {'passing' in cardData && cardData.passing && (
+          <div className="card-passing-badge" title={locale === 'zh' ? '传递卡' : 'Passing card'} />
         )}
         
         {hasCost && (

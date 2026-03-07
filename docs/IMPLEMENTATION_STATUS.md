@@ -75,12 +75,13 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 3.3 UI 组件
 
-- `ActionBoard` — 行动区，parchment 背景图（`action_frame_bg.jpg`），阶段边框色彩区分，`data-action-id` 属性。
+- `ActionBoard` — 行动区。Round 行动卡使用 `actions_background.png` sprite 精确映射（14 张），base 行动卡使用 parchment 背景，阶段边框色彩区分，`data-action-id` 属性。
 - `FarmBoard` — 农场格网、围栏、播种、马厩交互。
 - `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
 - `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。
 - `GameControls` — 撤销/计分/Reset，seed 输入与 Reset 仅在 devMode 显示。
-- `PlayerCard` — 卡牌渲染，BGA sprite 背景。
+- `PlayerCard` — 卡牌渲染，BGA sprite 背景。Category 图标带中英文 tooltip、passing 卡标识。
+- `GameHeader` — 回合/玩家信息。显示"轮到你了"/"等待对方"状态徽章，玩家身份标识，回合进度（N/14）。my-turn 时绿色高亮，not-my-turn 时 action 区域变暗并禁用交互。
 
 ## 4. 游戏引擎
 
@@ -135,9 +136,21 @@ npm test       # 单元测试
 npm run test:e2e  # E2E 测试
 ```
 
-## 6. 已知边界
+## 6. 已删除的遗留代码
 
-- 部分卡牌仅完成数据接入，复杂行为待补全。
+| 文件 | 原因 |
+|---|---|
+| `src/app/GameContainer.tsx` | 被 `GameContainerApi` 替代 |
+| `src/hooks/useGameState.ts` | 仅被 `GameContainer` 引用 |
+| `src/app/hooks/use-persistence.ts` | 无引用 |
+| `src/hooks/useRoomConnection.ts` | 连接逻辑内联到 `GameContainerApi` |
+| `src/hooks/useActionEngine.ts` | 引擎逻辑已迁至后端 `GameSession` |
+| `src/hooks/useGameApi.ts` | HTTP 调用已由 `HttpGameTransport` 承担 |
+| `docs/FRONTEND_STATE_FLOW.md` | 内容严重过时，已覆盖在 `ENGINE_ARCHITECTURE.md` |
+
+## 7. 已知边界
+
+- 部分卡牌仅完成数据接入，复杂行为待补全（188/898 已实现）。
 - 断线重连未实现（WS 断开后需刷新页面重连）。
 - BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
 - `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。

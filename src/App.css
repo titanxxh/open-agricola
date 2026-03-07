@@ -106,9 +106,25 @@
   font-size: 28px;
 }
 
+.header.my-turn {
+  border-left: 5px solid #2f855a;
+  background: rgba(240, 255, 240, 0.95);
+}
+
+.header.not-my-turn {
+  border-left: 5px solid #b0b0b0;
+}
+
 .subtitle {
   margin-top: 4px;
   color: #3a5a2c;
+}
+
+.my-identity {
+  margin-top: 2px;
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
 }
 
 .status {
@@ -117,6 +133,43 @@
   font-weight: 600;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge.your-turn {
+  background: #2f855a;
+  color: #fff;
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+
+.status-badge.waiting-turn {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.status-badge.game-over {
+  background: #c53030;
+  color: #fff;
+}
+
+.status-text {
+  font-size: 13px;
+  color: #718096;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
 }
 
 .locale-switch {
@@ -155,6 +208,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(12px, 2vw, 20px);
+  transition: opacity 0.3s;
+}
+
+.app:has(.header.not-my-turn) .board .actions {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .actions,
@@ -299,6 +358,32 @@
 .action-card.locked {
   border-style: dashed;
 }
+
+/* Round action card BGA sprite backgrounds (actions_background.png, 5x3 grid) */
+.round-slot .action-card:not(.locked) {
+  background-size: 500% 300%;
+  background-repeat: no-repeat;
+  background-image: url('/bga-img/actions_background.png'), linear-gradient(#f8fff2, #f8fff2);
+}
+.round-slot .action-card.taken:not(.locked) {
+  background-image: url('/bga-img/actions_background.png'), linear-gradient(#f3e6d8, #f3e6d8);
+  filter: saturate(0.6);
+}
+.action-card[data-action-id="fencing"]:not(.locked) { background-position: 0% 0%; }
+.action-card[data-action-id="sheep-market"]:not(.locked) { background-position: 25% 0%; }
+.action-card[data-action-id="grain-utilization"]:not(.locked) { background-position: 50% 0%; }
+.action-card[data-action-id="major-improvement"]:not(.locked) { background-position: 75% 0%; }
+.action-card[data-action-id="western-quarry"]:not(.locked) { background-position: 100% 0%; }
+.action-card[data-action-id="pig-market"]:not(.locked) { background-position: 0% 50%; }
+.action-card[data-action-id="vegetable-seeds"]:not(.locked) { background-position: 25% 50%; }
+.action-card[data-action-id="eastern-quarry"]:not(.locked) { background-position: 50% 50%; }
+.action-card[data-action-id="cattle-market"]:not(.locked) { background-position: 75% 50%; }
+.action-card[data-action-id="wish-children"]:not(.locked) { background-position: 100% 50%; }
+.action-card[data-action-id="urgent-wish-children"]:not(.locked) { background-position: 0% 100%; }
+.action-card[data-action-id="cultivation"]:not(.locked) { background-position: 25% 100%; }
+.action-card[data-action-id="house-redevelopment"]:not(.locked) { background-position: 50% 100%; }
+.action-card[data-action-id="farm-redevelopment"]:not(.locked) { background-position: 75% 100%; }
+.action-card[data-action-id="farm-expansion"]:not(.locked) { background-position: 100% 100%; }
 
 
 .reorg-error {

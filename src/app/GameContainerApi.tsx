@@ -1144,7 +1144,7 @@ export const GameContainerApi = () => {
         />
       ) : null}
       <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} isInteractive={isInteractive} />
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} isInteractive={isInteractive} myPlayerName={displayPlayer?.name ?? null} isMyTurn={isInteractive} />
       <GameControls
         locale={locale}
         onUndo={undoStep}
