@@ -28,20 +28,41 @@
 - 详见 `docs/cards_impl.md`。
 
 ### 2.4 后端 API
-- `GameSession`：持有 GameState + Engine，暴露命令式方法。
-- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/validate/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
-- 统合了原本分散的 `/api/plow/validate` 等校验接口到 `/api/game/validate`；校验通过时直接写回 GameSession 状态（开垦/围栏/房间/马厩/播种等会立即生效）。
-- WebSocket：`ws://localhost:5175/ws`（createRoom/joinRoom + 实时状态广播）。
+- `GameSession`：持有 GameState + Engine，暴露命令式方法，是唯一可写入 `GameState` 的入口。
+  - 新增 `commitFarmChoice()`：统一处理围栏/房间/马厩/开垦/播种的校验与状态写入。
+  - 新增 `devSetResources/devSetRound/devSetCurrentPlayer/devPlayCard/devSetSpaceTaken/devAddRooms`：dev 路由不再直接操作 state。
+  - `getRawState()` 已重命名为 `getStateForRead()`，强调只读语义。
+- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/validate/commit-farm/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
+  - `/api/game/validate` 已改为纯预检接口，不再写入 GameSession 状态。
+  - 新增 `/api/game/commit-farm`：由前端校验通过后调用，委托给 `GameSession.commitFarmChoice()`。
+- 共享协议类型：
+  - `shared/protocol/game.ts`：定义 `GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope`。
+  - `shared/protocol/ws.ts`：定义 `ClientCommand`、`ServerEvent`、`RoomSummary`。
+  - `shared/game/serialization.ts`：定义 `serializeState`/`rehydrateState`，统一状态序列化。
+- WebSocket：`ws://localhost:5175/ws`，使用共享 `ClientCommand`/`ServerEvent` 类型。
+  - `room-manager` 广播 `StateUpdateEnvelope`（含版本号 + cause）。
 - 房间管理：每房间独立 GameSession，支持多客户端。
+- 校验模块提取到 `server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`，打断了 index↔game-router 循环依赖。
 
 ### 2.5 前端
-- `GameContainerApi`：API 驱动，不运行本地引擎。
+- `GameContainerApi`：通过 `GameTransport` 接口驱动，不运行本地引擎。
+  - `src/services/gameTransport.ts`：定义 `GameTransport` 接口，提供 `HttpGameTransport` 和 `WsGameTransport` 两种实现。
+  - `useGameSync` 新增 `applySnapshot(GameSyncPayload)` 方法，统一接收序列化快照。
+  - 新增 `useRoomConnection` hook：管理 WebSocket 房间连接生命周期（创建/加入/断开）。
 - 使用 URL 参数锁定玩家视角：`?player=1..4` 或 `?player=p1..p4`。
+- 已删除死代码：`GameContainer.tsx`、`useGameState.ts`、`use-persistence.ts`。
+- `src/services/api.ts` 已清理 `fetchState`/`persistGame`/`addResource` 等遗留函数。
 
 ## 3. 测试与质量
 
 - 单测框架：vitest。
-- 32 个测试文件，229 个用例全部通过（含 Playwright e2e 测试）。
+- 41 个测试文件，295 个用例全部通过（含 Playwright e2e 测试）。
+- WS Phase 1 回归测试：
+  - `tests/serialization.test.ts`：共享 serializer 单测（serializeState/rehydrateState 往返）。
+  - `tests/game-session-contract.test.ts`：GameSession 契约测试（所有公开方法 + SessionResponse 结构）。
+  - `tests/game-sync-pipeline.test.ts`：useGameSync 数据管线测试（GameSyncPayload → rehydrate → GameState）。
+  - `tests/pending-undo-regression.test.ts`：五类 pending 选择（none/choice/confirmNextPlayer/animalReorg/harvestFeed）+ undo 回归。
+  - `tests/protocol-types.test.ts`：共享协议类型完整性测试。
 
 ## 4. 已知边界
 
@@ -75,7 +96,8 @@
 
 ## 5. 下一步方向
 
-- 完善 WebSocket 多人端到端流程（创建房间 → 加入 → 对局 → 结算）。
+- WS Phase 1 已完成：共享协议类型、GameSession 权威入口、GameTransport 抽象、WS 后端/前端 MVP、回归测试。
+- 下一阶段：前端 transport 切换联调（`?transport=ws`）、多端联机 E2E 测试、断线重连。
 - 持续完善撤销覆盖范围与异常场景。
 - 持续补全高频卡牌行为。
 - 已移除本地引擎模式，仅保留 API 驱动。

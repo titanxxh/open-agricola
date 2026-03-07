@@ -1,7 +1,8 @@
 import type {
-  ActionChoiceOption,
   ActionFlow,
+  FarmTilePosition,
   GameState,
+  PendingAction,
   PlayerState,
   Resource,
 } from '../shared/game/types.ts'
@@ -39,16 +40,14 @@ import {
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { runReturnHomeHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
-import { computeScores } from '../shared/logic/scoring.ts'
+import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
-type PendingAction =
-  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
-  | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
-  | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
-  | { type: 'none' }
+import { normalizePlayerFarm, validateFenceSelection } from './fence-validation.ts'
+import { validateRoomSelection, validateStableSelection } from './validators.ts'
+import { validatePlowSelection } from './plow-validation.ts'
+import { validateSowSelection, type SowSelection } from './sow-validation.ts'
 
 type HistoryEntry = {
   state: GameState
@@ -65,7 +64,7 @@ export type SessionResponse = {
   pending: PendingAction
   historyLength: number
   hasActionStartSnapshot: boolean
-  scores?: ReturnType<typeof computeScores>
+  scores?: PlayerScoreSummary[]
   error?: string
 }
 
@@ -848,8 +847,163 @@ export class GameSession {
     return this.respond()
   }
 
-  getRawState(): GameState {
+  getStateForRead(): Readonly<GameState> {
     return this.state
+  }
+
+  commitFarmChoice(
+    playerIndex: number,
+    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
+    payload: Record<string, unknown>,
+  ): SessionResponse {
+    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
+      return this.respond(false, 'no pending farm choice for this player')
+    }
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+
+    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+
+    switch (farmType) {
+      case 'fence': {
+        const { edges, extraWood } = payload as { edges: string[]; extraWood?: number }
+        const result = validateFenceSelection(normalized, edges, extraWood ?? 0)
+        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        this.pushHistory()
+        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        break
+      }
+      case 'room': {
+        const { rooms, costPerRoom } = payload as {
+          rooms: FarmTilePosition[]
+          costPerRoom: Partial<Resource>
+        }
+        const selection = validateRoomSelection(normalized, rooms)
+        if (!selection.ok) return this.respond(false, selection.code)
+        const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
+        const totalCost: Partial<Resource> = {}
+        for (const key of costKeys) {
+          const required = (costPerRoom[key] ?? 0) * rooms.length
+          if ((normalized.resources[key] ?? 0) < required) {
+            return this.respond(false, `Not enough ${key}`)
+          }
+          totalCost[key] = required
+        }
+        this.pushHistory()
+        for (const key of costKeys) {
+          player.resources[key] -= totalCost[key] ?? 0
+        }
+        player.roomTiles = [...player.roomTiles, ...rooms]
+        player.rooms += rooms.length
+        break
+      }
+      case 'stable': {
+        const { stables } = payload as { stables: FarmTilePosition[] }
+        const selection = validateStableSelection(normalized, stables)
+        if (!selection.ok) return this.respond(false, selection.code)
+        const woodRequired = stables.length * 2
+        if ((normalized.resources?.wood ?? 0) < woodRequired) {
+          return this.respond(false, 'Not enough wood')
+        }
+        this.pushHistory()
+        player.resources.wood -= woodRequired
+        player.stableTiles = [...player.stableTiles, ...stables]
+        break
+      }
+      case 'plow': {
+        const { tile } = payload as { tile: FarmTilePosition }
+        const result = validatePlowSelection(normalized, tile)
+        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        this.pushHistory()
+        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        break
+      }
+      case 'sow': {
+        const { crops } = payload as { crops: SowSelection[] }
+        const result = validateSowSelection(normalized, crops)
+        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        this.pushHistory()
+        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        break
+      }
+    }
+
+    if (!this.engine) {
+      this.pending = { type: 'none' }
+      return this.respond()
+    }
+
+    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    const updatedPlayer = this.state.players[playerIndex]!
+    if (!space) return this.respond(false, 'invalid state')
+
+    const result = this.engine.resolveChoice('confirm', { state: this.state, player: updatedPlayer, space })
+    this.flushEngineLog()
+
+    if (result.type === 'choice') {
+      this.pending = {
+        type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
+        options: result.options ?? [], promptKey: result.promptKey,
+      }
+      return this.respond()
+    }
+    if (result.type === 'fail') {
+      this.pending = { type: 'none' }
+      this.engine = null
+      this.actionStartIndex = null
+      return this.respond()
+    }
+
+    this.runEngineSteps()
+    return this.respond()
+  }
+
+  devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'player not found')
+    Object.entries(resources).forEach(([key, value]) => {
+      if (typeof value === 'number') {
+        (player.resources as Record<string, number>)[key] = value
+      }
+    })
+    return this.respond()
+  }
+
+  devSetRound(round: number): SessionResponse {
+    this.state.round = round
+    return this.respond()
+  }
+
+  devSetCurrentPlayer(playerIndex: number): SessionResponse {
+    if (playerIndex < 0 || playerIndex >= this.state.players.length) {
+      return this.respond(false, 'invalid player index')
+    }
+    this.state.currentPlayerIndex = playerIndex
+    return this.respond()
+  }
+
+  devPlayCard(playerIndex: number, cardId: string): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'player not found')
+    if (!player.minorPlayed.includes(cardId)) {
+      player.minorPlayed.push(cardId)
+    }
+    return this.respond()
+  }
+
+  devSetSpaceTaken(spaceId: string, playerId: string | null): SessionResponse {
+    const space = this.state.actionSpaces.find((s) => s.id === spaceId)
+    if (!space) return this.respond(false, 'space not found')
+    space.takenBy = playerId
+    return this.respond()
+  }
+
+  devAddRooms(playerIndex: number, rooms: FarmTilePosition[]): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'player not found')
+    player.roomTiles = [...player.roomTiles, ...rooms]
+    player.rooms = (player.rooms || 0) + rooms.length
+    return this.respond()
   }
 
   undoStep(): SessionResponse {

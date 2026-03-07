@@ -19,6 +19,9 @@ import {
 } from '../../shared/logic/state'
 import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
+import { HttpGameTransport, type GameTransport } from '../services/gameTransport'
+import type { GameSyncPayload } from '../../shared/protocol/game'
+import { rehydrateState } from '../../shared/game/serialization'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
@@ -41,9 +44,12 @@ import {
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
+const transportSingleton = new HttpGameTransport()
+
 export const GameContainerApi = () => {
   const api = useGameApi()
-  const { state, pending, historyLength, hasActionStartSnapshot, applyResponse } =
+  const transport = transportSingleton
+  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot, applyResponse } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>('en')
   const lockedViewPlayerId = useMemo(() => {
@@ -87,32 +93,51 @@ export const GameContainerApi = () => {
     updateSowSelection: updateSowSelectionInternal,
   } = useFarmSelection()
 
-  useEffect(() => {
-    api.fetchState().then((resp) => {
-      applyResponse(resp)
-      if (resp.pending.type === 'animalReorg' && resp.state) {
-        const player = resp.state.players[resp.pending.playerIndex]
-        if (player) {
-          const stableKeys = getLooseStableKeys(player)
-          setAnimalReorg({
-            zones: [
-              ...player.pastures.map((p) => ({
-                id: p.id, zoneType: 'pasture' as const,
-                animalType: p.animalType, animalCount: p.animalCount,
-              })),
-              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
-              ...stableKeys.map((key) => ({
-                id: `stable:${key}`, zoneType: 'stable' as const,
-                animalType: player.stableAnimals?.[key] ?? null,
-                animalCount: player.stableAnimals?.[key] ? 1 : 0,
-              })),
-            ],
-            confirmDiscard: false,
-          })
-        }
+  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+    applySnapshot(payload)
+    if (payload.pending.type === 'animalReorg') {
+      const hydrated = rehydrateState(payload.state)
+      const player = hydrated.players[payload.pending.playerIndex]
+      if (player) {
+        const stableKeys = getLooseStableKeys(player)
+        setAnimalReorg({
+          zones: [
+            ...player.pastures.map((p) => ({
+              id: p.id, zoneType: 'pasture' as const,
+              animalType: p.animalType, animalCount: p.animalCount,
+            })),
+            { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
+            ...stableKeys.map((key) => ({
+              id: `stable:${key}`, zoneType: 'stable' as const,
+              animalType: player.stableAnimals?.[key] ?? null,
+              animalCount: player.stableAnimals?.[key] ? 1 : 0,
+            })),
+          ],
+          confirmDiscard: false,
+        })
       }
-    }).catch((e) => { console.error("fetchState failed:", e) })
-  }, [])
+    } else if (payload.pending.type !== 'choice') {
+      setAnimalReorg(null)
+    }
+    if (payload.ok) {
+      setPendingFenceEdges([])
+      setFenceError(null)
+      setPendingRoomTiles([])
+      setRoomError(null)
+      setPendingStableTiles([])
+      setStableError(null)
+      setPendingPlowTile(null)
+      setPlowError(null)
+      setPendingSowSelections({})
+      setSowError(null)
+    }
+  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
+
+  useEffect(() => {
+    const unsub = transport.onSnapshot(handleSnapshot)
+    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
+    return unsub
+  }, [transport, handleSnapshot])
 
   const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
     try {
@@ -178,49 +203,77 @@ export const GameContainerApi = () => {
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
-    void applyAndSync(api.takeAction(state.currentPlayerIndex, space.id))
-  }, [state, api, applyAndSync, isInteractive])
+    void transport.takeAction(state.currentPlayerIndex, space.id).catch((e) => console.error('takeAction error', e))
+  }, [state, transport, isInteractive])
 
   const undoStep = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.undoStep())
-  }, [api, applyAndSync, isInteractive])
+    void transport.undoStep().catch((e) => console.error('undo error', e))
+  }, [transport, isInteractive])
 
   const undoAction = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.undoAction())
-  }, [api, applyAndSync, isInteractive])
+    void transport.undoAction().catch((e) => console.error('undoAction error', e))
+  }, [transport, isInteractive])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (pending.type !== 'choice' || !currentPlayer) return
     const promptKey = pending.promptKey
     if (promptKey === 'ui.interactionFenceSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validateFence(currentPlayer.id, pendingFenceEdges, 0).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'fence', { edges: pendingFenceEdges, extraWood: 0 }).catch((e) => console.error(e))
+        } else {
+          setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionRoomSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       const cost = getBuildRoomCost(currentPlayer.houseType)
       void validateRoom(currentPlayer.id, pendingRoomTiles, cost).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setRoomError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'room', { rooms: pendingRoomTiles, costPerRoom: cost }).catch((e) => console.error(e))
+        } else {
+          setRoomError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionStableSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validateStable(currentPlayer.id, pendingStableTiles).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setStableError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'stable', { stables: pendingStableTiles }).catch((e) => console.error(e))
+        } else {
+          setStableError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionPlowSelect' && pendingPlowTile) {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validatePlow(currentPlayer.id, pendingPlowTile).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setPlowError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'plow', { tile: pendingPlowTile }).catch((e) => console.error(e))
+        } else {
+          setPlowError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
@@ -234,18 +287,25 @@ export const GameContainerApi = () => {
           return { row, col, crop }
         })
         .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
-      if (value === 'confirm' && crops.length === 0) {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
+      if (crops.length === 0) {
         setSowError('NO_SELECTION')
         return
       }
       void validateSow(currentPlayer.id, crops).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setSowError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'sow', { crops }).catch((e) => console.error(e))
+        } else {
+          setSowError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
-    void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, api, applyAndSync, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
+    void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, transport, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -279,22 +339,22 @@ export const GameContainerApi = () => {
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.confirmNextPlayer())
-  }, [api, applyAndSync, isInteractive])
+    void transport.confirmNextPlayer().catch((e) => console.error(e))
+  }, [transport, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
-    void applyAndSync(api.confirmFeed(pending.playerIndex, []))
-  }, [pending, api, applyAndSync, isInteractive])
+    void transport.confirmFeed(pending.playerIndex, []).catch((e) => console.error(e))
+  }, [pending, transport, isInteractive])
   const confirmAnimalReorg = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'animalReorg' || !animalReorg) return
-    void applyAndSync(api.confirmReorg(pending.playerIndex, animalReorg.zones))
-  }, [pending, animalReorg, api, applyAndSync, isInteractive])
+    void transport.confirmReorg(pending.playerIndex, animalReorg.zones).catch((e) => console.error(e))
+  }, [pending, animalReorg, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.newGame())
-  }, [api, applyAndSync, isInteractive])
+    void transport.newGame().catch((e) => console.error(e))
+  }, [transport, isInteractive])
 
   const pendingChoice = pending.type === 'choice' ? {
     promptKey: pending.promptKey, options: pending.options,
