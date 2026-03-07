@@ -3,7 +3,7 @@
 ## 1. 目标与边界
 
 - 目标：以回合与行动卡为核心驱动的农场主桌游实现，后端为权威状态源，前端仅做渲染与输入收集。
-- 前端以 4 个浏览器窗口模拟 4 位玩家视角（`?player=1..4` 或 `?player=p1..p4`）。
+- 前端以 2 个浏览器窗口模拟 2 位玩家视角（`?player=1..2` 或 `?player=p1..p2`）。
 - 扩展策略：通过 `Action Hook` 与 `Card Listener` 叠加卡牌效果。
 - 多人支持：WebSocket 实时同步，房间管理，支持多客户端连接同一后端。
 
@@ -42,6 +42,7 @@ server/ (仅后端)
   - 撤销回合使用回合快照并清空行动格占用。
   - 动作完成后生成结构化行动日志，前端负责本地化渲染（播种支持新开垦田地且无选择禁用确认）。
   - 改良日志包含 `costResources`，改良行动不再生成 actionDetail；卡牌来源资源使用通用 `cardEffectGain`。
+  - C52_HuntsmansHat 在 pig-market 收取猪时追加食物并产生日志。
   - 前端仅对当前玩家展示行动选择高亮与播种控件。
   - 所有游戏逻辑（引擎推进、Hook 触发、回合结算、收获流程）均在后端执行。
 
@@ -58,7 +59,28 @@ server/ (仅后端)
   - `POST /api/game/round-end` — 回合结束
   - `POST /api/game/undo` — 撤销一步
   - `POST /api/game/undo-action` — 撤销整次行动
-  - `POST /api/game/new` — 新游戏
+- `POST /api/game/new` — 新游戏
+  - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
+
+### 开发者模式 API
+
+- `POST /api/game/dev/play-card` — 为指定玩家添加卡牌到已打出区
+  - Body: `{ playerIndex: number, cardId: string }`
+  - 用途：E2E 测试时快速设置卡牌状态
+- `POST /api/game/dev/set-space-taken` — 设置行动格占用状态
+  - Body: `{ spaceId: string, playerId: string | null }`
+  - 用途：E2E 测试时模拟行动格被占据
+- `POST /api/game/dev/set-current-player` — 设置当前玩家
+  - Body: `{ playerIndex: number }`
+  - 用途：E2E 测试时切换当前玩家
+- `POST /api/game/dev/set-resources` — 设置玩家资源
+  - Body: `{ playerIndex: number, resources: Record<string, number> }`
+  - 用途：E2E 测试时设置特定资源数量
+- `POST /api/game/dev/create-pasture` — 创建圈地（围栏选择模式）
+  - Body: `{ playerIndex: number }`
+  - 用途：开发者模式快速创建圈地
+
+### 3.3 WebSocket 多人（room-manager）
   - 统一响应：`{ ok, state, pending, historyLength, hasActionStartSnapshot, scores?, error? }`
 
 ### 3.3 WebSocket 多人（room-manager）

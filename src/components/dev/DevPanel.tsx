@@ -24,6 +24,7 @@ type Props = {
   drawDevCard: () => void
   saveDevState: () => void
   loadDevState: (file: File) => void
+  createDevPasture?: () => void
 }
 
 export const DevPanel = ({
@@ -46,6 +47,7 @@ export const DevPanel = ({
   drawDevCard,
   saveDevState,
   loadDevState,
+  createDevPasture,
 }: Props) => (
   <div className="dev-panel">
     <h3>{t(locale, 'ui.devPanelTitle')}</h3>
@@ -119,6 +121,11 @@ export const DevPanel = ({
         </button>
         <button className="dev-apply" onClick={drawDevCard}>
           {t(locale, 'ui.devDrawCard')}
+        </button>
+      </div>
+      <div className="dev-row">
+        <button className="dev-apply" onClick={createDevPasture} style={{ width: '100%' }}>
+          {t(locale, 'ui.devCreatePasture')}
         </button>
       </div>
     </div>

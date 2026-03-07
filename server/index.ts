@@ -275,6 +275,10 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && req.url === '/api/fence/validate') {
+    return
+  }
+
+  if (req.method === 'POST' && req.url === '/api/fence/validate') {
     const body = await parseBody(req)
     const { playerId, edges, extraWood } = body as {
       playerId?: string

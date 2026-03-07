@@ -145,6 +145,17 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/dev/create-pasture') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number }
+    if (typeof body.playerIndex !== 'number') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const resp = getSession().startDevFenceSelect(body.playerIndex)
+    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/validate') {
     const body = JSON.parse(await readBody(req)) as {
       type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
@@ -245,5 +256,112 @@ export const handleGameRoute = async (
     return true
   }
 
-  return false
+
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/play-card') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; cardId?: string }
+    if (typeof body.playerIndex !== 'number' || typeof body.cardId !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    const player = state.players[body.playerIndex]
+    if (!player) {
+      sendJson(res, 400, { ok: false, error: 'player not found' })
+      return true
+    }
+    if (!player.minorPlayed.includes(body.cardId)) {
+      player.minorPlayed.push(body.cardId)
+    }
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/set-space-taken') {
+    const body = JSON.parse(await readBody(req)) as { spaceId?: string; playerId?: string | null }
+    if (typeof body.spaceId !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    const space = state.actionSpaces.find((s) => s.id === body.spaceId)
+    if (!space) {
+      sendJson(res, 400, { ok: false, error: 'space not found' })
+      return true
+    }
+    space.takenBy = body.playerId ?? null
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/set-current-player') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number }
+    if (typeof body.playerIndex !== 'number') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    if (body.playerIndex < 0 || body.playerIndex >= state.players.length) {
+      sendJson(res, 400, { ok: false, error: 'invalid player index' })
+      return true
+    }
+    state.currentPlayerIndex = body.playerIndex
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/set-resources') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; resources?: Record<string, number> }
+    if (typeof body.playerIndex !== 'number' || !body.resources || typeof body.resources !== 'object') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    const player = state.players[body.playerIndex]
+    if (!player) {
+      sendJson(res, 400, { ok: false, error: 'player not found' })
+      return true
+    }
+    Object.entries(body.resources).forEach(([key, value]) => {
+      if (typeof value === 'number') {
+        (player.resources as Record<string, number>)[key] = value
+      }
+    })
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/add-rooms') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; rooms?: Array<{ row: number; col: number }> }
+    if (typeof body.playerIndex !== 'number' || !Array.isArray(body.rooms)) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const state = getSession().getRawState()
+    const player = state.players[body.playerIndex]
+    if (!player) {
+      sendJson(res, 400, { ok: false, error: 'player not found' })
+      return true
+    }
+    // Add room tiles
+    player.roomTiles = [...player.roomTiles, ...body.rooms]
+    player.rooms = (player.rooms || 0) + body.rooms.length
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+  // Dev: Set round
+  if (req.method === 'POST' && req.url === '/api/game/dev/set-round') {
+    const body = JSON.parse(await readBody(req)) as { round?: number }
+    if (typeof body.round !== 'number') {
+      sendJson(res, 400, { ok: false, error: 'invalid round' })
+      return true
+    }
+    const state = getSession().getRawState()
+    state.round = body.round
+    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    return true
+  }
+
+return false
 }

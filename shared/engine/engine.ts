@@ -279,7 +279,9 @@ export class Engine {
     }
     if (node instanceof OptionalNode) {
       if (node.active) {
-        return { type: 'blocked', nodeId: node.id }
+        // 当 active 为 true 时，子节点会被 nextUnresolved 返回
+        // 返回 ok 让引擎继续处理子节点
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       const actionNode = this.findActionNode(node.child)
       if (!actionNode) {

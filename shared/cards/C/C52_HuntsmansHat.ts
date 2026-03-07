@@ -3,35 +3,21 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
+const CARD_ID = 'C52_HuntsmansHat'
+
 const huntsmansHatListener: CardListenerRegistration = {
-  id: 'C52-huntsmans-hat-during',
-  phases: ['during' as ActionHookPhase],
+  id: 'C52-huntsmans-hat-before',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { actionId, state } = context
-    
-    if (actionId === 'sheep-market') {
-      return {
-        flow: {
-          type: 'xor',
-          children: [
-            { type: 'leaf', actionId: 'gain', optional: false },
-            { type: 'leaf', actionId: 'gain', optional: false },
-          ],
-        },
-      }
-    }
-    
-    if (actionId === 'pig-market') {
-      const pigMarketSpace = state.actionSpaces.find(s => s.id === 'pig-market')
-      const _pigsAvailable = pigMarketSpace?.resources.boar ?? 0
-      return {
-        flow: {
-          type: 'seq',
-          children: [
-            { type: 'leaf', actionId: 'reap', optional: false },
-          ],
-        },
-      }
+    const { space } = context
+    if (space.id !== 'pig-market') return
+    const obtainedBoar = space.resources.boar ?? 0
+    if (obtainedBoar <= 0) return
+    return {
+      costs: { food: -obtainedBoar },
+      sourceCard: CARD_ID,
     }
   },
 }
@@ -39,7 +25,7 @@ const huntsmansHatListener: CardListenerRegistration = {
 registerCardListener(huntsmansHatListener)
 
 export const C52_HuntsmansHat = new MinorImprovement({
-  id: "C52_HuntsmansHat",
+  id: CARD_ID,
   name: "Huntsman's Hat",
   deck: "C",
   number: 52,

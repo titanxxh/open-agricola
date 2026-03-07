@@ -65,7 +65,7 @@
 | E53_BoarSpear | Collect | 收取时交换资源 | ✅ |
 | A55_JunkRoom | Improvement | 打改良时获得食物 | 🔧 |
 | E33_BeaverColony | Gain | 获得资源时 | 🔧 |
-| C52_HuntsmansHat | PlaceFarmer | 替换放置农夫 | ✅ |
+| C52_HuntsmansHat | Collect | 猪市场收取前按猪数量获得食物 | ✅ |
 | C120_AgriculturalLabourer | Receive | 接收资源时 | 🔧 |
 
 ### ImmediatelyAfter Hook
@@ -130,6 +130,7 @@
 | E130_Overachiever | WishChildren | 放宽生孩子条件 | 🔧 |
 | D119_WoodBarterer | Exchange | 放宽交易条件 | ❌ |
 | B109_PaperMaker | Occupation | 放宽职业条件 | 🔧 |
+| E21_SheepRug | WishChildren | 允许使用被占用的 Wish for Children | ✅ |
 
 ---
 
@@ -240,7 +241,7 @@
 | C31_WritingChamber | - |
 | C37_DwellingMound | ComputeCosts(Plow) |
 | C51_FishingNet | - |
-| C52_HuntsmansHat | ComputeReplace(PlaceFarmer) |
+| C52_HuntsmansHat | Before(Collect) |
 | C57_Crudite | - |
 | C63_CraftBrewery | - |
 | C71_Slurry | - |

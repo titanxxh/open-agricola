@@ -106,6 +106,32 @@ export const useActionEngine = () => {
     isActionForPlayerCount: (space: ActionSpace, playerCount: number) => boolean,
   ) => {
     if (state.gameOver) return false
+    // Check if space is taken - but allow card hooks to override
+    const isTaken = !!space.takenBy
+    if (isTaken) {
+      // Allow card hooks to override the taken check (e.g., SheepRug)
+      const canUseWhenTaken = applyIsDoableHooks(
+        { state, player, space, actionId: space.id },
+        false, // Default: cannot use when taken
+      )
+      if (!canUseWhenTaken) return false
+    }
+    if (!isActionForPlayerCount(space, state.players.length)) return false
+    const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
+    if (state.round < openRound) return false
+    if (player.workersAvailable <= 0) return false
+    return applyIsDoableHooks(
+      { state, player, space, actionId: space.id },
+      space.canBeExecutedByPlayer(state, player),
+    )
+  }
+    state: GameState,
+    space: ActionSpace,
+    player: PlayerState,
+    roundOpenById: Map<string, number>,
+    isActionForPlayerCount: (space: ActionSpace, playerCount: number) => boolean,
+  ) => {
+    if (state.gameOver) return false
     if (space.takenBy) return false
     if (!isActionForPlayerCount(space, state.players.length)) return false
     const openRound = roundOpenById.get(space.id) ?? space.roundAvailable

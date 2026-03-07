@@ -31,7 +31,24 @@ import {
 import { computeFencedRegions } from '../../shared/logic/farm'
 import { formatResources } from '../../shared/logic/format'
 import type { HarvestSummary } from '../../shared/logic/round'
-import {
+SY|import {
+  addResource,
+  persistGame,
+  validateFence,
+  validatePlow,
+  validateRoom,
+  validateStable,
+  validateSow,
+} from '../services/api'
+  addResource,
+  persistGame,
+  setResource,
+  validateFence,
+  validatePlow,
+  validateRoom,
+  validateStable,
+  validateSow,
+} from '../services/api'
   addResource,
   persistGame,
   validateFence,
@@ -2497,8 +2514,10 @@ export const GameContainer = () => {
   const cardLabel = (id: string) =>
     t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
   const applyDevResource = async () => {
+    console.log('[applyDevResource] called with:', { devPlayerId, devResource, devAmount })
     if (!devPlayerId) return
     const data = await addResource(devPlayerId, devResource, devAmount)
+    console.log('[applyDevResource] addResource returned:', data ? 'has data' : 'no data')
     if (data?.state) {
       const nextState = normalizeState(data.state as GameState)
       updateState(nextState)
@@ -2507,12 +2526,17 @@ export const GameContainer = () => {
           (player) => player.id === devPlayerId,
         )
         const targetPlayer = nextState.players[playerIndex]
-        if (
-          targetPlayer &&
-          hasPendingAnimals(targetPlayer) &&
-          !pendingChoice &&
-          !pendingAnimalReorg
-        ) {
+        console.log('[applyDevResource] player:', devPlayerId, 'index:', playerIndex, 'hasPendingAnimals:', targetPlayer ? hasPendingAnimals(targetPlayer) : 'no player', 'pendingChoice:', pendingChoice)
+        if (!targetPlayer) {
+          return
+        }
+        // 开发者模式添加动物后，直接进入重整状态
+        if (pendingAnimalReorg && pendingAnimalReorg.playerIndex === playerIndex && animalReorg) {
+          // 更新现有重整状态
+          setAnimalReorg(createAnimalReorgState(targetPlayer))
+        } else if (!pendingAnimalReorg && !pendingChoice) {
+          // 直接进入重整状态（不检查 hasPendingAnimals）
+          console.log('[applyDevResource] Entering reorg mode for player', playerIndex)
           setPendingAnimalReorg({ playerIndex, spaceId: 'dev-add-animals' })
           setAnimalReorg(createAnimalReorgState(targetPlayer))
           setViewPlayerId(targetPlayer.id)
@@ -2668,6 +2692,36 @@ export const GameContainer = () => {
       void persistGame(nextState)
     }
     reader.readAsText(file)
+  }
+
+  const createDevPasture = async () => {
+    // Give player 6 wood for building a 2-tile pasture
+    const woodData = await addResource(devPlayerId, 'wood', 6)
+    if (!woodData?.state) return
+    
+    const nextState = normalizeState(woodData.state as GameState)
+    updateState(nextState)
+    
+    // Use current player index (must match devPlayerId)
+    const playerIndex = nextState.currentPlayerIndex
+    const currentPlayer = nextState.players[playerIndex]
+    if (currentPlayer?.id !== devPlayerId) return
+    
+    // Set pending choice for fencing action
+    setPendingChoice({
+      promptKey: 'ui.interactionFenceSelect',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionConfirmButton' },
+        { value: 'cancel', labelKey: 'ui.interactionCancelButton' },
+      ],
+      playerIndex,
+      spaceId: 'fencing',
+      fenceExtraWood: 0,
+    })
+    
+    // Clear any previous fence selections
+    setPendingFenceEdges([])
+    setFenceError(null)
   }
 
   const openAnytimeReorg = () => {
@@ -3306,6 +3360,7 @@ export const GameContainer = () => {
           drawDevCard={drawDevCard}
           saveDevState={saveDevState}
           loadDevState={loadDevState}
+          createDevPasture={createDevPasture}
         />
       ) : null}
       <AnytimeBar

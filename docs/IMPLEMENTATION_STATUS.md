@@ -22,8 +22,7 @@
 - Flow 节点树：leaf/seq/parallel/or/xor/optional。
 - 8 个 Hook 相位：before/during/immediatelyAfter/after/computeCosts/computeArgs/computeReplace/isDoable。
 - Hook 覆盖矩阵由真实注册数据动态生成。
-
-### 2.3 卡牌
+- **OptionalNode 修复**： 当 `OptionalNode.active=true` 时，引擎返回 `ok` 而非 `blocked`，允许子节点继续执行（例如 Meeting Place 的 optional minor improvement）。"}
 - 248 个卡牌定义文件（A/B/C/D/E）。
 - 大改良核心卡已接入主要效果。
 - 详见 `docs/cards_impl.md`。
@@ -58,6 +57,17 @@
 - ✅ 修复回合结束后无法进入下一轮问题（所有工人使用后不再设置 confirmNextPlayer pending，允许 End Round 按钮生效）
 - ✅ 实现 C75_Firewood 卡牌：新增 onReturnHome hook，在 returning home phase 触发放置木材效果，购买烤箱后可将卡上木材移至供应堆
 - ✅ 修复 Firewood 与改良日志展示：使用通用 cardEffectGain 记录卡牌来源，改良日志输出支付资源且改良行动不再输出 actionDetail
+- ✅ 修复 C52_HuntsmansHat：仅在 pig-market 收取猪时按数量获得食物并记录 cardEffectGain
+- ✅ 补充 C52_HuntsmansHat i18n：cardEffectGain 日志显示卡牌名
+- ✅ 默认开局玩家数调整为 2 人，方便 e2e 与人工回归
+- ✅ 修复开发者模式 Create Pasture：不消耗行动，且可进入围栏选择并确认
+- ✅ 新增开发者模式 API 端点：play-card, set-space-taken, set-current-player, set-resources（支持 E2E 测试状态设置）
+- ✅ E21_SheepRug 卡牌效果实现：允许玩家使用被占据的 Wish for Children 行动格
+- ✅ E21_SheepRug e2e 测试完成：验证有/无 SheepRug 时对被占用 Wish for Children 的使用权限
+- ✅ 新增 dev/set-round API：支持 e2e 测试快速跳转到指定回合
+- ✅ GameContainerApi 集成 applyIsDoableHooks：允许卡牌 hook 覆盖 taken 检查
+
+### 2.6 行动卡映射 (Action Card Mapping)
 
 ### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。

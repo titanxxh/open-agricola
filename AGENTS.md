@@ -4,14 +4,15 @@
 遇到不确定的实现，优先参考 ../bga-agricola 项目中的实现，除非在 docs/ENGINE_ARCHITECTURE.md 中有明确说明需要不一样的实现方式。
 
 ## 变更约定
-- 新增卡牌实现时，需要先提供一个实现后，预期的测试说明，给我确认后再进行实现。如果没有得到确认需要修改直到认可。
+- 新增卡牌实现时，需要先提供预期的测试说明，给我确认后再进行实现。如果没有得到确认需要修改直到认可。
   - 需要包含测试步骤，从启动一局新游戏开始，先设定前置条件，比如使用开发者工具做哪些准备。
   - 需要定义玩家进行交互的过程，会调用后端什么接口，一共有几个步骤。
   - 需要断点每次交互后游戏state有哪些变化。
   - 需要断点会输出哪些日志。
 - 不要引入循环依赖
 - 新增卡牌功能需要有e2e测试，按照之前提供的预期测试说明来写。
-  - 一定需要通过playwright截图，headless模式，查看界面是否符合预期，浏览器窗口宽度至少为1920，验证的每一步的截图文件保存在output目录。
+  - 所有临时文件都放进output/
+  - 一定需要通过playwright截图，headless模式，查看界面是否符合预期，浏览器窗口宽度至少为1920
   - 每一次调用后端后，state发生的改变需要记录在不同的文件中，方便后续人工debug。
   - 验证时需要将本次产生的截图文件发我，我会人工检查是否符合预期。
   - 我确认后，可以产生临时文件。
@@ -21,7 +22,7 @@
 - 提交代码到 Git 仓库，commit 标题需要符合规范：
   - 格式：`feat: 新增功能描述` 或 `fix: 修复问题描述` 或 `refactor: 代码重构描述`
   - 描述：简洁明了，避免使用中文
-- 最后git push到remote仓库，如果远端代码更新，需要向我确认如何操作。
+- 首先git fetch更新远端代码，如果远端代码更新，导致不能fast-forward push，列出commit差异，并向我确认。否则可以push到远端。
 
 ## 卡牌实现规范
 
@@ -61,3 +62,26 @@
 
 ## 启动命令
 可以用restart.sh重启。注意测试时只需要需要启动2个玩家的游戏。
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+The `canvas` npm package requires native C libraries. These are pre-installed in the VM snapshot: `libcairo2-dev`, `libpango1.0-dev`, `libjpeg-dev`, `libgif-dev`, `librsvg2-dev`, `libpixman-1-dev`. If `npm install` fails with canvas build errors, reinstall them via `sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`.
+
+### Services
+- **Backend** (port 5175): `npm run server` — runs `tsx server/index.ts`, HTTP + WebSocket game engine
+- **Frontend** (port 5173): `npm run dev` — Vite dev server for React SPA
+- Both can be started together via `./restart.sh` (uses `nohup` + background processes)
+- No database or external services required; game state is stored in memory / `data/game-state.json`
+
+### Common commands
+See `package.json` scripts. Key ones:
+- `npm test` — vitest unit tests (excludes e2e-tests)
+- `npm run lint` — ESLint (pre-existing `@typescript-eslint/no-explicit-any` warnings exist)
+- `npm run build` — `tsc -b && vite build` (pre-existing TS type errors in test files; does not affect dev mode)
+- E2E tests require Playwright browsers: `npx playwright install`
+
+### Gotchas
+- `npm run build` fails due to pre-existing TypeScript strict-mode errors in test files. Dev mode (`npm run dev` / `npm run server`) is unaffected.
+- The Vite config has a plugin that serves card images from `../bga-agricola/img`. This sibling directory does not exist in the cloud VM, so card sprite images will be missing — this is cosmetic only and does not affect functionality.
+- Access player views via `http://localhost:5173/?player=p1` and `?player=p2`.

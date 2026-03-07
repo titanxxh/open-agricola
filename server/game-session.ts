@@ -430,6 +430,10 @@ export class GameSession {
         if (!allWorkersUsed) {
           const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
           this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        } else {
+          // All workers used - set confirmNextPlayer with start player as next
+          const startIdx = this.state.players.findIndex((p) => p.startPlayer)
+          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
         }
         return
       }
@@ -542,7 +546,13 @@ export class GameSession {
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
-    if (!this.engine) return this.respond(false, 'no active engine')
+    if (!this.engine) {
+      if (pending.promptKey === 'ui.interactionFenceSelect') {
+        this.pending = { type: 'none' }
+        return this.respond()
+      }
+      return this.respond(false, 'no active engine')
+    }
     const player = this.state.players[playerIndex]
     const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
@@ -577,6 +587,25 @@ export class GameSession {
       return this.respond()
     }
     this.runEngineSteps()
+    return this.respond()
+  }
+
+  startDevFenceSelect(playerIndex: number): SessionResponse {
+    if (this.state.gameOver) return this.respond(false, 'game is over')
+    if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    if (this.pending.type !== 'none') return this.respond(false, 'pending action exists')
+    this.pending = {
+      type: 'choice',
+      playerIndex,
+      spaceId: 'dev-create-pasture',
+      promptKey: 'ui.interactionFenceSelect',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+      ],
+    }
     return this.respond()
   }
 
@@ -689,6 +718,13 @@ export class GameSession {
     this.activePlayerIndex = null
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
+
+    // Check if all workers are used (round end condition)
+    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    if (allWorkersUsed) {
+      return this.performRoundEnd()
+    }
+
     return this.respond()
   }
 
