@@ -415,15 +415,14 @@
 
 .gain-display .gain-amount {
   font-family: var(--agricola-font);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   color: #2a1a00;
   line-height: 1;
 }
 
 .gain-res-icon {
-  width: 32px !important;
-  height: 32px !important;
+  font-size: 28px;
 }
 
 .action-card.action-s .gain-display .gain-amount {
@@ -431,17 +430,15 @@
 }
 
 .action-card.action-s .gain-res-icon {
-  width: 26px !important;
-  height: 26px !important;
+  font-size: 24px;
 }
 
 .action-card-holder.round .gain-display .gain-amount {
-  font-size: 32px;
+  font-size: 26px;
 }
 
 .action-card-holder.round .gain-res-icon {
-  width: 38px !important;
-  height: 38px !important;
+  font-size: 28px;
 }
 
 /* --- Accumulate arrows (action_frame_arrow.png) --- */
@@ -498,6 +495,7 @@
   display: flex;
   flex-flow: column-reverse;
   z-index: 12;
+  font-size: 30px;
 }
 
 .resource-holder::before {
@@ -520,12 +518,11 @@
 }
 
 .resource-holder .res-icon {
-  width: 22px;
-  height: 22px;
+  margin: -0.6em auto 0;
 }
 
-.resource-holder .res-icon + .res-icon {
-  margin-bottom: -10px;
+.resource-holder .res-icon:last-child {
+  margin-top: 0;
 }
 
 /* --- Farmer holder (meeple overlay when action taken) --- */
@@ -1577,23 +1574,22 @@
 
 .res-icon {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  font-size: 24px; /* Base size, acts as scale factor */
   background-image: url('/bga-img/meeples.png');
   background-repeat: no-repeat;
   vertical-align: middle;
   flex-shrink: 0;
 }
-.res-icon-wood { background-position: 58.45% 21.78%; background-size: 5120%; }
-.res-icon-clay { background-position: 97.13% 8.61%; background-size: 4800%; }
-.res-icon-reed { background-position: 14.12% 21.82%; background-size: 4266%; }
-.res-icon-stone { background-position: 36.95% 21.80%; background-size: 4800%; }
-.res-icon-grain { background-position: 54.59% 21.79%; background-size: 4096%; }
-.res-icon-vegetable { background-position: 77.08% 21.73%; background-size: 3840%; }
-.res-icon-food { background-position: 41.01% 21.80%; background-size: 3840%; }
-.res-icon-sheep { background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
-.res-icon-boar { background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
-.res-icon-cattle { background-position: 18.57% 21.821%; background-size: 1969.23%; }
+.res-icon-wood { width: 0.6em; height: 0.78em; background-position: 58.4507% 21.7766%; background-size: 3413.33%; }
+.res-icon-clay { width: 0.64em; height: 0.74em; background-position: 97.127% 8.61196%; background-size: 3200%; }
+.res-icon-reed { width: 0.72em; height: 0.82em; background-position: 14.1194% 21.821%; background-size: 2844.44%; }
+.res-icon-stone { width: 0.64em; height: 0.8em; background-position: 36.9456% 21.7988%; background-size: 3200%; }
+.res-icon-grain { width: 0.75em; height: 0.79em; background-position: 54.5869% 21.7877%; background-size: 2730.67%; }
+.res-icon-vegetable { width: 0.82em; height: 0.8em; background-position: 77.0791% 21.7325%; background-size: 2694.74%; }
+.res-icon-food { width: 0.8em; height: 0.8em; background-position: 41.0061% 21.7988%; background-size: 2560%; }
+.res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
+.res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
+.res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
 
 .resource-inline-empty {
   color: #6b6b6b;
