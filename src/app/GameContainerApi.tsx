@@ -547,10 +547,12 @@ export const GameContainerApi = () => {
   }, [displayPlayer?.stableAnimals])
 
   const reorgAvailable = useMemo(() => {
-    if (!pendingAnimalReorg || !state) return null
-    const player = state.players[pendingAnimalReorg.playerIndex]
+    if (!state) return null
+    // 使用本地 animalReorg 状态或 pendingAnimalReorg
+    const playerIndex = pendingAnimalReorg?.playerIndex ?? state.currentPlayerIndex
+    const player = state.players[playerIndex]
     return player ? { sheep: player.resources.sheep, boar: player.resources.boar, cattle: player.resources.cattle } : null
-  }, [pendingAnimalReorg, state?.players])
+  }, [pendingAnimalReorg, state])
   const reorgTotals = useMemo(() => {
     if (!animalReorg) return { sheep: 0, boar: 0, cattle: 0 }
     return animalReorg.zones.reduce((acc, z) => { if (z.animalType) acc[z.animalType] += z.animalCount; return acc }, { sheep: 0, boar: 0, cattle: 0 })
@@ -718,14 +720,47 @@ export const GameContainerApi = () => {
   const occupationIdSet = useMemo(() => new Set(occupationIds), [])
 
   const applyDevResource = useCallback(async () => {
+    console.log('>>> applyDevResource CALLED <<<')
     if (!devPlayerId || !state) return
     const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
     const player = clone.players.find((p) => p.id === devPlayerId)
     if (!player) return
     const delta = Number(devAmount ?? 0)
     player.resources[devResource] = Math.max(0, (player.resources[devResource] ?? 0) + delta)
-    void applyAndSync(api.loadGame(clone))
-  }, [devPlayerId, devResource, devAmount, state, api, applyAndSync])
+    
+    // 同步到服务器
+    const resp = await api.loadGame(clone)
+    applyResponse(resp)
+    
+    // 如果是动物资源，直接进入重整状态（在 applyResponse 之后设置）
+    if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
+      console.log('>>> Animal resource detected, setting reorg <<<')
+      const stKeys = getLooseStableKeys(player)
+      setAnimalReorg({ 
+        zones: [
+          ...player.pastures.map((p) => ({ 
+            id: p.id, 
+            zoneType: 'pasture' as const, 
+            animalType: p.animalType, 
+            animalCount: p.animalCount 
+          })),
+          { 
+            id: 'house', 
+            zoneType: 'house' as const, 
+            animalType: player.houseAnimalType ?? null, 
+            animalCount: player.houseAnimalCount ?? 0 
+          },
+          ...stKeys.map((key) => ({ 
+            id: `stable:${key}`, 
+            zoneType: 'stable' as const, 
+            animalType: player.stableAnimals?.[key] ?? null, 
+            animalCount: player.stableAnimals?.[key] ? 1 : 0 
+          })),
+        ], 
+        confirmDiscard: false 
+      })
+    }
+  }, [devPlayerId, devResource, devAmount, state, api, applyResponse])
 
   const applyDevRound = useCallback(() => {
     if (!state || !Number.isFinite(devRound)) return
