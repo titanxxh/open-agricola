@@ -1,3 +1,25 @@
+@font-face {
+  font-family: 'Dominican';
+  src: url('/bga-img/fonts/Dominican.woff2') format('woff2'),
+       url('/bga-img/fonts/Dominican.woff') format('woff'),
+       url('/bga-img/fonts/Dominican.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CalibriB';
+  src: url('/bga-img/fonts/CalibriB.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --agricola-font: 'Dominican', 'CalibriB', serif;
+}
+
 .app {
   min-height: 100vh;
   color: #1e1e1e;
@@ -308,6 +330,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--agricola-font);
   font-size: 11px;
   font-weight: 700;
   padding: 2px 4px 0;
@@ -327,6 +350,7 @@
   flex-flow: column;
   justify-content: center;
   align-items: center;
+  font-family: var(--agricola-font);
   font-weight: bold;
   font-size: 13px;
   position: relative;
@@ -371,6 +395,53 @@
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0px 10px;
+}
+
+/* --- Accumulate gain display (number + resource icon inline) --- */
+
+.gain-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-grow: 1;
+}
+
+.gain-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gain-display .gain-amount {
+  font-family: var(--agricola-font);
+  font-size: 28px;
+  font-weight: 700;
+  color: #2a1a00;
+  line-height: 1;
+}
+
+.gain-res-icon {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.action-card.action-s .gain-display .gain-amount {
+  font-size: 22px;
+}
+
+.action-card.action-s .gain-res-icon {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+.action-card-holder.round .gain-display .gain-amount {
+  font-size: 32px;
+}
+
+.action-card-holder.round .gain-res-icon {
+  width: 38px !important;
+  height: 38px !important;
 }
 
 /* --- Accumulate arrows (action_frame_arrow.png) --- */
@@ -487,10 +558,12 @@
 
 .action-card-holder.round .action-header {
   height: 26px;
+  font-family: var(--agricola-font);
   font-size: 10px;
 }
 
 .action-card-holder.round .action-desc {
+  font-family: var(--agricola-font);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -581,6 +654,7 @@
 
 .tooltip-text strong {
   display: block;
+  font-family: var(--agricola-font);
   font-size: 14px;
   color: #2a1a00;
   margin-bottom: 4px;
@@ -1517,9 +1591,9 @@
 .res-icon-grain { background-position: 54.59% 21.79%; background-size: 4096%; }
 .res-icon-vegetable { background-position: 77.08% 21.73%; background-size: 3840%; }
 .res-icon-food { background-position: 41.01% 21.80%; background-size: 3840%; }
-.res-icon-sheep { background-position: 31.60% 21.60%; background-size: 3840%; }
-.res-icon-boar { background-position: 45.50% 21.60%; background-size: 3840%; }
-.res-icon-cattle { background-position: 49.80% 21.80%; background-size: 3840%; }
+.res-icon-sheep { background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
+.res-icon-boar { background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
+.res-icon-cattle { background-position: 18.57% 21.821%; background-size: 1969.23%; }
 
 .resource-inline-empty {
   color: #6b6b6b;

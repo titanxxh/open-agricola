@@ -15,7 +15,6 @@ import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import {
   baseActionOrder,
   createRoundOpenById,
-  isActionForPlayerCount,
 } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
@@ -457,7 +456,6 @@ export const GameContainerApi = () => {
       )
       if (!canUseWhenTaken) return false
     }
-    if (!isActionForPlayerCount(space, state.players.length)) return false
     const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
     if (state.round < openRound) return false
     if (currentPlayer.workersAvailable <= 0) return false
@@ -470,20 +468,19 @@ export const GameContainerApi = () => {
     if (!state) return new Map<string, ActionSpace>()
     return new Map(state.actionSpaces.map((s) => [s.id, s]))
   }, [state?.actionSpaces])
-  const playerCount = state?.players.length ?? 0
   const roundSlots: RoundSlot[] = useMemo(() => {
     if (!state) return []
     return state.roundActionOrder.map((id, index) => {
       const action = id ? actionMap.get(id) : undefined
       return {
         round: index + 1,
-        action: action && isActionForPlayerCount(action, playerCount) ? action : undefined,
+        action: action ?? undefined,
       }
     })
-  }, [state?.roundActionOrder, actionMap, playerCount])
+  }, [state?.roundActionOrder, actionMap])
   const baseActions = useMemo(() =>
-    baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s && isActionForPlayerCount(s, playerCount)),
-  [actionMap, playerCount])
+    baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s),
+  [actionMap])
 
   const scoreSummaries = useMemo(() => state ? computeScores(state) : [], [state])
 

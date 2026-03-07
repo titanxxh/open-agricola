@@ -3,6 +3,12 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 
+const RESOURCE_LABELS: Record<string, string> = {
+  wood: 'wood', clay: 'clay', reed: 'reed', stone: 'stone',
+  grain: 'grain', vegetable: 'vegetable', food: 'food',
+  sheep: 'sheep', boar: 'boar', cattle: 'cattle',
+}
+
 const BOARD_W = 1000
 const BOARD_H = 795
 
@@ -245,6 +251,24 @@ export const ActionBoard = ({
 
   const hideTooltip = () => setTooltip(null)
 
+  const renderGainDisplay = (space: ActionSpace) => {
+    const gains = Object.entries(space.gainPerRound).filter(([, v]) => (v ?? 0) > 0)
+    if (!gains.length) return null
+    return (
+      <div className="gain-display">
+        {gains.map(([res, amt]) => (
+          <span key={res} className="gain-entry">
+            <span className="gain-amount">{amt}</span>
+            <span className={`gain-res-icon res-icon res-icon-${res}`} />
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  const hasGainPerRound = (space: ActionSpace) =>
+    Object.values(space.gainPerRound).some((v) => (v ?? 0) > 0)
+
   return (
     <section className="actions">
       <h2>{t(locale, 'ui.actionArea')}</h2>
@@ -272,7 +296,11 @@ export const ActionBoard = ({
                   disabled={!canTakeAction(space, currentPlayer)}
                 >
                   <h4 className="action-header">{t(locale, space.nameKey)}</h4>
-                  <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+                  <div className="action-desc">
+                    {accDir && hasGainPerRound(space)
+                      ? renderGainDisplay(space)
+                      : t(locale, space.descriptionKey)}
+                  </div>
                   <div className="action-footer" />
                 </button>
                 {renderResourceHolder(space)}
@@ -311,7 +339,11 @@ export const ActionBoard = ({
                       disabled={!canTakeAction(action, currentPlayer)}
                     >
                       <h4 className="action-header">{t(locale, action.nameKey)}</h4>
-                      <div className="action-desc">{t(locale, action.descriptionKey)}</div>
+                      <div className="action-desc">
+                        {accDir && hasGainPerRound(action)
+                          ? renderGainDisplay(action)
+                          : t(locale, action.descriptionKey)}
+                      </div>
                       <div className="action-footer" />
                     </button>
                     {renderResourceHolder(action, true)}

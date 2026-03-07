@@ -391,8 +391,8 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 ## 前端展示 (UI)
 
-- **行动区布局**：`ActionBoard.tsx` 完全还原 BGA 棋盘布局。板面 1000×795px，`central.png` 作为主背景（偏移 170px），`add_2p.png` 作为左侧边栏背景。卡牌采用 BGA 3 段式渲染（header/desc/footer），每段分别引用 `action_frame.png` 或 `action_frame_s.png` 的不同 `background-position` 切片。累积类行动（如 Forest、Clay Pit、Sheep Market 等）通过 `action_frame_arrow.png` CSS 伪元素显示方向箭头（left/right/bottom），累积资源以 `.resource-holder` 显示在卡片外部，带橙色圆形数量徽章（`#f9a63b`）。Round 行动卡的 holder 使用 `actions_background.png` sprite（5×3 网格），hover 时通过 `position: fixed` tooltip 显示 `actions.jpg` 大图预览及描述。棋盘通过 ResizeObserver + CSS `transform: scale()` 响应式缩放。
-- **资源图标**：`ResourceLine.tsx` 使用 BGA meeple sprite 图标（`res-icon-*`）替代文字标签，`ActionBoard` 累积资源通过堆叠 `res-icon` sprite 显示在 `.resource-holder` 中。
+- **行动区布局**：`ActionBoard.tsx` 完全还原 BGA 棋盘布局。板面 1000×795px，`central.png` 作为主背景（偏移 170px），`add_2p.png` 作为左侧边栏背景。不论几人局，始终显示所有 4 人局行动位（含左侧 Copse、Grove、Resource Market、Hollow、Lessons-4、Traveling Players）。卡牌采用 BGA 3 段式渲染（header/desc/footer），每段分别引用 `action_frame.png` 或 `action_frame_s.png` 的不同 `background-position` 切片。累积类行动卡体内显示每回合获取量（数字 + 资源图标），非累积行动卡显示文字描述。箭头通过 `action_frame_arrow.png` CSS 伪元素显示方向（left/right/bottom），累积资源以 `.resource-holder` 显示在卡片外部，带橙色圆形数量徽章（`#f9a63b`）。Round 行动卡的 holder 使用 `actions_background.png` sprite（5×3 网格），hover 时通过 `position: fixed` tooltip 显示 `actions.jpg` 大图预览及描述。棋盘通过 ResizeObserver + CSS `transform: scale()` 响应式缩放。字体使用 BGA 的 Dominican（标题/卡牌）+ CalibriB（加粗文本）。
+- **资源图标**：`ResourceLine.tsx` 使用 BGA meeple sprite 图标（`res-icon-*`）替代文字标签，`ActionBoard` 累积资源通过堆叠 `res-icon` sprite 显示在 `.resource-holder` 中，卡牌体内通过 `.gain-display` 显示数字 + 内联资源图标。
 - **日志卡牌 hover**：`LogPanel.tsx` 检测日志中的卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
 - **卡牌关键字图标**：`PlayerCard.tsx` 的 `.card-category` 图标增加中英文 tooltip（8 个类别）。Passing 小牌增加 `.card-passing-badge` 可视标识。
 - **对局状态指示**：`GameHeader.tsx` 增加"轮到你了"/"等待对方"状态徽章（pulse 动画），显示玩家身份，回合进度（N/14）。My-turn 时 header 绿色高亮，not-my-turn 时 action 区域变暗并禁用交互。

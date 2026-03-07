@@ -398,7 +398,6 @@ export const createRoundSnapshot = (state: GameState): GameState => {
 export const applyRoundGrowth = (state: GameState) => {
   const roundOpenById = createRoundOpenById(state.roundActionOrder)
   state.actionSpaces.forEach((space) => {
-    if (!isActionForPlayerCount(space, state.players.length)) return
     const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
     if (state.round >= openRound) {
       Object.entries(space.gainPerRound).forEach(([key, value]) => {
