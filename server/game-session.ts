@@ -430,6 +430,10 @@ export class GameSession {
         if (!allWorkersUsed) {
           const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
           this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+        } else {
+          // All workers used - set confirmNextPlayer with start player as next
+          const startIdx = this.state.players.findIndex((p) => p.startPlayer)
+          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
         }
         return
       }
@@ -714,6 +718,13 @@ export class GameSession {
     this.activePlayerIndex = null
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
+
+    // Check if all workers are used (round end condition)
+    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    if (allWorkersUsed) {
+      return this.performRoundEnd()
+    }
+
     return this.respond()
   }
 
