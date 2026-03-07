@@ -1,254 +1,143 @@
-# 实现情况总结
+# 实现状态
 
-## 1. 架构
+## 1. 架构总览
 
-前后端职责已分离：后端持有唯一权威 `GameState`，前端仅做渲染与输入收集。
-前端采用 4 个浏览器窗口分别代表 4 位玩家（`?player=1..4` 或 `?player=p1..p4`）。
+WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 
-| 目录 | 职责 |
+| 层 | 目录 | 职责 |
+|---|---|---|
+| 共享领域 | `shared/` | 引擎、行动、效果、Hook、卡牌定义、状态模型、计分、i18n、协议类型 |
+| 后端 | `server/` | GameSession（权威状态入口）、HTTP API、WS 房间管理、校验 |
+| 前端 | `src/` | React UI、GameTransport（HTTP/WS）、状态订阅与渲染 |
+
+详细架构设计见 `docs/ENGINE_ARCHITECTURE.md`。
+
+## 2. 后端
+
+### 2.1 GameSession
+
+`server/game-session.ts` — 唯一可写入 `GameState` 的入口。
+
+- 命令式方法：`takeAction`、`resolveChoice`、`commitFarmChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`、`undoStep`、`undoAction`、`loadState`。
+- Dev 方法：`startDevFenceSelect`。
+- 构造函数支持可选 `seed` 参数，用于可复现测试。
+- 内部维护 `history` 快照栈 + `actionStartIndex` 用于撤销。
+- 所有方法返回 `SessionResponse`（state + pending + scores + 元数据）。
+
+### 2.2 WS 房间管理
+
+`server/room-manager.ts` — WebSocket 主链路。
+
+- 每个房间持有独立 `GameSession` 实例。
+- 支持 `ClientCommand`（共享类型）：`action`、`choice`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
+- 状态变更后广播 `StateUpdateEnvelope`（含 version + cause）给房间内所有客户端。
+- 连接断开时清理玩家，空房间自动销毁。
+
+### 2.3 HTTP API
+
+`server/game-router.ts` — 开发/调试/兼容通道。
+
+- 端点：`/api/game/state`、`/api/game/action`、`/api/game/choice`、`/api/game/commit-farm`、`/api/game/reorg`、`/api/game/feed`、`/api/game/next-player`、`/api/game/round-end`、`/api/game/undo`、`/api/game/undo-action`、`/api/game/new`（支持 seed）、`/api/game/load`、`/api/game/validate`（纯预检）。
+- Dev 端点：`/api/game/dev/create-pasture`、`/api/game/dev/play-card`、`/api/game/dev/set-space-taken`、`/api/game/dev/set-current-player`、`/api/game/dev/set-round`、`/api/game/dev/set-resources`。
+- `/api/rooms` — 列出当前活跃房间。
+- HTTP 使用单例 `GameSession`，仅用于单机调试。多人对局走 WS。
+
+### 2.4 共享协议
+
+| 文件 | 内容 |
 |---|---|
-| `shared/` | 引擎、行动、效果、Hook、卡牌、状态、计分、i18n（前后端共用） |
-| `server/` | GameSession（权威状态）、HTTP API、WebSocket 房间管理、校验 |
-| `src/` | React UI、API 调用 hook、渲染组件 |
+| `shared/protocol/game.ts` | `GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope` |
+| `shared/protocol/ws.ts` | `ClientCommand`、`ServerEvent`、`RoomSummary` |
+| `shared/game/serialization.ts` | `serializeState` / `rehydrateState` — 去函数序列化 |
+| `shared/game/types.ts` | `GameState`、`PlayerState`、`ActionSpace`、`PendingAction`、`Resource` |
 
-## 2. 当前能力
+### 2.5 校验
 
-### 2.1 核心流程
-- 1~14 回合主流程、行动轮转、回合结束、游戏结束。
-- 收获三阶段：收割、喂食、繁殖（严格按顺序执行：所有玩家收割完成后才开始喂食，所有玩家喂食完成后才开始繁殖）。
-- 动物重整与待安置处理。
+独立校验模块：`server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`。打断了 index↔game-router 循环依赖。
 
-### 2.2 引擎与 Hook
-- Flow 节点树：leaf/seq/parallel/or/xor/optional。
-- 8 个 Hook 相位：before/during/immediatelyAfter/after/computeCosts/computeArgs/computeReplace/isDoable。
-- Hook 覆盖矩阵由真实注册数据动态生成。
-- **OptionalNode 修复**： 当 `OptionalNode.active=true` 时，引擎返回 `ok` 而非 `blocked`，允许子节点继续执行（例如 Meeting Place 的 optional minor improvement）。"}
-- 248 个卡牌定义文件（A/B/C/D/E）。
-- 大改良核心卡已接入主要效果。
-- 详见 `docs/cards_impl.md`。
+## 3. 前端
 
-### 2.4 后端 API
-- `GameSession`：持有 GameState + Engine，暴露命令式方法，是唯一可写入 `GameState` 的入口。
-  - 新增 `commitFarmChoice()`：统一处理围栏/房间/马厩/开垦/播种的校验与状态写入。
-  - 新增 `devSetResources/devSetRound/devSetCurrentPlayer/devPlayCard/devSetSpaceTaken/devAddRooms`：dev 路由不再直接操作 state。
-  - `getRawState()` 已重命名为 `getStateForRead()`，强调只读语义。
-- HTTP 端点：`/api/game/*`（takeAction/resolveChoice/validate/commit-farm/confirmReorg/confirmFeed/confirmNextPlayer/performRoundEnd）。
-  - `/api/game/validate` 已改为纯预检接口，不再写入 GameSession 状态。
-  - 新增 `/api/game/commit-farm`：由前端校验通过后调用，委托给 `GameSession.commitFarmChoice()`。
-- 共享协议类型：
-  - `shared/protocol/game.ts`：定义 `GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope`。
-  - `shared/protocol/ws.ts`：定义 `ClientCommand`、`ServerEvent`、`RoomSummary`。
-  - `shared/game/serialization.ts`：定义 `serializeState`/`rehydrateState`，统一状态序列化。
-- WebSocket：`ws://localhost:5175/ws`，使用共享 `ClientCommand`/`ServerEvent` 类型。
-  - `room-manager` 广播 `StateUpdateEnvelope`（含版本号 + cause）。
-  - 新增 WS 命令：`newGame`（可选 `seed`）、`loadGame`、`devCreatePasture`；dev 操作统一走 WS，不再 HTTP 降级。
-- 房间管理：每房间独立 GameSession，支持多客户端。
-- 校验模块提取到 `server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`，打断了 index↔game-router 循环依赖。
+### 3.1 Transport 抽象
 
-### 2.5 前端
-- `GameContainerApi`：通过 `GameTransport` 接口驱动，不运行本地引擎。
-  - `src/services/gameTransport.ts`：定义 `GameTransport` 接口，提供 `HttpGameTransport` 和 `WsGameTransport` 两种实现。
-  - `useGameSync` 新增 `applySnapshot(GameSyncPayload)` 方法，统一接收序列化快照。
-- 使用 URL 参数锁定玩家视角：`?player=1..4` 或 `?player=p1..p4`。
-- 已删除死代码：`GameContainer.tsx`、`useGameState.ts`、`use-persistence.ts`、`useRoomConnection.ts`。
-- `src/services/api.ts` 已清理 `fetchState`/`persistGame`/`addResource` 等遗留函数。
+`src/services/gameTransport.ts` — 定义 `GameTransport` 接口。
 
-## 3. 测试与质量
+| 实现 | 说明 |
+|---|---|
+| `HttpGameTransport` | 每次 HTTP 响应后通过 `onSnapshot` 回调通知 |
+| `WsGameTransport` | WebSocket 长连接，接收服务端广播的 `StateUpdateEnvelope` |
 
-- 单测框架：vitest。
-- 41 个测试文件，295 个用例全部通过（含 Playwright e2e 测试）。
-- Playwright E2E：`playwright.config.ts`（testDir `./e2e-tests`，outputDir `./output/playwright`），`e2e-tests/ws-dual-player.spec.ts` 覆盖房间创建/加入、P1 行动→P2 同步、确认下一玩家、P2 行动→P1 同步、undo；`npm run test:e2e` 运行。
-- WS Phase 1 回归测试：
-  - `tests/serialization.test.ts`：共享 serializer 单测（serializeState/rehydrateState 往返）。
-  - `tests/game-session-contract.test.ts`：GameSession 契约测试（所有公开方法 + SessionResponse 结构）。
-  - `tests/game-sync-pipeline.test.ts`：useGameSync 数据管线测试（GameSyncPayload → rehydrate → GameState）。
-  - `tests/pending-undo-regression.test.ts`：五类 pending 选择（none/choice/confirmNextPlayer/animalReorg/harvestFeed）+ undo 回归。
-  - `tests/protocol-types.test.ts`：共享协议类型完整性测试。
+WS 模式通过 URL 参数 `?transport=ws` 启用。
 
-## 4. 已知边界
+### 3.2 状态管理
+
+- `useGameSync` — 持有 `state`、`pending`、`historyLength`、`hasActionStartSnapshot`。通过 `applySnapshot(GameSyncPayload)` 统一消费快照。
+- `GameContainerApi` — 主容器。通过 `useTransportSetup` 管理 WS 连接生命周期（创建/加入房间、等待对手、就绪）。所有操作（含 dev 操作）均通过 `transport` 发出，不直接调用 HTTP。
+
+### 3.3 UI 组件
+
+- `ActionBoard` — 行动区，parchment 背景图（`action_frame_bg.jpg`），阶段边框色彩区分，`data-action-id` 属性。
+- `FarmBoard` — 农场格网、围栏、播种、马厩交互。
+- `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
+- `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。
+- `GameControls` — 撤销/计分/Reset，seed 输入与 Reset 仅在 devMode 显示。
+- `PlayerCard` — 卡牌渲染，BGA sprite 背景。
+
+## 4. 游戏引擎
+
+### 4.1 Flow 节点树
+
+| 节点 | 语义 |
+|---|---|
+| `leaf` | 单个效果 |
+| `seq` | 顺序执行 |
+| `parallel` | 全部子节点 |
+| `or` | 多选一（玩家选择） |
+| `xor` | 条件互斥 |
+| `optional` | 可跳过 |
+
+### 4.2 Hook 系统
+
+8 个相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`。
+
+248 个卡牌定义（A/B/C/D/E 五个 deck），通过 Hook 注册效果。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+
+### 4.3 支付系统
+
+- `ComplexCost`：fee / fees / trades / bonuses / cards。
+- `computeAllBuyableCombinations`：穷举可用支付方案 + Pareto 过滤。
+- LRU 缓存加速重复查询（复杂场景 100x+ 提升）。
+- `CostModifier` 系统：`TradeModifier` / `BonusModifier`，30+ 卡牌注册了支付修改器。
+
+## 5. 测试
+
+### 5.1 单元测试
+
+vitest，41 文件 295 用例。
+
+| 类别 | 文件 |
+|---|---|
+| 协议 | `tests/serialization.test.ts`、`tests/protocol-types.test.ts` |
+| 会话契约 | `tests/game-session-contract.test.ts` |
+| 状态管线 | `tests/game-sync-pipeline.test.ts` |
+| Pending/Undo 回归 | `tests/pending-undo-regression.test.ts` |
+| 支付系统 | `tests/pay.test.ts`、`tests/pay-dp.test.ts`、`tests/exchange.test.ts` |
+| 卡牌效果 | `shared/cards/__tests__/*.test.ts` |
+
+### 5.2 E2E 测试
+
+Playwright，`playwright.config.ts`（testDir `./e2e-tests`）。
+
+- `ws-dual-player.spec.ts` — WS 双人对局：房间创建/加入、P1 行动→P2 同步、换人、P2 行动→P1 同步、undo。
+- 其他 E2E：`round-end-flow.spec.ts`、卡牌效果 E2E。
+
+```bash
+npm test       # 单元测试
+npm run test:e2e  # E2E 测试
+```
+
+## 6. 已知边界
 
 - 部分卡牌仅完成数据接入，复杂行为待补全。
-- WebSocket 多人流程已有 `ws-dual-player.spec.ts` E2E 覆盖。
-- 撤销功能支持 API 模式（撤销步骤、撤销行动）；撤销回合功能已移除以避免混淆。
-- API 模式行动日志已覆盖资源变化、播种与改良/烤面包记录（播种支持新开垦田地且无选择禁用确认）。
-- 卡牌给予行动日志支持：显示来源卡牌、获得的行动、资源转换数量（如 C25_SteamMachine 触发烤面包）
-- ✅ 修复 C25_SteamMachine 烤面包日志显示问题（bake-bread.ts 中 params -> logParams）
-- ✅ 修复 C25_SteamMachine 烤面包后续选择解析问题（engine.ts 中正确跟踪 pendingChoiceNodeId/pendingChoiceActionId）
-- ✅ 修复 resolveChoice 缺少条件检查导致的选择解析失败（game-session.ts 中恢复 pending 类型检查）
-- ✅ 修复玩家切换后 undo 历史未清空问题（confirmNextPlayer 时清空 history 数组，新增 server/__tests__/undo-history.test.ts 单测）
-- ✅ 修复回合结束后无法进入下一轮问题（所有工人使用后不再设置 confirmNextPlayer pending，允许 End Round 按钮生效）
-- ✅ 实现 C75_Firewood 卡牌：新增 onReturnHome hook，在 returning home phase 触发放置木材效果，购买烤箱后可将卡上木材移至供应堆
-- ✅ 修复 Firewood 与改良日志展示：使用通用 cardEffectGain 记录卡牌来源，改良日志输出支付资源且改良行动不再输出 actionDetail
-- ✅ 修复 C52_HuntsmansHat：仅在 pig-market 收取猪时按数量获得食物并记录 cardEffectGain
-- ✅ 补充 C52_HuntsmansHat i18n：cardEffectGain 日志显示卡牌名
-- ✅ 默认开局玩家数调整为 2 人，方便 e2e 与人工回归
-- ✅ 修复开发者模式 Create Pasture：不消耗行动，且可进入围栏选择并确认
-- ✅ 新增开发者模式 API 端点：play-card, set-space-taken, set-current-player, set-resources（支持 E2E 测试状态设置）
-- ✅ E21_SheepRug 卡牌效果实现：允许玩家使用被占据的 Wish for Children 行动格
-- ✅ E21_SheepRug e2e 测试完成：验证有/无 SheepRug 时对被占用 Wish for Children 的使用权限
-- ✅ 新增 dev/set-round API：支持 e2e 测试快速跳转到指定回合
-- ✅ GameContainerApi 集成 applyIsDoableHooks：允许卡牌 hook 覆盖 taken 检查
-
-### 2.6 行动卡映射 (Action Card Mapping)
-- 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
-- 该映射用于辅助测试用例的结构化编写，涵盖资源变化、状态校验与 Flow 节点逻辑。
-
-## 5. 下一步方向
-
-- WS Phase 1 + Phase 2 联调已完成：
-  - Phase 1：共享协议类型、GameSession 权威入口、GameTransport 抽象、WS 后端/前端 MVP、回归测试。
-  - Phase 2：前端 `?transport=ws` 切换联调，双窗口实时同步验证通过。
-  - 协议已支持：`action` / `choice` / `reorg` / `feed` / `nextPlayer` / `roundEnd` / `commitFarm` / `undoStep` / `undoAction` / `getState`
-  - P1 自动创建房间，P2 通过 `/api/rooms` 自动发现并加入。
-- 下一阶段：断线重连、多端联机扩展。WS 模式下 dev 操作已统一走 WS 命令。
-- 持续完善撤销覆盖范围与异常场景。
-- 持续补全高频卡牌行为。
-- 已移除本地引擎模式，仅保留 API 驱动。
-
-## 6. BGA-Agricola 资源支付系统参考
-
-### 6.1 当前实现 (pay.ts)
-
-当前实现的资源支付逻辑较为简单：
-
-```typescript
-// shared/actions/effects/pay.ts
-payResources(player, cost)  // 直接扣减数值
-canPayResources(player, cost)  // 验证资源是否足够
-applyCostOverride(base, override)  // 成本覆盖（用于卡牌效果）
-```
-
-**特点**：
-- 资源以数值形式存储 (`player.resources.wood = 5`)
-- 直接加减数值，无木块追踪
-- 成本结构简单，仅支持固定成本
-
-### 6.2 BGA 版本实现 (Pay.php)
-
-BGA 版本有完整的支付系统，核心文件：`modules/php/Actions/Pay.php`
-
-#### 成本结构 (Cost Format)
-
-```php
-$costs = [
-    'fee' => [resource => amount],      // 必付费用
-    'fees' => [fee1, fee2, ...],        // 多选一费用
-    'trades' => [                       // 可重复的交易选项
-        ['max' => maxTimes, 'nb' => units, resource => amount, ...]
-    ],
-    'cards' => [type => X, list => [...]],  // 卡牌抵换
-    'bonuses' => [                     // 一次性折扣
-        ['optional' => bool, resourceType => amount, ...]
-    ]
-]
-```
-
-#### 组合计算算法
-
-`computeAllBuyableCombinations()` - 计算玩家所有可用支付组合：
-1. 遍历 `fees` 作为基础
-2. 迭代所有 `trades` 组合
-3. 应用 `bonuses` 折扣
-4. 过滤资源不足组合
-5. 移除被其他组合"支配"的不优解
-
-#### 资源模型
-
-BGA 以**单个木块 (meeple)** 追踪资源：
-
-```php
-// Meeples.php
-public static function useResource($player_id, $resourceType, $amount)
-{
-    $resource = self::getResourceOfType($player_id, $resourceType);
-    foreach ($resource as $id => $res) {
-        $deleted[] = $res;  // 保存完整对象用于通知
-        self::DB()->delete($id);
-    }
-    return $deleted;
-}
-```
-
-#### 支付类型
-
-| 类型 | 方法 | 说明 |
-|------|------|------|
-| 普通支付 | `useResource()` | 从玩家储备中删除 |
-| 支付给其他玩家 | `payResourceTo()` | 转移资源到另一玩家 |
-| 从田地支付 | `payResourcesFromFields()` | 从田地中取资源 |
-| 从卡牌支付 | `payResourcesFromCards()` | 归还卡牌抵换 |
-| 卡牌抵换 | 支付卡牌代替资源 | 支持 Major 改良卡 |
-
-### 6.3 对比总结
-
-| 特性 | open-agricola | bga-agricola |
-|------|---------------|---------------|
-| 复杂度 | 简单直接 | 完整状态机 |
-| 资源模型 | 数值计数 | 逐个木块追踪 |
-| 支付组合 | 无 | 智能计算可用组合 |
-| 成本结构 | 固定成本 | fees + trades + bonuses + cards |
-| 卡牌抵换 | 无 | 完整支持 |
-| 玩家间支付 | 无 | 完整支持 |
-
-### 6.4 改进方向
-
-**已完成（2026-02-26）**：
-- ✅ 实现 `ComplexCost` 类型结构（fee, fees, trades, cards, bonuses）
-- ✅ 实现 `PaymentSolution` 类型结构（resourcesPaid, tradesUsed, bonusUsed, cardUsed）
-- ✅ 实现 `computeAllBuyableCombinations` 算法
-- ✅ 实现 `keepOnlyOptimals` Pareto 优化过滤
-- ✅ 实现 `canPayCost` 支持 ComplexCost（向后兼容简单成本）
-- ✅ 实现 `exchange.ts` 交易系统（canAffordTrade, applyTrade, convertResources 等）
-- ✅ 新增单元测试覆盖支付系统（exchange.test.ts + pay.test.ts）
-- ✅ 更新 docs/ut.md 测试覆盖文档
-
-**性能优化（2026-02-26）**：
-- ✅ LRU 缓存（100 条目）用于重复支付查询，复杂场景下 10x-700x 加速
-- ✅ O(1) 哈希去重替代 O(n) 数组比较
-- ✅ 基准测试验证：复杂支付场景 738x 加速
-- ✅ 新增 `clearPaymentCache()` 导出用于测试清理
-
-**卡牌抵换机制（2026-02-27）**：
-- ✅ 扩展 `ComplexCost.cards` 支持 `cost` 字段（支付额外资源）
-- ✅ 扩展 `MajorCardEffect` 支持 `ComplexCost` 类型和 `returnCards` 字段
-- ✅ 实现 `computeAllBuyableCombinations` 生成卡牌支付方案
-- ✅ 实现 `executePaymentSolution` 返回 `cardUsed` 标识
-- ✅ 实现 `returnCardToBoard` 归还卡牌到供应堆
-- ✅ 更新 `improvement.ts` 支持多支付方式选择
-- ✅ 更新 `Major_CookingHearth1/2` 支持从 Fireplace 升级（归还卡牌+支付折扣价）
-- ✅ 新增卡牌支付场景单元测试
-
-**支付卡牌修改器系统（2026-02-27）**：
-- ✅ 新增 `CostModifierType` 类型：construct, renovation, occupation, fencing, stables, plow
-- ✅ 新增 `TradeModifier` 类型：定义资源转换规则（如 2 Clay → 1 Wood）
-- ✅ 新增 `BonusModifier` 类型：定义资源折扣（如 -1 Wood）
-- ✅ `PlayerState` 新增 `activeModifiers` 字段追踪已生效的修改器
-- ✅ 新增 `applyCostModifiers()` 函数：将修改器应用到 ComplexCost
-- ✅ 新增 `getModifiersForCostType()` 函数：获取指定成本类型的修改器
-- ✅ `computeAllBuyableCombinations` 新增 `costType` 参数支持应用修改器
-- ✅ 新增 `card-modifiers.ts` 注册表，包含 30+ 支付相关卡牌：
-  - 建筑类：A123_FrameBuilder, A143_Stonecutter, B145_BrushwoodCollector, B126_Carpenter, B13_CarpentersParlor, C88_CarpentersApprentice, C122_Bricklayer, D15_ClaySupports, A149_HouseArtist, A128_RiparianBuilder, E150_RockBeater, D81_RoofLadder, C128_WoodenHutExtender, D154_ChimneySweep, A14_CarpentersHammer
-  - 围栏类：D82_HuntingTrophy, B15_CarpentersBench, A16_RammedClay, A88_HedgeKeeper, D88_Millwright
-  - 翻新类：D13_Trowel, B128_Plumber, E87_MasterRenovator, C14_StrawThatchedRoof, C13_WoodSlideHammer, D121_ClayPlasterer
-  -  occupation类：A28_ForestSchool, E60_WorkingGloves, B155_ArtTeacher
-  - 其他类：C56_FeedFence (马厩), C37_DwellingMound (开垦)
-- ✅ 新增支付卡牌修改器单元测试
-
-**短期（当前系统可支持）**：
-- 扩展 `applyCostOverride` 支持更复杂的成本修改规则
-- 实现更多支持卡牌升级的大改良（如 Stone Oven 从 Clay Oven 升级）
-
-**中期（需要架构调整）**：
-- 实现玩家间资源转移（参考 BGA 的 `payResourceTo`）
-- 实现从田地支付资源（参考 BGA 的 `payResourcesFromFields`）
-
-**长期（重大重构）**：
-- 将资源模型从数值改为木块追踪
-- 实现完整的卡牌/资源位置追踪系统
-
-# 7. 前端改进
-- ✅ 行动卡背景图：`ActionBoard.tsx` 增加 `data-action-id`，`.action-card` 使用 `/bga-img/action_frame_bg.jpg`，回合行动卡按阶段边框高亮，text-shadow 保证可读性。
-- ✅ 资源图标：`ResourceLine.tsx` 用 BGA meeple sprite 图标替代文字标签（`res-icon-*`），`ActionBoard` 资源 chip 显示图标+数量。
-- ⏳ 卡牌上的关键字使用图标（待实现）
-- ✅ 日志卡牌 hover：`LogPanel.tsx` 检测卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
-- ✅ 随机数种子：`newGame` 支持可选 `seed`，Reset 按钮与种子输入仅在 devMode 显示，`resetGame` 将解析后的 seed 传给 `transport.newGame()`。
+- 断线重连未实现（WS 断开后需刷新页面重连）。
+- BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
+- `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。
