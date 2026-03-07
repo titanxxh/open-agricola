@@ -75,7 +75,7 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 3.3 UI 组件
 
-- `ActionBoard` — 行动区。Round 行动卡使用 `actions_background.png` sprite 精确映射（14 张），base 行动卡使用 parchment 背景，阶段边框色彩区分，`data-action-id` 属性。
+- `ActionBoard` — BGA 风格行动区。使用 `central.png` 作为棋盘背景，所有行动卡绝对定位（匹配 BGA 坐标）。Base 行动卡使用 `action_frame.png`/`action_frame_s.png` 卡框（标准/小号），Round 行动卡使用 `actions_background.png` sprite 精确映射。侧边栏放置额外玩家数行动卡（copse、grove 等）。棋盘通过 ResizeObserver 响应式缩放。包含 14 个收获标记。
 - `FarmBoard` — 农场格网、围栏、播种、马厩交互。
 - `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
 - `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。
