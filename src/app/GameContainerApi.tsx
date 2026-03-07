@@ -162,6 +162,19 @@ export const GameContainerApi = () => {
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
   const isInteractive = !!(currentPlayer && displayPlayer && currentPlayer.id === displayPlayer.id)
+  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
+  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
+  console.log(`[DEBUG] currentPlayer: ${currentPlayer?.id}, ${typeof currentPlayer}`)
+  console.log(`[DEBUG] displayPlayer: ${displayPlayer?.id}, ${typeof displayPlayer}`)
+  console.log(`[DEBUG] isInteractive: ${isInteractive}, ${typeof isInteractive}`)
+  
+  console.log('[DEBUG] isInteractive calculation:', {
+    currentPlayerId: currentPlayer?.id,
+    displayPlayerId: displayPlayer?.id,
+    viewPlayerId,
+    currentPlayerIndex: state?.currentPlayerIndex,
+    isInteractive
+  })
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
