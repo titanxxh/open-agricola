@@ -25,7 +25,7 @@ export interface GameTransport {
   performRoundEnd(): Promise<GameSyncPayload>
   undoStep(): Promise<GameSyncPayload>
   undoAction(): Promise<GameSyncPayload>
-  newGame(): Promise<GameSyncPayload>
+  newGame(seed?: number): Promise<GameSyncPayload>
   loadGame(state: unknown): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
@@ -111,8 +111,8 @@ export class HttpGameTransport implements GameTransport {
     return this.send(() => post('/api/game/undo-action'))
   }
 
-  newGame() {
-    return this.send(() => post('/api/game/new'))
+  newGame(seed?: number) {
+    return this.send(() => post('/api/game/new', seed !== undefined ? { seed } : undefined))
   }
 
   loadGame(state: unknown) {
@@ -255,16 +255,16 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'undoAction' })
   }
 
-  async newGame(): Promise<GameSyncPayload> {
-    return post('/api/game/new')
+  async newGame(seed?: number): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'newGame', seed })
   }
 
   async loadGame(state: unknown): Promise<GameSyncPayload> {
-    return post('/api/game/load', { state })
+    return this.sendCommand({ type: 'loadGame', state })
   }
 
   async devCreatePasture(playerIndex: number): Promise<GameSyncPayload> {
-    return post('/api/game/dev/create-pasture', { playerIndex })
+    return this.sendCommand({ type: 'devCreatePasture', playerIndex })
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {

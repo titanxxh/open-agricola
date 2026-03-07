@@ -182,6 +182,25 @@ export const createWsServer = (server: import('node:http').Server) => {
         broadcastState(room, resp, 'undo')
         return
       }
+
+      if (msg.type === 'newGame') {
+        room.session = new GameSession(msg.seed)
+        const resp = room.session.getState()
+        broadcastState(room, resp, 'reconnect')
+        return
+      }
+
+      if (msg.type === 'loadGame') {
+        const resp = room.session.loadState(msg.state)
+        broadcastState(room, resp, 'reconnect')
+        return
+      }
+
+      if (msg.type === 'devCreatePasture') {
+        const resp = room.session.startDevFenceSelect(msg.playerIndex)
+        broadcastState(room, resp, 'action')
+        return
+      }
     })
 
     ws.on('close', () => {

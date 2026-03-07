@@ -27,6 +27,9 @@ export type ClientCommand =
   | { type: 'roundEnd' }
   | { type: 'undoStep' }
   | { type: 'undoAction' }
+  | { type: 'newGame'; seed?: number }
+  | { type: 'loadGame'; state: unknown }
+  | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string }
   | { type: 'joinRoom'; roomId: string; name?: string }

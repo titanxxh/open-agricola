@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
@@ -7,6 +8,49 @@ import { emptyResources } from '../../../shared/logic/state'
 type Props = {
   locale: Locale
   log: GameState['log']
+}
+
+type CardRef = { id: string; type: 'major' | 'minor' | 'occupation'; name: string }
+
+const resolveCardName = (locale: Locale, id: string): CardRef | null => {
+  const tryKey = (prefix: string, type: CardRef['type']) => {
+    const name = t(locale, `${prefix}.${id}.name`)
+    if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
+    return null
+  }
+  return tryKey('improvements', 'major') ?? tryKey('minorImprovements', 'minor') ?? tryKey('occupations', 'occupation')
+}
+
+const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
+  const prefix = ref.type === 'major' ? 'improvements' : ref.type === 'minor' ? 'minorImprovements' : 'occupations'
+  const desc = t(locale, `${prefix}.${ref.id}.description`)
+  return desc.includes('.description') ? '' : desc
+}
+
+const LogEntry = ({ text, cardRefs, locale }: { text: string; cardRefs: CardRef[]; locale: Locale }) => {
+  const [hoveredCard, setHoveredCard] = useState<CardRef | null>(null)
+  if (cardRefs.length === 0) return <li>{text}</li>
+  return (
+    <li className="log-entry-with-cards">
+      <span>{text}</span>
+      {cardRefs.map((ref) => (
+        <span
+          key={ref.id}
+          className="log-card-badge"
+          onMouseEnter={() => setHoveredCard(ref)}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          🃏
+          {hoveredCard?.id === ref.id && (
+            <span className="log-card-tooltip">
+              <strong>{ref.name}</strong>
+              <span className="log-card-tooltip-desc">{resolveCardDesc(locale, ref)}</span>
+            </span>
+          )}
+        </span>
+      ))}
+    </li>
+  )
 }
 
 export const LogPanel = ({ locale, log }: Props) => (
@@ -199,6 +243,21 @@ export const LogPanel = ({ locale, log }: Props) => (
           }
           params.detail = segments.length > 0 ? ` · ${segments.join(' · ')}` : ''
         }
+        const cardIds: string[] = []
+        if (entry.params) {
+          const raw = entry.params
+          if (typeof raw.cardId === 'string') cardIds.push(raw.cardId)
+          if (raw.improvements) {
+            const ids = Array.isArray(raw.improvements) ? raw.improvements : String(raw.improvements).split(',')
+            ids.forEach((id) => { if (typeof id === 'string') cardIds.push(id.trim()) })
+          }
+          const dp = raw.detailParts as Record<string, unknown> | undefined
+          if (dp?.improvements) (dp.improvements as string[]).forEach((id) => cardIds.push(id))
+          if (dp?.minorImprovements) (dp.minorImprovements as string[]).forEach((id) => cardIds.push(id))
+        }
+        const cardRefs = cardIds
+          .map((id) => resolveCardName(locale, id))
+          .filter((ref): ref is CardRef => ref !== null)
         const textParams = params
           ? (Object.fromEntries(
               Object.entries(params).filter(
@@ -207,9 +266,12 @@ export const LogPanel = ({ locale, log }: Props) => (
             ) as Record<string, string | number>)
           : undefined
         return (
-          <li key={`${entry.key}-${index}`}>
-            {t(locale, entry.key, textParams)}
-          </li>
+          <LogEntry
+            key={`${entry.key}-${index}`}
+            text={t(locale, entry.key, textParams)}
+            cardRefs={cardRefs}
+            locale={locale}
+          />
         )
       })}
     </ul>

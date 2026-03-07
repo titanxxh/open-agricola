@@ -101,7 +101,7 @@ src/ (前端)
 Phase 1 已实现全量快照同步，协议类型定义在 `shared/protocol/` 下：
 
 - `shared/protocol/game.ts`：`GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope`
-- `shared/protocol/ws.ts`：`ClientCommand`（含 `commitFarm`/`undoStep`/`undoAction`）、`ServerEvent`、`RoomSummary`
+- `shared/protocol/ws.ts`：`ClientCommand`（含 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devCreatePasture`）、`ServerEvent`、`RoomSummary`
 - `shared/game/serialization.ts`：`serializeState()`、`rehydrateState()`、`SerializedGameState`
 
 `room-manager.ts` 使用 `StateUpdateEnvelope`（含单调递增 `version` + `StateUpdateCause`）广播快照。前端通过 `GameTransport` 接口的 `onSnapshot` 回调接收。
@@ -110,7 +110,8 @@ Phase 2 前端联调已完成：
 - `GameContainerApi` 通过 URL 参数 `?transport=ws` 切换 WS 模式。
 - P1（`?player=p1&transport=ws`）自动创建房间并等待，P2（`?player=p2&transport=ws`）通过 `/api/rooms` 自动发现并加入。
 - 房间满员后后端广播 `gameStarted`，前端自动进入游戏。
-- `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction` 走 WS；`validateFarmChoice`/`loadGame`/`devCreatePasture` 降级走 HTTP。
+- `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
+- `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
 
 #### 4.3.2 如果后续要支持 patch，同步协议应如何设计
@@ -1135,8 +1136,7 @@ type CardContinuation = {
 
 可落在：
 
-- `src/services/` 的 WS transport
-- 或 `src/hooks/` 的 `useRoomConnection`
+- `src/services/` 的 WS transport（`GameContainerApi` 内联 `useTransportSetup` 管理连接）
 
 ### 12.2 同步状态层
 

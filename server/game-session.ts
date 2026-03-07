@@ -85,7 +85,7 @@ export class GameSession {
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
 
-  constructor(state?: GameState) {
+  constructor(stateOrSeed?: GameState | number) {
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
@@ -94,10 +94,11 @@ export class GameSession {
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
-    if (state) {
-      this.state = normalizeState(state)
+    if (stateOrSeed && typeof stateOrSeed === 'object') {
+      this.state = normalizeState(stateOrSeed)
     } else {
-      this.state = createInitialState(Date.now())
+      const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
+      this.state = createInitialState(seed)
     }
   }
 

@@ -1,5 +1,4 @@
-import type { Locale } from '../../../shared/i18n'
-import { t } from '../../../shared/i18n'
+import type { Locale as _Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/game/types'
 import { resourceKeyList } from '../../../shared/logic/state'
 
@@ -34,9 +33,7 @@ export const ResourceLine = ({
           data-resource={key}
           data-amount={amount}
         >
-          <span className="resource-inline-label">
-            {t(locale, `resources.${key}`)}
-          </span>
+          <span className={`res-icon res-icon-${key}`} />
           <span className="resource-inline-amount">{amount}</span>
         </span>
       ))}

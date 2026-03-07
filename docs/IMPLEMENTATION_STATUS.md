@@ -41,6 +41,7 @@
   - `shared/game/serialization.ts`：定义 `serializeState`/`rehydrateState`，统一状态序列化。
 - WebSocket：`ws://localhost:5175/ws`，使用共享 `ClientCommand`/`ServerEvent` 类型。
   - `room-manager` 广播 `StateUpdateEnvelope`（含版本号 + cause）。
+  - 新增 WS 命令：`newGame`（可选 `seed`）、`loadGame`、`devCreatePasture`；dev 操作统一走 WS，不再 HTTP 降级。
 - 房间管理：每房间独立 GameSession，支持多客户端。
 - 校验模块提取到 `server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`，打断了 index↔game-router 循环依赖。
 
@@ -48,15 +49,15 @@
 - `GameContainerApi`：通过 `GameTransport` 接口驱动，不运行本地引擎。
   - `src/services/gameTransport.ts`：定义 `GameTransport` 接口，提供 `HttpGameTransport` 和 `WsGameTransport` 两种实现。
   - `useGameSync` 新增 `applySnapshot(GameSyncPayload)` 方法，统一接收序列化快照。
-  - 新增 `useRoomConnection` hook：管理 WebSocket 房间连接生命周期（创建/加入/断开）。
 - 使用 URL 参数锁定玩家视角：`?player=1..4` 或 `?player=p1..p4`。
-- 已删除死代码：`GameContainer.tsx`、`useGameState.ts`、`use-persistence.ts`。
+- 已删除死代码：`GameContainer.tsx`、`useGameState.ts`、`use-persistence.ts`、`useRoomConnection.ts`。
 - `src/services/api.ts` 已清理 `fetchState`/`persistGame`/`addResource` 等遗留函数。
 
 ## 3. 测试与质量
 
 - 单测框架：vitest。
 - 41 个测试文件，295 个用例全部通过（含 Playwright e2e 测试）。
+- Playwright E2E：`playwright.config.ts`（testDir `./e2e-tests`，outputDir `./output/playwright`），`e2e-tests/ws-dual-player.spec.ts` 覆盖房间创建/加入、P1 行动→P2 同步、确认下一玩家、P2 行动→P1 同步、undo；`npm run test:e2e` 运行。
 - WS Phase 1 回归测试：
   - `tests/serialization.test.ts`：共享 serializer 单测（serializeState/rehydrateState 往返）。
   - `tests/game-session-contract.test.ts`：GameSession 契约测试（所有公开方法 + SessionResponse 结构）。
@@ -67,7 +68,7 @@
 ## 4. 已知边界
 
 - 部分卡牌仅完成数据接入，复杂行为待补全。
-- WebSocket 多人流程尚未端到端测试。
+- WebSocket 多人流程已有 `ws-dual-player.spec.ts` E2E 覆盖。
 - 撤销功能支持 API 模式（撤销步骤、撤销行动）；撤销回合功能已移除以避免混淆。
 - API 模式行动日志已覆盖资源变化、播种与改良/烤面包记录（播种支持新开垦田地且无选择禁用确认）。
 - 卡牌给予行动日志支持：显示来源卡牌、获得的行动、资源转换数量（如 C25_SteamMachine 触发烤面包）
@@ -89,8 +90,6 @@
 - ✅ GameContainerApi 集成 applyIsDoableHooks：允许卡牌 hook 覆盖 taken 检查
 
 ### 2.6 行动卡映射 (Action Card Mapping)
-
-### 2.6 行动卡映射 (Action Card Mapping)
 - 已生成 `docs/card_actions_mapping.json`，包含 30 个行动卡的执行前置条件（preconditions）与预期行为（behavior）。
 - 该映射用于辅助测试用例的结构化编写，涵盖资源变化、状态校验与 Flow 节点逻辑。
 
@@ -101,7 +100,7 @@
   - Phase 2：前端 `?transport=ws` 切换联调，双窗口实时同步验证通过。
   - 协议已支持：`action` / `choice` / `reorg` / `feed` / `nextPlayer` / `roundEnd` / `commitFarm` / `undoStep` / `undoAction` / `getState`
   - P1 自动创建房间，P2 通过 `/api/rooms` 自动发现并加入。
-- 下一阶段：多端联机 E2E 测试、断线重连、WS 模式下 dev 操作优化。
+- 下一阶段：断线重连、多端联机扩展。WS 模式下 dev 操作已统一走 WS 命令。
 - 持续完善撤销覆盖范围与异常场景。
 - 持续补全高频卡牌行为。
 - 已移除本地引擎模式，仅保留 API 驱动。
@@ -248,8 +247,8 @@ public static function useResource($player_id, $resourceType, $amount)
 - 实现完整的卡牌/资源位置追踪系统
 
 # 7. 前端改进
-1. action 卡牌没有图片显示
-2. 资源堆叠使用图标
-3. 卡牌上的关键字使用图标
-4. log中提到的卡牌需要增加hover后的卡牌显示
-5. reset 随机数种子都移动到 开发者模式中。
+- ✅ 行动卡背景图：`ActionBoard.tsx` 增加 `data-action-id`，`.action-card` 使用 `/bga-img/action_frame_bg.jpg`，回合行动卡按阶段边框高亮，text-shadow 保证可读性。
+- ✅ 资源图标：`ResourceLine.tsx` 用 BGA meeple sprite 图标替代文字标签（`res-icon-*`），`ActionBoard` 资源 chip 显示图标+数量。
+- ⏳ 卡牌上的关键字使用图标（待实现）
+- ✅ 日志卡牌 hover：`LogPanel.tsx` 检测卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
+- ✅ 随机数种子：`newGame` 支持可选 `seed`，Reset 按钮与种子输入仅在 devMode 显示，`resetGame` 将解析后的 seed 传给 `transport.newGame()`。

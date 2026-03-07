@@ -237,7 +237,12 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/new') {
-    session = new GameSession()
+    let seed: number | undefined
+    try {
+      const body = JSON.parse(await readBody(req)) as { seed?: number }
+      if (typeof body.seed === 'number') seed = body.seed
+    } catch { /* no body or invalid JSON — use random seed */ }
+    session = new GameSession(seed)
     const resp = getSingletonSession().getState()
     sendJson(res, 200, respondWith(resp))
     return true

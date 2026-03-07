@@ -105,7 +105,8 @@ export const ActionBoard = ({
               {item.player ? (
                 <span className={`resource-owner meeple-${item.player.color}`} />
               ) : null}
-              <span className="resource-chip-text">{label}</span>
+              <span className={`res-icon res-icon-${item.resource}`} />
+              <span className="resource-chip-text">{item.amount}</span>
             </div>
           )
         })}
@@ -137,6 +138,7 @@ export const ActionBoard = ({
           className={`action-card ${action.takenBy ? 'taken' : ''}${
             isOpen ? '' : ' locked'
           }`}
+          data-action-id={action.id}
           onClick={() => takeAction(action)}
           disabled={!canUse}
         >
@@ -170,6 +172,7 @@ export const ActionBoard = ({
               <button
                 key={space.id}
                 className={`action-card ${isTaken ? 'taken' : ''}`}
+                data-action-id={space.id}
                 onClick={() => takeAction(space)}
                 disabled={!canUse}
               >

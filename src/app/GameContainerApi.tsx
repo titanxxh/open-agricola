@@ -17,7 +17,6 @@ import {
   createRoundOpenById,
   isActionForPlayerCount,
 } from '../../shared/logic/state'
-import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
@@ -182,7 +181,6 @@ const useTransportSetup = (playerParam: string | null) => {
 }
 
 export const GameContainerApi = () => {
-  const api = useGameApi()
   const lockedViewPlayerId = useMemo(() => {
     const raw = urlParams.get('player') ?? urlParams.get('playerId')
     if (!raw) return null
@@ -192,7 +190,7 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
-  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot, applyResponse } =
+  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>('en')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
@@ -273,50 +271,6 @@ export const GameContainerApi = () => {
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
     return unsub
   }, [transport, handleSnapshot, isReady])
-
-  const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
-    try {
-      const resp = await promise
-      applyResponse(resp)
-      if (resp.pending.type === 'animalReorg' && resp.state) {
-        const player = resp.state.players[resp.pending.playerIndex]
-        if (player) {
-          const stableKeys = getLooseStableKeys(player)
-          setAnimalReorg({
-            zones: [
-              ...player.pastures.map((p) => ({
-                id: p.id, zoneType: 'pasture' as const,
-                animalType: p.animalType, animalCount: p.animalCount,
-              })),
-              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
-              ...stableKeys.map((key) => ({
-                id: `stable:${key}`, zoneType: 'stable' as const,
-                animalType: player.stableAnimals?.[key] ?? null,
-                animalCount: player.stableAnimals?.[key] ? 1 : 0,
-              })),
-            ],
-            confirmDiscard: false,
-          })
-        }
-      } else if (resp.pending.type !== 'choice') {
-        setAnimalReorg(null)
-      }
-      if (resp.ok) {
-        setPendingFenceEdges([])
-        setFenceError(null)
-        setPendingRoomTiles([])
-        setRoomError(null)
-        setPendingStableTiles([])
-        setStableError(null)
-        setPendingPlowTile(null)
-        setPlowError(null)
-        setPendingSowSelections({})
-        setSowError(null)
-      }
-    } catch (err) {
-      console.error('API error', err)
-    }
-  }, [applyResponse, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
@@ -475,8 +429,9 @@ export const GameContainerApi = () => {
   }, [pending, animalReorg, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
-    void transport.newGame().catch((e) => console.error(e))
-  }, [transport, isInteractive])
+    const seed = resetSeedInput ? Number(resetSeedInput) : undefined
+    void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
+  }, [transport, isInteractive, resetSeedInput])
 
   const pendingChoice = pending.type === 'choice' ? {
     promptKey: pending.promptKey, options: pending.options,
@@ -902,7 +857,6 @@ export const GameContainerApi = () => {
   const occupationIdSet = useMemo(() => new Set(occupationIds), [])
 
   const applyDevResource = useCallback(async () => {
-    console.log('>>> applyDevResource CALLED <<<')
     if (!devPlayerId || !state) return
     const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
     const player = clone.players.find((p) => p.id === devPlayerId)
@@ -910,13 +864,9 @@ export const GameContainerApi = () => {
     const delta = Number(devAmount ?? 0)
     player.resources[devResource] = Math.max(0, (player.resources[devResource] ?? 0) + delta)
     
-    // 同步到服务器
-    const resp = await api.loadGame(clone)
-    applyResponse(resp)
+    await transport.loadGame(clone)
     
-    // 如果是动物资源，直接进入重整状态（在 applyResponse 之后设置）
     if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
-      console.log('>>> Animal resource detected, setting reorg <<<')
       const stKeys = getLooseStableKeys(player)
       setAnimalReorg({ 
         zones: [
@@ -942,12 +892,12 @@ export const GameContainerApi = () => {
         confirmDiscard: false 
       })
     }
-  }, [devPlayerId, devResource, devAmount, state, api, applyResponse])
+  }, [devPlayerId, devResource, devAmount, state, transport])
 
   const applyDevRound = useCallback(() => {
     if (!state || !Number.isFinite(devRound)) return
-    void applyAndSync(api.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }))
-  }, [state, devRound, api, applyAndSync])
+    void transport.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }).catch((e) => console.error('applyDevRound error', e))
+  }, [state, devRound, transport])
 
   const stripCardId = (id: string) => id.trim()
   const getCardType = useCallback((player: import('../../shared/game/types').PlayerState, cardId: string) => {
@@ -982,8 +932,8 @@ export const GameContainerApi = () => {
       if (!cp.minorPlayed.includes(cardId)) cp.minorPlayed.push(cardId)
       cp.playedCards.push(`minor:${cardId}`)
     }
-    void applyAndSync(api.loadGame(clone))
-  }, [state, devPlayerId, devCardId, getCardType, api, applyAndSync])
+    void transport.loadGame(clone).catch((e) => console.error('playDevCard error', e))
+  }, [state, devPlayerId, devCardId, getCardType, transport])
 
   const drawDevCard = useCallback(() => {
     if (!state || !devPlayerId) return
@@ -1000,8 +950,8 @@ export const GameContainerApi = () => {
     } else {
       if (!cp.minorHand.includes(cardId)) cp.minorHand.push(cardId)
     }
-    void applyAndSync(api.loadGame(clone))
-  }, [state, devPlayerId, devCardId, occupationIdSet, api, applyAndSync])
+    void transport.loadGame(clone).catch((e) => console.error('drawDevCard error', e))
+  }, [state, devPlayerId, devCardId, occupationIdSet, transport])
 
   const createDevPasture = useCallback(async () => {
     if (!state || !isInteractive || !devPlayerId) return
@@ -1012,9 +962,9 @@ export const GameContainerApi = () => {
     const cp = clone.players.find((p) => p.id === devPlayerId)
     if (!cp) return
     cp.resources.wood = Math.max(0, 6)
-    await applyAndSync(api.loadGame(clone))
-    await applyAndSync(api.devCreatePasture(playerIndex))
-  }, [state, isInteractive, devPlayerId, api, applyAndSync])
+    await transport.loadGame(clone)
+    await transport.devCreatePasture(playerIndex)
+  }, [state, isInteractive, devPlayerId, transport])
 
   const saveDevState = useCallback(() => {
     if (!state) return
@@ -1034,10 +984,10 @@ export const GameContainerApi = () => {
       const result = reader.result
       if (!result) return
       const raw = JSON.parse(String(result)) as import('../../shared/game/types').GameState
-      void applyAndSync(api.loadGame(raw))
+      void transport.loadGame(raw).catch((e) => console.error('loadDevState error', e))
     }
     reader.readAsText(file)
-  }, [api, applyAndSync])
+  }, [transport])
 
   if (isWs && wsStatus.phase !== 'ready' && !state) {
     const statusText = wsStatus.phase === 'idle' ? 'Initializing...'

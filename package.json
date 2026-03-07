@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
+    "test:e2e": "npx playwright test",
     "docs:check": "node scripts/check-docs.js",
     "preview": "vite preview",
     "server": "tsx server/index.ts"
