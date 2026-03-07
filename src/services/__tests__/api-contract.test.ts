@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../../shared/game/types'
-import { persistGame } from '../api'
+import { serializeState } from '../../../shared/game/serialization'
 
 const createState = (): GameState => ({
   round: 1,
@@ -39,25 +39,27 @@ const createState = (): GameState => ({
   futureMeeples: [],
   pendingFutureMeeples: [],
   gameOver: false,
+  workPhaseObtainedResources: {},
 })
 
-describe('api contract', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('persistGame serializes action spaces safely', async () => {
+describe('serializeState contract', () => {
+  it('strips function fields from action spaces', () => {
     const state = createState()
-    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true }) })
-    vi.stubGlobal('fetch', fetchMock)
+    const serialized = serializeState(state)
 
-    await persistGame(state)
-
-    const call = fetchMock.mock.calls[0]
-    const payload = JSON.parse(call?.[1]?.body as string) as { state: GameState }
-    const action = payload.state.actionSpaces[0] as Record<string, unknown>
+    const action = serialized.actionSpaces[0] as Record<string, unknown>
     expect(action.canBeExecutedByPlayer).toBeUndefined()
     expect(action.execute).toBeUndefined()
     expect(action.resolveChoice).toBeUndefined()
+    expect(action.flow).toBeUndefined()
+    expect(action.id).toBe('test')
+    expect(action.nameKey).toBe('actions.test.name')
+  })
+
+  it('sets roundStartSnapshot to null', () => {
+    const state = createState()
+    state.roundStartSnapshot = createState()
+    const serialized = serializeState(state)
+    expect(serialized.roundStartSnapshot).toBeNull()
   })
 })

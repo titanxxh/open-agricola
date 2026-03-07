@@ -17,8 +17,11 @@ import {
   createRoundOpenById,
   isActionForPlayerCount,
 } from '../../shared/logic/state'
-import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
+import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
+import type { GameSyncPayload } from '../../shared/protocol/game'
+import type { RoomSummary } from '../../shared/protocol/ws'
+import { rehydrateState } from '../../shared/game/serialization'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
@@ -41,20 +44,155 @@ import {
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
+const urlParams = new URLSearchParams(window.location.search)
+const useWsMode = urlParams.get('transport') === 'ws'
+const httpTransportSingleton = new HttpGameTransport()
+
+type WsStatus =
+  | { phase: 'idle' }
+  | { phase: 'connecting' }
+  | { phase: 'creating' }
+  | { phase: 'joining'; roomId: string }
+  | { phase: 'waiting'; roomId: string }
+  | { phase: 'ready'; roomId: string; playerIndex: number }
+  | { phase: 'error'; message: string }
+
+const useTransportSetup = (playerParam: string | null) => {
+  const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
+  const wsRef = useRef<WsGameTransport | null>(null)
+  const [wsReady, setWsReady] = useState(false)
+
+  const initRef = useRef(false)
+
+  useEffect(() => {
+    if (!useWsMode || initRef.current) return
+    initRef.current = true
+
+    const init = async () => {
+      setWsStatus({ phase: 'connecting' })
+      const ws = new WsGameTransport()
+
+      try {
+        await ws.connect()
+      } catch {
+        setWsStatus({ phase: 'error', message: 'WebSocket connection failed' })
+        return
+      }
+
+      wsRef.current = ws
+      const rawWs = (ws as unknown as { ws: WebSocket }).ws
+      if (!rawWs) {
+        setWsStatus({ phase: 'error', message: 'no WebSocket instance' })
+        return
+      }
+
+      const roomParam = urlParams.get('room')
+      const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
+
+      if (isCreator) {
+        setWsStatus({ phase: 'creating' })
+        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomCreated') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+              } else if (msg.type === 'error') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: playerParam ?? 'Player 1' })
+        })
+
+        if ('error' in resp) {
+          setWsStatus({ phase: 'error', message: resp.error })
+          return
+        }
+        setWsStatus({ phase: 'waiting', roomId: resp.roomId })
+
+        const handler = (event: MessageEvent) => {
+          try {
+            const msg = JSON.parse(event.data as string)
+            if (msg.type === 'gameStarted') {
+              rawWs.removeEventListener('message', handler)
+              setWsReady(true)
+              setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+            }
+          } catch { /* skip */ }
+        }
+        rawWs.addEventListener('message', handler)
+      } else {
+        let roomId = roomParam
+        if (!roomId) {
+          setWsStatus({ phase: 'connecting' })
+          try {
+            const resp = await fetch('http://localhost:5175/api/rooms')
+            const data = await resp.json() as { ok: boolean; rooms: RoomSummary[] }
+            const rooms = data.rooms ?? []
+            const available = rooms.find((r) => r.playerCount < r.maxPlayers)
+            if (!available) {
+              setWsStatus({ phase: 'error', message: 'no available rooms' })
+              return
+            }
+            roomId = available.id
+          } catch {
+            setWsStatus({ phase: 'error', message: 'failed to fetch rooms' })
+            return
+          }
+        }
+
+        setWsStatus({ phase: 'joining', roomId })
+        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomJoined') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+              } else if (msg.type === 'error') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          ws.sendRoomCommand('joinRoom', { roomId: roomId!, name: playerParam ?? 'Player 2' })
+        })
+
+        if ('error' in resp) {
+          setWsStatus({ phase: 'error', message: resp.error })
+          return
+        }
+        setWsReady(true)
+        setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+      }
+    }
+
+    init()
+  }, [playerParam])
+
+  const transport: GameTransport = useWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
+  const isReady = !useWsMode || wsReady
+  return { transport, wsStatus, isWs: useWsMode, isReady }
+}
+
 export const GameContainerApi = () => {
-  const api = useGameApi()
-  const { state, pending, historyLength, hasActionStartSnapshot, applyResponse } =
-    useGameSync()
-  const [locale, setLocale] = useState<Locale>('en')
   const lockedViewPlayerId = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    const raw = params.get('player') ?? params.get('playerId')
+    const raw = urlParams.get('player') ?? urlParams.get('playerId')
     if (!raw) return null
     if (/^p[1-4]$/.test(raw)) return raw
     const index = Number(raw)
     if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
     return null
   }, [])
+  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
+  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot } =
+    useGameSync()
+  const [locale, setLocale] = useState<Locale>('en')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(true)
@@ -87,140 +225,131 @@ export const GameContainerApi = () => {
     updateSowSelection: updateSowSelectionInternal,
   } = useFarmSelection()
 
-  useEffect(() => {
-    api.fetchState().then((resp) => {
-      applyResponse(resp)
-      if (resp.pending.type === 'animalReorg' && resp.state) {
-        const player = resp.state.players[resp.pending.playerIndex]
-        if (player) {
-          const stableKeys = getLooseStableKeys(player)
-          setAnimalReorg({
-            zones: [
-              ...player.pastures.map((p) => ({
-                id: p.id, zoneType: 'pasture' as const,
-                animalType: p.animalType, animalCount: p.animalCount,
-              })),
-              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
-              ...stableKeys.map((key) => ({
-                id: `stable:${key}`, zoneType: 'stable' as const,
-                animalType: player.stableAnimals?.[key] ?? null,
-                animalCount: player.stableAnimals?.[key] ? 1 : 0,
-              })),
-            ],
-            confirmDiscard: false,
-          })
-        }
+  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+    applySnapshot(payload)
+    if (payload.pending.type === 'animalReorg') {
+      const hydrated = rehydrateState(payload.state)
+      const player = hydrated.players[payload.pending.playerIndex]
+      if (player) {
+        const stableKeys = getLooseStableKeys(player)
+        setAnimalReorg({
+          zones: [
+            ...player.pastures.map((p) => ({
+              id: p.id, zoneType: 'pasture' as const,
+              animalType: p.animalType, animalCount: p.animalCount,
+            })),
+            { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
+            ...stableKeys.map((key) => ({
+              id: `stable:${key}`, zoneType: 'stable' as const,
+              animalType: player.stableAnimals?.[key] ?? null,
+              animalCount: player.stableAnimals?.[key] ? 1 : 0,
+            })),
+          ],
+          confirmDiscard: false,
+        })
       }
-    }).catch((e) => { console.error("fetchState failed:", e) })
-  }, [])
-
-  const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
-    try {
-      const resp = await promise
-      applyResponse(resp)
-      if (resp.pending.type === 'animalReorg' && resp.state) {
-        const player = resp.state.players[resp.pending.playerIndex]
-        if (player) {
-          const stableKeys = getLooseStableKeys(player)
-          setAnimalReorg({
-            zones: [
-              ...player.pastures.map((p) => ({
-                id: p.id, zoneType: 'pasture' as const,
-                animalType: p.animalType, animalCount: p.animalCount,
-              })),
-              { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
-              ...stableKeys.map((key) => ({
-                id: `stable:${key}`, zoneType: 'stable' as const,
-                animalType: player.stableAnimals?.[key] ?? null,
-                animalCount: player.stableAnimals?.[key] ? 1 : 0,
-              })),
-            ],
-            confirmDiscard: false,
-          })
-        }
-      } else if (resp.pending.type !== 'choice') {
-        setAnimalReorg(null)
-      }
-      if (resp.ok) {
-        setPendingFenceEdges([])
-        setFenceError(null)
-        setPendingRoomTiles([])
-        setRoomError(null)
-        setPendingStableTiles([])
-        setStableError(null)
-        setPendingPlowTile(null)
-        setPlowError(null)
-        setPendingSowSelections({})
-        setSowError(null)
-      }
-    } catch (err) {
-      console.error('API error', err)
+    } else if (payload.pending.type !== 'choice') {
+      setAnimalReorg(null)
     }
-  }, [applyResponse, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
+    if (payload.ok) {
+      setPendingFenceEdges([])
+      setFenceError(null)
+      setPendingRoomTiles([])
+      setRoomError(null)
+      setPendingStableTiles([])
+      setStableError(null)
+      setPendingPlowTile(null)
+      setPlowError(null)
+      setPendingSowSelections({})
+      setSowError(null)
+    }
+  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
+
+  useEffect(() => {
+    if (!isReady) return
+    const unsub = transport.onSnapshot(handleSnapshot)
+    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
+    return unsub
+  }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
   const isInteractive = !!(currentPlayer && displayPlayer && currentPlayer.id === displayPlayer.id)
-  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
-  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
-  console.log(`[DEBUG] currentPlayer: ${currentPlayer?.id}, ${typeof currentPlayer}`)
-  console.log(`[DEBUG] displayPlayer: ${displayPlayer?.id}, ${typeof displayPlayer}`)
-  console.log(`[DEBUG] isInteractive: ${isInteractive}, ${typeof isInteractive}`)
-  
-  console.log('[DEBUG] isInteractive calculation:', {
-    currentPlayerId: currentPlayer?.id,
-    displayPlayerId: displayPlayer?.id,
-    viewPlayerId,
-    currentPlayerIndex: state?.currentPlayerIndex,
-    isInteractive
-  })
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
-    void applyAndSync(api.takeAction(state.currentPlayerIndex, space.id))
-  }, [state, api, applyAndSync, isInteractive])
+    void transport.takeAction(state.currentPlayerIndex, space.id).catch((e) => console.error('takeAction error', e))
+  }, [state, transport, isInteractive])
 
   const undoStep = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.undoStep())
-  }, [api, applyAndSync, isInteractive])
+    void transport.undoStep().catch((e) => console.error('undo error', e))
+  }, [transport, isInteractive])
 
   const undoAction = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.undoAction())
-  }, [api, applyAndSync, isInteractive])
+    void transport.undoAction().catch((e) => console.error('undoAction error', e))
+  }, [transport, isInteractive])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (pending.type !== 'choice' || !currentPlayer) return
     const promptKey = pending.promptKey
     if (promptKey === 'ui.interactionFenceSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validateFence(currentPlayer.id, pendingFenceEdges, 0).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'fence', { edges: pendingFenceEdges, extraWood: 0 }).catch((e) => console.error(e))
+        } else {
+          setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionRoomSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       const cost = getBuildRoomCost(currentPlayer.houseType)
       void validateRoom(currentPlayer.id, pendingRoomTiles, cost).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setRoomError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'room', { rooms: pendingRoomTiles, costPerRoom: cost }).catch((e) => console.error(e))
+        } else {
+          setRoomError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionStableSelect') {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validateStable(currentPlayer.id, pendingStableTiles).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setStableError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'stable', { stables: pendingStableTiles }).catch((e) => console.error(e))
+        } else {
+          setStableError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
     if (promptKey === 'ui.interactionPlowSelect' && pendingPlowTile) {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
       void validatePlow(currentPlayer.id, pendingPlowTile).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setPlowError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'plow', { tile: pendingPlowTile }).catch((e) => console.error(e))
+        } else {
+          setPlowError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
@@ -234,18 +363,25 @@ export const GameContainerApi = () => {
           return { row, col, crop }
         })
         .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
-      if (value === 'confirm' && crops.length === 0) {
+      if (value === 'cancel') {
+        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        return
+      }
+      if (crops.length === 0) {
         setSowError('NO_SELECTION')
         return
       }
       void validateSow(currentPlayer.id, crops).then((result) => {
-        if (result.valid) void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-        else setSowError(result.error?.code ?? result.error ?? 'validation failed')
+        if (result.valid) {
+          void transport.commitFarm(pending.playerIndex, 'sow', { crops }).catch((e) => console.error(e))
+        } else {
+          setSowError(result.error?.code ?? result.error ?? 'validation failed')
+        }
       })
       return
     }
-    void applyAndSync(api.resolveChoice(pending.playerIndex, value))
-  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, api, applyAndSync, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
+    void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, transport, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -279,22 +415,23 @@ export const GameContainerApi = () => {
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.confirmNextPlayer())
-  }, [api, applyAndSync, isInteractive])
+    void transport.confirmNextPlayer().catch((e) => console.error(e))
+  }, [transport, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
-    void applyAndSync(api.confirmFeed(pending.playerIndex, []))
-  }, [pending, api, applyAndSync, isInteractive])
+    void transport.confirmFeed(pending.playerIndex, []).catch((e) => console.error(e))
+  }, [pending, transport, isInteractive])
   const confirmAnimalReorg = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'animalReorg' || !animalReorg) return
-    void applyAndSync(api.confirmReorg(pending.playerIndex, animalReorg.zones))
-  }, [pending, animalReorg, api, applyAndSync, isInteractive])
+    void transport.confirmReorg(pending.playerIndex, animalReorg.zones).catch((e) => console.error(e))
+  }, [pending, animalReorg, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
-    void applyAndSync(api.newGame())
-  }, [api, applyAndSync, isInteractive])
+    const seed = resetSeedInput ? Number(resetSeedInput) : undefined
+    void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
+  }, [transport, isInteractive, resetSeedInput])
 
   const pendingChoice = pending.type === 'choice' ? {
     promptKey: pending.promptKey, options: pending.options,
@@ -720,7 +857,6 @@ export const GameContainerApi = () => {
   const occupationIdSet = useMemo(() => new Set(occupationIds), [])
 
   const applyDevResource = useCallback(async () => {
-    console.log('>>> applyDevResource CALLED <<<')
     if (!devPlayerId || !state) return
     const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
     const player = clone.players.find((p) => p.id === devPlayerId)
@@ -728,13 +864,9 @@ export const GameContainerApi = () => {
     const delta = Number(devAmount ?? 0)
     player.resources[devResource] = Math.max(0, (player.resources[devResource] ?? 0) + delta)
     
-    // 同步到服务器
-    const resp = await api.loadGame(clone)
-    applyResponse(resp)
+    await transport.loadGame(clone)
     
-    // 如果是动物资源，直接进入重整状态（在 applyResponse 之后设置）
     if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
-      console.log('>>> Animal resource detected, setting reorg <<<')
       const stKeys = getLooseStableKeys(player)
       setAnimalReorg({ 
         zones: [
@@ -760,12 +892,12 @@ export const GameContainerApi = () => {
         confirmDiscard: false 
       })
     }
-  }, [devPlayerId, devResource, devAmount, state, api, applyResponse])
+  }, [devPlayerId, devResource, devAmount, state, transport])
 
   const applyDevRound = useCallback(() => {
     if (!state || !Number.isFinite(devRound)) return
-    void applyAndSync(api.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }))
-  }, [state, devRound, api, applyAndSync])
+    void transport.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }).catch((e) => console.error('applyDevRound error', e))
+  }, [state, devRound, transport])
 
   const stripCardId = (id: string) => id.trim()
   const getCardType = useCallback((player: import('../../shared/game/types').PlayerState, cardId: string) => {
@@ -800,8 +932,8 @@ export const GameContainerApi = () => {
       if (!cp.minorPlayed.includes(cardId)) cp.minorPlayed.push(cardId)
       cp.playedCards.push(`minor:${cardId}`)
     }
-    void applyAndSync(api.loadGame(clone))
-  }, [state, devPlayerId, devCardId, getCardType, api, applyAndSync])
+    void transport.loadGame(clone).catch((e) => console.error('playDevCard error', e))
+  }, [state, devPlayerId, devCardId, getCardType, transport])
 
   const drawDevCard = useCallback(() => {
     if (!state || !devPlayerId) return
@@ -818,8 +950,8 @@ export const GameContainerApi = () => {
     } else {
       if (!cp.minorHand.includes(cardId)) cp.minorHand.push(cardId)
     }
-    void applyAndSync(api.loadGame(clone))
-  }, [state, devPlayerId, devCardId, occupationIdSet, api, applyAndSync])
+    void transport.loadGame(clone).catch((e) => console.error('drawDevCard error', e))
+  }, [state, devPlayerId, devCardId, occupationIdSet, transport])
 
   const createDevPasture = useCallback(async () => {
     if (!state || !isInteractive || !devPlayerId) return
@@ -830,9 +962,9 @@ export const GameContainerApi = () => {
     const cp = clone.players.find((p) => p.id === devPlayerId)
     if (!cp) return
     cp.resources.wood = Math.max(0, 6)
-    await applyAndSync(api.loadGame(clone))
-    await applyAndSync(api.devCreatePasture(playerIndex))
-  }, [state, isInteractive, devPlayerId, api, applyAndSync])
+    await transport.loadGame(clone)
+    await transport.devCreatePasture(playerIndex)
+  }, [state, isInteractive, devPlayerId, transport])
 
   const saveDevState = useCallback(() => {
     if (!state) return
@@ -852,10 +984,37 @@ export const GameContainerApi = () => {
       const result = reader.result
       if (!result) return
       const raw = JSON.parse(String(result)) as import('../../shared/game/types').GameState
-      void applyAndSync(api.loadGame(raw))
+      void transport.loadGame(raw).catch((e) => console.error('loadDevState error', e))
     }
     reader.readAsText(file)
-  }, [api, applyAndSync])
+  }, [transport])
+
+  if (isWs && wsStatus.phase !== 'ready' && !state) {
+    const statusText = wsStatus.phase === 'idle' ? 'Initializing...'
+      : wsStatus.phase === 'connecting' ? 'Connecting to server...'
+      : wsStatus.phase === 'creating' ? 'Creating room...'
+      : wsStatus.phase === 'joining' ? `Joining room ${wsStatus.roomId}...`
+      : wsStatus.phase === 'waiting' ? `Room ${wsStatus.roomId} — waiting for other player...`
+      : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
+      : 'Loading...'
+
+    return (
+      <div className="app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>Open Agricola — WebSocket Mode</div>
+        <div style={{ fontSize: '16px' }}>{statusText}</div>
+        {wsStatus.phase === 'waiting' && (
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            Other player: open <code>?player=p2&transport=ws</code>
+          </div>
+        )}
+        {wsStatus.phase === 'error' && (
+          <button type="button" onClick={() => window.location.reload()} style={{ padding: '8px 16px', cursor: 'pointer' }}>
+            Retry
+          </button>
+        )}
+      </div>
+    )
+  }
 
   if (!state || !currentPlayer || !displayPlayer) {
     return <div className="app">Loading...</div>

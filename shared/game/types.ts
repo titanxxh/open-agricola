@@ -221,3 +221,10 @@ export type ActionSpace = ActionDefinition & {
   resources: Resource
   takenBy: string | null
 }
+
+export type PendingAction =
+  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
+  | { type: 'animalReorg'; playerIndex: number; spaceId: string }
+  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
+  | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
+  | { type: 'none' }

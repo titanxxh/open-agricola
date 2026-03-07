@@ -1,14 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game-session.ts'
 import { normalizePlayerFarm, validateFenceSelection } from './fence-validation.ts'
-import { validateRoomSelection, validateStableSelection } from './index.ts'
+import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateSowSelection } from './sow-validation.ts'
+import { serializeState } from '../shared/game/serialization.ts'
 import type { Resource } from '../shared/game/types.ts'
 
 let session: GameSession | null = null
 
-const getSession = (): GameSession => {
+const getSingletonSession = (): GameSession => {
   if (!session) session = new GameSession()
   return session
 }
@@ -32,16 +33,10 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(JSON.stringify(payload))
 }
 
-const stripFunctions = (state: unknown) => {
-  const s = state as Record<string, unknown>
-  const result: Record<string, unknown> = { ...s, roundStartSnapshot: null }
-  if (s && Array.isArray(s.actionSpaces)) {
-    result.actionSpaces = (s.actionSpaces as Record<string, unknown>[]).map(
-      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...rest }) => rest,
-    )
-  }
-  return result
-}
+const respondWith = (resp: import('./game-session.ts').SessionResponse) => ({
+  ...resp,
+  state: serializeState(resp.state),
+})
 
 export const handleGameRoute = async (
   req: IncomingMessage,
@@ -53,8 +48,8 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'GET' && req.url === '/api/game/state') {
-    const resp = getSession().getState()
-    sendJson(res, 200, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().getState()
+    sendJson(res, 200, respondWith(resp))
     return true
   }
 
@@ -64,8 +59,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSession().takeAction(body.playerIndex, body.spaceId)
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().takeAction(body.playerIndex, body.spaceId)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -75,8 +70,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSession().resolveChoice(body.playerIndex, body.value)
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().resolveChoice(body.playerIndex, body.value)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -86,8 +81,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSession().confirmAnimalReorg(body.playerIndex, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1])
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().confirmAnimalReorg(body.playerIndex, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1])
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -97,39 +92,39 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSession().confirmHarvestFeed(body.playerIndex, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1])
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().confirmHarvestFeed(body.playerIndex, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1])
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
-    const resp = getSession().confirmNextPlayer()
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().confirmNextPlayer()
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
-    const resp = getSession().performRoundEnd()
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().performRoundEnd()
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo') {
-    const resp = getSession().undoStep()
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().undoStep()
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo-action') {
-    const resp = getSession().undoAction()
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().undoAction()
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'GET' && req.url?.startsWith('/api/game/actions')) {
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')
-    const actions = getSession().getAvailableActions(playerIndex)
+    const actions = getSingletonSession().getAvailableActions(playerIndex)
     sendJson(res, 200, { ok: true, actions })
     return true
   }
@@ -140,8 +135,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    const resp = getSession().loadState(body.state)
-    sendJson(res, 200, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().loadState(body.state)
+    sendJson(res, 200, respondWith(resp))
     return true
   }
 
@@ -151,8 +146,23 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSession().startDevFenceSelect(body.playerIndex)
-    sendJson(res, resp.ok ? 200 : 400, { ...resp, state: stripFunctions(resp.state) })
+    const resp = getSingletonSession().startDevFenceSelect(body.playerIndex)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/commit-farm') {
+    const body = JSON.parse(await readBody(req)) as {
+      playerIndex?: number
+      farmType?: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      payload?: Record<string, unknown>
+    }
+    if (typeof body.playerIndex !== 'number' || !body.farmType || !body.payload) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const resp = getSingletonSession().commitFarmChoice(body.playerIndex, body.farmType, body.payload)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -160,56 +170,43 @@ export const handleGameRoute = async (
     const body = JSON.parse(await readBody(req)) as {
       type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
       playerId: string
-      payload: any
+      payload: Record<string, unknown>
     }
-    const state = getSession().getRawState()
+    const state = getSingletonSession().getStateForRead()
     const playerIndex = state.players.findIndex((p) => p.id === body.playerId)
     if (playerIndex === -1) {
       sendJson(res, 400, { valid: false, error: 'Player not found' })
       return true
     }
-    const player = normalizePlayerFarm(state.players[playerIndex] as any)
+    const player = normalizePlayerFarm(state.players[playerIndex] as Parameters<typeof normalizePlayerFarm>[0])
 
     if (body.type === 'fence') {
-      const { edges, extraWood } = body.payload
-      const result = validateFenceSelection(player, edges, extraWood)
-      if (result.ok) {
-        state.players[playerIndex] = result.player
-      }
+      const { edges, extraWood } = body.payload as { edges: string[]; extraWood?: number }
+      const result = validateFenceSelection(player, edges, extraWood ?? 0)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result })
       return true
     }
     if (body.type === 'room') {
-      const { rooms, costPerRoom } = body.payload
+      const { rooms, costPerRoom } = body.payload as { rooms: { row: number; col: number }[]; costPerRoom: Partial<Resource> }
       const selection = validateRoomSelection(player, rooms)
       if (!selection.ok) {
         sendJson(res, 200, { valid: false, error: selection.code })
         return true
       }
-      const playerResources = player.resources || {}
       const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
-      let totalCost: Partial<Resource> = {}
       for (const key of costKeys) {
         const required = (costPerRoom[key] ?? 0) * rooms.length
-        const available = playerResources[key] ?? 0
+        const available = player.resources[key] ?? 0
         if (available < required) {
           sendJson(res, 200, { valid: false, error: `Not enough ${key}` })
           return true
         }
-        totalCost[key] = required
       }
-      for (const key of costKeys) {
-        player.resources[key] = (player.resources[key] ?? 0) - (totalCost[key] ?? 0)
-      }
-      player.roomTiles = [...player.roomTiles, ...rooms]
-      player.rooms += rooms.length
-      state.players[playerIndex] = player
-
       sendJson(res, 200, { valid: true })
       return true
     }
     if (body.type === 'stable') {
-      const { stables } = body.payload
+      const { stables } = body.payload as { stables: { row: number; col: number }[] }
       const selection = validateStableSelection(player, stables)
       if (!selection.ok) {
         sendJson(res, 200, { valid: false, error: selection.code })
@@ -220,28 +217,18 @@ export const handleGameRoute = async (
         sendJson(res, 200, { valid: false, error: 'Not enough wood' })
         return true
       }
-      player.resources.wood = (player.resources.wood ?? 0) - woodRequired
-      player.stableTiles = [...player.stableTiles, ...stables]
-      state.players[playerIndex] = player
-
       sendJson(res, 200, { valid: true })
       return true
     }
     if (body.type === 'plow') {
-      const { tile } = body.payload
+      const { tile } = body.payload as { tile: { row: number; col: number } }
       const result = validatePlowSelection(player, tile)
-      if (result.ok) {
-        state.players[playerIndex] = result.player
-      }
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'sow') {
-      const { crops } = body.payload
+      const { crops } = body.payload as { crops: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
       const result = validateSowSelection(player, crops)
-      if (result.ok) {
-        state.players[playerIndex] = result.player
-      }
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
@@ -250,13 +237,16 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/new') {
-    session = new GameSession()
-    const resp = getSession().getState()
-    sendJson(res, 200, { ...resp, state: stripFunctions(resp.state) })
+    let seed: number | undefined
+    try {
+      const body = JSON.parse(await readBody(req)) as { seed?: number }
+      if (typeof body.seed === 'number') seed = body.seed
+    } catch { /* no body or invalid JSON — use random seed */ }
+    session = new GameSession(seed)
+    const resp = getSingletonSession().getState()
+    sendJson(res, 200, respondWith(resp))
     return true
   }
-
-
 
   if (req.method === 'POST' && req.url === '/api/game/dev/play-card') {
     const body = JSON.parse(await readBody(req)) as { playerIndex?: number; cardId?: string }
@@ -264,16 +254,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const state = getSession().getRawState()
-    const player = state.players[body.playerIndex]
-    if (!player) {
-      sendJson(res, 400, { ok: false, error: 'player not found' })
-      return true
-    }
-    if (!player.minorPlayed.includes(body.cardId)) {
-      player.minorPlayed.push(body.cardId)
-    }
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devPlayCard(body.playerIndex, body.cardId)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -283,14 +265,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const state = getSession().getRawState()
-    const space = state.actionSpaces.find((s) => s.id === body.spaceId)
-    if (!space) {
-      sendJson(res, 400, { ok: false, error: 'space not found' })
-      return true
-    }
-    space.takenBy = body.playerId ?? null
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devSetSpaceTaken(body.spaceId, body.playerId ?? null)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -300,13 +276,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const state = getSession().getRawState()
-    if (body.playerIndex < 0 || body.playerIndex >= state.players.length) {
-      sendJson(res, 400, { ok: false, error: 'invalid player index' })
-      return true
-    }
-    state.currentPlayerIndex = body.playerIndex
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devSetCurrentPlayer(body.playerIndex)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -316,18 +287,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const state = getSession().getRawState()
-    const player = state.players[body.playerIndex]
-    if (!player) {
-      sendJson(res, 400, { ok: false, error: 'player not found' })
-      return true
-    }
-    Object.entries(body.resources).forEach(([key, value]) => {
-      if (typeof value === 'number') {
-        (player.resources as Record<string, number>)[key] = value
-      }
-    })
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devSetResources(body.playerIndex, body.resources)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
@@ -337,29 +298,19 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const state = getSession().getRawState()
-    const player = state.players[body.playerIndex]
-    if (!player) {
-      sendJson(res, 400, { ok: false, error: 'player not found' })
-      return true
-    }
-    // Add room tiles
-    player.roomTiles = [...player.roomTiles, ...body.rooms]
-    player.rooms = (player.rooms || 0) + body.rooms.length
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devAddRooms(body.playerIndex, body.rooms)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
-  // Dev: Set round
   if (req.method === 'POST' && req.url === '/api/game/dev/set-round') {
     const body = JSON.parse(await readBody(req)) as { round?: number }
     if (typeof body.round !== 'number') {
       sendJson(res, 400, { ok: false, error: 'invalid round' })
       return true
     }
-    const state = getSession().getRawState()
-    state.round = body.round
-    sendJson(res, 200, { ok: true, state: stripFunctions(state) })
+    const resp = getSingletonSession().devSetRound(body.round)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 

@@ -1,14 +1,8 @@
 import { useCallback, useRef } from 'react'
-import type { ActionChoiceOption, GameState, Resource } from '../../shared/game/types'
+import type { GameState, PendingAction, Resource } from '../../shared/game/types'
+import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 
 const API_BASE = 'http://localhost:5175'
-
-type PendingAction =
-  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
-  | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number }
-  | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
-  | { type: 'none' }
 
 export type GameApiResponse = {
   ok: boolean
@@ -16,7 +10,7 @@ export type GameApiResponse = {
   pending: PendingAction
   historyLength: number
   hasActionStartSnapshot: boolean
-  scores?: Record<string, unknown>
+  scores?: PlayerScoreSummary[]
   error?: string
 }
 
@@ -91,6 +85,9 @@ export const useGameApi = () => {
   const devCreatePasture = useCallback((playerIndex: number) =>
     guard(() => post('/api/game/dev/create-pasture', { playerIndex })), [guard])
 
+  const commitFarm = useCallback((playerIndex: number, farmType: string, payload: Record<string, unknown>) =>
+    guard(() => post('/api/game/commit-farm', { playerIndex, farmType, payload })), [guard])
+
   return {
     fetchState,
     takeAction,
@@ -104,5 +101,6 @@ export const useGameApi = () => {
     newGame,
     loadGame,
     devCreatePasture,
+    commitFarm,
   }
 }

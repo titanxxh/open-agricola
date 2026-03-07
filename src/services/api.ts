@@ -1,26 +1,6 @@
-import type { FarmTilePosition, GameState, Resource } from '../../shared/game/types'
+import type { FarmTilePosition, Resource } from '../../shared/game/types'
 
 const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:5175'
-
-export const fetchState = async () => {
-  const response = await fetch(`${apiBase}/api/state`)
-  return response.json()
-}
-
-export const persistGame = async (nextState: GameState) => {
-  const payload = {
-    ...nextState,
-    actionSpaces: nextState.actionSpaces.map(
-      ({ canBeExecutedByPlayer, execute, resolveChoice, ...rest }) => rest,
-    ),
-    roundStartSnapshot: null,
-  }
-  await fetch(`${apiBase}/api/state`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ state: payload }),
-  })
-}
 
 export const validateFence = async (
   playerId: string,
@@ -81,15 +61,3 @@ export const validateSow = async (
   return response.json()
 }
 
-export const addResource = async (
-  playerId: string,
-  resource: keyof Resource,
-  amount: number,
-) => {
-  const response = await fetch(`${apiBase}/api/dev/add-resource`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, resource, amount }),
-  })
-  return response.json()
-}

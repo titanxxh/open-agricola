@@ -39,19 +39,21 @@ export const GameControls = ({
       {t(locale, 'ui.scoringPadButton')}
     </button>
     {devMode ? (
-      <label className="seed-input">
-        {t(locale, 'ui.resetSeed')}
-        <input
-          type="number"
-          value={seedValue}
-          placeholder={t(locale, 'ui.resetSeedPlaceholder')}
-          onChange={(event) => onSeedChange(event.target.value)}
-          disabled={!isInteractive}
-        />
-      </label>
+      <>
+        <label className="seed-input">
+          {t(locale, 'ui.resetSeed')}
+          <input
+            type="number"
+            value={seedValue}
+            placeholder={t(locale, 'ui.resetSeedPlaceholder')}
+            onChange={(event) => onSeedChange(event.target.value)}
+            disabled={!isInteractive}
+          />
+        </label>
+        <button onClick={onResetGame} disabled={!isInteractive}>
+          {t(locale, 'ui.resetGame')}
+        </button>
+      </>
     ) : null}
-    <button onClick={onResetGame} disabled={!isInteractive}>
-      {t(locale, 'ui.resetGame')}
-    </button>
   </div>
 )
