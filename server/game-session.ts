@@ -31,7 +31,6 @@ import {
   cloneState,
   emptyResources,
   harvestRounds,
-  isActionForPlayerCount,
   normalizeState,
   resourceKeyList,
   applyRoundGrowth,
@@ -507,7 +506,6 @@ export class GameSession {
     return this.state.actionSpaces
       .filter((space) => {
         if (space.takenBy) return false
-        if (!isActionForPlayerCount(space, this.state.players.length)) return false
         const openRound = roundOpen.get(space.id) ?? space.roundAvailable
         if (this.state.round < openRound) return false
         if (player.workersAvailable <= 0) return false

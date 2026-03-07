@@ -3,8 +3,6 @@ import type { GameState, PendingAction } from '../../shared/game/types'
 import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateState } from '../../shared/game/serialization'
-import type { SerializedGameState } from '../../shared/game/serialization'
-import type { GameApiResponse } from './useGameApi'
 
 export type SyncedPending = PendingAction
 
@@ -33,16 +31,5 @@ export const useGameSync = () => {
     setHasActionStartSnapshot(payload.hasActionStartSnapshot ?? false)
   }, [])
 
-  const applyResponse = useCallback((resp: GameApiResponse) => {
-    if (!mountedRef.current) return
-    const hydrated = rehydrateState(resp.state as unknown as SerializedGameState)
-    setState(hydrated)
-    setPending(resp.pending)
-    setScores(resp.scores ?? null)
-    setError(resp.ok ? null : (resp.error ?? 'unknown error'))
-    setHistoryLength(resp.historyLength ?? 0)
-    setHasActionStartSnapshot(resp.hasActionStartSnapshot ?? false)
-  }, [])
-
-  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, applySnapshot, applyResponse }
+  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, applySnapshot }
 }
