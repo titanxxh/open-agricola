@@ -96,8 +96,12 @@
 
 ## 5. 下一步方向
 
-- WS Phase 1 已完成：共享协议类型、GameSession 权威入口、GameTransport 抽象、WS 后端/前端 MVP、回归测试。
-- 下一阶段：前端 transport 切换联调（`?transport=ws`）、多端联机 E2E 测试、断线重连。
+- WS Phase 1 + Phase 2 联调已完成：
+  - Phase 1：共享协议类型、GameSession 权威入口、GameTransport 抽象、WS 后端/前端 MVP、回归测试。
+  - Phase 2：前端 `?transport=ws` 切换联调，双窗口实时同步验证通过。
+  - 协议已支持：`action` / `choice` / `reorg` / `feed` / `nextPlayer` / `roundEnd` / `commitFarm` / `undoStep` / `undoAction` / `getState`
+  - P1 自动创建房间，P2 通过 `/api/rooms` 自动发现并加入。
+- 下一阶段：多端联机 E2E 测试、断线重连、WS 模式下 dev 操作优化。
 - 持续完善撤销覆盖范围与异常场景。
 - 持续补全高频卡牌行为。
 - 已移除本地引擎模式，仅保留 API 驱动。

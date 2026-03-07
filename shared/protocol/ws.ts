@@ -17,8 +17,16 @@ export type ClientCommand =
       type: 'feed'
       selections: { resourceKey: keyof Resource; count: number; food: number }[]
     }
+  | {
+      type: 'commitFarm'
+      playerIndex: number
+      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      payload: Record<string, unknown>
+    }
   | { type: 'nextPlayer' }
   | { type: 'roundEnd' }
+  | { type: 'undoStep' }
+  | { type: 'undoAction' }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string }
   | { type: 'joinRoom'; roomId: string; name?: string }

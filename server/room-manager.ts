@@ -164,6 +164,24 @@ export const createWsServer = (server: import('node:http').Server) => {
         broadcastState(room, resp, 'action')
         return
       }
+
+      if (msg.type === 'commitFarm') {
+        const resp = room.session.commitFarmChoice(msg.playerIndex, msg.farmType, msg.payload)
+        broadcastState(room, resp, 'choice')
+        return
+      }
+
+      if (msg.type === 'undoStep') {
+        const resp = room.session.undoStep()
+        broadcastState(room, resp, 'undo')
+        return
+      }
+
+      if (msg.type === 'undoAction') {
+        const resp = room.session.undoAction()
+        broadcastState(room, resp, 'undo')
+        return
+      }
     })
 
     ws.on('close', () => {

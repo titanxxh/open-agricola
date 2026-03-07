@@ -19,8 +19,9 @@ import {
 } from '../../shared/logic/state'
 import { useGameApi, type GameApiResponse } from '../hooks/useGameApi'
 import { useGameSync } from '../hooks/useGameSync'
-import { HttpGameTransport, type GameTransport } from '../services/gameTransport'
+import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
+import type { RoomSummary } from '../../shared/protocol/ws'
 import { rehydrateState } from '../../shared/game/serialization'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { DevPanel } from '../components/dev/DevPanel'
@@ -44,23 +45,156 @@ import {
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
-const transportSingleton = new HttpGameTransport()
+const urlParams = new URLSearchParams(window.location.search)
+const useWsMode = urlParams.get('transport') === 'ws'
+const httpTransportSingleton = new HttpGameTransport()
+
+type WsStatus =
+  | { phase: 'idle' }
+  | { phase: 'connecting' }
+  | { phase: 'creating' }
+  | { phase: 'joining'; roomId: string }
+  | { phase: 'waiting'; roomId: string }
+  | { phase: 'ready'; roomId: string; playerIndex: number }
+  | { phase: 'error'; message: string }
+
+const useTransportSetup = (playerParam: string | null) => {
+  const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
+  const wsRef = useRef<WsGameTransport | null>(null)
+  const [wsReady, setWsReady] = useState(false)
+
+  const initRef = useRef(false)
+
+  useEffect(() => {
+    if (!useWsMode || initRef.current) return
+    initRef.current = true
+
+    const init = async () => {
+      setWsStatus({ phase: 'connecting' })
+      const ws = new WsGameTransport()
+
+      try {
+        await ws.connect()
+      } catch {
+        setWsStatus({ phase: 'error', message: 'WebSocket connection failed' })
+        return
+      }
+
+      wsRef.current = ws
+      const rawWs = (ws as unknown as { ws: WebSocket }).ws
+      if (!rawWs) {
+        setWsStatus({ phase: 'error', message: 'no WebSocket instance' })
+        return
+      }
+
+      const roomParam = urlParams.get('room')
+      const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
+
+      if (isCreator) {
+        setWsStatus({ phase: 'creating' })
+        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomCreated') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+              } else if (msg.type === 'error') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: playerParam ?? 'Player 1' })
+        })
+
+        if ('error' in resp) {
+          setWsStatus({ phase: 'error', message: resp.error })
+          return
+        }
+        setWsStatus({ phase: 'waiting', roomId: resp.roomId })
+
+        const handler = (event: MessageEvent) => {
+          try {
+            const msg = JSON.parse(event.data as string)
+            if (msg.type === 'gameStarted') {
+              rawWs.removeEventListener('message', handler)
+              setWsReady(true)
+              setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+            }
+          } catch { /* skip */ }
+        }
+        rawWs.addEventListener('message', handler)
+      } else {
+        let roomId = roomParam
+        if (!roomId) {
+          setWsStatus({ phase: 'connecting' })
+          try {
+            const resp = await fetch('http://localhost:5175/api/rooms')
+            const data = await resp.json() as { ok: boolean; rooms: RoomSummary[] }
+            const rooms = data.rooms ?? []
+            const available = rooms.find((r) => r.playerCount < r.maxPlayers)
+            if (!available) {
+              setWsStatus({ phase: 'error', message: 'no available rooms' })
+              return
+            }
+            roomId = available.id
+          } catch {
+            setWsStatus({ phase: 'error', message: 'failed to fetch rooms' })
+            return
+          }
+        }
+
+        setWsStatus({ phase: 'joining', roomId })
+        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomJoined') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+              } else if (msg.type === 'error') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          ws.sendRoomCommand('joinRoom', { roomId: roomId!, name: playerParam ?? 'Player 2' })
+        })
+
+        if ('error' in resp) {
+          setWsStatus({ phase: 'error', message: resp.error })
+          return
+        }
+        setWsReady(true)
+        setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+      }
+    }
+
+    init()
+  }, [playerParam])
+
+  const transport: GameTransport = useWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
+  const isReady = !useWsMode || wsReady
+  return { transport, wsStatus, isWs: useWsMode, isReady }
+}
 
 export const GameContainerApi = () => {
   const api = useGameApi()
-  const transport = transportSingleton
-  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot, applyResponse } =
-    useGameSync()
-  const [locale, setLocale] = useState<Locale>('en')
   const lockedViewPlayerId = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    const raw = params.get('player') ?? params.get('playerId')
+    const raw = urlParams.get('player') ?? urlParams.get('playerId')
     if (!raw) return null
     if (/^p[1-4]$/.test(raw)) return raw
     const index = Number(raw)
     if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
     return null
   }, [])
+  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
+  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot, applyResponse } =
+    useGameSync()
+  const [locale, setLocale] = useState<Locale>('en')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(true)
@@ -134,10 +268,11 @@ export const GameContainerApi = () => {
   }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError])
 
   useEffect(() => {
+    if (!isReady) return
     const unsub = transport.onSnapshot(handleSnapshot)
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
     return unsub
-  }, [transport, handleSnapshot])
+  }, [transport, handleSnapshot, isReady])
 
   const applyAndSync = useCallback(async (promise: Promise<GameApiResponse>) => {
     try {
@@ -187,19 +322,6 @@ export const GameContainerApi = () => {
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
   const isInteractive = !!(currentPlayer && displayPlayer && currentPlayer.id === displayPlayer.id)
-  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
-  console.log(`[DEBUG] viewPlayerId: ${viewPlayerId}, ${typeof viewPlayerId}`)
-  console.log(`[DEBUG] currentPlayer: ${currentPlayer?.id}, ${typeof currentPlayer}`)
-  console.log(`[DEBUG] displayPlayer: ${displayPlayer?.id}, ${typeof displayPlayer}`)
-  console.log(`[DEBUG] isInteractive: ${isInteractive}, ${typeof isInteractive}`)
-  
-  console.log('[DEBUG] isInteractive calculation:', {
-    currentPlayerId: currentPlayer?.id,
-    displayPlayerId: displayPlayer?.id,
-    viewPlayerId,
-    currentPlayerIndex: state?.currentPlayerIndex,
-    isInteractive
-  })
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -916,6 +1038,33 @@ export const GameContainerApi = () => {
     }
     reader.readAsText(file)
   }, [api, applyAndSync])
+
+  if (isWs && wsStatus.phase !== 'ready' && !state) {
+    const statusText = wsStatus.phase === 'idle' ? 'Initializing...'
+      : wsStatus.phase === 'connecting' ? 'Connecting to server...'
+      : wsStatus.phase === 'creating' ? 'Creating room...'
+      : wsStatus.phase === 'joining' ? `Joining room ${wsStatus.roomId}...`
+      : wsStatus.phase === 'waiting' ? `Room ${wsStatus.roomId} — waiting for other player...`
+      : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
+      : 'Loading...'
+
+    return (
+      <div className="app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>Open Agricola — WebSocket Mode</div>
+        <div style={{ fontSize: '16px' }}>{statusText}</div>
+        {wsStatus.phase === 'waiting' && (
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            Other player: open <code>?player=p2&transport=ws</code>
+          </div>
+        )}
+        {wsStatus.phase === 'error' && (
+          <button type="button" onClick={() => window.location.reload()} style={{ padding: '8px 16px', cursor: 'pointer' }}>
+            Retry
+          </button>
+        )}
+      </div>
+    )
+  }
 
   if (!state || !currentPlayer || !displayPlayer) {
     return <div className="app">Loading...</div>

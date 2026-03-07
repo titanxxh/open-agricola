@@ -227,8 +227,8 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'choice', value })
   }
 
-  async commitFarm(_playerIndex: number, _farmType: string, _payload: Record<string, unknown>): Promise<GameSyncPayload> {
-    throw new Error('commitFarm not supported over WS yet')
+  async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow', payload })
   }
 
   async confirmReorg(playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {
@@ -248,27 +248,32 @@ export class WsGameTransport implements GameTransport {
   }
 
   async undoStep(): Promise<GameSyncPayload> {
-    throw new Error('undo not supported over WS yet')
+    return this.sendCommand({ type: 'undoStep' })
   }
 
   async undoAction(): Promise<GameSyncPayload> {
-    throw new Error('undo not supported over WS yet')
+    return this.sendCommand({ type: 'undoAction' })
   }
 
   async newGame(): Promise<GameSyncPayload> {
-    throw new Error('newGame not supported over WS yet')
+    return post('/api/game/new')
   }
 
-  async loadGame(_state: unknown): Promise<GameSyncPayload> {
-    throw new Error('loadGame not supported over WS yet')
+  async loadGame(state: unknown): Promise<GameSyncPayload> {
+    return post('/api/game/load', { state })
   }
 
-  async devCreatePasture(_playerIndex: number): Promise<GameSyncPayload> {
-    throw new Error('devCreatePasture not supported over WS')
+  async devCreatePasture(playerIndex: number): Promise<GameSyncPayload> {
+    return post('/api/game/dev/create-pasture', { playerIndex })
   }
 
-  async validateFarmChoice(_type: string, _playerId: string, _payload: Record<string, unknown>): Promise<ValidateResult> {
-    throw new Error('validateFarmChoice not supported over WS yet')
+  async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
+    const resp = await fetch(`${API_BASE}/api/game/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, playerId, payload }),
+    })
+    return resp.json() as Promise<ValidateResult>
   }
 
   onSnapshot(cb: SnapshotListener): () => void {
