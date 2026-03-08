@@ -608,6 +608,7 @@ export const en = {
     interactionBucksawPay: 'Pay 1 wood',
     interactionBucksawSkip: 'Skip',
     interactionFieldMerchantChoose: 'Field Merchant: Choose 1 food or 1 vegetable',
+    interactionSaddlerPlow: 'Saddler: Plow 1 field?',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
   },

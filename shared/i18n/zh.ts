@@ -591,6 +591,7 @@ export const zh = {
     interactionBucksawPay: '支付 1 木头',
     interactionBucksawSkip: '跳过',
     interactionFieldMerchantChoose: '田商人：选择获得 1 食物或 1 蔬菜',
+    interactionSaddlerPlow: '鞍匠：犁 1 块田？',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',
   },
