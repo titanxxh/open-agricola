@@ -1,7 +1,37 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
+
+const CARD_ID = 'B103_FieldMerchant'
+
+const computeReplaceListener: CardListenerRegistration = {
+  id: 'B103-field-merchant-replace-improvement',
+  cardIds: [CARD_ID],
+  phases: ['computeReplace' as ActionHookPhase],
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return {
+      decline: true,
+      alternativeFlow: {
+        type: 'xor',
+        promptKey: 'ui.interactionFieldMerchantChoose',
+        children: [
+          { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { vegetable: 1 } },
+        ],
+      },
+    }
+  },
+}
+
+registerCardListener(computeReplaceListener)
 
 export const B103_FieldMerchant = new Occupation({
-  id: "B103_FieldMerchant",
+  id: CARD_ID,
   name: "Field Merchant",
   deck: "B",
   number: 103,
