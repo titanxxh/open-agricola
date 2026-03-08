@@ -602,6 +602,8 @@ export const en = {
     playMinorImprovement: '{player} plays minor improvement: {improvements}{cost}',
     bakeBread: '{player} bakes bread: {count} grain → {food} food',
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
+    cardEffectTrigger: '{cardId} effect triggered',
+    cardEffectBlock: '{cardId} blocks this action',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
   },

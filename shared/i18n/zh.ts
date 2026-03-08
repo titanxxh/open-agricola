@@ -585,6 +585,8 @@ export const zh = {
     playMinorImprovement: '{player} 打出小改良：{improvements}{cost}',
     bakeBread: '{player} 烤面包: {count} 谷物 → {food} 食物',
     cardGrantedAction: '{player} 获得来自 {cardId} 的 {actionId} 行动',
+    cardEffectTrigger: '{cardId} 效果已触发',
+    cardEffectBlock: '{cardId} 阻止了此行动',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',
   },
