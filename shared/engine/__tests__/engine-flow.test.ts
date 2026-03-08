@@ -13,6 +13,7 @@ import { LogStore } from '../log-store'
 import {
   ActionNode,
   ChoiceNode,
+  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -447,5 +448,125 @@ describe('Engine flow nodes', () => {
     const space = createSpace(a)
     const result = engine.proceed({ state, player, space })
     expect(result.type).toBe('blocked')
+  })
+
+  it('optional node auto-skips when child is not doable', () => {
+    const action: ActionDefinition = {
+      id: 'blocked-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new OptionalNode(
+      'opt',
+      new ActionNode('action-blocked', 'blocked-action'),
+      'ui.interactionOptionalAction',
+    )
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+  })
+
+  it('optional node resolves when choosing __skip__', () => {
+    const action: ActionDefinition = {
+      id: 'skippable',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new OptionalNode(
+      'opt',
+      new ActionNode('action-skip', 'skippable'),
+      'ui.interactionOptionalAction',
+    )
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+
+    const result = engine.resolveChoice('__skip__', { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+
+    const done = engine.proceed({ state, player, space })
+    expect(done.type).toBe('done')
+  })
+
+  it('or node resolves when choosing __done__', () => {
+    const a: ActionDefinition = {
+      id: 'or-a',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const b: ActionDefinition = {
+      id: 'or-b',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(a)
+    registry.register(b)
+    const root = new OrNode('or', [
+      new ActionNode('action-a', 'or-a'),
+      new ActionNode('action-b', 'or-b'),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(a)
+
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    engine.resolveChoice('action-a', { state, player, space })
+
+    const second = engine.proceed({ state, player, space })
+    expect(second.type).toBe('choice')
+    if (second.type !== 'choice') return
+    expect(second.choice.options.map((o) => o.value)).toContain('__done__')
+
+    engine.resolveChoice('__done__', { state, player, space })
+    const done = engine.proceed({ state, player, space })
+    expect(done.type).toBe('done')
   })
 })

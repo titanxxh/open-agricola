@@ -37,7 +37,9 @@ import {
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
-import { runReturnHomeHooks } from '../shared/cards/card-effects.ts'
+import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
+import { getCardModifier } from '../shared/cards/card-modifiers.ts'
+import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
@@ -55,6 +57,7 @@ type HistoryEntry = {
   activePlayerIndex: number | null
   engineSnapshot: ReturnType<Engine['snapshot']> | null
   actionStart: boolean
+  undoBoundary?: boolean
 }
 
 export type SessionResponse = {
@@ -194,7 +197,7 @@ export class GameSession {
     return JSON.parse(JSON.stringify(pending)) as PendingAction
   }
 
-  private pushHistory(actionStart = false) {
+  private pushHistory(actionStart = false, undoBoundary = false) {
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       pending: this.clonePending(this.pending),
@@ -202,6 +205,7 @@ export class GameSession {
       activePlayerIndex: this.activePlayerIndex,
       engineSnapshot: this.engine?.snapshot() ?? null,
       actionStart,
+      undoBoundary,
     }
     this.history.push(entry)
     if (actionStart) {
@@ -439,34 +443,44 @@ export class GameSession {
 
       if (step.type === 'choice') {
         if (step.choice.options.length === 1) {
-          const auto = step.choice.options[0]
-          const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
-          this.flushEngineLog()
-          const isBakeChoice =
-            step.choice.promptKey === 'ui.interactionBakeBreadChoice' ||
-            step.choice.promptKey === 'ui.interactionBakeBreadCount'
-          if (isBakeChoice && auto.value !== 'cancel' && auto.value !== '__skip__') {
-            this.usedBakeBreadThisAction = true
-          }
-          if (isBakeChoice) {
-            this.logBakeBreadDelta(before, player)
-          }
-          if (result.type === 'choice') {
-            this.pending = {
-              type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
-              options: result.options ?? [], promptKey: result.promptKey,
+          let autoOptions = step.choice.options
+          let autoPromptKey = step.choice.promptKey
+          while (autoOptions.length === 1) {
+            const auto = autoOptions[0]
+            const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+            this.flushEngineLog()
+            const isBakeChoice =
+              autoPromptKey === 'ui.interactionBakeBreadChoice' ||
+              autoPromptKey === 'ui.interactionBakeBreadCount'
+            if (isBakeChoice && auto.value !== 'cancel' && auto.value !== '__skip__') {
+              this.usedBakeBreadThisAction = true
             }
-            return
-          }
-          if (result.type === 'fail') {
-            this.pending = { type: 'none' }
-            this.engine = null
-            this.actionStartIndex = null
-            return
-          }
-          if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-            this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
-            return
+            if (isBakeChoice) {
+              this.logBakeBreadDelta(before, player)
+            }
+            if (result.type === 'choice') {
+              if ((result.options?.length ?? 0) === 1) {
+                autoOptions = result.options!
+                autoPromptKey = result.promptKey
+                continue
+              }
+              this.pending = {
+                type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
+                options: result.options ?? [], promptKey: result.promptKey,
+              }
+              return
+            }
+            if (result.type === 'fail') {
+              this.pending = { type: 'none' }
+              this.engine = null
+              this.actionStartIndex = null
+              return
+            }
+            if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
+              this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+              return
+            }
+            break
           }
           continue
         }
@@ -654,6 +668,7 @@ export class GameSession {
         this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'harvest-breed' }
         return this.respond()
       }
+      this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
       return this.finalizeRound()
     }
     if (this.engine) {
@@ -753,8 +768,12 @@ export class GameSession {
   }
 
   private startHarvest(): SessionResponse {
+    this.state.players.forEach((p) => runBeforeHarvestHooks(this.state, p))
     this.state.players.forEach((p) => reap(p))
+    this.state.players.forEach((p) => runAfterReapHooks(this.state, p))
     applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
+
+    this.state.players.forEach((p) => runBeforeFeedHooks(this.state, p))
 
     const feedQueue: { index: number; remaining: number }[] = []
     
@@ -795,6 +814,7 @@ export class GameSession {
   }
 
   private startBreedPhase(): SessionResponse {
+    this.state.players.forEach((p) => runAfterFeedHooks(this.state, p))
     this.applyBreedPhase()
     
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
@@ -802,6 +822,8 @@ export class GameSession {
       this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
       return this.respond()
     }
+
+    this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
     return this.finalizeRound()
   }
 
@@ -810,6 +832,7 @@ export class GameSession {
   }
 
   private finalizeRound(): SessionResponse {
+    this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
     this.state.players.forEach((p) => { p.newbornCount = 0 })
     this.state.round += 1
     if (this.state.round > 14) {
@@ -818,6 +841,7 @@ export class GameSession {
       this.pending = { type: 'none' }
       return this.respond()
     }
+    this.state.players.forEach((p) => runBeforeStartOfTurnHooks(this.state, p))
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
     applyMajorEffectsToAllPlayers(this.state, 'onRoundStart')
@@ -984,8 +1008,25 @@ export class GameSession {
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    if (!player.minorPlayed.includes(cardId)) {
-      player.minorPlayed.push(cardId)
+    const isOccupation = cardId.match(/^[A-E]\d+_/) && !getMinorImprovement(cardId)
+    if (isOccupation) {
+      if (!player.occupationPlayed.includes(cardId)) {
+        player.occupationPlayed.push(cardId)
+      }
+    } else {
+      if (!player.minorPlayed.includes(cardId)) {
+        player.minorPlayed.push(cardId)
+      }
+    }
+    player.playedCards = player.playedCards ?? []
+    const prefix = isOccupation ? 'occupation' : 'minor'
+    const playedKey = `${prefix}:${cardId}`
+    if (!player.playedCards.includes(playedKey)) {
+      player.playedCards.push(playedKey)
+    }
+    const modifier = getCardModifier(cardId)
+    if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
+      player.activeModifiers.push(modifier)
     }
     return this.respond()
   }
@@ -1006,6 +1047,9 @@ export class GameSession {
   }
 
   undoStep(): SessionResponse {
+    if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
+      return this.respond(false, 'cannot undo past boundary')
+    }
     const entry = this.history.pop()
     if (!entry) return this.respond(false, 'no history to undo')
     this.restoreHistory(entry)
@@ -1015,11 +1059,22 @@ export class GameSession {
 
   undoAction(): SessionResponse {
     if (this.actionStartIndex === null) return this.respond(false, 'no action snapshot')
-    const entry = this.history[this.actionStartIndex]
+    let targetIndex = this.actionStartIndex
+    for (let i = this.history.length - 1; i > this.actionStartIndex; i -= 1) {
+      if (this.history[i]?.undoBoundary) {
+        targetIndex = i
+        break
+      }
+    }
+    const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
     this.restoreHistory(entry)
-    this.history = this.history.slice(0, this.actionStartIndex)
-    this.actionStartIndex = null
+    this.history = this.history.slice(0, targetIndex)
+    if (targetIndex === this.actionStartIndex) {
+      this.actionStartIndex = null
+    } else {
+      this.recomputeActionStartIndex()
+    }
     return this.respond()
   }
 }

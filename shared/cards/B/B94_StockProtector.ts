@@ -1,7 +1,50 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
+
+const CARD_ID = 'B94_StockProtector'
+
+const beforeListener: CardListenerRegistration = {
+  id: 'B94-stock-protector-before-fencing',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return {
+      flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 } },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { wood: 2 }, cardId: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+const afterListener: CardListenerRegistration = {
+  id: 'B94-stock-protector-after-fencing',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.player.workersAvailable <= 0) return
+    return {
+      flow: { type: 'leaf', actionId: 'place-farmer', optional: true, promptKey: 'ui.interactionStockProtectorPlace' },
+      logKey: 'log.cardGrantedAction',
+      logParams: { cardId: CARD_ID, actionId: 'place-farmer' },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(beforeListener)
+registerCardListener(afterListener)
 
 export const B94_StockProtector = new MinorImprovement({
-  id: "B94_StockProtector",
+  id: CARD_ID,
   name: "Stock Protector",
   deck: "B",
   number: 94,

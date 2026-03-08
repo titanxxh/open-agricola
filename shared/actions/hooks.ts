@@ -47,6 +47,8 @@ export type ActionHookResult = {
   sourceCard?: string
   logKey?: string
   logParams?: Record<string, unknown>
+  decline?: boolean
+  alternativeFlow?: ActionFlow
 }
 
 export type ActionHookHandler = (

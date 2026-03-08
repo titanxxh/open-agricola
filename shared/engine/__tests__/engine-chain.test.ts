@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { ActionRegistry } from '../registry'
-import { ActionNode, OptionalNode, OrNode, SequenceNode } from '../nodes'
+import { ActionNode, ChoiceNode, OptionalNode, OrNode, SequenceNode, XorNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
@@ -270,5 +270,132 @@ describe('engine follow-up actions', () => {
     const first = engine.proceed({ state, player, space })
     expect(first.type).toBe('ok')
     expect(tree.root).toBeInstanceOf(SequenceNode)
+  })
+
+  it('hook returning flow field inserts and executes flow node', () => {
+    const executed: string[] = []
+    const mainAction = {
+      id: 'flow-main',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed.push('flow-main')
+        return { type: 'ok' as const }
+      },
+    }
+    const bonusAction = {
+      id: 'flow-bonus',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed.push('flow-bonus')
+        return { type: 'ok' as const }
+      },
+    }
+
+    registerActionHook({
+      id: 'after-flow-main',
+      actions: ['flow-main'],
+      phases: ['after'],
+      handler: () => ({
+        flow: { type: 'leaf' as const, actionId: 'flow-bonus' },
+      }),
+    })
+
+    const registry = new ActionRegistry()
+    registry.register(mainAction)
+    registry.register(bonusAction)
+    const tree = new EngineTree(new ActionNode('action-main', 'flow-main'))
+    const engine = new Engine({
+      tree,
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const player = createPlayer()
+    const space = createSpace('day-laborer')
+    const state = createState(space, player)
+
+    engine.proceed({ state, player, space })
+    const second = engine.proceed({ state, player, space })
+    expect(second.type).toBe('ok')
+    expect(executed).toEqual(['flow-main', 'flow-bonus'])
+    expect(engine.proceed({ state, player, space }).type).toBe('done')
+  })
+
+  it('resolveChoice action path inserts flow nodes from after hooks', () => {
+    const executed: string[] = []
+    const mainAction = {
+      id: 'resolve-flow-main',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'choice' as const,
+        promptKey: 'choose',
+        options: [{ value: 'opt-a', labelKey: 'A' }],
+      }),
+      resolveChoice: () => {
+        executed.push('resolveChoice')
+        return { type: 'ok' as const }
+      },
+    }
+    const bonusAction = {
+      id: 'resolve-flow-bonus',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed.push('bonus')
+        return { type: 'ok' as const }
+      },
+    }
+
+    registerActionHook({
+      id: 'after-resolve-flow',
+      actions: ['resolve-flow-main'],
+      phases: ['after'],
+      handler: () => ({
+        flow: { type: 'leaf' as const, actionId: 'resolve-flow-bonus' },
+      }),
+    })
+
+    const registry = new ActionRegistry()
+    registry.register(mainAction)
+    registry.register(bonusAction)
+    const tree = new EngineTree(
+      new SequenceNode('seq', [
+        new ActionNode('action-main', 'resolve-flow-main'),
+        new ChoiceNode('choice-main', []),
+      ]),
+    )
+    const engine = new Engine({
+      tree,
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const player = createPlayer()
+    const space = createSpace('day-laborer')
+    const state = createState(space, player)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+
+    engine.resolveChoice('opt-a', { state, player, space })
+
+    const bonus = engine.proceed({ state, player, space })
+    expect(bonus.type).toBe('ok')
+    expect(executed).toContain('bonus')
   })
 })

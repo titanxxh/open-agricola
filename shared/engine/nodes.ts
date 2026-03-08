@@ -2,8 +2,10 @@ import type {
   ActionChoiceOption,
   ActionExecutionContext,
   ActionExecutionResult,
+  Resource,
 } from '../game/types'
 import type { EngineNode, EngineNodeType, NodeState } from './types'
+import type { ActionHookPhase } from '../actions/hooks'
 
 abstract class BaseNode implements EngineNode {
   public id: string
@@ -44,11 +46,13 @@ abstract class BaseNode implements EngineNode {
 export class ActionNode extends BaseNode {
   public actionId: string
   public sourceCard?: string
+  public params?: Partial<Resource>
 
-  constructor(id: string, actionId: string, sourceCard?: string) {
+  constructor(id: string, actionId: string, sourceCard?: string, params?: Partial<Resource>) {
     super(id, 'action')
     this.actionId = actionId
     this.sourceCard = sourceCard
+    this.params = params
   }
 
   execute(
@@ -169,5 +173,29 @@ export class OptionalNode extends BaseNode {
 
   resolve() {
     this.state = 'resolved'
+  }
+}
+
+export class ActivateCardNode extends BaseNode {
+  public listenerId: string
+  public cardId: string
+  public phase: ActionHookPhase
+  public actionId: string
+  public event: Record<string, unknown>
+
+  constructor(
+    id: string,
+    listenerId: string,
+    cardId: string,
+    phase: ActionHookPhase,
+    actionId: string,
+    event: Record<string, unknown> = {},
+  ) {
+    super(id, 'activateCard')
+    this.listenerId = listenerId
+    this.cardId = cardId
+    this.phase = phase
+    this.actionId = actionId
+    this.event = event
   }
 }

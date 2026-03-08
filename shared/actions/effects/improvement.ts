@@ -3,6 +3,7 @@ import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard } from './pay'
 import { getMajorCardEffect } from '../../cards/major'
+import { getCardModifier } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 
 export type ImprovementPlayMode = 'major' | 'minor' | 'any'
@@ -157,6 +158,10 @@ const playMinorImprovement = (
   player.minorPlayed.push(improvement.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`minor:${improvement.id}`)
+  const modifier = getCardModifier(improvement.id)
+  if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
+    player.activeModifiers.push(modifier)
+  }
   // Return with logKey to record the improvement play with payment info
   return {
     type: 'ok',

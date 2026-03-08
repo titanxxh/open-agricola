@@ -14,6 +14,6 @@ export const A88_HedgeKeeper = new Occupation({
     type: 'bonus',
     cardId: 'A88_HedgeKeeper',
     appliesTo: ['fencing'],
-    discount: { reed: 1 },
+    discount: { wood: 3 },
   } as BonusModifier,
 })

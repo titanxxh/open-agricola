@@ -1,7 +1,39 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
+
+const CARD_ID = 'D14_HammerCrusher'
+
+const listener: CardListenerRegistration = {
+  id: 'D14-hammer-crusher-before-renovate',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'clay') return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'gain', params: { clay: 2, reed: 1 } },
+          { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.interactionHammerCrusherBuild' },
+        ],
+      },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { clay: 2, reed: 1 }, cardId: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
 
 export const D14_HammerCrusher = new MinorImprovement({
-  id: "D14_HammerCrusher",
+  id: CARD_ID,
   name: "Hammer Crusher",
   deck: "D",
   number: 14,

@@ -14,6 +14,7 @@ export type EngineNodeType =
   | 'or'
   | 'xor'
   | 'optional'
+  | 'activateCard'
 
 export type EngineNode = {
   id: string

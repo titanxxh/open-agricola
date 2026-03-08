@@ -240,8 +240,8 @@ export const internalActionDefinitions: ActionDefinition[] = [
     roundAvailable: 1,
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
-    execute: ({ player, space }) => {
-      const gain = gainConfigByActionId.get(space.id)
+    execute: ({ player, space, params }) => {
+      const gain = params ?? gainConfigByActionId.get(space.id)
       const gained: Record<string, number> = {}
       if (gain) {
         Object.keys(gain).forEach((key) => {
@@ -529,6 +529,35 @@ export const internalActionDefinitions: ActionDefinition[] = [
       }
       
       return { type: 'ok' }
+    },
+  },
+  {
+    id: 'place-farmer',
+    nameKey: 'actions.place-farmer.name',
+    descriptionKey: 'actions.place-farmer.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (_, player) => player.workersAvailable > 0,
+    execute: ({ state, player }) => {
+      const available = state.actionSpaces
+        .filter((s) => !s.takenBy && s.canBeExecutedByPlayer(state, player))
+        .map((s) => ({ value: s.id, labelKey: s.nameKey }))
+      if (available.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      return {
+        type: 'choice',
+        promptKey: 'ui.interactionPlaceFarmerExtra',
+        options: available,
+      }
+    },
+    resolveChoice: ({ state, player }, choice) => {
+      const targetSpace = state.actionSpaces.find((s) => s.id === choice)
+      if (!targetSpace || targetSpace.takenBy) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      targetSpace.takenBy = player.id
+      player.workersAvailable -= 1
+      const action = targetSpace
+      const result = action.execute({ state, player, space: targetSpace })
+      if (result.type === 'flow') return result
+      return result
     },
   },
 ]

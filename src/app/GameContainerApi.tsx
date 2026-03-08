@@ -247,7 +247,7 @@ export const GameContainerApi = () => {
           confirmDiscard: false,
         })
       }
-    } else if (payload.pending.type !== 'choice') {
+    } else {
       setAnimalReorg(null)
     }
     if (payload.ok) {

@@ -168,7 +168,6 @@ const firewoodProcessChoiceListener: CardListenerRegistration = {
       const actualCount = Math.min(count, woodOnCard, 4)
       
       if (actualCount > 0) {
-        // Initialize card state if needed
         if (!player.cardStates) {
           player.cardStates = {}
         }
@@ -179,11 +178,10 @@ const firewoodProcessChoiceListener: CardListenerRegistration = {
           player.cardStates[CARD_ID].counters = {}
         }
         
-        // Update wood counts
         player.cardStates[CARD_ID].counters!['wood'] = woodOnCard - actualCount
-        player.resources.wood += actualCount
         
         return {
+          flow: { type: 'leaf' as const, actionId: 'gain', params: { wood: actualCount } },
           logKey: 'log.cardEffectGain',
           logParams: { gain: { wood: actualCount }, cardId: CARD_ID },
         }

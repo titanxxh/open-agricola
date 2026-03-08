@@ -273,6 +273,24 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       entries: cardBonusEntries,
     })
 
+    let cardStateBonusVp = 0
+    if (player.cardStates) {
+      Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
+        if (cardId === '__pendingChoice__') return
+        const vp = cardState.counters?.bonusVp ?? 0
+        if (vp > 0) {
+          cardStateBonusVp += vp
+        }
+      })
+    }
+    if (cardStateBonusVp > 0) {
+      categories.push({
+        key: 'cardStateBonusVp',
+        total: cardStateBonusVp,
+        entries: [{ type: 'bonus' as const, score: cardStateBonusVp }],
+      })
+    }
+
     const beggingCount = player.resources.begging
     const beggingScore = beggingCount * -3
     categories.push({

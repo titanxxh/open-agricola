@@ -616,7 +616,11 @@ export const FarmBoard = ({
           const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
-          const hasCounters = Object.values(cardStateCounters).some((count) => count > 0)
+          const internalKeys = new Set(['triggerCount', 'usedRound'])
+          const displayCounters = Object.fromEntries(
+            Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
+          )
+          const hasCounters = Object.keys(displayCounters).length > 0
           
           return (
             <div key={`played-${index}`} className="played-card-wrapper">
@@ -628,19 +632,18 @@ export const FarmBoard = ({
               />
               {futureEntries.length > 0 || hasCounters ? (
                 <div className="card-future">
-                  {Object.entries(cardStateCounters).map(([resKey, count]) => {
+                  {Object.entries(displayCounters).map(([resKey, count]) => {
                     if (count <= 0) return null
+                    const isKnownResource = resKey in emptyResources
                     return (
                       <div
                         key={`state-${rawId}-${resKey}`}
-                        className="card-future-item"
+                        className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
                         title={`${count} ${t(locale, `resources.${resKey}`)}`}
                       >
-                        <ResourceLine
-                          locale={locale}
-                          resources={{ ...emptyResources, [resKey]: count }}
-                          className="card-future-text"
-                        />
+                        <span className="resource-chip-text">
+                          {count} {t(locale, `resources.${resKey}`)}
+                        </span>
                       </div>
                     )
                   })}

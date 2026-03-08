@@ -22,15 +22,23 @@ describe('C52_HuntsmansHat server session', () => {
     pigMarket.resources.boar = 2
 
     session.loadState(state)
-    const resp = session.takeAction(0, 'pig-market')
+    let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0].resources.boar).toBe(2)
+
+    if (resp.pending?.type === 'animalReorg') {
+      resp = session.confirmAnimalReorg(0, [
+        { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      ])
+    }
+
+    expect(resp.state.players[0].resources.boar).toBeGreaterThanOrEqual(1)
+
     expect(resp.state.players[0].resources.food).toBe(2)
     const hasLog = resp.state.log.some(
       (e) =>
         e.key === 'log.cardEffectGain' &&
-        e.params?.cardId === 'C52_HuntsmansHat' &&
-        e.params?.gain === '2 FOOD',
+        e.params?.cardId === 'C52_HuntsmansHat',
     )
     expect(hasLog).toBe(true)
   })

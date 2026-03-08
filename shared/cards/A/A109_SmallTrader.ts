@@ -1,7 +1,34 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
+
+const CARD_ID = 'A109_SmallTrader'
+
+const listener: CardListenerRegistration = {
+  id: 'A109-small-trader-after-improvement',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const choice = context.choice
+    if (!choice || !choice.startsWith('minor:')) return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return {
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { food: 3 }, cardId: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
 
 export const A109_SmallTrader = new Occupation({
-  id: "A109_SmallTrader",
+  id: CARD_ID,
   name: "Small Trader",
   deck: "A",
   number: 109,
