@@ -6,7 +6,7 @@ import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'E130_Overachiever'
 
-const listener: CardListenerRegistration = {
+const afterWishChildrenListener: CardListenerRegistration = {
   id: 'E130-overachiever-after-wish-children',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
@@ -23,7 +23,21 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
+const computeCardCostsListener: CardListenerRegistration = {
+  id: 'E130-overachiever-compute-card-costs',
+  cardIds: [CARD_ID],
+  phases: ['computeCardCosts' as ActionHookPhase],
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const counters = context.player.cardStates?.[CARD_ID]?.counters
+    if (!counters?.triggerCount || counters.triggerCount <= 0) return
+    return { costs: { wood: -1 } }
+  },
+}
+
+registerCardListener(afterWishChildrenListener)
+registerCardListener(computeCardCostsListener)
 
 export const E130_Overachiever = new MinorImprovement({
   id: CARD_ID,

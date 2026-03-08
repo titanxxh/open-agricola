@@ -16,8 +16,28 @@ export const playOccupation = (
   if (!player.occupationHand.includes(occupation.id)) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
-  const cost =
+  const baseCost =
     costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
+  let cost = { ...baseCost }
+  if (!canPayResources(player, cost)) {
+    for (const mod of player.activeModifiers ?? []) {
+      if (mod.type === 'trade' && mod.appliesTo.includes('occupation')) {
+        const toKey = Object.keys(mod.to)[0] as keyof typeof cost
+        const fromKey = Object.keys(mod.from)[0] as keyof typeof cost
+        const toAmount = mod.to[toKey as keyof typeof mod.to] ?? 0
+        const fromAmount = mod.from[fromKey as keyof typeof mod.from] ?? 0
+        if (toAmount > 0 && fromAmount > 0 && (cost[toKey] ?? 0) > 0) {
+          const tradeable = Math.min(cost[toKey] ?? 0, mod.max ?? Infinity)
+          const altCost = { ...cost }
+          altCost[toKey] = (altCost[toKey] ?? 0) - tradeable
+          altCost[fromKey] = (altCost[fromKey] ?? 0) + (tradeable * fromAmount / toAmount)
+          if (canPayResources(player, altCost)) {
+            cost = altCost
+          }
+        }
+      }
+    }
+  }
   if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }

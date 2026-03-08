@@ -1,10 +1,41 @@
 import type { ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
-import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard } from './pay'
+import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, applyCostOverride } from './pay'
 import { getMajorCardEffect } from '../../cards/major'
 import { getCardModifier } from '../../cards/card-modifiers'
+import { getMatchingListeners, executeCardListener, type CardListenerContext } from '../../cards/card-listeners'
 import { activateCard } from './activate-card'
+
+const applyCardCostModifiers = (
+  state: GameState,
+  player: PlayerState,
+  cardId: string,
+  baseCost: Partial<Resource>,
+  actionCardId?: string,
+): Partial<Resource> => {
+  const emptySpace = { id: '', nameKey: '', descriptionKey: '', roundAvailable: 1, gainPerRound: {}, canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' as const }), resources: {} as any, takenBy: null }
+  const context: CardListenerContext = {
+    state,
+    player,
+    space: emptySpace as any,
+    actionId: 'improvement-any',
+    phase: 'computeCardCosts',
+  }
+  const matched = getMatchingListeners(context)
+  let cost = { ...baseCost }
+  for (const entry of matched) {
+    const result = executeCardListener(entry.registration, {
+      ...context,
+      cardId,
+      actionCardId,
+    } as any)
+    if (result?.costs) {
+      cost = applyCostOverride(cost, result.costs)
+    }
+  }
+  return cost
+}
 
 export type ImprovementPlayMode = 'major' | 'minor' | 'any'
 
@@ -136,8 +167,10 @@ export const getMinorImprovementCost = (
 }
 
 const playMinorImprovement = (
+  state: GameState,
   player: PlayerState,
   improvementId: string,
+  actionCardId?: string,
 ): ActionExecutionResult => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) {
@@ -146,7 +179,8 @@ const playMinorImprovement = (
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
-  const cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
+  let cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
+  cost = applyCardCostModifiers(state, player, improvementId, cost, actionCardId)
   if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
@@ -203,7 +237,7 @@ export const playImprovement = (
     if (!allowMinor) {
       return { type: 'fail', logKey: 'log.minorImprovementFail' }
     }
-    return playMinorImprovement(player, parsed.id)
+    return playMinorImprovement(state, player, parsed.id)
   }
 
   const majorImprovement = allowMajor
@@ -213,7 +247,7 @@ export const playImprovement = (
     return playMajorImprovement(state, player, parsed.id)
   }
   if (allowMinor) {
-    return playMinorImprovement(player, parsed.id)
+    return playMinorImprovement(state, player, parsed.id)
   }
   return { type: 'fail', logKey: 'log.improvementFail' }
 }

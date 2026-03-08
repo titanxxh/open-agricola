@@ -13,6 +13,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const counters = initCardState(player, CARD_ID)
     counters['flagged'] = 0
+    counters['placedThisTurn'] = 0
   },
 })
 
@@ -25,8 +26,20 @@ const afterWishChildrenListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const counters = initCardState(context.player, CARD_ID)
     if (counters['flagged']) return
+    const placed = counters['placedThisTurn'] ?? 0
+    if (placed < 2) return
     counters['flagged'] = 1
     incCounter(context.player, CARD_ID, 'triggerCount')
+
+    const occupiedSpaces = context.state.actionSpaces.filter(
+      (s) => s.takenBy === context.player.id && s.id !== 'meeting-place',
+    )
+    if (occupiedSpaces.length === 0) return
+
+    const firstOccupied = occupiedSpaces[0]
+    firstOccupied.takenBy = null
+    context.player.workersAvailable += 1
+
     return {
       logKey: 'log.cardEffectTrigger',
       logParams: { cardId: CARD_ID },
