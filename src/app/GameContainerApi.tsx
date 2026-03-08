@@ -129,7 +129,8 @@ const useTransportSetup = (playerParam: string | null) => {
         if (!roomId) {
           setWsStatus({ phase: 'connecting' })
           try {
-            const resp = await fetch('http://localhost:5175/api/rooms')
+            const apiBase = `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:5175`
+            const resp = await fetch(`${apiBase}/api/rooms`)
             const data = await resp.json() as { ok: boolean; rooms: RoomSummary[] }
             const rooms = data.rooms ?? []
             const available = rooms.find((r) => r.playerCount < r.maxPlayers)

@@ -50,7 +50,9 @@ const server = createServer(async (req, res) => {
 createWsServer(server)
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
-server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`)
-  console.log(`WebSocket available at ws://localhost:${PORT}/ws`)
+const HOST = process.env.BACKEND_HOST || undefined
+server.listen(PORT, HOST, () => {
+  const addr = HOST ? `http://${HOST}:${PORT}` : `http://localhost:${PORT}`
+  console.log(`Server listening on ${addr}`)
+  console.log(`WebSocket available at ws://${HOST || 'localhost'}:${PORT}/ws`)
 })
