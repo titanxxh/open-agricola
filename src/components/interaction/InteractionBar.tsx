@@ -6,7 +6,9 @@ type Props = {
   pendingAnimalReorg: PendingAnimalReorg | null
   pendingChoice: PendingChoice | null
   pendingNextPlayerIndex: number | null
+  pendingPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
   locale: Locale
+  playerNames: string[]
   pendingRoomTilesLength: number
   maxRoomSelections: number
   pendingStableTilesLength: number
@@ -25,6 +27,7 @@ type Props = {
   isInteractive: boolean
   resolveChoice: (value: string) => void
   confirmNextPlayer: () => void
+  confirmPlayerSwitch: () => void
   harvestFeedPlayerName: string | null
   confirmHarvestFeed: () => void
 }
@@ -33,7 +36,9 @@ export const InteractionBar = ({
   pendingAnimalReorg,
   pendingChoice,
   pendingNextPlayerIndex,
+  pendingPlayerSwitch,
   locale,
+  playerNames,
   pendingRoomTilesLength,
   maxRoomSelections,
   pendingStableTilesLength,
@@ -52,6 +57,7 @@ export const InteractionBar = ({
   isInteractive,
   resolveChoice,
   confirmNextPlayer,
+  confirmPlayerSwitch,
   harvestFeedPlayerName,
   confirmHarvestFeed,
 }: Props) => (
@@ -137,6 +143,19 @@ export const InteractionBar = ({
             ))}
           </div>
         )}
+      </>
+    ) : pendingPlayerSwitch ? (
+      <>
+        <div className="interaction-title">
+          {t(locale, 'ui.interactionPlayerSwitchPrompt', {
+            player: playerNames[pendingPlayerSwitch.toPlayerIndex] ?? `Player ${pendingPlayerSwitch.toPlayerIndex + 1}`,
+          })}
+        </div>
+        <div className="interaction-actions">
+          <button onClick={confirmPlayerSwitch}>
+            {t(locale, 'ui.interactionPlayerSwitchConfirm')}
+          </button>
+        </div>
       </>
     ) : pendingNextPlayerIndex !== null ? (
       <>

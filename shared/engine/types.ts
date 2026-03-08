@@ -15,6 +15,7 @@ export type EngineNodeType =
   | 'xor'
   | 'optional'
   | 'activateCard'
+  | 'playerSwitch'
 
 export type EngineNode = {
   id: string
@@ -35,3 +36,4 @@ export type EngineStepResult =
   | { type: 'blocked'; nodeId: string }
   | { type: 'choice'; nodeId: string; choice: EngineChoice }
   | { type: 'ok'; nodeId: string; result: ActionExecutionResult }
+  | { type: 'playerSwitch'; nodeId: string; targetPlayerId: string }

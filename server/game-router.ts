@@ -103,6 +103,12 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
+    const resp = getSingletonSession().confirmPlayerSwitch()
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
     const resp = getSingletonSession().performRoundEnd()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))

@@ -24,6 +24,7 @@ export type ClientCommand =
       payload: Record<string, unknown>
     }
   | { type: 'nextPlayer' }
+  | { type: 'confirmPlayerSwitch' }
   | { type: 'roundEnd' }
   | { type: 'undoStep' }
   | { type: 'undoAction' }

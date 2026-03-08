@@ -152,7 +152,14 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
       ? 0
       : 1
   const discount = player.occupationPlayed.includes('B109_PaperMaker') ? 1 : 0
-  const food = Math.max(0, base - discount)
+  let food = Math.max(0, base - discount)
+  for (const mod of player.activeModifiers ?? []) {
+    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+      if (mod.discount.food && food > 0) {
+        food = Math.max(0, food - mod.discount.food)
+      }
+    }
+  }
   return food > 0 ? { food } : {}
 }
 

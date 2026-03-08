@@ -15,6 +15,7 @@ export type ActionHookPhase =
   | 'computeArgs'
   | 'computeReplace'
   | 'isDoable'
+  | 'computeCardCosts'
 
 export const actionHookPhases: ActionHookPhase[] = [
   'before',

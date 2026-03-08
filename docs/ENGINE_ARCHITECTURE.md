@@ -1048,7 +1048,96 @@ type ActionHookResult = {
 - `onRoundEnd`
 - `onReturnHome`
 
+完整的阶段型 Hook 清单（按触发顺序）：
+
+```text
+回合开始:
+  onBeforeStartOfTurn → onRoundStart
+
+工作阶段:
+  PlaceFarmer → 各原子行动
+
+回家阶段:
+  onBeforeReturnHome → onStartReturnHome → onReturnHome
+
+回合结束:
+  onRoundEnd → onAfterRoundEnd
+
+收获阶段（仅收获轮 4/7/9/11/13/14）:
+  onBeforeHarvest → onStartHarvest
+  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap → onAfterReap → onEndHarvestFieldPhase
+  → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase → feed → onEndHarvestFeedingPhase → onAfterFeed
+  → breed → onEndHarvest → onAfterHarvest
+```
+
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
+
+#### 11.6.2a ActivateCardNode 架构
+
+行动生命周期 Hook 中，`CardListener` 的执行采用延迟节点模式：
+
+1. 在 `before`/`during`/`immediatelyAfter`/`after` 阶段，`HookDispatcher` 调用 `getMatchingListeners()` 获取匹配的监听器列表，但不立即执行 handler。
+2. 引擎为每个匹配的监听器创建 `ActivateCardNode`（`shared/engine/nodes.ts`），插入引擎树。
+3. 当引擎推进到 `ActivateCardNode` 时，执行 `executeCardListener()`；如果 handler 返回 `flow`，通过 `buildFlowNode` 将其插入引擎树继续执行。
+4. 如果 `ActivateCardNode` 对应的卡牌持有者与当前行动玩家不同（opponent scope），引擎自动在 flow 前后插入 `PlayerSwitchNode`。
+
+```text
+ActionNode(collect)
+  ├─ proceed → after phase
+  │   getMatchingListeners → [C75_Firewood(after/improvement)]
+  │   buildActivateCardNodes → [ActivateCardNode(C75)]
+  │   insert into tree
+  └─ proceed → ActivateCardNode(C75)
+      executeCardListener → flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } }
+      buildFlowNode → ActionNode(gain)
+      insert into tree → proceed
+```
+
+#### 11.6.2b PlayerSwitchNode
+
+当 `ActivateCardNode` 发现卡牌持有者（`ownerPlayerId`）与当前执行玩家不同时，自动在 flow 前后插入 `PlayerSwitchNode`：
+
+```text
+PlayerSwitchNode(→ p2)
+  └─ flowNode (卡牌效果)
+PlayerSwitchNode(→ p1)
+```
+
+引擎推进到 `PlayerSwitchNode` 时返回 `{ type: 'playerSwitch', targetPlayerId }` 给 `GameSession`。`GameSession` 设置 `pending = { type: 'confirmPlayerSwitch' }`，并标记 `undoBoundary`（undo 不能跨越此边界）。前端展示确认 UI，确认后 `GameSession.confirmPlayerSwitch()` 切换活跃玩家并继续推进引擎。
+
+#### 11.6.2c computeCardCosts 阶段
+
+`computeCardCosts` 是行动生命周期中的扩展阶段，用于在购买改良/打出职业时动态修改卡牌本身的成本。与 `computeCosts`（修改行动空间的执行成本）不同，`computeCardCosts` 作用于被购买卡牌的费用。
+
+```ts
+// E130_Overachiever: improvement-any 折扣 1 wood
+{
+  phases: ['computeCardCosts'],
+  actions: ['improvement-any'],
+  handler: (context) => ({ costs: { wood: -1 } })
+}
+```
+
+`applyCardCostModifiers()` 在 `playMinorImprovement()` 中调用，收集所有 `computeCardCosts` 监听器的返回值并应用到卡牌基础费用上。
+
+#### 11.6.2d costOverride 机制
+
+引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，传递给 `commitFarmChoice()`。
+
+在 `commitFarmChoice` 中：
+- `room` 路径：`applyCostOverride(baseCost, override)` 直接修改每间房的基础成本
+- `fence` 路径：从 `override.wood` 中提取折扣，减少额外木头需求
+
+#### 11.6.2e gain params（参数化资源获取）
+
+卡牌效果中"获得资源"统一走 `gain` 原子行动。通过 `params` 字段指定要获得的资源类型和数量：
+
+```ts
+// C75_Firewood: after/improvement 获得 1 wood
+flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } }
+```
+
+`gain` 行动的 `execute` 方法优先使用 `context.params` 中的资源定义。`params` 在 `ActionFlow` 和 `ActionNode` 上均有定义，引擎在 `buildFlowNode` 时传递给 `ActionNode` 构造器。
 
 #### 11.6.3 作用域与过滤
 

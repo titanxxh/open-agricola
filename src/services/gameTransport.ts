@@ -22,6 +22,7 @@ export interface GameTransport {
     resourceKey: keyof Resource; count: number; food: number
   }[]): Promise<GameSyncPayload>
   confirmNextPlayer(): Promise<GameSyncPayload>
+  confirmPlayerSwitch(): Promise<GameSyncPayload>
   performRoundEnd(): Promise<GameSyncPayload>
   undoStep(): Promise<GameSyncPayload>
   undoAction(): Promise<GameSyncPayload>
@@ -97,6 +98,10 @@ export class HttpGameTransport implements GameTransport {
 
   confirmNextPlayer() {
     return this.send(() => post('/api/game/next-player'))
+  }
+
+  confirmPlayerSwitch() {
+    return this.send(() => post('/api/game/confirm-player-switch'))
   }
 
   performRoundEnd() {
@@ -241,6 +246,10 @@ export class WsGameTransport implements GameTransport {
 
   async confirmNextPlayer(): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'nextPlayer' })
+  }
+
+  async confirmPlayerSwitch(): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'confirmPlayerSwitch' })
   }
 
   async performRoundEnd(): Promise<GameSyncPayload> {

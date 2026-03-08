@@ -15,6 +15,7 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
+  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from './nodes'
@@ -39,6 +40,11 @@ export class Engine {
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
   private flowNodeCounter = 0
+  private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
+
+  getLastComputedCosts() {
+    return this.lastComputedCosts
+  }
 
   private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
     if (typeof followUp === 'string') {
@@ -354,6 +360,10 @@ export class Engine {
       }
       return { type: 'blocked', nodeId: node.id }
     }
+    if (node instanceof PlayerSwitchNode) {
+      node.resolve({})
+      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: node.targetPlayerId }
+    }
     if (node instanceof ActivateCardNode) {
       const listener = getListenerById(node.listenerId)
       if (!listener) {
@@ -370,8 +380,16 @@ export class Engine {
       }
       const result = executeCardListener(listener, listenerContext as any)
       if (result?.flow) {
+        const ownerPlayerId = node.event.ownerPlayerId as string | undefined
+        const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
         const flowNode = this.buildFlowNode(result.flow)
-        this.tree.insertAfter(node.id, [flowNode])
+        if (needsSwitch) {
+          const switchTo = new PlayerSwitchNode(`ps-to-${node.id}`, ownerPlayerId)
+          const switchBack = new PlayerSwitchNode(`ps-back-${node.id}`, context.player.id)
+          this.tree.insertAfter(node.id, [switchTo, flowNode, switchBack])
+        } else {
+          this.tree.insertAfter(node.id, [flowNode])
+        }
       }
       if (result?.logKey) {
         this.log.append({
@@ -429,6 +447,7 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
+      this.lastComputedCosts = executionContext.costs
       const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
       const beforeActivateNodes = this.buildActivateCardNodes(
         beforePhase.matchedListeners, 'before', replacedActionId,

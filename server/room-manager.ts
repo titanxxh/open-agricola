@@ -159,6 +159,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
+      if (msg.type === 'confirmPlayerSwitch') {
+        const resp = room.session.confirmPlayerSwitch()
+        broadcastState(room, resp, 'action')
+        return
+      }
+
       if (msg.type === 'roundEnd') {
         const resp = room.session.performRoundEnd()
         broadcastState(room, resp, 'action')

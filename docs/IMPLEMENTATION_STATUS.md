@@ -99,9 +99,9 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 4.2 Hook 系统
 
-8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。
+8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
 
-11 个阶段性 CardEffect Hook：`onBuy`、`onRoundStart`、`onHarvest`、`onRoundEnd`、`onReturnHome`、`onBeforeHarvest`、`onAfterReap`、`onBeforeFeed`、`onAfterFeed`、`onAfterHarvest`、`onBeforeStartOfTurn`。
+22 个阶段性 CardEffect Hook：`onBuy`、`onRoundStart`、`onHarvest`、`onRoundEnd`、`onReturnHome`、`onBeforeReturnHome`、`onStartReturnHome`、`onAfterRoundEnd`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onAfterReap`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onBeforeFeed`、`onAfterFeed`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn`。
 
 ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引擎节点，延迟执行 handler。handler 返回的 flow 通过 buildFlowNode 插入引擎树继续执行。
 
@@ -118,7 +118,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 
 ### 5.1 单元测试
 
-vitest，50 文件 371 用例。
+vitest，51 文件 380 用例。
 
 | 类别 | 文件 |
 |---|---|
@@ -130,6 +130,7 @@ vitest，50 文件 371 用例。
 | 引擎 Pipeline | `shared/engine/__tests__/engine-pipeline.test.ts` |
 | Hook 分发 | `shared/engine/__tests__/hook-dispatch.test.ts` |
 | Stub 卡牌 Hook 矩阵 | `shared/cards/__stubs__/__tests__/hook-coverage-matrix.test.ts` |
+| Stub 新阶段 Hook | `shared/cards/__stubs__/__tests__/new-hooks.test.ts` |
 | PayGainVp 机制 | `shared/cards/__stubs__/__tests__/pay-gain-vp.test.ts` |
 | OnRoundEnd 机制 | `shared/cards/__stubs__/__tests__/on-round-end.test.ts` |
 | 卡牌效果（批次 1-3） | `shared/cards/__tests__/batch1-cards.test.ts` 等 |
@@ -163,10 +164,10 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 部分卡牌仅完成数据接入，复杂行为待补全（30+/248 已实现 hook）。
-- Modifier 系统已激活（Step 1），但 construct/fence 路径尚未接入 modifier（成本通过 CardListener computeCosts 实现折扣）。
-- PlayerSwitchNode（opponent 卡牌触发的玩家切换）尚未实现。
-- D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts）需额外机制。
+- 部分卡牌仅完成数据接入，复杂行为待补全（45+/251 已实现 hook）。
+- Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。
+- PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
+- D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。
 - 断线重连未实现（WS 断开后需刷新页面重连）。
 - BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
 - `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。
