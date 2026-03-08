@@ -101,3 +101,52 @@ export const runCardListeners = (context: CardListenerContext) => {
   })
   return results
 }
+
+export type MatchedCardListener = {
+  registration: CardListenerRegistration
+  cardId: string
+  ownerPlayerId: string
+}
+
+export const getMatchingListeners = (context: CardListenerContext): MatchedCardListener[] => {
+  const matched: MatchedCardListener[] = []
+  getOrderedListeners(context).forEach((registration) => {
+    if (!registration.cardIds || registration.cardIds.length === 0) {
+      matched.push({ registration, cardId: '', ownerPlayerId: '' })
+      return
+    }
+    const scope = registration.scope ?? 'player'
+    for (const cardId of registration.cardIds) {
+      if (scope === 'player') {
+        if (getPlayerCardIds(context.player).includes(cardId)) {
+          matched.push({ registration, cardId, ownerPlayerId: context.player.id })
+        }
+      } else if (scope === 'opponent') {
+        for (const p of context.state.players) {
+          if (p.id !== context.player.id && getPlayerCardIds(p).includes(cardId)) {
+            matched.push({ registration, cardId, ownerPlayerId: p.id })
+          }
+        }
+      } else {
+        for (const p of context.state.players) {
+          if (getPlayerCardIds(p).includes(cardId)) {
+            matched.push({ registration, cardId, ownerPlayerId: p.id })
+            break
+          }
+        }
+      }
+    }
+  })
+  return matched
+}
+
+export const executeCardListener = (
+  registration: CardListenerRegistration,
+  context: CardListenerContext,
+): ActionHookResult | void => {
+  return registration.handler(context)
+}
+
+export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
+  return cardListeners.find((l) => l.id === listenerId)
+}

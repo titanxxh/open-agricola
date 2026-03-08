@@ -630,17 +630,16 @@ export const FarmBoard = ({
                 <div className="card-future">
                   {Object.entries(cardStateCounters).map(([resKey, count]) => {
                     if (count <= 0) return null
+                    const isKnownResource = resKey in emptyResources
                     return (
                       <div
                         key={`state-${rawId}-${resKey}`}
-                        className="card-future-item"
+                        className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
                         title={`${count} ${t(locale, `resources.${resKey}`)}`}
                       >
-                        <ResourceLine
-                          locale={locale}
-                          resources={{ ...emptyResources, [resKey]: count }}
-                          className="card-future-text"
-                        />
+                        <span className="resource-chip-text">
+                          {count} {t(locale, `resources.${resKey}`)}
+                        </span>
                       </div>
                     )
                   })}

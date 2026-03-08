@@ -179,6 +179,7 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
+  params?: Partial<Resource>
 }
 
 export type ActionChoiceOption = {
@@ -193,7 +194,7 @@ export type ActionExecutionResult =
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }
 export type ActionFlow =
-  | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string }
+  | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string; params?: Partial<Resource> }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
       promptKey?: string

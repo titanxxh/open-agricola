@@ -54,3 +54,17 @@ export const runReturnHomeHooks = (state: GameState, player: PlayerState): void 
     }
   }
 }
+
+export const runRoundEndHooks = (state: GameState, player: PlayerState): void => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (effect?.onRoundEnd) {
+      effect.onRoundEnd(state, player)
+    }
+  }
+}

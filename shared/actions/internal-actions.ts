@@ -240,8 +240,8 @@ export const internalActionDefinitions: ActionDefinition[] = [
     roundAvailable: 1,
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
-    execute: ({ player, space }) => {
-      const gain = gainConfigByActionId.get(space.id)
+    execute: ({ player, space, params }) => {
+      const gain = params ?? gainConfigByActionId.get(space.id)
       const gained: Record<string, number> = {}
       if (gain) {
         Object.keys(gain).forEach((key) => {

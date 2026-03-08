@@ -10,6 +10,7 @@ import type {
 import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,
+  ActivateCardNode,
   ChoiceNode,
   OptionalNode,
   OrNode,
@@ -20,6 +21,7 @@ import {
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
+import { getListenerById, executeCardListener } from '../cards/card-listeners'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 
@@ -79,10 +81,29 @@ export class Engine {
     return null
   }
 
+  private buildActivateCardNodes(
+    matched: { registration: { id: string; cardIds?: string[] }; cardId: string; ownerPlayerId: string }[],
+    phase: string,
+    actionId: string,
+    event: Record<string, unknown> = {},
+  ): EngineNode[] {
+    return matched.map((entry, index) => {
+      const nodeId = `activate-${phase}-${actionId}-${index}-${this.flowNodeCounter++}`
+      return new ActivateCardNode(
+        nodeId,
+        entry.registration.id,
+        entry.cardId,
+        phase as import('../actions/hooks').ActionHookPhase,
+        actionId,
+        { ...event, ownerPlayerId: entry.ownerPlayerId },
+      )
+    })
+  }
+
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(nextId(), flow.actionId)
+      const actionNode = new ActionNode(nextId(), flow.actionId, undefined, flow.params)
       const definition = this.registry.get(flow.actionId)
       if (definition?.resolveChoice) {
         const sequence = new SequenceNode(nextId(), [
@@ -333,11 +354,46 @@ export class Engine {
       }
       return { type: 'blocked', nodeId: node.id }
     }
+    if (node instanceof ActivateCardNode) {
+      const listener = getListenerById(node.listenerId)
+      if (!listener) {
+        node.resolve({})
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+      const listenerContext = {
+        state: context.state,
+        player: context.player,
+        space: context.space,
+        actionId: node.actionId,
+        phase: node.phase,
+        ...node.event,
+      }
+      const result = executeCardListener(listener, listenerContext as any)
+      if (result?.flow) {
+        const flowNode = this.buildFlowNode(result.flow)
+        this.tree.insertAfter(node.id, [flowNode])
+      }
+      if (result?.logKey) {
+        this.log.append({
+          key: result.logKey,
+          params: { player: context.player.name, ...result.logParams },
+        })
+      }
+      node.resolve(result ?? {})
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+    }
     if (node instanceof ActionNode) {
-      const replacedActionId = this.hooks.applyComputeReplace({
+      const replaceResult = this.hooks.applyComputeReplace({
         ...context,
         actionId: node.actionId,
       })
+      const replacedActionId = replaceResult.actionId
+      if (replaceResult.declined && replaceResult.alternativeFlow) {
+        const flowNode = this.buildFlowNode(replaceResult.alternativeFlow)
+        this.tree.insertAfter(node.id, [flowNode])
+        node.resolve({ type: 'ok' })
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
       const action = this.registry.get(replacedActionId)
       if (!action) {
         return { type: 'blocked', nodeId: node.id }
@@ -346,6 +402,7 @@ export class Engine {
         state: context.state,
         player: context.player,
         space: context.space,
+        params: node.params,
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: replacedActionId },
@@ -372,32 +429,15 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
-      const beforeResults = this.hooks.before({ ...executionContext, actionId: replacedActionId })
-      // Process before hook costs: negative values mean gain resources
-      beforeResults.forEach((entry) => {
-        if (!entry.costs) return
-        Object.entries(entry.costs).forEach(([key, value]) => {
-          if (typeof value !== 'number') return
-          const resourceKey = key as keyof PlayerState['resources']
-          if (value < 0) {
-            // Negative cost = gain resource
-            const gain = Math.abs(value)
-            context.player.resources[resourceKey] += gain
-            if (entry.sourceCard) {
-              this.log.append({
-                key: 'log.cardEffectGain',
-                params: {
-                  player: context.player.name,
-                  cardId: entry.sourceCard,
-                  gain: `${gain} ${resourceKey.toUpperCase()}`,
-                },
-              })
-            }
-          }
-        })
-      })
+      const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
+      const beforeActivateNodes = this.buildActivateCardNodes(
+        beforePhase.matchedListeners, 'before', replacedActionId,
+      )
       const result = action.execute(executionContext)
-      this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
+      const duringPhase = this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
+      const duringActivateNodes = this.buildActivateCardNodes(
+        duringPhase.matchedListeners, 'during', replacedActionId,
+      )
 if (result.type === 'choice') {
 node.resolve(result)
 const argResults = this.hooks.computeArgs(
@@ -410,15 +450,16 @@ const extraOptions = argResults
 if (extraOptions.length > 0) {
 result.options = [...result.options, ...extraOptions]
         }
-        // Check if there's a ChoiceNode in the tree to handle this choice
         const choiceNode = this.findChoiceNode(this.tree.root)
         if (choiceNode) {
           choiceNode.setChoice(result.promptKey, result.options)
           this.pendingChoiceNodeId = choiceNode.id
           this.pendingChoiceActionId = replacedActionId
         } else {
-          // No ChoiceNode - action will handle choice via resolveChoice
           this.pendingChoiceActionId = replacedActionId
+        }
+        if (beforeActivateNodes.length > 0 || duringActivateNodes.length > 0) {
+          this.tree.insertAfter(node.id, [...beforeActivateNodes, ...duringActivateNodes])
         }
 return {
 type: 'choice',
@@ -430,11 +471,10 @@ choice: { promptKey: result.promptKey, options: result.options },
         const flowNode = this.buildFlowNode(result.flow)
         this.tree.insertAfter(node.id, [flowNode])
       }
-      const immediateResults = this.hooks.immediatelyAfter(
+      const immediatePhase = this.hooks.immediatelyAfter(
         { ...executionContext, actionId: replacedActionId },
         result,
       )
-      // Use result's logKey if present, otherwise use generic action log
       if (result.type === 'ok' && result.logKey) {
         this.log.append({
           key: result.logKey,
@@ -446,24 +486,40 @@ choice: { promptKey: result.promptKey, options: result.options },
           params: { actionId: replacedActionId },
         })
       }
-      const afterResults = this.hooks.after(
+      const afterPhase = this.hooks.after(
         { ...executionContext, actionId: replacedActionId },
         result,
         undefined,
       )
-      const hookFlows = [...immediateResults, ...afterResults]
+      const allActionHookResults = [
+        ...immediatePhase.actionHookResults,
+        ...afterPhase.actionHookResults,
+      ]
+      const hookFlows = allActionHookResults
         .map((entry) => entry.flow)
         .filter((flow) => flow)
         .map((flow) => this.buildFlowNode(flow as ActionFlow))
-      const followUps = [...immediateResults, ...afterResults]
+      const followUps = allActionHookResults
         .flatMap((entry) => entry.followUpActions ?? [])
         .filter((action) => action)
-      if (hookFlows.length > 0 || followUps.length > 0) {
-        const nodes = [
-          ...hookFlows,
-          ...this.buildFollowUpNodes(followUps, node.id, context.player),
-        ]
-        this.tree.insertAfter(node.id, nodes)
+      const immediateActivateNodes = this.buildActivateCardNodes(
+        immediatePhase.matchedListeners, 'immediatelyAfter', replacedActionId,
+        { result },
+      )
+      const afterActivateNodes = this.buildActivateCardNodes(
+        afterPhase.matchedListeners, 'after', replacedActionId,
+        { result },
+      )
+      const allInsertNodes = [
+        ...beforeActivateNodes,
+        ...duringActivateNodes,
+        ...hookFlows,
+        ...this.buildFollowUpNodes(followUps, node.id, context.player),
+        ...immediateActivateNodes,
+        ...afterActivateNodes,
+      ]
+      if (allInsertNodes.length > 0) {
+        this.tree.insertAfter(node.id, allInsertNodes)
       }
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, result }
@@ -556,19 +612,22 @@ choice: { promptKey: result.promptKey, options: result.options },
           }
           return result
         }
-        const immediateResults = this.hooks.immediatelyAfter(
+        const immediatePhase = this.hooks.immediatelyAfter(
           { ...executionContext, actionId, choice },
           result,
           choice,
         )
-        const afterResults = this.hooks.after(
+        const afterPhase = this.hooks.after(
           { ...executionContext, actionId, choice },
           result,
           choice,
         )
         
-        // Process logKey from hook results
-        ;[...immediateResults, ...afterResults].forEach((entry) => {
+        const allResults = [
+          ...immediatePhase.actionHookResults,
+          ...afterPhase.actionHookResults,
+        ]
+        allResults.forEach((entry) => {
           if (entry.logKey) {
             this.log.append({
               key: entry.logKey,
@@ -577,19 +636,29 @@ choice: { promptKey: result.promptKey, options: result.options },
           }
         })
         
-        const hookFlows = [...immediateResults, ...afterResults]
+        const hookFlows = allResults
           .map((entry) => entry.flow)
           .filter((flow) => flow)
           .map((flow) => this.buildFlowNode(flow as ActionFlow))
-        const followUps = [...immediateResults, ...afterResults]
+        const followUps = allResults
           .flatMap((entry) => entry.followUpActions ?? [])
           .filter((action) => action)
-        if (hookFlows.length > 0 || followUps.length > 0) {
-          const nodes = [
-            ...hookFlows,
-            ...this.buildFollowUpNodes(followUps, child.id, context.player),
-          ]
-          this.tree.insertAfter(child.id, nodes)
+        const immediateActivateNodes = this.buildActivateCardNodes(
+          immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
+          { result },
+        )
+        const afterActivateNodes = this.buildActivateCardNodes(
+          afterPhase.matchedListeners, 'after', actionId,
+          { result },
+        )
+        const allInsertNodes = [
+          ...hookFlows,
+          ...this.buildFollowUpNodes(followUps, child.id, context.player),
+          ...immediateActivateNodes,
+          ...afterActivateNodes,
+        ]
+        if (allInsertNodes.length > 0) {
+          this.tree.insertAfter(child.id, allInsertNodes)
         }
         child.resolve(result)
         if (node instanceof XorNode) {
@@ -640,11 +709,14 @@ choice: { promptKey: result.promptKey, options: result.options },
         params: { player: context.player.name, ...result.logParams },
       })
     }
-    const immediateResults = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
-    const afterResults = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
+    const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
+    const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
     
-    // Process logKey from hook results
-    ;[...immediateResults, ...afterResults].forEach((entry) => {
+    const allResults = [
+      ...immediatePhase.actionHookResults,
+      ...afterPhase.actionHookResults,
+    ]
+    allResults.forEach((entry) => {
       if (entry.logKey) {
         this.log.append({
           key: entry.logKey,
@@ -653,19 +725,29 @@ choice: { promptKey: result.promptKey, options: result.options },
       }
     })
     
-    const hookFlows = [...immediateResults, ...afterResults]
+    const hookFlows = allResults
       .map((entry) => entry.flow)
       .filter((flow) => flow)
       .map((flow) => this.buildFlowNode(flow as ActionFlow))
-    const followUps = [...immediateResults, ...afterResults]
+    const followUps = allResults
       .flatMap((entry) => entry.followUpActions ?? [])
       .filter((action) => action)
-    if ((hookFlows.length > 0 || followUps.length > 0) && this.pendingChoiceNodeId) {
-      const nodes = [
-        ...hookFlows,
-        ...this.buildFollowUpNodes(followUps, this.pendingChoiceNodeId, context.player),
-      ]
-      this.tree.insertAfter(this.pendingChoiceNodeId, nodes)
+    const immediateActivateNodes = this.buildActivateCardNodes(
+      immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
+      { result },
+    )
+    const afterActivateNodes = this.buildActivateCardNodes(
+      afterPhase.matchedListeners, 'after', actionId,
+      { result },
+    )
+    const allInsertNodes = [
+      ...hookFlows,
+      ...this.buildFollowUpNodes(followUps, this.pendingChoiceNodeId ?? '', context.player),
+      ...immediateActivateNodes,
+      ...afterActivateNodes,
+    ]
+    if (allInsertNodes.length > 0 && this.pendingChoiceNodeId) {
+      this.tree.insertAfter(this.pendingChoiceNodeId, allInsertNodes)
     }
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
