@@ -1,8 +1,45 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
 import type { BonusModifier } from '../../game/types'
 
+const CARD_ID = 'C88_CarpentersApprentice'
+
+const constructCostListener: CardListenerRegistration = {
+  id: 'C88-carpenters-apprentice-costs-construct',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['construct'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'wood') return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return { costs: { wood: -2 } }
+  },
+}
+
+const stablesCostListener: CardListenerRegistration = {
+  id: 'C88-carpenters-apprentice-costs-stables',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['stables'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const stablesBuilt = context.player.stableTiles.length
+    if (stablesBuilt >= 2) {
+      incCounter(context.player, CARD_ID, 'triggerCount')
+      return { costs: { wood: -1 } }
+    }
+  },
+}
+
+registerCardListener(constructCostListener)
+registerCardListener(stablesCostListener)
+
 export const C88_CarpentersApprentice = new Occupation({
-  id: "C88_CarpentersApprentice",
+  id: CARD_ID,
   name: "Carpenter's Apprentice",
   deck: "C",
   number: 88,
@@ -12,7 +49,7 @@ export const C88_CarpentersApprentice = new Occupation({
   players: "1+",
   modifier: {
     type: 'bonus',
-    cardId: 'C88_CarpentersApprentice',
+    cardId: CARD_ID,
     appliesTo: ['construct'],
     discount: { wood: 2 },
   } as BonusModifier,

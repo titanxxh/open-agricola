@@ -99,7 +99,7 @@ describe('C52_HuntsmansHat', () => {
 
   it('adds food equal to boar gained from pig-market collect', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
-      (entry) => entry.id === 'C52-huntsmans-hat-before',
+      (entry) => entry.id === 'C52-huntsmans-hat-after-collect',
     )
     const player = createPlayer()
     const context = {
@@ -107,17 +107,22 @@ describe('C52_HuntsmansHat', () => {
       player,
       space: { ...createSpace('pig-market'), resources: { ...createSpace('pig-market').resources, boar: 2 } },
       actionId: 'pig-market',
-      phase: 'before',
+      phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
     const result = listener?.handler(context as any)
-    expect(result?.costs).toEqual({ food: -2 })
+    expect(result?.flow).toBeDefined()
+    expect(result?.flow?.type).toBe('leaf')
+    if (result?.flow?.type === 'leaf') {
+      expect(result.flow.actionId).toBe('gain')
+      expect(result.flow.params).toEqual({ food: 2 })
+    }
     expect(result?.sourceCard).toBe(CARD_ID)
   })
 
   it('does nothing when collect is not from pig-market', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
-      (entry) => entry.id === 'C52-huntsmans-hat-before',
+      (entry) => entry.id === 'C52-huntsmans-hat-after-collect',
     )
     const player = createPlayer()
     const context = {

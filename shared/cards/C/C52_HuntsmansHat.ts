@@ -6,17 +6,19 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 const CARD_ID = 'C52_HuntsmansHat'
 
 const huntsmansHatListener: CardListenerRegistration = {
-  id: 'C52-huntsmans-hat-before',
+  id: 'C52-huntsmans-hat-after-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
+  phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space } = context
+    const { space, result } = context
     if (space.id !== 'pig-market') return
-    const obtainedBoar = space.resources.boar ?? 0
-    if (obtainedBoar <= 0) return
+    const gained = (result as any)?.resourcesGained?.boar ?? 0
+    if (gained <= 0) return
     return {
-      costs: { food: -obtainedBoar },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: gained } },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { food: gained }, cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },

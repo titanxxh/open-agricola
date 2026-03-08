@@ -1,7 +1,32 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { incCounter } from '../__stubs__/helpers'
+
+const CARD_ID = 'A55_JunkRoom'
+
+const listener: CardListenerRegistration = {
+  id: 'A55-junk-room-during-improvement',
+  cardIds: [CARD_ID],
+  phases: ['during' as ActionHookPhase],
+  actions: ['improvement-any', 'minor-improvement'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return {
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { food: 1 }, cardId: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
 
 export const A55_JunkRoom = new MinorImprovement({
-  id: "A55_JunkRoom",
+  id: CARD_ID,
   name: "Junk Room",
   deck: "A",
   number: 55,
