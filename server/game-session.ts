@@ -39,6 +39,8 @@ import {
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
+import { getBuildRoomCost } from '../shared/actions/effects/house.ts'
+import { applyCostOverride } from '../shared/actions/effects/pay.ts'
 import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
@@ -467,6 +469,7 @@ export class GameSession {
               this.pending = {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
                 options: result.options ?? [], promptKey: result.promptKey,
+                costOverride: this.engine?.getLastComputedCosts(),
               }
               return
             }
@@ -487,6 +490,7 @@ export class GameSession {
         this.pending = {
           type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
+          costOverride: this.engine?.getLastComputedCosts(),
         }
         return
       }
@@ -890,7 +894,10 @@ export class GameSession {
     switch (farmType) {
       case 'fence': {
         const { edges, extraWood } = payload as { edges: string[]; extraWood?: number }
-        const result = validateFenceSelection(normalized, edges, extraWood ?? 0)
+        const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
+        const woodDiscount = override?.wood ? Math.abs(override.wood) : 0
+        const adjustedExtraWood = (extraWood ?? 0) - woodDiscount
+        const result = validateFenceSelection(normalized, edges, Math.max(0, adjustedExtraWood))
         if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
@@ -903,10 +910,13 @@ export class GameSession {
         }
         const selection = validateRoomSelection(normalized, rooms)
         if (!selection.ok) return this.respond(false, selection.code)
-        const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
+        const baseCost = getBuildRoomCost(player.houseType as 'wood' | 'clay' | 'stone')
+        const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
+        const effectiveCostPerRoom = applyCostOverride(baseCost, override)
+        const costKeys = Object.keys(effectiveCostPerRoom) as (keyof Resource)[]
         const totalCost: Partial<Resource> = {}
         for (const key of costKeys) {
-          const required = (costPerRoom[key] ?? 0) * rooms.length
+          const required = (effectiveCostPerRoom[key] ?? 0) * rooms.length
           if ((normalized.resources[key] ?? 0) < required) {
             return this.respond(false, `Not enough ${key}`)
           }

@@ -48,5 +48,15 @@ export const getOccupationCost = (
   if (player.occupationPlayed.includes('B109_PaperMaker') && (cost.food ?? 0) > 0) {
     cost.food = Math.max(0, (cost.food ?? 0) - 1)
   }
+  for (const mod of player.activeModifiers ?? []) {
+    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+      for (const [key, discount] of Object.entries(mod.discount)) {
+        const rk = key as keyof typeof cost
+        if ((cost[rk] ?? 0) > 0) {
+          cost[rk] = Math.max(0, (cost[rk] ?? 0) - (discount ?? 0))
+        }
+      }
+    }
+  }
   return cost
 }

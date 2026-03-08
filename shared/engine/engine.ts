@@ -39,6 +39,11 @@ export class Engine {
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
   private flowNodeCounter = 0
+  private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
+
+  getLastComputedCosts() {
+    return this.lastComputedCosts
+  }
 
   private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
     if (typeof followUp === 'string') {
@@ -429,6 +434,7 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
+      this.lastComputedCosts = executionContext.costs
       const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
       const beforeActivateNodes = this.buildActivateCardNodes(
         beforePhase.matchedListeners, 'before', replacedActionId,
