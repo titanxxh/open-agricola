@@ -37,6 +37,7 @@ import {
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
+import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { runReturnHomeHooks, runRoundEndHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
@@ -997,8 +998,21 @@ export class GameSession {
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    if (!player.minorPlayed.includes(cardId)) {
-      player.minorPlayed.push(cardId)
+    const isOccupation = cardId.match(/^[A-E]\d+_/) && !getMinorImprovement(cardId)
+    if (isOccupation) {
+      if (!player.occupationPlayed.includes(cardId)) {
+        player.occupationPlayed.push(cardId)
+      }
+    } else {
+      if (!player.minorPlayed.includes(cardId)) {
+        player.minorPlayed.push(cardId)
+      }
+    }
+    player.playedCards = player.playedCards ?? []
+    const prefix = isOccupation ? 'occupation' : 'minor'
+    const playedKey = `${prefix}:${cardId}`
+    if (!player.playedCards.includes(playedKey)) {
+      player.playedCards.push(playedKey)
     }
     return this.respond()
   }
