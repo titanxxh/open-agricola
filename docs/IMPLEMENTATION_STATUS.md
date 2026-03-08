@@ -89,18 +89,23 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 | 节点 | 语义 |
 |---|---|
-| `leaf` | 单个效果 |
+| `leaf` | 单个效果（支持 `params` 传参给 action） |
 | `seq` | 顺序执行 |
 | `parallel` | 全部子节点 |
 | `or` | 多选一（玩家选择） |
 | `xor` | 条件互斥 |
 | `optional` | 可跳过 |
+| `activateCard` | 卡牌效果执行节点（ActivateCardNode） |
 
 ### 4.2 Hook 系统
 
-8 个相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`。
+8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。
 
-248 个卡牌定义（A/B/C/D/E 五个 deck），通过 Hook 注册效果。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+11 个阶段性 CardEffect Hook：`onBuy`、`onRoundStart`、`onHarvest`、`onRoundEnd`、`onReturnHome`、`onBeforeHarvest`、`onAfterReap`、`onBeforeFeed`、`onAfterFeed`、`onAfterHarvest`、`onBeforeStartOfTurn`。
+
+ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引擎节点，延迟执行 handler。handler 返回的 flow 通过 buildFlowNode 插入引擎树继续执行。
+
+248 个卡牌定义（A/B/C/D/E 五个 deck），30+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
@@ -113,7 +118,7 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 5.1 单元测试
 
-vitest，41 文件 295 用例。
+vitest，50 文件 371 用例。
 
 | 类别 | 文件 |
 |---|---|
@@ -122,7 +127,14 @@ vitest，41 文件 295 用例。
 | 状态管线 | `tests/game-sync-pipeline.test.ts` |
 | Pending/Undo 回归 | `tests/pending-undo-regression.test.ts` |
 | 支付系统 | `tests/pay.test.ts`、`tests/pay-dp.test.ts`、`tests/exchange.test.ts` |
-| 卡牌效果 | `shared/cards/__tests__/*.test.ts` |
+| 引擎 Pipeline | `shared/engine/__tests__/engine-pipeline.test.ts` |
+| Hook 分发 | `shared/engine/__tests__/hook-dispatch.test.ts` |
+| Stub 卡牌 Hook 矩阵 | `shared/cards/__stubs__/__tests__/hook-coverage-matrix.test.ts` |
+| PayGainVp 机制 | `shared/cards/__stubs__/__tests__/pay-gain-vp.test.ts` |
+| OnRoundEnd 机制 | `shared/cards/__stubs__/__tests__/on-round-end.test.ts` |
+| 卡牌效果（批次 1-3） | `shared/cards/__tests__/batch1-cards.test.ts` 等 |
+| C52/C75 卡牌 | `shared/cards/__tests__/C52_HuntsmansHat.test.ts`、`C75_Firewood.test.ts` |
+| A37 Bucksaw | `shared/cards/__tests__/A37_Bucksaw.test.ts` |
 
 ### 5.2 E2E 测试
 
@@ -146,11 +158,15 @@ npm run test:e2e  # E2E 测试
 | `src/hooks/useRoomConnection.ts` | 连接逻辑内联到 `GameContainerApi` |
 | `src/hooks/useActionEngine.ts` | 引擎逻辑已迁至后端 `GameSession` |
 | `src/hooks/useGameApi.ts` | HTTP 调用已由 `HttpGameTransport` 承担 |
-| `docs/FRONTEND_STATE_FLOW.md` | 内容严重过时，已覆盖在 `ENGINE_ARCHITECTURE.md` |
+| `src/app/hooks/use-engine-flow.ts` (runEngineStepsCore) | 前端引擎镜像代码，违反架构原则，已删除 |
+| `src/app/__tests__/use-engine-flow.test.ts` | 前端镜像测试，已删除 |
 
 ## 7. 已知边界
 
-- 部分卡牌仅完成数据接入，复杂行为待补全（188/898 已实现）。
+- 部分卡牌仅完成数据接入，复杂行为待补全（30+/248 已实现 hook）。
+- Modifier 系统已激活（Step 1），但 construct/fence 路径尚未接入 modifier（成本通过 CardListener computeCosts 实现折扣）。
+- PlayerSwitchNode（opponent 卡牌触发的玩家切换）尚未实现。
+- D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts）需额外机制。
 - 断线重连未实现（WS 断开后需刷新页面重连）。
 - BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
 - `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。
