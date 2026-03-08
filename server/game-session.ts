@@ -38,6 +38,7 @@ import {
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
+import { getCardModifier } from '../shared/cards/card-modifiers.ts'
 import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
@@ -1022,6 +1023,10 @@ export class GameSession {
     const playedKey = `${prefix}:${cardId}`
     if (!player.playedCards.includes(playedKey)) {
       player.playedCards.push(playedKey)
+    }
+    const modifier = getCardModifier(cardId)
+    if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
+      player.activeModifiers.push(modifier)
     }
     return this.respond()
   }

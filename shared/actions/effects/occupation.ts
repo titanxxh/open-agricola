@@ -2,6 +2,7 @@ import type { ActionExecutionResult, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import { gainResources } from './gain'
 import { canPayResources, payResources } from './pay'
+import { getCardModifier } from '../../cards/card-modifiers'
 
 export const playOccupation = (
   player: PlayerState,
@@ -30,6 +31,10 @@ export const playOccupation = (
   player.occupationPlayed.push(occupation.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`occupation:${occupation.id}`)
+  const modifier = getCardModifier(occupation.id)
+  if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
+    player.activeModifiers.push(modifier)
+  }
   return { type: 'ok' }
 }
 
