@@ -15,6 +15,7 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
+  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from './nodes'
@@ -359,6 +360,10 @@ export class Engine {
       }
       return { type: 'blocked', nodeId: node.id }
     }
+    if (node instanceof PlayerSwitchNode) {
+      node.resolve({})
+      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: node.targetPlayerId }
+    }
     if (node instanceof ActivateCardNode) {
       const listener = getListenerById(node.listenerId)
       if (!listener) {
@@ -375,8 +380,16 @@ export class Engine {
       }
       const result = executeCardListener(listener, listenerContext as any)
       if (result?.flow) {
+        const ownerPlayerId = node.event.ownerPlayerId as string | undefined
+        const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
         const flowNode = this.buildFlowNode(result.flow)
-        this.tree.insertAfter(node.id, [flowNode])
+        if (needsSwitch) {
+          const switchTo = new PlayerSwitchNode(`ps-to-${node.id}`, ownerPlayerId)
+          const switchBack = new PlayerSwitchNode(`ps-back-${node.id}`, context.player.id)
+          this.tree.insertAfter(node.id, [switchTo, flowNode, switchBack])
+        } else {
+          this.tree.insertAfter(node.id, [flowNode])
+        }
       }
       if (result?.logKey) {
         this.log.append({

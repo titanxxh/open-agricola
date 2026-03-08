@@ -436,11 +436,24 @@ export class GameSession {
           const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
           this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
         } else {
-          // All workers used - set confirmNextPlayer with start player as next
           const startIdx = this.state.players.findIndex((p) => p.startPlayer)
           this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
         }
         return
+      }
+
+      if (step.type === 'playerSwitch') {
+        this.pushHistory(false, true)
+        const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
+        if (toIndex !== -1 && toIndex !== this.activePlayerIndex) {
+          this.pending = {
+            type: 'confirmPlayerSwitch',
+            fromPlayerIndex: this.activePlayerIndex!,
+            toPlayerIndex: toIndex,
+          }
+          return
+        }
+        continue
       }
 
       if (step.type === 'choice') {
@@ -723,6 +736,15 @@ export class GameSession {
     }
 
     return this.startBreedPhase()
+  }
+
+  confirmPlayerSwitch(): SessionResponse {
+    if (this.pending.type !== 'confirmPlayerSwitch') return this.respond(false, 'no pending player switch')
+    this.pushHistory(false, true)
+    this.activePlayerIndex = this.pending.toPlayerIndex
+    this.pending = { type: 'none' }
+    this.runEngineSteps()
+    return this.respond()
   }
 
   confirmNextPlayer(): SessionResponse {
