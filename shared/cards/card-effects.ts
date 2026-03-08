@@ -2,6 +2,8 @@ import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 import { getMajorCardEffect } from './major'
 
 export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onReturnHome'
+  | 'onBeforeHarvest' | 'onAfterReap' | 'onBeforeFeed' | 'onAfterFeed' | 'onAfterHarvest'
+  | 'onBeforeStartOfTurn'
 
 export type CardEffect = {
   id: string
@@ -10,6 +12,12 @@ export type CardEffect = {
   onHarvest?: (state: GameState, player: PlayerState) => ActionFlow | void
   onRoundEnd?: (state: GameState, player: PlayerState) => ActionFlow | void
   onReturnHome?: (state: GameState, player: PlayerState) => void
+  onBeforeHarvest?: (state: GameState, player: PlayerState) => void
+  onAfterReap?: (state: GameState, player: PlayerState) => void
+  onBeforeFeed?: (state: GameState, player: PlayerState) => void
+  onAfterFeed?: (state: GameState, player: PlayerState) => void
+  onAfterHarvest?: (state: GameState, player: PlayerState) => void
+  onBeforeStartOfTurn?: (state: GameState, player: PlayerState) => void
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -68,3 +76,38 @@ export const runRoundEndHooks = (state: GameState, player: PlayerState): void =>
     }
   }
 }
+
+const runHookForAllCards = (
+  state: GameState,
+  player: PlayerState,
+  hookName: keyof CardEffect,
+): void => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.[hookName] as ((s: GameState, p: PlayerState) => void) | undefined
+    if (handler) handler(state, player)
+  }
+}
+
+export const runBeforeHarvestHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onBeforeHarvest')
+
+export const runAfterReapHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onAfterReap')
+
+export const runBeforeFeedHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onBeforeFeed')
+
+export const runAfterFeedHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onAfterFeed')
+
+export const runAfterHarvestHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onAfterHarvest')
+
+export const runBeforeStartOfTurnHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onBeforeStartOfTurn')

@@ -38,7 +38,7 @@ import {
 } from '../shared/logic/state.ts'
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
-import { runReturnHomeHooks, runRoundEndHooks } from '../shared/cards/card-effects.ts'
+import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
@@ -667,6 +667,7 @@ export class GameSession {
         this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'harvest-breed' }
         return this.respond()
       }
+      this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
       return this.finalizeRound()
     }
     if (this.engine) {
@@ -766,8 +767,12 @@ export class GameSession {
   }
 
   private startHarvest(): SessionResponse {
+    this.state.players.forEach((p) => runBeforeHarvestHooks(this.state, p))
     this.state.players.forEach((p) => reap(p))
+    this.state.players.forEach((p) => runAfterReapHooks(this.state, p))
     applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
+
+    this.state.players.forEach((p) => runBeforeFeedHooks(this.state, p))
 
     const feedQueue: { index: number; remaining: number }[] = []
     
@@ -808,6 +813,7 @@ export class GameSession {
   }
 
   private startBreedPhase(): SessionResponse {
+    this.state.players.forEach((p) => runAfterFeedHooks(this.state, p))
     this.applyBreedPhase()
     
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
@@ -815,6 +821,8 @@ export class GameSession {
       this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
       return this.respond()
     }
+
+    this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
     return this.finalizeRound()
   }
 
@@ -832,6 +840,7 @@ export class GameSession {
       this.pending = { type: 'none' }
       return this.respond()
     }
+    this.state.players.forEach((p) => runBeforeStartOfTurnHooks(this.state, p))
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
     applyMajorEffectsToAllPlayers(this.state, 'onRoundStart')
