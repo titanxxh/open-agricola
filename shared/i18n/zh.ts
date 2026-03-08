@@ -64,6 +64,8 @@ export const zh = {
     interactionNextPlayer: '下一位玩家：{player}',
     interactionConfirmButton: '确认',
     interactionConfirmSwitch: '确认切换',
+    interactionPlayerSwitchPrompt: '卡牌效果触发，需切换到 {player} 执行。',
+    interactionPlayerSwitchConfirm: '确认切换',
     interactionSowChoice: '选择播种作物',
     interactionSowGrain: '播种谷物',
     interactionSowVegetable: '播种蔬菜',

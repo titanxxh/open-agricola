@@ -64,6 +64,8 @@ export const en = {
     interactionNextPlayer: 'Next player: {player}',
     interactionConfirmButton: 'Confirm',
     interactionConfirmSwitch: 'Confirm switch',
+    interactionPlayerSwitchPrompt: 'Card effect triggers for {player}. Confirm player switch.',
+    interactionPlayerSwitchConfirm: 'Confirm switch',
     interactionSowChoice: 'Choose a crop to sow',
     interactionSowGrain: 'Sow grain',
     interactionSowVegetable: 'Sow vegetable',

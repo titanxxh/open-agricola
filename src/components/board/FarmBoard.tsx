@@ -641,9 +641,16 @@ export const FarmBoard = ({
                         className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
                         title={`${count} ${t(locale, `resources.${resKey}`)}`}
                       >
-                        <span className="resource-chip-text">
-                          {count} {t(locale, `resources.${resKey}`)}
-                        </span>
+                        {isKnownResource ? (
+                          <>
+                            <span className={`res-icon res-icon-${resKey}`} />
+                            <span className="resource-chip-count">{count}</span>
+                          </>
+                        ) : (
+                          <span className="resource-chip-text">
+                            {count} {t(locale, `resources.${resKey}`)}
+                          </span>
+                        )}
                       </div>
                     )
                   })}

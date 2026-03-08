@@ -41,7 +41,7 @@ import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
 import { getBuildRoomCost } from '../shared/actions/effects/house.ts'
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
-import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks } from '../shared/cards/card-effects.ts'
+import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks, runBeforeReturnHomeHooks, runStartReturnHomeHooks, runAfterRoundEndHooks, runStartHarvestHooks, runStartHarvestFieldPhaseHooks, runHarvestFieldPhaseHooks, runEndHarvestFieldPhaseHooks, runStartHarvestFeedingPhaseHooks, runHarvestFeedingPhaseHooks, runEndHarvestFeedingPhaseHooks, runEndHarvestHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
@@ -685,6 +685,7 @@ export class GameSession {
         this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'harvest-breed' }
         return this.respond()
       }
+      this.state.players.forEach((p) => runEndHarvestHooks(this.state, p))
       this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
       return this.finalizeRound()
     }
@@ -787,7 +788,8 @@ export class GameSession {
   }
 
   private applyReturnHome() {
-    // Run onReturnHome hooks for all players' cards before workers return
+    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
+    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
     this.state.players.forEach((p) => runReturnHomeHooks(this.state, p))
     this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
     this.state.actionSpaces.forEach((s) => { s.takenBy = null })
@@ -795,11 +797,19 @@ export class GameSession {
 
   private startHarvest(): SessionResponse {
     this.state.players.forEach((p) => runBeforeHarvestHooks(this.state, p))
+    this.state.players.forEach((p) => runStartHarvestHooks(this.state, p))
+
+    this.state.players.forEach((p) => runStartHarvestFieldPhaseHooks(this.state, p))
+    this.state.players.forEach((p) => runHarvestFieldPhaseHooks(this.state, p))
     this.state.players.forEach((p) => reap(p))
     this.state.players.forEach((p) => runAfterReapHooks(this.state, p))
+    this.state.players.forEach((p) => runEndHarvestFieldPhaseHooks(this.state, p))
+
     applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
 
+    this.state.players.forEach((p) => runStartHarvestFeedingPhaseHooks(this.state, p))
     this.state.players.forEach((p) => runBeforeFeedHooks(this.state, p))
+    this.state.players.forEach((p) => runHarvestFeedingPhaseHooks(this.state, p))
 
     const feedQueue: { index: number; remaining: number }[] = []
     
@@ -840,6 +850,7 @@ export class GameSession {
   }
 
   private startBreedPhase(): SessionResponse {
+    this.state.players.forEach((p) => runEndHarvestFeedingPhaseHooks(this.state, p))
     this.state.players.forEach((p) => runAfterFeedHooks(this.state, p))
     this.applyBreedPhase()
     
@@ -849,6 +860,7 @@ export class GameSession {
       return this.respond()
     }
 
+    this.state.players.forEach((p) => runEndHarvestHooks(this.state, p))
     this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
     return this.finalizeRound()
   }
@@ -859,6 +871,7 @@ export class GameSession {
 
   private finalizeRound(): SessionResponse {
     this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
+    this.state.players.forEach((p) => runAfterRoundEndHooks(this.state, p))
     this.state.players.forEach((p) => { p.newbornCount = 0 })
     this.state.round += 1
     if (this.state.round > 14) {

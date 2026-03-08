@@ -57,13 +57,24 @@
 |---|---|---|---|
 | onBuy | [Major_ClayOven](../shared/cards/major/index.ts)、[Major_StoneOven](../shared/cards/major/index.ts)、[Major_Well](../shared/cards/major/index.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts)、[B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts) | 已接入 | 建造/购买时立即触发 |
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
-| onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发 |
+| onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发（Major 专用） |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
+| onBeforeReturnHome | — | 已接入 | 回家阶段最先触发（BGA: D51_Archway） |
+| onStartReturnHome | — | 已接入 | 回家阶段工人返回前（BGA: A151_Minstrel 等 11 张卡） |
 | onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts) | 已接入 | 每回合回家阶段触发 |
+| onAfterRoundEnd | — | 已接入 | 回合结束后触发（BGA: D167_PureBreeder） |
 | onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发 |
+| onStartHarvest | — | 已接入 | 收获开始时触发（BGA: D97_BeggingStudent 等 16 张卡） |
+| onStartHarvestFieldPhase | — | 已接入 | 田地阶段开始（BGA: E73_Scythe 等 7 张卡） |
+| onHarvestFieldPhase | — | 已接入 | 田地阶段中（BGA: A112_ScytheWorker 等 10 张卡） |
+| onEndHarvestFieldPhase | — | 已接入 | 田地阶段结束（BGA: E112_GrainThief 等 6 张卡） |
 | onAfterReap | [A64_BarleyMill](../shared/cards/A/A64_BarleyMill.ts) | 已接入 | 收获田地后触发 |
+| onStartHarvestFeedingPhase | — | 已接入 | 喂食阶段开始（BGA: C107_Baker 等 3 张卡） |
+| onHarvestFeedingPhase | — | 已接入 | 喂食阶段中（BGA: D84_FeedPellets 等 11 张卡） |
+| onEndHarvestFeedingPhase | — | 已接入 | 喂食阶段结束（BGA: E83_ShepherdsWhistle 等 4 张卡） |
 | onBeforeFeed | — | 已接入 | 喂食前触发 |
 | onAfterFeed | — | 已接入 | 喂食后触发 |
+| onEndHarvest | — | 已接入 | 收获结束/繁殖前（BGA: E73_Scythe 等 9 张卡） |
 | onAfterHarvest | [D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts) | 已接入 | 收获阶段结束后触发 |
 | onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts) | 已接入 | 每回合开始前触发 |
 
@@ -167,7 +178,7 @@
 - [C19_SwingPlow](../shared/cards/C/C19_SwingPlow.ts)
 - [C23_JobContract](../shared/cards/C/C23_JobContract.ts)
 - [C24_BedintheGrainField](../shared/cards/C/C24_BedintheGrainField.ts)
-- [C25_SteamMachine](../shared/cards/major/steam-machine.ts)
+- [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts)
 - [C27_Blueprint](../shared/cards/C/C27_Blueprint.ts)
 - [C29_BeerTable](../shared/cards/C/C29_BeerTable.ts)
 - [C31_WritingChamber](../shared/cards/C/C31_WritingChamber.ts)
@@ -320,9 +331,9 @@ type ComplexCost = {
 
 ```typescript
 type PaymentSolution = {
-  resourcesPaid: Partial<Resource>  // 实际支付的资源
-  tradesUsed?: Trade[]              // 使用的交易
-  bonusUsed?: Bonus                 // 使用的折扣
+  resourcesPaid: Partial<Resource>   // 实际支付的资源
+  tradesUsed: { trade: Trade; times: number }[]  // 使用的交易及次数
+  bonusUsed?: string                // 使用的折扣来源 ID
   cardUsed?: string                 // 使用的卡牌 ID（用于抵换）
 }
 ```
@@ -340,20 +351,26 @@ type PaymentSolution = {
 #### TradeModifier（资源转换）
 
 ```typescript
-// 示例：C88_CarpentersApprentice - 建造房间时 2 Clay → 1 Wood
+// 示例：A123_FrameBuilder - 建造/翻新时 2 Clay → 1 Wood（每行动至多 1 次）
 modifier: {
-  costType: CostModifierType.Construct,
-  trades: [{ max: 1, wood: 1, clay: -2 }]
+  type: 'trade',
+  cardId: 'A123_FrameBuilder',
+  appliesTo: ['construct', 'renovation'],
+  from: { clay: 2 },
+  to: { wood: 1 },
+  max: 1,
 }
 ```
 
 #### BonusModifier（资源折扣）
 
 ```typescript
-// 示例：A88_HedgeKeeper - 围栏时 -1 Wood
+// 示例：A88_HedgeKeeper - 围栏时 -3 Wood
 modifier: {
-  costType: CostModifierType.Fencing,
-  bonuses: [{ optional: false, wood: -1 }]
+  type: 'bonus',
+  cardId: 'A88_HedgeKeeper',
+  appliesTo: ['fencing'],
+  discount: { wood: 3 },
 }
 ```
 
@@ -385,21 +402,16 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 | 卡牌 | 成本类型 | 转换规则 |
 |------|----------|----------|
-| [A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) | 房间建造 | 1 Reed → 2 Wood |
-| [A143_Stonecutter](../shared/cards/A/A143_Stonecutter.ts) | 房间建造 | 2 Stone → 1 Wood |
-| [B126_Carpenter](../shared/cards/B/B126_Carpenter.ts) | 房间建造 | 2 Reed → 1 Wood |
-| [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | 房间建造 | 2 Clay → 1 Wood |
-| [D154_ChimneySweep](../shared/cards/D/D154_ChimneySweep.ts) | 房间建造 | 2 Stone → 1 Clay |
+| [A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) | 房间建造/翻新 | 2 Clay → 1 Wood（每行动至多 1 次） |
 
 #### 资源折扣卡 (BonusModifier)
 
 | 卡牌 | 成本类型 | 折扣 |
 |------|----------|------|
-| [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | -1 Wood |
-| [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | -1 Reed |
-| [B15_CarpentersBench](../shared/cards/B/B15_CarpentersBench.ts) | 围栏 | -2 Wood |
-| [D13_Trowel](../shared/cards/D/D13_Trowel.ts) | 翻新 | -1 Reed |
-| [E87_MasterRenovator](../shared/cards/E/E87_MasterRenovator.ts) | 翻新 | -1 Reed |
+| [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | -3 Wood |
+| [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | -1 Food |
+| [B15_CarpentersBench](../shared/cards/B/B15_CarpentersBench.ts) | 围栏 | -1 Wood |
+| [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | 房间建造 | -2 Wood（木屋时） |
 
 #### 卡牌升级类 (returnCards)
 
@@ -421,7 +433,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 ### 类型定义
 - [types.ts](../shared/game/types.ts) - 游戏类型定义（ComplexCost, PaymentSolution, TradeModifier, BonusModifier）
 - [cards/types.ts](../shared/cards/types.ts) - 卡牌类型定义
-- [cards/card-modifiers.ts](../shared/cards/card-modifiers.ts) - 卡牌修改器注册表
+- [cards/card-modifiers.ts](../shared/cards/card-modifiers.ts) - 卡牌修改器查找（getCardModifier / getCardModifiers，从卡牌定义读取）
 
 ### 行动效果
 - [pay.ts](../shared/actions/effects/pay.ts) - 支付系统核心（computeAllBuyableCombinations, executePaymentSolution）
@@ -482,38 +494,31 @@ const Major_CookingHearth1: MajorCardDefinition = {
 | 阶段 | BGA 卡牌数 | Open 对应 | 差距 | 典型示例 |
 |---|---|---|---|---|
 | onBuy | 100+ | onBuy（已接入） | Major 已覆盖，Minor/Occ 待补 | E53_BoarSpear, E74_AshTrees, Major_Well |
-| BeforeStartOfTurn | 6 | — | 未实现 | B70_NewPurchase, D48_CivicFacade, C157_ResourceAnalyzer |
+| BeforeStartOfTurn | 6 | onBeforeStartOfTurn（已接入） | 仅 B70 | B70_NewPurchase, D48_CivicFacade, C157_ResourceAnalyzer |
 | StartOfTurn | 30+ | onRoundStart（已接入） | 仅 Major 间接使用 | A81_InterimStorage, E126_TaxCollector, D53_TeaHouse |
-| BeforeReturnHome | 1 | — | 未实现 | D51_Archway |
-| StartReturnHome | 11 | — | 未实现 | A151_Minstrel, E20_IronHoe, C97_SeedResearcher, A100_Curator |
-| ReturnHome | 12 | onReturnHome（已接入） | 仅 C75_Firewood | A84_Silage, A53_Claypipe, A29_AleBenches, B139_ForestScientist |
-| EndOfRound | 7 | onRoundEnd（未接入） | 类型已定义，无调用 | A70_LiftingMachine, A54_Credit, A165_PigBreeder |
-| AfterEndOfRound | 1 | — | 未实现 | D167_PureBreeder |
-| BeforeHarvest | 3 | — | 未实现 | D98_Transactor, D32_WoodRake, C92_AutumnMother |
-| StartHarvest | 11 | onHarvest（已接入，粗粒度） | 需细化 | D97_BeggingStudent, E58_LunchtimeBeer, E61_RaisedBed |
-| StartHarvestFieldPhase | 5 | — | 未实现 | E73_Scythe, E112_GrainThief, D70_StrawManure |
-| HarvestFieldPhase | 10+ | — | 未实现 | A112_ScytheWorker, B39_Loom, E107_LandSurveyor |
-| EndHarvestFieldPhase | 2 | — | 未实现 | E112_GrainThief, C110_HomeBrewer |
-| StartHarvestFeedingPhase | 3 | — | 未实现 | C107_Baker, E52_Cubbyhole, E110_Dentist |
-| HarvestFeedingPhase | 10+ | — | 未实现 | D84_FeedPellets, E132_VeggieLover, D133_BeerTentOperator |
-| EndHarvestFeedingPhase | 4 | — | 未实现 | E83_ShepherdsWhistle, E91_PlowBuilder, D76_SocialBenefits |
-| EndHarvest | 4 | — | 未实现 | E73_Scythe, E99_UncaringParents, D72_StableManure |
-| AfterHarvest | 3 | — | 未实现 | D99_EarthenwarePotter, E134_Omnifarmer, D129_LumberVirtuoso |
+| BeforeReturnHome | 1 | onBeforeReturnHome（已接入） | 暂无卡牌注册 | D51_Archway |
+| StartReturnHome | 11 | onStartReturnHome（已接入） | 暂无卡牌注册 | A151_Minstrel, E20_IronHoe, C97_SeedResearcher, A100_Curator |
+| ReturnHome | 12 | onReturnHome（已接入） | C75_Firewood, A84_Silage | A53_Claypipe, A29_AleBenches, B139_ForestScientist |
+| EndOfRound | 7 | onRoundEnd（已接入） | 暂无卡牌注册 | A70_LiftingMachine, A54_Credit, A165_PigBreeder |
+| AfterEndOfRound | 1 | onAfterRoundEnd（已接入） | 暂无卡牌注册 | D167_PureBreeder |
+| BeforeHarvest | 3 | onBeforeHarvest（已接入） | A166_Haydryer | D98_Transactor, D32_WoodRake, C92_AutumnMother |
+| StartHarvest | 16 | onStartHarvest（已接入） | 暂无卡牌注册 | D97_BeggingStudent, E58_LunchtimeBeer, E61_RaisedBed |
+| StartHarvestFieldPhase | 7 | onStartHarvestFieldPhase（已接入） | 暂无卡牌注册 | E73_Scythe, E112_GrainThief, D70_StrawManure |
+| HarvestFieldPhase | 10+ | onHarvestFieldPhase（已接入） | 暂无卡牌注册 | A112_ScytheWorker, B39_Loom, E107_LandSurveyor |
+| EndHarvestFieldPhase | 6 | onEndHarvestFieldPhase（已接入） | 暂无卡牌注册 | E112_GrainThief, C110_HomeBrewer |
+| StartHarvestFeedingPhase | 3 | onStartHarvestFeedingPhase（已接入） | 暂无卡牌注册 | C107_Baker, E52_Cubbyhole, E110_Dentist |
+| HarvestFeedingPhase | 10+ | onHarvestFeedingPhase（已接入） | 暂无卡牌注册 | D84_FeedPellets, E132_VeggieLover, D133_BeerTentOperator |
+| EndHarvestFeedingPhase | 4 | onEndHarvestFeedingPhase（已接入） | 暂无卡牌注册 | E83_ShepherdsWhistle, E91_PlowBuilder, D76_SocialBenefits |
+| EndHarvest | 9 | onEndHarvest（已接入） | 暂无卡牌注册 | E73_Scythe, E99_UncaringParents, D72_StableManure |
+| AfterHarvest | 3 | onAfterHarvest（已接入） | D99_EarthenwarePotter | E134_Omnifarmer, D129_LumberVirtuoso |
 
 ### 扩展优先级建议
 
-**P0 - 已定义但未接入**：
-- `onRoundEnd`：类型已在 `card-effects.ts` 中定义，需在 `game-session.ts` 中接入调用
+**P0 - 全部阶段性 Hook 已接入**：
+- 所有 22 个 CardEffect Hook 均已定义并在 `game-session.ts` 中按 BGA 顺序调用
+- 架构机制已就绪（ActivateCardNode、PlayerSwitchNode、computeCardCosts、costOverride、gain params）
 
-**P1 - 当前缺失但有现存卡牌需要**：
-- `StartReturnHome`：BGA 有 11 张卡注册，如 A151_Minstrel、A141_TurnipFarmer
-- `BeforeReturnHome`：BGA 有 D51_Archway
-- `EndOfRound` / `AfterEndOfRound`：BGA 有 8 张卡
-
-**P2 - 收获阶段细化（大量卡牌依赖）**：
-- BGA 收获阶段有 10 个 sub-phase，涉及 50+ 张卡牌
-- open-agricola 只有 1 个 `onHarvest`
-- 建议至少拆分为：`StartHarvest`、`HarvestFieldPhase`、`HarvestFeedingPhase`、`EndHarvest`
-
-**P3 - 回合开始细化**：
-- `BeforeStartOfTurn`：BGA 有 6 张卡
+**P1 - 待实现具体卡牌**：
+- ReturnHome 子阶段（BeforeReturnHome/StartReturnHome）：BGA 有 12 张卡待接入
+- Harvest 子阶段（StartHarvest 等 8 个阶段）：BGA 有 50+ 张卡待接入
+- StartOfTurn：BGA 有 30+ 张卡待接入

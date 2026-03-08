@@ -766,13 +766,24 @@
 .resource-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-size: 11px;
+  gap: 2px;
+  padding: 2px 5px;
+  border-radius: 10px;
+  font-size: 12px;
   border: 1px solid #c9dcb8;
   background: #f0f7e6;
   color: #2e4b1e;
+}
+
+.resource-chip .res-icon {
+  font-size: 16px;
+}
+
+.resource-chip-count {
+  font-weight: bold;
+  font-size: 11px;
+  min-width: 12px;
+  text-align: center;
 }
 
 .resource-chip.resource-wood {

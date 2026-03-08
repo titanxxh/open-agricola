@@ -14,6 +14,13 @@ import { listener as afterActionOptionalConstruct } from './Stub_AfterAction_Opt
 import { afterListener as payGainVpAfter, choiceListener as payGainVpChoice } from './Stub_PayGainVp'
 import { computeCostsListener as cardStorageFence } from './Stub_CardStorage_ConsumeFence'
 import { listener as computeReplaceDecline } from './Stub_ComputeReplace_Decline'
+import { effect as beforeReturnHomeEffect } from './Stub_BeforeReturnHome'
+import { effect as startReturnHomeEffect } from './Stub_StartReturnHome'
+import { effect as afterRoundEndEffect } from './Stub_AfterRoundEnd'
+import { effect as startHarvestEffect } from './Stub_StartHarvest'
+import { effect as harvestFieldPhaseEffect } from './Stub_HarvestFieldPhase'
+import { effect as harvestFeedingPhaseEffect } from './Stub_HarvestFeedingPhase'
+import { effect as endHarvestEffect } from './Stub_EndHarvest'
 
 const allListeners = [
   immediatelyAfterGainFlow,
@@ -31,7 +38,17 @@ const allListeners = [
   computeReplaceDecline,
 ]
 
-const allEffects = [onReturnHomeAccumulate, onRoundEndEffect]
+const allEffects = [
+  onReturnHomeAccumulate,
+  onRoundEndEffect,
+  beforeReturnHomeEffect,
+  startReturnHomeEffect,
+  afterRoundEndEffect,
+  startHarvestEffect,
+  harvestFieldPhaseEffect,
+  harvestFeedingPhaseEffect,
+  endHarvestEffect,
+]
 
 export const registerStubCards = () => {
   allListeners.forEach((l) => registerCardListener(l))

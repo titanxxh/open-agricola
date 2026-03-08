@@ -416,6 +416,9 @@ export const GameContainerApi = () => {
     if (!isInteractive) return
     void transport.confirmNextPlayer().catch((e) => console.error(e))
   }, [transport, isInteractive])
+  const confirmPlayerSwitch = useCallback(() => {
+    void transport.confirmPlayerSwitch().catch((e) => console.error(e))
+  }, [transport])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return
@@ -437,6 +440,10 @@ export const GameContainerApi = () => {
     playerIndex: pending.playerIndex, spaceId: pending.spaceId,
   } : null
   const pendingNextPlayerIndex = pending.type === 'confirmNextPlayer' ? pending.nextPlayerIndex : null
+  const pendingPlayerSwitch = pending.type === 'confirmPlayerSwitch' ? {
+    fromPlayerIndex: pending.fromPlayerIndex,
+    toPlayerIndex: pending.toPlayerIndex,
+  } : null
   const pendingAnimalReorg = pending.type === 'animalReorg' ? { playerIndex: pending.playerIndex, spaceId: pending.spaceId } : null
   const harvestPending = pending.type === 'harvestFeed' && state ? {
     playerIndex: pending.playerIndex,
@@ -460,9 +467,9 @@ export const GameContainerApi = () => {
     if (state.round < openRound) return false
     if (currentPlayer.workersAvailable <= 0) return false
     if (state.gameOver) return false
-    if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || harvestPending) return false
+    if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || pendingPlayerSwitch || harvestPending) return false
     return true
-  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, harvestPending, isInteractive])
+  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, pendingPlayerSwitch, harvestPending, isInteractive])
 
   const actionMap = useMemo(() => {
     if (!state) return new Map<string, ActionSpace>()
@@ -1022,6 +1029,9 @@ export const GameContainerApi = () => {
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
+        pendingPlayerSwitch={pendingPlayerSwitch}
+        confirmPlayerSwitch={confirmPlayerSwitch}
+        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingSowSelectionsLength={sowSelectedCount}
