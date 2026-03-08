@@ -605,6 +605,7 @@ export const zh = {
     interactionWoodBartererTrade1: '支付 2 木头换 1 芦苇',
     interactionWoodBartererTrade2: '支付 4 木头换 2 芦苇',
     interactionWoodBartererSkip: '跳过',
+    interactionOverachieverImprovement: '成就者：执行一次改良行动？',
     placeFarmerFail: '无法在此放置工人',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',

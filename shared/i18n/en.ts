@@ -622,6 +622,7 @@ export const en = {
     interactionWoodBartererTrade1: 'Pay 2 wood for 1 reed',
     interactionWoodBartererTrade2: 'Pay 4 wood for 2 reed',
     interactionWoodBartererSkip: 'Skip',
+    interactionOverachieverImprovement: 'Overachiever: Take a Major or Minor Improvement action?',
     placeFarmerFail: 'Cannot place worker here',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
