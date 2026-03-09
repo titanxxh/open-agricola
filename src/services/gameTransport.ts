@@ -34,7 +34,9 @@ export interface GameTransport {
   destroy(): void
 }
 
-const API_BASE = 'http://localhost:5175'
+const BACKEND_PORT = 5175
+const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+const API_BASE = `http://${backendHost}:${BACKEND_PORT}`
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
@@ -147,7 +149,7 @@ export class HttpGameTransport implements GameTransport {
   }
 }
 
-const WS_BASE = `ws://localhost:5175/ws`
+const WS_BASE = `ws://${backendHost}:${BACKEND_PORT}/ws`
 
 export class WsGameTransport implements GameTransport {
   private ws: WebSocket | null = null

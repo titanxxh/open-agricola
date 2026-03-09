@@ -19,7 +19,6 @@ import {
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
-import type { RoomSummary } from '../../shared/protocol/ws'
 import { rehydrateState } from '../../shared/game/serialization'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { DevPanel } from '../components/dev/DevPanel'
@@ -46,6 +45,16 @@ type RoundSlot = { round: number; action?: ActionSpace }
 const urlParams = new URLSearchParams(window.location.search)
 const useWsMode = urlParams.get('transport') === 'ws'
 const httpTransportSingleton = new HttpGameTransport()
+
+/** Update browser URL to include room= so the link can be shared; same room id = same game. */
+const setRoomInUrl = (roomId: string) => {
+  if (typeof window === 'undefined') return
+  const params = new URLSearchParams(window.location.search)
+  params.set('room', roomId)
+  const newSearch = params.toString()
+  const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash || ''}`
+  window.history.replaceState(null, '', newUrl)
+}
 
 type WsStatus =
   | { phase: 'idle' }
@@ -111,6 +120,7 @@ const useTransportSetup = (playerParam: string | null) => {
           setWsStatus({ phase: 'error', message: resp.error })
           return
         }
+        setRoomInUrl(resp.roomId)
         setWsStatus({ phase: 'waiting', roomId: resp.roomId })
 
         const handler = (event: MessageEvent) => {
@@ -127,21 +137,11 @@ const useTransportSetup = (playerParam: string | null) => {
       } else {
         let roomId = roomParam
         if (!roomId) {
-          setWsStatus({ phase: 'connecting' })
-          try {
-            const resp = await fetch('http://localhost:5175/api/rooms')
-            const data = await resp.json() as { ok: boolean; rooms: RoomSummary[] }
-            const rooms = data.rooms ?? []
-            const available = rooms.find((r) => r.playerCount < r.maxPlayers)
-            if (!available) {
-              setWsStatus({ phase: 'error', message: 'no available rooms' })
-              return
-            }
-            roomId = available.id
-          } catch {
-            setWsStatus({ phase: 'error', message: 'failed to fetch rooms' })
-            return
-          }
+          setWsStatus({
+            phase: 'error',
+            message: 'No room in URL. Use the link shared by Player 1 (URL must contain room=...) to join the same game.',
+          })
+          return
         }
 
         setWsStatus({ phase: 'joining', roomId })
@@ -166,6 +166,7 @@ const useTransportSetup = (playerParam: string | null) => {
           setWsStatus({ phase: 'error', message: resp.error })
           return
         }
+        setRoomInUrl(resp.roomId)
         setWsReady(true)
         setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
       }
