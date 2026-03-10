@@ -9,7 +9,6 @@ import type {
 import { actionDefinitions } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
 import { clearActionHooks, applyIsDoableHooks } from '../shared/actions/hooks.ts'
-import { registerCardHooks } from '../shared/actions/hooks/card-hooks.ts'
 import {
   ActionNode,
   ActionRegistry,
@@ -43,6 +42,7 @@ import { getBuildRoomCost } from '../shared/actions/effects/house.ts'
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
 import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks, runBeforeReturnHomeHooks, runStartReturnHomeHooks, runAfterRoundEndHooks, runStartHarvestHooks, runStartHarvestFieldPhaseHooks, runHarvestFieldPhaseHooks, runEndHarvestFieldPhaseHooks, runStartHarvestFeedingPhaseHooks, runHarvestFeedingPhaseHooks, runEndHarvestFeedingPhaseHooks, runEndHarvestHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
+import { getMatchingListeners, executeCardListener } from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
@@ -94,7 +94,6 @@ export class GameSession {
     actionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
     clearActionHooks()
-    registerCardHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
@@ -566,6 +565,36 @@ export class GameSession {
     this.engine = this.createEngine(spaceId)
     this.activeSpaceId = spaceId
     this.activePlayerIndex = playerIndex
+
+    const beforeListenerContext = {
+      state: this.state,
+      player,
+      space,
+      actionId: spaceId,
+      phase: 'before' as const,
+    }
+    const matched = getMatchingListeners(beforeListenerContext)
+    const beforeFlowNodes: EngineNode[] = []
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, beforeListenerContext)
+      if (result?.flow) {
+        beforeFlowNodes.push(this.engine.buildFlowNodePublic(result.flow))
+      }
+    }
+    if (beforeFlowNodes.length > 0) {
+      const injectedIds = new Set(beforeFlowNodes.map(n => n.id))
+      this.engine.injectBeforeNodes(beforeFlowNodes)
+      let safety = beforeFlowNodes.length * 3
+      while (safety-- > 0 && this.engine) {
+        const next = this.engine.peekNextUnresolved()
+        if (!next || !injectedIds.has(next.id)) break
+        const step = this.engine.proceed({ state: this.state, player, space })
+        this.flushEngineLog()
+        if (step.type !== 'ok') break
+      }
+      this.actionStartPlayerSnapshot = this.clonePlayer(player)
+    }
+
     this.runEngineSteps()
     return this.respond()
   }

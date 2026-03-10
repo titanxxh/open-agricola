@@ -247,7 +247,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
     roundAvailable: 1,
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
-    execute: ({ player, space, params }) => {
+    execute: ({ player, space, params, sourceCard }) => {
       const gain = params ?? gainConfigByActionId.get(space.id)
       const gained: Record<string, number> = {}
       if (gain) {
@@ -258,6 +258,14 @@ export const internalActionDefinitions: ActionDefinition[] = [
           }
         })
         gainResources(player, gain)
+      }
+      if (sourceCard) {
+        return {
+          type: 'ok' as const,
+          resourcesGained: gained,
+          logKey: 'log.cardEffectGain',
+          logParams: { gain: gained, cardId: sourceCard },
+        }
       }
       return { type: 'ok' as const, resourcesGained: gained }
     },

@@ -11,14 +11,23 @@ const masterWorkmanBeforeListener: CardListenerRegistration = {
   cardIds: ['A126_MasterWorkman'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, state } = context
-    const actionId = (space as ActionSpace).id
+    const { state } = context
+    const actionId = context.actionId
     const index = state.roundActionOrder.indexOf(actionId)
-    const turn = index >= 0 ? index + 1 : undefined
-    
-    if (turn !== undefined && turn >= 1 && turn <= 4) {
+    if (index < 0) return
+    const turn = index + 1
+
+    if (turn >= 1 && turn <= 4) {
       const resource = RESOURCE_MAP[turn - 1]
-      return { costs: { [resource]: -1 }, sourceCard: 'A126_MasterWorkman' }
+      return {
+        flow: {
+          type: 'leaf',
+          actionId: 'gain',
+          params: { [resource]: 1 },
+          sourceCard: 'A126_MasterWorkman',
+        },
+        sourceCard: 'A126_MasterWorkman',
+      }
     }
   },
 }

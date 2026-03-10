@@ -52,6 +52,31 @@ export class EngineTree {
     return nodes
   }
 
+  insertBefore(nodeId: string, nodes: EngineNode[]) {
+    if (nodes.length === 0) return false
+    if (this.root.id === nodeId) {
+      this.root = new SequenceNode(`pre-${nodeId}`, [...nodes, this.root])
+      return true
+    }
+    const found = this.findNodeWithParent(nodeId, this.root)
+    if (!found) return false
+    const { parent, index } = found
+    if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
+      parent.children.splice(index, 0, ...nodes)
+      return true
+    }
+    const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
+    if (parent instanceof OptionalNode) {
+      parent.child = replacement
+      return true
+    }
+    if (parent instanceof OrNode || parent instanceof XorNode) {
+      parent.children[index] = replacement
+      return true
+    }
+    return false
+  }
+
   insertAfter(nodeId: string, nodes: EngineNode[]) {
     if (nodes.length === 0) return false
     if (this.root.id === nodeId) {
