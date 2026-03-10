@@ -27,6 +27,7 @@ dist-ssr
 *.pdf
 data/
 .env
+.persisted-room.json
 output/
 artifacts/
 test-results/

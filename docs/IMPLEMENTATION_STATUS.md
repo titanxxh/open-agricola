@@ -31,7 +31,8 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 - 每个房间持有独立 `GameSession` 实例。
 - 支持 `ClientCommand`（共享类型）：`action`、`choice`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
 - 状态变更后广播 `StateUpdateEnvelope`（含 version + cause）给房间内所有客户端。
-- 连接断开时清理玩家，空房间自动销毁。
+- 连接断开时清理玩家，非固定房间在空房时自动销毁。
+- **固定持久化房间（dev）**：房间 ID 由 `PERSISTENT_ROOM_ID` 指定，默认 `dev`。后端启动时若存在 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）则恢复该房间状态，否则新建空局；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁，便于重启后端后继续对局。固定房间的 WS 加入现在支持 `requestedPlayerIndex`，前端会把 `player=p1/p2` 固定映射到 0/1 号位，刷新重连时会替换旧连接而不是误占另一个空位。为兼容旧环境，固定 dev 房间仍会回退读取 `.persisted-room.json`。文档中的访问示例统一写作 `http://<host>:5173/...`；同机本地调试时 `<host>` 可视为 `localhost`，局域网场景请使用 `./restart-intranet.sh` 输出的地址。
 
 ### 2.3 HTTP API
 

@@ -56,6 +56,16 @@ const setRoomInUrl = (roomId: string) => {
   window.history.replaceState(null, '', newUrl)
 }
 
+const toRequestedPlayerIndex = (playerParam: string | null) => {
+  if (!playerParam) return undefined
+  const match = /^p(\d+)$/.exec(playerParam)
+  if (!match) return undefined
+  const playerIndex = Number(match[1]) - 1
+  return Number.isInteger(playerIndex) && playerIndex >= 0
+    ? playerIndex
+    : undefined
+}
+
 type WsStatus =
   | { phase: 'idle' }
   | { phase: 'connecting' }
@@ -136,6 +146,7 @@ const useTransportSetup = (playerParam: string | null) => {
         rawWs.addEventListener('message', handler)
       } else {
         let roomId = roomParam
+        const requestedPlayerIndex = toRequestedPlayerIndex(playerParam)
         if (!roomId) {
           setWsStatus({
             phase: 'error',
@@ -159,7 +170,11 @@ const useTransportSetup = (playerParam: string | null) => {
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('joinRoom', { roomId: roomId!, name: playerParam ?? 'Player 2' })
+          ws.sendRoomCommand('joinRoom', {
+            roomId: roomId!,
+            name: playerParam ?? 'Player 2',
+            requestedPlayerIndex,
+          })
         })
 
         if ('error' in resp) {
@@ -1036,6 +1051,7 @@ export const GameContainerApi = () => {
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingSowSelectionsLength={sowSelectedCount}
+        hasPendingPlowSelection={pendingPlowTile !== null}
         fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
         stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
         isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}

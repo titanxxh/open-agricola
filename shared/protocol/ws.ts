@@ -33,7 +33,7 @@ export type ClientCommand =
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string }
-  | { type: 'joinRoom'; roomId: string; name?: string }
+  | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
 
 export type ServerEvent =
   | StateUpdateEnvelope

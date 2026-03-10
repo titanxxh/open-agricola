@@ -113,6 +113,7 @@ Phase 2 前端联调已完成：
 - `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
+- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时从 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）恢复该房间状态；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
 
 #### 4.3.2 如果后续要支持 patch，同步协议应如何设计
 
@@ -430,7 +431,7 @@ WebSocket 比轮询 HTTP 更适合这个场景。
 
 推荐的房间流程如下：
 
-1. 客户端连接 `ws://localhost:5175/ws`
+1. 客户端连接 `ws://<host>:5175/ws`
 2. 首位玩家发送 `createRoom`
 3. 服务端创建 `Room` 和 `GameSession`
 4. 其他玩家发送 `joinRoom`

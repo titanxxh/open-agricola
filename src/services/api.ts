@@ -1,6 +1,9 @@
 import type { FarmTilePosition, Resource } from '../../shared/game/types'
 
-const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:5175'
+const backendHost =
+  typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+const apiBase =
+  import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
 
 export const validateFence = async (
   playerId: string,

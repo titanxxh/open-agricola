@@ -24,6 +24,9 @@ describe('A126 MasterWorkman integration', () => {
       (e: any) => e.key === 'log.cardEffectGain'
     )
     expect(cardGainLog).toBeTruthy()
+    if (!cardGainLog?.params) {
+      throw new Error('missing cardEffectGain log params')
+    }
     expect(cardGainLog.params.cardId).toBe('A126_MasterWorkman')
     expect(cardGainLog.params.gain).toEqual({ wood: 1 })
 
@@ -31,8 +34,28 @@ describe('A126 MasterWorkman integration', () => {
       (e: any) => e.key === 'log.actionDetail'
     )
     if (actionDetailLog) {
-      const gains = actionDetailLog.params?.detailParts?.gains ?? {}
+      const gains = (actionDetailLog.params as {
+        detailParts?: { gains?: Record<string, number> }
+      } | undefined)?.detailParts?.gains ?? {}
       expect(gains.wood ?? 0).toBe(0)
     }
+  })
+
+  it('does not inject unrelated options into plow choice', () => {
+    const state = createInitialState(42)
+    const session = new GameSession(state)
+
+    session.devPlayCard(0, 'A126_MasterWorkman')
+
+    const resp = session.takeAction(0, 'farmland')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
+    expect(resp.pending.options).toEqual([
+      { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
+      { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
+    ])
   })
 })

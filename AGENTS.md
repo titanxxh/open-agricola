@@ -159,8 +159,10 @@
 
 - 主链路是后端 HTTP + WebSocket 共同提供服务，其中多人同步以 WebSocket 为主。
 - 玩家视角访问：
-  - `http://localhost:5173/?player=p1`
-  - `http://localhost:5173/?player=p2`
+  - `http://<host>:5173/?player=p1`
+  - `http://<host>:5173/?player=p2`
+ - 同机本地调试可将 `<host>` 视为 `localhost`
+ - 局域网 / intranet 调试优先使用 `./restart-intranet.sh` 输出的地址
 
 ## Cursor Cloud specific instructions
 

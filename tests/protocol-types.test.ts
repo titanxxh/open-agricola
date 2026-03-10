@@ -66,7 +66,7 @@ describe('shared protocol types', () => {
       { type: 'roundEnd' },
       { type: 'getState' },
       { type: 'createRoom', maxPlayers: 2 },
-      { type: 'joinRoom', roomId: 'abc' },
+      { type: 'joinRoom', roomId: 'abc', requestedPlayerIndex: 0 },
     ]
     expect(commands.length).toBe(9)
   })

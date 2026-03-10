@@ -31,16 +31,19 @@ npm run dev
 **WS 多人模式**（推荐）：
 
 ```
-玩家 1：http://localhost:5173/?player=p1&transport=ws
-玩家 2：http://localhost:5173/?player=p2&transport=ws
+玩家 1：http://<host>:5173/?player=p1&transport=ws
+玩家 2：http://<host>:5173/?player=p2&transport=ws
 ```
 
 P1 自动创建房间并等待，P2 自动发现房间并加入。双方就绪后游戏开始，操作实时同步。
 
+- 在同一台机器本地调试时，`<host>` 通常就是 `localhost`。
+- 在局域网 / WSL intranet 场景下，优先使用 `./restart-intranet.sh` 输出的地址。
+
 **HTTP 单机模式**（调试用）：
 
 ```
-http://localhost:5173/?player=p1
+http://<host>:5173/?player=p1
 ```
 
 HTTP 模式使用单例 GameSession，适合单人调试。
