@@ -13,6 +13,7 @@ export const useGameSync = () => {
   const [error, setError] = useState<string | null>(null)
   const [historyLength, setHistoryLength] = useState(0)
   const [hasActionStartSnapshot, setHasActionStartSnapshot] = useState(false)
+  const [actionAvailability, setActionAvailability] = useState<Record<string, boolean>>({})
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -29,7 +30,8 @@ export const useGameSync = () => {
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
     setHistoryLength(payload.historyLength ?? 0)
     setHasActionStartSnapshot(payload.hasActionStartSnapshot ?? false)
+    setActionAvailability(payload.actionAvailability ?? {})
   }, [])
 
-  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, applySnapshot }
+  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot }
 }

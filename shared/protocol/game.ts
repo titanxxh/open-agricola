@@ -9,6 +9,7 @@ export type GameSyncPayload = {
   historyLength: number
   hasActionStartSnapshot: boolean
   ok: boolean
+  actionAvailability?: Record<string, boolean>
   error?: string
 }
 

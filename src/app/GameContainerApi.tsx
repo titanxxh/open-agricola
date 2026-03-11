@@ -205,7 +205,7 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
-  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot } =
+  const { state, pending, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>('en')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
@@ -484,8 +484,10 @@ export const GameContainerApi = () => {
     if (currentPlayer.workersAvailable <= 0) return false
     if (state.gameOver) return false
     if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || pendingPlayerSwitch || harvestPending) return false
+    // Use backend-provided action availability
+    if (actionAvailability[space.id] === false) return false
     return true
-  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, pendingPlayerSwitch, harvestPending, isInteractive])
+  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, pendingPlayerSwitch, harvestPending, isInteractive, actionAvailability])
 
   const actionMap = useMemo(() => {
     if (!state) return new Map<string, ActionSpace>()

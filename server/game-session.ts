@@ -69,6 +69,7 @@ export type SessionResponse = {
   historyLength: number
   hasActionStartSnapshot: boolean
   scores?: PlayerScoreSummary[]
+  actionAvailability?: Record<string, boolean>
   error?: string
 }
 
@@ -182,6 +183,10 @@ export class GameSession {
     }
     if (this.state.gameOver) {
       resp.scores = computeScores(this.state)
+    }
+    // Include action availability for current player
+    if (!this.state.gameOver && this.pending.type === 'none') {
+      resp.actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
     }
     if (error) resp.error = error
     return resp
@@ -545,6 +550,42 @@ export class GameSession {
         )
       })
       .map((space) => ({ spaceId: space.id, nameKey: space.nameKey }))
+  }
+
+  /**
+   * Compute which action spaces can be executed by the current player.
+   * Returns a map of spaceId -> isExecutable for all action spaces.
+   */
+  getActionAvailability(playerIndex: number): Record<string, boolean> {
+    const player = this.state.players[playerIndex]
+    if (!player) return {}
+
+    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
+    const result: Record<string, boolean> = {}
+
+    for (const space of this.state.actionSpaces) {
+      // Basic availability checks (same as getAvailableActions)
+      if (space.takenBy) {
+        result[space.id] = false
+        continue
+      }
+      const openRound = roundOpen.get(space.id) ?? space.roundAvailable
+      if (this.state.round < openRound) {
+        result[space.id] = false
+        continue
+      }
+      if (player.workersAvailable <= 0) {
+        result[space.id] = false
+        continue
+      }
+      // Backend-executability check
+      result[space.id] = applyIsDoableHooks(
+        { state: this.state, player, space, actionId: space.id },
+        space.canBeExecutedByPlayer(this.state, player),
+      )
+    }
+
+    return result
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
