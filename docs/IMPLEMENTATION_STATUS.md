@@ -102,6 +102,8 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
 
+行动格可执行性与 flow 推导已部分统一：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，现在可以递归读取 `flow.children` 的原子行动 `isDoable` 结果，并继续应用子行动自己的 `isDoable` hook / CardListener，避免像 `grain-utilization`、`cultivation`、`farm-expansion`、`farmland`、`major-improvement` 这类行动格维护两套手写条件。
+
 22 个阶段性 CardEffect Hook：`onBuy`、`onRoundStart`、`onHarvest`、`onRoundEnd`、`onReturnHome`、`onBeforeReturnHome`、`onStartReturnHome`、`onAfterRoundEnd`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onAfterReap`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onBeforeFeed`、`onAfterFeed`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn`。
 
 ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引擎节点，延迟执行 handler。handler 返回的 flow 通过 buildFlowNode 插入引擎树继续执行。

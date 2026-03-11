@@ -46,6 +46,7 @@
 | ComputeReplace | 判断行动替代时 | 允许用其他行动替代当前行动 |
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
 
+注：部分顶层行动卡的开放性不再单独手写，而是由 `flow` 递归合成。当前已接入顶层 `or` / `xor` 行动格，以及一批安全 `seq` 包装行动格；递归到 `leaf` 时会继续应用子行动自己的 `IsDoable` hook / CardListener，因此诸如 `A94_LazySowman` 挂在 `sow` 上的放宽效果、`B75_WoodWorkshop` 挂在 `improvement-any` 上的放宽效果，也能反映到顶层复合行动格的可执行性上。
 注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
 注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。
 

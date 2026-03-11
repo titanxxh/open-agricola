@@ -1,4 +1,6 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../game/types'
+import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
+import { internalActionDefinitions } from './internal-actions'
 import { cattleMarket } from '../cards/action/round-cattle-market'
 import { clayPit } from '../cards/action/common-clay-pit'
 import { copse } from '../cards/action/common-copse'
@@ -44,7 +46,7 @@ const emptyResources: Resource = {
   begging: 0,
 }
 
-export const actionDefinitions: ActionDefinition[] = [
+const baseActionDefinitions: ActionDefinition[] = [
   forest,
   copse,
   grove,
@@ -76,6 +78,22 @@ export const actionDefinitions: ActionDefinition[] = [
   vegetableSeeds,
   resourceMarket4,
 ]
+
+const actionDefinitionLookup = new Map(
+  [...baseActionDefinitions, ...internalActionDefinitions].map((action) => [
+    action.id,
+    action,
+  ]),
+)
+
+baseActionDefinitions.forEach((action) => {
+  initializeFlowDerivedCanBeExecutedByPlayer(
+    action,
+    (actionId) => actionDefinitionLookup.get(actionId),
+  )
+})
+
+export const actionDefinitions: ActionDefinition[] = baseActionDefinitions
 
 export const createActionSpaces = (): ActionSpace[] =>
   actionDefinitions.map((action) => ({

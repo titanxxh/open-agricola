@@ -1,4 +1,5 @@
-import type { ActionDefinition } from '../../../game/types'
+import type { ActionDefinition } from '../../game/types'
+import { deriveCanBeExecutedByFlow } from '../../actions/flow'
 
 export const urgentWishChildren: ActionDefinition = {
   id: 'urgent-wish-children',
@@ -6,7 +7,7 @@ export const urgentWishChildren: ActionDefinition = {
   descriptionKey: 'actions.urgent-wish-children.description',
   roundAvailable: 5,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

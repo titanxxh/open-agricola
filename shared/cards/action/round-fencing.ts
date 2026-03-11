@@ -1,4 +1,5 @@
-import type { ActionDefinition } from '../../../game/types'
+import { deriveCanBeExecutedByFlow } from '../../actions/flow'
+import type { ActionDefinition } from '../../game/types'
 
 export const fencing: ActionDefinition = {
   id: 'fencing',
@@ -6,7 +7,7 @@ export const fencing: ActionDefinition = {
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => player.resources.wood > 0,
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

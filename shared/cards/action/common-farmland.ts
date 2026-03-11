@@ -1,4 +1,4 @@
-import { getPlowableTiles } from '../../actions/effects/plow'
+import { deriveCanBeExecutedByFlow } from '../../actions/flow'
 import type { ActionDefinition } from '../../game/types'
 
 export const farmland: ActionDefinition = {
@@ -7,7 +7,7 @@ export const farmland: ActionDefinition = {
   descriptionKey: 'actions.farmland.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => getPlowableTiles(player).length > 0,
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

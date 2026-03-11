@@ -1,18 +1,5 @@
-import { canBakeBread, type BakeImprovementId } from '../../actions/effects/bake-bread'
-import { canSow } from '../../actions/effects/sow'
-import type { ActionDefinition, PlayerState } from '../../game/types'
-
-const bakeImprovements: BakeImprovementId[] = [
-  'Major_Fireplace1',
-  'Major_Fireplace2',
-  'Major_CookingHearth1',
-  'Major_CookingHearth2',
-  'Major_ClayOven',
-  'Major_StoneOven',
-]
-
-const hasBakeableImprovement = (player: PlayerState) =>
-  bakeImprovements.some((id) => canBakeBread(player, id))
+import { deriveCanBeExecutedByFlow } from '../../actions/flow'
+import type { ActionDefinition } from '../../game/types'
 
 export const grainUtilization: ActionDefinition = {
   id: 'grain-utilization',
@@ -20,8 +7,7 @@ export const grainUtilization: ActionDefinition = {
   descriptionKey: 'actions.grain-utilization.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) =>
-    canSow(player) || hasBakeableImprovement(player),
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'or',
