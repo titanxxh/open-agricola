@@ -1,0 +1,121 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Open Agricola — an online implementation of the Agricola board game using React + TypeScript + Vite (frontend) and a Node.js WebSocket/HTTP server (backend). Backend-authoritative architecture with real-time multiplayer sync.
+
+## Commands
+
+```bash
+# Install dependencies (canvas requires native libs: libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev)
+npm install
+
+# Start both frontend (5173) and backend (5175)
+./restart.sh
+
+# Or start separately
+npm run server   # Backend on port 5175
+npm run dev      # Frontend on port 5173
+
+# Tests
+npm test                # Vitest unit tests (~295 cases, excludes e2e and scripts/)
+npm run test:e2e        # Playwright E2E tests (requires running server + frontend)
+npx vitest run tests/path/to/file.spec.ts   # Run a single test file
+
+# Lint & build
+npm run lint            # ESLint
+npm run build           # tsc + vite build (may fail on strict TS errors in test files; doesn't affect dev/server)
+```
+
+## Architecture
+
+### Three-Layer Design
+
+```
+shared/    ← Pure domain logic (no React, no Node APIs). Used by both frontend and backend.
+server/    ← Backend: HTTP + WebSocket server, authoritative state
+src/       ← Frontend: React UI, transport abstraction, hooks
+```
+
+### Backend Authority Pattern
+
+`GameSession` (server/game-session.ts) is the **sole writer** of `GameState`. All state mutations flow through it:
+
+1. Client sends `ClientCommand` via WebSocket (or HTTP for debug)
+2. `RoomManager` routes command to the room's `GameSession`
+3. `GameSession` executes the command, returns `SessionResponse` (`ok`, `state`, `pending`, `scores`, etc.)
+4. `RoomManager` serializes state as `StateUpdateEnvelope` and broadcasts full snapshot to all clients
+5. Frontend receives snapshot, rehydrates state, and re-renders
+
+No optimistic updates — frontend always waits for server confirmation.
+
+### Flow Engine (shared/engine/)
+
+Actions are executed as node trees (behavior-tree-like). Key node types:
+- `SequenceNode`, `ParallelNode`, `OrNode`, `XorNode` — control flow
+- `ChoiceNode` — awaits player input
+- `ActionNode` — executes a leaf action
+- `ActivateCardNode` — triggers card listener
+- `PlayerSwitchNode` — transfers control between players
+
+`Engine.step()` returns `EngineStepResult`: `done | blocked | choice | ok | playerSwitch`. The engine drives all action execution including multi-step flows, card triggers, and pending choices.
+
+### Hook System (shared/actions/hooks.ts)
+
+Card effects extend the game through hooks rather than modifying core paths. Hook phases:
+- `before`, `during`, `immediatelyAfter`, `after` — execution lifecycle
+- `computeCosts`, `computeArgs`, `computeReplace` — action customization
+- `isDoable` — availability override
+- `computeCardCosts` — card cost modification
+
+### Transport Abstraction (src/services/)
+
+`GameTransport` interface unifies HTTP and WebSocket. Two implementations:
+- `HttpGameTransport` — single-player debugging (all methods are HTTP POST)
+- `WsGameTransport` — multiplayer real-time (WebSocket messages, HTTP fallback for validation only)
+
+Frontend code uses `GameTransport` without knowing the underlying transport.
+
+### Pending States
+
+Mutual-exclusion pending model drives UI interaction:
+- `none` — awaiting player action
+- `choice` — player must select from options
+- `animalReorg` — animal placement required
+- `harvestFeed` — harvest feeding required
+
+### Key Types
+
+- `shared/game/types.ts` — `GameState`, `PlayerState`, `Resource`, `ActionSpace`, `PendingAction`, `ActionFlow`
+- `shared/protocol/game.ts` — `GameSyncPayload`, `StateUpdateEnvelope`
+- `shared/protocol/ws.ts` — `ClientCommand`, `ServerEvent`
+- `shared/game/serialization.ts` — `serializeState()` / `rehydrateState()`
+
+### Room System
+
+`RoomManager` (server/room-manager.ts) maintains `Map<roomId, Room>`. Each room has an independent `GameSession`. A persistent dev room (ID `dev`, configurable via `PERSISTENT_ROOM_ID`) survives backend restarts via JSON state files in `output/`.
+
+## Development Guidelines (from AGENTS.md)
+
+- **Backend authority**: Rules live in `shared/` + `server/`. Never put rule logic in frontend UI.
+- **No circular dependencies**.
+- **Card encapsulation**: Card abilities must be self-contained in their card file (`shared/cards/`). No card-specific `if-else` in core paths. Use hooks, modifiers, and `player.cardStates[cardId]` for per-card state.
+- **Don't modify core paths** (`pay.ts`, `improvement.ts`, `game-session.ts`) for single-card needs. Use existing extension points (hooks, modifiers, card definition fields).
+- **Card naming**: Files are `{Deck}_{Number}_{Name}.ts` (e.g., `A123_FrameBuilder.ts`).
+- **Test-first for cards**: Write test specification based on `docs/CARD_TEST_TEMPLATE.md` before implementing.
+- **Tests drive through backend boundary**: Use `GameSession`, HTTP API, or WS commands. Assert on `state`, `pending`, `log`, `scores` — not DOM elements.
+- **Default to 2-player games** in tests.
+- **Commit messages**: `feat:`, `fix:`, `refactor:` prefixes. English only.
+- **After code changes**: Run `npm test` to verify. Update relevant docs (`docs/IMPLEMENTATION_STATUS.md`, `docs/ENGINE_ARCHITECTURE.md`, `docs/cards_impl.md`, `docs/card_progress.md`).
+
+## URL Parameters (for manual testing)
+
+```
+?player=p1          # Player 1 perspective
+?player=p2          # Player 2 perspective
+?transport=ws       # Enable WebSocket multiplayer
+?room=<id>          # Join specific room
+?devMode=1          # Enable dev panel (resource editing, round jump, card tools)
+```

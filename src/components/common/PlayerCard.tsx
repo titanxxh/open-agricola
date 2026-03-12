@@ -248,7 +248,7 @@ export const PlayerCard = ({
 
         <div className="card-desc">
           <div className="card-desc-scroller">
-            <div dangerouslySetInnerHTML={{ __html: cardData.description.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />') }} />
+            <div dangerouslySetInnerHTML={{ __html: cardData.description.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />') }} />
           </div>
         </div>
 
