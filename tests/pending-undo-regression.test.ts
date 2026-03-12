@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game-session'
 import { createInitialState } from '../shared/logic/state'
+import { getAllTilePositions } from '../shared/game/farm'
 import type { PendingAction } from '../shared/game/types'
 
 describe('pending choice types + undo regression', () => {
@@ -10,6 +11,141 @@ describe('pending choice types + undo regression', () => {
     const actions = session.getAvailableActions(0)
     return predicate ? actions.find(predicate) : actions[0]
   }
+
+  function hasAvailableAction(session: GameSession, spaceId: string) {
+    return session.getAvailableActions(0).some((action) => action.spaceId === spaceId)
+  }
+
+  function openRoundAction(actionId: string) {
+    return [actionId, ...Array.from({ length: 13 }, () => null)]
+  }
+
+  describe('flow-derived action availability', () => {
+    it('grain-utilization is available when only sow child is doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      player.resources.grain = 1
+      player.fields = [{ row: 0, col: 3, crop: null, remaining: 0 }]
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
+
+    it('grain-utilization is available when only bake-bread child is doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      player.resources.grain = 1
+      player.improvements.push('Major_Fireplace1')
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
+
+    it('grain-utilization is not available when no child is doable', () => {
+      const state = createInitialState(42)
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(false)
+    })
+
+    it('cultivation is available when only plow child is doable', () => {
+      const state = createInitialState(42)
+      state.round = 5
+      state.roundActionOrder = openRoundAction('cultivation')
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'cultivation')).toBe(true)
+    })
+
+    it('cultivation is available when only sow child is doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.round = 5
+      state.roundActionOrder = openRoundAction('cultivation')
+      player.resources.grain = 1
+      player.fields = getAllTilePositions().map((position, index) => ({
+        row: position.row,
+        col: position.col,
+        crop: index === 0 ? null : 'grain',
+        remaining: index === 0 ? 0 : 1,
+      }))
+      player.roomTiles = []
+      player.stableTiles = []
+      player.pastures = []
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'cultivation')).toBe(true)
+    })
+
+    it('farm-expansion is available when only construct child is doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      player.resources.wood = 5
+      player.resources.reed = 2
+      player.stableTiles = getAllTilePositions().slice(0, 4)
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'farm-expansion')).toBe(true)
+    })
+
+    it('farm-expansion is available when only stables child is doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      player.resources.wood = 2
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'farm-expansion')).toBe(true)
+    })
+
+    it('major-improvement is available when child isDoable hook makes improvement-any doable', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('major-improvement')
+      state.availableMajorImprovements = []
+      player.minorHand = []
+
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'B75_WoodWorkshop')
+
+      expect(hasAvailableAction(session, 'major-improvement')).toBe(true)
+    })
+
+    it('house-redevelopment is available when mandatory renovate child is doable and optional improvement is not', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('house-redevelopment')
+      player.resources.clay = player.rooms
+      player.resources.reed = player.rooms
+      player.minorHand = []
+      state.availableMajorImprovements = []
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'house-redevelopment')).toBe(true)
+    })
+
+    it('wish-children is available when growth child is doable and optional minor-improvement is not', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('wish-children')
+      player.rooms = 3
+      player.familySize = 2
+      player.minorHand = []
+
+      const session = new GameSession(state)
+      expect(hasAvailableAction(session, 'wish-children')).toBe(true)
+    })
+
+    it('child isDoable hook can make grain-utilization available', () => {
+      const state = createInitialState(42)
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'A94_LazySowman')
+
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
+  })
 
   describe('pending type: none', () => {
     beforeEach(() => {
@@ -91,6 +227,63 @@ describe('pending choice types + undo regression', () => {
       const resp = session.takeAction(0, farmExpansion.spaceId)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
+    })
+  })
+
+  describe('interaction + anytime actions', () => {
+    beforeEach(() => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      player.resources.grain = 1
+      player.improvements.push('Major_Fireplace1')
+      session = new GameSession(state)
+    })
+
+    it('farmland exposes anytime bake-bread during plow selection', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const resp = session.takeAction(0, farmland.spaceId)
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId).toBe('farmSelect')
+      if (resp.interaction.stateId !== 'farmSelect') return
+
+      expect(resp.interaction.farm.farmType).toBe('plow')
+      expect(resp.interaction.anytimeActions.some((action) => action.id === 'bake-bread')).toBe(true)
+    })
+
+    it('anytime bake-bread can interrupt plow selection and return to it', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const takeResp = session.takeAction(0, farmland.spaceId)
+      if (!takeResp.ok) return
+
+      const anytimeResp = session.takeAnytimeAction(0, 'bake-bread')
+      expect(anytimeResp.ok).toBe(true)
+      expect(anytimeResp.interaction.stateId).toBe('choice')
+      if (anytimeResp.interaction.stateId !== 'choice') return
+      expect(anytimeResp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
+
+      const finishAnytime = session.resolveChoice(0, 'Major_Fireplace1')
+      expect(finishAnytime.ok).toBe(true)
+      expect(finishAnytime.state.players[0]!.resources.grain).toBe(0)
+      expect(finishAnytime.state.players[0]!.resources.food).toBeGreaterThan(0)
+      expect(finishAnytime.interaction.stateId).toBe('farmSelect')
+      if (finishAnytime.interaction.stateId !== 'farmSelect') return
+      expect(finishAnytime.interaction.promptKey).toBe('ui.interactionPlowSelect')
+    })
+
+    it('rejects ordinary takeAction while an interaction is in progress', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const takeResp = session.takeAction(0, farmland.spaceId)
+      if (!takeResp.ok) return
+
+      const rejectResp = session.takeAction(0, 'day-laborer')
+      expect(rejectResp.ok).toBe(false)
+      expect(rejectResp.error).toBe('interaction in progress')
     })
   })
 
@@ -276,6 +469,7 @@ describe('pending choice types + undo regression', () => {
         expect(resp).toHaveProperty('ok')
         expect(resp).toHaveProperty('state')
         expect(resp).toHaveProperty('pending')
+        expect(resp).toHaveProperty('interaction')
         expect(resp).toHaveProperty('historyLength')
         expect(resp).toHaveProperty('hasActionStartSnapshot')
         expect(resp.state).toHaveProperty('round')
@@ -285,7 +479,7 @@ describe('pending choice types + undo regression', () => {
     })
 
     it('pending type is always one of the known variants', () => {
-      const validTypes = ['none', 'choice', 'animalReorg', 'harvestFeed', 'confirmNextPlayer']
+      const validTypes = ['none', 'choice', 'animalReorg', 'harvestFeed', 'confirmNextPlayer', 'confirmPlayerSwitch']
       const resp = session.getState()
       expect(validTypes).toContain(resp.pending.type)
 

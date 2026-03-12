@@ -1,4 +1,4 @@
-import type { ActionSpace, GameState, Resource } from './types'
+import type { ActionSpace, GameState } from './types'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 

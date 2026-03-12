@@ -1,5 +1,4 @@
-import { getPlowableTiles } from '../../actions/effects/plow'
-import { canSow } from '../../actions/effects/sow'
+import { deriveCanBeExecutedByFlow } from '../../actions/flow'
 import type { ActionDefinition } from '../../game/types'
 
 export const cultivation: ActionDefinition = {
@@ -8,8 +7,7 @@ export const cultivation: ActionDefinition = {
   descriptionKey: 'actions.cultivation.description',
   roundAvailable: 5,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) =>
-    getPlowableTiles(player).length > 0 || canSow(player),
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'or',

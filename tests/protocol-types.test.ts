@@ -11,6 +11,11 @@ describe('shared protocol types', () => {
     const payload: GameSyncPayload = {
       state: serializeState(state),
       pending: { type: 'none' },
+      interaction: {
+        stateId: 'idle',
+        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      },
       scores: null,
       historyLength: 0,
       hasActionStartSnapshot: false,
@@ -32,6 +37,11 @@ describe('shared protocol types', () => {
       payload: {
         state: serializeState(state),
         pending: { type: 'none' },
+        interaction: {
+          stateId: 'idle',
+          allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+          anytimeActions: [],
+        },
         scores: null,
         historyLength: 0,
         hasActionStartSnapshot: false,
@@ -60,15 +70,16 @@ describe('shared protocol types', () => {
     const commands: ClientCommand[] = [
       { type: 'action', spaceId: 'test' },
       { type: 'choice', value: 'confirm' },
+      { type: 'anytime', actionId: 'bake-bread' },
       { type: 'reorg', zones: [] },
       { type: 'feed', selections: [] },
       { type: 'nextPlayer' },
       { type: 'roundEnd' },
       { type: 'getState' },
       { type: 'createRoom', maxPlayers: 2 },
-      { type: 'joinRoom', roomId: 'abc' },
+      { type: 'joinRoom', roomId: 'abc', requestedPlayerIndex: 0 },
     ]
-    expect(commands.length).toBe(9)
+    expect(commands.length).toBe(10)
   })
 
   it('ServerEvent discriminates on type', () => {
@@ -83,8 +94,8 @@ describe('shared protocol types', () => {
   })
 
   it('StateUpdateCause has all expected values', () => {
-    const causes: StateUpdateCause[] = ['action', 'choice', 'reorg', 'feed', 'undo', 'dev', 'reconnect']
-    expect(causes.length).toBe(7)
+    const causes: StateUpdateCause[] = ['action', 'choice', 'anytime', 'reorg', 'feed', 'undo', 'dev', 'reconnect']
+    expect(causes.length).toBe(8)
   })
 
   it('RoomSummary has expected shape', () => {

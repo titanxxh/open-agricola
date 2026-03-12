@@ -2,24 +2,47 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { Resource } from '../../game/types'
 
-const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+const CARD_ID = 'A53_Claypipe'
+const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
+const TRACKED_ACTIONS = ['gain', 'receive', 'collect', 'exchange'] as const
+
+const claypipeTrackListener: CardListenerRegistration = {
+  id: 'A53-claypipe-track-building-resources',
+  cardIds: [CARD_ID],
+  phases: ['immediatelyAfter' as ActionHookPhase],
+  actions: [...TRACKED_ACTIONS],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const { state, player, result } = context
+    if (result?.type !== 'ok' || !result.resourcesGained) return
+    for (const res of BUILDING_RESOURCES) {
+      const amount = result.resourcesGained[res] ?? 0
+      if (amount > 0) {
+        if (!state.workPhaseObtainedResources[player.id]) {
+          state.workPhaseObtainedResources[player.id] = {}
+        }
+        const current = state.workPhaseObtainedResources[player.id][res] ?? 0
+        state.workPhaseObtainedResources[player.id][res] = current + amount
+      }
+    }
+  },
+}
 
 const claypipeAfterListener: CardListenerRegistration = {
   id: 'A53-claypipe-after',
+  cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { state, player } = context
-    
-    if (!player.minorPlayed.includes('A53_Claypipe')) return
-    
+
     const workPhaseResources = state.workPhaseObtainedResources?.[player.id] ?? {}
     let totalBuilding = 0
     for (const res of BUILDING_RESOURCES) {
       totalBuilding += workPhaseResources[res] ?? 0
     }
-    
+
     if (totalBuilding >= 7) {
       return {
         flow: {
@@ -33,6 +56,7 @@ const claypipeAfterListener: CardListenerRegistration = {
   },
 }
 
+registerCardListener(claypipeTrackListener)
 registerCardListener(claypipeAfterListener)
 
 export const A53_Claypipe = new MinorImprovement({

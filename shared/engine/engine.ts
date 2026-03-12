@@ -46,6 +46,35 @@ export class Engine {
     return this.lastComputedCosts
   }
 
+  injectBeforeNodes(nodes: EngineNode[]) {
+    if (nodes.length === 0) return
+    const first = this.tree.nextUnresolved()
+    if (first) {
+      this.tree.insertBefore(first.id, nodes)
+    }
+  }
+
+  peekNextUnresolved(): EngineNode | null {
+    return this.tree.nextUnresolved()
+  }
+
+  buildFlowNodePublic(flow: ActionFlow): EngineNode {
+    return this.buildFlowNode(flow)
+  }
+
+  prependFlow(flow: ActionFlow) {
+    const first = this.tree.nextUnresolved()
+    const flowNode = this.buildFlowNode(flow)
+    if (first) {
+      this.tree.insertBefore(first.id, [flowNode])
+      return
+    }
+    this.tree.root = new SequenceNode(`prepend-root-${this.flowNodeCounter++}`, [
+      flowNode,
+      this.tree.root,
+    ])
+  }
+
   private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
     if (typeof followUp === 'string') {
       return { actionId: followUp }
@@ -109,7 +138,7 @@ export class Engine {
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(nextId(), flow.actionId, undefined, flow.params)
+      const actionNode = new ActionNode(nextId(), flow.actionId, flow.sourceCard, flow.params)
       const definition = this.registry.get(flow.actionId)
       if (definition?.resolveChoice) {
         const sequence = new SequenceNode(nextId(), [
@@ -421,6 +450,7 @@ export class Engine {
         player: context.player,
         space: context.space,
         params: node.params,
+        sourceCard: node.sourceCard,
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: replacedActionId },
@@ -452,6 +482,11 @@ export class Engine {
       const beforeActivateNodes = this.buildActivateCardNodes(
         beforePhase.matchedListeners, 'before', replacedActionId,
       )
+      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
+        node.beforePhaseResolved = true
+        this.tree.insertBefore(node.id, beforeActivateNodes)
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
       const result = action.execute(executionContext)
       const duringPhase = this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
       const duringActivateNodes = this.buildActivateCardNodes(
@@ -477,8 +512,8 @@ result.options = [...result.options, ...extraOptions]
         } else {
           this.pendingChoiceActionId = replacedActionId
         }
-        if (beforeActivateNodes.length > 0 || duringActivateNodes.length > 0) {
-          this.tree.insertAfter(node.id, [...beforeActivateNodes, ...duringActivateNodes])
+        if (duringActivateNodes.length > 0) {
+          this.tree.insertAfter(node.id, [...duringActivateNodes])
         }
 return {
 type: 'choice',
@@ -530,7 +565,6 @@ choice: { promptKey: result.promptKey, options: result.options },
         { result },
       )
       const allInsertNodes = [
-        ...beforeActivateNodes,
         ...duringActivateNodes,
         ...hookFlows,
         ...this.buildFollowUpNodes(followUps, node.id, context.player),

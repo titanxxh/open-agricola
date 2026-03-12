@@ -292,7 +292,7 @@ export const applyBonusModifier = (
 
 export const getEffectiveCost = (
   baseCost: ComplexCost,
-  costType: CostModifierType,
+  _costType: CostModifierType,
 ): ComplexCost => {
   const result: ComplexCost = { ...baseCost }
 

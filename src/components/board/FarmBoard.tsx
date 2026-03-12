@@ -36,15 +36,14 @@ type Props = {
   stablePositions: Set<string>
   pendingRoomSet: Set<string>
   pendingStableSet: Set<string>
-  canSelectRooms: boolean
-  canSelectStables: boolean
-  canSelectPlow: boolean
-  canSelectSow: boolean
+  roomSelectableSet: Set<string>
+  stableSelectableSet: Set<string>
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
   pendingSowSelections: Record<string, 'grain' | 'vegetable'>
   sowRemaining: { grain: number; vegetable: number }
+  sowSelectableMap: Map<string, ('grain' | 'vegetable')[]>
   pastureTiles: Map<string, { pastureId: string; isCorner: boolean }>
   pastureDisplayMap: Map<
     string,
@@ -62,7 +61,7 @@ type Props = {
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
   existingFenceSet: Set<string>
-  canSelectFences: boolean
+  fenceSelectableSet: Set<string>
   toggleRoomTile: (tile: FarmTilePosition) => void
   toggleStableTile: (tile: FarmTilePosition) => void
   togglePlowTile: (tile: FarmTilePosition) => void
@@ -107,15 +106,14 @@ export const FarmBoard = ({
   stablePositions,
   pendingRoomSet,
   pendingStableSet,
-  canSelectRooms,
-  canSelectStables,
-  canSelectPlow,
-  canSelectSow,
+  roomSelectableSet,
+  stableSelectableSet,
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
   pendingSowSelections,
   sowRemaining,
+  sowSelectableMap,
   pastureTiles,
   pastureDisplayMap,
   pastureCapacityMap,
@@ -127,7 +125,7 @@ export const FarmBoard = ({
   animalReorg,
   pendingFenceSet,
   existingFenceSet,
-  canSelectFences,
+  fenceSelectableSet,
   toggleRoomTile,
   toggleStableTile,
   togglePlowTile,
@@ -271,24 +269,16 @@ export const FarmBoard = ({
           const isField = fieldPositions.has(tileKey)
           const isStable = stablePositions.has(tileKey)
           const isRoomSelectable =
-            isInteractive &&
-            canSelectRooms &&
-            !isRoom &&
-            !isField &&
-            !isStable &&
-            !pastureTiles.has(tileKey)
+            isInteractive && roomSelectableSet.has(tileKey)
           const isRoomSelected = isInteractive && pendingRoomSet.has(tileKey)
           const isStableSelected = isInteractive && pendingStableSet.has(tileKey)
           const maxStableReached = pendingStableSet.size >= maxStableSelections
           const isStableSelectable =
             isInteractive &&
-            canSelectStables &&
-            !isRoom &&
-            !isField &&
-            !isStable &&
+            stableSelectableSet.has(tileKey) &&
             (!maxStableReached || isStableSelected)
           const isPlowSelectable =
-            isInteractive && canSelectPlow && plowSelectableSet.has(tileKey)
+            isInteractive && plowSelectableSet.has(tileKey)
           const isPlowSelected =
             isInteractive && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
@@ -303,7 +293,9 @@ export const FarmBoard = ({
             fieldInfo?.crop && fieldInfo.remaining > 0
               ? `${t(locale, `resources.${fieldInfo.crop}`)} ${fieldInfo.remaining}`
               : ''
-          const isSowSelectable = isInteractive && canSelectSow && isEmptyField
+          const allowedSowCrops = sowSelectableMap.get(tileKey) ?? []
+          const isSowSelectable =
+            isInteractive && isEmptyField && allowedSowCrops.length > 0
           const currentSowChoice = isInteractive ? (pendingSowSelections[tileKey] ?? '') : ''
           const availableGrain =
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
@@ -394,10 +386,10 @@ export const FarmBoard = ({
                   disabled={!isInteractive}
                 >
                   <option value="">{t(locale, 'ui.sowSelectNone')}</option>
-                  {availableGrain > 0 ? (
+                  {allowedSowCrops.includes('grain') && availableGrain > 0 ? (
                     <option value="grain">{t(locale, 'resources.grain')}</option>
                   ) : null}
-                  {availableVegetable > 0 ? (
+                  {allowedSowCrops.includes('vegetable') && availableVegetable > 0 ? (
                     <option value="vegetable">{t(locale, 'resources.vegetable')}</option>
                   ) : null}
                 </select>
@@ -540,7 +532,8 @@ export const FarmBoard = ({
           const isExisting = edgeId && existingFenceSet.has(edgeId)
           const isPending = isInteractive && edgeId && pendingFenceSet.has(edgeId)
           const isActive = isExisting || isPending
-          const isSelectable = isInteractive && canSelectFences && edgeId && !isExisting
+          const isSelectable =
+            isInteractive && !!edgeId && !isExisting && fenceSelectableSet.has(edgeId)
           return (
             <div
               key={cell.key}

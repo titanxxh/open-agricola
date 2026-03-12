@@ -1,5 +1,6 @@
 import type {
   ActionChoiceOption,
+  ComplexCost,
   ActionDefinition,
   ActionExecutionResult,
 } from '../game/types'
@@ -188,7 +189,12 @@ const buildMajorImprovementOptions = (
     .filter((improvement) => {
       const cost =
         getMinorImprovementCost(player, improvement.id) ?? improvement.cost
-      return canPayResources(player, cost)
+      if (!cost) return true
+      const normalizedCost: Partial<PlayerState['resources']> =
+        'fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost
+          ? ((cost as ComplexCost).fee ?? {})
+          : (cost as Partial<PlayerState['resources']>)
+      return canPayResources(player, normalizedCost)
     })
     .map((improvement) => ({
       value: `major:${improvement.id}`,
@@ -247,7 +253,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
     roundAvailable: 1,
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
-    execute: ({ player, space, params }) => {
+    execute: ({ player, space, params, sourceCard }) => {
       const gain = params ?? gainConfigByActionId.get(space.id)
       const gained: Record<string, number> = {}
       if (gain) {
@@ -258,6 +264,14 @@ export const internalActionDefinitions: ActionDefinition[] = [
           }
         })
         gainResources(player, gain)
+      }
+      if (sourceCard) {
+        return {
+          type: 'ok' as const,
+          resourcesGained: gained,
+          logKey: 'log.cardEffectGain',
+          logParams: { gain: gained, cardId: sourceCard },
+        }
       }
       return { type: 'ok' as const, resourcesGained: gained }
     },
@@ -464,6 +478,19 @@ export const internalActionDefinitions: ActionDefinition[] = [
       options: buildBakeBreadOptions(player),
     }),
     resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
+  },
+  {
+    id: 'anytime-reorg',
+    nameKey: 'actions.anytime-reorg.name',
+    descriptionKey: 'actions.anytime-reorg.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: (_, player) =>
+      player.pastures.length > 0 || Object.keys(player.stableAnimals ?? {}).length > 0,
+    execute: () => ({
+      type: 'animalReorg',
+      sourceId: 'anytime-reorg',
+    }),
   },
   {
     id: 'construct',

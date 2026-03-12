@@ -14,7 +14,11 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const accumulationSpaces = context.state.actionSpaces.filter(
-      (s) => s.takenBy === context.player.id && Object.values(s.gainPerRound).some((v) => v > 0),
+      (space) =>
+        space.takenBy === context.player.id &&
+        Object.values(space.gainPerRound).some(
+          (value) => typeof value === 'number' && value > 0,
+        ),
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return

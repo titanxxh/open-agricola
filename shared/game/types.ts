@@ -180,6 +180,7 @@ export type ActionExecutionContext = {
   space: ActionSpace
   costs?: Partial<Resource>
   params?: Partial<Resource>
+  sourceCard?: string
 }
 
 export type ActionChoiceOption = {
@@ -191,10 +192,11 @@ export type ActionChoiceOption = {
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
+  | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }
 export type ActionFlow =
-  | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string; params?: Partial<Resource> }
+  | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string; params?: Partial<Resource>; sourceCard?: string }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
       promptKey?: string
@@ -230,3 +232,97 @@ export type PendingAction =
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
   | { type: 'none' }
+
+export type InteractionCommand =
+  | 'takeAction'
+  | 'resolveChoice'
+  | 'commitFarm'
+  | 'takeAnytimeAction'
+  | 'confirmReorg'
+  | 'confirmFeed'
+  | 'confirmNextPlayer'
+  | 'confirmPlayerSwitch'
+  | 'undoStep'
+  | 'undoAction'
+
+export type AnytimeAction = {
+  id: string
+  labelKey: string
+  labelParams?: Record<string, string | number>
+  actionId?: string
+  sourceCard?: string
+}
+
+export type InteractionFarmSelection =
+  | {
+      farmType: 'fence'
+      selectableEdges: string[]
+      extraWood?: number
+    }
+  | {
+      farmType: 'room'
+      selectableTiles: FarmTilePosition[]
+      maxSelections: number
+      costPerRoom?: Partial<Resource>
+    }
+  | {
+      farmType: 'stable'
+      selectableTiles: FarmTilePosition[]
+      maxSelections: number
+    }
+  | {
+      farmType: 'plow'
+      selectableTiles: FarmTilePosition[]
+    }
+  | {
+      farmType: 'sow'
+      selectableFields: {
+        tile: FarmTilePosition
+        allowedCrops: ('grain' | 'vegetable')[]
+      }[]
+    }
+
+type InteractionBase = {
+  allowedCommands: InteractionCommand[]
+  anytimeActions: AnytimeAction[]
+}
+
+export type InteractionState =
+  | (InteractionBase & { stateId: 'idle' })
+  | (InteractionBase & {
+      stateId: 'choice'
+      playerIndex: number
+      spaceId: string
+      promptKey?: string
+      options: ActionChoiceOption[]
+      costOverride?: Partial<Resource>
+    })
+  | (InteractionBase & {
+      stateId: 'farmSelect'
+      playerIndex: number
+      spaceId: string
+      promptKey?: string
+      options: ActionChoiceOption[]
+      costOverride?: Partial<Resource>
+      farm: InteractionFarmSelection
+    })
+  | (InteractionBase & {
+      stateId: 'animalReorg'
+      playerIndex: number
+      spaceId: string
+    })
+  | (InteractionBase & {
+      stateId: 'harvestFeed'
+      playerIndex: number
+      remaining: number
+      feedQueue?: { index: number; remaining: number }[]
+    })
+  | (InteractionBase & {
+      stateId: 'confirmNextPlayer'
+      nextPlayerIndex: number
+    })
+  | (InteractionBase & {
+      stateId: 'confirmPlayerSwitch'
+      fromPlayerIndex: number
+      toPlayerIndex: number
+    })

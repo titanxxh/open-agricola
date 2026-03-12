@@ -351,7 +351,12 @@ export const createInitialPlayers = (
 ): PlayerState[] => {
   const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
   const dealtHands = dealHands(count, seed)
-  const base = [
+  const base: Array<{
+    id: PlayerState['id']
+    name: string
+    color: PlayerState['color']
+    startPlayer: boolean
+  }> = [
     { id: 'p1', name: '玩家 A', color: 'red', startPlayer: true },
     { id: 'p2', name: '玩家 B', color: 'blue', startPlayer: false },
     { id: 'p3', name: '玩家 C', color: 'black', startPlayer: false },

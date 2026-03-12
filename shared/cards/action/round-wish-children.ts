@@ -1,5 +1,5 @@
-import type { ActionDefinition } from '../../../game/types'
-import { wrapOptional } from '../../actions/flow'
+import type { ActionDefinition } from '../../game/types'
+import { deriveCanBeExecutedByFlow, wrapOptional } from '../../actions/flow'
 
 export const wishChildren: ActionDefinition = {
   id: 'wish-children',
@@ -7,7 +7,7 @@ export const wishChildren: ActionDefinition = {
   descriptionKey: 'actions.wish-children.description',
   roundAvailable: 2,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => player.rooms > player.familySize,
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

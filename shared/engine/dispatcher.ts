@@ -6,7 +6,6 @@ import {
   runActionHooks,
 } from '../actions/hooks'
 import {
-  runCardListeners,
   getMatchingListeners,
   executeCardListener,
   type MatchedCardListener,
@@ -107,7 +106,7 @@ export class HookDispatcher {
   }
 
   immediatelyAfter(
-    context: ActionExecutionContext & { actionId: string },
+    context: ActionExecutionContext & { actionId: string; choice?: string },
     result: ActionExecutionResult,
     choice?: string,
   ): EffectPhaseResult {
@@ -118,7 +117,7 @@ export class HookDispatcher {
   }
 
   after(
-    context: ActionExecutionContext & { actionId: string },
+    context: ActionExecutionContext & { actionId: string; choice?: string },
     result: ActionExecutionResult,
     choice?: string,
   ): EffectPhaseResult {

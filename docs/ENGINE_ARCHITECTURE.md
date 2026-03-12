@@ -113,6 +113,7 @@ Phase 2 前端联调已完成：
 - `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
+- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时从 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）恢复该房间状态；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
 
 #### 4.3.2 如果后续要支持 patch，同步协议应如何设计
 
@@ -192,6 +193,24 @@ type StateUpdateEnvelope =
 - `sync`：标记当前是完整快照还是增量 patch
 - `cause`：说明这次更新由哪个命令触发，便于调试和埋点
 - `pending` / `scores` / `historyLength`：即使使用 patch，也建议作为 top-level 字段始终带上，避免客户端再从 patch 里二次推断
+- 当前实现还会同步携带 `interaction`：它比 `pending` 更贴近 BGA 的状态 args，包含 `stateId`、`allowedCommands`、`anytimeActions` 与服务端白名单目标；前端主消费对象已切到它，`pending` 主要保留给兼容层与 undo 历史。
+
+#### 4.3.2 当前交互协议（BGA 风格）
+
+当前 `GameSyncPayload` / `SessionResponse` 同时包含两层交互信息：
+
+- `pending`：后端规则状态与历史兼容层。
+- `interaction`：前端渲染层的唯一真相，携带：
+  - `stateId`
+  - `allowedCommands`
+  - `anytimeActions`
+  - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`
+
+协议层规则：
+
+- 存在未完成交互时，普通 `takeAction` 会被拒绝。
+- 只有 `allowedCommands` 中声明的命令可以继续推进。
+- `anytime` 不再覆盖当前 pending，而是通过引擎根前插 flow 执行，结束后回到原未完成节点。
 
 #### 4.3.3 patch 的推荐生成方式
 
@@ -430,7 +449,7 @@ WebSocket 比轮询 HTTP 更适合这个场景。
 
 推荐的房间流程如下：
 
-1. 客户端连接 `ws://localhost:5175/ws`
+1. 客户端连接 `ws://<host>:5175/ws`
 2. 首位玩家发送 `createRoom`
 3. 服务端创建 `Room` 和 `GameSession`
 4. 其他玩家发送 `joinRoom`
@@ -986,6 +1005,8 @@ type PendingAction =
 #### 11.6.1 行动生命周期 Hook
 
 行动生命周期 Hook 负责拦截或扩展某个 action 的执行过程。
+
+对于由多个子动作组成的行动格，当前实现补充了一条重要约束：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，`canBeExecutedByPlayer` 可以由 `flow` 递归合成，而不是在行动卡文件里再手写一份平行条件。递归到 `leaf` 时，应继续复用子 action 自身的 `isDoable` 判定，并继续应用该子 action 的 `isDoable` hooks / CardListener；这样像 `grain-utilization` 里的 `sow`、`farm-expansion` 里的 `construct` / `stables`、`major-improvement` 里的 `improvement-any`，以及被卡牌放宽的子行动，都能在行动格开放性判断阶段保持一致。
 
 推荐沿用以下 phase：
 

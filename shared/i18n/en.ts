@@ -330,6 +330,7 @@ export const en = {
     plow: { name: 'Plow', description: 'Plow 1 field' },
     sow: { name: 'Sow', description: 'Sow in empty fields' },
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
+    'anytime-reorg': { name: 'Reorganize Animals', description: 'Reorganize animals at any time' },
     'house-redevelopment': { name: 'House Redevelopment', description: 'Renovate and optionally improve' },
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
     'card-choice': { name: 'Card Choice', description: 'Make a choice from card options' },

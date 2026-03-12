@@ -4,6 +4,7 @@ import type { StateUpdateEnvelope } from './game'
 export type ClientCommand =
   | { type: 'action'; spaceId: string }
   | { type: 'choice'; value: string }
+  | { type: 'anytime'; actionId: string }
   | {
       type: 'reorg'
       zones: {
@@ -33,7 +34,7 @@ export type ClientCommand =
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string }
-  | { type: 'joinRoom'; roomId: string; name?: string }
+  | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
 
 export type ServerEvent =
   | StateUpdateEnvelope

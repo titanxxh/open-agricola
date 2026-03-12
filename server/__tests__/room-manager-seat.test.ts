@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest'
+import { FIXED_DEV_ROOM_ID, resolveJoinPlayerIndex } from '../room-manager.ts'
+
+const createRoom = (
+  id: string,
+  playerIndices: number[],
+  maxPlayers = 2,
+) => ({
+  id,
+  maxPlayers,
+  players: playerIndices.map((playerIndex) => ({
+    playerIndex,
+    ws: {} as never,
+    name: `Player ${playerIndex + 1}`,
+  })),
+})
+
+describe('room-manager seat assignment', () => {
+  it('binds fixed dev room reconnects to requested seat', () => {
+    const room = createRoom(FIXED_DEV_ROOM_ID, [0, 1])
+    const result = resolveJoinPlayerIndex(room, 0)
+
+    expect(result).toEqual({
+      ok: true,
+      playerIndex: 0,
+      replacedExistingPlayer: true,
+    })
+  })
+
+  it('rejects taking an occupied seat in non-fixed rooms', () => {
+    const room = createRoom('abc123', [0, 1])
+    const result = resolveJoinPlayerIndex(room, 0)
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'player slot occupied',
+    })
+  })
+
+  it('uses the requested empty seat when available', () => {
+    const room = createRoom(FIXED_DEV_ROOM_ID, [1])
+    const result = resolveJoinPlayerIndex(room, 0)
+
+    expect(result).toEqual({
+      ok: true,
+      playerIndex: 0,
+      replacedExistingPlayer: false,
+    })
+  })
+
+  it('fills the first free seat when no seat is requested', () => {
+    const room = createRoom('abc123', [1], 3)
+    const result = resolveJoinPlayerIndex(room)
+
+    expect(result).toEqual({
+      ok: true,
+      playerIndex: 0,
+      replacedExistingPlayer: false,
+    })
+  })
+
+  it('rejects invalid requested seat indices', () => {
+    const room = createRoom(FIXED_DEV_ROOM_ID, [])
+
+    expect(resolveJoinPlayerIndex(room, -1)).toEqual({
+      ok: false,
+      error: 'invalid player slot',
+    })
+    expect(resolveJoinPlayerIndex(room, 2)).toEqual({
+      ok: false,
+      error: 'invalid player slot',
+    })
+  })
+})

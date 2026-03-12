@@ -66,7 +66,7 @@ export const FARM_ROWS = 3
 export const FARM_COLS = 5
 export const MAX_FENCES = 15
 
-const getAllTilePositions = (): FarmTilePosition[] => {
+export const getAllTilePositions = (): FarmTilePosition[] => {
   const positions: FarmTilePosition[] = []
   for (let row = 0; row < FARM_ROWS; row += 1) {
     for (let col = 0; col < FARM_COLS; col += 1) {
@@ -74,6 +74,21 @@ const getAllTilePositions = (): FarmTilePosition[] => {
     }
   }
   return positions
+}
+
+export const getAllEdgeIds = () => {
+  const edges: string[] = []
+  for (let row = 0; row <= FARM_ROWS; row += 1) {
+    for (let col = 0; col < FARM_COLS; col += 1) {
+      edges.push(`H-${row}-${col}`)
+    }
+  }
+  for (let row = 0; row < FARM_ROWS; row += 1) {
+    for (let col = 0; col <= FARM_COLS; col += 1) {
+      edges.push(`V-${row}-${col}`)
+    }
+  }
+  return edges
 }
 
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`

@@ -3,10 +3,8 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
-import { FARM_COLS, FARM_ROWS, positionKey, getAllTilePositions } from '../../shared/game/farm'
+import { positionKey } from '../../shared/game/farm'
 import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
-import { getBuildRoomCost } from '../../shared/actions/effects/house'
-import { stableWoodCost } from '../../shared/actions/effects/fencing'
 import { computeScores } from '../../shared/logic/scoring'
 import { applyIsDoableHooks } from '../../shared/actions/hooks'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
@@ -32,13 +30,6 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
 import { ResourceLine } from '../components/common/ResourceLine'
-import {
-  validateFence,
-  validateRoom,
-  validateStable,
-  validatePlow,
-  validateSow,
-} from '../services/api'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -54,6 +45,16 @@ const setRoomInUrl = (roomId: string) => {
   const newSearch = params.toString()
   const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash || ''}`
   window.history.replaceState(null, '', newUrl)
+}
+
+const toRequestedPlayerIndex = (playerParam: string | null) => {
+  if (!playerParam) return undefined
+  const match = /^p(\d+)$/.exec(playerParam)
+  if (!match) return undefined
+  const playerIndex = Number(match[1]) - 1
+  return Number.isInteger(playerIndex) && playerIndex >= 0
+    ? playerIndex
+    : undefined
 }
 
 type WsStatus =
@@ -136,6 +137,7 @@ const useTransportSetup = (playerParam: string | null) => {
         rawWs.addEventListener('message', handler)
       } else {
         let roomId = roomParam
+        const requestedPlayerIndex = toRequestedPlayerIndex(playerParam)
         if (!roomId) {
           setWsStatus({
             phase: 'error',
@@ -159,7 +161,11 @@ const useTransportSetup = (playerParam: string | null) => {
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('joinRoom', { roomId: roomId!, name: playerParam ?? 'Player 2' })
+          ws.sendRoomCommand('joinRoom', {
+            roomId: roomId!,
+            name: playerParam ?? 'Player 2',
+            requestedPlayerIndex,
+          })
         })
 
         if ('error' in resp) {
@@ -190,7 +196,7 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
-  const { state, pending, historyLength, hasActionStartSnapshot, applySnapshot } =
+  const { state, pending, interaction, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>('en')
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
@@ -292,96 +298,74 @@ export const GameContainerApi = () => {
     void transport.undoAction().catch((e) => console.error('undoAction error', e))
   }, [transport, isInteractive])
 
+  const takeAnytimeAction = useCallback((actionId: string) => {
+    if (!state || !isInteractive) return
+    void transport.takeAnytimeAction(state.currentPlayerIndex, actionId).catch((e) => {
+      console.error('takeAnytimeAction error', e)
+    })
+  }, [state, transport, isInteractive])
+
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
-    if (pending.type !== 'choice' || !currentPlayer) return
-    const promptKey = pending.promptKey
-    if (promptKey === 'ui.interactionFenceSelect') {
+    if (!currentPlayer) return
+    if (interaction.stateId === 'farmSelect') {
+      const pendingPlayerIndex = interaction.playerIndex
       if (value === 'cancel') {
-        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
+        void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
         return
       }
-      void validateFence(currentPlayer.id, pendingFenceEdges, 0).then((result) => {
-        if (result.valid) {
-          void transport.commitFarm(pending.playerIndex, 'fence', { edges: pendingFenceEdges, extraWood: 0 }).catch((e) => console.error(e))
-        } else {
-          setFenceError(result.error ?? { code: 'unknown', edges: [], newEdges: [] })
+      if (interaction.farm.farmType === 'fence') {
+        void transport.commitFarm(pendingPlayerIndex, 'fence', {
+          edges: pendingFenceEdges,
+          extraWood: interaction.farm.extraWood ?? 0,
+        }).catch((e) => console.error(e))
+        return
+      }
+      if (interaction.farm.farmType === 'room') {
+        void transport.commitFarm(pendingPlayerIndex, 'room', {
+          rooms: pendingRoomTiles,
+          costPerRoom: interaction.farm.costPerRoom ?? {},
+        }).catch((e) => console.error(e))
+        return
+      }
+      if (interaction.farm.farmType === 'stable') {
+        void transport.commitFarm(pendingPlayerIndex, 'stable', {
+          stables: pendingStableTiles,
+        }).catch((e) => console.error(e))
+        return
+      }
+      if (interaction.farm.farmType === 'plow') {
+        if (!pendingPlowTile) {
+          setPlowError('NO_SELECTION')
+          return
         }
-      })
+        void transport.commitFarm(pendingPlayerIndex, 'plow', {
+          tile: pendingPlowTile,
+        }).catch((e) => console.error(e))
+        return
+      }
+      if (interaction.farm.farmType === 'sow') {
+        const crops = Object.entries(pendingSowSelections)
+          .map(([key, crop]) => {
+            const [rowText, colText] = key.split('-')
+            const row = Number(rowText)
+            const col = Number(colText)
+            if (!Number.isFinite(row) || !Number.isFinite(col)) return null
+            return { row, col, crop }
+          })
+          .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
+        if (crops.length === 0) {
+          setSowError('NO_SELECTION')
+          return
+        }
+        void transport.commitFarm(pendingPlayerIndex, 'sow', { crops }).catch((e) => console.error(e))
+        return
+      }
       return
     }
-    if (promptKey === 'ui.interactionRoomSelect') {
-      if (value === 'cancel') {
-        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
-        return
-      }
-      const cost = getBuildRoomCost(currentPlayer.houseType)
-      void validateRoom(currentPlayer.id, pendingRoomTiles, cost).then((result) => {
-        if (result.valid) {
-          void transport.commitFarm(pending.playerIndex, 'room', { rooms: pendingRoomTiles, costPerRoom: cost }).catch((e) => console.error(e))
-        } else {
-          setRoomError(result.error?.code ?? result.error ?? 'validation failed')
-        }
-      })
-      return
-    }
-    if (promptKey === 'ui.interactionStableSelect') {
-      if (value === 'cancel') {
-        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
-        return
-      }
-      void validateStable(currentPlayer.id, pendingStableTiles).then((result) => {
-        if (result.valid) {
-          void transport.commitFarm(pending.playerIndex, 'stable', { stables: pendingStableTiles }).catch((e) => console.error(e))
-        } else {
-          setStableError(result.error?.code ?? result.error ?? 'validation failed')
-        }
-      })
-      return
-    }
-    if (promptKey === 'ui.interactionPlowSelect' && pendingPlowTile) {
-      if (value === 'cancel') {
-        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
-        return
-      }
-      void validatePlow(currentPlayer.id, pendingPlowTile).then((result) => {
-        if (result.valid) {
-          void transport.commitFarm(pending.playerIndex, 'plow', { tile: pendingPlowTile }).catch((e) => console.error(e))
-        } else {
-          setPlowError(result.error?.code ?? result.error ?? 'validation failed')
-        }
-      })
-      return
-    }
-    if (promptKey === 'ui.interactionSowSelect') {
-      const crops = Object.entries(pendingSowSelections)
-        .map(([key, crop]) => {
-          const [rowText, colText] = key.split('-')
-          const row = Number(rowText)
-          const col = Number(colText)
-          if (!Number.isFinite(row) || !Number.isFinite(col)) return null
-          return { row, col, crop }
-        })
-        .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
-      if (value === 'cancel') {
-        void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
-        return
-      }
-      if (crops.length === 0) {
-        setSowError('NO_SELECTION')
-        return
-      }
-      void validateSow(currentPlayer.id, crops).then((result) => {
-        if (result.valid) {
-          void transport.commitFarm(pending.playerIndex, 'sow', { crops }).catch((e) => console.error(e))
-        } else {
-          setSowError(result.error?.code ?? result.error ?? 'validation failed')
-        }
-      })
-      return
-    }
-    void transport.resolveChoice(pending.playerIndex, value).catch((e) => console.error(e))
-  }, [pending, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, transport, setFenceError, setRoomError, setStableError, setPlowError, setSowError, isInteractive])
+    if (interaction.stateId !== 'choice') return
+    void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -436,21 +420,41 @@ export const GameContainerApi = () => {
     void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
   }, [transport, isInteractive, resetSeedInput])
 
-  const pendingChoice = pending.type === 'choice' ? {
-    promptKey: pending.promptKey, options: pending.options,
-    playerIndex: pending.playerIndex, spaceId: pending.spaceId,
-  } : null
-  const pendingNextPlayerIndex = pending.type === 'confirmNextPlayer' ? pending.nextPlayerIndex : null
-  const pendingPlayerSwitch = pending.type === 'confirmPlayerSwitch' ? {
-    fromPlayerIndex: pending.fromPlayerIndex,
-    toPlayerIndex: pending.toPlayerIndex,
-  } : null
-  const pendingAnimalReorg = pending.type === 'animalReorg' ? { playerIndex: pending.playerIndex, spaceId: pending.spaceId } : null
-  const harvestPending = pending.type === 'harvestFeed' && state ? {
-    playerIndex: pending.playerIndex,
-    playerName: state.players[pending.playerIndex]?.name ?? '',
-    remaining: pending.remaining, foodUsed: 0,
-  } : null
+  const pendingChoice =
+    interaction.stateId === 'choice' || interaction.stateId === 'farmSelect'
+      ? {
+          promptKey: interaction.promptKey,
+          options: interaction.options,
+          playerIndex: interaction.playerIndex,
+          spaceId: interaction.spaceId,
+          fenceExtraWood:
+            interaction.stateId === 'farmSelect' && interaction.farm.farmType === 'fence'
+              ? interaction.farm.extraWood ?? 0
+              : undefined,
+        }
+      : null
+  const pendingNextPlayerIndex =
+    interaction.stateId === 'confirmNextPlayer' ? interaction.nextPlayerIndex : null
+  const pendingPlayerSwitch =
+    interaction.stateId === 'confirmPlayerSwitch'
+      ? {
+          fromPlayerIndex: interaction.fromPlayerIndex,
+          toPlayerIndex: interaction.toPlayerIndex,
+        }
+      : null
+  const pendingAnimalReorg =
+    interaction.stateId === 'animalReorg'
+      ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId }
+      : null
+  const harvestPending =
+    interaction.stateId === 'harvestFeed' && state
+      ? {
+          playerIndex: interaction.playerIndex,
+          playerName: state.players[interaction.playerIndex]?.name ?? '',
+          remaining: interaction.remaining,
+          foodUsed: 0,
+        }
+      : null
   const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
 
   const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
@@ -468,9 +472,11 @@ export const GameContainerApi = () => {
     if (state.round < openRound) return false
     if (currentPlayer.workersAvailable <= 0) return false
     if (state.gameOver) return false
-    if (pendingChoice || pendingAnimalReorg || pendingNextPlayerIndex !== null || pendingPlayerSwitch || harvestPending) return false
+    if (interaction.stateId !== 'idle') return false
+    // Use backend-provided action availability
+    if (actionAvailability[space.id] === false) return false
     return true
-  }, [state, currentPlayer, roundOpenById, pendingChoice, pendingAnimalReorg, pendingNextPlayerIndex, pendingPlayerSwitch, harvestPending, isInteractive])
+  }, [state, currentPlayer, roundOpenById, interaction.stateId, isInteractive, actionAvailability])
 
   const actionMap = useMemo(() => {
     if (!state) return new Map<string, ActionSpace>()
@@ -598,17 +604,13 @@ export const GameContainerApi = () => {
   const existingFenceSet = useMemo(() => new Set(displayPlayer?.fenceSegments ?? []), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
 
-  const maxRoomSelections = useMemo(() => {
-    if (!displayPlayer) return 0
-    const cost = getBuildRoomCost(displayPlayer.houseType)
-    const resourceMax = Object.entries(cost).reduce((max, [key, value]) => {
-      if (typeof value !== 'number' || value <= 0) return max
-      const available = displayPlayer.resources[key as keyof Resource] ?? 0
-      return Math.min(max, Math.floor(available / value))
-    }, Number.POSITIVE_INFINITY)
-    const openTiles = FARM_ROWS * FARM_COLS - roomPositions.size - fieldPositions.size - stablePositions.size
-    return Math.min(resourceMax, openTiles)
-  }, [displayPlayer, roomPositions, fieldPositions, stablePositions])
+  const farmInteraction =
+    interaction.stateId === 'farmSelect' ? interaction.farm : null
+
+  const maxRoomSelections = useMemo(
+    () => (farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0),
+    [farmInteraction],
+  )
 
   const resetBakeExchangeCounts = () => {
     const nextCounts: Record<string, number> = {}
@@ -618,7 +620,10 @@ export const GameContainerApi = () => {
     setBakeExchangeCounts(nextCounts)
   }
 
-  const maxStableSelections = useMemo(() => Math.max(0, Math.floor((displayPlayer?.resources.wood ?? 0) / stableWoodCost)), [displayPlayer?.resources.wood])
+  const maxStableSelections = useMemo(
+    () => (farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0),
+    [farmInteraction],
+  )
   const sowSelectedCount = Object.keys(pendingSowSelections).length
   const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
   const roomErrorText: string | null = roomError ? (typeof roomError === 'string' ? roomError : '') : null
@@ -709,16 +714,41 @@ export const GameContainerApi = () => {
     boar: Math.max(0, reorgAvailable.boar - reorgTotals.boar),
     cattle: Math.max(0, reorgAvailable.cattle - reorgTotals.cattle),
   } : null
-  const hasAnytimeReorg = (currentPlayer?.pastures.length ?? 0) > 0 || Object.keys(currentPlayer?.stableAnimals ?? {}).length > 0
-  const openAnytimeReorg = () => {
-    if (!currentPlayer) return
-    const stKeys = getLooseStableKeys(currentPlayer)
-    setAnimalReorg({ zones: [
-      ...currentPlayer.pastures.map((p) => ({ id: p.id, zoneType: 'pasture' as const, animalType: p.animalType, animalCount: p.animalCount })),
-      { id: 'house', zoneType: 'house' as const, animalType: currentPlayer.houseAnimalType ?? null, animalCount: currentPlayer.houseAnimalCount ?? 0 },
-      ...stKeys.map((key) => ({ id: `stable:${key}`, zoneType: 'stable' as const, animalType: currentPlayer.stableAnimals?.[key] ?? null, animalCount: currentPlayer.stableAnimals?.[key] ? 1 : 0 })),
-    ], confirmDiscard: false })
-  }
+  const roomSelectableSet = useMemo(
+    () =>
+      new Set(
+        farmInteraction?.farmType === 'room'
+          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
+          : [],
+      ),
+    [farmInteraction],
+  )
+  const stableSelectableSet = useMemo(
+    () =>
+      new Set(
+        farmInteraction?.farmType === 'stable'
+          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
+          : [],
+      ),
+    [farmInteraction],
+  )
+  const fenceSelectableSet = useMemo(
+    () =>
+      new Set(
+        farmInteraction?.farmType === 'fence'
+          ? farmInteraction.selectableEdges
+          : [],
+      ),
+    [farmInteraction],
+  )
+  const sowSelectableMap = useMemo(() => {
+    const map = new Map<string, ('grain' | 'vegetable')[]>()
+    if (farmInteraction?.farmType !== 'sow') return map
+    farmInteraction.selectableFields.forEach((entry) => {
+      map.set(positionKey(entry.tile), entry.allowedCrops)
+    })
+    return map
+  }, [farmInteraction])
   const wrappedToggleRoom = (tile: FarmTilePosition) =>
     toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
   const wrappedToggleStable = (tile: FarmTilePosition) =>
@@ -808,37 +838,15 @@ export const GameContainerApi = () => {
     })
   }
   const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
-  const plowSelectableSet = useMemo(() => {
-    const occupied = new Set<string>()
-    roomPositions.forEach((key) => occupied.add(key))
-    fieldPositions.forEach((key) => occupied.add(key))
-    stablePositions.forEach((key) => occupied.add(key))
-    pastureTiles.forEach((_, key) => occupied.add(key))
-    if (fieldPositions.size === 0) {
-      const result = new Set<string>()
-      getAllTilePositions().forEach((pos) => {
-        const key = positionKey(pos)
-        if (!occupied.has(key)) result.add(key)
-      })
-      return result
-    }
-    const deltas = [
-      { dr: -1, dc: 0 },
-      { dr: 1, dc: 0 },
-      { dr: 0, dc: -1 },
-      { dr: 0, dc: 1 },
-    ]
-    const result = new Set<string>()
-    getAllTilePositions().forEach((pos) => {
-      const key = positionKey(pos)
-      if (occupied.has(key)) return
-      const adjacent = deltas.some((delta) =>
-        fieldPositions.has(`${pos.row + delta.dr}-${pos.col + delta.dc}`),
-      )
-      if (adjacent) result.add(key)
-    })
-    return result
-  }, [isSelectingPlow, roomPositions, fieldPositions, stablePositions, pastureTiles])
+  const plowSelectableSet = useMemo(
+    () =>
+      new Set(
+        farmInteraction?.farmType === 'plow'
+          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
+          : [],
+      ),
+    [farmInteraction],
+  )
   const sowRemaining = useMemo(() => ({
     grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
     vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),
@@ -1036,6 +1044,7 @@ export const GameContainerApi = () => {
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingSowSelectionsLength={sowSelectedCount}
+        hasPendingPlowSelection={pendingPlowTile !== null}
         fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
         stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
         isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
@@ -1151,8 +1160,13 @@ export const GameContainerApi = () => {
           saveDevState={saveDevState} loadDevState={loadDevState}
         />
       ) : null}
-      <AnytimeBar hasAnytimeReorg={hasAnytimeReorg} pendingChoice={pendingChoice} pendingNextPlayerIndex={pendingNextPlayerIndex} pendingAnimalReorg={pendingAnimalReorg} locale={locale} openAnytimeReorg={openAnytimeReorg} />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} isInteractive={isInteractive} myPlayerName={displayPlayer?.name ?? null} isMyTurn={isInteractive} />
+      <AnytimeBar
+        anytimeActions={interaction.anytimeActions}
+        locale={locale}
+        isInteractive={isInteractive}
+        takeAnytimeAction={takeAnytimeAction}
+      />
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={displayPlayer?.name ?? null} isMyTurn={isInteractive} />
       <GameControls
         locale={locale}
         onUndo={undoStep}
@@ -1176,13 +1190,13 @@ export const GameContainerApi = () => {
           fieldMap={fieldMap} stablePositions={stablePositions}
           pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
           pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-          canSelectRooms={isSelectingRooms} canSelectStables={isSelectingStables} canSelectPlow={isSelectingPlow} canSelectSow={isSelectingSow}
+          roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
           maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-          pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} pastureTiles={pastureTiles}
+          pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
           pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
           stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
           hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
-          existingFenceSet={existingFenceSet} canSelectFences={isSelectingFences}
+          existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
           toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
           togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
           toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}

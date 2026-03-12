@@ -1,4 +1,4 @@
-import type { Resource, ComplexCost } from '../../../game/types'
+import type { Resource, ComplexCost } from '../../game/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
 
 export type MajorEffectHook = CardEffectHook

@@ -14,6 +14,7 @@ type Props = {
   pendingStableTilesLength: number
   maxStableSelections: number
   pendingSowSelectionsLength?: number
+  hasPendingPlowSelection: boolean
   fenceErrorText: string
   roomErrorText: string
   stableErrorText: string
@@ -44,6 +45,7 @@ export const InteractionBar = ({
   pendingStableTilesLength,
   maxStableSelections,
   pendingSowSelectionsLength,
+  hasPendingPlowSelection,
   fenceErrorText,
   roomErrorText,
   stableErrorText,
@@ -60,116 +62,126 @@ export const InteractionBar = ({
   confirmPlayerSwitch,
   harvestFeedPlayerName,
   confirmHarvestFeed,
-}: Props) => (
-  <div className="interaction-bar">
-    {pendingAnimalReorg ? (
-      <>
-        <div className="interaction-title">
-          {t(locale, 'ui.interactionReorgAnimalsTitle')}
-        </div>
-        <div className="interaction-subtitle">
-          {t(locale, 'ui.interactionReorgAnimalsSubtitle')}
-        </div>
-      </>
-    ) : harvestFeedPlayerName ? (
-      <>
-        <div className="interaction-title">
-          {t(locale, 'ui.harvestFeedConfirm')}
-        </div>
-        <div className="interaction-actions">
-          <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
-            {t(locale, 'ui.interactionConfirmButton')}
-          </button>
-        </div>
-      </>
-    ) : pendingChoice ? (
-      <>
-        <div className="interaction-title">
-          {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
-        </div>
-        {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
-          <div className="interaction-subtitle">
-            {t(locale, 'ui.interactionRoomSelectSubtitle', {
-              selected: pendingRoomTilesLength,
-              max: maxRoomSelections,
-            })}
+}: Props) => {
+  const visibleOptions =
+    pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
+      ? pendingChoice.options.filter((option) => option.value === 'confirm')
+      : pendingChoice?.options ?? []
+
+  return (
+    <div className="interaction-bar">
+      {pendingAnimalReorg ? (
+        <>
+          <div className="interaction-title">
+            {t(locale, 'ui.interactionReorgAnimalsTitle')}
           </div>
-        ) : null}
-        {pendingChoice.promptKey === 'ui.interactionStableSelect' ? (
           <div className="interaction-subtitle">
-            {t(locale, 'ui.interactionStableSelectSubtitle', {
-              selected: pendingStableTilesLength,
-              max: maxStableSelections,
-            })}
+            {t(locale, 'ui.interactionReorgAnimalsSubtitle')}
           </div>
-        ) : null}
-        {pendingChoice.promptKey === 'ui.interactionSowSelect' ? (
-          <div className="interaction-subtitle">
-            {t(locale, 'ui.interactionSowSelectSubtitle', {
-              selected: pendingSowSelectionsLength ?? 0,
-            })}
+        </>
+      ) : harvestFeedPlayerName ? (
+        <>
+          <div className="interaction-title">
+            {t(locale, 'ui.harvestFeedConfirm')}
           </div>
-        ) : null}
-        {isSelectingFences && fenceErrorText ? (
-          <div className="interaction-error">{fenceErrorText}</div>
-        ) : null}
-        {isSelectingRooms && roomErrorText ? (
-          <div className="interaction-error">{roomErrorText}</div>
-        ) : null}
-        {isSelectingStables && stableErrorText ? (
-          <div className="interaction-error">{stableErrorText}</div>
-        ) : null}
-        {isSelectingPlow && plowErrorText ? (
-          <div className="interaction-error">{plowErrorText}</div>
-        ) : null}
-        {isSelectingSow && sowErrorText ? (
-          <div className="interaction-error">{sowErrorText}</div>
-        ) : null}
-        {pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
           <div className="interaction-actions">
-            {pendingChoice.options.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => resolveChoice(option.value)}
-                disabled={
-                  !isInteractive ||
-                  (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
-                    option.value === 'confirm' &&
-                    (pendingSowSelectionsLength ?? 0) === 0)
-                }
-              >
-                {t(locale, option.labelKey, option.labelParams)}
-              </button>
-            ))}
+            <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
+              {t(locale, 'ui.interactionConfirmButton')}
+            </button>
           </div>
-        )}
-      </>
-    ) : pendingPlayerSwitch ? (
-      <>
-        <div className="interaction-title">
-          {t(locale, 'ui.interactionPlayerSwitchPrompt', {
-            player: playerNames[pendingPlayerSwitch.toPlayerIndex] ?? `Player ${pendingPlayerSwitch.toPlayerIndex + 1}`,
-          })}
-        </div>
-        <div className="interaction-actions">
-          <button onClick={confirmPlayerSwitch}>
-            {t(locale, 'ui.interactionPlayerSwitchConfirm')}
-          </button>
-        </div>
-      </>
-    ) : pendingNextPlayerIndex !== null ? (
-      <>
-        <div className="interaction-title">
-          {t(locale, 'ui.interactionConfirmNext')}
-        </div>
-        <div className="interaction-actions">
-          <button onClick={confirmNextPlayer} disabled={!isInteractive}>
-            {t(locale, 'ui.interactionConfirmSwitch')}
-          </button>
-        </div>
-      </>
-    ) : (
-      <div className="interaction-title">{t(locale, 'ui.interactionChooseOne')}</div>
-    )}
-  </div>
-)
+        </>
+      ) : pendingChoice ? (
+        <>
+          <div className="interaction-title">
+            {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+          </div>
+          {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
+            <div className="interaction-subtitle">
+              {t(locale, 'ui.interactionRoomSelectSubtitle', {
+                selected: pendingRoomTilesLength,
+                max: maxRoomSelections,
+              })}
+            </div>
+          ) : null}
+          {pendingChoice.promptKey === 'ui.interactionStableSelect' ? (
+            <div className="interaction-subtitle">
+              {t(locale, 'ui.interactionStableSelectSubtitle', {
+                selected: pendingStableTilesLength,
+                max: maxStableSelections,
+              })}
+            </div>
+          ) : null}
+          {pendingChoice.promptKey === 'ui.interactionSowSelect' ? (
+            <div className="interaction-subtitle">
+              {t(locale, 'ui.interactionSowSelectSubtitle', {
+                selected: pendingSowSelectionsLength ?? 0,
+              })}
+            </div>
+          ) : null}
+          {isSelectingFences && fenceErrorText ? (
+            <div className="interaction-error">{fenceErrorText}</div>
+          ) : null}
+          {isSelectingRooms && roomErrorText ? (
+            <div className="interaction-error">{roomErrorText}</div>
+          ) : null}
+          {isSelectingStables && stableErrorText ? (
+            <div className="interaction-error">{stableErrorText}</div>
+          ) : null}
+          {isSelectingPlow && plowErrorText ? (
+            <div className="interaction-error">{plowErrorText}</div>
+          ) : null}
+          {isSelectingSow && sowErrorText ? (
+            <div className="interaction-error">{sowErrorText}</div>
+          ) : null}
+          {pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
+            <div className="interaction-actions">
+              {visibleOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => resolveChoice(option.value)}
+                  disabled={
+                    !isInteractive ||
+                    (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
+                      option.value === 'confirm' &&
+                      !hasPendingPlowSelection) ||
+                    (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
+                      option.value === 'confirm' &&
+                      (pendingSowSelectionsLength ?? 0) === 0)
+                  }
+                >
+                  {t(locale, option.labelKey, option.labelParams)}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : pendingPlayerSwitch ? (
+        <>
+          <div className="interaction-title">
+            {t(locale, 'ui.interactionPlayerSwitchPrompt', {
+              player: playerNames[pendingPlayerSwitch.toPlayerIndex] ?? `Player ${pendingPlayerSwitch.toPlayerIndex + 1}`,
+            })}
+          </div>
+          <div className="interaction-actions">
+            <button onClick={confirmPlayerSwitch}>
+              {t(locale, 'ui.interactionPlayerSwitchConfirm')}
+            </button>
+          </div>
+        </>
+      ) : pendingNextPlayerIndex !== null ? (
+        <>
+          <div className="interaction-title">
+            {t(locale, 'ui.interactionConfirmNext')}
+          </div>
+          <div className="interaction-actions">
+            <button onClick={confirmNextPlayer} disabled={!isInteractive}>
+              {t(locale, 'ui.interactionConfirmSwitch')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="interaction-title">{t(locale, 'ui.interactionChooseOne')}</div>
+      )}
+    </div>
+  )
+}
