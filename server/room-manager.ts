@@ -148,10 +148,12 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
 const toSyncPayload = (resp: SessionResponse): GameSyncPayload => ({
   state: serializeState(resp.state),
   pending: resp.pending,
+  interaction: resp.interaction,
   scores: resp.scores ?? null,
   historyLength: resp.historyLength,
   hasActionStartSnapshot: resp.hasActionStartSnapshot,
   ok: resp.ok,
+  actionAvailability: resp.actionAvailability,
   error: resp.error,
 })
 
@@ -274,6 +276,12 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (msg.type === 'choice') {
         const resp = room.session.resolveChoice(currentPlayerIndex, msg.value)
         broadcastState(room, resp, 'choice')
+        return
+      }
+
+      if (msg.type === 'anytime') {
+        const resp = room.session.takeAnytimeAction(currentPlayerIndex, msg.actionId)
+        broadcastState(room, resp, 'anytime')
         return
       }
 

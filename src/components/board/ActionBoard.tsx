@@ -3,12 +3,6 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 
-const RESOURCE_LABELS: Record<string, string> = {
-  wood: 'wood', clay: 'clay', reed: 'reed', stone: 'stone',
-  grain: 'grain', vegetable: 'vegetable', food: 'food',
-  sheep: 'sheep', boar: 'boar', cattle: 'cattle',
-}
-
 const BOARD_W = 1000
 const BOARD_H = 795
 
@@ -315,7 +309,6 @@ export const ActionBoard = ({
             const isOpen = devMode || currentRound >= slot.round
             const action = slot.action
             const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
-            const spritePos = action ? ACTION_SPRITE[action.id] : undefined
             return (
               <div
                 key={`r-${slot.round}`}

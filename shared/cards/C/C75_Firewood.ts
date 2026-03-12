@@ -70,7 +70,7 @@ const storePendingChoice = (
  */
 const firewoodReturnHomeEffect = {
   id: CARD_ID,
-  onReturnHome: (state: GameState, player: PlayerState): void => {
+  onReturnHome: (_state: GameState, player: PlayerState): void => {
     // Check if player has this card
     if (!player.minorPlayed.includes(CARD_ID)) return
     

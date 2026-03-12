@@ -1,10 +1,11 @@
-import type { PendingAction } from '../game/types'
+import type { InteractionState, PendingAction } from '../game/types'
 import type { SerializedGameState } from '../game/serialization'
 import type { PlayerScoreSummary } from '../logic/scoring'
 
 export type GameSyncPayload = {
   state: SerializedGameState
   pending: PendingAction
+  interaction: InteractionState
   scores: PlayerScoreSummary[] | null
   historyLength: number
   hasActionStartSnapshot: boolean
@@ -16,6 +17,7 @@ export type GameSyncPayload = {
 export type StateUpdateCause =
   | 'action'
   | 'choice'
+  | 'anytime'
   | 'reorg'
   | 'feed'
   | 'undo'

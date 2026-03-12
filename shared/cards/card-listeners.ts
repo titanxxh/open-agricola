@@ -1,6 +1,5 @@
-import type { ActionExecutionContext, ActionExecutionResult } from '../../game/types'
-import type { ActionHookPhase, ActionHookResult } from '../hooks'
-import type { GameState, PlayerState } from '../../game/types'
+import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
+import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -8,6 +7,7 @@ export type CardListenerContext = ActionExecutionContext & {
   result?: ActionExecutionResult
   choice?: string
   doable?: boolean
+  extraData?: Record<string, unknown>
 }
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'

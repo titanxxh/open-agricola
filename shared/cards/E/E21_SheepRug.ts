@@ -17,7 +17,7 @@ const sheepRugIsDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['wish-children', 'wish-children-1', 'wish-children-2', 'wish-children-3', 'wish-children-4', 'wish-children-5', 'urgent-wish-children', 'urgent-wish-children-1', 'urgent-wish-children-2', 'urgent-wish-children-3', 'urgent-wish-children-4', 'urgent-wish-children-5'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, player } = context
+    const { player } = context
     
     // Check if player has this card played
     if (!player.minorPlayed.includes(CARD_ID)) return

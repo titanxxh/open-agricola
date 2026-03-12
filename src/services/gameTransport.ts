@@ -13,6 +13,7 @@ export interface GameTransport {
   getState(): Promise<GameSyncPayload>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
   resolveChoice(playerIndex: number, value: string): Promise<GameSyncPayload>
+  takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
   commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload>
   confirmReorg(playerIndex: number, zones: {
     id: string; zoneType: 'pasture' | 'house' | 'stable'
@@ -84,6 +85,10 @@ export class HttpGameTransport implements GameTransport {
 
   resolveChoice(playerIndex: number, value: string) {
     return this.send(() => post('/api/game/choice', { playerIndex, value }))
+  }
+
+  takeAnytimeAction(playerIndex: number, actionId: string) {
+    return this.send(() => post('/api/game/anytime', { playerIndex, actionId }))
   }
 
   commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>) {
@@ -159,16 +164,17 @@ export class WsGameTransport implements GameTransport {
     reject: (err: Error) => void
   }>()
   private reqCounter = 0
-  private lastPayload: GameSyncPayload | null = null
+  private readonly wsUrl: string
   readonly roomId: string
   readonly playerIndex: number
   private _connected = false
 
   constructor(
-    private readonly wsUrl: string = WS_BASE,
+    wsUrl: string = WS_BASE,
     roomId?: string,
     playerIndex?: number,
   ) {
+    this.wsUrl = wsUrl
     this.roomId = roomId ?? ''
     this.playerIndex = playerIndex ?? 0
   }
@@ -182,7 +188,7 @@ export class WsGameTransport implements GameTransport {
         this._connected = true
         resolve()
       }
-      this.ws.onerror = (e) => {
+      this.ws.onerror = () => {
         reject(new Error('WebSocket connection failed'))
       }
       this.ws.onclose = () => {
@@ -194,7 +200,6 @@ export class WsGameTransport implements GameTransport {
 
         if (msg.type === 'stateUpdate') {
           const envelope = msg as StateUpdateEnvelope
-          this.lastPayload = envelope.payload
           this.listeners.forEach((cb) => cb(envelope.payload))
           this.pendingResolvers.forEach(({ resolve: res }) => {
             res(envelope.payload)
@@ -226,23 +231,27 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'getState' })
   }
 
-  async takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload> {
+  async takeAction(_playerIndex: number, spaceId: string): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'action', spaceId })
   }
 
-  async resolveChoice(playerIndex: number, value: string): Promise<GameSyncPayload> {
+  async resolveChoice(_playerIndex: number, value: string): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'choice', value })
+  }
+
+  async takeAnytimeAction(_playerIndex: number, actionId: string): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'anytime', actionId })
   }
 
   async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow', payload })
   }
 
-  async confirmReorg(playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {
+  async confirmReorg(_playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'reorg', zones })
   }
 
-  async confirmFeed(playerIndex: number, selections: Parameters<GameTransport['confirmFeed']>[1]): Promise<GameSyncPayload> {
+  async confirmFeed(_playerIndex: number, selections: Parameters<GameTransport['confirmFeed']>[1]): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'feed', selections })
   }
 

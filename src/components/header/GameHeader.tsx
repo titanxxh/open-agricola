@@ -10,7 +10,6 @@ type Props = {
   allWorkersUsed: boolean
   devMode: boolean
   setDevMode: (value: boolean) => void
-  isInteractive: boolean
   myPlayerName: string | null
   isMyTurn: boolean
 }
@@ -23,7 +22,6 @@ export const GameHeader = ({
   allWorkersUsed,
   devMode,
   setDevMode,
-  isInteractive,
   myPlayerName,
   isMyTurn,
 }: Props) => (

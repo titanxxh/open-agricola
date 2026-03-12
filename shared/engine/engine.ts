@@ -62,6 +62,19 @@ export class Engine {
     return this.buildFlowNode(flow)
   }
 
+  prependFlow(flow: ActionFlow) {
+    const first = this.tree.nextUnresolved()
+    const flowNode = this.buildFlowNode(flow)
+    if (first) {
+      this.tree.insertBefore(first.id, [flowNode])
+      return
+    }
+    this.tree.root = new SequenceNode(`prepend-root-${this.flowNodeCounter++}`, [
+      flowNode,
+      this.tree.root,
+    ])
+  }
+
   private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
     if (typeof followUp === 'string') {
       return { actionId: followUp }

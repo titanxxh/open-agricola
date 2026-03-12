@@ -313,6 +313,7 @@ export const zh = {
     plow: { name: '开垦', description: '开垦 1 块田地' },
     sow: { name: '播种', description: '在空田播种作物' },
     'bake-bread': { name: '烤面包', description: '使用改良烤面包' },
+    'anytime-reorg': { name: '重整动物', description: '随时调整动物摆放' },
     'house-redevelopment': { name: '住宅改建', description: '改建并可追加改良' },
     'farm-redevelopment': { name: '农场改建', description: '改建房屋' },
     'card-choice': { name: '卡牌选择', description: '从卡牌选项中选择' },

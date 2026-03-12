@@ -17,7 +17,7 @@ const listener: CardListenerRegistration = {
     const counters = initCardState(context.player, CARD_ID)
     const previousBigPastures = counters['processedBigPastures'] ?? 0
     const currentBigPastures = context.player.pastures.filter(
-      (p) => (p.spaces?.length ?? 0) >= MIN_PASTURE_SIZE,
+      (pasture) => (pasture.tiles?.length ?? 0) >= MIN_PASTURE_SIZE,
     ).length
     const newBig = currentBigPastures - previousBigPastures
     if (newBig <= 0) return

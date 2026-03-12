@@ -1,38 +1,33 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { PendingAnimalReorg, PendingChoice } from '../../types/ui'
+import type { AnytimeAction } from '../../../shared/game/types'
 
 type Props = {
-  hasAnytimeReorg: boolean
-  pendingChoice: PendingChoice | null
-  pendingNextPlayerIndex: number | null
-  pendingAnimalReorg: PendingAnimalReorg | null
+  anytimeActions: AnytimeAction[]
   locale: Locale
-  openAnytimeReorg: () => void
+  isInteractive: boolean
+  takeAnytimeAction: (actionId: string) => void
 }
 
 export const AnytimeBar = ({
-  hasAnytimeReorg,
-  pendingChoice,
-  pendingNextPlayerIndex,
-  pendingAnimalReorg,
+  anytimeActions,
   locale,
-  openAnytimeReorg,
+  isInteractive,
+  takeAnytimeAction,
 }: Props) =>
-  hasAnytimeReorg ? (
+  anytimeActions.length > 0 ? (
     <div className="anytime-bar">
       <div className="anytime-title">{t(locale, 'ui.anytimeActions')}</div>
       <div className="anytime-actions">
-        <button
-          onClick={openAnytimeReorg}
-          disabled={
-            !!pendingChoice ||
-            pendingAnimalReorg !== null ||
-            pendingNextPlayerIndex !== null
-          }
-        >
-          {t(locale, 'ui.anytimeReorgAnimals')}
-        </button>
+        {anytimeActions.map((action) => (
+          <button
+            key={action.id}
+            onClick={() => takeAnytimeAction(action.id)}
+            disabled={!isInteractive}
+          >
+            {t(locale, action.labelKey, action.labelParams)}
+          </button>
+        ))}
       </div>
     </div>
   ) : null

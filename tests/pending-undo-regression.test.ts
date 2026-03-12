@@ -230,6 +230,63 @@ describe('pending choice types + undo regression', () => {
     })
   })
 
+  describe('interaction + anytime actions', () => {
+    beforeEach(() => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      player.resources.grain = 1
+      player.improvements.push('Major_Fireplace1')
+      session = new GameSession(state)
+    })
+
+    it('farmland exposes anytime bake-bread during plow selection', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const resp = session.takeAction(0, farmland.spaceId)
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId).toBe('farmSelect')
+      if (resp.interaction.stateId !== 'farmSelect') return
+
+      expect(resp.interaction.farm.farmType).toBe('plow')
+      expect(resp.interaction.anytimeActions.some((action) => action.id === 'bake-bread')).toBe(true)
+    })
+
+    it('anytime bake-bread can interrupt plow selection and return to it', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const takeResp = session.takeAction(0, farmland.spaceId)
+      if (!takeResp.ok) return
+
+      const anytimeResp = session.takeAnytimeAction(0, 'bake-bread')
+      expect(anytimeResp.ok).toBe(true)
+      expect(anytimeResp.interaction.stateId).toBe('choice')
+      if (anytimeResp.interaction.stateId !== 'choice') return
+      expect(anytimeResp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
+
+      const finishAnytime = session.resolveChoice(0, 'Major_Fireplace1')
+      expect(finishAnytime.ok).toBe(true)
+      expect(finishAnytime.state.players[0]!.resources.grain).toBe(0)
+      expect(finishAnytime.state.players[0]!.resources.food).toBeGreaterThan(0)
+      expect(finishAnytime.interaction.stateId).toBe('farmSelect')
+      if (finishAnytime.interaction.stateId !== 'farmSelect') return
+      expect(finishAnytime.interaction.promptKey).toBe('ui.interactionPlowSelect')
+    })
+
+    it('rejects ordinary takeAction while an interaction is in progress', () => {
+      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
+      if (!farmland) return
+
+      const takeResp = session.takeAction(0, farmland.spaceId)
+      if (!takeResp.ok) return
+
+      const rejectResp = session.takeAction(0, 'day-laborer')
+      expect(rejectResp.ok).toBe(false)
+      expect(rejectResp.error).toBe('interaction in progress')
+    })
+  })
+
   describe('pending type: animalReorg', () => {
     beforeEach(() => {
       session = new GameSession(createInitialState(42))
@@ -412,6 +469,7 @@ describe('pending choice types + undo regression', () => {
         expect(resp).toHaveProperty('ok')
         expect(resp).toHaveProperty('state')
         expect(resp).toHaveProperty('pending')
+        expect(resp).toHaveProperty('interaction')
         expect(resp).toHaveProperty('historyLength')
         expect(resp).toHaveProperty('hasActionStartSnapshot')
         expect(resp.state).toHaveProperty('round')
@@ -421,7 +479,7 @@ describe('pending choice types + undo regression', () => {
     })
 
     it('pending type is always one of the known variants', () => {
-      const validTypes = ['none', 'choice', 'animalReorg', 'harvestFeed', 'confirmNextPlayer']
+      const validTypes = ['none', 'choice', 'animalReorg', 'harvestFeed', 'confirmNextPlayer', 'confirmPlayerSwitch']
       const resp = session.getState()
       expect(validTypes).toContain(resp.pending.type)
 

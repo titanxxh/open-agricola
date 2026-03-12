@@ -14,7 +14,8 @@ const boarSpearDuringListener: CardListenerRegistration = {
     
     if (!TRACKED_ACTIONS.includes(actionId as any)) return
     
-    const obtainedBoar = result?.resourcesGained?.boar ?? 0
+    const obtainedBoar =
+      result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
     if (obtainedBoar <= 0) return
     
     const cardState = player.cardStates?.['E53_BoarSpear'] ?? {}
@@ -49,7 +50,8 @@ const boarSpearAfterListener: CardListenerRegistration = {
     
     if (!TRACKED_ACTIONS.includes(actionId as any)) return
     
-    const obtainedBoar = result?.resourcesGained?.boar ?? 0
+    const obtainedBoar =
+      result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
     if (obtainedBoar <= 0) return
     
     if (!choice) return
@@ -72,7 +74,7 @@ const boarSpearAfterListener: CardListenerRegistration = {
           },
         ],
       },
-      extraData_IGNORED: { 
+      extraData: {
         convertBoar: convertCount,
         previousConverted,
       },

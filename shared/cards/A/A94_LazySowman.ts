@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter, initCardState } from '../__stubs__/helpers'
+import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'A94_LazySowman'
 

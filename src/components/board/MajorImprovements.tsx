@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { PlayerState, Resource } from '../../../shared/game/types'
+import type { ComplexCost, PlayerState, Resource } from '../../../shared/game/types'
 import { formatResources } from '../../../shared/logic/format'
 import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
@@ -42,7 +42,17 @@ export const MajorImprovements = ({
     <div className="major-row">
       {availableMajorImprovements.map((cardId) => {
         const major = getMajorCardEffect(cardId)
-        const canBuy = !!major && canPayResources(currentPlayer, major.cost)
+        const normalizedCost: Partial<Resource> =
+          major && (
+            'fee' in major.cost ||
+            'fees' in major.cost ||
+            'trades' in major.cost ||
+            'cards' in major.cost ||
+            'bonuses' in major.cost
+          )
+            ? ((major.cost as ComplexCost).fee ?? {})
+            : ((major?.cost ?? {}) as Partial<Resource>)
+        const canBuy = !!major && canPayResources(currentPlayer, normalizedCost)
         const canInteract = isInteractive && isSelectingMajor && canBuy
         const futureEntries = futureCardResources[cardId] ?? []
         return (

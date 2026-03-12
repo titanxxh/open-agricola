@@ -75,6 +75,17 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/anytime') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; actionId?: string }
+    if (typeof body.playerIndex !== 'number' || typeof body.actionId !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const resp = getSingletonSession().takeAnytimeAction(body.playerIndex, body.actionId)
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/reorg') {
     const body = JSON.parse(await readBody(req)) as { playerIndex?: number; zones?: unknown[] }
     if (typeof body.playerIndex !== 'number' || !Array.isArray(body.zones)) {

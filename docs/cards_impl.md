@@ -47,6 +47,8 @@
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
 
 注：部分顶层行动卡的开放性不再单独手写，而是由 `flow` 递归合成。当前已接入顶层 `or` / `xor` 行动格，以及一批安全 `seq` 包装行动格；递归到 `leaf` 时会继续应用子行动自己的 `IsDoable` hook / CardListener，因此诸如 `A94_LazySowman` 挂在 `sow` 上的放宽效果、`B75_WoodWorkshop` 挂在 `improvement-any` 上的放宽效果，也能反映到顶层复合行动格的可执行性上。
+注：`card-choice` 与农场类选择现在统一走服务端 `interaction` 协议对外暴露；前端不再依赖本地 `promptKey` 规则推导可选格/可选边，只消费服务端下发的白名单 args。
+注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。
 注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
 注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。
 

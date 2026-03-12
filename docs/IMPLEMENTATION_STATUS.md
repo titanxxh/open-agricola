@@ -19,17 +19,18 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 `server/game-session.ts` — 唯一可写入 `GameState` 的入口。
 
 - 命令式方法：`takeAction`、`resolveChoice`、`commitFarmChoice`、`confirmAnimalReorg`、`confirmHarvestFeed`、`confirmNextPlayer`、`performRoundEnd`、`undoStep`、`undoAction`、`loadState`。
+- 新增 `takeAnytimeAction`：对当前引擎根节点做 BGA 风格前插 flow，中断完成后回到原交互。
 - Dev 方法：`startDevFenceSelect`。
 - 构造函数支持可选 `seed` 参数，用于可复现测试。
 - 内部维护 `history` 快照栈 + `actionStartIndex` 用于撤销。
-- 所有方法返回 `SessionResponse`（state + pending + scores + 元数据）。
+- 所有方法返回 `SessionResponse`（state + pending + interaction + scores + 元数据）。
 
 ### 2.2 WS 房间管理
 
 `server/room-manager.ts` — WebSocket 主链路。
 
 - 每个房间持有独立 `GameSession` 实例。
-- 支持 `ClientCommand`（共享类型）：`action`、`choice`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
+- 支持 `ClientCommand`（共享类型）：`action`、`choice`、`anytime`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
 - 状态变更后广播 `StateUpdateEnvelope`（含 version + cause）给房间内所有客户端。
 - 连接断开时清理玩家，非固定房间在空房时自动销毁。
 - **固定持久化房间（dev）**：房间 ID 由 `PERSISTENT_ROOM_ID` 指定，默认 `dev`。后端启动时若存在 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）则恢复该房间状态，否则新建空局；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁，便于重启后端后继续对局。固定房间的 WS 加入现在支持 `requestedPlayerIndex`，前端会把 `player=p1/p2` 固定映射到 0/1 号位，刷新重连时会替换旧连接而不是误占另一个空位。为兼容旧环境，固定 dev 房间仍会回退读取 `.persisted-room.json`。文档中的访问示例统一写作 `http://<host>:5173/...`；同机本地调试时 `<host>` 可视为 `localhost`，局域网场景请使用 `./restart-intranet.sh` 输出的地址。
@@ -38,7 +39,7 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 
 `server/game-router.ts` — 开发/调试/兼容通道。
 
-- 端点：`/api/game/state`、`/api/game/action`、`/api/game/choice`、`/api/game/commit-farm`、`/api/game/reorg`、`/api/game/feed`、`/api/game/next-player`、`/api/game/round-end`、`/api/game/undo`、`/api/game/undo-action`、`/api/game/new`（支持 seed）、`/api/game/load`、`/api/game/validate`（纯预检）。
+- 端点：`/api/game/state`、`/api/game/action`、`/api/game/choice`、`/api/game/anytime`、`/api/game/commit-farm`、`/api/game/reorg`、`/api/game/feed`、`/api/game/next-player`、`/api/game/round-end`、`/api/game/undo`、`/api/game/undo-action`、`/api/game/new`（支持 seed）、`/api/game/load`、`/api/game/validate`（纯预检，主链已不依赖）。
 - Dev 端点：`/api/game/dev/create-pasture`、`/api/game/dev/play-card`、`/api/game/dev/set-space-taken`、`/api/game/dev/set-current-player`、`/api/game/dev/set-round`、`/api/game/dev/set-resources`。
 - `/api/rooms` — 列出当前活跃房间。
 - HTTP 使用单例 `GameSession`，仅用于单机调试。多人对局走 WS。
@@ -47,10 +48,10 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 
 | 文件 | 内容 |
 |---|---|
-| `shared/protocol/game.ts` | `GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope` |
+| `shared/protocol/game.ts` | `GameSyncPayload`、`StateUpdateCause`、`StateUpdateEnvelope`、`interaction` 快照 |
 | `shared/protocol/ws.ts` | `ClientCommand`、`ServerEvent`、`RoomSummary` |
 | `shared/game/serialization.ts` | `serializeState` / `rehydrateState` — 去函数序列化 |
-| `shared/game/types.ts` | `GameState`、`PlayerState`、`ActionSpace`、`PendingAction`、`Resource` |
+| `shared/game/types.ts` | `GameState`、`PlayerState`、`ActionSpace`、`PendingAction`、`InteractionState`、`Resource` |
 
 ### 2.5 校验
 
@@ -71,13 +72,13 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 3.2 状态管理
 
-- `useGameSync` — 持有 `state`、`pending`、`historyLength`、`hasActionStartSnapshot`。通过 `applySnapshot(GameSyncPayload)` 统一消费快照。
-- `GameContainerApi` — 主容器。通过 `useTransportSetup` 管理 WS 连接生命周期（创建/加入房间、等待对手、就绪）。所有操作（含 dev 操作）均通过 `transport` 发出，不直接调用 HTTP。
+- `useGameSync` — 持有 `state`、`pending`、`interaction`、`historyLength`、`hasActionStartSnapshot`。通过 `applySnapshot(GameSyncPayload)` 统一消费快照。
+- `GameContainerApi` — 主容器。通过 `useTransportSetup` 管理 WS 连接生命周期（创建/加入房间、等待对手、就绪）。所有操作（含 dev 操作）均通过 `transport` 发出，不直接调用 HTTP；农场交互和 anytime 按服务端 `interaction` 渲染。
 
 ### 3.3 UI 组件
 
 - `ActionBoard` — 完全还原 BGA 行动区。不论几人局始终显示全部 4 人局行动位（含左侧 6 个特殊行动）。卡牌采用 BGA 3 段式框架（header/desc/footer 分别切片 `action_frame.png`/`action_frame_s.png`）。使用 BGA 字体 Dominican + CalibriB。累积类行动卡体内显示每回合获取量（数字 + 资源图标 `.gain-display`），非累积行动显示文字描述。箭头通过 `action_frame_arrow.png` 伪元素显示方向（left/right/bottom），累积资源以 `.resource-holder` 显示在卡片外部，带橙色数量徽章。Round 行动 hover 显示 `actions.jpg` 大图 tooltip。侧边栏使用 `add_2p.png` 背景。14 个收获标记。ResizeObserver 响应式缩放。
-- `FarmBoard` — 农场格网、围栏、播种、马厩交互。
+- `FarmBoard` — 农场格网、围栏、播种、马厩交互；可选格/边由服务端 `interaction.farm` 下发。
 - `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
 - `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。
 - `GameControls` — 撤销/计分/Reset，seed 输入与 Reset 仅在 devMode 显示。
@@ -101,6 +102,14 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 ### 4.2 Hook 系统
 
 8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
+
+### 4.2.1 BGA 风格交互协议
+
+- `GameSyncPayload` 现在同时广播 `pending` 与 `interaction`。
+- `interaction` 是前端主消费对象，包含 `stateId`、`allowedCommands`、`anytimeActions`、以及 `farmSelect` 的 `selectableTiles/selectableEdges/selectableFields` 白名单。
+- `pending` 仍保留，用于兼容旧测试、undo 历史与逐步迁移。
+- `takeAction` 在存在未完成交互时会被协议层拒绝；只有 `allowedCommands` 与显式 `anytime` 能继续推进。
+- `takeAnytimeAction` 通过 `Engine.prependFlow()` 把 flow 插到当前未完成节点之前，执行完成后自然回到原交互。
 
 行动格可执行性与 flow 推导已部分统一：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，现在可以递归读取 `flow.children` 的原子行动 `isDoable` 结果，并继续应用子行动自己的 `isDoable` hook / CardListener，避免像 `grain-utilization`、`cultivation`、`farm-expansion`、`farmland`、`major-improvement` 这类行动格维护两套手写条件。
 

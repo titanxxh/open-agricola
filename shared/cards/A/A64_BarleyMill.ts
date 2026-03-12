@@ -8,7 +8,10 @@ registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    const grainFields = player.fields.filter(f => f.crop === 'grain' && f.amount > 0).length
+    const grainFields = player.fields.filter((field) => {
+      const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
+      return field.crop === 'grain' && (field.remaining > 0 || legacyAmount > 0)
+    }).length
     if (grainFields <= 0) return
     incCounter(player, CARD_ID, 'triggerCount')
     player.resources.food += grainFields

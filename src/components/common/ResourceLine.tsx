@@ -1,4 +1,4 @@
-import type { Locale as _Locale } from '../../../shared/i18n'
+import type { Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/game/types'
 import { resourceKeyList } from '../../../shared/logic/state'
 
@@ -11,7 +11,7 @@ type Props = {
 }
 
 export const ResourceLine = ({
-  locale,
+  locale: _locale,
   resources,
   hideZero = true,
   emptyLabel,

@@ -1,4 +1,4 @@
-import type { CostModifier } from '../../game/types'
+import type { CostModifier } from '../game/types'
 import { getOccupationCard } from './catalog'
 import { getMinorImprovementCard } from './catalog'
 

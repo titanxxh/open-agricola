@@ -14,7 +14,10 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const hasVegetable = context.player.fields.some(
-      (f) => f.crop === 'vegetable' && f.amount > 0,
+      (field) => {
+        const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
+        return field.crop === 'vegetable' && (field.remaining > 0 || legacyAmount > 0)
+      },
     )
     if (!hasVegetable) return
     incCounter(context.player, CARD_ID, 'triggerCount')

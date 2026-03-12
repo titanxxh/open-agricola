@@ -41,6 +41,7 @@ export type FollowUpAction = string | { actionId: string; sourceCard?: string }
 export type ActionHookResult = {
   doable?: boolean
   actionId?: string
+  extraData?: Record<string, unknown>
   extraOptions?: ActionChoiceOption[]
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow

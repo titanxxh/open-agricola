@@ -1,4 +1,4 @@
-import type { FarmTilePosition, PlayerFarmState } from './fence-validation.ts'
+import type { PlayerFarmState } from './fence-validation.ts'
 import { FARM_COLS, FARM_ROWS } from './fence-validation.ts'
 
 const positionKey = (pos: { row: number; col: number }) =>

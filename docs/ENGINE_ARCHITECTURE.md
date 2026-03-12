@@ -193,6 +193,24 @@ type StateUpdateEnvelope =
 - `sync`：标记当前是完整快照还是增量 patch
 - `cause`：说明这次更新由哪个命令触发，便于调试和埋点
 - `pending` / `scores` / `historyLength`：即使使用 patch，也建议作为 top-level 字段始终带上，避免客户端再从 patch 里二次推断
+- 当前实现还会同步携带 `interaction`：它比 `pending` 更贴近 BGA 的状态 args，包含 `stateId`、`allowedCommands`、`anytimeActions` 与服务端白名单目标；前端主消费对象已切到它，`pending` 主要保留给兼容层与 undo 历史。
+
+#### 4.3.2 当前交互协议（BGA 风格）
+
+当前 `GameSyncPayload` / `SessionResponse` 同时包含两层交互信息：
+
+- `pending`：后端规则状态与历史兼容层。
+- `interaction`：前端渲染层的唯一真相，携带：
+  - `stateId`
+  - `allowedCommands`
+  - `anytimeActions`
+  - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`
+
+协议层规则：
+
+- 存在未完成交互时，普通 `takeAction` 会被拒绝。
+- 只有 `allowedCommands` 中声明的命令可以继续推进。
+- `anytime` 不再覆盖当前 pending，而是通过引擎根前插 flow 执行，结束后回到原未完成节点。
 
 #### 4.3.3 patch 的推荐生成方式
 

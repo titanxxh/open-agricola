@@ -1,4 +1,4 @@
-import type { Resource, CostModifier } from '../../game/types'
+import type { Resource, CostModifier } from '../game/types'
 
 export type CardPrerequisites = {
   min?: number

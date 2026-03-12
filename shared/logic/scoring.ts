@@ -18,11 +18,13 @@ type ScoreCategoryKey =
   | 'farmers'
   | 'cards'
   | 'cardsBonus'
+  | 'cardStateBonusVp'
   | 'beggings'
 
 export type ScoreEntry =
   | { type: 'quantity'; quantity: number; score: number }
   | { type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation'; score: number }
+  | { type: 'bonus'; score: number }
   | {
       type: 'cardBonus'
       cardId: string

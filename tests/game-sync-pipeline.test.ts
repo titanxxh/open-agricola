@@ -15,6 +15,11 @@ describe('game sync pipeline (applySnapshot path)', () => {
     return {
       state: serializeState(rawState),
       pending: { type: 'none' },
+      interaction: {
+        stateId: 'idle',
+        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      },
       scores: null,
       historyLength: 0,
       hasActionStartSnapshot: false,
@@ -82,6 +87,11 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const payload: GameSyncPayload = {
       state: serializeState(modified),
       pending: { type: 'none' },
+      interaction: {
+        stateId: 'idle',
+        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      },
       scores: null,
       historyLength: 0,
       hasActionStartSnapshot: false,

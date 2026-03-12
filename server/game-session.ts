@@ -1,7 +1,10 @@
 import type {
   ActionFlow,
+  AnytimeAction,
   FarmTilePosition,
   GameState,
+  InteractionFarmSelection,
+  InteractionState,
   PendingAction,
   PlayerState,
   Resource,
@@ -40,6 +43,7 @@ import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
 import { getBuildRoomCost } from '../shared/actions/effects/house.ts'
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
+import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks, runBeforeReturnHomeHooks, runStartReturnHomeHooks, runAfterRoundEndHooks, runStartHarvestHooks, runStartHarvestFieldPhaseHooks, runHarvestFieldPhaseHooks, runEndHarvestFieldPhaseHooks, runStartHarvestFeedingPhaseHooks, runHarvestFeedingPhaseHooks, runEndHarvestFeedingPhaseHooks, runEndHarvestHooks } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../shared/cards/card-listeners.ts'
@@ -47,7 +51,12 @@ import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
-import { normalizePlayerFarm, validateFenceSelection } from './fence-validation.ts'
+import {
+  getAllEdgeIds,
+  getAllTilePositions,
+  normalizePlayerFarm,
+  validateFenceSelection,
+} from './fence-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateSowSelection, type SowSelection } from './sow-validation.ts'
@@ -66,6 +75,7 @@ export type SessionResponse = {
   ok: boolean
   state: GameState
   pending: PendingAction
+  interaction: InteractionState
   historyLength: number
   hasActionStartSnapshot: boolean
   scores?: PlayerScoreSummary[]
@@ -173,11 +183,255 @@ export class GameSession {
     return current
   }
 
+  private getActiveInteractionContext() {
+    if (this.activePlayerIndex === null || !this.activeSpaceId) return null
+    const player = this.state.players[this.activePlayerIndex]
+    const space = this.state.actionSpaces.find((item) => item.id === this.activeSpaceId)
+    if (!player || !space) return null
+    return { player, space }
+  }
+
+  private isFarmPromptKey(promptKey?: string) {
+    switch (promptKey) {
+      case 'ui.interactionFenceSelect':
+        return 'fence' as const
+      case 'ui.interactionRoomSelect':
+        return 'room' as const
+      case 'ui.interactionStableSelect':
+        return 'stable' as const
+      case 'ui.interactionPlowSelect':
+        return 'plow' as const
+      case 'ui.interactionSowSelect':
+        return 'sow' as const
+      default:
+        return null
+    }
+  }
+
+  private buildRoomInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
+    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const occupied = new Set(normalized.roomTiles.map(positionKey))
+    normalized.fields.forEach((field) => occupied.add(positionKey(field)))
+    normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
+    normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
+    const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+    const costPerRoom = applyCostOverride(getBuildRoomCost(player.houseType), costOverride)
+    const resourceMax = Object.entries(costPerRoom).reduce((max, [key, value]) => {
+      if (typeof value !== 'number' || value <= 0) return max
+      const available = player.resources[key as keyof Resource] ?? 0
+      return Math.min(max, Math.floor(available / value))
+    }, Number.POSITIVE_INFINITY)
+    const maxSelections = Math.min(
+      selectableTiles.length,
+      Number.isFinite(resourceMax) ? resourceMax : selectableTiles.length,
+    )
+    return {
+      farmType: 'room',
+      selectableTiles,
+      maxSelections: Math.max(0, maxSelections),
+      costPerRoom,
+    }
+  }
+
+  private buildStableInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
+    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const occupied = new Set(normalized.roomTiles.map(positionKey))
+    normalized.fields.forEach((field) => occupied.add(positionKey(field)))
+    normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
+    const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+    const woodDiscount = Math.max(0, Math.abs(costOverride?.wood ?? 0))
+    const effectiveCost = Math.max(0, stableWoodCost - woodDiscount)
+    const woodAvailable = player.resources.wood ?? 0
+    const maxSelections =
+      effectiveCost === 0
+        ? Math.max(0, 4 - normalized.stableTiles.length)
+        : Math.min(
+            Math.max(0, 4 - normalized.stableTiles.length),
+            Math.floor(woodAvailable / effectiveCost),
+          )
+    return {
+      farmType: 'stable',
+      selectableTiles,
+      maxSelections,
+    }
+  }
+
+  private buildPlowInteraction(player: PlayerState): InteractionFarmSelection {
+    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const selectableTiles = getAllTilePositions().filter(
+      (tile) => validatePlowSelection(normalized, tile).ok,
+    )
+    return { farmType: 'plow', selectableTiles }
+  }
+
+  private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
+    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const selectableFields = normalized.fields.flatMap((field) => {
+      if (field.crop !== null) return []
+      const allowedCrops: ('grain' | 'vegetable')[] = []
+      if ((normalized.resources.grain ?? 0) > 0) {
+        allowedCrops.push('grain')
+      }
+      if ((normalized.resources.vegetable ?? 0) > 0) {
+        allowedCrops.push('vegetable')
+      }
+      if (allowedCrops.length === 0) return []
+      return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
+    })
+    return { farmType: 'sow', selectableFields }
+  }
+
+  private buildFenceInteraction(pending: Extract<PendingAction, { type: 'choice' }>): InteractionFarmSelection {
+    const normalized = normalizePlayerFarm(this.state.players[pending.playerIndex] as Parameters<typeof normalizePlayerFarm>[0])
+    const existing = new Set(normalized.fenceSegments ?? [])
+    const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
+    const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0
+    return {
+      farmType: 'fence',
+      selectableEdges,
+      extraWood,
+    }
+  }
+
+  private buildFarmInteraction(
+    pending: Extract<PendingAction, { type: 'choice' }>,
+  ): InteractionFarmSelection | null {
+    const farmType = this.isFarmPromptKey(pending.promptKey)
+    const player = this.state.players[pending.playerIndex]
+    if (!farmType || !player) return null
+    switch (farmType) {
+      case 'fence':
+        return this.buildFenceInteraction(pending)
+      case 'room':
+        return this.buildRoomInteraction(player, pending.costOverride)
+      case 'stable':
+        return this.buildStableInteraction(player, pending.costOverride)
+      case 'plow':
+        return this.buildPlowInteraction(player)
+      case 'sow':
+        return this.buildSowInteraction(player)
+      default:
+        return null
+    }
+  }
+
+  private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+    const context = this.getActiveInteractionContext()
+    if (!context) return []
+    if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
+      return []
+    }
+    if (
+      this.pending.type === 'choice' &&
+      this.pending.promptKey &&
+      this.pending.promptKey.startsWith('ui.interactionBakeBread')
+    ) {
+      return []
+    }
+    const { player, space } = context
+    const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
+    const pushAction = (id: string, labelKey: string) => {
+      const action = this.registry.get(id)
+      if (!action) return
+      const doable = applyIsDoableHooks(
+        { state: this.state, player, space, actionId: id },
+        action.canBeExecutedByPlayer(this.state, player),
+      )
+      if (!doable) return
+      anytimeEntries.push({
+        descriptor: {
+          id,
+          labelKey,
+          actionId: id,
+        },
+        flow: { type: 'leaf', actionId: id },
+      })
+    }
+    pushAction('anytime-reorg', 'ui.anytimeReorgAnimals')
+    pushAction('bake-bread', 'actions.bake-bread.name')
+    return anytimeEntries
+  }
+
+  private buildInteraction(): InteractionState {
+    const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+    if (this.pending.type === 'choice') {
+      const farm = this.buildFarmInteraction(this.pending)
+      const allowedCommands = farm
+        ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
+        : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
+      if (farm) {
+        return {
+          stateId: 'farmSelect',
+          playerIndex: this.pending.playerIndex,
+          spaceId: this.pending.spaceId,
+          promptKey: this.pending.promptKey,
+          options: this.pending.options,
+          costOverride: this.pending.costOverride,
+          farm,
+          allowedCommands: [...allowedCommands],
+          anytimeActions,
+        }
+      }
+      return {
+        stateId: 'choice',
+        playerIndex: this.pending.playerIndex,
+        spaceId: this.pending.spaceId,
+        promptKey: this.pending.promptKey,
+        options: this.pending.options,
+        costOverride: this.pending.costOverride,
+        allowedCommands: [...allowedCommands],
+        anytimeActions,
+      }
+    }
+    if (this.pending.type === 'animalReorg') {
+      return {
+        stateId: 'animalReorg',
+        playerIndex: this.pending.playerIndex,
+        spaceId: this.pending.spaceId,
+        allowedCommands: ['confirmReorg', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      }
+    }
+    if (this.pending.type === 'harvestFeed') {
+      return {
+        stateId: 'harvestFeed',
+        playerIndex: this.pending.playerIndex,
+        remaining: this.pending.remaining,
+        feedQueue: this.pending.feedQueue,
+        allowedCommands: ['confirmFeed', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      }
+    }
+    if (this.pending.type === 'confirmNextPlayer') {
+      return {
+        stateId: 'confirmNextPlayer',
+        nextPlayerIndex: this.pending.nextPlayerIndex,
+        allowedCommands: ['confirmNextPlayer', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      }
+    }
+    if (this.pending.type === 'confirmPlayerSwitch') {
+      return {
+        stateId: 'confirmPlayerSwitch',
+        fromPlayerIndex: this.pending.fromPlayerIndex,
+        toPlayerIndex: this.pending.toPlayerIndex,
+        allowedCommands: ['confirmPlayerSwitch', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      }
+    }
+    return {
+      stateId: 'idle',
+      allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+      anytimeActions: [],
+    }
+  }
+
   private respond(ok = true, error?: string): SessionResponse {
     const resp: SessionResponse = {
       ok,
       state: this.state,
       pending: this.pending,
+      interaction: this.buildInteraction(),
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
     }
@@ -512,6 +766,15 @@ export class GameSession {
         return
       }
 
+      if (step.type === 'ok' && step.result.type === 'animalReorg') {
+        this.pending = {
+          type: 'animalReorg',
+          playerIndex: this.activePlayerIndex,
+          spaceId: step.result.sourceId,
+        }
+        return
+      }
+
       if (step.type === 'ok' && step.result.type === 'fail') {
         space.takenBy = null
         player.workersAvailable += 1
@@ -590,6 +853,7 @@ export class GameSession {
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
+    if (this.pending.type !== 'none') return this.respond(false, 'interaction in progress')
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
     if (!player || player.workersAvailable <= 0) return this.respond(false, 'no workers available')
@@ -640,6 +904,25 @@ export class GameSession {
     return this.respond()
   }
 
+  takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
+    if (this.state.gameOver) return this.respond(false, 'game is over')
+    if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
+    if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) {
+      return this.respond(false, 'no active interaction to interrupt')
+    }
+    const entry = this.buildAnytimeEntries().find(
+      (candidate) => candidate.descriptor.id === actionId,
+    )
+    if (!entry) {
+      return this.respond(false, 'anytime action unavailable')
+    }
+    this.pushHistory()
+    this.pending = { type: 'none' }
+    this.engine.prependFlow(entry.flow)
+    this.runEngineSteps()
+    return this.respond()
+  }
+
   resolveChoice(playerIndex: number, value: string): SessionResponse {
     const pending = this.pending
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
@@ -674,6 +957,14 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+      }
+      return this.respond()
+    }
+    if (result.type === 'animalReorg') {
+      this.pending = {
+        type: 'animalReorg',
+        playerIndex,
+        spaceId: result.sourceId,
       }
       return this.respond()
     }
@@ -747,6 +1038,10 @@ export class GameSession {
     const source = this.pending.spaceId
     if (source === 'anytime-reorg') {
       this.pending = { type: 'none' }
+      if (this.engine) {
+        this.runEngineSteps()
+        return this.respond()
+      }
       return this.respond()
     }
     if (source === 'harvest-breed') {
@@ -1009,9 +1304,8 @@ export class GameSession {
         break
       }
       case 'room': {
-        const { rooms, costPerRoom } = payload as {
+        const { rooms } = payload as {
           rooms: FarmTilePosition[]
-          costPerRoom: Partial<Resource>
         }
         const selection = validateRoomSelection(normalized, rooms)
         if (!selection.ok) return this.respond(false, selection.code)
@@ -1082,6 +1376,14 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+      }
+      return this.respond()
+    }
+    if (result.type === 'animalReorg') {
+      this.pending = {
+        type: 'animalReorg',
+        playerIndex,
+        spaceId: result.sourceId,
       }
       return this.respond()
     }

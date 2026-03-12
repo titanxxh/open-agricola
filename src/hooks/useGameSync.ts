@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, PendingAction } from '../../shared/game/types'
+import type { GameState, InteractionState, PendingAction } from '../../shared/game/types'
 import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateState } from '../../shared/game/serialization'
@@ -9,6 +9,11 @@ export type SyncedPending = PendingAction
 export const useGameSync = () => {
   const [state, setState] = useState<GameState | null>(null)
   const [pending, setPending] = useState<SyncedPending>({ type: 'none' })
+  const [interaction, setInteraction] = useState<InteractionState>({
+    stateId: 'idle',
+    allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+    anytimeActions: [],
+  })
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [historyLength, setHistoryLength] = useState(0)
@@ -26,6 +31,7 @@ export const useGameSync = () => {
     const hydrated = rehydrateState(payload.state)
     setState(hydrated)
     setPending(payload.pending)
+    setInteraction(payload.interaction)
     setScores(payload.scores ?? null)
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
     setHistoryLength(payload.historyLength ?? 0)
@@ -33,5 +39,15 @@ export const useGameSync = () => {
     setActionAvailability(payload.actionAvailability ?? {})
   }, [])
 
-  return { state, pending, scores, error, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot }
+  return {
+    state,
+    pending,
+    interaction,
+    scores,
+    error,
+    historyLength,
+    hasActionStartSnapshot,
+    actionAvailability,
+    applySnapshot,
+  }
 }

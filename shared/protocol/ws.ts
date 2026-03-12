@@ -4,6 +4,7 @@ import type { StateUpdateEnvelope } from './game'
 export type ClientCommand =
   | { type: 'action'; spaceId: string }
   | { type: 'choice'; value: string }
+  | { type: 'anytime'; actionId: string }
   | {
       type: 'reorg'
       zones: {

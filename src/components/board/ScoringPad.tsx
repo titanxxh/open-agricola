@@ -27,6 +27,7 @@ const categoryOrder: ScoreCategoryResult['key'][] = [
   'farmers',
   'cards',
   'cardsBonus',
+  'cardStateBonusVp',
   'beggings',
 ]
 
@@ -45,6 +46,7 @@ const categoryLabelKey: Record<ScoreCategoryResult['key'], string> = {
   farmers: 'ui.scoringFarmers',
   cards: 'ui.scoringCards',
   cardsBonus: 'ui.scoringCardsBonus',
+  cardStateBonusVp: 'ui.scoringCardsBonus',
   beggings: 'ui.scoringBeggings',
 }
 

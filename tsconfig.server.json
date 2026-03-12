@@ -18,5 +18,14 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["server", "shared"]
+  "include": ["server", "shared"],
+  "exclude": [
+    "server/**/__tests__/**",
+    "shared/**/__tests__/**",
+    "shared/cards/__stubs__/Stub_*.ts",
+    "shared/cards/__stubs__/index.ts",
+    "tests",
+    "e2e-tests",
+    "scripts"
+  ]
 }
