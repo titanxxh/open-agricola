@@ -321,7 +321,8 @@ export class GameSession {
     if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
       return []
     }
-    // Suppress anytime actions during bake-bread resolution to avoid recursion
+    // Suppress anytime actions during sub-choice resolution (e.g. bake-bread)
+    // to avoid recursive anytime interrupts
     if (
       this.pending.type === 'choice' &&
       this.pending.promptKey &&

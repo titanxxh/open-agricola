@@ -470,7 +470,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
     descriptionKey: 'actions.bake-bread.description',
     roundAvailable: 1,
     gainPerRound: {},
-    anytime: true,
     canBeExecutedByPlayer: (_, player) =>
       bakeImprovements.some((id) => canBakeBread(player, id)),
     execute: ({ player }) => ({

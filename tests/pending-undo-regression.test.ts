@@ -239,7 +239,7 @@ describe('pending choice types + undo regression', () => {
       session = new GameSession(state)
     })
 
-    it('farmland exposes anytime bake-bread during plow selection', () => {
+    it('farmland does not expose bake-bread as anytime during plow selection', () => {
       const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
       if (!farmland) return
 
@@ -249,29 +249,8 @@ describe('pending choice types + undo regression', () => {
       if (resp.interaction.stateId !== 'farmSelect') return
 
       expect(resp.interaction.farm.farmType).toBe('plow')
-      expect(resp.interaction.anytimeActions.some((action) => action.id === 'bake-bread')).toBe(true)
-    })
-
-    it('anytime bake-bread can interrupt plow selection and return to it', () => {
-      const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
-      if (!farmland) return
-
-      const takeResp = session.takeAction(0, farmland.spaceId)
-      if (!takeResp.ok) return
-
-      const anytimeResp = session.takeAnytimeAction(0, 'bake-bread')
-      expect(anytimeResp.ok).toBe(true)
-      expect(anytimeResp.interaction.stateId).toBe('choice')
-      if (anytimeResp.interaction.stateId !== 'choice') return
-      expect(anytimeResp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-
-      const finishAnytime = session.resolveChoice(0, 'Major_Fireplace1')
-      expect(finishAnytime.ok).toBe(true)
-      expect(finishAnytime.state.players[0]!.resources.grain).toBe(0)
-      expect(finishAnytime.state.players[0]!.resources.food).toBeGreaterThan(0)
-      expect(finishAnytime.interaction.stateId).toBe('farmSelect')
-      if (finishAnytime.interaction.stateId !== 'farmSelect') return
-      expect(finishAnytime.interaction.promptKey).toBe('ui.interactionPlowSelect')
+      // bake-bread is NOT an anytime action — only exchange-type actions are
+      expect(resp.interaction.anytimeActions.some((action) => action.id === 'bake-bread')).toBe(false)
     })
 
     it('rejects ordinary takeAction while an interaction is in progress', () => {
