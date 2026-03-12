@@ -316,7 +316,8 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'commitFarm') {
-        const resp = room.session.commitFarmChoice(msg.playerIndex, msg.farmType, msg.payload)
+        // Use server-side currentPlayerIndex for security - don't trust client
+        const resp = room.session.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload)
         broadcastState(room, resp, 'choice')
         return
       }
@@ -347,7 +348,8 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'devCreatePasture') {
-        const resp = room.session.startDevFenceSelect(msg.playerIndex)
+        // Use server-side currentPlayerIndex for consistency
+        const resp = room.session.startDevFenceSelect(currentPlayerIndex)
         broadcastState(room, resp, 'action')
         return
       }
