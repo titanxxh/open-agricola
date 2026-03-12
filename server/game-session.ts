@@ -321,6 +321,7 @@ export class GameSession {
     if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
       return []
     }
+    // Suppress anytime actions during bake-bread resolution to avoid recursion
     if (
       this.pending.type === 'choice' &&
       this.pending.promptKey &&
@@ -330,59 +331,28 @@ export class GameSession {
     }
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
-    const pushAction = (id: string, labelKey: string) => {
-      const action = this.registry.get(id)
-      if (!action) return
+    // Auto-discover anytime actions from registry instead of hardcoding
+    for (const action of this.registry.values()) {
+      if (!action.anytime) continue
       const doable = applyIsDoableHooks(
-        { state: this.state, player, space, actionId: id },
+        { state: this.state, player, space, actionId: action.id },
         action.canBeExecutedByPlayer(this.state, player),
       )
-      if (!doable) return
+      if (!doable) continue
       anytimeEntries.push({
         descriptor: {
-          id,
-          labelKey,
-          actionId: id,
+          id: action.id,
+          labelKey: action.nameKey,
+          actionId: action.id,
         },
-        flow: { type: 'leaf', actionId: id },
+        flow: { type: 'leaf', actionId: action.id },
       })
     }
-    pushAction('anytime-reorg', 'ui.anytimeReorgAnimals')
-    pushAction('bake-bread', 'actions.bake-bread.name')
     return anytimeEntries
   }
 
   private buildInteraction(): InteractionState {
-    const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
-    if (this.pending.type === 'choice') {
-      const farm = this.buildFarmInteraction(this.pending)
-      const allowedCommands = farm
-        ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
-        : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
-      if (farm) {
-        return {
-          stateId: 'farmSelect',
-          playerIndex: this.pending.playerIndex,
-          spaceId: this.pending.spaceId,
-          promptKey: this.pending.promptKey,
-          options: this.pending.options,
-          costOverride: this.pending.costOverride,
-          farm,
-          allowedCommands: [...allowedCommands],
-          anytimeActions,
-        }
-      }
-      return {
-        stateId: 'choice',
-        playerIndex: this.pending.playerIndex,
-        spaceId: this.pending.spaceId,
-        promptKey: this.pending.promptKey,
-        options: this.pending.options,
-        costOverride: this.pending.costOverride,
-        allowedCommands: [...allowedCommands],
-        anytimeActions,
-      }
-    }
+    // Fast paths: skip expensive anytime/farm computation for states that don't need them
     if (this.pending.type === 'animalReorg') {
       return {
         stateId: 'animalReorg',
@@ -419,10 +389,43 @@ export class GameSession {
         anytimeActions: [],
       }
     }
+    if (this.pending.type === 'none') {
+      // Idle: only compute anytime actions (no farm interaction needed)
+      const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+      return {
+        stateId: 'idle',
+        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        anytimeActions,
+      }
+    }
+    // Choice state: compute both anytime and farm interaction
+    const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+    const farm = this.buildFarmInteraction(this.pending)
+    const allowedCommands = farm
+      ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
+      : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
+    if (farm) {
+      return {
+        stateId: 'farmSelect',
+        playerIndex: this.pending.playerIndex,
+        spaceId: this.pending.spaceId,
+        promptKey: this.pending.promptKey,
+        options: this.pending.options,
+        costOverride: this.pending.costOverride,
+        farm,
+        allowedCommands: [...allowedCommands],
+        anytimeActions,
+      }
+    }
     return {
-      stateId: 'idle',
-      allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
-      anytimeActions: [],
+      stateId: 'choice',
+      playerIndex: this.pending.playerIndex,
+      spaceId: this.pending.spaceId,
+      promptKey: this.pending.promptKey,
+      options: this.pending.options,
+      costOverride: this.pending.costOverride,
+      allowedCommands: [...allowedCommands],
+      anytimeActions,
     }
   }
 

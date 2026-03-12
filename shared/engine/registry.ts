@@ -10,4 +10,9 @@ export class ActionRegistry {
   get(actionId: string) {
     return this.actions.get(actionId)
   }
+
+  /** Iterate over all registered actions. */
+  values() {
+    return this.actions.values()
+  }
 }

@@ -470,6 +470,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
     descriptionKey: 'actions.bake-bread.description',
     roundAvailable: 1,
     gainPerRound: {},
+    anytime: true,
     canBeExecutedByPlayer: (_, player) =>
       bakeImprovements.some((id) => canBakeBread(player, id)),
     execute: ({ player }) => ({
@@ -485,6 +486,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
     descriptionKey: 'actions.anytime-reorg.description',
     roundAvailable: 1,
     gainPerRound: {},
+    anytime: true,
     canBeExecutedByPlayer: (_, player) =>
       player.pastures.length > 0 || Object.keys(player.stableAnimals ?? {}).length > 0,
     execute: () => ({
