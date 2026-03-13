@@ -320,6 +320,34 @@
   background-size: 1106.89% 1328%;
 }
 
+/* Alt cost (multi-choice, e.g. 2W/2C/2S) */
+.card-cost-alt {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  height: 96.35px;
+  overflow: hidden;
+  padding-right: 4px;
+  gap: 1px;
+}
+.card-cost-alt .card-cost-option {
+  display: inline-flex;
+  align-items: center;
+}
+.card-cost-alt .card-cost-text {
+  height: auto;
+  padding: 0;
+  font-size: 20px;
+  line-height: 22px;
+}
+.card-cost-alt .card-cost-separator {
+  display: none;
+}
+.card-cost-alt .card-res-icon {
+  font-size: 20px;
+}
+
 /* Prerequisite area */
 .card-prerequisite {
   position: absolute;
