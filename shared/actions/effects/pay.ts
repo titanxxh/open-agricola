@@ -152,6 +152,13 @@ const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
     if (aVal > bVal) return false
     if (aVal < bVal) hasStrictlyLess = true
   }
+
+  // Treat card return as an additional cost dimension
+  const aCard = a.cardUsed ? 1 : 0
+  const bCard = b.cardUsed ? 1 : 0
+  if (aCard > bCard) return false
+  if (aCard < bCard) hasStrictlyLess = true
+
   return hasStrictlyLess
 }
 

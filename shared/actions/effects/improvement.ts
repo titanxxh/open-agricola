@@ -359,14 +359,12 @@ const buildMajorImprovementOptions = (
   majorCardEffects
     .filter((improvement) => available.includes(improvement.id))
     .filter((improvement) => {
-      const cost =
-        getMinorImprovementCost(player, improvement.id) ?? improvement.cost
+      const cost = improvement.cost
       if (!cost) return true
-      const normalizedCost: Partial<PlayerState['resources']> =
-        'fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost
-          ? ((cost as ComplexCost).fee ?? {})
-          : (cost as Partial<PlayerState['resources']>)
-      return canPayResources(player, normalizedCost)
+      if (isComplexCost(cost)) {
+        return computeAllBuyableCombinations(player, cost, player.improvements).length > 0
+      }
+      return canPayResources(player, cost as Partial<PlayerState['resources']>)
     })
     .map((improvement) => ({
       value: `major:${improvement.id}`,
