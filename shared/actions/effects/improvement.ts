@@ -196,6 +196,10 @@ const playMinorImprovement = (
   if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
     player.activeModifiers.push(modifier)
   }
+  const activation = activateCard(state, player, improvement.id, 'onBuy')
+  if (activation.type === 'flow') {
+    return activation
+  }
   // Return with logKey to record the improvement play with payment info
   return {
     type: 'ok',
