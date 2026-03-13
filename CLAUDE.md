@@ -93,9 +93,27 @@ Mutual-exclusion pending model drives UI interaction:
 - `shared/protocol/ws.ts` — `ClientCommand`, `ServerEvent`
 - `shared/game/serialization.ts` — `serializeState()` / `rehydrateState()`
 
+### Action System (shared/actions/)
+
+Actions are auto-discovered from per-effect files in `shared/actions/effects/*.ts`. Each effect file exports an action definition with `id`, `nameKey`, `flow` (node tree), and round availability. Anytime actions (e.g., bake bread, exchange) are also auto-discovered and merged into the action registry. Action factories in `shared/actions/factories/` (e.g., `createGainAction()`) generate common action patterns.
+
 ### Room System
 
 `RoomManager` (server/room-manager.ts) maintains `Map<roomId, Room>`. Each room has an independent `GameSession`. A persistent dev room (ID `dev`, configurable via `PERSISTENT_ROOM_ID`) survives backend restarts via JSON state files in `output/`.
+
+### TypeScript & Build
+
+Three tsconfig projects: `tsconfig.app.json` (frontend + shared), `tsconfig.server.json`, `tsconfig.node.json`. No path aliases — all imports use relative paths. Vite serves BGA card images via a plugin reading from `BGA_IMAGE_DIR` (defaults to `../bga-agricola/img`); missing images only affect display, not rules.
+
+## Test Structure
+
+Three test tiers:
+
+- **Unit tests** (`shared/**/__tests__/*.test.ts`) — Pure domain logic. Create mock `PlayerState`/`GameState` objects directly, call functions, assert results.
+- **Session tests** (`server/__tests__/*.test.ts`) — Instantiate `GameSession` directly, call `takeAction()` / `confirmAnimalReorg()` etc., assert on `resp.state`, `resp.pending`, `resp.ok`.
+- **E2E tests** (`e2e-tests/*.spec.ts`) — Playwright browser tests against running server + frontend. 120s timeout, headless, 1920×1080 viewport.
+
+Rule correctness tests should use session tests (tier 2). Assert on `state`, `pending`, `log`, `scores` — never on DOM elements.
 
 ## Development Guidelines (from AGENTS.md)
 
