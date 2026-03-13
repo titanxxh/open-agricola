@@ -1,4 +1,4 @@
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
 import { getAllTilePositions, getNextEmptyTileForPlayer, positionKey } from '../../game/farm'
 
 export const addField = (player: PlayerState) => {
@@ -51,4 +51,22 @@ export const getPlowableTiles = (player: PlayerState) => {
     if (occupied.has(positionKey(pos))) return false
     return isAdjacentToField(pos, fieldKeys)
   })
+}
+
+export const plowAction: ActionDefinition = {
+  id: 'plow',
+  nameKey: 'actions.plow.name',
+  descriptionKey: 'actions.plow.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_, player) => getPlowableTiles(player).length > 0,
+  execute: () => ({
+    type: 'choice',
+    promptKey: 'ui.interactionPlowSelect',
+    options: [
+      { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
+      { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
+    ],
+  }),
+  resolveChoice: () => ({ type: 'ok' }),
 }

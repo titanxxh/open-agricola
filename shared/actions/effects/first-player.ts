@@ -1,5 +1,10 @@
 import type { GameState, PlayerState } from '../../game/types'
-import { setStartPlayer } from './start-player'
+
+export const setStartPlayer = (state: GameState, player: PlayerState) => {
+  state.players.forEach((item) => {
+    item.startPlayer = item.id === player.id
+  })
+}
 
 export const setFirstPlayer = (state: GameState, player: PlayerState) =>
   setStartPlayer(state, player)

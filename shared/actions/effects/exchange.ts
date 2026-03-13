@@ -1,4 +1,6 @@
 import type {
+  ActionChoiceOption,
+  ActionDefinition,
   ActionExecutionResult,
   PlayerState,
   Resource,
@@ -191,3 +193,138 @@ export const reverseTrade = (trade: Trade): Trade => ({
   source: trade.source,
   sourceId: trade.sourceId,
 })
+
+// ============================================
+// Anytime Cookery Trades
+// ============================================
+
+const cookeryTrades: Record<string, Trade[]> = {
+  Major_Fireplace1: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
+    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
+    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace1' },
+    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
+  ],
+  Major_Fireplace2: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
+    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
+    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace2' },
+    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
+  ],
+  Major_CookingHearth1: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth1' },
+    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1' },
+    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth1' },
+    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1' },
+  ],
+  Major_CookingHearth2: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth2' },
+    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2' },
+    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth2' },
+    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2' },
+  ],
+}
+
+const getPlayerCookeryTrades = (player: PlayerState): Trade[] => {
+  const trades: Trade[] = []
+  for (const cardId of player.improvements) {
+    const cardTrades = cookeryTrades[cardId]
+    if (cardTrades) {
+      trades.push(...cardTrades)
+    }
+  }
+  return trades
+}
+
+const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
+  for (const cardId of player.improvements) {
+    const cardTrades = cookeryTrades[cardId]
+    if (!cardTrades) continue
+    for (const trade of cardTrades) {
+      if (canAffordTrade(player, trade, 1)) return true
+    }
+  }
+  return false
+}
+
+const formatTradeLabel = (trade: Trade): string => {
+  const fromKey = Object.keys(trade.from)[0] as ResourceKey
+  const toKey = Object.keys(trade.to)[0] as ResourceKey
+  const toAmount = trade.to[toKey] ?? 0
+  return `${fromKey} → ${toAmount} ${toKey}`
+}
+
+const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
+  const trades = getPlayerCookeryTrades(player)
+  const options: ActionChoiceOption[] = []
+  for (let i = 0; i < trades.length; i++) {
+    const trade = trades[i]
+    if (!canAffordTrade(player, trade, 1)) continue
+    const max = getMaxTradeTimes(player, trade)
+    options.push({
+      value: `trade:${i}:${max}`,
+      labelKey: formatTradeLabel(trade),
+    })
+  }
+  options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
+  return options
+}
+
+const resolveExchangeChoice = (
+  player: PlayerState,
+  choice: string,
+): ActionExecutionResult => {
+  if (choice === 'cancel') {
+    return { type: 'ok' }
+  }
+  if (choice.startsWith('bulk:')) {
+    const trades = getPlayerCookeryTrades(player)
+    const payload = choice.replace('bulk:', '').trim()
+    if (!payload) return { type: 'ok' }
+    payload.split(',').forEach((entry) => {
+      const [indexStr, countStr] = entry.split('=')
+      const index = Number(indexStr)
+      const count = Number(countStr)
+      if (!Number.isFinite(index) || !Number.isFinite(count) || count <= 0) return
+      const trade = trades[index]
+      if (!trade) return
+      const max = getMaxTradeTimes(player, trade)
+      const times = Math.min(count, max)
+      if (times > 0) {
+        applyTrade(player, trade, times)
+      }
+    })
+    return { type: 'ok' }
+  }
+  if (choice.startsWith('trade:')) {
+    const parts = choice.split(':')
+    const index = Number(parts[1])
+    const trades = getPlayerCookeryTrades(player)
+    const trade = trades[index]
+    if (!trade) return { type: 'ok' }
+    const count = parts[2] ? Number(parts[2]) : 1
+    const max = getMaxTradeTimes(player, trade)
+    const times = Math.min(count, max)
+    if (times > 0) {
+      applyTrade(player, trade, times)
+    }
+    return { type: 'ok' }
+  }
+  return { type: 'ok' }
+}
+
+export const anytimeExchangeAction: ActionDefinition = {
+  id: 'anytime-exchange',
+  nameKey: 'actions.anytime-exchange.name',
+  descriptionKey: 'actions.anytime-exchange.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  anytime: true,
+  canBeExecutedByPlayer: (_, player) => hasAffordableCookeryTrade(player),
+  execute: ({ player }) => ({
+    type: 'choice',
+    promptKey: 'ui.interactionExchangeChoice',
+    options: buildExchangeOptions(player),
+  }),
+  resolveChoice: ({ player }, choice) => resolveExchangeChoice(player, choice),
+}

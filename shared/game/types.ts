@@ -211,6 +211,8 @@ export type ActionDefinition = {
   roundAvailable: number
   gainPerRound: Partial<Resource>
   players?: number[]
+  /** Mark as an anytime action that can interrupt the current flow. */
+  anytime?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   execute: (context: ActionExecutionContext) => ActionExecutionResult
   resolveChoice?: (

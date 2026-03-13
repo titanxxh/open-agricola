@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter((field) => field.crop === null)
@@ -31,4 +31,22 @@ export const sowCrop = (
   emptyField.crop = 'vegetable'
   emptyField.remaining = 2
   return { type: 'ok', logKey: 'log.sow' }
+}
+
+export const sowAction: ActionDefinition = {
+  id: 'sow',
+  nameKey: 'actions.sow.name',
+  descriptionKey: 'actions.sow.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_, player) => canSow(player),
+  execute: () => ({
+    type: 'choice',
+    promptKey: 'ui.interactionSowSelect',
+    options: [
+      { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
+      { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
+    ],
+  }),
+  resolveChoice: () => ({ type: 'ok' }),
 }

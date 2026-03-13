@@ -1,8 +1,8 @@
-import type { ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, applyCostOverride } from './pay'
-import { getMajorCardEffect } from '../../cards/major'
+import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifier } from '../../cards/card-modifiers'
 import { getMatchingListeners, executeCardListener, type CardListenerContext } from '../../cards/card-listeners'
 import { activateCard } from './activate-card'
@@ -250,4 +250,105 @@ export const playImprovement = (
     return playMinorImprovement(state, player, parsed.id)
   }
   return { type: 'fail', logKey: 'log.improvementFail' }
+}
+
+const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
+  player.minorHand
+    .map((id) => getMinorImprovement(id))
+    .filter(
+      (improvement): improvement is NonNullable<typeof improvement> =>
+        !!improvement,
+    )
+    .filter((improvement) => {
+      const cost =
+        getMinorImprovementCost(player, improvement.id) ?? improvement.cost ?? {}
+      return canPayResources(player, cost)
+    })
+    .map((improvement) => ({
+      value: improvement.id,
+      labelKey: `minorImprovements.${improvement.id}.name`,
+    }))
+
+const buildMajorImprovementOptions = (
+  available: string[],
+  player: PlayerState,
+): ActionChoiceOption[] =>
+  majorCardEffects
+    .filter((improvement) => available.includes(improvement.id))
+    .filter((improvement) => {
+      const cost =
+        getMinorImprovementCost(player, improvement.id) ?? improvement.cost
+      if (!cost) return true
+      const normalizedCost: Partial<PlayerState['resources']> =
+        'fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost
+          ? ((cost as ComplexCost).fee ?? {})
+          : (cost as Partial<PlayerState['resources']>)
+      return canPayResources(player, normalizedCost)
+    })
+    .map((improvement) => ({
+      value: `major:${improvement.id}`,
+      labelKey: `improvements.${improvement.id}.name`,
+    }))
+
+const buildMinorImprovementOptions = (player: PlayerState): ActionChoiceOption[] =>
+  player.minorHand
+    .map((id) => getMinorImprovement(id))
+    .filter(
+      (improvement): improvement is NonNullable<typeof improvement> =>
+        !!improvement,
+    )
+    .filter((improvement) => canPayResources(player, improvement.cost ?? {}))
+    .map((improvement) => ({
+      value: `minor:${improvement.id}`,
+      labelKey: `minorImprovements.${improvement.id}.name`,
+    }))
+
+export const minorImprovementAction: ActionDefinition = {
+  id: 'minor-improvement',
+  nameKey: 'actions.minor-improvement.name',
+  descriptionKey: 'actions.minor-improvement.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_, player) =>
+    buildPlayableMinorOptions(player).length > 0,
+  execute: ({ player }) => {
+    const options = buildPlayableMinorOptions(player)
+    if (options.length === 0) {
+      return { type: 'ok' }
+    }
+    return {
+      type: 'choice',
+      promptKey: 'ui.interactionChooseMinorImprovement',
+      options,
+    }
+  },
+  resolveChoice: ({ state, player }, choice) =>
+    playImprovement(state, player, choice, 'minor'),
+}
+
+export const improvementAnyAction: ActionDefinition = {
+  id: 'improvement-any',
+  nameKey: 'actions.major-improvement.name',
+  descriptionKey: 'actions.major-improvement.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (state, player) =>
+    buildMajorImprovementOptions(state.availableMajorImprovements, player).length >
+      0 || buildMinorImprovementOptions(player).length > 0,
+  execute: ({ state, player }) => {
+    const options = [
+      ...buildMajorImprovementOptions(state.availableMajorImprovements, player),
+      ...buildMinorImprovementOptions(player),
+    ]
+    if (options.length === 0) {
+      return { type: 'fail', logKey: 'log.improvementFail' }
+    }
+    return {
+      type: 'choice',
+      promptKey: 'ui.interactionChooseImprovement',
+      options,
+    }
+  },
+  resolveChoice: ({ state, player }, choice) =>
+    playImprovement(state, player, choice, 'any'),
 }
