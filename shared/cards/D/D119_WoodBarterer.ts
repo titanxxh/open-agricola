@@ -65,8 +65,8 @@ const processChoiceListener: CardListenerRegistration = {
       }
     }
     if (pending.choiceResult === 'trade1') {
-      if (context.player.resources.wood >= 2) {
-        context.player.resources.wood -= 2
+      if (context.player.resources.wood >= 1) {
+        context.player.resources.wood -= 1
         return {
           flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 } },
           logKey: 'log.cardEffectGain',
@@ -75,8 +75,8 @@ const processChoiceListener: CardListenerRegistration = {
       }
     }
     if (pending.choiceResult === 'trade2') {
-      if (context.player.resources.wood >= 4) {
-        context.player.resources.wood -= 4
+      if (context.player.resources.wood >= 2) {
+        context.player.resources.wood -= 2
         return {
           flow: { type: 'leaf', actionId: 'gain', params: { reed: 2 } },
           logKey: 'log.cardEffectGain',
@@ -87,8 +87,23 @@ const processChoiceListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'D119-wood-barterer-isdoable',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['fence', 'construct'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    // The card can provide 2 wood, which may make fence/construct affordable
+    if (!context.doable) {
+      return { doable: true }
+    }
+  },
+}
+
 registerCardListener(beforeListener)
 registerCardListener(processChoiceListener)
+registerCardListener(isDoableListener)
 
 export const D119_WoodBarterer = new Occupation({
   id: CARD_ID,
@@ -96,7 +111,7 @@ export const D119_WoodBarterer = new Occupation({
   deck: "D",
   number: 119,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time before you use a Build Fences / Build Rooms action, choose: get 2 <WOOD>; or pay 2 <WOOD> for 1 <REED>; or pay 4 <WOOD> for 2 <REED>."],
+  desc: ["Each time before you use an action space with a __Build Fences__ or __Build Rooms__ action, you can choose to either get 2 <WOOD> or exchange up to 2 <WOOD> for 1 <REED> each."],
   cost: {},
   players: "1+",
 })
