@@ -118,6 +118,7 @@ export const PlayerCard = ({
             name: minor.name,
             description: minor.desc.join('\n'),
             cost: { ...emptyResources, ...minor.cost },
+            altCosts: minor.altCosts,
             deck: minor.deck,
             category: minor.category,
             vp: minor.vp,
@@ -238,9 +239,19 @@ export const PlayerCard = ({
           <div className="card-passing-badge" title={locale === 'zh' ? '传递卡' : 'Passing card'} />
         )}
         
-        {hasCost && (
+        {hasCost && !cardData.altCosts && (
           <div className="card-cost">
             {renderCost(cardData.cost, locale)}
+          </div>
+        )}
+        {cardData.altCosts && cardData.altCosts.length > 0 && (
+          <div className="card-cost card-cost-alt">
+            {cardData.altCosts.map((alt, i) => (
+              <span key={i} className="card-cost-option">
+                {i > 0 && <span className="card-cost-separator">/</span>}
+                {renderCost(alt, locale)}
+              </span>
+            ))}
           </div>
         )}
 

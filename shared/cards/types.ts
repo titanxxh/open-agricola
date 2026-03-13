@@ -13,6 +13,7 @@ export type CardDefinition = {
   category?: string
   desc: string[]
   cost?: Partial<Resource>
+  altCosts?: Partial<Resource>[]
   reward?: Partial<Resource>
   vp?: number
   prerequisite?: string
@@ -35,6 +36,7 @@ export class CardBase {
   category?: string
   desc!: string[]
   cost?: Partial<Resource>
+  altCosts?: Partial<Resource>[]
   reward?: Partial<Resource>
   vp?: number
   prerequisite?: string
