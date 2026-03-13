@@ -122,6 +122,7 @@ type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
+  feeIndex?: number
 }
 
 const subtractResources = (
@@ -151,6 +152,13 @@ const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
     if (aVal > bVal) return false
     if (aVal < bVal) hasStrictlyLess = true
   }
+
+  // Treat card return as an additional cost dimension
+  const aCard = a.cardUsed ? 1 : 0
+  const bCard = b.cardUsed ? 1 : 0
+  if (aCard > bCard) return false
+  if (aCard < bCard) hasStrictlyLess = true
+
   return hasStrictlyLess
 }
 
@@ -375,14 +383,15 @@ export const computeAllBuyableCombinations = (
       ? [effectiveCost.fee]
       : [{}]
 
-  for (const baseFee of baseFees) {
+  for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
+    const baseFee = baseFees[feeIdx]
     const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
       ? generateTradeCombinations(effectiveCost.trades, playerResources)
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
       const bonuses = effectiveCost.bonuses ?? [undefined]
-      
+
       for (const bonus of bonuses) {
         let effectiveCostFee = baseFee
         let bonusId: string | undefined
@@ -394,11 +403,12 @@ export const computeAllBuyableCombinations = (
 
         if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
           const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
-          
+
           rawSolutions.push({
             resourcesRemaining: remaining,
             tradesUsed: tradeCombo.tradesUsed,
             bonusUsed: bonusId,
+            feeIndex: baseFees.length > 1 ? feeIdx : undefined,
           })
         }
       }
@@ -413,6 +423,7 @@ export const computeAllBuyableCombinations = (
       resourcesPaid: subtractResources(playerResources, sol.resourcesRemaining),
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
+      feeIndex: sol.feeIndex,
     }
 
     const hash = hashSolution(solution)

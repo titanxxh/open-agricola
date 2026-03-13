@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { Resource } from '../../../shared/game/types'
+import type { ComplexCost, Resource } from '../../../shared/game/types'
 import { getMajorCardEffect } from '../../../shared/cards/major'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
@@ -74,6 +74,18 @@ const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   return positions[cardId] || { x: '0%', y: '0%' }
 }
 
+const isComplexCost = (cost: unknown): cost is ComplexCost =>
+  !!cost && typeof cost === 'object' && ('fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost)
+
+const extractMajorDisplayCost = (cost: Partial<Resource> | ComplexCost): { baseCost: Partial<Resource>; upgradeCost?: Partial<Resource> } => {
+  if (!isComplexCost(cost)) return { baseCost: cost }
+  const fees = cost.fees ?? (cost.fee ? [cost.fee] : [{}])
+  // First fee is the base (full) price; if cards exist, the card-return cost is cards.cost
+  const baseCost = fees[0] ?? {}
+  const upgradeCost = cost.cards?.cost
+  return { baseCost, upgradeCost }
+}
+
 const renderCost = (cost: Partial<Resource>, locale: Locale) => {
   const parts = []
   if (cost.wood) parts.push(<div key="wood" className="card-cost-item">{cost.wood} <span className="card-res-icon wood" title={t(locale, 'resources.wood')}/></div>)
@@ -101,16 +113,17 @@ export const PlayerCard = ({
   const cardData = useMemo(() => {
     if (cardType === 'major') {
       const major = getMajorCardEffect(cardId)
-      return major
-        ? {
-            name: t(locale, `improvements.${cardId}.name`),
-            description: major.description.join('\n'),
-            cost: { ...emptyResources, ...major.cost },
-            vp: major.vp,
-            isCookery: major.isCookery,
-            isBaking: major.isBaking,
-          }
-        : null
+      if (!major) return null
+      const { baseCost } = extractMajorDisplayCost(major.cost)
+      return {
+        name: t(locale, `improvements.${cardId}.name`),
+        description: major.description.join('\n'),
+        cost: { ...emptyResources, ...baseCost },
+        returnCards: major.returnCards,
+        vp: major.vp,
+        isCookery: major.isCookery,
+        isBaking: major.isBaking,
+      }
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
       return minor
@@ -118,6 +131,7 @@ export const PlayerCard = ({
             name: minor.name,
             description: minor.desc.join('\n'),
             cost: { ...emptyResources, ...minor.cost },
+            altCosts: minor.altCosts,
             deck: minor.deck,
             category: minor.category,
             vp: minor.vp,
@@ -238,9 +252,30 @@ export const PlayerCard = ({
           <div className="card-passing-badge" title={locale === 'zh' ? '传递卡' : 'Passing card'} />
         )}
         
-        {hasCost && (
+        {hasCost && !cardData.altCosts && (
           <div className="card-cost">
-            {renderCost(cardData.cost, locale)}
+            {'returnCards' in cardData && cardData.returnCards && cardData.returnCards.length > 0 ? (
+              <div className="card-cost-return">
+                <div className="card-cost-return-text">
+                  {locale === 'zh' ? '归还' : 'Return'}{' '}
+                  {t(locale, `improvements.${cardData.returnCards[0]}.name`)}{' '}
+                  {locale === 'zh' ? '或' : 'or'}
+                </div>
+                {renderCost(cardData.cost, locale)}
+              </div>
+            ) : (
+              renderCost(cardData.cost, locale)
+            )}
+          </div>
+        )}
+        {cardData.altCosts && cardData.altCosts.length > 0 && (
+          <div className="card-cost card-cost-alt">
+            {cardData.altCosts.map((alt, i) => (
+              <span key={i} className="card-cost-option">
+                {i > 0 && <span className="card-cost-separator">/</span>}
+                {renderCost(alt, locale)}
+              </span>
+            ))}
           </div>
         )}
 

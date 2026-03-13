@@ -4,7 +4,7 @@ import type { ComplexCost, PlayerState, Resource } from '../../../shared/game/ty
 import { formatResources } from '../../../shared/logic/format'
 import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
-import { canPayResources } from '../../../shared/actions/effects/pay'
+import { canPayResources, computeAllBuyableCombinations } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard } from '../common/PlayerCard'
 
@@ -42,17 +42,18 @@ export const MajorImprovements = ({
     <div className="major-row">
       {availableMajorImprovements.map((cardId) => {
         const major = getMajorCardEffect(cardId)
-        const normalizedCost: Partial<Resource> =
-          major && (
-            'fee' in major.cost ||
-            'fees' in major.cost ||
-            'trades' in major.cost ||
-            'cards' in major.cost ||
-            'bonuses' in major.cost
-          )
-            ? ((major.cost as ComplexCost).fee ?? {})
-            : ((major?.cost ?? {}) as Partial<Resource>)
-        const canBuy = !!major && canPayResources(currentPlayer, normalizedCost)
+        const isComplex = !!major && (
+          'fee' in major.cost ||
+          'fees' in major.cost ||
+          'trades' in major.cost ||
+          'cards' in major.cost ||
+          'bonuses' in major.cost
+        )
+        const canBuy = !!major && (
+          isComplex
+            ? computeAllBuyableCombinations(currentPlayer, major.cost as ComplexCost, currentPlayer.improvements).length > 0
+            : canPayResources(currentPlayer, (major?.cost ?? {}) as Partial<Resource>)
+        )
         const canInteract = isInteractive && isSelectingMajor && canBuy
         const futureEntries = futureCardResources[cardId] ?? []
         return (
