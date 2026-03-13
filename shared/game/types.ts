@@ -63,6 +63,7 @@ export type PaymentSolution = {
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
+  feeIndex?: number
 }
 
 export type PaymentSource = 'reserve' | 'field' | 'card'

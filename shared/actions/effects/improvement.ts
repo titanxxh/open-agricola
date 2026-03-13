@@ -1,4 +1,5 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
+import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
 import { canPayResources, payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, applyCostOverride } from './pay'
@@ -90,10 +91,11 @@ const playMajorImprovement = (
       state.availableMajorImprovements = state.availableMajorImprovements.filter(
         (id) => id !== improvement.id,
       )
-      const activation = activateCard(state, player, improvement.id, 'onBuy')
+      const paymentInfo: PaymentInfo = { resourcesPaid: solution.resourcesPaid, feeIndex: solution.feeIndex }
+      const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
       return activation.type === 'flow' ? activation : { type: 'ok' }
     }
-    
+
     if (paymentChoice) {
       const choiceIndex = parseInt(paymentChoice, 10)
       const solution = solutions[choiceIndex]
@@ -111,7 +113,8 @@ const playMajorImprovement = (
       state.availableMajorImprovements = state.availableMajorImprovements.filter(
         (id) => id !== improvement.id,
       )
-      const activation = activateCard(state, player, improvement.id, 'onBuy')
+      const paymentInfo: PaymentInfo = { resourcesPaid: solution.resourcesPaid, feeIndex: solution.feeIndex }
+      const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
       return activation.type === 'flow' ? activation : { type: 'ok' }
     }
     
@@ -139,11 +142,12 @@ const playMajorImprovement = (
   player.improvements.push(improvement.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`major:${improvement.id}`)
-  const activation = activateCard(state, player, improvement.id, 'onBuy')
+  const paymentInfo: PaymentInfo = { resourcesPaid: cost }
+  const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   state.availableMajorImprovements = state.availableMajorImprovements.filter(
     (id) => id !== improvement.id,
   )
-  
+
   // Return with logKey to record the improvement play with payment info
   const result: ActionExecutionResult = activation.type === 'flow' ? activation : { type: 'ok' }
   if (result.type === 'ok') {
@@ -166,25 +170,13 @@ export const getMinorImprovementCost = (
   return cost
 }
 
-const playMinorImprovement = (
+const placeMinorImprovement = (
   state: GameState,
   player: PlayerState,
-  improvementId: string,
-  actionCardId?: string,
+  improvement: NonNullable<ReturnType<typeof getMinorImprovement>>,
+  paymentInfo: PaymentInfo,
+  cost: Partial<Resource>,
 ): ActionExecutionResult => {
-  const improvement = getMinorImprovement(improvementId)
-  if (!improvement) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
-  }
-  if (!player.minorHand.includes(improvement.id)) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
-  }
-  let cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
-  cost = applyCardCostModifiers(state, player, improvementId, cost, actionCardId)
-  if (!canPayResources(player, cost)) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
-  }
-  payResources(player, cost)
   if (improvement.reward) {
     gainResources(player, improvement.reward)
   }
@@ -196,16 +188,85 @@ const playMinorImprovement = (
   if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
     player.activeModifiers.push(modifier)
   }
-  const activation = activateCard(state, player, improvement.id, 'onBuy')
+  const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
     return activation
   }
-  // Return with logKey to record the improvement play with payment info
   return {
     type: 'ok',
     logKey: 'log.playMinorImprovement',
     logParams: { improvements: improvement.id, costResources: cost },
   }
+}
+
+const playMinorImprovement = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  actionCardId?: string,
+  paymentChoice?: string,
+): ActionExecutionResult => {
+  const improvement = getMinorImprovement(improvementId)
+  if (!improvement) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
+  if (!player.minorHand.includes(improvement.id)) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
+
+  // altCosts path: use ComplexCost / PaymentSolution pipeline
+  if (improvement.altCosts && improvement.altCosts.length > 0) {
+    const complexCost: ComplexCost = { fees: improvement.altCosts }
+    const solutions = computeAllBuyableCombinations(player, complexCost)
+
+    if (solutions.length === 0) {
+      return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    }
+
+    if (solutions.length === 1) {
+      const solution = solutions[0]
+      executePaymentSolution(player, solution)
+      const paymentInfo: PaymentInfo = { resourcesPaid: solution.resourcesPaid, feeIndex: solution.feeIndex }
+      return placeMinorImprovement(state, player, improvement, paymentInfo, solution.resourcesPaid)
+    }
+
+    if (paymentChoice !== undefined) {
+      const choiceIndex = parseInt(paymentChoice, 10)
+      const solution = solutions[choiceIndex]
+      if (!solution) {
+        return { type: 'fail', logKey: 'log.minorImprovementFail' }
+      }
+      executePaymentSolution(player, solution)
+      const paymentInfo: PaymentInfo = { resourcesPaid: solution.resourcesPaid, feeIndex: solution.feeIndex }
+      return placeMinorImprovement(state, player, improvement, paymentInfo, solution.resourcesPaid)
+    }
+
+    // Multiple solutions — return choice to player
+    return {
+      type: 'choice',
+      promptKey: 'prompt.selectPayment',
+      options: solutions.map((sol, idx) => {
+        const resourcesDesc = Object.entries(sol.resourcesPaid)
+          .filter(([, v]) => (v ?? 0) > 0)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(', ')
+        return {
+          value: `pay:minor:${improvementId}:${idx}`,
+          labelKey: resourcesDesc,
+        }
+      }),
+    }
+  }
+
+  // Flat-cost path (existing behavior)
+  let cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
+  cost = applyCardCostModifiers(state, player, improvementId, cost, actionCardId)
+  if (!canPayResources(player, cost)) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
+  payResources(player, cost)
+  const paymentInfo: PaymentInfo = { resourcesPaid: cost }
+  return placeMinorImprovement(state, player, improvement, paymentInfo, cost)
 }
 
 export const playImprovement = (
@@ -215,8 +276,21 @@ export const playImprovement = (
   mode: ImprovementPlayMode = 'major',
   paymentChoice?: string,
 ): ActionExecutionResult => {
-  if (paymentChoice?.startsWith('pay:')) {
-    const parts = paymentChoice.split(':')
+  // Payment choice can arrive as either paymentChoice param (direct call)
+  // or as improvementId (via resolveChoice which passes choice as first arg)
+  const payValue = paymentChoice?.startsWith('pay:') ? paymentChoice
+    : improvementId.startsWith('pay:') ? improvementId
+    : undefined
+  if (payValue) {
+    const parts = payValue.split(':')
+    // pay:minor:cardId:idx or pay:cardId:idx (major)
+    if (parts[1] === 'minor') {
+      const minorId = parts[2]
+      const choiceIdx = parts[3]
+      if (minorId && choiceIdx !== undefined) {
+        return playMinorImprovement(state, player, minorId, undefined, choiceIdx)
+      }
+    }
     const targetId = parts[1]
     const choiceIdx = parts[2]
     if (targetId && choiceIdx !== undefined) {
@@ -256,6 +330,15 @@ export const playImprovement = (
   return { type: 'fail', logKey: 'log.improvementFail' }
 }
 
+const canAffordMinorImprovement = (player: PlayerState, improvement: NonNullable<ReturnType<typeof getMinorImprovement>>): boolean => {
+  if (improvement.altCosts && improvement.altCosts.length > 0) {
+    const complexCost: ComplexCost = { fees: improvement.altCosts }
+    return computeAllBuyableCombinations(player, complexCost).length > 0
+  }
+  const cost = getMinorImprovementCost(player, improvement.id) ?? improvement.cost ?? {}
+  return canPayResources(player, cost)
+}
+
 const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -263,11 +346,7 @@ const buildPlayableMinorOptions = (player: PlayerState): ActionChoiceOption[] =>
       (improvement): improvement is NonNullable<typeof improvement> =>
         !!improvement,
     )
-    .filter((improvement) => {
-      const cost =
-        getMinorImprovementCost(player, improvement.id) ?? improvement.cost ?? {}
-      return canPayResources(player, cost)
-    })
+    .filter((improvement) => canAffordMinorImprovement(player, improvement))
     .map((improvement) => ({
       value: improvement.id,
       labelKey: `minorImprovements.${improvement.id}.name`,
@@ -301,7 +380,7 @@ const buildMinorImprovementOptions = (player: PlayerState): ActionChoiceOption[]
       (improvement): improvement is NonNullable<typeof improvement> =>
         !!improvement,
     )
-    .filter((improvement) => canPayResources(player, improvement.cost ?? {}))
+    .filter((improvement) => canAffordMinorImprovement(player, improvement))
     .map((improvement) => ({
       value: `minor:${improvement.id}`,
       labelKey: `minorImprovements.${improvement.id}.name`,

@@ -122,6 +122,7 @@ type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
+  feeIndex?: number
 }
 
 const subtractResources = (
@@ -375,14 +376,15 @@ export const computeAllBuyableCombinations = (
       ? [effectiveCost.fee]
       : [{}]
 
-  for (const baseFee of baseFees) {
+  for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
+    const baseFee = baseFees[feeIdx]
     const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
       ? generateTradeCombinations(effectiveCost.trades, playerResources)
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
       const bonuses = effectiveCost.bonuses ?? [undefined]
-      
+
       for (const bonus of bonuses) {
         let effectiveCostFee = baseFee
         let bonusId: string | undefined
@@ -394,11 +396,12 @@ export const computeAllBuyableCombinations = (
 
         if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
           const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
-          
+
           rawSolutions.push({
             resourcesRemaining: remaining,
             tradesUsed: tradeCombo.tradesUsed,
             bonusUsed: bonusId,
+            feeIndex: baseFees.length > 1 ? feeIdx : undefined,
           })
         }
       }
@@ -413,6 +416,7 @@ export const computeAllBuyableCombinations = (
       resourcesPaid: subtractResources(playerResources, sol.resourcesRemaining),
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
+      feeIndex: sol.feeIndex,
     }
 
     const hash = hashSolution(solution)

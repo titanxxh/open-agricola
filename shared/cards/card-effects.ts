@@ -1,5 +1,10 @@
-import type { ActionFlow, GameState, PlayerState } from '../game/types'
+import type { ActionFlow, GameState, PlayerState, Resource } from '../game/types'
 import { getMajorCardEffect } from './major'
+
+export type PaymentInfo = {
+  resourcesPaid: Partial<Resource>
+  feeIndex?: number
+}
 
 export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onReturnHome'
   | 'onBeforeReturnHome' | 'onStartReturnHome'
@@ -14,10 +19,11 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
+type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 
 export type CardEffect = {
   id: string
-  onBuy?: FlowEffectHandler
+  onBuy?: FlowEffectHandlerWithPayment
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: EffectHandler
@@ -59,11 +65,15 @@ export const runCardEffectHook = (
   player: PlayerState,
   cardId: string,
   hook: CardEffectHook,
+  paymentInfo?: PaymentInfo,
 ): ActionFlow | null => {
   const effect = getCardEffect(cardId)
   const handler = effect?.[hook]
   if (!handler) return null
-  return handler(state, player) ?? null
+  if (hook === 'onBuy') {
+    return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo) ?? null
+  }
+  return (handler as FlowEffectHandler)(state, player) ?? null
 }
 
 /**
