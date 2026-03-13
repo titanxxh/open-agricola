@@ -41,7 +41,7 @@ import {
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
-import { getBuildRoomCost } from '../shared/actions/effects/house.ts'
+import { getBuildRoomCost } from '../shared/actions/effects/construct.ts'
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks, runBeforeReturnHomeHooks, runStartReturnHomeHooks, runAfterRoundEndHooks, runStartHarvestHooks, runStartHarvestFieldPhaseHooks, runHarvestFieldPhaseHooks, runEndHarvestFieldPhaseHooks, runStartHarvestFeedingPhaseHooks, runHarvestFeedingPhaseHooks, runEndHarvestFeedingPhaseHooks, runEndHarvestHooks } from '../shared/cards/card-effects.ts'
@@ -321,12 +321,13 @@ export class GameSession {
     if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
       return []
     }
-    // Suppress anytime actions during sub-choice resolution (e.g. bake-bread)
+    // Suppress anytime actions during sub-choice resolution (e.g. bake-bread, exchange)
     // to avoid recursive anytime interrupts
     if (
       this.pending.type === 'choice' &&
       this.pending.promptKey &&
-      this.pending.promptKey.startsWith('ui.interactionBakeBread')
+      (this.pending.promptKey.startsWith('ui.interactionBakeBread') ||
+       this.pending.promptKey.startsWith('ui.interactionExchange'))
     ) {
       return []
     }

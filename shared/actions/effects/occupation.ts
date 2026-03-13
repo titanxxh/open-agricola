@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import { gainResources } from './gain'
 import { canPayResources, payResources } from './pay'
@@ -79,4 +79,66 @@ export const getOccupationCost = (
     }
   }
   return cost
+}
+
+const getLessonsCost = (player: PlayerState, spaceId: string) => {
+  const isLessons4 = spaceId === 'lessons-4'
+  const base = isLessons4
+    ? player.occupationPlayed.length <= 1
+      ? 1
+      : 2
+    : player.occupationPlayed.length === 0
+      ? 0
+      : 1
+  const discount = player.occupationPlayed.includes('B109_PaperMaker') ? 1 : 0
+  let food = Math.max(0, base - discount)
+  for (const mod of player.activeModifiers ?? []) {
+    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+      if (mod.discount.food && food > 0) {
+        food = Math.max(0, food - mod.discount.food)
+      }
+    }
+  }
+  return food > 0 ? { food } : {}
+}
+
+const buildPlayableOccupationOptions = (
+  player: PlayerState,
+  cost: Partial<PlayerState['resources']>,
+): ActionChoiceOption[] =>
+  player.occupationHand
+    .map((id) => getOccupation(id))
+    .filter(
+      (occupation): occupation is NonNullable<typeof occupation> =>
+        !!occupation,
+    )
+    .filter(() => canPayResources(player, cost))
+    .map((occupation) => ({
+      value: occupation.id,
+      labelKey: `occupations.${occupation.id}.name`,
+    }))
+
+export const playOccupationAction: ActionDefinition = {
+  id: 'play-occupation',
+  nameKey: 'actions.lessons.name',
+  descriptionKey: 'actions.lessons.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, space }) => {
+    const cost = getLessonsCost(player, space.id)
+    const playableOptions = buildPlayableOccupationOptions(player, cost)
+    if (playableOptions.length === 0) {
+      return { type: 'ok' }
+    }
+    return {
+      type: 'choice',
+      promptKey: 'ui.interactionChooseOccupation',
+      options: playableOptions,
+    }
+  },
+  resolveChoice: ({ player, space }, choice) => {
+    const cost = getLessonsCost(player, space.id)
+    return playOccupation(player, choice, cost)
+  },
 }

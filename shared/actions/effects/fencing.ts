@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, Pasture, PlayerState } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, Pasture, PlayerState } from '../../game/types'
 import { canPayResources, payResources } from './pay'
 
 export const maxFences = 15
@@ -61,4 +61,21 @@ export const buildPasture = (
   }
   player.pastures.push(pasture)
   return { type: 'ok' }
+}
+
+export const fenceAction: ActionDefinition = {
+  id: 'fence',
+  nameKey: 'actions.fencing.name',
+  descriptionKey: 'actions.fencing.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_, player) => player.resources.wood > 0,
+  execute: () => ({
+    type: 'choice',
+    promptKey: 'ui.interactionFenceSelect',
+    options: [
+      { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+      { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+    ],
+  }),
 }

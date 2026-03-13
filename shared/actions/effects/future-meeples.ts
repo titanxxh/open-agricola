@@ -1,4 +1,5 @@
 import type {
+  ActionDefinition,
   ActionFlow,
   FutureMeepleRequest,
   GameState,
@@ -54,4 +55,17 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
     }
   })
   state.futureMeeples = nextEntries
+}
+
+export const futureMeeplesAction: ActionDefinition = {
+  id: 'future-meeples',
+  nameKey: 'actions.future-meeples.name',
+  descriptionKey: 'actions.future-meeples.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state }) => {
+    resolveFutureMeepleRequests(state)
+    return { type: 'ok' }
+  },
 }

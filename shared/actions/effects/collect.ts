@@ -1,4 +1,4 @@
-import type { ActionSpace, PlayerState, Resource } from '../../game/types'
+import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../game/types'
 
 export const collectAccumulatedResources = (
   player: PlayerState,
@@ -12,4 +12,24 @@ export const collectAccumulatedResources = (
       space.resources[resourceKey] = 0
     }
   })
+}
+
+export const collectAction: ActionDefinition = {
+  id: 'collect',
+  nameKey: 'actions.collect.name',
+  descriptionKey: 'actions.collect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, space }) => {
+    const gained: Record<string, number> = {}
+    const resources = space.resources
+    ;(['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const).forEach((key) => {
+      if (resources[key] > 0) {
+        gained[key] = resources[key]
+      }
+    })
+    collectAccumulatedResources(player, space)
+    return { type: 'ok' as const, resourcesGained: gained }
+  },
 }
