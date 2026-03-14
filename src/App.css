@@ -23,7 +23,7 @@
 .app {
   min-height: 100vh;
   color: #1e1e1e;
-  background: linear-gradient(180deg, #cfe6b4 0%, #9fc07c 100%);
+  background: url('/bga-img/background.jpg');
   padding: clamp(12px, 2vw, 24px);
   box-sizing: border-box;
   overflow-x: hidden;
@@ -149,6 +149,44 @@
   font-weight: 600;
 }
 
+/* Phase breadcrumb bar */
+.phase-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(200, 210, 180, 0.5);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #555;
+  flex-wrap: wrap;
+}
+
+.phase-round {
+  margin-right: 8px;
+  font-size: 15px;
+  color: #333;
+}
+
+.phase-separator {
+  margin: 0 2px;
+  color: #999;
+  font-size: 10px;
+}
+
+.phase-label {
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.phase-label.phase-active {
+  background: #d4a017;
+  color: #fff;
+  font-weight: 700;
+}
+
+
 .status {
   display: flex;
   gap: 12px;
@@ -264,24 +302,28 @@
 .action-board {
   position: relative;
   background:
-    url('/bga-img/central.png') 170px 0 / 830px 795px no-repeat,
-    url('/bga-img/add_2p.png') 7px 0 / 156px auto no-repeat,
-    #4a6f2e;
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/add_2p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
+/* Left panel dashed border (matches BGA #add-board) */
 .action-board::before {
   content: '';
   position: absolute;
-  left: 168px;
+  left: 0;
   top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.05));
-  z-index: 0;
-  border-radius: 2px;
+  width: 156px;
+  height: 614px;
+  border: 1px dashed white;
+  border-left: none;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* --- Action card holder (wrapper) --- */
@@ -553,6 +595,10 @@
   height: auto;
 }
 
+.action-card-holder.round .resource-holder {
+  flex-flow: row-reverse;
+}
+
 .action-card-holder.round .action-header {
   font-family: var(--agricola-font);
   font-size: 10px;
@@ -657,13 +703,14 @@
 /* --- Harvest markers --- */
 
 .harvest-marker {
-  width: 28px;
+  width: 35px;
   height: 28px;
-  border-radius: 50%;
-  background: #c85a5a;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 8.62866% 21.8543%;
+  background-size: 2027.72%;
+  background-repeat: no-repeat;
+  color: transparent;
+  font-size: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -673,7 +720,7 @@
 }
 
 .harvest-marker.past {
-  background: #888;
+  opacity: 0.5;
 }
 
 
@@ -1755,8 +1802,9 @@
 }
 
 .dev-row + .dev-row {
-  margin-top: 8px;
+  margin-top: 12px;
 }
+
 
 .dev-field {
   display: flex;

@@ -326,6 +326,7 @@ export const normalizeState = (raw: GameState): GameState => {
     gameSeed: seed,
     roundActionOrder,
     availableMajorImprovements,
+    phase: raw.phase ?? 'work',
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
   }
@@ -441,6 +442,7 @@ export const createInitialState = (seed?: number): GameState => {
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const initialState: GameState = {
     round: 1,
+    phase: 'work',
     currentPlayerIndex: 0,
     players: createInitialPlayers(gameSeed),
     actionSpaces: createActionSpaces(),

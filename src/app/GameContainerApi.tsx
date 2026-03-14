@@ -1158,6 +1158,8 @@ export const GameContainerApi = () => {
           playDevCard={playDevCard} drawDevCard={drawDevCard}
           createDevPasture={createDevPasture}
           saveDevState={saveDevState} loadDevState={loadDevState}
+          isInteractive={isInteractive}
+          seedValue={resetSeedInput} onSeedChange={setResetSeedInput} onResetGame={resetGame}
         />
       ) : null}
       <AnytimeBar
@@ -1171,14 +1173,10 @@ export const GameContainerApi = () => {
         locale={locale}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onResetGame={resetGame}
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
         isInteractive={isInteractive}
-        devMode={devMode}
-        seedValue={resetSeedInput}
-        onSeedChange={setResetSeedInput}
       />
       <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
       <main className="board">
