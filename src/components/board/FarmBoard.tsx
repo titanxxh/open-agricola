@@ -10,6 +10,33 @@ import type { AnimalReorgState } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
+type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+const AnimalCount = ({
+  count,
+  animalType,
+  capacity,
+}: {
+  count: number
+  animalType: AnimalType | null
+  capacity: number
+}) => {
+  if (!animalType) {
+    return (
+      <span className="pasture-count">
+        0/{capacity}
+      </span>
+    )
+  }
+  return (
+    <span className="pasture-count">
+      {count}
+      <span className={`res-icon res-icon-${animalType}`} style={{ marginLeft: '2px', marginRight: '2px' }} />
+      /{capacity}
+    </span>
+  )
+}
+
 type FarmCell = {
   key: string
   type: 'tile' | 'post' | 'fence-h' | 'fence-v'
@@ -397,7 +424,7 @@ export const FarmBoard = ({
               {cropLabel ? <div className="field-crop">{cropLabel}</div> : null}
               {pastureInfo?.isCorner ? (
                 <div className="pasture-info">
-                  <div className="pasture-count">{pastureLabel}</div>
+                  <div className="pasture-count"><AnimalCount count={pastureAnimalCount} animalType={pastureAnimalType} capacity={pastureCapacity} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
                       {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
@@ -440,7 +467,7 @@ export const FarmBoard = ({
               ) : null}
               {houseLabel ? (
                 <div className="pasture-info">
-                  <div className="pasture-count">{houseLabel}</div>
+                  <div className="pasture-count"><AnimalCount count={houseDisplay.animalCount} animalType={houseDisplay.animalType} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
                       {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
@@ -482,7 +509,7 @@ export const FarmBoard = ({
               ) : null}
               {stableLabel ? (
                 <div className="pasture-info">
-                  <div className="pasture-count">{stableLabel}</div>
+                  <div className="pasture-count"><AnimalCount count={stableDisplay?.animalCount ?? 0} animalType={stableDisplay?.animalType ?? null} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
                       {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
