@@ -58,5 +58,5 @@ export const D150_GodlySpouse = new Occupation({
   category: "ACTIONS_BOOSTER",
   desc: ["After you use Wish for Children and have placed a second person this round, you may return your first placed person home (unless on Meeting Place)."],
   cost: {},
-  players: "1+",
+  players: "4+",
 })

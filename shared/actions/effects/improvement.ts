@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource, Bonus } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { gainResources } from './gain'
@@ -14,7 +14,7 @@ const applyCardCostModifiers = (
   cardId: string,
   baseCost: Partial<Resource>,
   actionCardId?: string,
-): Partial<Resource> => {
+): Partial<Resource> | ComplexCost => {
   const emptySpace = { id: '', nameKey: '', descriptionKey: '', roundAvailable: 1, gainPerRound: {}, canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' as const }), resources: {} as any, takenBy: null }
   const context: CardListenerContext = {
     state,
@@ -25,6 +25,7 @@ const applyCardCostModifiers = (
   }
   const matched = getMatchingListeners(context)
   let cost = { ...baseCost }
+  const collectedBonuses: Bonus[] = []
   for (const entry of matched) {
     const result = executeCardListener(entry.registration, {
       ...context,
@@ -34,6 +35,12 @@ const applyCardCostModifiers = (
     if (result?.costs) {
       cost = applyCostOverride(cost, result.costs)
     }
+    if (result?.bonuses) {
+      collectedBonuses.push(...result.bonuses)
+    }
+  }
+  if (collectedBonuses.length > 0) {
+    return { fee: cost, bonuses: collectedBonuses }
   }
   return cost
 }
@@ -259,8 +266,42 @@ const playMinorImprovement = (
   }
 
   // Flat-cost path (existing behavior)
-  let cost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
-  cost = applyCardCostModifiers(state, player, improvementId, cost, actionCardId)
+  const baseCost = getMinorImprovementCost(player, improvementId) ?? improvement.cost ?? {}
+  const modifiedCost = applyCardCostModifiers(state, player, improvementId, baseCost, actionCardId)
+
+  // If hooks returned bonuses, route through ComplexCost pipeline
+  if (isComplexCost(modifiedCost)) {
+    const solutions = computeAllBuyableCombinations(player, modifiedCost)
+    if (solutions.length === 0) {
+      return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    }
+    if (solutions.length === 1 || paymentChoice) {
+      const choiceIndex = paymentChoice ? parseInt(paymentChoice, 10) : 0
+      const solution = solutions[choiceIndex]
+      if (!solution) {
+        return { type: 'fail', logKey: 'log.minorImprovementFail' }
+      }
+      executePaymentSolution(player, solution)
+      const pInfo: PaymentInfo = { resourcesPaid: solution.resourcesPaid, feeIndex: solution.feeIndex }
+      return placeMinorImprovement(state, player, improvement, pInfo, solution.resourcesPaid)
+    }
+    return {
+      type: 'choice',
+      promptKey: 'prompt.selectPayment',
+      options: solutions.map((sol, idx) => {
+        const resourcesDesc = Object.entries(sol.resourcesPaid)
+          .filter(([, v]) => (v ?? 0) > 0)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(', ')
+        return {
+          value: `pay:minor:${improvementId}:${idx}`,
+          labelKey: resourcesDesc,
+        }
+      }),
+    }
+  }
+
+  const cost = modifiedCost
   if (!canPayResources(player, cost)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }

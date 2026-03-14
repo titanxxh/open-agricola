@@ -42,5 +42,5 @@ export const E128_Saddler = new Occupation({
   category: "ACTIONS_BOOSTER",
   desc: ["Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 field."],
   cost: {},
-  players: "1+",
+  players: "3+",
 })

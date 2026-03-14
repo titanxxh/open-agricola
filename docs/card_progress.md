@@ -61,7 +61,7 @@
 | B34_SpecialFood | SpecialEffect | 特殊效果前 | 🔧 |
 | A166_Haydryer | Harvest | 收获前效果 | ❌ |
 | C133_Soldier | EndOfGame | 游戏结束时 | 🔧 |
-| B70_NewPurchase | StartOfTurn | 回合开始时 | ❌ |
+| B70_NewPurchase | StartOfTurn | 回合开始时 | ✅ |
 
 ### During Hook
 | 卡牌 | 行动 | 说明 | 状态 |
@@ -94,20 +94,20 @@
 | A74_StableTree | Stables | 建马厩后 | 🔧 |
 | A37_Bucksaw | Renovation | 翻新后 | 🔧 |
 | A144_Sequestrator | Fencing | 围栏后 | 🔧 |
-| D150_GodlySpouse | WishChildren | 生孩子后 | 🔧 |
+| D150_GodlySpouse | WishChildren | 生孩子后 | ✅ |
 | B65_GrainDepot | Pay | 支付后 | 🔧 |
 | C71_SlurrySpreader | Reorganize | 重组后 | 🔧 |
 | B100_Clutterer | Occupation | 打职业后 | 🔧 |
 | A64_BarleyMill | Reap | 收割后 | 🔧 |
 | D99_EarthenwarePotter | Harvest | 收获后 | ❌ |
-| E128_Saddler | Receive | 接收后 | ❌ |
-| E57_CheeseFondue | Exchange | 交易后 | ❌ |
+| E128_Saddler | Receive | 接收后 | ✅ |
+| E57_CheeseFondue | Exchange | 交易后 | ✅ |
 
 ### ComputeCosts Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
 | A128_RiparianBuilder | Construct | 建造成本折扣 | 🔧 |
-| C37_DwellingMound | Plow | 犁地成本折扣 | 🔧 |
+| C37_DwellingMound | Plow | 犁地成本增加(+1食物) | ✅ |
 | C88_CarpentersApprentice | Construct | 建造成本转换 | 🔧 |
 | A123_FrameBuilder | Renovation/Construct | 翻新/建造成本 | 🔧 |
 | A88_HedgeKeeper | Fencing | 围栏成本折扣 | 🔧 |
@@ -130,9 +130,9 @@
 |------|------|------|------|
 | D49_Bookshelf | Improvement | 放宽改良条件 | ❌ |
 | C60_SmallPottersOven | Sow | 放宽播种条件 | ❌ |
-| D152_Patron | Occupation | 放宽职业条件 | ❌ |
+| D152_Patron | Occupation | 放宽职业条件 | ✅ |
 | B94_StockProtector | Fencing | 放宽围栏条件 | 🔧 |
-| E130_Overachiever | WishChildren | 放宽生孩子条件 | 🔧 |
+| E130_Overachiever | WishChildren | 放宽生孩子条件 | ✅ |
 | D119_WoodBarterer | Exchange | 放宽交易条件 | ❌ |
 | B109_PaperMaker | Occupation | 放宽职业条件 | 🔧 |
 | E21_SheepRug | WishChildren | 允许使用被占用的 Wish for Children | ✅ |
@@ -165,7 +165,7 @@
 | A81_InterimStorage | - |
 | A82_WorkCertificate | After(PlaceFarmer) |
 | A83_ShepherdsCrook | ImmediatelyAfter(Fencing) |
-| A84_Silage | - |
+| A84_Silage | onReturnHome |
 | A85_Homekeeper | - |
 | A87_Conservator | - |
 | A88_HedgeKeeper | ComputeCosts(Fencing) |
