@@ -12,10 +12,10 @@ const CX = 170
 
 const SIDE_ACTIONS: Record<string, Pos> = {
   'copse':             { top: 18,  left: 5,   width: 60,  height: 83,  size: 's' },
-  'grove':             { top: 110, left: 5,   width: 60,  height: 86,  size: 's' },
+  'grove':             { top: 110, left: 54,  width: 60,  height: 86,  size: 's' },
   'resource-market-4': { top: 236, left: 5,   width: 110, height: 65,  size: 'std' },
-  'hollow-4':          { top: 313, left: 6,   width: 60,  height: 86,  size: 's' },
-  'lessons-4':         { top: 412, left: 2,   width: 115, height: 94,  size: 'std' },
+  'hollow-4':          { top: 313, left: 5,   width: 60,  height: 86,  size: 's' },
+  'lessons-4':         { top: 412, left: 5,   width: 115, height: 94,  size: 'std' },
   'traveling-players': { top: 516, left: 53,  width: 65,  height: 84,  size: 's' },
 }
 
@@ -108,6 +108,66 @@ const ACTION_SPRITE: Record<string, string> = {
   'farm-redevelopment': '75% 100%',
 }
 
+const ACTION_ICON_DESC: Record<string, string[]> = {
+  // Base actions
+  'farm-expansion':     ['5<wood>2<reed><arrow><room-wood>', '5<clay>2<reed><arrow><room-clay>', '5<stone>2<reed><arrow><room-stone>', '+', '2<wood> <arrow> <barn>'],
+  'meeting-place':      ['<first> + 1<minor>'],
+  'grain-seeds':        ['+1<grain>'],
+  'farmland':           ['<field>'],
+  'day-laborer':        ['+2<food>'],
+  'lessons':            ['[Pay] 1<food>*', '1<occupation>'],
+  'lessons-4':          ['[Pay] 2<food>*', '1<occupation>'],
+  'resource-market-4':  ['+1<reed>+1<stone>+1<food>'],
+  // Round actions
+  'fencing':            ['1<wood><arrow><fence-icon>'],
+  'grain-utilization':  ['<sow> + <bread>'],
+  'major-improvement':  ['1<major>/<minor>'],
+  'vegetable-seeds':    ['+1<vegetable>'],
+  'cultivation':        ['<field> + <sow>'],
+  'wish-children':      ['<child> [▷] 1<minor>'],
+  'urgent-wish-children': ['<child-free>'],
+  'house-redevelopment':  ['<upgrade>', '[▷] 1<major>/<minor>'],
+  'farm-redevelopment':   ['<upgrade>', '[▷] 1<wood><arrow><fence-icon>'],
+  'sheep-market':       [],
+  'pig-market':         [],
+  'cattle-market':      [],
+  'western-quarry':     [],
+  'eastern-quarry':     [],
+}
+
+function renderIconDesc(templates: string[]): React.ReactNode {
+  return templates.map((tpl, i) => {
+    const parts: React.ReactNode[] = []
+    let rest = tpl
+    let key = 0
+    while (rest.length > 0) {
+      // Match <type> icons
+      const iconMatch = rest.match(/^<([a-z-]+)>/)
+      if (iconMatch) {
+        parts.push(<span key={key++} className={`res-icon res-icon-${iconMatch[1]}`} />)
+        rest = rest.slice(iconMatch[0].length)
+        continue
+      }
+      // Match [text] brackets
+      const textMatch = rest.match(/^\[([^\]]*)\]/)
+      if (textMatch) {
+        parts.push(<span key={key++} className="text">{textMatch[1]}</span>)
+        rest = rest.slice(textMatch[0].length)
+        continue
+      }
+      // Plain text until next < or [
+      const nextSpecial = rest.search(/[<\[]/)
+      if (nextSpecial === -1) {
+        parts.push(<span key={key++}>{rest}</span>)
+        break
+      }
+      parts.push(<span key={key++}>{rest.slice(0, nextSpecial)}</span>)
+      rest = rest.slice(nextSpecial)
+    }
+    return <div key={i} className="icon-line">{parts}</div>
+  })
+}
+
 const STAGE_LABELS: Record<number, string> = {
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
 }
@@ -140,7 +200,7 @@ type TooltipInfo = {
   actionId: string
   nameKey: string
   descKey: string
-  spritePos: string
+  spritePos?: string
   x: number
   y: number
 }
@@ -228,7 +288,6 @@ export const ActionBoard = ({
 
   const showTooltip = (e: MouseEvent, action: ActionSpace) => {
     const spritePos = ACTION_SPRITE[action.id]
-    if (!spritePos) return
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const tooltipW = 360
     const rightSpace = window.innerWidth - rect.right
@@ -283,6 +342,8 @@ export const ActionBoard = ({
                 ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
+                onMouseEnter={(e) => showTooltip(e, space)}
+                onMouseLeave={hideTooltip}
               >
                 <button
                   className={`action-card action-${pos.size}`}
@@ -293,7 +354,9 @@ export const ActionBoard = ({
                   <div className="action-desc">
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
-                      : t(locale, space.descriptionKey)}
+                      : ACTION_ICON_DESC[space.id]?.length
+                        ? renderIconDesc(ACTION_ICON_DESC[space.id])
+                        : t(locale, space.descriptionKey)}
                   </div>
                   <div className="action-footer" />
                 </button>
@@ -335,7 +398,9 @@ export const ActionBoard = ({
                       <div className="action-desc">
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
-                          : t(locale, action.descriptionKey)}
+                          : ACTION_ICON_DESC[action.id]?.length
+                            ? renderIconDesc(ACTION_ICON_DESC[action.id])
+                            : t(locale, action.descriptionKey)}
                       </div>
                       <div className="action-footer" />
                     </button>
@@ -371,7 +436,9 @@ export const ActionBoard = ({
           className="round-action-tooltip"
           style={{ top: tooltip.y, left: tooltip.x }}
         >
-          <div className="tooltip-card-img" style={{ backgroundPosition: tooltip.spritePos }} />
+          {tooltip.spritePos && (
+            <div className="tooltip-card-img" style={{ backgroundPosition: tooltip.spritePos }} />
+          )}
           <div className="tooltip-text">
             <strong>{t(locale, tooltip.nameKey)}</strong>
             <p>{t(locale, tooltip.descKey)}</p>

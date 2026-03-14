@@ -10,9 +10,16 @@ registerCardEffect({
   onBeforeStartOfTurn: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!harvestRounds.includes(state.round)) return
+    // Option 1: 2 FOOD → 1 GRAIN (player can do both if they have enough)
     if (player.resources.food >= 2) {
       player.resources.food -= 2
       player.resources.grain += 1
+      incCounter(player, CARD_ID, 'triggerCount')
+    }
+    // Option 2: 4 FOOD → 1 VEGETABLE
+    if (player.resources.food >= 4) {
+      player.resources.food -= 4
+      player.resources.vegetable += 1
       incCounter(player, CARD_ID, 'triggerCount')
     }
   },

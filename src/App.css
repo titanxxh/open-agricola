@@ -23,7 +23,7 @@
 .app {
   min-height: 100vh;
   color: #1e1e1e;
-  background: linear-gradient(180deg, #cfe6b4 0%, #9fc07c 100%);
+  background: url('/bga-img/background.jpg');
   padding: clamp(12px, 2vw, 24px);
   box-sizing: border-box;
   overflow-x: hidden;
@@ -149,6 +149,44 @@
   font-weight: 600;
 }
 
+/* Phase breadcrumb bar */
+.phase-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(200, 210, 180, 0.5);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #555;
+  flex-wrap: wrap;
+}
+
+.phase-round {
+  margin-right: 8px;
+  font-size: 15px;
+  color: #333;
+}
+
+.phase-separator {
+  margin: 0 2px;
+  color: #999;
+  font-size: 10px;
+}
+
+.phase-label {
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.phase-label.phase-active {
+  background: #d4a017;
+  color: #fff;
+  font-weight: 700;
+}
+
+
 .status {
   display: flex;
   gap: 12px;
@@ -264,24 +302,28 @@
 .action-board {
   position: relative;
   background:
-    url('/bga-img/central.png') 170px 0 / 830px 795px no-repeat,
-    url('/bga-img/add_2p.png') 7px 0 / 156px auto no-repeat,
-    #4a6f2e;
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/add_2p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
+/* Left panel dashed border (matches BGA #add-board) */
 .action-board::before {
   content: '';
   position: absolute;
-  left: 168px;
+  left: 0;
   top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.05));
-  z-index: 0;
-  border-radius: 2px;
+  width: 156px;
+  height: 614px;
+  border: 1px dashed white;
+  border-left: none;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* --- Action card holder (wrapper) --- */
@@ -352,7 +394,7 @@
   align-items: center;
   font-family: var(--agricola-font);
   font-weight: bold;
-  font-size: 13px;
+  font-size: 22px;
   position: relative;
   background-image: url('/bga-img/action_frame.png');
   background-size: 100% 160px;
@@ -362,8 +404,6 @@
   text-align: center;
   line-height: 1.15;
   padding: 2px 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .action-card .action-footer {
@@ -373,14 +413,13 @@
   background-image: url('/bga-img/action_frame.png');
   background-size: 100% 160px;
   background-position: 0px 10px;
-  background-repeat: no-repeat;
 }
 
 /* Small card frame sections (action-s) */
 .action-card.action-s .action-header {
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 143px;
-  height: 30px;
+  height: 40px;
   font-size: 8px;
 }
 
@@ -388,7 +427,6 @@
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0 -32px;
-  font-size: 12px;
 }
 
 .action-card.action-s .action-footer {
@@ -553,17 +591,17 @@
   background-repeat: no-repeat;
 }
 
-.action-card-holder.round .action-header {
-  height: 26px;
-  font-family: var(--agricola-font);
-  font-size: 10px;
+.action-card-holder.round .action-card {
+  height: auto;
 }
 
-.action-card-holder.round .action-desc {
+.action-card-holder.round .resource-holder {
+  flex-flow: row-reverse;
+}
+
+.action-card-holder.round .action-header {
   font-family: var(--agricola-font);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 10px;
 }
 
 /* Round action sprite positions (5x3 grid) on the holder */
@@ -665,13 +703,14 @@
 /* --- Harvest markers --- */
 
 .harvest-marker {
-  width: 28px;
+  width: 35px;
   height: 28px;
-  border-radius: 50%;
-  background: #c85a5a;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
+  background-image: url('/bga-img/meeples.png');
+  background-position: 8.62866% 21.8543%;
+  background-size: 2027.72%;
+  background-repeat: no-repeat;
+  color: transparent;
+  font-size: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -681,7 +720,7 @@
 }
 
 .harvest-marker.past {
-  background: #888;
+  opacity: 0.5;
 }
 
 
@@ -1602,6 +1641,72 @@
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
 
+/* Action-specific icons from meeples.png */
+.res-icon-arrow   { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
+.res-icon-major   { width:1.1em; height:0.74em; background-position:8.08903% 15.0728%;  background-size:994.175%; }
+.res-icon-minor   { width:1.1em; height:0.74em; background-position:19.7832% 15.0571%; background-size:1008.87%; }
+.res-icon-occupation { width:1.1em; height:0.74em; background-position:31.3279% 15.0571%; background-size:1008.87%; }
+.res-icon-field   { width:1.1em; height:0.6em;  background-position:43.5094% 15.0415%; background-size:890.435%; }
+.res-icon-sow     { width:1.8em; height:1.5em;  background-position:0.580383% 0.56243%; background-size:630.154%; }
+.res-icon-bread   { width:1.1em; height:0.74em; background-position:0.526316% 21.8989%; background-size:1383.78%; }
+.res-icon-first   { width:0.4em; height:0.9em;  background-position:93.9333% 0.523834%; background-size:2925.71%; }
+.res-icon-child   { width:1.1em; height:1.3em;  background-position:19.0819% 0.562114%; background-size:853.333%; }
+.res-icon-child-free { width:1.1em; height:1.5em; background-position:31.7333% 0.552486%; background-size:1183.82%; }
+.res-icon-room-wood  { width:1.5em; height:0.8em; background-position:74.5923% 8.62506%; background-size:1393.2%; }
+.res-icon-room-clay  { width:1.5em; height:0.8em; background-position:88.5324% 8.62069%; background-size:1393.2%; }
+.res-icon-room-stone { width:1.5em; height:0.8em; background-position:71.6544% 21.7766%; background-size:1365.33%; }
+.res-icon-upgrade { width:4em;  height:1.7em;  background-position:54.866% 0.552181%;  background-size:325.079%; }
+.res-icon-pasture { width:1.1em; height:1.1em;  background-position:93.3536% 8.61632%;  background-size:2659.74%; }
+
+/* Icons from separate sprite files */
+.res-icon-barn {
+  background-image: url('/bga-img/stables.png');
+  background-size: 500% 100%;
+  background-position-x: 100%;
+  width: 0.8em; height: 1.1em;
+}
+.res-icon-fence-icon {
+  background-image: url('/bga-img/fences.png');
+  background-size: 500% 100%;
+  background-position-x: 100%;
+  width: 0.9em; height: 0.9em;
+}
+
+/* Icon description styling (matches BGA's action-desc rendering) */
+.action-desc .icon-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.action-desc .icon-line .text {
+  font-family: var(--agricola-font);
+  font-size: 0.8em;
+  font-weight: normal;
+}
+.action-desc .icon-line .res-icon {
+  font-size: inherit;
+}
+
+/* Farm Expansion: smaller font for its many cost lines */
+[data-action-id="farm-expansion"] .action-desc .icon-line {
+  font-size: 0.67em;
+}
+/* Farmland: larger icon */
+[data-action-id="farmland"] .action-desc .icon-line {
+  font-size: 1.5em;
+}
+/* Lessons: smaller first line */
+[data-action-id="lessons"] .action-desc .icon-line:first-child,
+[data-action-id="lessons-4"] .action-desc .icon-line:first-child {
+  font-size: 0.7em;
+}
+/* Resource Market: smaller text */
+[data-action-id="resource-market-4"] .action-desc .icon-line {
+  font-size: 0.65em;
+}
+
 .resource-inline-empty {
   color: #6b6b6b;
 }
@@ -1697,8 +1802,9 @@
 }
 
 .dev-row + .dev-row {
-  margin-top: 8px;
+  margin-top: 12px;
 }
+
 
 .dev-field {
   display: flex;

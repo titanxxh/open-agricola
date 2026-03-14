@@ -45,5 +45,5 @@ export const D152_Patron = new Occupation({
   category: "FOOD_PROVIDER",
   desc: ["Each time before you play an occupation, you get 2 <FOOD>."],
   cost: {},
-  players: "1+",
+  players: "4+",
 })

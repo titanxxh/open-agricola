@@ -1150,6 +1150,7 @@ export class GameSession {
     }
 
     this.pushHistory()
+    this.state.phase = 'returning-home'
     this.applyReturnHome()
     if (harvestRounds.includes(this.state.round)) {
       return this.startHarvest()
@@ -1166,9 +1167,11 @@ export class GameSession {
   }
 
   private startHarvest(): SessionResponse {
+    this.state.phase = 'harvest'
     this.state.players.forEach((p) => runBeforeHarvestHooks(this.state, p))
     this.state.players.forEach((p) => runStartHarvestHooks(this.state, p))
 
+    this.state.phase = 'field'
     this.state.players.forEach((p) => runStartHarvestFieldPhaseHooks(this.state, p))
     this.state.players.forEach((p) => runHarvestFieldPhaseHooks(this.state, p))
     this.state.players.forEach((p) => reap(p))
@@ -1177,6 +1180,7 @@ export class GameSession {
 
     applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
 
+    this.state.phase = 'feeding'
     this.state.players.forEach((p) => runStartHarvestFeedingPhaseHooks(this.state, p))
     this.state.players.forEach((p) => runBeforeFeedHooks(this.state, p))
     this.state.players.forEach((p) => runHarvestFeedingPhaseHooks(this.state, p))
@@ -1220,6 +1224,7 @@ export class GameSession {
   }
 
   private startBreedPhase(): SessionResponse {
+    this.state.phase = 'breeding'
     this.state.players.forEach((p) => runEndHarvestFeedingPhaseHooks(this.state, p))
     this.state.players.forEach((p) => runAfterFeedHooks(this.state, p))
     this.applyBreedPhase()
@@ -1240,6 +1245,7 @@ export class GameSession {
   }
 
   private finalizeRound(): SessionResponse {
+    this.state.phase = 'preparation'
     this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
     this.state.players.forEach((p) => runAfterRoundEndHooks(this.state, p))
     this.state.players.forEach((p) => { p.newbornCount = 0 })
@@ -1256,6 +1262,7 @@ export class GameSession {
     applyMajorEffectsToAllPlayers(this.state, 'onRoundStart')
     const startIdx = this.state.players.findIndex((p) => p.startPlayer)
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
+    this.state.phase = 'work'
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.pending = { type: 'none' }

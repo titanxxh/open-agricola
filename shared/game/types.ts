@@ -154,8 +154,11 @@ export type FutureMeepleRequest = {
   resources: Partial<Resource>
 }
 
+export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' | 'field' | 'feeding' | 'breeding'
+
 export type GameState = {
   round: number
+  phase: RoundPhase
   currentPlayerIndex: number
   players: PlayerState[]
   actionSpaces: ActionSpace[]
