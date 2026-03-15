@@ -90,4 +90,5 @@ export const fenceAction: ActionDefinition = {
       { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
     ],
   }),
+  resolveChoice: () => ({ type: 'ok' }),
 }

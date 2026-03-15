@@ -78,6 +78,11 @@ describe('farm choice', () => {
     expect(result.player.resources.wood).toBe(0)
     expect(result.player.cardStates?.E74_AshTrees?.counters?.fences).toBe(1)
     expect(result.player.cardStates?.E74_AshTrees?.counters?.triggerCount).toBe(1)
-    expect(result.meta).toEqual({ sourceCard: 'E74_AshTrees', usedFreeFences: 4 })
+    expect(result.meta).toMatchObject({
+      sourceCard: 'E74_AshTrees',
+      usedFreeFences: 4,
+      newEdges: edgesForTile(1, 1),
+    })
+    expect(result.meta?.newPastures).toHaveLength(1)
   })
 })

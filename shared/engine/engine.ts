@@ -522,6 +522,7 @@ result.options = [...result.options, ...extraOptions]
           this.pendingChoiceNodeId = choiceNode.id
           this.pendingChoiceActionId = replacedActionId
         } else {
+          this.pendingChoiceNodeId = node.id
           this.pendingChoiceActionId = replacedActionId
         }
         if (duringActivateNodes.length > 0) {
@@ -595,6 +596,7 @@ choice: { promptKey: result.promptKey, options: result.options },
   resolveChoice(
     choice: string,
     context: EngineContext,
+    resolvedResultOverride?: ActionExecutionResult,
   ): ActionExecutionResult {
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -664,8 +666,8 @@ choice: { promptKey: result.promptKey, options: result.options },
             this.pendingChoiceNodeId = choiceNode.id
             this.pendingChoiceActionId = actionId
           } else {
-            this.pendingChoiceNodeId = null
-            this.pendingChoiceActionId = null
+            this.pendingChoiceNodeId = child.id
+            this.pendingChoiceActionId = actionId
           }
           const argResults = this.hooks.computeArgs(
             { ...executionContext, actionId },
@@ -740,7 +742,7 @@ choice: { promptKey: result.promptKey, options: result.options },
       return { type: 'ok' }
     }
     const action = this.registry.get(actionId)
-    if (!action || !action.resolveChoice) {
+    if (!action) {
       return { type: 'ok' }
     }
     const executionContext: ActionExecutionContext = {
@@ -748,7 +750,14 @@ choice: { promptKey: result.promptKey, options: result.options },
       player: context.player,
       space: context.space,
     }
-    const result = action.resolveChoice(executionContext, choice)
+    let result: ActionExecutionResult
+    if (resolvedResultOverride) {
+      result = resolvedResultOverride
+    } else if (action.resolveChoice) {
+      result = action.resolveChoice(executionContext, choice)
+    } else {
+      return { type: 'ok' }
+    }
     this.hooks.during({ ...executionContext, actionId }, result)
     if (result.type === 'choice') {
       if (this.pendingChoiceNodeId) {

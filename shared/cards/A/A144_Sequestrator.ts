@@ -2,76 +2,66 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { initCardState, incCounter } from '../__stubs__/helpers'
+import { incCounter } from '../__stubs__/helpers'
+import { registerCardEffect } from '../card-effects'
+import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
+import type { Resource } from '../../game/types'
 
 const CARD_ID = 'A144_Sequestrator'
 
-const fencingListener: CardListenerRegistration = {
-  id: 'A144-sequestrator-after-fencing',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['fence'],
-  scope: 'any',
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const owner = context.state.players.find(p =>
-      p.occupationPlayed.includes(CARD_ID),
-    )
-    if (!owner) return
-    const counters = initCardState(owner, CARD_ID)
-    const reedLeft = counters['reed'] ?? 0
-    if (reedLeft <= 0) return
-    if (context.player.pastures.length < 3) return
-    const amount = reedLeft
-    counters['reed'] = 0
-    incCounter(owner, CARD_ID, 'triggerCount')
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { reed: amount } },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { reed: amount }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
-  },
-}
+const getOwner = (context: CardListenerContext) =>
+  context.state.players.find((player) => player.occupationPlayed.includes(CARD_ID))
 
-const plowListener: CardListenerRegistration = {
-  id: 'A144-sequestrator-after-plow',
+const createStorageReleaseListener = (params: {
+  id: string
+  actionId: string
+  resource: keyof Resource
+  shouldTrigger: (player: CardListenerContext['player']) => boolean
+}): CardListenerRegistration => ({
+  id: params.id,
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['plow'],
+  actions: [params.actionId],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const owner = context.state.players.find(p =>
-      p.occupationPlayed.includes(CARD_ID),
-    )
-    if (!owner) return
-    const counters = initCardState(owner, CARD_ID)
-    const clayLeft = counters['clay'] ?? 0
-    if (clayLeft <= 0) return
-    if (context.player.fields.length < 5) return
-    const amount = clayLeft
-    counters['clay'] = 0
+    const owner = getOwner(context)
+    if (!owner || !params.shouldTrigger(context.player)) return
+    const amount = takeStoredResource(owner, CARD_ID, params.resource)
+    if (amount <= 0) return
     incCounter(owner, CARD_ID, 'triggerCount')
+    const gain = { [params.resource]: amount } as Partial<Resource>
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { clay: amount } },
+      flow: { type: 'leaf', actionId: 'gain', params: gain },
       logKey: 'log.cardEffectGain',
-      logParams: { gain: { clay: amount }, cardId: CARD_ID },
+      logParams: { gain, cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },
-}
+})
+
+const fencingListener = createStorageReleaseListener({
+  id: 'A144-sequestrator-after-fencing',
+  actionId: 'fence',
+  resource: 'reed',
+  shouldTrigger: (player) => player.pastures.length >= 3,
+})
+
+const plowListener = createStorageReleaseListener({
+  id: 'A144-sequestrator-after-plow',
+  actionId: 'plow',
+  resource: 'clay',
+  shouldTrigger: (player) => player.fields.length >= 5,
+})
 
 registerCardListener(fencingListener)
 registerCardListener(plowListener)
-
-import { registerCardEffect } from '../card-effects'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    const counters = initCardState(player, CARD_ID)
-    counters['reed'] = 3
-    counters['clay'] = 4
+    setStoredResource(player, CARD_ID, 'reed', 3)
+    setStoredResource(player, CARD_ID, 'clay', 4)
   },
 })
 

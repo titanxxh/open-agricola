@@ -31,7 +31,16 @@ type FarmChoiceOptions = {
 }
 
 export type FarmChoiceApplyResult<T extends PlayerFarmState = PlayerFarmState> =
-  | { ok: true; player: T; meta?: { usedFreeFences?: number; sourceCard?: string } }
+  | {
+      ok: true
+      player: T
+      meta?: {
+        usedFreeFences?: number
+        sourceCard?: string
+        newEdges?: string[]
+        newPastures?: T['pastures']
+      }
+    }
   | { ok: false; error: string }
 
 const sanitizePayableCost = (
@@ -109,7 +118,13 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       return {
         ok: true,
         player: result.player as T,
-        meta: consumed ? { usedFreeFences: consumed.usedFreeFences, sourceCard: consumed.sourceCard } : undefined,
+        meta: {
+          ...(consumed
+            ? { usedFreeFences: consumed.usedFreeFences, sourceCard: consumed.sourceCard }
+            : {}),
+          newEdges: result.newEdges,
+          newPastures: result.newPastures as T['pastures'],
+        },
       }
     }
     case 'room': {

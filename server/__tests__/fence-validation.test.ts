@@ -45,6 +45,8 @@ describe('fence validation', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.player.fenceSegments.length).toBe(4)
+      expect(result.newPastures).toHaveLength(1)
+      expect(result.newPastures[0]?.tiles).toHaveLength(1)
     }
   })
 

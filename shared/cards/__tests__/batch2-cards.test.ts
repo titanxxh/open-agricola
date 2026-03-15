@@ -38,17 +38,18 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     newbornCount: 0, pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
-  }) as PlayerState
+    activeModifiers: [], cardStates: {},
+  }) as unknown as PlayerState
 
 const createState = (...players: PlayerState[]): GameState =>
   ({
-    round: 3, currentPlayerIndex: 0, players,
+    round: 3, phase: 'work', currentPlayerIndex: 0, players,
     actionSpaces: [], log: [], roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
-  }) as GameState
+  }) as unknown as GameState
 
 const createSpace = (id: string): ActionSpace =>
   ({
@@ -245,17 +246,31 @@ describe('A79_GardenHoe', () => {
 })
 
 describe('A83_ShepherdsCrook', () => {
-  it('gains 2 sheep for each newly counted large pasture', () => {
+  it('gains 2 sheep for each newly fenced large pasture', () => {
     const listener = findListener('A83-shepherds-crook-after-fencing')
     expect(listener).toBeDefined()
     const player = createPlayer()
     player.minorPlayed = ['A83_ShepherdsCrook']
-    player.pastures = [
-      { id: 'p1', tiles: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }], animalType: null, animalCount: 0 },
-    ] as any
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('fence'),
-      actionId: 'fence', phase: 'immediatelyAfter', result: { type: 'ok' },
+      actionId: 'fence',
+      phase: 'immediatelyAfter',
+      result: {
+        type: 'ok',
+        extraData: {
+          newPastures: [
+            {
+              id: 'p1',
+              tiles: [
+                { row: 0, col: 0 },
+                { row: 0, col: 1 },
+                { row: 1, col: 0 },
+                { row: 1, col: 1 },
+              ],
+            },
+          ],
+        },
+      },
     } as any)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -263,21 +278,29 @@ describe('A83_ShepherdsCrook', () => {
     }
   })
 
-  it('does not trigger again for already processed large pastures', () => {
+  it('does not trigger when no newly fenced pasture is large enough', () => {
     const listener = findListener('A83-shepherds-crook-after-fencing')
     const player = createPlayer()
     player.minorPlayed = ['A83_ShepherdsCrook']
-    player.cardStates = {
-      A83_ShepherdsCrook: {
-        counters: { processedBigPastures: 1 },
-      },
-    }
-    player.pastures = [
-      { id: 'p1', tiles: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }], animalType: null, animalCount: 0 },
-    ] as any
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('fence'),
-      actionId: 'fence', phase: 'immediatelyAfter', result: { type: 'ok' },
+      actionId: 'fence',
+      phase: 'immediatelyAfter',
+      result: {
+        type: 'ok',
+        extraData: {
+          newPastures: [
+            {
+              id: 'p1',
+              tiles: [
+                { row: 0, col: 0 },
+                { row: 0, col: 1 },
+                { row: 1, col: 0 },
+              ],
+            },
+          ],
+        },
+      },
     } as any)
     expect(result).toBeUndefined()
   })

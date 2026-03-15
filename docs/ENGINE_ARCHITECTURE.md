@@ -1034,6 +1034,8 @@ type ActionHookContext = {
 }
 ```
 
+其中 `result` 不只是 `ok/fail/choice` 的类型标签，也允许携带额外执行上下文。例如 `commitFarmChoice('fence')` 会把本次新建 pasture 的 delta 透传成 `result.extraData.newPastures/newEdges`，这样 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接按“本次新增围栏结果”判断，而不是回头从整张农场快照里猜增量。
+
 推荐返回值：
 
 ```ts

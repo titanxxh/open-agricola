@@ -52,6 +52,7 @@
 注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。
 注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
 注：近期新增了几层 BGA 风格卡牌 helper：`payGainNode/payThenGainFlow/payThenActionFlow/returnToSpaceThenGainFlow`、`pending-choice`、`stage-effects`、`card-state/round-placement`、`action-snapshot`，并给 flow 叶子节点补了自定义 choice label。像 `A108_MushroomCollector`、`B109_PaperMaker`、`C96_Merchant`、`E128_Saddler`、`A37_Bucksaw`、`C75_Firewood`、`D119_WoodBarterer` 已从单卡手写流程收敛到公共抽象；`A17_ReclamationPlow`、`D150_GodlySpouse`、`A74_StableTree` 这类时序卡也不再手写散落的 `flagged/placedThisTurn/usedRound` 过程状态；同时 `B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter` 的阶段型 hook 已切到服务端 `Engine` 驱动的 `ActionFlow`，不再走即时 imperative 结算。
+注：`fence` 的提交链现已把“本次新建 pasture delta”连同 `newEdges` 一起挂到 `ActionExecutionResult.extraData`，因此 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接读取 `result.extraData.newPastures` / `result.extraData.newEdges`。`A83_ShepherdsCrook` 已切到这条通用链路，不再维护额外的累计 pasture 计数。
 注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。
 
 ## 卡牌效果 Hook 覆盖矩阵

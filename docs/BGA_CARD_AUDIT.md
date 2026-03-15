@@ -116,6 +116,9 @@
 - 支付后收益/追加行动：`A37_Bucksaw`、`A108_MushroomCollector`、`B109_PaperMaker`、`C96_Merchant`、`E128_Saddler`
 - choice 流程：`C75_Firewood`、`D119_WoodBarterer`
   - 现已迁到直接 flow 分支，`pending-choice` 仍保留给其他尚未收敛的 `card-choice` 卡牌
+- fencing delta：`A83_ShepherdsCrook`
+  - `fence-validation -> farm-choice -> GameSession -> Engine` 现已透传 `newPastures/newEdges`
+  - `A83` 不再维护 `processedBigPastures` 之类的累计计数，而是直接按本次新增 pasture delta 判定
 - 时序/一次性状态：`A17_ReclamationPlow`、`D150_GodlySpouse`
   - `A17` 改为 `before(collect)` 记录快照，`after(collect)` 只返回瘦身后的 xor flow，消费标记不再依赖不存在的 `pass/special-effect`
   - `D150` 改为基于 round placement order 的单叶子分支，不再手写 `placedThisTurn`

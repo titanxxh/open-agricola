@@ -24,6 +24,7 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 - 构造函数支持可选 `seed` 参数，用于可复现测试。
 - 内部维护 `history` 快照栈 + `actionStartIndex` 用于撤销。
 - 所有方法返回 `SessionResponse`（state + pending + interaction + scores + 元数据）。
+- `commitFarmChoice('fence')` 现在会把 `validateFenceSelection/applyFarmChoice` 计算出的 `newPastures/newEdges` 挂到本次 `ActionExecutionResult.extraData`，供 `immediatelyAfter/after` listener 直接消费。
 
 ### 2.2 WS 房间管理
 
@@ -56,6 +57,8 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 ### 2.5 校验
 
 独立校验模块：`server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`。打断了 index↔game-router 循环依赖。
+
+其中 `server/fence-validation.ts` 现已额外产出本次围栏新增的 `newPastures` / `newEdges` delta；`server/farm-choice.ts` 与 `GameSession.commitFarmChoice()` 会把这组 delta 继续透传到引擎 result context，避免 `A83_ShepherdsCrook` 这类卡牌再手写累计 pasture 状态。
 
 ## 3. 前端
 

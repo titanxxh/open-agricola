@@ -207,7 +207,7 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown> }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown>; extraData?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }

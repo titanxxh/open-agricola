@@ -1449,6 +1449,7 @@ export class GameSession {
 
     const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
     const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
+    let farmChoiceMeta: Record<string, unknown> | undefined
 
     switch (farmType) {
       case 'fence': {
@@ -1458,6 +1459,7 @@ export class GameSession {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        farmChoiceMeta = result.meta
         break
       }
       case 'room': {
@@ -1505,7 +1507,15 @@ export class GameSession {
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
 
-    const result = this.engine.resolveChoice('confirm', { state: this.state, player: updatedPlayer, space })
+    const resultOverride =
+      farmChoiceMeta && Object.keys(farmChoiceMeta).length > 0
+        ? { type: 'ok' as const, extraData: farmChoiceMeta }
+        : undefined
+    const result = this.engine.resolveChoice(
+      'confirm',
+      { state: this.state, player: updatedPlayer, space },
+      resultOverride,
+    )
     this.flushEngineLog()
 
     if (result.type === 'choice') {

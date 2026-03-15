@@ -116,8 +116,10 @@ export const playOccupationAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, space }) => {
-    const cost = getLessonsCost(player, space.id)
+  execute: ({ player, space, params }) => {
+    const cost =
+      (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
+      getLessonsCost(player, space.id)
     const playableOptions = buildPlayableOccupationOptions(player, cost)
     if (playableOptions.length === 0) {
       return { type: 'ok' }
@@ -128,8 +130,10 @@ export const playOccupationAction: ActionDefinition = {
       options: playableOptions,
     }
   },
-  resolveChoice: ({ player, space }, choice) => {
-    const cost = getLessonsCost(player, space.id)
+  resolveChoice: ({ player, space, params }, choice) => {
+    const cost =
+      (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
+      getLessonsCost(player, space.id)
     return playOccupation(player, choice, cost)
   },
 }

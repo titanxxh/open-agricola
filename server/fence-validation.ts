@@ -59,7 +59,7 @@ export type FenceValidationError = {
 }
 
 export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
-  | { ok: true; player: T; newEdges: string[] }
+  | { ok: true; player: T; newEdges: string[]; newPastures: Pasture[] }
   | { ok: false; error: FenceValidationError }
 
 export const FARM_ROWS = 3
@@ -412,6 +412,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const stableSet = new Set(
     normalized.stableTiles.map((tile) => positionKey(tile)),
   )
+  const previousPastureKeys = new Set(
+    normalized.pastures.map((pasture) =>
+      pasture.tiles
+        .map(positionKey)
+        .sort()
+        .join('|'),
+    ),
+  )
   const pastures: Pasture[] = fencedRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
     size: region.tiles.length,
@@ -422,6 +430,13 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     animalType: null,
     animalCount: 0,
   }))
+  const newPastures = pastures.filter((pasture) => {
+    const pastureKey = pasture.tiles
+      .map(positionKey)
+      .sort()
+      .join('|')
+    return !previousPastureKeys.has(pastureKey)
+  })
   const updated: PlayerFarmState = {
     ...normalized,
     resources: {
@@ -433,5 +448,5 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     pastures,
   }
   enforceAnimalCapacity(updated)
-  return { ok: true, player: updated as T, newEdges }
+  return { ok: true, player: updated as T, newEdges, newPastures }
 }

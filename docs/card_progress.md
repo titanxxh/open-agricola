@@ -80,7 +80,7 @@
 | A108_MushroomCollector | Collect | 收取后立即交换 | ✅ |
 | C52_HuntsmansHat | Collect | 猪市场收取后按猪数量获得食物 | ✅ |
 | C96_Merchant | Improvement | 打改良后可付 1 食物追加一次改良行动，现已收敛为单段 flow | ✅ |
-| A83_ShepherdsCrook | Fencing | 围栏后立即得羊 | ✅ |
+| A83_ShepherdsCrook | Fencing | 围栏后立即得羊；现已直接读取本次 fencing 的 `newPastures` delta | ✅ |
 
 ### After Hook
 | 卡牌 | 行动 | 说明 | 状态 |
