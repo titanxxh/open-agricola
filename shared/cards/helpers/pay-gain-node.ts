@@ -17,6 +17,7 @@ type PayGainNodeOptions = {
   promptKey?: string
   choiceLabelKey?: string
   choiceLabelParams?: Record<string, string | number>
+  markTrigger?: boolean
 }
 
 type PayThenActionFlowOptions = {
@@ -92,30 +93,35 @@ export const payGainActionFlow = ({
   gain,
   choiceLabelKey,
   choiceLabelParams,
+  markTrigger,
 }: PayGainNodeOptions): SequenceFlow =>
   buildSequenceNode(undefined, [
     payLeaf({ cardId, cost, choiceLabelKey, choiceLabelParams }),
     ...bonusVpLeaves(cardId, gain),
     ...(gain ? [gainLeaf(cardId, gain)] : []),
+    ...(markTrigger ? [{ type: 'leaf' as const, actionId: 'mark-card-trigger', sourceCard: cardId }] : []),
   ])
 
-export const payGainNode = ({
+export const payGainFlow = ({
   cardId,
   cost,
   gain,
   promptKey,
   choiceLabelKey,
   choiceLabelParams,
-}: PayGainNodeOptions): ActionHookResult =>
-  ({
-    flow: buildSequenceNode(promptKey, payGainActionFlow({
-      cardId,
-      cost,
-      gain,
-      choiceLabelKey,
-      choiceLabelParams,
-    }).children, true),
-  })
+  markTrigger,
+}: PayGainNodeOptions): ActionFlow =>
+  buildSequenceNode(promptKey, payGainActionFlow({
+    cardId,
+    cost,
+    gain,
+    choiceLabelKey,
+    choiceLabelParams,
+    markTrigger,
+  }).children, true)
+
+export const payGainNode = (options: PayGainNodeOptions): ActionHookResult =>
+  ({ flow: payGainFlow(options) })
 
 export const payThenGainActionFlow = ({
   cardId,

@@ -8,6 +8,8 @@ export type CardListenerContext = ActionExecutionContext & {
   choice?: string
   doable?: boolean
   extraData?: Record<string, unknown>
+  cardId?: string
+  actionCardId?: string
 }
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'

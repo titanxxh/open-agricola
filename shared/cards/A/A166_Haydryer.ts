@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { stagePayGainFlow } from '../helpers/stage-effects'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A166_Haydryer'
 
@@ -10,7 +10,13 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const pastureCount = player.pastures.length
     const cost = Math.max(0, 4 - pastureCount)
-    return stagePayGainFlow(CARD_ID, { food: cost }, { cattle: 1 }, 'ui.interactionHaydryer')
+    return payGainFlow({
+      cardId: CARD_ID,
+      cost: { food: cost },
+      gain: { cattle: 1 },
+      promptKey: 'ui.interactionHaydryer',
+      markTrigger: true,
+    })
   },
 })
 

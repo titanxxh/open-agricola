@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { stagePayGainFlow } from '../helpers/stage-effects'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B70_NewPurchase'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -13,8 +13,8 @@ registerCardEffect({
     return {
       type: 'seq',
       children: [
-        stagePayGainFlow(CARD_ID, { food: 2 }, { grain: 1 }, 'ui.interactionNewPurchaseGrain'),
-        stagePayGainFlow(CARD_ID, { food: 4 }, { vegetable: 1 }, 'ui.interactionNewPurchaseVegetable'),
+        payGainFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { grain: 1 }, promptKey: 'ui.interactionNewPurchaseGrain', markTrigger: true }),
+        payGainFlow({ cardId: CARD_ID, cost: { food: 4 }, gain: { vegetable: 1 }, promptKey: 'ui.interactionNewPurchaseVegetable', markTrigger: true }),
       ],
     }
   },

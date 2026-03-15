@@ -1,8 +1,7 @@
-import type { ActionFlow, GameState, PlayerState, Resource } from '../../game/types'
+import type { GameState, PlayerState, Resource } from '../../game/types'
 import { canPayResources, payResources } from '../../actions/effects/pay'
 import { incCounter, initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
-import { payGainActionFlow } from './pay-gain-node'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -55,22 +54,4 @@ export const createSingleHarvestExchange = (
   if ((player.resources[resource] ?? 0) <= 0) return
   player.resources[resource] -= 1
   applyCardGain(player, gain)
-}
-
-export const stagePayGainFlow = (
-  cardId: string,
-  cost: Partial<Resource>,
-  gain: CardGain,
-  promptKey: string,
-): ActionFlow => {
-  const base = payGainActionFlow({ cardId, cost, gain })
-  return {
-    ...base,
-    optional: true,
-    promptKey,
-    children: [
-      ...base.children,
-      { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: cardId },
-    ],
-  }
 }

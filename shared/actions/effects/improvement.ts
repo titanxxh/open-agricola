@@ -409,6 +409,7 @@ export const playImprovement = (
   improvementId: string,
   mode: ImprovementPlayMode = 'major',
   paymentChoice?: string,
+  sourceCard?: string,
 ): ActionExecutionResult => {
   // Payment choice can arrive as either paymentChoice param (direct call)
   // or as improvementId (via resolveChoice which passes choice as first arg)
@@ -417,7 +418,7 @@ export const playImprovement = (
     : undefined
   if (payValue) {
     const parts = payValue.split(':')
-    const actionCardId = resolveImprovementActionCardId(mode)
+    const actionCardId = sourceCard ?? resolveImprovementActionCardId(mode)
     // pay:minor:cardId:idx or pay:cardId:idx (major)
     if (parts[1] === 'minor') {
       const minorId = parts[2]
@@ -451,6 +452,7 @@ export const playImprovement = (
   const parsed = parseImprovementChoice(improvementId)
   const allowMajor = mode === 'major' || mode === 'any'
   const allowMinor = mode === 'minor' || mode === 'any'
+  const effectiveActionCardId = sourceCard ?? resolveImprovementActionCardId(mode)
 
   if (parsed.kind === 'major') {
     if (!allowMajor) {
@@ -460,7 +462,7 @@ export const playImprovement = (
       state,
       player,
       parsed.id,
-      resolveImprovementActionCardId(mode),
+      effectiveActionCardId,
     )
   }
   if (parsed.kind === 'minor') {
@@ -471,7 +473,7 @@ export const playImprovement = (
       state,
       player,
       parsed.id,
-      resolveImprovementActionCardId(mode),
+      effectiveActionCardId,
     )
   }
 
@@ -483,7 +485,7 @@ export const playImprovement = (
       state,
       player,
       parsed.id,
-      resolveImprovementActionCardId(mode),
+      effectiveActionCardId,
     )
   }
   if (allowMinor) {
@@ -491,7 +493,7 @@ export const playImprovement = (
       state,
       player,
       parsed.id,
-      resolveImprovementActionCardId(mode),
+      effectiveActionCardId,
     )
   }
   return { type: 'fail', logKey: 'log.improvementFail' }
@@ -533,10 +535,11 @@ export const improvementAnyAction: ActionDefinition = {
       player,
     ).length > 0 ||
     buildMinorImprovementOptions(state, player).length > 0,
-  execute: ({ state, player }) => {
+  execute: ({ state, player, sourceCard }) => {
+    const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
     const options = [
-      ...buildMajorImprovementOptions(state.availableMajorImprovements, state, player),
-      ...buildMinorImprovementOptions(state, player),
+      ...buildMajorImprovementOptions(state.availableMajorImprovements, state, player, actionCardId),
+      ...buildMinorImprovementOptions(state, player, actionCardId),
     ]
     if (options.length === 0) {
       return { type: 'fail', logKey: 'log.improvementFail' }
@@ -547,6 +550,6 @@ export const improvementAnyAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player }, choice) =>
-    playImprovement(state, player, choice, 'any'),
+  resolveChoice: ({ state, player, sourceCard }, choice) =>
+    playImprovement(state, player, choice, 'any', undefined, sourceCard),
 }

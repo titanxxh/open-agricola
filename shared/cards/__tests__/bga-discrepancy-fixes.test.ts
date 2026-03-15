@@ -143,37 +143,34 @@ describe('E130_Overachiever — resource choice discount', () => {
     expect(E130_Overachiever.players).toBe('3+')
   })
 
-  it('returns bonuses for all resource types when triggered', () => {
+  it('returns bonuses when actionCardId matches', () => {
     const listener = findListener('E130-overachiever-compute-card-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
-    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 1 } } }
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionCardId: 'E130_Overachiever',
     } as any)
 
     expect(result?.bonuses).toBeDefined()
-    expect(result!.bonuses!.length).toBe(10) // wood, clay, stone, reed, food, grain, vegetable, sheep, boar, cattle
-    // Each bonus discounts one resource by 1
+    expect(result!.bonuses!.length).toBe(10)
     const woodBonus = result!.bonuses!.find(b => b.discount.wood === 1)
     expect(woodBonus).toBeDefined()
     expect(woodBonus!.optional).toBe(true)
     expect(woodBonus!.sources).toEqual(['E130_Overachiever'])
-    const clayBonus = result!.bonuses!.find(b => b.discount.clay === 1)
-    expect(clayBonus).toBeDefined()
   })
 
-  it('does not return bonuses when triggerCount is 0', () => {
+  it('does not return bonuses when actionCardId does not match', () => {
     const listener = findListener('E130-overachiever-compute-card-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
-    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 0 } } }
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionCardId: 'improvement-any',
     } as any)
     expect(result).toBeUndefined()
   })
