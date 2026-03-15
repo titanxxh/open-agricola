@@ -1858,40 +1858,63 @@
 }
 
 .log-entry-with-cards {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  flex-wrap: wrap;
+  line-height: 1.45;
 }
 
-.log-card-badge {
+.log-card-link {
   position: relative;
   cursor: help;
-  font-size: 14px;
-  line-height: 1;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.log-card-link:hover,
+.log-card-link:focus-visible {
+  color: #214f22;
+  outline: none;
 }
 
 .log-card-tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1a1a2e;
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(26, 26, 46, 0.96);
   color: #eee;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: 12px;
   font-size: 12px;
   line-height: 1.4;
   white-space: normal;
-  width: 220px;
+  width: 256px;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   pointer-events: none;
+}
+
+.log-card-tooltip-preview {
+  width: 188px;
+}
+
+.log-card-preview {
+  width: 188px;
+  max-width: 188px;
+  pointer-events: none;
+}
+
+.log-card-tooltip-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
 }
 
 .log-card-tooltip strong {
   display: block;
-  margin-bottom: 4px;
   font-size: 13px;
   color: #fff;
 }

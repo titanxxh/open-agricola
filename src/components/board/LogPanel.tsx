@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
 import { formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state'
+import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type Props = {
   locale: Locale
   log: GameState['log']
 }
 
-type CardRef = { id: string; type: 'major' | 'minor' | 'occupation'; name: string }
+type CardRef = { id: string; type: CardType; name: string }
 
 const resolveCardName = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
@@ -27,28 +28,123 @@ const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   return desc.includes('.description') ? '' : desc
 }
 
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+type TooltipPosition = {
+  top: number
+  left: number
+}
+
+const LogCardLink = ({ locale, cardRef, children }: { locale: Locale; cardRef: CardRef; children: string }) => {
+  const [open, setOpen] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const tooltipRef = useRef<HTMLSpanElement | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) return
+
+    const updatePosition = () => {
+      if (!triggerRef.current || !tooltipRef.current) return
+
+      const margin = 12
+      const gap = 10
+      const triggerRect = triggerRef.current.getBoundingClientRect()
+      const tooltipRect = tooltipRef.current.getBoundingClientRect()
+
+      let left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2
+      left = Math.max(margin, Math.min(left, window.innerWidth - tooltipRect.width - margin))
+
+      let top = triggerRect.top - tooltipRect.height - gap
+      if (top < margin) {
+        top = triggerRect.bottom + gap
+      }
+      if (top + tooltipRect.height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - tooltipRect.height - margin)
+      }
+
+      setTooltipPosition({ top, left })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  return (
+    <span
+      ref={triggerRef}
+      className="log-card-link"
+      tabIndex={0}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      {children}
+      {open && (
+        <span
+          ref={tooltipRef}
+          className="log-card-tooltip"
+          role="tooltip"
+          style={{
+            top: tooltipPosition?.top ?? -9999,
+            left: tooltipPosition?.left ?? -9999,
+          }}
+        >
+          <span className="log-card-tooltip-preview">
+            <PlayerCard
+              locale={locale}
+              cardId={cardRef.id}
+              cardType={cardRef.type}
+              className="log-card-preview"
+            />
+          </span>
+          <span className="log-card-tooltip-meta">
+            <strong>{cardRef.name}</strong>
+            <span className="log-card-tooltip-desc">{resolveCardDesc(locale, cardRef)}</span>
+          </span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 const LogEntry = ({ text, cardRefs, locale }: { text: string; cardRefs: CardRef[]; locale: Locale }) => {
-  const [hoveredCard, setHoveredCard] = useState<CardRef | null>(null)
   if (cardRefs.length === 0) return <li>{text}</li>
+
+  const refsByName = new Map<string, CardRef>()
+  cardRefs.forEach((ref) => {
+    if (!refsByName.has(ref.name)) refsByName.set(ref.name, ref)
+  })
+
+  const pattern = Array.from(refsByName.keys())
+    .sort((a, b) => b.length - a.length)
+    .map((name) => escapeRegExp(name))
+    .join('|')
+
+  if (!pattern) return <li>{text}</li>
+
+  const parts = text.split(new RegExp(`(${pattern})`, 'g')).filter(Boolean)
+
   return (
     <li className="log-entry-with-cards">
-      <span>{text}</span>
-      {cardRefs.map((ref) => (
-        <span
-          key={ref.id}
-          className="log-card-badge"
-          onMouseEnter={() => setHoveredCard(ref)}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          🃏
-          {hoveredCard?.id === ref.id && (
-            <span className="log-card-tooltip">
-              <strong>{ref.name}</strong>
-              <span className="log-card-tooltip-desc">{resolveCardDesc(locale, ref)}</span>
-            </span>
-          )}
-        </span>
-      ))}
+      {parts.map((part, index) => {
+        const ref = refsByName.get(part)
+        if (!ref) return <Fragment key={`text-${index}`}>{part}</Fragment>
+
+        return (
+          <LogCardLink key={`${ref.id}-${index}`} locale={locale} cardRef={ref}>
+            {part}
+          </LogCardLink>
+        )
+      })}
     </li>
   )
 }
