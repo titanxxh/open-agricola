@@ -24,6 +24,7 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
+  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from '../shared/engine/index.ts'
@@ -159,6 +160,7 @@ export class GameSession {
         flow.params,
         flow.choiceLabelKey,
         flow.choiceLabelParams,
+        flow.actionContext,
       )
       const def = this.registry.get(flow.actionId)
       if (def?.resolveChoice) {
@@ -190,6 +192,58 @@ export class GameSession {
     }
     const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
     return flow.optional ? new OptionalNode(`opt-${counter.value++}`, or, flow.promptKey) : or
+  }
+
+  private runPlaceFarmerAfterHooks(
+    player: PlayerState,
+    space: ActionSpace,
+  ): boolean {
+    const context = {
+      state: this.state,
+      player,
+      space,
+      actionId: 'place-farmer',
+      phase: 'after' as const,
+      result: { type: 'ok' as const },
+    }
+    const matched = getMatchingListeners(context)
+    const counter = { value: 0 }
+    const nodes: EngineNode[] = []
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, context, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (!result?.flow) continue
+      if (result.logKey) {
+        const logPlayer =
+          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
+        this.state.log.unshift({
+          key: result.logKey,
+          params: { player: logPlayer.name, ...result.logParams },
+        })
+      }
+      const flowNode = this.buildEngineNode(result.flow, counter)
+      const needsSwitch = entry.ownerPlayerId && entry.ownerPlayerId !== player.id
+      if (needsSwitch) {
+        nodes.push(
+          new PlayerSwitchNode(`pf-ps-to-${counter.value++}`, entry.ownerPlayerId),
+          flowNode,
+          new PlayerSwitchNode(`pf-ps-back-${counter.value++}`, player.id),
+        )
+      } else {
+        nodes.push(flowNode)
+      }
+    }
+    if (nodes.length === 0) return false
+    const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
+    this.engine = new Engine({
+      tree: new EngineTree(root),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
+    this.engineSource = { kind: 'flow', flow: { type: 'seq', children: [] } }
+    return true
   }
 
   private createFlowEngine(flow: ActionFlow): Engine {
@@ -301,8 +355,12 @@ export class GameSession {
     }
   }
 
-  private buildRoomInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    return buildRoomFarmInteraction(player, costOverride)
+  private buildRoomInteraction(
+    player: PlayerState,
+    costOverride?: Partial<Resource>,
+    actionContext?: Record<string, unknown>,
+  ): InteractionFarmSelection {
+    return buildRoomFarmInteraction(player, costOverride, actionContext)
   }
 
   private buildStableInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
@@ -331,7 +389,7 @@ export class GameSession {
       case 'fence':
         return this.buildFenceInteraction(pending)
       case 'room':
-        return this.buildRoomInteraction(player, pending.costOverride)
+        return this.buildRoomInteraction(player, pending.costOverride, pending.actionContext)
       case 'stable':
         return this.buildStableInteraction(player, pending.costOverride)
       case 'plow':
@@ -878,10 +936,11 @@ export class GameSession {
 
     while (true) {
       const before = this.clonePlayer(player)
-      const step = this.engine.proceed({ state: this.state, player, space })
+      const step = this.engine!.proceed({ state: this.state, player, space })
       this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
+        const isActionEngine = this.engineSource?.kind === 'action'
         const stageResume = this.stageResume
         this.engine = null
         this.engineSource = null
@@ -892,6 +951,9 @@ export class GameSession {
           this.activePlayerIndex = null
           this.resumeStageFlow(stageResume)
           return
+        }
+        if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
+          continue
         }
         this.finalizeActionLog(player)
         const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
@@ -925,7 +987,7 @@ export class GameSession {
           let autoPromptKey = step.choice.promptKey
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+            const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             const isBakeChoice =
               autoPromptKey === 'ui.interactionBakeBreadChoice' ||
@@ -946,6 +1008,7 @@ export class GameSession {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
                 options: result.options ?? [], promptKey: result.promptKey,
                 costOverride: this.engine?.getLastComputedCosts(),
+                actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
               }
               return
             }
@@ -969,6 +1032,7 @@ export class GameSession {
           type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
           costOverride: this.engine?.getLastComputedCosts(),
+          actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
         }
         return
       }
@@ -1095,7 +1159,9 @@ export class GameSession {
     const matched = getMatchingListeners(beforeListenerContext)
     const beforeFlowNodes: EngineNode[] = []
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, beforeListenerContext)
+      const result = executeCardListener(entry.registration, beforeListenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result?.flow) {
         beforeFlowNodes.push(this.engine.buildFlowNodePublic(result.flow))
       }
@@ -1171,6 +1237,8 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        costOverride: this.engine.getLastComputedCosts(),
+        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
     }
@@ -1487,6 +1555,10 @@ export class GameSession {
       case 'room': {
         const result = applyFarmChoice(normalized, 'room', payload as any, {
           costOverride: override,
+          maxUnits:
+            typeof this.pending.actionContext?.maxRooms === 'number'
+              ? this.pending.actionContext.maxRooms
+              : undefined,
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
@@ -1544,6 +1616,8 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        costOverride: this.engine.getLastComputedCosts(),
+        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
     }

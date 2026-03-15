@@ -193,6 +193,7 @@ export type ActionExecutionContext = {
   costs?: Partial<Resource>
   params?: Partial<Resource>
   sourceCard?: string
+  actionContext?: Record<string, unknown>
 }
 
 export type ActionCostPreview = {
@@ -220,6 +221,7 @@ export type ActionFlow =
       promptKey?: string
       params?: Partial<Resource>
       sourceCard?: string
+      actionContext?: Record<string, unknown>
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, string | number>
     }
@@ -255,7 +257,15 @@ export type ActionSpace = ActionDefinition & {
 }
 
 export type PendingAction =
-  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string; costOverride?: Partial<Resource> }
+  | {
+      type: 'choice'
+      playerIndex: number
+      spaceId: string
+      options: ActionChoiceOption[]
+      promptKey?: string
+      costOverride?: Partial<Resource>
+      actionContext?: Record<string, unknown>
+    }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
   | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }

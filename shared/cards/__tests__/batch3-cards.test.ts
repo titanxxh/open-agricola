@@ -67,6 +67,8 @@ describe('C144_ReedRoofRenovator', () => {
       expect(result.flow.params).toEqual({ reed: 1 })
     }
     expect(result?.logKey).toBe('log.cardEffectGain')
+    expect(p1.cardStates?.C144_ReedRoofRenovator?.counters?.triggerCount).toBe(1)
+    expect(p2.cardStates?.C144_ReedRoofRenovator?.counters?.triggerCount).toBeUndefined()
   })
 
   it('matches via getMatchingListeners when opponent renovates', () => {

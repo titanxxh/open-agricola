@@ -28,6 +28,7 @@ type FarmChoicePayloadMap = {
 type FarmChoiceOptions = {
   costOverride?: Partial<Resource>
   roomCostPerUnit?: Partial<Resource>
+  maxUnits?: number
 }
 
 export type FarmChoiceApplyResult<T extends PlayerFarmState = PlayerFarmState> =
@@ -131,6 +132,12 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       const { rooms } = payload as FarmChoicePayloadMap['room']
       const selection = validateRoomSelection(normalized, rooms)
       if (!selection.ok) return { ok: false, error: selection.code }
+      if (
+        typeof options.maxUnits === 'number' &&
+        rooms.length > Math.max(0, Math.floor(options.maxUnits))
+      ) {
+        return { ok: false, error: 'too many rooms selected' }
+      }
       const costPerRoom = options.roomCostPerUnit ??
         applyCostOverride(
           getBuildRoomCost(normalized.houseType),

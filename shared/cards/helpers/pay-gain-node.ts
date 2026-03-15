@@ -34,6 +34,7 @@ type ReturnToSpaceThenGainFlowOptions = {
   cost: Partial<Resource>
   gain: CardGain
   promptKey?: string
+  choiceLabelKey?: string
 }
 
 const buildSequenceNode = (
@@ -187,9 +188,10 @@ export const returnToSpaceThenGainActionFlow = ({
   cardId,
   cost,
   gain,
+  choiceLabelKey,
 }: ReturnToSpaceThenGainFlowOptions): SequenceFlow =>
   buildSequenceNode(undefined, [
-    { type: 'leaf', actionId: 'return-to-space', params: cost, sourceCard: cardId },
+    { type: 'leaf', actionId: 'return-to-space', params: cost, sourceCard: cardId, choiceLabelKey },
     gainLeaf(cardId, gain),
   ])
 
@@ -198,11 +200,13 @@ export const returnToSpaceThenGainFlow = ({
   cost,
   gain,
   promptKey,
+  choiceLabelKey,
 }: ReturnToSpaceThenGainFlowOptions): ActionHookResult =>
   ({
     flow: buildSequenceNode(promptKey, returnToSpaceThenGainActionFlow({
       cardId,
       cost,
       gain,
+      choiceLabelKey,
     }).children, true),
   })

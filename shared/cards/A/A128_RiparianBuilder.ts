@@ -14,7 +14,7 @@ const triggerBuildListener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space.id !== 'reed-bank') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.effectPlayer ?? context.player, CARD_ID, 'triggerCount')
     return {
       flow: {
         type: 'leaf',
@@ -22,6 +22,7 @@ const triggerBuildListener: CardListenerRegistration = {
         optional: true,
         promptKey: 'ui.interactionRiparianBuilderConstruct',
         sourceCard: CARD_ID,
+        actionContext: { maxRooms: 1, trueAction: false },
       },
       logKey: 'log.cardGrantedAction',
       logParams: { cardId: CARD_ID, actionId: 'construct' },

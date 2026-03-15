@@ -426,8 +426,9 @@ describe('Stub card: Stub_Scope_Opponent', () => {
 
     runToCompletion(engine, { state, player: p2, space })
 
-    expect(p2.cardStates[SCOPE_OPPONENT_ID]?.counters?.triggerCount).toBe(1)
-    expect(p2.resources.food).toBe(6)
+    expect(p1.cardStates[SCOPE_OPPONENT_ID]?.counters?.triggerCount).toBe(1)
+    expect(p1.resources.food).toBe(6)
+    expect(p2.cardStates[SCOPE_OPPONENT_ID]?.counters?.triggerCount).toBeUndefined()
   })
 
   it('does not trigger when card owner collects', () => {

@@ -10,6 +10,10 @@ export type CardListenerContext = ActionExecutionContext & {
   extraData?: Record<string, unknown>
   cardId?: string
   actionCardId?: string
+  triggerPlayer?: PlayerState
+  ownerPlayer?: PlayerState
+  effectPlayer?: PlayerState
+  trueAction?: boolean
 }
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
@@ -110,6 +114,55 @@ export type MatchedCardListener = {
   ownerPlayerId: string
 }
 
+const findPlayerById = (state: GameState, playerId?: string) =>
+  (state.players ?? []).find((player) => player.id === playerId)
+
+const resolveOwnerPlayer = (
+  registration: CardListenerRegistration,
+  context: CardListenerContext,
+  ownerPlayerId?: string,
+) => {
+  if (context.ownerPlayer) return context.ownerPlayer
+  if (ownerPlayerId) {
+    const byId = findPlayerById(context.state, ownerPlayerId)
+    if (byId) return byId
+  }
+  const scope = registration.scope ?? 'player'
+  if (scope === 'player') return context.player
+  if (!registration.cardIds?.length) return context.player
+  if (scope === 'opponent') {
+    return (context.state.players ?? []).find(
+      (player) =>
+        player.id !== context.player.id &&
+        registration.cardIds!.some((cardId) => getPlayerCardIds(player).includes(cardId)),
+    ) ?? context.player
+  }
+  return (context.state.players ?? []).find((player) =>
+    registration.cardIds!.some((cardId) => getPlayerCardIds(player).includes(cardId)),
+  ) ?? context.player
+}
+
+export const buildCardListenerContext = (
+  registration: CardListenerRegistration,
+  context: CardListenerContext,
+  ownerPlayerId?: string,
+): CardListenerContext => {
+  const triggerPlayer = context.triggerPlayer ?? context.player
+  const ownerPlayer = resolveOwnerPlayer(registration, context, ownerPlayerId)
+  const effectPlayer = context.effectPlayer ?? ownerPlayer ?? triggerPlayer
+  const trueAction =
+    typeof context.trueAction === 'boolean'
+      ? context.trueAction
+      : context.actionContext?.trueAction !== false
+  return {
+    ...context,
+    triggerPlayer,
+    ownerPlayer,
+    effectPlayer,
+    trueAction,
+  }
+}
+
 export const getMatchingListeners = (context: CardListenerContext): MatchedCardListener[] => {
   const matched: MatchedCardListener[] = []
   getOrderedListeners(context).forEach((registration) => {
@@ -145,8 +198,11 @@ export const getMatchingListeners = (context: CardListenerContext): MatchedCardL
 export const executeCardListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
+  options?: { ownerPlayerId?: string },
 ): ActionHookResult | void => {
-  return registration.handler(context)
+  return registration.handler(
+    buildCardListenerContext(registration, context, options?.ownerPlayerId),
+  )
 }
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {

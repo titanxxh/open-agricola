@@ -47,6 +47,7 @@ export class ActionNode extends BaseNode {
   public actionId: string
   public sourceCard?: string
   public params?: Partial<Resource>
+  public actionContext?: Record<string, unknown>
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, string | number>
   public beforePhaseResolved = false
@@ -58,6 +59,7 @@ export class ActionNode extends BaseNode {
     params?: Partial<Resource>,
     choiceLabelKey?: string,
     choiceLabelParams?: Record<string, string | number>,
+    actionContext?: Record<string, unknown>,
   ) {
     super(id, 'action')
     this.actionId = actionId
@@ -65,6 +67,7 @@ export class ActionNode extends BaseNode {
     this.params = params
     this.choiceLabelKey = choiceLabelKey
     this.choiceLabelParams = choiceLabelParams
+    this.actionContext = actionContext
   }
 
   execute(

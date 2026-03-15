@@ -339,7 +339,7 @@ describe('A108_MushroomCollector', () => {
     if (result?.flow?.type === 'seq') {
       expect(result.flow.optional).toBe(true)
       expect(result.flow.children).toEqual([
-        { type: 'leaf', actionId: 'return-to-space', params: { wood: 1 }, sourceCard: 'A108_MushroomCollector' },
+        { type: 'leaf', actionId: 'return-to-space', params: { wood: 1 }, sourceCard: 'A108_MushroomCollector', choiceLabelKey: 'occupations.A108_MushroomCollector.name' },
         { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'A108_MushroomCollector' },
       ])
     }

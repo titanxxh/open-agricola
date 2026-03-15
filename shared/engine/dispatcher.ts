@@ -89,7 +89,9 @@ export class HookDispatcher {
     const listenerContext: CardListenerContext = { ...context, phase: 'computeReplace' }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext)
+      const result = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result) {
         if (typeof result.actionId === 'string') {
           actionId = result.actionId
@@ -113,7 +115,9 @@ export class HookDispatcher {
     const listenerContext: CardListenerContext = { ...context, phase: 'isDoable', doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext)
+      const result = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result && typeof result.doable === 'boolean') {
         doable = result.doable
       }
@@ -127,7 +131,9 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext)
+      const result = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result) listenerResults.push(result)
     }
     return [...actionResults, ...listenerResults]
@@ -142,7 +148,9 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
-      const result2 = executeCardListener(entry.registration, listenerContext)
+      const result2 = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result2) listenerResults.push(result2)
     }
     return [...actionResults, ...listenerResults]

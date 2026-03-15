@@ -36,6 +36,18 @@ type RoundSlot = { round: number; action?: ActionSpace }
 const urlParams = new URLSearchParams(window.location.search)
 const useWsMode = urlParams.get('transport') === 'ws'
 const httpTransportSingleton = new HttpGameTransport()
+const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
+
+const detectInitialLocale = (): Locale => {
+  if (typeof window === 'undefined') return 'zh'
+  try {
+    const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY)
+    if (saved === 'zh' || saved === 'en') return saved
+  } catch {
+    // Ignore storage access failures and fall back to default locale.
+  }
+  return 'zh'
+}
 
 /** Update browser URL to include room= so the link can be shared; same room id = same game. */
 const setRoomInUrl = (roomId: string) => {
@@ -198,7 +210,7 @@ export const GameContainerApi = () => {
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
   const { state, pending, interaction, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot } =
     useGameSync()
-  const [locale, setLocale] = useState<Locale>('en')
+  const [locale, setLocale] = useState<Locale>(detectInitialLocale)
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(true)
@@ -210,6 +222,15 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+    } catch {
+      // Ignore storage access failures.
+    }
+  }, [locale])
 
   useEffect(() => {
     if (state && viewPlayerId) {
@@ -281,7 +302,12 @@ export const GameContainerApi = () => {
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
-  const isInteractive = !!(currentPlayer && displayPlayer && currentPlayer.id === displayPlayer.id)
+  const activePlayer = interaction.stateId === 'confirmPlayerSwitch'
+    ? state?.players[interaction.fromPlayerIndex] ?? currentPlayer
+    : ('playerIndex' in interaction && typeof interaction.playerIndex === 'number')
+      ? state?.players[interaction.playerIndex] ?? currentPlayer
+      : currentPlayer
+  const isInteractive = !!(activePlayer && displayPlayer && activePlayer.id === displayPlayer.id)
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -402,8 +428,9 @@ export const GameContainerApi = () => {
     void transport.confirmNextPlayer().catch((e) => console.error(e))
   }, [transport, isInteractive])
   const confirmPlayerSwitch = useCallback(() => {
+    if (!isInteractive) return
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
-  }, [transport])
+  }, [transport, isInteractive])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'harvestFeed') return

@@ -75,7 +75,9 @@ export const resolveCardCostWithModifiers = (
       cardId,
       actionCardId,
     }
-    const result = executeCardListener(entry.registration, listenerContext)
+    const result = executeCardListener(entry.registration, listenerContext, {
+      ownerPlayerId: entry.ownerPlayerId,
+    })
     if (result?.costs) {
       cost = applyCostOverride(cost, result.costs)
     }

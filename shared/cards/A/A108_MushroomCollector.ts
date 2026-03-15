@@ -21,6 +21,7 @@ const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
       cardId: CARD_ID,
       cost: { wood: 1 },
       gain: { food: 2 },
+      choiceLabelKey: 'occupations.A108_MushroomCollector.name',
     })
   },
 }

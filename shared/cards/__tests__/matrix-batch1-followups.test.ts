@@ -150,11 +150,12 @@ describe('A128_RiparianBuilder', () => {
   it('grants an optional construct action after an opponent uses reed-bank', () => {
     const listener = findListener('A128-riparian-builder-after-opponent-reed-bank')
     expect(listener).toBeDefined()
-    const owner = createPlayer()
+    const owner = createPlayer('p1', 'P1')
     owner.occupationPlayed = ['A128_RiparianBuilder']
+    const opponent = createPlayer('p2', 'P2')
     const result = executeCardListener(listener!, {
-      state: createState(owner),
-      player: owner,
+      state: createState(owner, opponent),
+      player: opponent,
       space: createSpace('reed-bank'),
       actionId: 'place-farmer',
       phase: 'after',
@@ -166,7 +167,10 @@ describe('A128_RiparianBuilder', () => {
       expect(result.flow.actionId).toBe('construct')
       expect(result.flow.optional).toBe(true)
       expect(result.flow.sourceCard).toBe('A128_RiparianBuilder')
+      expect(result.flow.actionContext).toEqual({ maxRooms: 1, trueAction: false })
     }
+    expect(owner.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBe(1)
+    expect(opponent.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBeUndefined()
   })
 
   it('discounts clay or stone only when the construct action comes from the card', () => {

@@ -114,7 +114,9 @@ const applyChildActionDoable = (
   }
   const matched = getMatchingListeners(listenerContext)
   for (const entry of matched) {
-    const result = executeCardListener(entry.registration, listenerContext)
+    const result = executeCardListener(entry.registration, listenerContext, {
+      ownerPlayerId: entry.ownerPlayerId,
+    })
     if (typeof result?.doable === 'boolean') {
       doable = result.doable
     }

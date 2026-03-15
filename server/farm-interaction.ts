@@ -25,6 +25,7 @@ const sanitizePayableCost = (
 export const buildRoomFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
   const occupied = new Set(normalized.roomTiles.map(positionKey))
@@ -41,6 +42,7 @@ export const buildRoomFarmInteraction = (
   const maxSelections = Math.min(
     selectableTiles.length,
     Number.isFinite(resourceMax) ? resourceMax : selectableTiles.length,
+    typeof actionContext?.maxRooms === 'number' ? Math.max(0, Math.floor(actionContext.maxRooms)) : selectableTiles.length,
   )
   return {
     farmType: 'room',

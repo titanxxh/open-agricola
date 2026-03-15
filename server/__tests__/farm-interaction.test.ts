@@ -66,6 +66,18 @@ describe('farm interaction builders', () => {
     expect(interaction.maxSelections).toBe(1)
   })
 
+  it('respects explicit room limit from action context', () => {
+    const player = createPlayer()
+    player.resources.wood = 15
+    player.resources.reed = 6
+
+    const interaction = buildRoomFarmInteraction(player, undefined, { maxRooms: 1 })
+
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    expect(interaction.maxSelections).toBe(1)
+  })
+
   it('limits stable maxSelections using discounted stable cost', () => {
     const player = createPlayer()
     player.resources.wood = 2
