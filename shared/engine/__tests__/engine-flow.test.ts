@@ -20,6 +20,7 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { clearCardListeners } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -100,6 +101,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 describe('Engine flow nodes', () => {
   beforeEach(() => {
     clearActionHooks()
+  clearCardListeners()
   })
 
   it('or node removes completed choice and exposes done', () => {
@@ -204,6 +206,39 @@ describe('Engine flow nodes', () => {
     engine.resolveChoice(choiceId, { state, player, space })
     const done = engine.proceed({ state, player, space })
     expect(done.type).toBe('done')
+  })
+
+  it('xor node prefers custom choice labels from flow leaves', () => {
+    const a: ActionDefinition = {
+      id: 'a',
+      nameKey: 'actions.bonus-wood.name',
+      descriptionKey: 'actions.bonus-wood.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(a)
+    const root = new XorNode('xor-root', [
+      new ActionNode('action-a', a.id, undefined, undefined, 'ui.customChoice', { count: 2 }),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(a)
+
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    expect(first.choice.options).toEqual([
+      { value: 'action-a', labelKey: 'ui.customChoice', labelParams: { count: 2 } },
+    ])
   })
 
   it('sequence node runs actions in order', () => {

@@ -1,19 +1,26 @@
-import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
-import { canPayResources, payResources } from './pay'
+import { payResources } from './pay'
 import { stableWoodCost } from './fencing'
+import { canExecuteWithCostPreview } from './cost-preview'
+import { canAffordCost } from './pay-helpers'
 
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
-  if (!canPayResources(player, { wood: stableWoodCost })) {
+  if (!canAffordCost(player, { wood: stableWoodCost })) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
   payResources(player, { wood: stableWoodCost })
   player.stableTiles.push(next)
   return { type: 'ok', logKey: 'log.buildStable' }
+}
+
+export const stablesCostPreview: ActionCostPreview = {
+  isStructurallyPossible: ({ player }) => player.stableTiles.length < 4,
+  getBaseCost: () => ({ wood: stableWoodCost }),
 }
 
 export const stablesAction: ActionDefinition = {
@@ -22,9 +29,9 @@ export const stablesAction: ActionDefinition = {
   descriptionKey: 'actions.stables.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) =>
-    player.stableTiles.length < 4 &&
-    canPayResources(player, { wood: stableWoodCost }),
+  canBeExecutedByPlayer: (state, player) =>
+    canExecuteWithCostPreview(stablesCostPreview, { state, player }),
+  costPreview: stablesCostPreview,
   execute: () => ({
     type: 'choice',
     promptKey: 'ui.interactionStableSelect',

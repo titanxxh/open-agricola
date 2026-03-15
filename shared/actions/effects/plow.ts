@@ -1,5 +1,6 @@
-import type { ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
+import type { ActionCostPreview, ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
 import { getAllTilePositions, getNextEmptyTileForPlayer, positionKey } from '../../game/farm'
+import { canExecuteWithCostPreview } from './cost-preview'
 
 export const addField = (player: PlayerState) => {
   const next = getNextEmptyTileForPlayer(player)
@@ -53,13 +54,20 @@ export const getPlowableTiles = (player: PlayerState) => {
   })
 }
 
+export const plowCostPreview: ActionCostPreview = {
+  isStructurallyPossible: ({ player }) => getPlowableTiles(player).length > 0,
+  getBaseCost: () => ({}),
+}
+
 export const plowAction: ActionDefinition = {
   id: 'plow',
   nameKey: 'actions.plow.name',
   descriptionKey: 'actions.plow.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => getPlowableTiles(player).length > 0,
+  canBeExecutedByPlayer: (state, player) =>
+    canExecuteWithCostPreview(plowCostPreview, { state, player }),
+  costPreview: plowCostPreview,
   execute: () => ({
     type: 'choice',
     promptKey: 'ui.interactionPlowSelect',

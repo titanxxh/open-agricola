@@ -1,10 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { ActionRegistry } from '../registry'
 import { EngineTree } from '../tree'
 import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
+import { clearActionHooks } from '../../actions/hooks'
+import { clearCardListeners } from '../../cards/card-listeners'
+
+beforeEach(() => {
+  clearActionHooks()
+  clearCardListeners()
+})
 
 describe('optional node active', () => {
   it('should not return blocked when active is true', () => {
@@ -26,8 +33,56 @@ describe('optional node active', () => {
     const log = new LogStore()
     const engine = new Engine({ tree, registry, hooks, log })
 
-    const step = engine.proceed({ state: {} as any, player: {} as any, space: {} as any })
-    console.log('step:', step)
+    const step = engine.proceed({
+      state: {
+        round: 1,
+        currentPlayerIndex: 0,
+        players: [],
+        actionSpaces: [],
+        log: [],
+        roundStartSnapshot: null,
+        roundActionOrder: [],
+        gameSeed: 1,
+        availableMajorImprovements: [],
+        futureMeeples: [],
+        pendingFutureMeeples: [],
+        gameOver: false,
+      } as any,
+      player: {
+        id: 'p1',
+        name: 'P1',
+        color: 'red',
+        resources: {
+          wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+          grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        },
+        familySize: 2,
+        workersAvailable: 2,
+        rooms: 2,
+        houseType: 'wood',
+        fields: [],
+        fences: 0,
+        roomTiles: [],
+        stableTiles: [],
+        improvements: [],
+        minorHand: [],
+        minorPlayed: [],
+        occupationHand: [],
+        occupationPlayed: [],
+        playedCards: [],
+        houseAnimalType: null,
+        houseAnimalCount: 0,
+        stableAnimals: {},
+        newbornCount: 0,
+        pastures: [],
+        fenceSegments: [],
+        majorEffects: { wellRounds: 0 },
+        startPlayer: false,
+        activeModifiers: [],
+        cardStates: {},
+      } as any,
+      space: {} as any,
+    })
     expect(step.type).not.toBe('blocked')
   })
 })

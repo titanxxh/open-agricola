@@ -1,10 +1,19 @@
 import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { ActionFlow } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionSpace, PlayerState, Pasture } from '../../game/types'
+import {
+  isCardFlagged,
+  readCardExtraData,
+  setCardFlag,
+  writeCardExtraData,
+} from '../helpers/card-state'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+const CARD_ID = 'A17_ReclamationPlow'
+const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
 
 const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
   const gainPerRound = space.gainPerRound ?? {}
@@ -27,38 +36,64 @@ const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> =
   }
 }
 
+const buildReclamationPlowUseFlow = (ambiguous: boolean): ActionFlow => ({
+  type: 'xor',
+  promptKey: ambiguous
+    ? 'ui.interactionReclamationPlowAmbiguous'
+    : 'ui.interactionReclamationPlow',
+  children: [
+    {
+      type: 'leaf',
+      actionId: 'plow',
+      sourceCard: CARD_ID,
+      choiceLabelKey: 'ui.interactionReclamationPlowUse',
+    },
+    ambiguous
+      ? {
+          type: 'leaf',
+          actionId: 'noop',
+          choiceLabelKey: 'ui.interactionReclamationPlowDecline',
+        }
+      : {
+          type: 'leaf',
+          actionId: 'flag-card',
+          sourceCard: CARD_ID,
+          choiceLabelKey: 'ui.interactionReclamationPlowSkip',
+        },
+  ],
+})
+
 const reclamationPlowDuringListener: CardListenerRegistration = {
-  id: 'A17-reclamation-plow-during',
-  phases: ['during' as ActionHookPhase],
+  id: 'A17-reclamation-plow-before',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { space, player } = context
-    
+
     if (!isAnimalAccumulationSpace(space)) return
-    
-    const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
-    if (cardState.flagged) return
-    
-    const currentAnimals = getAnimalCountByType(player)
-    return {
-      extraData: { animalsBeforeCollecting: currentAnimals },
-    }
+    if (isCardFlagged(player, CARD_ID)) return
+
+    writeCardExtraData(player, CARD_ID, ANIMALS_BEFORE_KEY, getAnimalCountByType(player))
   },
 }
 
 const reclamationPlowAfterListener: CardListenerRegistration = {
   id: 'A17-reclamation-plow-after',
+  cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, player, extraData } = context
-    
+    const { space, player } = context
+
     if (!isAnimalAccumulationSpace(space)) return
-    
-    const cardState = player.cardStates?.['A17_ReclamationPlow'] ?? {}
-    if (cardState.flagged) return
-    
-    const animalsBeforeCollecting = extraData?.['animalsBeforeCollecting'] as Record<AnimalType, number> | undefined
+    if (isCardFlagged(player, CARD_ID)) return
+
+    const animalsBeforeCollecting = readCardExtraData<Record<AnimalType, number>>(
+      player,
+      CARD_ID,
+      ANIMALS_BEFORE_KEY,
+    )
     if (!animalsBeforeCollecting) return
     const resourcesGained =
       context.result?.type === 'ok' ? context.result.resourcesGained : undefined
@@ -68,49 +103,45 @@ const reclamationPlowAfterListener: CardListenerRegistration = {
       boar: resourcesGained?.boar ?? 0,
       cattle: resourcesGained?.cattle ?? 0,
     }
-    
     const totalObtained = obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return
-    
+
     const animalsAfterCollecting = getAnimalCountByType(player)
-    
-    let canAccommodate = true
+    let ambiguous = false
     for (const animalType of ['sheep', 'boar', 'cattle'] as AnimalType[]) {
       const after = animalsAfterCollecting[animalType]
       const obtained = obtainedAnimals[animalType]
-      
+
       if (after < obtained) {
-        canAccommodate = false
-        break
+        return
       }
-      
+      if (after < obtained + animalsBeforeCollecting[animalType]) {
+        ambiguous = true
+      }
     }
-    
-    if (!canAccommodate) return
-    
-    return {
-      flow: {
-        type: 'xor',
-        children: [
-          { 
-            type: 'seq', 
-            children: [
-              { type: 'leaf', actionId: 'plow', optional: false },
-              { type: 'leaf', actionId: 'special-effect', optional: false },
-            ]
-          },
-          { type: 'leaf', actionId: 'pass', optional: false },
-        ],
-      },
-    }
+
+    return { flow: buildReclamationPlowUseFlow(ambiguous) }
+  },
+}
+
+const reclamationPlowAfterPlowListener: CardListenerRegistration = {
+  id: 'A17-reclamation-plow-after-plow',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['plow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard !== CARD_ID) return
+    if (isCardFlagged(context.player, CARD_ID)) return
+    setCardFlag(context.player, CARD_ID, true)
   },
 }
 
 registerCardListener(reclamationPlowDuringListener)
 registerCardListener(reclamationPlowAfterListener)
+registerCardListener(reclamationPlowAfterPlowListener)
 
 export const A17_ReclamationPlow = new MinorImprovement({
-  id: "A17_ReclamationPlow",
+  id: CARD_ID,
   name: "Reclamation Plow",
   deck: "A",
   number: 17,

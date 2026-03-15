@@ -138,7 +138,14 @@ export class Engine {
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(nextId(), flow.actionId, flow.sourceCard, flow.params)
+      const actionNode = new ActionNode(
+        nextId(),
+        flow.actionId,
+        flow.sourceCard,
+        flow.params,
+        flow.choiceLabelKey,
+        flow.choiceLabelParams,
+      )
       const definition = this.registry.get(flow.actionId)
       if (definition?.resolveChoice) {
         const sequence = new SequenceNode(nextId(), [
@@ -298,6 +305,7 @@ export class Engine {
           }
           const doable = this.hooks.applyIsDoable(
             { ...executionContext, actionId: entry.actionNode.actionId },
+            action,
             action.canBeExecutedByPlayer(
               executionContext.state,
               executionContext.player,
@@ -306,12 +314,14 @@ export class Engine {
           if (!doable) return null
           return {
             value: entry.nodeId,
-            labelKey: action.nameKey,
+            labelKey: entry.actionNode.choiceLabelKey ?? action.nameKey,
+            labelParams: entry.actionNode.choiceLabelParams,
           }
         })
         .filter((option) => option !== null) as {
         value: string
         labelKey: string
+        labelParams?: Record<string, string | number>
       }[]
       if (
         node instanceof OrNode &&
@@ -356,6 +366,7 @@ export class Engine {
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: actionNode.actionId },
+        action,
         action.canBeExecutedByPlayer(
           executionContext.state,
           executionContext.player,
@@ -454,6 +465,7 @@ export class Engine {
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: replacedActionId },
+        action,
         action.canBeExecutedByPlayer(executionContext.state, executionContext.player),
       )
       if (!doable) {
@@ -558,11 +570,11 @@ choice: { promptKey: result.promptKey, options: result.options },
         .filter((action) => action)
       const immediateActivateNodes = this.buildActivateCardNodes(
         immediatePhase.matchedListeners, 'immediatelyAfter', replacedActionId,
-        { result },
+        { result, sourceCard: executionContext.sourceCard },
       )
       const afterActivateNodes = this.buildActivateCardNodes(
         afterPhase.matchedListeners, 'after', replacedActionId,
-        { result },
+        { result, sourceCard: executionContext.sourceCard },
       )
       const allInsertNodes = [
         ...duringActivateNodes,
@@ -620,6 +632,8 @@ choice: { promptKey: result.promptKey, options: result.options },
           state: context.state,
           player: context.player,
           space: context.space,
+          params: child.params,
+          sourceCard: child.sourceCard,
         }
         const costResults = this.hooks.computeCosts({
           ...executionContext,
@@ -698,11 +712,11 @@ choice: { promptKey: result.promptKey, options: result.options },
           .filter((action) => action)
         const immediateActivateNodes = this.buildActivateCardNodes(
           immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-          { result },
+          { result, sourceCard: executionContext.sourceCard },
         )
         const afterActivateNodes = this.buildActivateCardNodes(
           afterPhase.matchedListeners, 'after', actionId,
-          { result },
+          { result, sourceCard: executionContext.sourceCard },
         )
         const allInsertNodes = [
           ...hookFlows,

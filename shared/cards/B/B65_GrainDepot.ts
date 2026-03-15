@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { incCounter } from '../__stubs__/helpers'
-import { queueFutureMeeples } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 
 const CARD_ID = 'B65_GrainDepot'
 
@@ -17,14 +17,13 @@ registerCardEffect({
     if (!rounds) return
 
     incCounter(player, CARD_ID, 'triggerCount')
-    queueFutureMeeples(state, {
+    return queueFutureMeeplesFlow(state, {
       cardId: CARD_ID,
       playerId: player.id,
       startRound: state.round + 1,
       count: rounds,
       resources: { grain: 1 },
     })
-    return { type: 'leaf', actionId: 'future-meeples' }
   },
 })
 

@@ -110,12 +110,24 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 - `pending` 仍保留，用于兼容旧测试、undo 历史与逐步迁移。
 - `takeAction` 在存在未完成交互时会被协议层拒绝；只有 `allowedCommands` 与显式 `anytime` 能继续推进。
 - `takeAnytimeAction` 通过 `Engine.prependFlow()` 把 flow 插到当前未完成节点之前，执行完成后自然回到原交互。
+- 阶段型 `card-effects` 现已可复用同一套 `Engine` / `pending` / `interaction` 协议推进；`GameSession` 为阶段 flow 维护 resume cursor，使 `onBeforeHarvest`、`onHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 都可以像普通行动 flow 一样暂停与恢复。
 
 行动格可执行性与 flow 推导已部分统一：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，现在可以递归读取 `flow.children` 的原子行动 `isDoable` 结果，并继续应用子行动自己的 `isDoable` hook / CardListener，避免像 `grain-utilization`、`cultivation`、`farm-expansion`、`farmland`、`major-improvement` 这类行动格维护两套手写条件。
 
 22 个阶段性 CardEffect Hook：`onBuy`、`onRoundStart`、`onHarvest`、`onRoundEnd`、`onReturnHome`、`onBeforeReturnHome`、`onStartReturnHome`、`onAfterRoundEnd`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onAfterReap`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onBeforeFeed`、`onAfterFeed`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn`。
 
 ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引擎节点，延迟执行 handler。handler 返回的 flow 通过 buildFlowNode 插入引擎树继续执行。
+
+卡牌糖衣层最近补了三组公共抽象，减少单卡重复流程代码：
+
+- `shared/cards/helpers/pay-gain-node.ts`：`payThenGainFlow`、`payThenActionFlow`、`returnToSpaceThenGainFlow`
+- `shared/cards/helpers/pending-choice.ts`：统一 `card-choice` 的 pending 数据存取
+- `shared/cards/helpers/stage-effects.ts`：统一阶段型支付、标记、bonus VP 与收获兑换；新增 `stagePayGainFlow`
+- `shared/cards/helpers/card-state.ts`、`round-placement.ts`：统一一次性卡牌标记与“本轮放人顺序”这类时序状态
+- `shared/cards/helpers/action-snapshot.ts`：统一记录单次行动起点快照，供 `A74_StableTree` 这类“同一行动前后”卡复用
+- `shared/actions/effects/mark-card-trigger.ts`：把阶段型触发计数收敛成可复用内部 action
+- `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
+- `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
 248 个卡牌定义（A/B/C/D/E 五个 deck），30+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
@@ -130,7 +142,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 
 ### 5.1 单元测试
 
-vitest，51 文件 380 用例。
+vitest，58 文件 470 用例。
 
 | 类别 | 文件 |
 |---|---|
@@ -148,6 +160,8 @@ vitest，51 文件 380 用例。
 | 卡牌效果（批次 1-3） | `shared/cards/__tests__/batch1-cards.test.ts` 等 |
 | C52/C75 卡牌 | `shared/cards/__tests__/C52_HuntsmansHat.test.ts`、`C75_Firewood.test.ts` |
 | A37 Bucksaw | `shared/cards/__tests__/A37_Bucksaw.test.ts` |
+| 阶段 hook flow 回归 | `server/__tests__/stage-hook-flow.test.ts` |
+| A17/D150 时序卡回归 | `server/__tests__/card-flow-regressions.test.ts` |
 
 ### 5.2 E2E 测试
 

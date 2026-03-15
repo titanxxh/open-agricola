@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../game/types'
-import { playImprovement } from '../improvement'
+import { improvementAnyAction, playImprovement } from '../improvement'
+
+import '../../../cards/E/E130_Overachiever'
 
 const createState = (): GameState => ({
   round: 1,
@@ -86,6 +88,32 @@ describe('improvement logging', () => {
       improvements: 'Major_Fireplace1',
       costResources: { clay: 2 },
     })
+  })
+
+  it('improvement-any becomes doable when computeCardCosts bonus makes a card affordable', () => {
+    const state = createState()
+    state.availableMajorImprovements = []
+    const player = createPlayer()
+    player.resources.clay = 0
+    player.minorPlayed = ['E130_Overachiever']
+    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 1 } } }
+
+    expect(improvementAnyAction.canBeExecutedByPlayer(state, player)).toBe(true)
+  })
+
+  it('plays discounted minor improvement through improvement-any pricing model', () => {
+    const state = createState()
+    state.availableMajorImprovements = []
+    const player = createPlayer()
+    player.resources.clay = 0
+    player.minorHand = ['A53_Claypipe']
+    player.minorPlayed = ['E130_Overachiever']
+    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 1 } } }
+
+    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+
+    expect(result.type).toBe('ok')
+    expect(player.minorPlayed).toContain('A53_Claypipe')
   })
 })
 

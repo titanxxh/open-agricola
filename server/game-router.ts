@@ -1,11 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game-session.ts'
-import { normalizePlayerFarm, validateFenceSelection } from './fence-validation.ts'
-import { validateRoomSelection, validateStableSelection } from './validators.ts'
-import { validatePlowSelection } from './plow-validation.ts'
-import { validateSowSelection } from './sow-validation.ts'
 import { serializeState } from '../shared/game/serialization.ts'
 import type { Resource } from '../shared/game/types.ts'
+import { normalizePlayerFarm } from './fence-validation.ts'
+import { applyFarmChoice } from './farm-choice.ts'
 
 let session: GameSession | null = null
 
@@ -198,54 +196,30 @@ export const handleGameRoute = async (
     const player = normalizePlayerFarm(state.players[playerIndex] as Parameters<typeof normalizePlayerFarm>[0])
 
     if (body.type === 'fence') {
-      const { edges, extraWood } = body.payload as { edges: string[]; extraWood?: number }
-      const result = validateFenceSelection(player, edges, extraWood ?? 0)
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result })
+      const result = applyFarmChoice(player, 'fence', body.payload as any)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'room') {
-      const { rooms, costPerRoom } = body.payload as { rooms: { row: number; col: number }[]; costPerRoom: Partial<Resource> }
-      const selection = validateRoomSelection(player, rooms)
-      if (!selection.ok) {
-        sendJson(res, 200, { valid: false, error: selection.code })
-        return true
-      }
-      const costKeys = Object.keys(costPerRoom) as (keyof Resource)[]
-      for (const key of costKeys) {
-        const required = (costPerRoom[key] ?? 0) * rooms.length
-        const available = player.resources[key] ?? 0
-        if (available < required) {
-          sendJson(res, 200, { valid: false, error: `Not enough ${key}` })
-          return true
-        }
-      }
-      sendJson(res, 200, { valid: true })
+      const { costPerRoom } = body.payload as { costPerRoom: Partial<Resource> }
+      const result = applyFarmChoice(player, 'room', body.payload as any, {
+        roomCostPerUnit: costPerRoom,
+      })
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'stable') {
-      const { stables } = body.payload as { stables: { row: number; col: number }[] }
-      const selection = validateStableSelection(player, stables)
-      if (!selection.ok) {
-        sendJson(res, 200, { valid: false, error: selection.code })
-        return true
-      }
-      const woodRequired = stables.length * 2
-      if ((player.resources?.wood ?? 0) < woodRequired) {
-        sendJson(res, 200, { valid: false, error: 'Not enough wood' })
-        return true
-      }
-      sendJson(res, 200, { valid: true })
+      const result = applyFarmChoice(player, 'stable', body.payload as any)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'plow') {
-      const { tile } = body.payload as { tile: { row: number; col: number } }
-      const result = validatePlowSelection(player, tile)
+      const result = applyFarmChoice(player, 'plow', body.payload as any)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'sow') {
-      const { crops } = body.payload as { crops: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
-      const result = validateSowSelection(player, crops)
+      const result = applyFarmChoice(player, 'sow', body.payload as any)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }

@@ -13,7 +13,7 @@ Open Agricola — an online implementation of the Agricola board game using Reac
 npm install
 
 # Start both frontend (5173) and backend (5175)
-./restart.sh
+./restart-intranet.sh
 
 # Or start separately
 npm run server   # Backend on port 5175

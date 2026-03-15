@@ -1092,6 +1092,7 @@ type ActionHookResult = {
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
+当前实现里，`onBeforeHarvest`、`onHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。
 
 #### 11.6.2a ActivateCardNode 架构
 
@@ -1101,6 +1102,19 @@ type ActionHookResult = {
 2. 引擎为每个匹配的监听器创建 `ActivateCardNode`（`shared/engine/nodes.ts`），插入引擎树。
 3. 当引擎推进到 `ActivateCardNode` 时，执行 `executeCardListener()`；如果 handler 返回 `flow`，通过 `buildFlowNode` 将其插入引擎树继续执行。
 4. 如果 `ActivateCardNode` 对应的卡牌持有者与当前行动玩家不同（opponent scope），引擎自动在 flow 前后插入 `PlayerSwitchNode`。
+
+为减少单卡重复流程代码，`shared/cards/helpers/` 现在承接一层 BGA 风格糖衣：
+
+- `pay-gain-node.ts`：封装支付后得收益、支付后追加行动、返还到当前格后再得收益
+- `pending-choice.ts`：统一 `card-choice` 的 pending 数据搬运与清理
+- `stage-effects.ts`：统一阶段型 `card-effects` 的支付、标记、bonus VP、单次收获兑换；`stagePayGainFlow` 可直接表达 BGA 风格阶段可选支付 flow
+- `card-state.ts` / `round-placement.ts`：统一一次性卡牌的 `flagged/extraData` 与“本轮放人顺序”运行时状态
+- `action-snapshot.ts`：统一单次行动起点快照，让 `A74_StableTree` 这类“同一行动里先做 A 再买卡”的 onBuy 卡可以直接复用
+- `mark-card-trigger` 内部 action：把阶段型触发计数从单卡 imperative 代码收敛到通用 flow leaf
+- `flow` leaf 自定义 choice label：允许卡牌直接返回带文案的 `xor/or` 分支，而不必额外包一层 `card-choice`
+- `resolveChoice()` 现在会把分支叶子的 `params` 一并透传到 action 执行上下文，避免 `xor/or` 叶子参数在真实执行时丢失
+
+目标是让卡牌文件尽量只描述“触发条件 + 业务参数”，而不是反复手写 `__pendingChoice__`、临时标记和支付样板。
 
 ```text
 ActionNode(collect)

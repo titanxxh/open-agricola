@@ -6,21 +6,21 @@
 
 | 原子行动 | Before | During | ImmediatelyAfter | After | ComputeCosts | ComputeArgs | ComputeReplace | IsDoable |
 |---|---|---|---|---|---|---|---|---|
-| PlaceFarmer | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | — | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | — | — | — | [C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | — |
+| PlaceFarmer | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | — | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | — | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts) | — | — |
 | Collect | — | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts)、[C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts) | — | — | — | — |
 | Gain | — | [E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts)、[E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | — | [A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
-| Construct | — | — | — | [A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts)、[C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | — | — | — |
+| Construct | — | — | — | [A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts)、[C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | — | — | [D119_WoodBarterer](../shared/cards/D/D119_WoodBarterer.ts) |
 | Plow | — | — | — | [A105_BarrowPusher](../shared/cards/A/A105_BarrowPusher.ts) | [C37_DwellingMound](../shared/cards/C/C37_DwellingMound.ts) | — | — | — |
 | FirstPlayer | — | — | — | — | — | — | — | — |
-| Improvement | [B75_WoodWorkshop](../shared/cards/B/B75_WoodWorkshop.ts) | [A55_JunkRoom](../shared/cards/A/A55_JunkRoom.ts) | [C96_Merchant](../shared/cards/C/C96_Merchant.ts) | [A109_SmallTrader](../shared/cards/A/A109_SmallTrader.ts)、[C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[E128_Saddler](../shared/cards/E/E128_Saddler.ts) | — | — | [B103_FieldMerchant](../shared/cards/B/B103_FieldMerchant.ts) | [D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts)、[B75_WoodWorkshop](../shared/cards/B/B75_WoodWorkshop.ts) |
+| Improvement | [B75_WoodWorkshop](../shared/cards/B/B75_WoodWorkshop.ts) | [A55_JunkRoom](../shared/cards/A/A55_JunkRoom.ts) | [C96_Merchant](../shared/cards/C/C96_Merchant.ts) | [A109_SmallTrader](../shared/cards/A/A109_SmallTrader.ts)、[C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[E128_Saddler](../shared/cards/E/E128_Saddler.ts) | — | — | [B103_FieldMerchant](../shared/cards/B/B103_FieldMerchant.ts) | [B75_WoodWorkshop](../shared/cards/B/B75_WoodWorkshop.ts) |
 | Sow | [A65_SeedPellets](../shared/cards/A/A65_SeedPellets.ts) | — | — | [A79_GardenHoe](../shared/cards/A/A79_GardenHoe.ts) | — | — | [A94_LazySowman](../shared/cards/A/A94_LazySowman.ts) | [C60_SmallPottersOven](../shared/cards/C/C60_SmallPottersOven.ts)、[A94_LazySowman](../shared/cards/A/A94_LazySowman.ts) |
 | Stables | — | — | — | [A74_StableTree](../shared/cards/A/A74_StableTree.ts) | [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | — | — | — |
 | Renovation | [D14_HammerCrusher](../shared/cards/D/D14_HammerCrusher.ts) | — | [C144_ReedRoofRenovator](../shared/cards/C/C144_ReedRoofRenovator.ts) | [A37_Bucksaw](../shared/cards/A/A37_Bucksaw.ts)、[A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) | — | — | [D152_Patron](../shared/cards/D/D152_Patron.ts) |
-| Fencing | [E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[B94_StockProtector](../shared/cards/B/B94_StockProtector.ts) | — | [A83_ShepherdsCrook](../shared/cards/A/A83_ShepherdsCrook.ts) | [A144_Sequestrator](../shared/cards/A/A144_Sequestrator.ts)、[B94_StockProtector](../shared/cards/B/B94_StockProtector.ts) | [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts) | — | — | [B94_StockProtector](../shared/cards/B/B94_StockProtector.ts) |
-| WishChildren | — | — | — | [D150_GodlySpouse](../shared/cards/D/D150_GodlySpouse.ts) | — | — | — | [E130_Overachiever](../shared/cards/E/E130_Overachiever.ts)、[E21_SheepRug](../shared/cards/E/E21_SheepRug.ts) |
+| Fencing | [E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[B94_StockProtector](../shared/cards/B/B94_StockProtector.ts) | — | [A83_ShepherdsCrook](../shared/cards/A/A83_ShepherdsCrook.ts) | [A144_Sequestrator](../shared/cards/A/A144_Sequestrator.ts)、[B94_StockProtector](../shared/cards/B/B94_StockProtector.ts) | [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts) | — | — | [D119_WoodBarterer](../shared/cards/D/D119_WoodBarterer.ts) |
+| WishChildren | — | — | — | [D150_GodlySpouse](../shared/cards/D/D150_GodlySpouse.ts)、[E130_Overachiever](../shared/cards/E/E130_Overachiever.ts) | — | — | — | — |
 | Pay | — | — | — | [B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts) | — | — | — | — |
 | Reorganize | — | — | — | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts) | — | — | — | — |
-| Exchange | [B67_HandTruck](../shared/cards/B/B67_HandTruck.ts) | — | — | [E57_CheeseFondue](../shared/cards/E/E57_CheeseFondue.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | [A97_Freshman](../shared/cards/A/A97_Freshman.ts) | [D119_WoodBarterer](../shared/cards/D/D119_WoodBarterer.ts)、[A97_Freshman](../shared/cards/A/A97_Freshman.ts) |
+| Exchange | [B67_HandTruck](../shared/cards/B/B67_HandTruck.ts) | — | — | [E57_CheeseFondue](../shared/cards/E/E57_CheeseFondue.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
 | Occupation | [E101_Blighter](../shared/cards/E/E101_Blighter.ts)、[B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) | — | — | [B100_Clutterer](../shared/cards/B/B100_Clutterer.ts) | [A28_ForestSchool](../shared/cards/A/A28_ForestSchool.ts) | — | — | [B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) |
 | ActivateCard | — | — | — | — | — | — | — | — |
 | SpecialEffect | [B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | — | — | — | — | — | — | — |
@@ -47,9 +47,11 @@
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
 
 注：部分顶层行动卡的开放性不再单独手写，而是由 `flow` 递归合成。当前已接入顶层 `or` / `xor` 行动格，以及一批安全 `seq` 包装行动格；递归到 `leaf` 时会继续应用子行动自己的 `IsDoable` hook / CardListener，因此诸如 `A94_LazySowman` 挂在 `sow` 上的放宽效果、`B75_WoodWorkshop` 挂在 `improvement-any` 上的放宽效果，也能反映到顶层复合行动格的可执行性上。
+注：本矩阵现在同时保留“已接入示例”和“排期目标示例”。实际完成状态以 `docs/card_progress.md` 为准；其中 `Harvest`、`StartOfTurn` 等格子当前可能由 `card-effects.ts` 承担，而不是原子行动 listener。
 注：`card-choice` 与农场类选择现在统一走服务端 `interaction` 协议对外暴露；前端不再依赖本地 `promptKey` 规则推导可选格/可选边，只消费服务端下发的白名单 args。
 注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。
 注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
+注：近期新增了几层 BGA 风格卡牌 helper：`payGainNode/payThenGainFlow/payThenActionFlow/returnToSpaceThenGainFlow`、`pending-choice`、`stage-effects`、`card-state/round-placement`、`action-snapshot`，并给 flow 叶子节点补了自定义 choice label。像 `A108_MushroomCollector`、`B109_PaperMaker`、`C96_Merchant`、`E128_Saddler`、`A37_Bucksaw`、`C75_Firewood`、`D119_WoodBarterer` 已从单卡手写流程收敛到公共抽象；`A17_ReclamationPlow`、`D150_GodlySpouse`、`A74_StableTree` 这类时序卡也不再手写散落的 `flagged/placedThisTurn/usedRound` 过程状态；同时 `B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter` 的阶段型 hook 已切到服务端 `Engine` 驱动的 `ActionFlow`，不再走即时 imperative 结算。
 注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。
 
 ## 卡牌效果 Hook 覆盖矩阵
@@ -60,13 +62,13 @@
 |---|---|---|---|
 | onBuy | [Major_ClayOven](../shared/cards/major/index.ts)、[Major_StoneOven](../shared/cards/major/index.ts)、[Major_Well](../shared/cards/major/index.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts)、[B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts) | 已接入 | 建造/购买时立即触发 |
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
-| onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发（Major 专用） |
+| onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发，现由 `GameSession` 统一按阶段 flow 推进 |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
 | onBeforeReturnHome | — | 已接入 | 回家阶段最先触发（BGA: D51_Archway） |
 | onStartReturnHome | — | 已接入 | 回家阶段工人返回前（BGA: A151_Minstrel 等 11 张卡） |
 | onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts) | 已接入 | 每回合回家阶段触发 |
 | onAfterRoundEnd | — | 已接入 | 回合结束后触发（BGA: D167_PureBreeder） |
-| onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发 |
+| onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发，支持返回可暂停/恢复的 `ActionFlow` |
 | onStartHarvest | — | 已接入 | 收获开始时触发（BGA: D97_BeggingStudent 等 16 张卡） |
 | onStartHarvestFieldPhase | — | 已接入 | 田地阶段开始（BGA: E73_Scythe 等 7 张卡） |
 | onHarvestFieldPhase | — | 已接入 | 田地阶段中（BGA: A112_ScytheWorker 等 10 张卡） |
@@ -78,8 +80,8 @@
 | onBeforeFeed | — | 已接入 | 喂食前触发 |
 | onAfterFeed | — | 已接入 | 喂食后触发 |
 | onEndHarvest | — | 已接入 | 收获结束/繁殖前（BGA: E73_Scythe 等 9 张卡） |
-| onAfterHarvest | [D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts) | 已接入 | 收获阶段结束后触发 |
-| onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts) | 已接入 | 每回合开始前触发 |
+| onAfterHarvest | [D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts) | 已接入 | 收获阶段结束后触发，支持返回可暂停/恢复的 `ActionFlow` |
+| onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts) | 已接入 | 每回合开始前触发，支持返回可暂停/恢复的 `ActionFlow` |
 
 ## 行动卡 Hook 示例
 
@@ -412,7 +414,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 | 卡牌 | 成本类型 | 折扣 |
 |------|----------|------|
 | [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | -3 Wood |
-| [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | -1 Food |
+| [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | 芦苇河岸赠送建房时，泥屋 -1 Clay / 石屋 -2 Stone |
 | [B15_CarpentersBench](../shared/cards/B/B15_CarpentersBench.ts) | 围栏 | -1 Wood |
 | [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | 房间建造 | -2 Wood（木屋时） |
 

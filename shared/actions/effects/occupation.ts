@@ -1,8 +1,21 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import { gainResources } from './gain'
-import { canPayResources, payResources } from './pay'
+import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 import { getCardModifier } from '../../cards/card-modifiers'
+
+const canAffordWithPaperMaker = (
+  player: PlayerState,
+  cost: Partial<PlayerState['resources']>,
+) => {
+  if (canAffordTypedFlatCost(player, cost, 'occupation')) return true
+  if (!player.occupationPlayed.includes('B109_PaperMaker')) return false
+  if (player.resources.wood < 1) return false
+  const foodNeeded = cost.food ?? 0
+  const generatedFood = player.occupationPlayed.length
+  if (foodNeeded <= 0 || generatedFood <= 0) return false
+  return player.resources.food + generatedFood >= foodNeeded
+}
 
 export const playOccupation = (
   player: PlayerState,
@@ -18,30 +31,9 @@ export const playOccupation = (
   }
   const baseCost =
     costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
-  let cost = { ...baseCost }
-  if (!canPayResources(player, cost)) {
-    for (const mod of player.activeModifiers ?? []) {
-      if (mod.type === 'trade' && mod.appliesTo.includes('occupation')) {
-        const toKey = Object.keys(mod.to)[0] as keyof typeof cost
-        const fromKey = Object.keys(mod.from)[0] as keyof typeof cost
-        const toAmount = mod.to[toKey as keyof typeof mod.to] ?? 0
-        const fromAmount = mod.from[fromKey as keyof typeof mod.from] ?? 0
-        if (toAmount > 0 && fromAmount > 0 && (cost[toKey] ?? 0) > 0) {
-          const tradeable = Math.min(cost[toKey] ?? 0, mod.max ?? Infinity)
-          const altCost = { ...cost }
-          altCost[toKey] = (altCost[toKey] ?? 0) - tradeable
-          altCost[fromKey] = (altCost[fromKey] ?? 0) + (tradeable * fromAmount / toAmount)
-          if (canPayResources(player, altCost)) {
-            cost = altCost
-          }
-        }
-      }
-    }
-  }
-  if (!canPayResources(player, cost)) {
+  if (!payTypedFlatCost(player, baseCost, 'occupation')) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
-  payResources(player, cost)
   if (occupation.reward) {
     gainResources(player, occupation.reward)
   }
@@ -65,9 +57,6 @@ export const getOccupationCost = (
   const occupation = getOccupation(occupationId)
   if (!occupation) return null
   const cost = { ...occupation.cost }
-  if (player.occupationPlayed.includes('B109_PaperMaker') && (cost.food ?? 0) > 0) {
-    cost.food = Math.max(0, (cost.food ?? 0) - 1)
-  }
   for (const mod of player.activeModifiers ?? []) {
     if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
       for (const [key, discount] of Object.entries(mod.discount)) {
@@ -112,11 +101,13 @@ const buildPlayableOccupationOptions = (
       (occupation): occupation is NonNullable<typeof occupation> =>
         !!occupation,
     )
-    .filter(() => canPayResources(player, cost))
+    .filter(() => canAffordWithPaperMaker(player, cost))
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
     }))
+
+export const canAffordOccupationActionCost = canAffordWithPaperMaker
 
 export const playOccupationAction: ActionDefinition = {
   id: 'play-occupation',

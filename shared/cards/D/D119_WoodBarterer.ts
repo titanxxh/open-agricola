@@ -2,20 +2,10 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
 import { incCounter } from '../__stubs__/helpers'
+import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D119_WoodBarterer'
-
-const storePendingChoice = (
-  player: import('../../game/types').PlayerState,
-  options: ActionChoiceOption[],
-  promptKey: string,
-) => {
-  if (!player.cardStates) player.cardStates = {}
-  if (!player.cardStates.__pendingChoice__) player.cardStates.__pendingChoice__ = { counters: {} }
-  player.cardStates.__pendingChoice__.extraData = { options, promptKey, targetCardId: CARD_ID }
-}
 
 const beforeListener: CardListenerRegistration = {
   id: 'D119-wood-barterer-before-fence-construct',
@@ -25,64 +15,30 @@ const beforeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     incCounter(context.player, CARD_ID, 'triggerCount')
-    storePendingChoice(context.player, [
-      { value: 'wood2', labelKey: 'ui.interactionWoodBarterer2Wood' },
-      { value: 'trade1', labelKey: 'ui.interactionWoodBartererTrade1' },
-      { value: 'trade2', labelKey: 'ui.interactionWoodBartererTrade2' },
-      { value: 'skip', labelKey: 'ui.interactionWoodBartererSkip' },
-    ], 'ui.interactionWoodBartererPrompt')
     return {
-      flow: { type: 'leaf', actionId: 'card-choice' },
+      flow: {
+        type: 'xor',
+        optional: true,
+        promptKey: 'ui.interactionWoodBartererPrompt',
+        children: [
+          gainLeaf(CARD_ID, { wood: 2 }, 'ui.interactionWoodBarterer2Wood'),
+          payThenGainActionFlow({
+            cardId: CARD_ID,
+            cost: { wood: 1 },
+            gain: { reed: 1 },
+            choiceLabelKey: 'ui.interactionWoodBartererTrade1',
+          }),
+          payThenGainActionFlow({
+            cardId: CARD_ID,
+            cost: { wood: 2 },
+            gain: { reed: 2 },
+            choiceLabelKey: 'ui.interactionWoodBartererTrade2',
+          }),
+        ],
+      },
       logKey: 'log.cardEffectTrigger',
       logParams: { cardId: CARD_ID },
       sourceCard: CARD_ID,
-    }
-  },
-}
-
-const processChoiceListener: CardListenerRegistration = {
-  id: 'D119-wood-barterer-process-choice',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['card-choice'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const pending = context.player.cardStates?.__pendingChoice__?.extraData as {
-      targetCardId?: string
-      choiceResult?: string
-    } | undefined
-    if (pending?.targetCardId !== CARD_ID) return
-    if (pending?.choiceResult === undefined) return
-
-    if (context.player.cardStates?.__pendingChoice__?.extraData) {
-      delete context.player.cardStates.__pendingChoice__.extraData
-    }
-
-    if (pending.choiceResult === 'wood2') {
-      return {
-        flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 } },
-        logKey: 'log.cardEffectGain',
-        logParams: { gain: { wood: 2 }, cardId: CARD_ID },
-      }
-    }
-    if (pending.choiceResult === 'trade1') {
-      if (context.player.resources.wood >= 1) {
-        context.player.resources.wood -= 1
-        return {
-          flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 } },
-          logKey: 'log.cardEffectGain',
-          logParams: { gain: { reed: 1 }, cardId: CARD_ID },
-        }
-      }
-    }
-    if (pending.choiceResult === 'trade2') {
-      if (context.player.resources.wood >= 2) {
-        context.player.resources.wood -= 2
-        return {
-          flow: { type: 'leaf', actionId: 'gain', params: { reed: 2 } },
-          logKey: 'log.cardEffectGain',
-          logParams: { gain: { reed: 2 }, cardId: CARD_ID },
-        }
-      }
     }
   },
 }
@@ -94,7 +50,6 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    // The card can provide 2 wood, which may make fence/construct affordable
     if (!context.doable) {
       return { doable: true }
     }
@@ -102,7 +57,6 @@ const isDoableListener: CardListenerRegistration = {
 }
 
 registerCardListener(beforeListener)
-registerCardListener(processChoiceListener)
 registerCardListener(isDoableListener)
 
 export const D119_WoodBarterer = new Occupation({

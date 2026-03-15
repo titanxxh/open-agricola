@@ -3,11 +3,12 @@ import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState, ActionChoiceOption } from '../../game/types'
+import type { GameState, PlayerState } from '../../game/types'
+import { initCardState } from '../__stubs__/helpers'
 
-const OVEN_IMPROVEMENTS = [
+const OVEN_IMPROVEMENTS = new Set([
   'Major_Fireplace1',
-  'Major_Fireplace2', 
+  'Major_Fireplace2',
   'Major_CookingHearth1',
   'Major_CookingHearth2',
   'Major_ClayOven',
@@ -15,89 +16,44 @@ const OVEN_IMPROVEMENTS = [
   'E63_IronOven',
   'E64_SimpleOven',
   'D59_EarthOven',
-]
+])
 
 const CARD_ID = 'C75_Firewood'
 
-/**
- * Helper function to generate options for firewood exchange
- */
-const generateFirewoodOptions = (woodOnCard: number): ActionChoiceOption[] => {
+const getBuiltImprovementId = (choice: string | undefined) =>
+  choice ? choice.replace(/^major:/, '').replace(/^minor:/, '') : undefined
+
+const buildTakeWoodFlow = (woodOnCard: number): ActionHookResult | void => {
   const maxWood = Math.min(4, woodOnCard)
-  if (maxWood <= 0) return []
-  
-  const options: ActionChoiceOption[] = []
-  // Add skip option
-  options.push({ value: '0', labelKey: 'ui.interactionFirewoodExchangeSkip' })
-  // Add options for 1 to maxWood
-  for (let i = 1; i <= maxWood; i++) {
-    options.push({
-      value: String(i),
-      labelKey: 'ui.interactionFirewoodExchangeCount',
-      labelParams: { count: i },
-    })
-  }
-  return options
-}
-
-/**
- * Helper function to store pending choice in the generic location
- */
-const storePendingChoice = (
-  player: PlayerState,
-  options: ActionChoiceOption[],
-  promptKey: string,
-): void => {
-  if (!player.cardStates) {
-    player.cardStates = {}
-  }
-  if (!player.cardStates.__pendingChoice__) {
-    player.cardStates.__pendingChoice__ = { counters: {} }
-  }
-  if (!player.cardStates.__pendingChoice__.extraData) {
-    player.cardStates.__pendingChoice__.extraData = {}
-  }
-  
-  player.cardStates.__pendingChoice__.extraData = {
-    options,
-    promptKey,
-    targetCardId: CARD_ID,
+  if (maxWood <= 0) return
+  return {
+    flow: {
+      type: 'xor',
+      optional: true,
+      promptKey: 'ui.interactionFirewoodExchange',
+      children: Array.from({ length: maxWood }, (_, index) => ({
+        type: 'leaf' as const,
+        actionId: 'take-from-card',
+        params: { wood: index + 1 },
+        sourceCard: CARD_ID,
+        choiceLabelKey: 'ui.interactionFirewoodExchangeCount',
+        choiceLabelParams: { count: index + 1 },
+      })),
+    },
   }
 }
 
-/**
- * C75_Firewood: In the returning home phase of each round, place 1 wood on this card.
- */
 const firewoodReturnHomeEffect = {
   id: CARD_ID,
   onReturnHome: (_state: GameState, player: PlayerState): void => {
-    // Check if player has this card
     if (!player.minorPlayed.includes(CARD_ID)) return
-    
-    // Initialize cardStates if needed
-    if (!player.cardStates) {
-      player.cardStates = {}
-    }
-    if (!player.cardStates[CARD_ID]) {
-      player.cardStates[CARD_ID] = { counters: {} }
-    }
-    if (!player.cardStates[CARD_ID].counters) {
-      player.cardStates[CARD_ID].counters = {}
-    }
-    
-    // Place 1 wood on this card
-    const currentWood = player.cardStates[CARD_ID].counters!['wood'] ?? 0
-    player.cardStates[CARD_ID].counters!['wood'] = currentWood + 1
+    const counters = initCardState(player, CARD_ID)
+    counters['wood'] = (counters['wood'] ?? 0) + 1
   },
 }
 
 registerCardEffect(firewoodReturnHomeEffect)
 
-/**
- * Hook for triggering choice after building an oven.
- * "Each time after you build a Fireplace, Cooking Hearth, or oven, 
- * move up to 4 <WOOD> from this card to your supply."
- */
 const firewoodAfterBuildListener: CardListenerRegistration = {
   id: 'C75-firewood-after-build',
   cardIds: [CARD_ID],
@@ -105,92 +61,14 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, choice } = context
-    
-    // Parse choice to get the actual improvement ID
-    // Choice format is 'major:Major_Fireplace1' or 'minor:E01_SomeCard'
-    const builtCardId = choice ? choice.replace(/^major:/, '').replace(/^minor:/, '') : undefined
-    if (!builtCardId || !OVEN_IMPROVEMENTS.includes(builtCardId)) return
-    
-    // Check if there's wood on this card
+    const builtCardId = getBuiltImprovementId(choice)
+    if (!builtCardId || !OVEN_IMPROVEMENTS.has(builtCardId)) return
     const woodOnCard = player.cardStates?.[CARD_ID]?.counters?.['wood'] ?? 0
-    if (woodOnCard <= 0) return
-    
-    // Generate options and store them in the generic location
-    const options = generateFirewoodOptions(woodOnCard)
-    if (options.length === 0) return
-    
-    storePendingChoice(player, options, 'ui.interactionFirewoodExchange')
-    
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'card-choice',
-      },
-    }
+    return buildTakeWoodFlow(woodOnCard)
   },
 }
 
 registerCardListener(firewoodAfterBuildListener)
-
-/**
- * Hook for processing the choice result after card-choice action completes
- */
-const firewoodProcessChoiceListener: CardListenerRegistration = {
-  id: 'C75-firewood-process-choice',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['card-choice'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { player } = context
-    
-    // Check if this choice was for us
-    const pendingChoice = player.cardStates?.__pendingChoice__?.extraData as {
-      options?: ActionChoiceOption[]
-      promptKey?: string
-      targetCardId?: string
-      choiceResult?: string
-      choiceTimestamp?: number
-    } | undefined
-    
-    if (pendingChoice?.targetCardId !== CARD_ID) return
-    if (pendingChoice?.choiceResult === undefined) return
-    
-    const choice = pendingChoice.choiceResult
-    const count = Number(choice)
-    
-    // Clear the pending choice data
-    if (player.cardStates?.__pendingChoice__?.extraData) {
-      delete player.cardStates.__pendingChoice__.extraData
-    }
-    
-    if (Number.isFinite(count) && count > 0) {
-      const woodOnCard = player.cardStates?.[CARD_ID]?.counters?.['wood'] ?? 0
-      const actualCount = Math.min(count, woodOnCard, 4)
-      
-      if (actualCount > 0) {
-        if (!player.cardStates) {
-          player.cardStates = {}
-        }
-        if (!player.cardStates[CARD_ID]) {
-          player.cardStates[CARD_ID] = { counters: {} }
-        }
-        if (!player.cardStates[CARD_ID].counters) {
-          player.cardStates[CARD_ID].counters = {}
-        }
-        
-        player.cardStates[CARD_ID].counters!['wood'] = woodOnCard - actualCount
-        
-        return {
-          flow: { type: 'leaf' as const, actionId: 'gain', params: { wood: actualCount } },
-          logKey: 'log.cardEffectGain',
-          logParams: { gain: { wood: actualCount }, cardId: CARD_ID },
-        }
-      }
-    }
-  },
-}
-
-registerCardListener(firewoodProcessChoiceListener)
 
 export const C75_Firewood = new MinorImprovement({
   id: CARD_ID,

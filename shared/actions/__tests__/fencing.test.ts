@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildPasture } from '../effects/fencing'
+import { A88_HedgeKeeper } from '../../cards/A/A88_HedgeKeeper'
+import {
+  buildPasture,
+  canStartFencing,
+} from '../effects/fencing'
 import type { PlayerState } from '../../game/types'
 
 const createPlayer = (): PlayerState => ({
@@ -51,5 +55,26 @@ describe('fencing pasture', () => {
     expect(player.pastures.length).toBe(1)
     expect(player.fences).toBe(6)
     expect(player.resources.wood).toBe(2)
+  })
+
+  it('allows starting fencing with Hedge Keeper discount', () => {
+    const player = createPlayer()
+    player.resources.wood = 1
+    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+
+    expect(canStartFencing(player)).toBe(true)
+  })
+
+  it('applies fencing discount when building a minimum pasture', () => {
+    const player = createPlayer()
+    player.resources.wood = 1
+    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+
+    const result = buildPasture(player, { size: 1, stables: 0, fenceCost: 4 })
+
+    expect(result.type).toBe('ok')
+    expect(player.pastures.length).toBe(1)
+    expect(player.fences).toBe(4)
+    expect(player.resources.wood).toBe(0)
   })
 })

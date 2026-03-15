@@ -1,11 +1,43 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter, initCardState } from '../__stubs__/helpers'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { incCounter } from '../__stubs__/helpers'
+import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import {
+  getStableTilesBuiltThisAction,
+  readActionSnapshotToken,
+} from '../helpers/action-snapshot'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'A74_StableTree'
+const USED_ACTION_TOKEN_KEY = 'usedActionToken'
+
+const queueStableTreeWood = (
+  state: CardListenerContext['state'],
+  player: CardListenerContext['player'],
+) => {
+  const actionToken = readActionSnapshotToken(player)
+  if (actionToken === undefined) return
+  if (getStableTilesBuiltThisAction(player) < 1) return
+  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+
+  writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+  incCounter(player, CARD_ID, 'triggerCount')
+  return queueFutureMeeplesFlow(state, {
+    cardId: CARD_ID,
+    playerId: player.id,
+    startRound: state.round + 1,
+    count: 3,
+    resources: { wood: 1 },
+  })
+}
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (state, player) => queueStableTreeWood(state, player),
+})
 
 const listener: CardListenerRegistration = {
   id: 'A74-stable-tree-after-stables',
@@ -14,20 +46,10 @@ const listener: CardListenerRegistration = {
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    const counters = initCardState(context.player, CARD_ID)
-    const usedRound = counters['usedRound'] ?? 0
-    if (usedRound === context.state.round) return
-    counters['usedRound'] = context.state.round
-    incCounter(context.player, CARD_ID, 'triggerCount')
-    queueFutureMeeples(context.state, {
-      cardId: CARD_ID,
-      playerId: context.player.id,
-      startRound: context.state.round + 1,
-      count: 3,
-      resources: { wood: 1 },
-    })
+    const flow = queueStableTreeWood(context.state, context.player)
+    if (!flow) return
     return {
-      flow: futureMeeplesNode(),
+      flow,
       logKey: 'log.cardEffectGain',
       logParams: { cardId: CARD_ID, gain: 'futureMeeples: 3x1 WOOD' },
       sourceCard: CARD_ID,

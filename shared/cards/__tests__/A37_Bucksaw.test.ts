@@ -6,6 +6,8 @@ import {
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../A/A37_Bucksaw'
+import { payResourcesAction } from '../../actions/effects/pay-resources'
+import { bonusVpAction } from '../../actions/effects/bonus-vp'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -45,7 +47,7 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
 describe('A37_Bucksaw', () => {
-  it('triggers card-choice flow after renovate when player has wood', () => {
+  it('returns optional pay-gain flow after renovate', () => {
     const listener = findListener('A37-bucksaw-after-renovate')
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -54,64 +56,41 @@ describe('A37_Bucksaw', () => {
       state: createState(player), player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
     } as any)
-    expect(result?.flow?.type).toBe('leaf')
-    if (result?.flow?.type === 'leaf') {
-      expect(result.flow.actionId).toBe('card-choice')
+    expect(result?.flow?.type).toBe('seq')
+    if (result?.flow?.type === 'seq') {
+      expect(result.flow.optional).toBe(true)
+      expect(result.flow.children).toEqual([
+        { type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: 'A37_Bucksaw' },
+        { type: 'leaf', actionId: 'bonus-vp', sourceCard: 'A37_Bucksaw' },
+        { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: 'A37_Bucksaw' },
+      ])
     }
     expect(player.cardStates?.A37_Bucksaw?.counters?.triggerCount).toBe(1)
-    expect(player.cardStates?.__pendingChoice__?.extraData).toBeDefined()
   })
 
-  it('does not trigger when no wood', () => {
-    const listener = findListener('A37-bucksaw-after-renovate')
+  it('bonus-vp action records card bonus points', () => {
     const player = createPlayer()
     player.minorPlayed = ['A37_Bucksaw']
-    player.resources.wood = 0
-    const result = executeCardListener(listener!, {
-      state: createState(player), player, space: createSpace('renovate-house'),
-      actionId: 'renovate-house', phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
-
-  it('pay choice deducts wood and gives grain + bonusVp', () => {
-    const listener = findListener('A37-bucksaw-process-choice')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.minorPlayed = ['A37_Bucksaw']
-    player.cardStates = {
-      __pendingChoice__: {
-        counters: {},
-        extraData: { targetCardId: 'A37_Bucksaw', choiceResult: 'pay' },
-      },
-    }
-    const result = executeCardListener(listener!, {
-      state: createState(player), player, space: createSpace('card-choice'),
-      actionId: 'card-choice', phase: 'after',
-    } as any)
-    expect(result?.flow?.type).toBe('leaf')
-    if (result?.flow?.type === 'leaf') {
-      expect(result.flow.params).toEqual({ grain: 1 })
-    }
-    expect(player.resources.wood).toBe(4)
+    const result = bonusVpAction.execute({
+      state: createState(player),
+      player,
+      space: createSpace('renovate-house'),
+      sourceCard: 'A37_Bucksaw',
+    })
+    expect(result.type).toBe('ok')
     expect(player.cardStates?.A37_Bucksaw?.counters?.bonusVp).toBe(1)
   })
 
-  it('skip choice does nothing', () => {
-    const listener = findListener('A37-bucksaw-process-choice')
+  it('pay-resources action deducts wood', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A37_Bucksaw']
-    player.cardStates = {
-      __pendingChoice__: {
-        counters: {},
-        extraData: { targetCardId: 'A37_Bucksaw', choiceResult: 'skip' },
-      },
-    }
-    const result = executeCardListener(listener!, {
-      state: createState(player), player, space: createSpace('card-choice'),
-      actionId: 'card-choice', phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-    expect(player.resources.wood).toBe(5)
+    const payResult = payResourcesAction.execute({
+      state: createState(player),
+      player,
+      space: createSpace('renovate-house'),
+      params: { wood: 1 },
+      sourceCard: 'A37_Bucksaw',
+    })
+    expect(payResult.type).toBe('ok')
+    expect(player.resources.wood).toBe(4)
   })
 })

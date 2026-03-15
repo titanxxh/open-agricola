@@ -35,9 +35,9 @@ export const clearCardListeners = () => {
 export const getRegisteredCardListeners = () => [...cardListeners]
 
 const getPlayerCardIds = (player: PlayerState) => [
-  ...player.improvements,
-  ...player.minorPlayed,
-  ...player.occupationPlayed,
+  ...(player.improvements ?? []),
+  ...(player.minorPlayed ?? []),
+  ...(player.occupationPlayed ?? []),
 ]
 
 const playerHasAnyCard = (player: PlayerState, cardIds: string[]) =>
@@ -55,12 +55,12 @@ const scopeMatches = (
     return playerHasAnyCard(player, cardIds)
   }
   if (scope === 'opponent') {
-    return state.players.some(
+    return (state.players ?? []).some(
       (entry) =>
         entry.id !== player.id && playerHasAnyCard(entry, cardIds),
     )
   }
-  return state.players.some((entry) => playerHasAnyCard(entry, cardIds))
+  return (state.players ?? []).some((entry) => playerHasAnyCard(entry, cardIds))
 }
 
 const matchesListener = (
@@ -122,13 +122,13 @@ export const getMatchingListeners = (context: CardListenerContext): MatchedCardL
           matched.push({ registration, cardId, ownerPlayerId: context.player.id })
         }
       } else if (scope === 'opponent') {
-        for (const p of context.state.players) {
+        for (const p of context.state.players ?? []) {
           if (p.id !== context.player.id && getPlayerCardIds(p).includes(cardId)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id })
           }
         }
       } else {
-        for (const p of context.state.players) {
+        for (const p of context.state.players ?? []) {
           if (getPlayerCardIds(p).includes(cardId)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id })
             break

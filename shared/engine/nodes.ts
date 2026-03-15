@@ -47,13 +47,24 @@ export class ActionNode extends BaseNode {
   public actionId: string
   public sourceCard?: string
   public params?: Partial<Resource>
+  public choiceLabelKey?: string
+  public choiceLabelParams?: Record<string, string | number>
   public beforePhaseResolved = false
 
-  constructor(id: string, actionId: string, sourceCard?: string, params?: Partial<Resource>) {
+  constructor(
+    id: string,
+    actionId: string,
+    sourceCard?: string,
+    params?: Partial<Resource>,
+    choiceLabelKey?: string,
+    choiceLabelParams?: Record<string, string | number>,
+  ) {
     super(id, 'action')
     this.actionId = actionId
     this.sourceCard = sourceCard
     this.params = params
+    this.choiceLabelKey = choiceLabelKey
+    this.choiceLabelParams = choiceLabelParams
   }
 
   execute(

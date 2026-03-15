@@ -1,4 +1,9 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow } from '../game/types'
+import type {
+  ActionDefinition,
+  ActionExecutionContext,
+  ActionExecutionResult,
+  ActionFlow,
+} from '../game/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
   applyComputeReplaceHooks,
@@ -11,6 +16,8 @@ import {
   type MatchedCardListener,
   type CardListenerContext,
 } from '../cards/card-listeners'
+import { resolveActionPreviewCost } from '../actions/effects/cost-preview'
+import { canPayResources } from '../actions/effects/pay'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]
@@ -23,7 +30,58 @@ export type ComputeReplaceResult = {
   alternativeFlow?: ActionFlow
 }
 
+const cloneValue = <T>(value: T): T => {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(value)
+    } catch {
+      return JSON.parse(JSON.stringify(value)) as T
+    }
+  }
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
 export class HookDispatcher {
+  private previewComputeCosts(context: ActionExecutionContext & { actionId: string }) {
+    const clonedState = cloneValue(context.state)
+    const clonedPlayer =
+      clonedState.players?.find((player) => player.id === context.player.id) ??
+      cloneValue(context.player)
+    const clonedSpace =
+      clonedState.actionSpaces?.find((space) => space.id === context.space.id) ??
+      cloneValue(context.space)
+    if (!clonedPlayer || !clonedSpace) return []
+    return this.computeCosts({
+      ...context,
+      state: clonedState,
+      player: clonedPlayer,
+      space: clonedSpace,
+    })
+  }
+
+  private applyCostPreviewDoable(
+    context: ActionExecutionContext & { actionId: string },
+    action: ActionDefinition,
+    initialDoable: boolean,
+  ) {
+    const preview = action.costPreview
+    if (!preview) return initialDoable
+    if (preview.isStructurallyPossible && !preview.isStructurallyPossible(context)) {
+      return false
+    }
+    const previewResults = this.previewComputeCosts(context)
+    const costOverride = previewResults.reduce<Record<string, number>>((acc, entry) => {
+      if (!entry.costs) return acc
+      Object.entries(entry.costs).forEach(([key, value]) => {
+        if (typeof value !== 'number') return
+        acc[key] = (acc[key] ?? 0) + value
+      })
+      return acc
+    }, {})
+    const previewCost = resolveActionPreviewCost(preview, context, costOverride)
+    return canPayResources(context.player, previewCost)
+  }
+
   applyComputeReplace(context: ActionExecutionContext & { actionId: string }): ComputeReplaceResult {
     let actionId = applyComputeReplaceHooks(context)
     let declined = false
@@ -47,9 +105,11 @@ export class HookDispatcher {
 
   applyIsDoable(
     context: ActionExecutionContext & { actionId: string },
+    action: ActionDefinition,
     initialDoable: boolean,
   ) {
-    let doable = applyIsDoableHooks(context, initialDoable)
+    let doable = this.applyCostPreviewDoable(context, action, initialDoable)
+    doable = applyIsDoableHooks(context, doable)
     const listenerContext: CardListenerContext = { ...context, phase: 'isDoable', doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {

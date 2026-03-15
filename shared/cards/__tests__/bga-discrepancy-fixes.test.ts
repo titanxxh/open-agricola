@@ -182,45 +182,21 @@ describe('E130_Overachiever — resource choice discount', () => {
 // === B70_NewPurchase — grain and vegetable options ===
 
 describe('B70_NewPurchase — grain and vegetable', () => {
-  it('converts 2 food to 1 grain before harvest', () => {
+  it('returns two optional exchanges before harvest rounds', () => {
     const effect = getCardEffect('B70_NewPurchase')!
     const player = createPlayer()
     player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 3
     const state = createState(player)
     state.round = 4 // harvest round
 
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(1)
-    expect(player.resources.food).toBe(1) // 3 - 2 = 1
-  })
-
-  it('converts 4 food to 1 vegetable before harvest', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 4
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.vegetable).toBe(0) // 4 - 2 = 2 food left, not enough for vegetable
-    expect(player.resources.grain).toBe(1)
-    expect(player.resources.food).toBe(2)
-  })
-
-  it('converts both when having 6+ food', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 6
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(1) // 6 - 2 = 4 food for grain
-    expect(player.resources.vegetable).toBe(1) // 4 food left for vegetable
-    expect(player.resources.food).toBe(0) // 6 - 2 - 4 = 0
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toMatchObject({
+      type: 'seq',
+      children: [
+        { type: 'seq', optional: true, promptKey: 'ui.interactionNewPurchaseGrain' },
+        { type: 'seq', optional: true, promptKey: 'ui.interactionNewPurchaseVegetable' },
+      ],
+    })
   })
 
   it('does nothing on non-harvest rounds', () => {
@@ -231,24 +207,7 @@ describe('B70_NewPurchase — grain and vegetable', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(0)
-    expect(player.resources.vegetable).toBe(0)
-    expect(player.resources.food).toBe(10)
-  })
-
-  it('does nothing with insufficient food', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 1
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(0)
-    expect(player.resources.vegetable).toBe(0)
-    expect(player.resources.food).toBe(1)
+    expect(effect.onBeforeStartOfTurn!(state, player)).toBeUndefined()
   })
 })
 

@@ -7,8 +7,9 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
-import { canPayResources, payResources } from './pay'
+import { payResources } from './pay'
 import { gainResources } from './gain'
+import { canAffordFlatCost } from './pay-helpers'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -36,7 +37,7 @@ export const exchangeResources = (
     return { type: 'ok' }
   }
   const scaledCost = scaleResources(cost, times)
-  if (!canPayResources(player, scaledCost)) {
+  if (!canAffordFlatCost(player, scaledCost)) {
     return { type: 'ok' }
   }
   payResources(player, scaledCost)

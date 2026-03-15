@@ -178,6 +178,14 @@ export type CanBeExecutedByPlayer = (
   player: PlayerState,
 ) => boolean
 
+export type ActionAvailabilityContext = {
+  state: GameState
+  player: PlayerState
+  space?: ActionSpace
+  params?: Partial<Resource>
+  sourceCard?: string
+}
+
 export type ActionExecutionContext = {
   state: GameState
   player: PlayerState
@@ -185,6 +193,11 @@ export type ActionExecutionContext = {
   costs?: Partial<Resource>
   params?: Partial<Resource>
   sourceCard?: string
+}
+
+export type ActionCostPreview = {
+  isStructurallyPossible?: (context: ActionAvailabilityContext) => boolean
+  getBaseCost: (context: ActionAvailabilityContext) => Partial<Resource>
 }
 
 export type ActionChoiceOption = {
@@ -200,7 +213,16 @@ export type ActionExecutionResult =
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }
 export type ActionFlow =
-  | { type: 'leaf'; actionId: string; optional?: boolean; promptKey?: string; params?: Partial<Resource>; sourceCard?: string }
+  | {
+      type: 'leaf'
+      actionId: string
+      optional?: boolean
+      promptKey?: string
+      params?: Partial<Resource>
+      sourceCard?: string
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
+    }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
       promptKey?: string
@@ -218,6 +240,7 @@ export type ActionDefinition = {
   /** Mark as an anytime action that can interrupt the current flow. */
   anytime?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
+  costPreview?: ActionCostPreview
   execute: (context: ActionExecutionContext) => ActionExecutionResult
   resolveChoice?: (
     context: ActionExecutionContext,

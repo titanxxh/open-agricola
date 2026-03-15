@@ -1,5 +1,6 @@
-import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
-import { canPayResources } from './pay'
+import type { ActionCostPreview, ActionDefinition, PlayerState, Resource } from '../../game/types'
+import { canExecuteWithCostPreview } from './cost-preview'
+import { canAffordCost } from './pay-helpers'
 
 export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   if (houseType === 'clay') return { clay: 5, reed: 2 }
@@ -8,7 +9,11 @@ export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
 }
 
 export const canAfford = (player: PlayerState, cost: Partial<Resource>) =>
-  canPayResources(player, cost)
+  canAffordCost(player, cost)
+
+export const constructCostPreview: ActionCostPreview = {
+  getBaseCost: ({ player }) => getBuildRoomCost(player.houseType),
+}
 
 export const constructAction: ActionDefinition = {
   id: 'construct',
@@ -16,8 +21,9 @@ export const constructAction: ActionDefinition = {
   descriptionKey: 'actions.construct.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) =>
-    canAfford(player, getBuildRoomCost(player.houseType)),
+  canBeExecutedByPlayer: (state, player) =>
+    canExecuteWithCostPreview(constructCostPreview, { state, player }),
+  costPreview: constructCostPreview,
   execute: () => ({
     type: 'choice',
     promptKey: 'ui.interactionRoomSelect',
