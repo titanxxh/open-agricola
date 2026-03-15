@@ -43,7 +43,6 @@ import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
 import {
-  runReturnHomeHooks,
   runRoundEndHooks,
   runAfterReapHooks,
   runBeforeFeedHooks,
@@ -98,7 +97,7 @@ type EngineSource =
   | { kind: 'flow'; flow: ActionFlow }
 
 type StageResumeState = {
-  hook: 'onBeforeHarvest' | 'onHarvest' | 'onAfterHarvest' | 'onBeforeStartOfTurn'
+  hook: 'onBeforeHarvest' | 'onHarvest' | 'onAfterHarvest' | 'onBeforeStartOfTurn' | 'onReturnHome'
   playerIndex: number
   cardIndex: number
 }
@@ -865,6 +864,9 @@ export class GameSession {
       case 'onBeforeStartOfTurn':
         this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onReturnHome':
+        this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
     }
   }
 
@@ -1258,6 +1260,17 @@ export class GameSession {
       }
       return this.respond()
     }
+    if (source === 'returning-home') {
+      const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+      if (nextPending !== -1) {
+        this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'returning-home' }
+        return this.respond()
+      }
+      if (harvestRounds.includes(this.state.round)) {
+        return this.startHarvest()
+      }
+      return this.finalizeRound()
+    }
     if (source === 'harvest-breed') {
       const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
       if (nextPending !== -1) {
@@ -1361,19 +1374,28 @@ export class GameSession {
 
     this.pushHistory()
     this.state.phase = 'returning-home'
-    this.applyReturnHome()
+    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
+    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
+    return this.continueReturnHomeHooks()
+  }
+
+  private continueReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
+    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
+
+    const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+    if (pendingAnimal !== -1) {
+      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'returning-home' }
+      return this.respond()
+    }
+
     if (harvestRounds.includes(this.state.round)) {
       return this.startHarvest()
     }
     return this.finalizeRound()
-  }
-
-  private applyReturnHome() {
-    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => runReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
   }
 
   private startHarvest(): SessionResponse {

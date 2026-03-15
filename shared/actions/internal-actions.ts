@@ -14,7 +14,6 @@ import { sowAction } from './effects/sow'
 import { bakeBreadAction } from './effects/bake-bread'
 import { anytimeReorgAction } from './effects/reorganize'
 import { anytimeExchangeAction } from './effects/exchange'
-import { cardChoiceAction } from './effects/card-choice'
 import { placeFarmerAction } from './effects/place-farmer'
 import { payResourcesAction } from './effects/pay-resources'
 import { returnToSpaceAction } from './effects/return-to-space'
@@ -26,6 +25,7 @@ import { unflagCardAction } from './effects/unflag-card'
 import { noopAction } from './effects/noop'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
+import { payGrainAnyAction } from './effects/pay-grain-any'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -57,7 +57,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   noopAction,
   returnFirstWorkerHomeAction,
   reserveFenceBonusAction,
+  payGrainAnyAction,
   constructAction,
-  cardChoiceAction,
   placeFarmerAction,
 ]
