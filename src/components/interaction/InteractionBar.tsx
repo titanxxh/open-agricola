@@ -90,7 +90,7 @@ export const InteractionBar = ({
             </button>
           </div>
         </>
-      ) : pendingChoice ? (
+      ) : pendingChoice && isInteractive ? (
         <>
           <div className="interaction-title">
             {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
@@ -155,7 +155,7 @@ export const InteractionBar = ({
             </div>
           )}
         </>
-      ) : pendingPlayerSwitch ? (
+      ) : pendingPlayerSwitch && isInteractive ? (
         <>
           <div className="interaction-title">
             {t(locale, 'ui.interactionPlayerSwitchPrompt', {
@@ -163,12 +163,12 @@ export const InteractionBar = ({
             })}
           </div>
           <div className="interaction-actions">
-            <button onClick={confirmPlayerSwitch}>
+            <button onClick={confirmPlayerSwitch} disabled={!isInteractive}>
               {t(locale, 'ui.interactionPlayerSwitchConfirm')}
             </button>
           </div>
         </>
-      ) : pendingNextPlayerIndex !== null ? (
+      ) : pendingNextPlayerIndex !== null && isInteractive ? (
         <>
           <div className="interaction-title">
             {t(locale, 'ui.interactionConfirmNext')}
@@ -180,7 +180,9 @@ export const InteractionBar = ({
           </div>
         </>
       ) : (
-        <div className="interaction-title">{t(locale, 'ui.interactionChooseOne')}</div>
+        <div className="interaction-title">
+          {isInteractive ? t(locale, 'ui.interactionChooseOne') : t(locale, 'ui.statusWaiting')}
+        </div>
       )}
     </div>
   )

@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { incCounter } from '../__stubs__/helpers'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B70_NewPurchase'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -10,17 +10,12 @@ registerCardEffect({
   onBeforeStartOfTurn: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!harvestRounds.includes(state.round)) return
-    // Option 1: 2 FOOD → 1 GRAIN (player can do both if they have enough)
-    if (player.resources.food >= 2) {
-      player.resources.food -= 2
-      player.resources.grain += 1
-      incCounter(player, CARD_ID, 'triggerCount')
-    }
-    // Option 2: 4 FOOD → 1 VEGETABLE
-    if (player.resources.food >= 4) {
-      player.resources.food -= 4
-      player.resources.vegetable += 1
-      incCounter(player, CARD_ID, 'triggerCount')
+    return {
+      type: 'seq',
+      children: [
+        payGainFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { grain: 1 }, promptKey: 'ui.interactionNewPurchaseGrain', markTrigger: true }),
+        payGainFlow({ cardId: CARD_ID, cost: { food: 4 }, gain: { vegetable: 1 }, promptKey: 'ui.interactionNewPurchaseVegetable', markTrigger: true }),
+      ],
     }
   },
 })

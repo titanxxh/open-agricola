@@ -27,11 +27,11 @@ export type CardEffect = {
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: EffectHandler
-  onReturnHome?: EffectHandler
+  onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: EffectHandler
   onStartReturnHome?: EffectHandler
   onAfterRoundEnd?: EffectHandler
-  onBeforeHarvest?: EffectHandler
+  onBeforeHarvest?: FlowEffectHandler
   onStartHarvest?: EffectHandler
   onStartHarvestFieldPhase?: EffectHandler
   onHarvestFieldPhase?: EffectHandler
@@ -43,8 +43,8 @@ export type CardEffect = {
   onBeforeFeed?: EffectHandler
   onAfterFeed?: EffectHandler
   onEndHarvest?: EffectHandler
-  onAfterHarvest?: EffectHandler
-  onBeforeStartOfTurn?: EffectHandler
+  onAfterHarvest?: FlowEffectHandler
+  onBeforeStartOfTurn?: FlowEffectHandler
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()

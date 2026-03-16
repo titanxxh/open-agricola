@@ -1,5 +1,6 @@
 import type {
   ActionFlow,
+  ActionSpace,
   AnytimeAction,
   FarmTilePosition,
   GameState,
@@ -23,6 +24,7 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
+  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from '../shared/engine/index.ts'
@@ -41,25 +43,43 @@ import {
 import { applyMajorEffectsToAllPlayers } from '../shared/cards/major/index.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifier } from '../shared/cards/card-modifiers.ts'
-import { getBuildRoomCost } from '../shared/actions/effects/construct.ts'
-import { applyCostOverride } from '../shared/actions/effects/pay.ts'
-import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
-import { runReturnHomeHooks, runRoundEndHooks, runBeforeHarvestHooks, runAfterReapHooks, runBeforeFeedHooks, runAfterFeedHooks, runAfterHarvestHooks, runBeforeStartOfTurnHooks, runBeforeReturnHomeHooks, runStartReturnHomeHooks, runAfterRoundEndHooks, runStartHarvestHooks, runStartHarvestFieldPhaseHooks, runHarvestFieldPhaseHooks, runEndHarvestFieldPhaseHooks, runStartHarvestFeedingPhaseHooks, runHarvestFeedingPhaseHooks, runEndHarvestFeedingPhaseHooks, runEndHarvestHooks } from '../shared/cards/card-effects.ts'
+import {
+  runRoundEndHooks,
+  runAfterReapHooks,
+  runBeforeFeedHooks,
+  runAfterFeedHooks,
+  runBeforeReturnHomeHooks,
+  runStartReturnHomeHooks,
+  runAfterRoundEndHooks,
+  runStartHarvestHooks,
+  runStartHarvestFieldPhaseHooks,
+  runHarvestFieldPhaseHooks,
+  runEndHarvestFieldPhaseHooks,
+  runStartHarvestFeedingPhaseHooks,
+  runHarvestFeedingPhaseHooks,
+  runEndHarvestFeedingPhaseHooks,
+  runEndHarvestHooks,
+  runCardEffectHook,
+} from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
+import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
+import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
 import {
-  getAllEdgeIds,
-  getAllTilePositions,
   normalizePlayerFarm,
-  validateFenceSelection,
 } from './fence-validation.ts'
-import { validateRoomSelection, validateStableSelection } from './validators.ts'
-import { validatePlowSelection } from './plow-validation.ts'
-import { validateSowSelection, type SowSelection } from './sow-validation.ts'
+import { applyFarmChoice } from './farm-choice.ts'
+import {
+  buildFenceFarmInteraction,
+  buildPlowFarmInteraction,
+  buildRoomFarmInteraction,
+  buildSowFarmInteraction,
+  buildStableFarmInteraction,
+} from './farm-interaction.ts'
 
 type HistoryEntry = {
   state: GameState
@@ -67,8 +87,20 @@ type HistoryEntry = {
   activeSpaceId: string | null
   activePlayerIndex: number | null
   engineSnapshot: ReturnType<Engine['snapshot']> | null
+  engineSource: EngineSource | null
+  stageResume: StageResumeState | null
   actionStart: boolean
   undoBoundary?: boolean
+}
+
+type EngineSource =
+  | { kind: 'action'; actionId: string }
+  | { kind: 'flow'; flow: ActionFlow }
+
+type StageResumeState = {
+  hook: 'onBeforeHarvest' | 'onHarvest' | 'onAfterHarvest' | 'onBeforeStartOfTurn' | 'onReturnHome'
+  playerIndex: number
+  cardIndex: number
 }
 
 export type SessionResponse = {
@@ -86,13 +118,16 @@ export type SessionResponse = {
 export class GameSession {
   private state: GameState
   private engine: Engine | null = null
+  private engineSource: EngineSource | null = null
   private activeSpaceId: string | null = null
   private activePlayerIndex: number | null = null
+  private stageResume: StageResumeState | null = null
   private pending: PendingAction = { type: 'none' }
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
   private usedBakeBreadThisAction = false
+  private nextActionToken = 1
   private loggedImprovementThisAction = false
   private loggedBakeBreadThisAction = false
 
@@ -116,44 +151,132 @@ export class GameSession {
     }
   }
 
+  private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
+    if (flow.type === 'leaf') {
+      const actionNode = new ActionNode(
+        `action-${flow.actionId}-${counter.value++}`,
+        flow.actionId,
+        flow.sourceCard,
+        flow.params,
+        flow.choiceLabelKey,
+        flow.choiceLabelParams,
+        flow.actionContext,
+      )
+      const def = this.registry.get(flow.actionId)
+      if (def?.resolveChoice) {
+        const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
+          actionNode,
+          new ChoiceNode(`choice-${flow.actionId}-${counter.value++}`, []),
+        ])
+        return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+      }
+      return flow.optional
+        ? new OptionalNode(`opt-${counter.value++}`, actionNode, flow.promptKey)
+        : actionNode
+    }
+
+    const children = flow.children.map((child) => this.buildEngineNode(child, counter))
+    if (flow.type === 'seq') {
+      const seq = new SequenceNode(`seq-${counter.value++}`, children)
+      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+    }
+    if (flow.type === 'parallel') {
+      const parallel = new ParallelNode(`par-${counter.value++}`, children)
+      return flow.optional
+        ? new OptionalNode(`opt-${counter.value++}`, parallel, flow.promptKey)
+        : parallel
+    }
+    if (flow.type === 'xor') {
+      const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
+      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, xor, flow.promptKey) : xor
+    }
+    const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
+    return flow.optional ? new OptionalNode(`opt-${counter.value++}`, or, flow.promptKey) : or
+  }
+
+  private runPlaceFarmerAfterHooks(
+    player: PlayerState,
+    space: ActionSpace,
+  ): boolean {
+    const context = {
+      state: this.state,
+      player,
+      space,
+      actionId: 'place-farmer',
+      phase: 'after' as const,
+      result: { type: 'ok' as const },
+    }
+    const matched = getMatchingListeners(context)
+    const counter = { value: 0 }
+    const nodes: EngineNode[] = []
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, context, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (!result?.flow) continue
+      if (result.logKey) {
+        const logPlayer =
+          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
+        this.state.log.unshift({
+          key: result.logKey,
+          params: { player: logPlayer.name, ...result.logParams },
+        })
+      }
+      const flowNode = this.buildEngineNode(result.flow, counter)
+      const needsSwitch = entry.ownerPlayerId && entry.ownerPlayerId !== player.id
+      if (needsSwitch) {
+        nodes.push(
+          new PlayerSwitchNode(`pf-ps-to-${counter.value++}`, entry.ownerPlayerId),
+          flowNode,
+          new PlayerSwitchNode(`pf-ps-back-${counter.value++}`, player.id),
+        )
+      } else {
+        nodes.push(flowNode)
+      }
+    }
+    if (nodes.length === 0) return false
+    const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
+    this.engine = new Engine({
+      tree: new EngineTree(root),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
+    this.engineSource = { kind: 'flow', flow: { type: 'seq', children: [] } }
+    return true
+  }
+
+  private createFlowEngine(flow: ActionFlow): Engine {
+    const counter = { value: 0 }
+    return new Engine({
+      tree: new EngineTree(this.buildEngineNode(flow, counter)),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
+  }
+
   private createEngine(actionId: string): Engine {
     const action = this.registry.get(actionId)
-    let counter = 0
-    const build = (flow: ActionFlow): EngineNode => {
-      if (flow.type === 'leaf') {
-        const an = new ActionNode(`action-${flow.actionId}-${counter++}`, flow.actionId)
-        const def = this.registry.get(flow.actionId)
-        if (def?.resolveChoice) {
-          const seq = new SequenceNode(`seq-${flow.actionId}-${counter++}`, [
-            an, new ChoiceNode(`choice-${flow.actionId}-${counter++}`, []),
-          ])
-          return flow.optional ? new OptionalNode(`opt-${counter++}`, seq, flow.promptKey) : seq
-        }
-        return flow.optional ? new OptionalNode(`opt-${counter++}`, an, flow.promptKey) : an
-      }
-      const children = flow.children.map((c) => build(c))
-      if (flow.type === 'seq') {
-        const s = new SequenceNode(`seq-${counter++}`, children)
-        return flow.optional ? new OptionalNode(`opt-${counter++}`, s, flow.promptKey) : s
-      }
-      if (flow.type === 'parallel') {
-        const p = new ParallelNode(`par-${counter++}`, children)
-        return flow.optional ? new OptionalNode(`opt-${counter++}`, p, flow.promptKey) : p
-      }
-      if (flow.type === 'xor') {
-        const x = new XorNode(`xor-${counter++}`, children, flow.promptKey)
-        return flow.optional ? new OptionalNode(`opt-${counter++}`, x, flow.promptKey) : x
-      }
-      const o = new OrNode(`or-${counter++}`, children, flow.promptKey)
-      return flow.optional ? new OptionalNode(`opt-${counter++}`, o, flow.promptKey) : o
-    }
+    const counter = { value: 0 }
     const an = new ActionNode(`action-${actionId}`, actionId)
     const root = action?.flow
-      ? build(action.flow)
+      ? this.buildEngineNode(action.flow, counter)
       : action?.resolveChoice
         ? new SequenceNode(`seq-${actionId}`, [an, new ChoiceNode(`choice-${actionId}`, [])])
         : an
-    return new Engine({ tree: new EngineTree(root), registry: this.registry, hooks: this.hookDispatcher, log: this.engineLog })
+    return new Engine({
+      tree: new EngineTree(root),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
+  }
+
+  private createEngineFromSource(source: EngineSource): Engine {
+    return source.kind === 'action'
+      ? this.createEngine(source.actionId)
+      : this.createFlowEngine(source.flow)
   }
 
   private clonePlayer(p: PlayerState): PlayerState {
@@ -183,10 +306,34 @@ export class GameSession {
     return current
   }
 
+  private createSyntheticSpace(id: string): ActionSpace {
+    return {
+      id,
+      nameKey: 'ui.interactionOptionalAction',
+      descriptionKey: 'ui.interactionOptionalAction',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+      resources: { ...emptyResources },
+      takenBy: null,
+    }
+  }
+
+  private getSpaceById(spaceId: string | null): ActionSpace | null {
+    if (!spaceId) return null
+    return this.state.actionSpaces.find((item) => item.id === spaceId)
+      ?? (spaceId.startsWith('__stage:') ? this.createSyntheticSpace(spaceId) : null)
+  }
+
+  private getPlayerEffectCardIds(player: PlayerState) {
+    return [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
+  }
+
   private getActiveInteractionContext() {
     if (this.activePlayerIndex === null || !this.activeSpaceId) return null
     const player = this.state.players[this.activePlayerIndex]
-    const space = this.state.actionSpaces.find((item) => item.id === this.activeSpaceId)
+    const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return null
     return { player, space }
   }
@@ -208,89 +355,28 @@ export class GameSession {
     }
   }
 
-  private buildRoomInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
-    const occupied = new Set(normalized.roomTiles.map(positionKey))
-    normalized.fields.forEach((field) => occupied.add(positionKey(field)))
-    normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
-    normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
-    const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
-    const costPerRoom = applyCostOverride(getBuildRoomCost(player.houseType), costOverride)
-    const resourceMax = Object.entries(costPerRoom).reduce((max, [key, value]) => {
-      if (typeof value !== 'number' || value <= 0) return max
-      const available = player.resources[key as keyof Resource] ?? 0
-      return Math.min(max, Math.floor(available / value))
-    }, Number.POSITIVE_INFINITY)
-    const maxSelections = Math.min(
-      selectableTiles.length,
-      Number.isFinite(resourceMax) ? resourceMax : selectableTiles.length,
-    )
-    return {
-      farmType: 'room',
-      selectableTiles,
-      maxSelections: Math.max(0, maxSelections),
-      costPerRoom,
-    }
+  private buildRoomInteraction(
+    player: PlayerState,
+    costOverride?: Partial<Resource>,
+    actionContext?: Record<string, unknown>,
+  ): InteractionFarmSelection {
+    return buildRoomFarmInteraction(player, costOverride, actionContext)
   }
 
   private buildStableInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
-    const occupied = new Set(normalized.roomTiles.map(positionKey))
-    normalized.fields.forEach((field) => occupied.add(positionKey(field)))
-    normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
-    const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
-    const woodDiscount = Math.max(0, Math.abs(costOverride?.wood ?? 0))
-    const effectiveCost = Math.max(0, stableWoodCost - woodDiscount)
-    const woodAvailable = player.resources.wood ?? 0
-    const maxSelections =
-      effectiveCost === 0
-        ? Math.max(0, 4 - normalized.stableTiles.length)
-        : Math.min(
-            Math.max(0, 4 - normalized.stableTiles.length),
-            Math.floor(woodAvailable / effectiveCost),
-          )
-    return {
-      farmType: 'stable',
-      selectableTiles,
-      maxSelections,
-    }
+    return buildStableFarmInteraction(player, costOverride)
   }
 
-  private buildPlowInteraction(player: PlayerState): InteractionFarmSelection {
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
-    const selectableTiles = getAllTilePositions().filter(
-      (tile) => validatePlowSelection(normalized, tile).ok,
-    )
-    return { farmType: 'plow', selectableTiles }
+  private buildPlowInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
+    return buildPlowFarmInteraction(player, costOverride)
   }
 
   private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
-    const selectableFields = normalized.fields.flatMap((field) => {
-      if (field.crop !== null) return []
-      const allowedCrops: ('grain' | 'vegetable')[] = []
-      if ((normalized.resources.grain ?? 0) > 0) {
-        allowedCrops.push('grain')
-      }
-      if ((normalized.resources.vegetable ?? 0) > 0) {
-        allowedCrops.push('vegetable')
-      }
-      if (allowedCrops.length === 0) return []
-      return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
-    })
-    return { farmType: 'sow', selectableFields }
+    return buildSowFarmInteraction(player)
   }
 
   private buildFenceInteraction(pending: Extract<PendingAction, { type: 'choice' }>): InteractionFarmSelection {
-    const normalized = normalizePlayerFarm(this.state.players[pending.playerIndex] as Parameters<typeof normalizePlayerFarm>[0])
-    const existing = new Set(normalized.fenceSegments ?? [])
-    const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
-    const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0
-    return {
-      farmType: 'fence',
-      selectableEdges,
-      extraWood,
-    }
+    return buildFenceFarmInteraction(this.state.players[pending.playerIndex]!, pending)
   }
 
   private buildFarmInteraction(
@@ -303,11 +389,11 @@ export class GameSession {
       case 'fence':
         return this.buildFenceInteraction(pending)
       case 'room':
-        return this.buildRoomInteraction(player, pending.costOverride)
+        return this.buildRoomInteraction(player, pending.costOverride, pending.actionContext)
       case 'stable':
         return this.buildStableInteraction(player, pending.costOverride)
       case 'plow':
-        return this.buildPlowInteraction(player)
+        return this.buildPlowInteraction(player, pending.costOverride)
       case 'sow':
         return this.buildSowInteraction(player)
       default:
@@ -316,6 +402,7 @@ export class GameSession {
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+    if (this.stageResume) return []
     const context = this.getActiveInteractionContext()
     if (!context) return []
     if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
@@ -469,6 +556,10 @@ export class GameSession {
       activeSpaceId: this.activeSpaceId,
       activePlayerIndex: this.activePlayerIndex,
       engineSnapshot: this.engine?.snapshot() ?? null,
+      engineSource: this.engineSource
+        ? JSON.parse(JSON.stringify(this.engineSource)) as EngineSource
+        : null,
+      stageResume: this.stageResume ? { ...this.stageResume } : null,
       actionStart,
       undoBoundary,
     }
@@ -483,8 +574,12 @@ export class GameSession {
     this.pending = this.clonePending(entry.pending)
     this.activeSpaceId = entry.activeSpaceId
     this.activePlayerIndex = entry.activePlayerIndex
-    if (entry.engineSnapshot && entry.activeSpaceId) {
-      this.engine = this.createEngine(entry.activeSpaceId)
+    this.engineSource = entry.engineSource
+      ? JSON.parse(JSON.stringify(entry.engineSource)) as EngineSource
+      : null
+    this.stageResume = entry.stageResume ? { ...entry.stageResume } : null
+    if (entry.engineSnapshot && this.engineSource) {
+      this.engine = this.createEngineFromSource(this.engineSource)
       this.engine.restore(entry.engineSnapshot)
     } else {
       this.engine = null
@@ -591,7 +686,7 @@ export class GameSession {
 
   private logActionDetail(before: PlayerState, player: PlayerState) {
     if (!this.activeSpaceId) return
-    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    const space = this.getSpaceById(this.activeSpaceId)
     if (!space) return
     const detailParts = this.buildActionDetailParts(before, player)
     const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
@@ -680,19 +775,186 @@ export class GameSession {
     this.loggedBakeBreadThisAction = false
   }
 
+  private startStageFlow(
+    flow: ActionFlow,
+    hook: StageResumeState['hook'],
+    playerIndex: number,
+    nextCardIndex: number,
+  ) {
+    this.engine = this.createFlowEngine(flow)
+    this.engineSource = { kind: 'flow', flow }
+    this.activeSpaceId = `__stage:${hook}`
+    this.activePlayerIndex = playerIndex
+    this.stageResume = { hook, playerIndex, cardIndex: nextCardIndex }
+    this.pending = { type: 'none' }
+    this.runEngineSteps()
+  }
+
+  private continueStageHook(
+    hook: StageResumeState['hook'],
+    playerIndex = 0,
+    cardIndex = 0,
+  ) {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      const player = this.state.players[currentPlayerIndex]
+      if (!player) continue
+      const cards = this.getPlayerEffectCardIds(player)
+      const startCardIndex = currentPlayerIndex === playerIndex ? cardIndex : 0
+      for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
+        const cardId = cards[currentCardIndex]
+        if (!cardId) continue
+        const flow = runCardEffectHook(this.state, player, cardId, hook)
+        if (!flow) continue
+        this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
+        return true
+      }
+    }
+    return false
+  }
+
+  private continueHarvestFromBeforeHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    this.state.players.forEach((player) => runStartHarvestHooks(this.state, player))
+
+    this.state.phase = 'field'
+    this.state.players.forEach((player) => runStartHarvestFieldPhaseHooks(this.state, player))
+    this.state.players.forEach((player) => runHarvestFieldPhaseHooks(this.state, player))
+    this.state.players.forEach((player) => reap(player))
+    this.state.players.forEach((player) => runAfterReapHooks(this.state, player))
+    this.state.players.forEach((player) => runEndHarvestFieldPhaseHooks(this.state, player))
+    this.state.phase = 'harvest'
+
+    return this.continueHarvestEffects()
+  }
+
+  private continueHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onHarvest', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+
+    this.state.phase = 'feeding'
+    this.state.players.forEach((player) => runStartHarvestFeedingPhaseHooks(this.state, player))
+    this.state.players.forEach((player) => runBeforeFeedHooks(this.state, player))
+    this.state.players.forEach((player) => runHarvestFeedingPhaseHooks(this.state, player))
+
+    const feedQueue: { index: number; remaining: number }[] = []
+
+    for (let i = 0; i < this.state.players.length; i += 1) {
+      const player = this.state.players[i]!
+      const newborn = Math.min(player.newbornCount, player.familySize)
+      const required = Math.max(0, player.familySize * 2 - newborn)
+      const useFood = Math.min(player.resources.food, required)
+      player.resources.food -= useFood
+      const remaining = required - useFood
+
+      if (remaining <= 0) continue
+
+      const hasCooking = player.improvements.some((id) =>
+        id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
+      const canConvert = player.resources.grain > 0 || player.resources.vegetable > 0 ||
+        (hasCooking && (player.resources.sheep > 0 || player.resources.boar > 0 || player.resources.cattle > 0))
+
+      if (canConvert) {
+        feedQueue.push({ index: i, remaining })
+      } else {
+        player.resources.begging += remaining
+      }
+    }
+
+    if (feedQueue.length > 0) {
+      const first = feedQueue[0]!
+      this.pending = {
+        type: 'harvestFeed',
+        playerIndex: first.index,
+        remaining: first.remaining,
+        feedQueue: feedQueue.slice(1),
+      }
+      return this.respond()
+    }
+
+    return this.startBreedPhase()
+  }
+
+  private continueAfterHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.finalizeRound()
+  }
+
+  private continueBeforeStartOfTurn(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    this.state.players.forEach((player) => resetRoundPlacements(player))
+    applyRoundGrowth(this.state)
+    applyFutureMeeples(this.state)
+    applyMajorEffectsToAllPlayers(this.state, 'onRoundStart')
+    const startIdx = this.state.players.findIndex((player) => player.startPlayer)
+    this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
+    this.state.phase = 'work'
+    this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
+    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    this.pending = { type: 'none' }
+    this.engine = null
+    this.engineSource = null
+    this.activeSpaceId = null
+    this.activePlayerIndex = null
+    this.stageResume = null
+    this.history = []
+    this.actionStartIndex = null
+    return this.respond()
+  }
+
+  private resumeStageFlow(stageResume: StageResumeState) {
+    switch (stageResume.hook) {
+      case 'onBeforeHarvest':
+        this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onHarvest':
+        this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onAfterHarvest':
+        this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onBeforeStartOfTurn':
+        this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onReturnHome':
+        this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
+    }
+  }
+
   private runEngineSteps(): void {
     if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
     const player = this.state.players[this.activePlayerIndex]
-    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return
 
     while (true) {
       const before = this.clonePlayer(player)
-      const step = this.engine.proceed({ state: this.state, player, space })
+      const step = this.engine!.proceed({ state: this.state, player, space })
       this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
+        const isActionEngine = this.engineSource?.kind === 'action'
+        const stageResume = this.stageResume
         this.engine = null
+        this.engineSource = null
+        if (stageResume) {
+          this.stageResume = null
+          this.pending = { type: 'none' }
+          this.activeSpaceId = null
+          this.activePlayerIndex = null
+          this.resumeStageFlow(stageResume)
+          return
+        }
+        if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
+          continue
+        }
         this.finalizeActionLog(player)
         const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
         if (!allWorkersUsed) {
@@ -725,7 +987,7 @@ export class GameSession {
           let autoPromptKey = step.choice.promptKey
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const result = this.engine.resolveChoice(auto.value, { state: this.state, player, space })
+            const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             const isBakeChoice =
               autoPromptKey === 'ui.interactionBakeBreadChoice' ||
@@ -746,12 +1008,15 @@ export class GameSession {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
                 options: result.options ?? [], promptKey: result.promptKey,
                 costOverride: this.engine?.getLastComputedCosts(),
+                actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
               }
               return
             }
             if (result.type === 'fail') {
               this.pending = { type: 'none' }
               this.engine = null
+              this.engineSource = null
+              this.stageResume = null
               this.actionStartIndex = null
               return
             }
@@ -767,6 +1032,7 @@ export class GameSession {
           type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
           costOverride: this.engine?.getLastComputedCosts(),
+          actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
         }
         return
       }
@@ -781,9 +1047,12 @@ export class GameSession {
       }
 
       if (step.type === 'ok' && step.result.type === 'fail') {
-        space.takenBy = null
-        player.workersAvailable += 1
+        if (!this.stageResume) {
+          space.takenBy = null
+          player.workersAvailable += 1
+        }
         this.engine = null
+        this.engineSource = null
         this.pending = { type: 'none' }
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
@@ -868,13 +1137,17 @@ export class GameSession {
     this.pushHistory(true)
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.usedBakeBreadThisAction = false
+    recordActionSnapshot(player, this.nextActionToken++)
     space.takenBy = player.id
     player.workersAvailable -= 1
+    recordRoundPlacement(player, spaceId)
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
     this.engine = this.createEngine(spaceId)
+    this.engineSource = { kind: 'action', actionId: spaceId }
     this.activeSpaceId = spaceId
     this.activePlayerIndex = playerIndex
+    this.stageResume = null
 
     const beforeListenerContext = {
       state: this.state,
@@ -886,7 +1159,9 @@ export class GameSession {
     const matched = getMatchingListeners(beforeListenerContext)
     const beforeFlowNodes: EngineNode[] = []
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, beforeListenerContext)
+      const result = executeCardListener(entry.registration, beforeListenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
       if (result?.flow) {
         beforeFlowNodes.push(this.engine.buildFlowNodePublic(result.flow))
       }
@@ -941,7 +1216,7 @@ export class GameSession {
       return this.respond(false, 'no active engine')
     }
     const player = this.state.players[playerIndex]
-    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
     const promptKey = pending.promptKey
@@ -962,6 +1237,8 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        costOverride: this.engine.getLastComputedCosts(),
+        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
     }
@@ -976,6 +1253,8 @@ export class GameSession {
     if (result.type === 'fail') {
       this.pending = { type: 'none' }
       this.engine = null
+      this.engineSource = null
+      this.stageResume = null
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
       this.usedBakeBreadThisAction = false
@@ -1049,6 +1328,17 @@ export class GameSession {
       }
       return this.respond()
     }
+    if (source === 'returning-home') {
+      const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+      if (nextPending !== -1) {
+        this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'returning-home' }
+        return this.respond()
+      }
+      if (harvestRounds.includes(this.state.round)) {
+        return this.startHarvest()
+      }
+      return this.finalizeRound()
+    }
     if (source === 'harvest-breed') {
       const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
       if (nextPending !== -1) {
@@ -1056,8 +1346,7 @@ export class GameSession {
         return this.respond()
       }
       this.state.players.forEach((p) => runEndHarvestHooks(this.state, p))
-      this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
-      return this.finalizeRound()
+      return this.continueAfterHarvestEffects()
     }
     if (this.engine) {
       this.runEngineSteps()
@@ -1124,8 +1413,10 @@ export class GameSession {
     this.state.currentPlayerIndex = this.pending.nextPlayerIndex
     this.pending = { type: 'none' }
     this.engine = null
+    this.engineSource = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
+    this.stageResume = null
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
 
@@ -1151,76 +1442,33 @@ export class GameSession {
 
     this.pushHistory()
     this.state.phase = 'returning-home'
-    this.applyReturnHome()
+    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
+    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
+    return this.continueReturnHomeHooks()
+  }
+
+  private continueReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
+    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
+
+    const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+    if (pendingAnimal !== -1) {
+      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'returning-home' }
+      return this.respond()
+    }
+
     if (harvestRounds.includes(this.state.round)) {
       return this.startHarvest()
     }
     return this.finalizeRound()
   }
 
-  private applyReturnHome() {
-    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => runReturnHomeHooks(this.state, p))
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
-  }
-
   private startHarvest(): SessionResponse {
     this.state.phase = 'harvest'
-    this.state.players.forEach((p) => runBeforeHarvestHooks(this.state, p))
-    this.state.players.forEach((p) => runStartHarvestHooks(this.state, p))
-
-    this.state.phase = 'field'
-    this.state.players.forEach((p) => runStartHarvestFieldPhaseHooks(this.state, p))
-    this.state.players.forEach((p) => runHarvestFieldPhaseHooks(this.state, p))
-    this.state.players.forEach((p) => reap(p))
-    this.state.players.forEach((p) => runAfterReapHooks(this.state, p))
-    this.state.players.forEach((p) => runEndHarvestFieldPhaseHooks(this.state, p))
-
-    applyMajorEffectsToAllPlayers(this.state, 'onHarvest')
-
-    this.state.phase = 'feeding'
-    this.state.players.forEach((p) => runStartHarvestFeedingPhaseHooks(this.state, p))
-    this.state.players.forEach((p) => runBeforeFeedHooks(this.state, p))
-    this.state.players.forEach((p) => runHarvestFeedingPhaseHooks(this.state, p))
-
-    const feedQueue: { index: number; remaining: number }[] = []
-    
-    for (let i = 0; i < this.state.players.length; i++) {
-      const p = this.state.players[i]!
-      const newborn = Math.min(p.newbornCount, p.familySize)
-      const required = Math.max(0, p.familySize * 2 - newborn)
-      const useFood = Math.min(p.resources.food, required)
-      p.resources.food -= useFood
-      const remaining = required - useFood
-      
-      if (remaining > 0) {
-        const hasCooking = p.improvements.some((id) =>
-          id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
-        const canConvert = p.resources.grain > 0 || p.resources.vegetable > 0 ||
-          (hasCooking && (p.resources.sheep > 0 || p.resources.boar > 0 || p.resources.cattle > 0))
-        
-        if (canConvert) {
-          feedQueue.push({ index: i, remaining })
-        } else {
-          p.resources.begging += remaining
-        }
-      }
-    }
-
-    if (feedQueue.length > 0) {
-      const first = feedQueue[0]!
-      this.pending = { 
-        type: 'harvestFeed', 
-        playerIndex: first.index, 
-        remaining: first.remaining,
-        feedQueue: feedQueue.slice(1)
-      }
-      return this.respond()
-    }
-
-    return this.startBreedPhase()
+    return this.continueHarvestFromBeforeHarvest()
   }
 
   private startBreedPhase(): SessionResponse {
@@ -1236,8 +1484,7 @@ export class GameSession {
     }
 
     this.state.players.forEach((p) => runEndHarvestHooks(this.state, p))
-    this.state.players.forEach((p) => runAfterHarvestHooks(this.state, p))
-    return this.finalizeRound()
+    return this.continueAfterHarvestEffects()
   }
 
   private applyBreedPhase() {
@@ -1256,22 +1503,7 @@ export class GameSession {
       this.pending = { type: 'none' }
       return this.respond()
     }
-    this.state.players.forEach((p) => runBeforeStartOfTurnHooks(this.state, p))
-    applyRoundGrowth(this.state)
-    applyFutureMeeples(this.state)
-    applyMajorEffectsToAllPlayers(this.state, 'onRoundStart')
-    const startIdx = this.state.players.findIndex((p) => p.startPlayer)
-    this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
-    this.state.phase = 'work'
-    this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
-    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    this.pending = { type: 'none' }
-    this.engine = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
-    this.history = []
-    this.actionStartIndex = null
-    return this.respond()
+    return this.continueBeforeStartOfTurn()
   }
 
   loadState(raw: unknown): SessionResponse {
@@ -1280,6 +1512,10 @@ export class GameSession {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     }
     this.engine = null
+    this.engineSource = null
+    this.stageResume = null
+    this.activeSpaceId = null
+    this.activePlayerIndex = null
     this.pending = { type: 'none' }
     this.history = []
     this.actionStartIndex = null
@@ -1302,70 +1538,54 @@ export class GameSession {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
+    let farmChoiceMeta: Record<string, unknown> | undefined
 
     switch (farmType) {
       case 'fence': {
-        const { edges, extraWood } = payload as { edges: string[]; extraWood?: number }
-        const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
-        const woodDiscount = override?.wood ? Math.abs(override.wood) : 0
-        const adjustedExtraWood = (extraWood ?? 0) - woodDiscount
-        const result = validateFenceSelection(normalized, edges, Math.max(0, adjustedExtraWood))
-        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        const result = applyFarmChoice(normalized, 'fence', payload as any, {
+          costOverride: override,
+        })
+        if (!result.ok) return this.respond(false, result.error)
+        this.pushHistory()
+        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        farmChoiceMeta = result.meta
+        break
+      }
+      case 'room': {
+        const result = applyFarmChoice(normalized, 'room', payload as any, {
+          costOverride: override,
+          maxUnits:
+            typeof this.pending.actionContext?.maxRooms === 'number'
+              ? this.pending.actionContext.maxRooms
+              : undefined,
+        })
+        if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
         break
       }
-      case 'room': {
-        const { rooms } = payload as {
-          rooms: FarmTilePosition[]
-        }
-        const selection = validateRoomSelection(normalized, rooms)
-        if (!selection.ok) return this.respond(false, selection.code)
-        const baseCost = getBuildRoomCost(player.houseType as 'wood' | 'clay' | 'stone')
-        const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
-        const effectiveCostPerRoom = applyCostOverride(baseCost, override)
-        const costKeys = Object.keys(effectiveCostPerRoom) as (keyof Resource)[]
-        const totalCost: Partial<Resource> = {}
-        for (const key of costKeys) {
-          const required = (effectiveCostPerRoom[key] ?? 0) * rooms.length
-          if ((normalized.resources[key] ?? 0) < required) {
-            return this.respond(false, `Not enough ${key}`)
-          }
-          totalCost[key] = required
-        }
-        this.pushHistory()
-        for (const key of costKeys) {
-          player.resources[key] -= totalCost[key] ?? 0
-        }
-        player.roomTiles = [...player.roomTiles, ...rooms]
-        player.rooms += rooms.length
-        break
-      }
       case 'stable': {
-        const { stables } = payload as { stables: FarmTilePosition[] }
-        const selection = validateStableSelection(normalized, stables)
-        if (!selection.ok) return this.respond(false, selection.code)
-        const woodRequired = stables.length * 2
-        if ((normalized.resources?.wood ?? 0) < woodRequired) {
-          return this.respond(false, 'Not enough wood')
-        }
+        const result = applyFarmChoice(normalized, 'stable', payload as any, {
+          costOverride: override,
+        })
+        if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
-        player.resources.wood -= woodRequired
-        player.stableTiles = [...player.stableTiles, ...stables]
+        this.state.players[playerIndex] = result.player as unknown as PlayerState
         break
       }
       case 'plow': {
-        const { tile } = payload as { tile: FarmTilePosition }
-        const result = validatePlowSelection(normalized, tile)
-        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        const result = applyFarmChoice(normalized, 'plow', payload as any, {
+          costOverride: override,
+        })
+        if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
         break
       }
       case 'sow': {
-        const { crops } = payload as { crops: SowSelection[] }
-        const result = validateSowSelection(normalized, crops)
-        if (!result.ok) return this.respond(false, result.error?.code ?? 'validation failed')
+        const result = applyFarmChoice(normalized, 'sow', payload as any)
+        if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
         break
@@ -1377,17 +1597,27 @@ export class GameSession {
       return this.respond()
     }
 
-    const space = this.state.actionSpaces.find((s) => s.id === this.activeSpaceId)
+    const space = this.getSpaceById(this.activeSpaceId)
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
 
-    const result = this.engine.resolveChoice('confirm', { state: this.state, player: updatedPlayer, space })
+    const resultOverride =
+      farmChoiceMeta && Object.keys(farmChoiceMeta).length > 0
+        ? { type: 'ok' as const, extraData: farmChoiceMeta }
+        : undefined
+    const result = this.engine.resolveChoice(
+      'confirm',
+      { state: this.state, player: updatedPlayer, space },
+      resultOverride,
+    )
     this.flushEngineLog()
 
     if (result.type === 'choice') {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        costOverride: this.engine.getLastComputedCosts(),
+        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
     }
@@ -1402,6 +1632,8 @@ export class GameSession {
     if (result.type === 'fail') {
       this.pending = { type: 'none' }
       this.engine = null
+      this.engineSource = null
+      this.stageResume = null
       this.actionStartIndex = null
       return this.respond()
     }

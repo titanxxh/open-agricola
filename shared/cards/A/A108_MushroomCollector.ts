@@ -2,36 +2,34 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 
-const isWoodAccumulationSpace = (space: any): boolean => {
-  return (space.gainPerRound?.wood ?? 0) > 0
-}
+const CARD_ID = 'A108_MushroomCollector'
+
+const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
+  (space.gainPerRound?.wood ?? 0) > 0
 
 const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
   id: 'A108-mushroom-collector-immediately-after',
+  cardIds: [CARD_ID],
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space } = context
-    
-    if (!isWoodAccumulationSpace(space)) return
-    
-    return {
-      flow: {
-        type: 'seq',
-        optional: true,
-        children: [
-          { type: 'leaf', actionId: 'special-effect', optional: false },
-        ],
-      },
-    }
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (!isWoodAccumulationSpace(context.space)) return
+    return returnToSpaceThenGainFlow({
+      cardId: CARD_ID,
+      cost: { wood: 1 },
+      gain: { food: 2 },
+      choiceLabelKey: 'occupations.A108_MushroomCollector.name',
+    })
   },
 }
 
 registerCardListener(mushroomCollectorImmediatelyAfterListener)
 
 export const A108_MushroomCollector = new Occupation({
-  id: "A108_MushroomCollector",
+  id: CARD_ID,
   name: "Mushroom Collector",
   deck: "A",
   number: 108,

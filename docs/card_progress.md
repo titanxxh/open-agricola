@@ -6,6 +6,7 @@
 注：行动格开放性判定已新增一层 flow 自动合成能力。当前顶层 `or` / `xor` 复合行动格，以及一批安全 `seq` 包装行动格，会递归读取子行动的 `isDoable` 与其 hooks / listeners，减少行动卡文件中的重复可执行性条件。
 注：与卡牌相关的 `card-choice`、播种/围栏/扩建等多步选择，现统一通过服务端 `interaction` 快照向前端暴露；前端不再本地推导这些卡牌/行动带来的可选目标。
 注：可插入的 `anytime` 动作已接入 BGA 风格根前插 flow，像 `bake-bread`、`anytime-reorg` 这类中断动作执行后会回到原本的待完成交互。
+注：本轮仅同步“原子行动 Hook 覆盖矩阵”涉及卡牌的状态。对 `Harvest`、`StartOfTurn` 等更偏阶段性的格子，会在说明中标注当前是否已通过 `card-effects.ts` 接入；其中 `B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter` 已进一步切到服务端阶段 flow，不再是即时 imperative 结算。
 
 ## 图例
 
@@ -19,12 +20,12 @@
 | 类型 | 总数 | 已实现 | 未实现 |
 |------|------|--------|--------|
 | Major Improvements | 10 | 10 | 0 |
-| A Deck | 180 | 48 | 132 |
-| B Deck | 180 | 27 | 153 |
+| A Deck | 180 | 49 | 131 |
+| B Deck | 180 | 28 | 152 |
 | C Deck | 180 | 34 | 146 |
-| D Deck | 180 | 28 | 152 |
-| E Deck | 168 | 41 | 127 |
-| **总计** | **898** | **188** | **710** |
+| D Deck | 180 | 32 | 148 |
+| E Deck | 168 | 43 | 125 |
+| **总计** | **898** | **196** | **702** |
 
 ---
 
@@ -47,71 +48,72 @@
 
 ## Hook 覆盖矩阵代表性卡牌
 
-以下卡牌在 Hook 覆盖矩阵中被选为代表性示例（无重复）：
+以下卡牌在 Hook 覆盖矩阵中被选为代表性示例；若某些效果当前通过 `card-effects.ts` 接入，也会在说明中注明。
 
 ### Before Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
 | B75_WoodWorkshop | Improvement | 打改良前获得木材 | 🔧 |
 | A65_SeedPellets | Sow | 播种前获得谷物 | 🔧 |
-| D14_HammerCrusher | Renovation | 翻新前获得资源 | 🔧 |
-| E74_AshTrees | Fencing | 围栏前获得资源 | 🔧 |
-| B67_HandTruck | Exchange | 交易前获得谷物 | 🔧 |
-| E101_Blighter | Occupation | 打职业前效果 | ❌ |
-| B34_SpecialFood | SpecialEffect | 特殊效果前 | 🔧 |
-| A166_Haydryer | Harvest | 收获前效果 | ❌ |
-| C133_Soldier | EndOfGame | 游戏结束时 | 🔧 |
-| B70_NewPurchase | StartOfTurn | 回合开始时 | ✅ |
+| D14_HammerCrusher | Renovation | 翻新前获得资源，并可放宽翻修可行性 | ✅ |
+| E74_AshTrees | Fencing | 围栏前预留免费围栏，并接入围栏提交链 | ✅ |
+| B67_HandTruck | BakeBread | 烤面包前按累积格工人数获得谷物 | ✅ |
+| A126_MasterWorkman | PlaceFarmer | 在 1-4 轮行动格放人前获得对应资源 | ✅ |
+| E101_Blighter | Occupation | 入场按剩余完整阶段给 VP，并封锁后续打职业 | ✅ |
+| B34_SpecialFood | Collect | 动物累积格收取前后判定并按动物数给 VP | ✅ |
+| A166_Haydryer | Harvest | 收获前效果，当前走 `onBeforeHarvest` 阶段 flow | ✅ |
+| C133_Soldier | EndOfGame | 终局按木头+石头配对计分，并扣除 Joinery 木材复用 | ✅ |
+| B70_NewPurchase | StartOfTurn | 回合开始前结算购买效果，当前走 `onBeforeStartOfTurn` 阶段 flow | ✅ |
 
 ### During Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| A126_MasterWorkman | PlaceFarmer | 放置农夫时获得资源 | ✅ |
 | E53_BoarSpear | Collect | 收取时交换资源 | ✅ |
-| A55_JunkRoom | Improvement | 打改良时获得食物 | 🔧 |
+| A55_JunkRoom | Improvement | 打改良时获得食物 | ✅ |
 | E33_BeaverColony | Gain | 获得资源时 | 🔧 |
-| C52_HuntsmansHat | Collect | 猪市场收取前按猪数量获得食物 | ✅ |
-| C120_AgriculturalLabourer | Receive | 接收资源时 | 🔧 |
+| C120_AgriculturalLabourer | Receive | 接收资源时 | ❌ |
 
 ### ImmediatelyAfter Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
 | C25_SteamMachine | PlaceFarmer | 放置后立即烤面包 | ✅ |
 | A108_MushroomCollector | Collect | 收取后立即交换 | ✅ |
-| C96_Merchant | Improvement | 打改良后可再行动 | 🔧 |
-| A83_ShepherdsCrook | Fencing | 围栏后放置农夫 | 🔧 |
+| C52_HuntsmansHat | Collect | 猪市场收取后按猪数量获得食物 | ✅ |
+| C96_Merchant | Improvement | 打改良后可付 1 食物追加一次改良行动，现已收敛为单段 flow | ✅ |
+| A83_ShepherdsCrook | Fencing | 围栏后立即得羊；现已直接读取本次 fencing 的 `newPastures` delta | ✅ |
 
 ### After Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| C75_Firewood | Improvement | 打改良后触发搬木并记录 cardEffectGain 日志 | ✅ |
-| A17_ReclamationPlow | Collect | 收取后获得动物 | ✅ |
+| C75_Firewood | Improvement | 打改良后以直接 xor flow 取卡上木材，并记录 cardEffectGain 日志 | ✅ |
+| A17_ReclamationPlow | Collect | 收取前快照动物板面，收取后以 xor flow 决定是否触发犁地 | ✅ |
 | A53_Claypipe | Gain/Receive | 获得/接收后交换 | ✅ |
-| A110_Roughcaster | Construct/Renovation | 建造/翻新后 | 🔧 |
-| A105_BarrowPusher | Plow | 犁地后 | 🔧 |
-| A109_SmallTrader | Improvement | 打改良后 | 🔧 |
+| A110_Roughcaster | Construct/Renovation | 建造/翻新后 | ✅ |
+| A105_BarrowPusher | Plow | 犁地后 | ✅ |
+| A109_SmallTrader | Improvement | 打改良后 | ✅ |
 | A79_GardenHoe | Sow | 播种后 | 🔧 |
-| A74_StableTree | Stables | 建马厩后 | 🔧 |
-| A37_Bucksaw | Renovation | 翻新后 | 🔧 |
+| A74_StableTree | Stables / onBuy | 建马厩后，或在同一行动里先建畜栏再买入时，都会排入 future meeples | ✅ |
+| A37_Bucksaw | Renovation | 翻新后支付得收益，已通过支付后跟进 helper 收敛 | ✅ |
 | A144_Sequestrator | Fencing | 围栏后 | 🔧 |
-| D150_GodlySpouse | WishChildren | 生孩子后 | ✅ |
-| B65_GrainDepot | Pay | 支付后 | 🔧 |
-| C71_SlurrySpreader | Reorganize | 重组后 | 🔧 |
-| B100_Clutterer | Occupation | 打职业后 | 🔧 |
+| D150_GodlySpouse | WishChildren | 生孩子后基于本轮放人顺序收回第一个工人 | ✅ |
+| E130_Overachiever | WishChildren | 生孩子后可追加打改良 | ✅ |
+| B65_GrainDepot | Pay | 支付后按 feeIndex 排入未来谷物 | ✅ |
+| C71_SlurrySpreader | Harvest | 繁殖前后快照动物，满足两种新生后追加播种 | ✅ |
+| B100_Clutterer | Occupation/Improvement | 统计此后带 accumulation space 文案的卡牌并加 VP | ✅ |
 | A64_BarleyMill | Reap | 收割后 | 🔧 |
-| D99_EarthenwarePotter | Harvest | 收获后 | ❌ |
+| D99_EarthenwarePotter | Harvest | 收获后效果，当前走 `onAfterHarvest` 阶段 flow | ✅ |
 | E128_Saddler | Receive | 接收后 | ✅ |
 | E57_CheeseFondue | Exchange | 交易后 | ✅ |
 
 ### ComputeCosts Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| A128_RiparianBuilder | Construct | 建造成本折扣 | 🔧 |
+| A128_RiparianBuilder | Construct | 芦苇河岸触发的建房折扣；可行性现由引擎预览 `computeCosts` 统一判定 | ✅ |
 | C37_DwellingMound | Plow | 犁地成本增加(+1食物) | ✅ |
-| C88_CarpentersApprentice | Construct | 建造成本转换 | 🔧 |
-| A123_FrameBuilder | Renovation/Construct | 翻新/建造成本 | 🔧 |
-| A88_HedgeKeeper | Fencing | 围栏成本折扣 | 🔧 |
-| A28_ForestSchool | Occupation | 职业成本折扣 | 🔧 |
+| C88_CarpentersApprentice | Construct/Stables/Fencing | 木屋/畜栏/13-15 围栏成本折扣 | ✅ |
+| A123_FrameBuilder | Renovation/Construct | 翻新/建造按房型把 2 clay/stone 换成 1 wood | ✅ |
+| A88_HedgeKeeper | Fencing | 围栏成本折扣 | ✅ |
+| A28_ForestSchool | Occupation | 职业食物成本可用木材替代，并可无视 Lessons 占用 | ✅ |
 
 ### ComputeArgs Hook
 | 卡牌 | 行动 | 说明 | 状态 |
@@ -121,34 +123,33 @@
 ### ComputeReplace Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| B103_FieldMerchant | Improvement | 替换改良行动 | 🔧 |
-| A94_LazySowman | Sow | 替换播种行动 | 🔧 |
-| A97_Freshman | Exchange | 替换交易行动 | 🔧 |
+| B103_FieldMerchant | Improvement | 打出即得木头+芦苇，并可放弃改良换食物/蔬菜 | ✅ |
+| A94_LazySowman | Sow | 替换播种行动 | ✅ |
+| A97_Freshman | BakeBread | 替换烤面包行动 | ✅ |
 
 ### IsDoable Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
-| D49_Bookshelf | Improvement | 放宽改良条件 | ❌ |
-| C60_SmallPottersOven | Sow | 放宽播种条件 | ❌ |
+| D49_Bookshelf | Occupation | 放宽打职业条件 | ✅ |
+| C60_SmallPottersOven | BakeBread | 文档原先误标到 Sow；当前仓库仍缺卡文件 | ❌ |
 | D152_Patron | Occupation | 放宽职业条件 | ✅ |
-| B94_StockProtector | Fencing | 放宽围栏条件 | 🔧 |
-| E130_Overachiever | WishChildren | 放宽生孩子条件 | ✅ |
-| D119_WoodBarterer | Exchange | 放宽交易条件 | ❌ |
-| B109_PaperMaker | Occupation | 放宽职业条件 | 🔧 |
-| E21_SheepRug | WishChildren | 允许使用被占用的 Wish for Children | ✅ |
+| B94_StockProtector | Fencing | 前/后置效果与可行性放宽均已接通 | ✅ |
+| D119_WoodBarterer | Construct/Fencing | 放宽建造/围栏条件，并已收敛为直接 xor flow 分支 | ✅ |
+| B109_PaperMaker | Occupation | 打职业前可付 1 木换食物，并放宽 Lessons 可行性 | ✅ |
+| A94_LazySowman | Sow | 放宽播种条件并支持替代放人 | ✅ |
 
 ---
 
-## A Deck 已实现卡牌 (48/180)
+## A Deck 已实现卡牌 (49/180)
 
 | ID | Hook 覆盖 |
 |----|-----------|
 | A10_WoodenShed | - |
 | A14_CarpentersHammer | ComputeCosts(Construct) |
-| A17_ReclamationPlow | After(Collect), Before(SpecialEffect) |
+| A17_ReclamationPlow | Before(Collect), After(Collect, Plow) |
 | A22_Telegram | - |
 | A23_StoneCompany | - |
-| A28_ForestSchool | ComputeCosts(Occupation) |
+| A28_ForestSchool | ComputeCosts(Occupation), ComputeArgs(PlaceFarmer) |
 | A37_Bucksaw | After(Renovation) |
 | A39_Chapel | - |
 | A40_PottersYard | - |
@@ -160,7 +161,7 @@
 | A70_LiftingMachine | - |
 | A71_ClearingSpade | - |
 | A72_CalciumFertilizers | - |
-| A74_StableTree | After(Stables) |
+| A74_StableTree | After(Stables), onBuy |
 | A79_GardenHoe | After(Sow) |
 | A81_InterimStorage | - |
 | A82_WorkCertificate | After(PlaceFarmer) |
@@ -172,7 +173,7 @@
 | A89_StablePlanner | - |
 | A92_AdoptiveParents | After(PlaceFarmer) |
 | A94_LazySowman | ComputeReplace(Sow), IsDoable(Sow) |
-| A97_Freshman | ComputeReplace(Exchange), IsDoable(Exchange) |
+| A97_Freshman | ComputeReplace(BakeBread) |
 | A105_BarrowPusher | After(Plow) |
 | A106_SlurrySpreader | - |
 | A108_MushroomCollector | ImmediatelyAfter(Collect) |
@@ -181,19 +182,20 @@
 | A112_ScytheWorker | - |
 | A119_FirewoodCollector | - |
 | A123_FrameBuilder | ComputeCosts(Construct, Renovation) |
-| A126_MasterWorkman | During(PlaceFarmer), ComputeArgs(PlaceFarmer) |
+| A126_MasterWorkman | Before(PlaceFarmer) |
 | A127_Lodger | - |
-| A128_RiparianBuilder | ComputeCosts(Construct) |
+| A128_RiparianBuilder | After(opponent PlaceFarmer), ComputeCosts(Construct) |
 | A136_DrudgeryReeve | - |
 | A137_RiverineShepherd | - |
 | A144_Sequestrator | After(Fencing) |
 | A148_Woolgrower | - |
 | A162_ForestTallyman | - |
 | A165_PigBreeder | - |
+| A166_Haydryer | onBeforeHarvest |
 
 ---
 
-## B Deck 已实现卡牌 (27/180)
+## B Deck 已实现卡牌 (28/180)
 
 | ID | Hook 覆盖 |
 |----|-----------|
@@ -204,19 +206,20 @@
 | B19_MoldboardPlow | - |
 | B21_HayloftBarn | - |
 | B23_FinalScenario | - |
-| B34_SpecialFood | Before(SpecialEffect) |
+| B34_SpecialFood | Before/After(Collect) |
 | B42_ForestInn | - |
 | B48_ForestStone | - |
 | B55_MaintenancePremium | - |
-| B65_GrainDepot | After(Pay) |
-| B67_HandTruck | Before(Exchange) |
+| B65_GrainDepot | onBuy / After(Pay) |
+| B67_HandTruck | Before(BakeBread) |
+| B70_NewPurchase | onBeforeStartOfTurn |
 | B75_WoodWorkshop | Before(Improvement), IsDoable(Improvement) |
 | B76_Ceilings | - |
 | B81_Handcart | - |
 | B86_TruffleSearcher | - |
-| B94_StockProtector | IsDoable(Fencing), After(PlaceFarmer) |
-| B100_Clutterer | After(Occupation) |
-| B103_FieldMerchant | ComputeReplace(Improvement) |
+| B94_StockProtector | Before(Fencing), After(Fencing), IsDoable(Fencing) |
+| B100_Clutterer | After(Occupation, Improvement) |
+| B103_FieldMerchant | onBuy, ComputeReplace(Improvement), IsDoable(Improvement) |
 | B109_PaperMaker | Before(Occupation), IsDoable(Occupation) |
 | B115_TinsmithMaster | - |
 | B124_Trimmer | - |
@@ -246,28 +249,28 @@
 | C31_WritingChamber | - |
 | C37_DwellingMound | ComputeCosts(Plow) |
 | C51_FishingNet | - |
-| C52_HuntsmansHat | Before(Collect) |
+| C52_HuntsmansHat | ImmediatelyAfter(Collect) |
 | C57_Crudite | - |
 | C63_CraftBrewery | - |
 | C71_Slurry | - |
-| C71_SlurrySpreader | After(Reorganize) |
+| C71_SlurrySpreader | onEndHarvestFeedingPhase, onEndHarvest |
 | C75_Firewood | After(Improvement) |
 | C84_PerennialRye | - |
 | C85_DenBuilder | - |
 | C86_LivestockFeeder | - |
 | C87_Mason | - |
-| C88_CarpentersApprentice | ComputeCosts(Construct) |
+| C88_CarpentersApprentice | ComputeCosts(Construct, Stables, Fencing) |
 | C93_InnerDistrictsDirector | - |
 | C96_Merchant | ImmediatelyAfter(Improvement) |
 | C99_GardenDesigner | - |
 | C104_Collector | - |
 | C115_Sower | - |
-| C120_AgriculturalLabourer | After(Obtain, Gain, Receive, Reap) |
+| C120_AgriculturalLabourer | - |
 | C130_OutskirtsDirector | - |
-| C133_Soldier | Before(EndOfGame) |
+| C133_Soldier | EndOfGame(Scoring) |
 | C135_Constable | - |
 | C142_MarketCrier | - |
-| C144_ReedRoofRenovator | - |
+| C144_ReedRoofRenovator | ImmediatelyAfter(Renovation) |
 | C148_MudWallower | - |
 | C156_HoofCaregiver | - |
 | C162_ForestOwner | - |
@@ -275,7 +278,7 @@
 
 ---
 
-## D Deck 已实现卡牌 (28/180)
+## D Deck 已实现卡牌 (32/180)
 
 | ID | Hook 覆盖 |
 |----|-----------|
@@ -286,6 +289,7 @@
 | D23_PioneeringSpirit | - |
 | D27_Retraining | - |
 | D36_BreedRegistry | - |
+| D49_Bookshelf | Before(Occupation), IsDoable(Occupation) |
 | D51_Archway | Before(ReturnHome) |
 | D53_TeaHouse | - |
 | D55_NewMarket | - |
@@ -298,12 +302,14 @@
 | D93_SheepInspector | - |
 | D94_HenpeckedHusband | - |
 | D98_Transactor | Before(Harvest) |
+| D99_EarthenwarePotter | onBuy, onAfterHarvest |
 | D100_LordoftheManor | - |
 | D101_SugarBaker | - |
 | D102_SampleStableMaker | - |
 | D103_CanalBoatman | - |
 | D115_FodderPlanter | - |
 | D116_TreeInspector | - |
+| D119_WoodBarterer | Before(Construct, Fencing), IsDoable(Construct, Fencing) |
 | D124_Emissary | - |
 | D126_FieldCultivator | - |
 | D127_HardworkingMan | - |
@@ -311,7 +317,8 @@
 | D132_HideFarmer | Before(EndOfGame) |
 | D134_OysterEater | - |
 | D137_TradeTeacher | - |
-| D150_GodlySpouse | After(WishChildren) |
+| D150_GodlySpouse | After(WishChildren), onBeforeStartOfTurn |
+| D152_Patron | Before(Occupation), IsDoable(Occupation) |
 | D157_PartyOrganizer | - |
 | D158_BeanCounter | - |
 | D164_PetGrower | - |
@@ -319,7 +326,7 @@
 
 ---
 
-## E Deck 已实现卡牌 (42/168)
+## E Deck 已实现卡牌 (43/168)
 
 | ID | Hook 覆盖 |
 |----|-----------|
@@ -351,12 +358,13 @@
 | E91_PlowBuilder | - |
 | E92_FieldDoctor | - |
 | E93_Motivator | - |
+| E101_Blighter | onBuy, IsDoable(Occupation) |
 | E103_Wolf | After(Obtain, Gain, Receive, Reap, Collect) |
 | E109_BraidMaker | - |
 | E112_GrainThief | - |
 | E123_ResourceHoarder | ComputeCosts(Renovation, Construct) |
 | E124_MayorCandidate | - |
-| E130_Overachiever | IsDoable(WishChildren) |
+| E130_Overachiever | After(WishChildren), ComputeCardCosts(Improvement) |
 | E133_ChampionBreeder | - |
 | E134_Omnifarmer | - |
 | E148_Lazybones | - |
@@ -371,19 +379,56 @@
 
 ---
 
-## 待实现卡牌优先级
+## 原子行动 Hook 矩阵卡牌排期
 
-### 高优先级 (核心游戏机制)
-1. A73_AgriculturalFertilizers - 多行动 After Hook
-2. B27_Toolbox - 多行动 After Hook
-3. B132_EstateMaster - 多行动 After Hook
-4. C48_Farmstead - 多行动 After Hook
+以下顺序只考虑 `docs/cards_impl.md` 的“原子行动 Hook 覆盖矩阵”里出现过的示例卡牌。
 
-### 中优先级 (复杂 Hook)
-1. D88_Millwright - 多类型 ComputeCosts
-2. E87_MasterRenovator - ComputeCosts
-3. D21_Recruitment - ComputeReplace + IsDoable
-4. C140_PackagingArtist - ComputeReplace + IsDoable
+### 第一批：纯 Modifier / 低交互 Hook
+1. `A123_FrameBuilder`
+2. `A128_RiparianBuilder`
+3. `C88_CarpentersApprentice`
+4. `A88_HedgeKeeper`
+5. `A94_LazySowman`
+6. `A97_Freshman`
+7. `B103_FieldMerchant`
+8. `A28_ForestSchool`
+9. `D49_Bookshelf`
+10. `D152_Patron`
 
-### 低优先级 (简单效果)
-- 其他无 Hook 的基础卡牌
+### 第二批：复用现有动作树的 Before / After / ImmediatelyAfter
+1. `A65_SeedPellets`
+2. `A79_GardenHoe`
+3. `A105_BarrowPusher`
+4. `A109_SmallTrader`
+5. `A110_Roughcaster`
+6. `A37_Bucksaw`
+7. `A74_StableTree`
+8. `A83_ShepherdsCrook`
+9. `A144_Sequestrator`
+10. `B75_WoodWorkshop`
+11. `A55_JunkRoom`
+12. `C96_Merchant`
+13. `E53_BoarSpear`
+14. `A108_MushroomCollector`
+15. `A17_ReclamationPlow`
+16. `A53_Claypipe`
+17. `B65_GrainDepot`
+18. `C71_SlurrySpreader`
+19. `E57_CheeseFondue`
+20. `E128_Saddler`
+
+### 第三批：参数改写、条件放宽或带选择流程
+1. `A126_MasterWorkman`
+2. `E21_SheepRug`
+3. `B94_StockProtector`
+4. `D119_WoodBarterer`
+5. `E101_Blighter`
+6. `B109_PaperMaker`
+7. `C60_SmallPottersOven`
+
+### 最后处理：时序或协议更重的矩阵卡
+1. `B34_SpecialFood`
+2. `A166_Haydryer`
+3. `D99_EarthenwarePotter`
+4. `C133_Soldier`
+5. `B70_NewPurchase`

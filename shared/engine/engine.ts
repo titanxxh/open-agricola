@@ -39,6 +39,9 @@ export class Engine {
   private log: LogStore
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
+  private pendingChoiceContext:
+    | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
+    | null = null
   private flowNodeCounter = 0
   private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
 
@@ -138,7 +141,15 @@ export class Engine {
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(nextId(), flow.actionId, flow.sourceCard, flow.params)
+      const actionNode = new ActionNode(
+        nextId(),
+        flow.actionId,
+        flow.sourceCard,
+        flow.params,
+        flow.choiceLabelKey,
+        flow.choiceLabelParams,
+        flow.actionContext,
+      )
       const definition = this.registry.get(flow.actionId)
       if (definition?.resolveChoice) {
         const sequence = new SequenceNode(nextId(), [
@@ -176,6 +187,9 @@ export class Engine {
 
   private findChoiceNode(node: EngineNode): ChoiceNode | null {
     if (node instanceof ChoiceNode) return node
+    if (node instanceof OptionalNode) {
+      return this.findChoiceNode(node.child)
+    }
     if ('children' in node) {
       const composite = node as { children: EngineNode[] }
       for (const child of composite.children) {
@@ -184,6 +198,37 @@ export class Engine {
       }
     }
     return null
+  }
+
+  private resolveTrueAction(actionContext?: Record<string, unknown>) {
+    return actionContext?.trueAction !== false
+  }
+
+  private buildListenerEvent(
+    executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'actionContext'>,
+    extraEvent: Record<string, unknown> = {},
+  ) {
+    return {
+      ...extraEvent,
+      sourceCard: executionContext.sourceCard,
+      ...(executionContext.actionContext ?? {}),
+      trueAction: this.resolveTrueAction(executionContext.actionContext),
+    }
+  }
+
+  private buildChoiceExecutionContext(
+    context: EngineContext,
+    base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null,
+  ): ActionExecutionContext {
+    return {
+      state: context.state,
+      player: context.player,
+      space: context.space,
+      params: base?.params,
+      costs: base?.costs,
+      sourceCard: base?.sourceCard,
+      actionContext: base?.actionContext,
+    }
   }
 
   snapshot() {
@@ -209,6 +254,7 @@ export class Engine {
       nodeStates,
       pendingChoiceNodeId: this.pendingChoiceNodeId,
       pendingChoiceActionId: this.pendingChoiceActionId,
+      pendingChoiceContext: this.pendingChoiceContext,
       choiceData,
     }
   }
@@ -221,6 +267,7 @@ export class Engine {
     }[]
     pendingChoiceNodeId: string | null
     pendingChoiceActionId: string | null
+    pendingChoiceContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
       promptKey?: string
@@ -257,6 +304,7 @@ export class Engine {
     }
     this.pendingChoiceNodeId = snapshot.pendingChoiceNodeId
     this.pendingChoiceActionId = snapshot.pendingChoiceActionId
+    this.pendingChoiceContext = snapshot.pendingChoiceContext
   }
 
   constructor(params: {
@@ -298,6 +346,7 @@ export class Engine {
           }
           const doable = this.hooks.applyIsDoable(
             { ...executionContext, actionId: entry.actionNode.actionId },
+            action,
             action.canBeExecutedByPlayer(
               executionContext.state,
               executionContext.player,
@@ -306,12 +355,14 @@ export class Engine {
           if (!doable) return null
           return {
             value: entry.nodeId,
-            labelKey: action.nameKey,
+            labelKey: entry.actionNode.choiceLabelKey ?? action.nameKey,
+            labelParams: entry.actionNode.choiceLabelParams,
           }
         })
         .filter((option) => option !== null) as {
         value: string
         labelKey: string
+        labelParams?: Record<string, string | number>
       }[]
       if (
         node instanceof OrNode &&
@@ -356,6 +407,7 @@ export class Engine {
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: actionNode.actionId },
+        action,
         action.canBeExecutedByPlayer(
           executionContext.state,
           executionContext.player,
@@ -373,7 +425,7 @@ export class Engine {
         choice: {
           promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
           options: [
-            { value: actionNode.id, labelKey: action.nameKey },
+            { value: actionNode.id, labelKey: actionNode.choiceLabelKey ?? action.nameKey },
             { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
           ],
         },
@@ -407,9 +459,11 @@ export class Engine {
         phase: node.phase,
         ...node.event,
       }
-      const result = executeCardListener(listener, listenerContext as any)
+      const ownerPlayerId = node.event.ownerPlayerId as string | undefined
+      const result = executeCardListener(listener, listenerContext as any, {
+        ownerPlayerId,
+      })
       if (result?.flow) {
-        const ownerPlayerId = node.event.ownerPlayerId as string | undefined
         const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
         const flowNode = this.buildFlowNode(result.flow)
         if (needsSwitch) {
@@ -421,9 +475,15 @@ export class Engine {
         }
       }
       if (result?.logKey) {
+        const effectPlayer =
+          (ownerPlayerId ? context.state.players.find((player) => player.id === ownerPlayerId) : null)
+          ?? context.player
         this.log.append({
           key: result.logKey,
-          params: { player: context.player.name, ...result.logParams },
+          params: {
+            player: effectPlayer.name,
+            ...result.logParams,
+          },
         })
       }
       node.resolve(result ?? {})
@@ -451,9 +511,11 @@ export class Engine {
         space: context.space,
         params: node.params,
         sourceCard: node.sourceCard,
+        actionContext: node.actionContext,
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: replacedActionId },
+        action,
         action.canBeExecutedByPlayer(executionContext.state, executionContext.player),
       )
       if (!doable) {
@@ -510,7 +572,14 @@ result.options = [...result.options, ...extraOptions]
           this.pendingChoiceNodeId = choiceNode.id
           this.pendingChoiceActionId = replacedActionId
         } else {
+          this.pendingChoiceNodeId = node.id
           this.pendingChoiceActionId = replacedActionId
+        }
+        this.pendingChoiceContext = {
+          params: executionContext.params,
+          costs: executionContext.costs,
+          sourceCard: executionContext.sourceCard,
+          actionContext: executionContext.actionContext,
         }
         if (duringActivateNodes.length > 0) {
           this.tree.insertAfter(node.id, [...duringActivateNodes])
@@ -558,11 +627,11 @@ choice: { promptKey: result.promptKey, options: result.options },
         .filter((action) => action)
       const immediateActivateNodes = this.buildActivateCardNodes(
         immediatePhase.matchedListeners, 'immediatelyAfter', replacedActionId,
-        { result },
+        this.buildListenerEvent(executionContext, { result }),
       )
       const afterActivateNodes = this.buildActivateCardNodes(
         afterPhase.matchedListeners, 'after', replacedActionId,
-        { result },
+        this.buildListenerEvent(executionContext, { result }),
       )
       const allInsertNodes = [
         ...duringActivateNodes,
@@ -583,6 +652,7 @@ choice: { promptKey: result.promptKey, options: result.options },
   resolveChoice(
     choice: string,
     context: EngineContext,
+    resolvedResultOverride?: ActionExecutionResult,
   ): ActionExecutionResult {
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -591,35 +661,43 @@ choice: { promptKey: result.promptKey, options: result.options },
           node.resolve()
           this.pendingChoiceNodeId = null
           this.pendingChoiceActionId = null
+          this.pendingChoiceContext = null
           return { type: 'ok' }
         }
         node.active = true
         this.pendingChoiceNodeId = null
         this.pendingChoiceActionId = null
+        this.pendingChoiceContext = null
         return { type: 'ok' }
       }
       if (node instanceof OrNode || node instanceof XorNode) {
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
           this.pendingChoiceNodeId = null
+          this.pendingChoiceContext = null
           return { type: 'ok' }
         }
         const targetNode = node.children.find((item) => item.id === choice)
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
           this.pendingChoiceNodeId = null
+          this.pendingChoiceContext = null
           return { type: 'ok' }
         }
         const actionId = child.actionId
         const action = this.registry.get(actionId)
         if (!action) {
           this.pendingChoiceNodeId = null
+          this.pendingChoiceContext = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const executionContext: ActionExecutionContext = {
           state: context.state,
           player: context.player,
           space: context.space,
+          params: child.params,
+          sourceCard: child.sourceCard,
+          actionContext: child.actionContext,
         }
         const costResults = this.hooks.computeCosts({
           ...executionContext,
@@ -650,8 +728,14 @@ choice: { promptKey: result.promptKey, options: result.options },
             this.pendingChoiceNodeId = choiceNode.id
             this.pendingChoiceActionId = actionId
           } else {
-            this.pendingChoiceNodeId = null
-            this.pendingChoiceActionId = null
+            this.pendingChoiceNodeId = child.id
+            this.pendingChoiceActionId = actionId
+          }
+          this.pendingChoiceContext = {
+            params: executionContext.params,
+            costs: executionContext.costs,
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
           }
           const argResults = this.hooks.computeArgs(
             { ...executionContext, actionId },
@@ -698,11 +782,11 @@ choice: { promptKey: result.promptKey, options: result.options },
           .filter((action) => action)
         const immediateActivateNodes = this.buildActivateCardNodes(
           immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-          { result },
+          this.buildListenerEvent(executionContext, { result }),
         )
         const afterActivateNodes = this.buildActivateCardNodes(
           afterPhase.matchedListeners, 'after', actionId,
-          { result },
+          this.buildListenerEvent(executionContext, { result }),
         )
         const allInsertNodes = [
           ...hookFlows,
@@ -718,23 +802,29 @@ choice: { promptKey: result.promptKey, options: result.options },
           node.resolve(choice)
         }
         this.pendingChoiceNodeId = null
+        this.pendingChoiceContext = null
         return result
       }
     }
     const actionId = this.pendingChoiceActionId
     if (!actionId) {
+      this.pendingChoiceContext = null
       return { type: 'ok' }
     }
     const action = this.registry.get(actionId)
-    if (!action || !action.resolveChoice) {
+    if (!action) {
+      this.pendingChoiceContext = null
       return { type: 'ok' }
     }
-    const executionContext: ActionExecutionContext = {
-      state: context.state,
-      player: context.player,
-      space: context.space,
+    const executionContext = this.buildChoiceExecutionContext(context, this.pendingChoiceContext)
+    let result: ActionExecutionResult
+    if (resolvedResultOverride) {
+      result = resolvedResultOverride
+    } else if (action.resolveChoice) {
+      result = action.resolveChoice(executionContext, choice)
+    } else {
+      return { type: 'ok' }
     }
-    const result = action.resolveChoice(executionContext, choice)
     this.hooks.during({ ...executionContext, actionId }, result)
     if (result.type === 'choice') {
       if (this.pendingChoiceNodeId) {
@@ -742,6 +832,12 @@ choice: { promptKey: result.promptKey, options: result.options },
         if (node instanceof ChoiceNode) {
           node.setChoice(result.promptKey, result.options)
           this.pendingChoiceActionId = actionId
+          this.pendingChoiceContext = {
+            params: executionContext.params,
+            costs: executionContext.costs,
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          }
           return result
         }
       }
@@ -787,11 +883,11 @@ choice: { promptKey: result.promptKey, options: result.options },
       .filter((action) => action)
     const immediateActivateNodes = this.buildActivateCardNodes(
       immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-      { result },
+      this.buildListenerEvent(executionContext, { result }),
     )
     const afterActivateNodes = this.buildActivateCardNodes(
       afterPhase.matchedListeners, 'after', actionId,
-      { result },
+      this.buildListenerEvent(executionContext, { result }),
     )
     const allInsertNodes = [
       ...hookFlows,
@@ -817,6 +913,7 @@ choice: { promptKey: result.promptKey, options: result.options },
     }
     this.pendingChoiceNodeId = null
     this.pendingChoiceActionId = null
+    this.pendingChoiceContext = null
     return result
   }
 }

@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { initCardState, incCounter } from '../__stubs__/helpers'
+import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'A83_ShepherdsCrook'
 const MIN_PASTURE_SIZE = 4
@@ -14,14 +14,14 @@ const listener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    const counters = initCardState(context.player, CARD_ID)
-    const previousBigPastures = counters['processedBigPastures'] ?? 0
-    const currentBigPastures = context.player.pastures.filter(
+    const newPastures =
+      (context.result?.type === 'ok'
+        ? (context.result.extraData?.newPastures as { tiles?: unknown[] }[] | undefined)
+        : undefined) ?? []
+    const newBig = newPastures.filter(
       (pasture) => (pasture.tiles?.length ?? 0) >= MIN_PASTURE_SIZE,
     ).length
-    const newBig = currentBigPastures - previousBigPastures
     if (newBig <= 0) return
-    counters['processedBigPastures'] = currentBigPastures
     incCounter(context.player, CARD_ID, 'triggerCount')
     const sheepGain = newBig * 2
     return {

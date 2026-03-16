@@ -4,13 +4,12 @@ import type {
   PlayerState,
   Resource,
 } from '../../game/types'
-import { canPayResources } from '../../actions/effects/pay'
+import { canAffordOccupationActionCost } from '../../actions/effects/occupation'
 import { getOccupation } from '../../game/occupations'
 
 const getLessonsCost = (player: PlayerState): Partial<Resource> => {
   const base = player.occupationPlayed.length === 0 ? 0 : 1
-  const discount = player.occupationPlayed.includes('B109_PaperMaker') ? 1 : 0
-  const food = Math.max(0, base - discount)
+  const food = Math.max(0, base)
   return food > 0 ? { food } : {}
 }
 
@@ -24,7 +23,7 @@ const buildPlayableOccupationOptions = (
       (occupation): occupation is NonNullable<typeof occupation> =>
         !!occupation,
     )
-    .filter(() => canPayResources(player, cost))
+    .filter(() => canAffordOccupationActionCost(player, cost))
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,

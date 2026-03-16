@@ -143,37 +143,34 @@ describe('E130_Overachiever — resource choice discount', () => {
     expect(E130_Overachiever.players).toBe('3+')
   })
 
-  it('returns bonuses for all resource types when triggered', () => {
+  it('returns bonuses when actionCardId matches', () => {
     const listener = findListener('E130-overachiever-compute-card-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
-    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 1 } } }
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionCardId: 'E130_Overachiever',
     } as any)
 
     expect(result?.bonuses).toBeDefined()
-    expect(result!.bonuses!.length).toBe(10) // wood, clay, stone, reed, food, grain, vegetable, sheep, boar, cattle
-    // Each bonus discounts one resource by 1
+    expect(result!.bonuses!.length).toBe(10)
     const woodBonus = result!.bonuses!.find(b => b.discount.wood === 1)
     expect(woodBonus).toBeDefined()
     expect(woodBonus!.optional).toBe(true)
     expect(woodBonus!.sources).toEqual(['E130_Overachiever'])
-    const clayBonus = result!.bonuses!.find(b => b.discount.clay === 1)
-    expect(clayBonus).toBeDefined()
   })
 
-  it('does not return bonuses when triggerCount is 0', () => {
+  it('does not return bonuses when actionCardId does not match', () => {
     const listener = findListener('E130-overachiever-compute-card-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
-    player.cardStates = { E130_Overachiever: { counters: { triggerCount: 0 } } }
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionCardId: 'improvement-any',
     } as any)
     expect(result).toBeUndefined()
   })
@@ -182,45 +179,21 @@ describe('E130_Overachiever — resource choice discount', () => {
 // === B70_NewPurchase — grain and vegetable options ===
 
 describe('B70_NewPurchase — grain and vegetable', () => {
-  it('converts 2 food to 1 grain before harvest', () => {
+  it('returns two optional exchanges before harvest rounds', () => {
     const effect = getCardEffect('B70_NewPurchase')!
     const player = createPlayer()
     player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 3
     const state = createState(player)
     state.round = 4 // harvest round
 
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(1)
-    expect(player.resources.food).toBe(1) // 3 - 2 = 1
-  })
-
-  it('converts 4 food to 1 vegetable before harvest', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 4
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.vegetable).toBe(0) // 4 - 2 = 2 food left, not enough for vegetable
-    expect(player.resources.grain).toBe(1)
-    expect(player.resources.food).toBe(2)
-  })
-
-  it('converts both when having 6+ food', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 6
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(1) // 6 - 2 = 4 food for grain
-    expect(player.resources.vegetable).toBe(1) // 4 food left for vegetable
-    expect(player.resources.food).toBe(0) // 6 - 2 - 4 = 0
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toMatchObject({
+      type: 'seq',
+      children: [
+        { type: 'seq', optional: true, promptKey: 'ui.interactionNewPurchaseGrain' },
+        { type: 'seq', optional: true, promptKey: 'ui.interactionNewPurchaseVegetable' },
+      ],
+    })
   })
 
   it('does nothing on non-harvest rounds', () => {
@@ -231,24 +204,7 @@ describe('B70_NewPurchase — grain and vegetable', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(0)
-    expect(player.resources.vegetable).toBe(0)
-    expect(player.resources.food).toBe(10)
-  })
-
-  it('does nothing with insufficient food', () => {
-    const effect = getCardEffect('B70_NewPurchase')!
-    const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
-    player.resources.food = 1
-    const state = createState(player)
-    state.round = 4
-
-    effect.onBeforeStartOfTurn!(state, player)
-    expect(player.resources.grain).toBe(0)
-    expect(player.resources.vegetable).toBe(0)
-    expect(player.resources.food).toBe(1)
+    expect(effect.onBeforeStartOfTurn!(state, player)).toBeUndefined()
   })
 })
 
@@ -259,7 +215,7 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     expect(A84_Silage.prerequisite).toBe('2 Fields')
   })
 
-  it('does not trigger without 2 fields', () => {
+  it('does not return flow without 2 fields', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
@@ -269,12 +225,11 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.sheep).toBe(3) // no breeding
-    expect(player.resources.grain).toBe(2) // no payment
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeUndefined()
   })
 
-  it('breeds most valuable animal (cattle first) with reserve grain', () => {
+  it('returns xor flow with animal choices when eligible', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
@@ -288,51 +243,43 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.cattle).toBe(3) // cattle bred (most valuable)
-    expect(player.resources.sheep).toBe(2) // sheep unchanged
-    expect(player.resources.grain).toBe(0) // paid from reserve
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    expect(flow!.promptKey).toBe('ui.interactionSilage')
+    // cattle + sheep + decline = 3 options
+    const children = (flow as any).children
+    expect(children).toHaveLength(3)
+    // First is cattle (most valuable), second is sheep
+    expect(children[0].children[1].params).toEqual({ cattle: 1 })
+    expect(children[1].children[1].params).toEqual({ sheep: 1 })
+    // Last is decline
+    expect(children[2].actionId).toBe('noop')
   })
 
-  it('pays grain from field when reserve is empty', () => {
+  it('includes pay-grain-any in each animal choice branch', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
-    player.resources.grain = 0
+    player.resources.grain = 1
     player.resources.sheep = 2
     player.fields = [
-      { crop: 'grain', remaining: 2, row: 0, col: 0 },
+      { crop: null, remaining: 0, row: 0, col: 0 },
       { crop: null, remaining: 0, row: 0, col: 1 },
     ]
     const state = createState(player)
     state.round = 3
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.sheep).toBe(3) // sheep bred
-    expect(player.fields[0].remaining).toBe(1) // field grain decremented
-    expect(player.fields[0].crop).toBe('grain') // still has grain
+    const flow = effect.onReturnHome!(state, player)
+    const children = (flow as any).children
+    // Animal branch: seq of [pay-grain-any, gain, mark-card-trigger]
+    expect(children[0].type).toBe('seq')
+    expect(children[0].children[0].actionId).toBe('pay-grain-any')
+    expect(children[0].children[1].actionId).toBe('gain')
+    expect(children[0].children[2].actionId).toBe('mark-card-trigger')
   })
 
-  it('clears field crop when last grain taken', () => {
-    const effect = getCardEffect('A84_Silage')!
-    const player = createPlayer()
-    player.minorPlayed = ['A84_Silage']
-    player.resources.grain = 0
-    player.resources.boar = 2
-    player.fields = [
-      { crop: 'grain', remaining: 1, row: 0, col: 0 },
-      { crop: null, remaining: 0, row: 0, col: 1 },
-    ]
-    const state = createState(player)
-    state.round = 3
-
-    effect.onReturnHome!(state, player)
-    expect(player.resources.boar).toBe(3) // boar bred
-    expect(player.fields[0].remaining).toBe(0)
-    expect(player.fields[0].crop).toBeNull() // cleared
-  })
-
-  it('does not trigger on harvest rounds', () => {
+  it('does not return flow on harvest rounds', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
@@ -345,12 +292,11 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     const state = createState(player)
     state.round = 4 // harvest round
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.sheep).toBe(2)
-    expect(player.resources.grain).toBe(1)
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeUndefined()
   })
 
-  it('does not trigger without breedable animals', () => {
+  it('does not return flow without breedable animals', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
@@ -363,12 +309,11 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.sheep).toBe(1)
-    expect(player.resources.grain).toBe(1) // grain not spent
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeUndefined()
   })
 
-  it('does not trigger without any grain source', () => {
+  it('does not return flow without any grain source', () => {
     const effect = getCardEffect('A84_Silage')!
     const player = createPlayer()
     player.minorPlayed = ['A84_Silage']
@@ -381,7 +326,25 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
     const state = createState(player)
     state.round = 3
 
-    effect.onReturnHome!(state, player)
-    expect(player.resources.sheep).toBe(2) // no breeding
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+
+  it('accepts field grain as source', () => {
+    const effect = getCardEffect('A84_Silage')!
+    const player = createPlayer()
+    player.minorPlayed = ['A84_Silage']
+    player.resources.grain = 0
+    player.resources.sheep = 2
+    player.fields = [
+      { crop: 'grain', remaining: 2, row: 0, col: 0 },
+      { crop: null, remaining: 0, row: 0, col: 1 },
+    ]
+    const state = createState(player)
+    state.round = 3
+
+    const flow = effect.onReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
   })
 })

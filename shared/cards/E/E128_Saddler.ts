@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { incCounter } from '../__stubs__/helpers'
+import { payThenActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E128_Saddler'
 
@@ -15,16 +16,14 @@ const listener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const choice = context.choice
     if (!choice || !choice.startsWith('major:')) return
-    if (context.player.resources.food < 1) return
     incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: {
-        type: 'seq',
-        children: [
-          { type: 'leaf', actionId: 'gain', params: { food: -1 } },
-          { type: 'leaf', actionId: 'plow', optional: true, promptKey: 'ui.interactionSaddlerPlow' },
-        ],
-      },
+      ...payThenActionFlow({
+        cardId: CARD_ID,
+        cost: { food: 1 },
+        promptKey: 'ui.interactionSaddlerPlow',
+        action: { type: 'leaf', actionId: 'plow' },
+      }),
       logKey: 'log.cardGrantedAction',
       logParams: { cardId: CARD_ID, actionId: 'plow' },
       sourceCard: CARD_ID,

@@ -6,6 +6,8 @@ import {
 } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace, ActionExecutionResult } from '../../game/types'
 import { clearActionHooks } from '../../actions/hooks'
+import { getCardEffect } from '../card-effects'
+import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../A/A105_BarrowPusher'
 import '../A/A110_Roughcaster'
@@ -142,6 +144,8 @@ describe('A74_StableTree', () => {
     player.minorPlayed = ['A74_StableTree']
     const state = createState(player)
     state.round = 5
+    recordActionSnapshot(player, 1)
+    player.stableTiles = [{ row: 0, col: 0 }] as any
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('stables'),
       actionId: 'stables', phase: 'after',
@@ -158,16 +162,58 @@ describe('A74_StableTree', () => {
     expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(1)
   })
 
-  it('does not trigger twice in same round', () => {
+  it('does not trigger twice in same action', () => {
     const listener = findListener('A74-stable-tree-after-stables')
     const player = createPlayer()
     player.minorPlayed = ['A74_StableTree']
     const state = createState(player)
     state.round = 5
+    recordActionSnapshot(player, 1)
+    player.stableTiles = [{ row: 0, col: 0 }] as any
     const ctx = { state, player, space: createSpace('stables'), actionId: 'stables', phase: 'after' } as any
     executeCardListener(listener!, ctx)
     const result2 = executeCardListener(listener!, ctx)
     expect(result2).toBeUndefined()
+  })
+
+  it('can trigger again on a later action in the same round', () => {
+    const listener = findListener('A74-stable-tree-after-stables')
+    const player = createPlayer()
+    player.minorPlayed = ['A74_StableTree']
+    const state = createState(player)
+    state.round = 5
+
+    recordActionSnapshot(player, 1)
+    player.stableTiles = [{ row: 0, col: 0 }] as any
+    executeCardListener(listener!, {
+      state, player, space: createSpace('stables'), actionId: 'stables', phase: 'after',
+    } as any)
+
+    recordActionSnapshot(player, 2)
+    player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }] as any
+    const result = executeCardListener(listener!, {
+      state, player, space: createSpace('stables'), actionId: 'stables', phase: 'after',
+    } as any)
+
+    expect(result?.flow?.type).toBe('leaf')
+    expect(state.pendingFutureMeeples.length).toBe(2)
+    expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(2)
+  })
+
+  it('triggers on buy when stables were already built this action', () => {
+    const effect = getCardEffect('A74_StableTree')
+    expect(effect?.onBuy).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player)
+    state.round = 5
+    recordActionSnapshot(player, 3)
+    player.stableTiles = [{ row: 0, col: 0 }] as any
+
+    const flow = effect?.onBuy?.(state, player)
+    expect(flow).toMatchObject({ type: 'leaf', actionId: 'future-meeples' })
+    expect(state.pendingFutureMeeples.length).toBe(1)
+    expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(1)
   })
 })
 

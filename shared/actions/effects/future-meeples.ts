@@ -18,6 +18,14 @@ export const queueFutureMeeples = (
   state.pendingFutureMeeples = [...state.pendingFutureMeeples, request]
 }
 
+export const queueFutureMeeplesFlow = (
+  state: GameState,
+  request: FutureMeepleRequest,
+): ActionFlow => {
+  queueFutureMeeples(state, request)
+  return futureMeeplesNode()
+}
+
 const clampRound = (round: number) => Math.max(1, Math.min(14, round))
 
 const addResourceCounts = (

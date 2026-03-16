@@ -1,5 +1,5 @@
 import type { MajorCardEffect } from './types'
-import { futureMeeplesNode, queueFutureMeeples } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 
 export const well: MajorCardEffect = {
   id: 'Major_Well',
@@ -8,13 +8,12 @@ export const well: MajorCardEffect = {
   extraVp: false,
   description: ['At the start of the next 5 rounds, gain 1 food'],
   onBuy: (state, player) => {
-    queueFutureMeeples(state, {
+    return queueFutureMeeplesFlow(state, {
       cardId: 'Major_Well',
       playerId: player.id,
       startRound: state.round + 1,
       count: 5,
       resources: { food: 1 },
     })
-    return futureMeeplesNode()
   },
 }

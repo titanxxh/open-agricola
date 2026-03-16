@@ -12,6 +12,9 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { constructAction } from '../../actions/effects/construct'
+import { plowAction } from '../../actions/effects/plow'
+import { stablesAction } from '../../actions/effects/stables'
 import {
   clearCardListeners,
   registerCardListener,
@@ -426,5 +429,102 @@ describe('Multiple hooks overriding doable', () => {
     })
     const result = engine.proceed({ state, player, space })
     expect(result.type).toBe('ok')
+  })
+})
+
+describe('Cost preview doable', () => {
+  beforeEach(() => {
+    clearActionHooks()
+    clearCardListeners()
+  })
+
+  it('construct can become doable after computeCosts discount', () => {
+    registerActionHook({
+      id: 'construct-discount',
+      actions: ['construct'],
+      phases: ['computeCosts'],
+      handler: () => ({ costs: { stone: -2 } }),
+    })
+
+    const player = createPlayer()
+    player.houseType = 'stone'
+    player.resources.stone = 3
+    player.resources.reed = 2
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+    const dispatcher = new HookDispatcher()
+
+    const doable = dispatcher.applyIsDoable({
+      state,
+      player,
+      space: createSpace({ ...createAction(), id: 'construct' }),
+      actionId: 'construct',
+    }, constructAction, false)
+
+    expect(doable).toBe(true)
+  })
+
+  it('plow becomes not doable when computeCosts adds a food surcharge', () => {
+    registerActionHook({
+      id: 'plow-food-cost',
+      actions: ['plow'],
+      phases: ['computeCosts'],
+      handler: () => ({ costs: { food: 1 } }),
+    })
+
+    const player = createPlayer()
+    player.resources.food = 0
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+    const dispatcher = new HookDispatcher()
+
+    const doable = dispatcher.applyIsDoable({
+      state,
+      player,
+      space: createSpace({ ...createAction(), id: 'plow' }),
+      actionId: 'plow',
+    }, plowAction, true)
+
+    expect(doable).toBe(false)
+  })
+
+  it('stables still respects structural limits even with discounts', () => {
+    registerActionHook({
+      id: 'stable-discount',
+      actions: ['stables'],
+      phases: ['computeCosts'],
+      handler: () => ({ costs: { wood: -1 } }),
+    })
+
+    const player = createPlayer()
+    player.resources.wood = 1
+    player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }]
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+    const dispatcher = new HookDispatcher()
+
+    const doable = dispatcher.applyIsDoable({
+      state,
+      player,
+      space: createSpace({ ...createAction(), id: 'stables' }),
+      actionId: 'stables',
+    }, stablesAction, false)
+
+    expect(doable).toBe(false)
   })
 })

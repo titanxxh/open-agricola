@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { initCardState, incCounter } from '../__stubs__/helpers'
+import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D99_EarthenwarePotter'
 
@@ -8,23 +9,19 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    if (state.round <= 4) {
-      const counters = initCardState(player, CARD_ID)
-      counters['earlyBuy'] = 1
-    }
+    markCardCounterIfBoughtByRound(state, player, CARD_ID, 'earlyBuy', 4)
   },
   onAfterHarvest: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    const counters = initCardState(player, CARD_ID)
-    if (!counters['earlyBuy']) return
+    if (!hasCardCounter(player, CARD_ID, 'earlyBuy')) return
     if (state.round < 14) return
-    const clayAvailable = player.resources.clay
-    const familySize = player.familySize
-    const count = Math.min(clayAvailable, familySize)
-    if (count <= 0) return
-    player.resources.clay -= count
-    incCounter(player, CARD_ID, 'bonusVp', count)
-    incCounter(player, CARD_ID, 'triggerCount')
+    return payGainFlow({
+      cardId: CARD_ID,
+      cost: { clay: player.familySize },
+      gain: { score: player.familySize },
+      promptKey: 'ui.interactionEarthenwarePotter',
+      markTrigger: true,
+    })
   },
 })
 

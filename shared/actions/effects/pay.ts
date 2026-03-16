@@ -118,6 +118,19 @@ export const canPayResources = (
     return amount <= 0 || player.resources[resourceKey] >= amount
   })
 
+export const isComplexCost = (
+  cost: Partial<Resource> | ComplexCost | undefined,
+): cost is ComplexCost => {
+  if (!cost) return false
+  return (
+    'fee' in cost ||
+    'fees' in cost ||
+    'trades' in cost ||
+    'cards' in cost ||
+    'bonuses' in cost
+  )
+}
+
 type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
@@ -300,7 +313,6 @@ export const applyBonusModifier = (
 
 export const getEffectiveCost = (
   baseCost: ComplexCost,
-  _costType: CostModifierType,
 ): ComplexCost => {
   const result: ComplexCost = { ...baseCost }
 
@@ -457,7 +469,7 @@ export const canPayCost = (
   cost: ComplexCost | Partial<Resource>,
   costType?: CostModifierType,
 ): boolean => {
-  if (!('fee' in cost) && !('fees' in cost) && !('trades' in cost)) {
+  if (!isComplexCost(cost)) {
     return canPayResources(player, cost as Partial<Resource>)
   }
 

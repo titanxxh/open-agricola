@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { incCounter } from '../__stubs__/helpers'
+import { getRenovation } from '../../actions/effects/renovation'
 
 const CARD_ID = 'D14_HammerCrusher'
 
@@ -30,7 +31,30 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'D14-hammer-crusher-isdoable-renovate',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'clay') return
+    const renovation = getRenovation(context.player)
+    if (!renovation) return
+    const boostedResources = {
+      ...context.player.resources,
+      clay: context.player.resources.clay + 2,
+      reed: context.player.resources.reed + 1,
+    }
+    const canAfford =
+      (boostedResources.stone ?? 0) >= (renovation.cost.stone ?? 0) &&
+      (boostedResources.reed ?? 0) >= (renovation.cost.reed ?? 0)
+    return canAfford ? { doable: true } : undefined
+  },
+}
+
 registerCardListener(listener)
+registerCardListener(isDoableListener)
 
 export const D14_HammerCrusher = new MinorImprovement({
   id: CARD_ID,

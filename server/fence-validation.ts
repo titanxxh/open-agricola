@@ -59,7 +59,7 @@ export type FenceValidationError = {
 }
 
 export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
-  | { ok: true; player: T }
+  | { ok: true; player: T; newEdges: string[]; newPastures: Pasture[] }
   | { ok: false; error: FenceValidationError }
 
 export const FARM_ROWS = 3
@@ -331,8 +331,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   player: T,
   edges: string[],
   extraWood = 0,
+  freeFences = 0,
 ): FenceValidationResult<T> => {
   const extraCost = Number.isFinite(extraWood) ? Math.max(0, extraWood) : 0
+  const freeFenceCount = Number.isFinite(freeFences) ? Math.max(0, freeFences) : 0
   const normalized = normalizePlayerFarm(player)
   const parsedEdges = edges.map((edge) => parseEdgeId(edge))
   if (parsedEdges.some((edge) => edge === null)) {
@@ -349,7 +351,8 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       error: { code: 'NO_NEW_FENCES', edges, newEdges },
     }
   }
-  if ((normalized.resources?.wood ?? 0) < newEdges.length + extraCost) {
+  const payableFenceCount = Math.max(0, newEdges.length - freeFenceCount)
+  if ((normalized.resources?.wood ?? 0) < payableFenceCount + extraCost) {
     return {
       ok: false,
       error: { code: 'NOT_ENOUGH_WOOD', edges, newEdges },
@@ -409,6 +412,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const stableSet = new Set(
     normalized.stableTiles.map((tile) => positionKey(tile)),
   )
+  const previousPastureKeys = new Set(
+    normalized.pastures.map((pasture) =>
+      pasture.tiles
+        .map(positionKey)
+        .sort()
+        .join('|'),
+    ),
+  )
   const pastures: Pasture[] = fencedRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
     size: region.tiles.length,
@@ -419,16 +430,23 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     animalType: null,
     animalCount: 0,
   }))
+  const newPastures = pastures.filter((pasture) => {
+    const pastureKey = pasture.tiles
+      .map(positionKey)
+      .sort()
+      .join('|')
+    return !previousPastureKeys.has(pastureKey)
+  })
   const updated: PlayerFarmState = {
     ...normalized,
     resources: {
       ...normalized.resources,
-      wood: (normalized.resources?.wood ?? 0) - newEdges.length - extraCost,
+      wood: (normalized.resources?.wood ?? 0) - payableFenceCount - extraCost,
     },
     fenceSegments: Array.from(edgeSet),
     fences: edgeSet.size,
     pastures,
   }
   enforceAnimalCapacity(updated)
-  return { ok: true, player: updated as T }
+  return { ok: true, player: updated as T, newEdges, newPastures }
 }

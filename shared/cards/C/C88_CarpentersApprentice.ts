@@ -28,15 +28,31 @@ const stablesCostListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stablesBuilt = context.player.stableTiles.length
-    if (stablesBuilt >= 2) {
+    if (stablesBuilt === 2 || stablesBuilt === 3) {
       incCounter(context.player, CARD_ID, 'triggerCount')
       return { costs: { wood: -1 } }
     }
   },
 }
 
+const fenceCostListener: CardListenerRegistration = {
+  id: 'C88-carpenters-apprentice-costs-fence',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.player.fences < 12) return
+    const remainingFreeFences = Math.max(0, 15 - context.player.fences)
+    if (remainingFreeFences <= 0) return
+    incCounter(context.player, CARD_ID, 'triggerCount')
+    return { costs: { wood: -remainingFreeFences } }
+  },
+}
+
 registerCardListener(constructCostListener)
 registerCardListener(stablesCostListener)
+registerCardListener(fenceCostListener)
 
 export const C88_CarpentersApprentice = new Occupation({
   id: CARD_ID,

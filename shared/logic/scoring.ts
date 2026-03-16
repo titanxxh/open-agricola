@@ -107,6 +107,9 @@ const totalTiles = FARM_ROWS * FARM_COLS
 export const computeScores = (state: GameState): PlayerScoreSummary[] =>
   state.players.map((player) => {
     const categories: ScoreCategoryResult[] = []
+    const soldierPairs = player.occupationPlayed.includes('C133_Soldier')
+      ? Math.min(player.resources.wood, player.resources.stone)
+      : 0
 
     const fieldCount = player.fields.length
     const fieldScore = scoreByRanges(fieldCount, ['0-1', '2', '3', '4', '5+'])
@@ -241,7 +244,11 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       if (!card) return
       cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
       if (card.scoring) {
-        const resourceCount = player.resources[card.scoring.resource] ?? 0
+        const reservedBySoldier = card.scoring.resource === 'wood' ? soldierPairs : 0
+        const resourceCount = Math.max(
+          0,
+          (player.resources[card.scoring.resource] ?? 0) - reservedBySoldier,
+        )
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
@@ -284,6 +291,9 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
           cardStateBonusVp += vp
         }
       })
+    }
+    if (soldierPairs > 0) {
+      cardStateBonusVp += soldierPairs
     }
     if (cardStateBonusVp > 0) {
       categories.push({

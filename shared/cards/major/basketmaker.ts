@@ -1,4 +1,5 @@
 import type { MajorCardEffect } from './types'
+import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
 export const basketmaker: MajorCardEffect = {
   id: 'Major_Basket',
@@ -19,9 +20,5 @@ export const basketmaker: MajorCardEffect = {
       '5+': 3,
     },
   },
-  onHarvest: (_state, player) => {
-    if (player.resources.reed <= 0) return
-    player.resources.reed -= 1
-    player.resources.food += 3
-  },
+  onHarvest: createSingleHarvestExchange('reed', { food: 3 }),
 }

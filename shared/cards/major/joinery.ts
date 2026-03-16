@@ -1,4 +1,5 @@
 import type { MajorCardEffect } from './types'
+import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
 export const joinery: MajorCardEffect = {
   id: 'Major_Joinery',
@@ -19,9 +20,5 @@ export const joinery: MajorCardEffect = {
       '7+': 3,
     },
   },
-  onHarvest: (_state, player) => {
-    if (player.resources.wood <= 0) return
-    player.resources.wood -= 1
-    player.resources.food += 2
-  },
+  onHarvest: createSingleHarvestExchange('wood', { food: 2 }),
 }

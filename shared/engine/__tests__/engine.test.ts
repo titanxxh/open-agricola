@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
 import type {
   ActionDefinition,
   ActionSpace,
@@ -11,6 +11,8 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
+import { clearActionHooks } from '../../actions/hooks'
+import { clearCardListeners } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -106,6 +108,11 @@ const buildEngine = (action: ActionDefinition, withChoice: boolean) => {
 }
 
 describe('Engine tree flow', () => {
+  beforeEach(() => {
+    clearActionHooks()
+    clearCardListeners()
+  })
+
   it('handles action with choice and resolves to done', () => {
     const action: ActionDefinition = {
       id: 'choice-action',

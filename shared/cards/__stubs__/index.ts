@@ -11,7 +11,7 @@ import { effect as onRoundEndEffect } from './Stub_OnRoundEnd'
 import { listener as scopeOpponent } from './Stub_Scope_Opponent'
 import { listenerA as orderLow, listenerB as orderHigh } from './Stub_Order_Priority'
 import { listener as afterActionOptionalConstruct } from './Stub_AfterAction_OptionalConstruct'
-import { afterListener as payGainVpAfter, choiceListener as payGainVpChoice } from './Stub_PayGainVp'
+import { afterListener as payGainVpAfter } from './Stub_PayGainVp'
 import { computeCostsListener as cardStorageFence } from './Stub_CardStorage_ConsumeFence'
 import { listener as computeReplaceDecline } from './Stub_ComputeReplace_Decline'
 import { effect as beforeReturnHomeEffect } from './Stub_BeforeReturnHome'
@@ -33,7 +33,6 @@ const allListeners = [
   orderHigh,
   afterActionOptionalConstruct,
   payGainVpAfter,
-  payGainVpChoice,
   cardStorageFence,
   computeReplaceDecline,
 ]

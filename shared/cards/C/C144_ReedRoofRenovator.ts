@@ -13,7 +13,7 @@ const listener: CardListenerRegistration = {
   actions: ['renovate-house'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.effectPlayer ?? context.player, CARD_ID, 'triggerCount')
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 } },
       logKey: 'log.cardEffectGain',

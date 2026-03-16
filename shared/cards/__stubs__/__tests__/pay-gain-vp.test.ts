@@ -13,7 +13,8 @@ import { internalActionDefinitions } from '../../../actions/internal-actions'
 import { computeScores } from '../../../logic/scoring'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
-const cardChoiceAction = internalActionDefinitions.find(a => a.id === 'card-choice')!
+const payResourcesAction = internalActionDefinitions.find(a => a.id === 'pay-resources')!
+const bonusVpAction = internalActionDefinitions.find(a => a.id === 'bonus-vp')!
 
 const makeRenovateAction = (): ActionDefinition => ({
   id: 'renovate-house',
@@ -67,14 +68,15 @@ describe('Stub_PayGainVp mechanism', () => {
     registerStubCards()
   })
 
-  it('presents pay/skip choice after renovate, pay gives grain + bonusVp', () => {
+  it('presents optional pay flow after renovate, pay gives grain + bonusVp', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     const renovate = makeRenovateAction()
     const registry = new ActionRegistry()
     registry.register(renovate)
     registry.register(gainAction)
-    registry.register(cardChoiceAction)
+    registry.register(payResourcesAction)
+    registry.register(bonusVpAction)
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'renovate-house')),
       registry,
@@ -90,10 +92,11 @@ describe('Stub_PayGainVp mechanism', () => {
     }
     expect(step.type).toBe('choice')
     if (step.type !== 'choice') return
-    expect(step.choice.options.some(o => o.value === 'pay')).toBe(true)
-    expect(step.choice.options.some(o => o.value === 'skip')).toBe(true)
+    const payOption = step.choice.options.find(o => o.value !== '__skip__')
+    expect(payOption).toBeDefined()
+    expect(step.choice.options.some(o => o.value === '__skip__')).toBe(true)
 
-    const result = engine.resolveChoice('pay', { state, player, space })
+    const result = engine.resolveChoice(payOption!.value, { state, player, space })
     expect(result.type).not.toBe('fail')
 
     let step2 = engine.proceed({ state, player, space })
@@ -114,7 +117,8 @@ describe('Stub_PayGainVp mechanism', () => {
     const registry = new ActionRegistry()
     registry.register(renovate)
     registry.register(gainAction)
-    registry.register(cardChoiceAction)
+    registry.register(payResourcesAction)
+    registry.register(bonusVpAction)
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'renovate-house')),
       registry,
@@ -130,7 +134,7 @@ describe('Stub_PayGainVp mechanism', () => {
     }
     if (step.type !== 'choice') return
 
-    engine.resolveChoice('skip', { state, player, space })
+    engine.resolveChoice('__skip__', { state, player, space })
     let step2 = engine.proceed({ state, player, space })
     while (step2.type === 'ok') {
       step2 = engine.proceed({ state, player, space })
