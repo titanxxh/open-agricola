@@ -1,8 +1,38 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { TradeModifier } from '../../game/types'
 
+const CARD_ID = 'A123_FrameBuilder'
+
+const buildCostAdjustment = (context: CardListenerContext) => {
+  if (context.player.houseType === 'clay') {
+    return { wood: 1, clay: -2 }
+  }
+  if (context.player.houseType === 'stone') {
+    return { wood: 1, stone: -2 }
+  }
+  return undefined
+}
+
+const computeCostsListener: CardListenerRegistration = {
+  id: 'A123-frame-builder-costs',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['construct', 'renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const costs = buildCostAdjustment(context)
+    if (!costs) return
+    return { costs }
+  },
+}
+
+registerCardListener(computeCostsListener)
+
 export const A123_FrameBuilder = new Occupation({
-  id: "A123_FrameBuilder",
+  id: CARD_ID,
   name: "Frame Builder",
   deck: "A",
   number: 123,
@@ -12,7 +42,7 @@ export const A123_FrameBuilder = new Occupation({
   players: "1+",
   modifier: {
     type: 'trade',
-    cardId: 'A123_FrameBuilder',
+    cardId: CARD_ID,
     appliesTo: ['construct', 'renovation'],
     from: { clay: 2 },
     to: { wood: 1 },

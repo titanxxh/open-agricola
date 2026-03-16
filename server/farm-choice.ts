@@ -105,10 +105,15 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
   switch (farmType) {
     case 'fence': {
       const { edges, extraWood } = payload as FarmChoicePayloadMap['fence']
-      const freeFences = readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
-      const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
-      const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
-      const result = validateFenceSelection(normalized, edges, adjustedExtraWood, freeFences)
+      const freeFencesFromCard =
+        readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
+      const freeFencesFromCost = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
+      const result = validateFenceSelection(
+        normalized,
+        edges,
+        extraWood ?? 0,
+        freeFencesFromCard + freeFencesFromCost,
+      )
       if (!result.ok) {
         return { ok: false, error: result.error?.code ?? 'validation failed' }
       }

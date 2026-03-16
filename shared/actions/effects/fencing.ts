@@ -1,4 +1,10 @@
-import type { ActionDefinition, ActionExecutionResult, Pasture, PlayerState } from '../../game/types'
+import type {
+  ActionCostPreview,
+  ActionDefinition,
+  ActionExecutionResult,
+  Pasture,
+  PlayerState,
+} from '../../game/types'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 
 export const maxFences = 15
@@ -81,6 +87,12 @@ export const fenceAction: ActionDefinition = {
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
+  costPreview: {
+    isStructurallyPossible: ({ player }) =>
+      player.fences + minimumFenceSegments <= maxFences &&
+      getTotalPastureCells(player) < maxPastureCells,
+    getBaseCost: () => ({ wood: minimumFenceSegments }),
+  } satisfies ActionCostPreview,
   canBeExecutedByPlayer: (_, player) => canStartFencing(player),
   execute: () => ({
     type: 'choice',

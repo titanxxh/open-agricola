@@ -1094,7 +1094,7 @@ type ActionHookResult = {
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
-当前实现里，`onBeforeHarvest`、`onHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。
+当前实现里，`onBeforeHarvest`、`onHarvest`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、繁殖后追加播种、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。
 
 #### 11.6.2a ActivateCardNode 架构
 

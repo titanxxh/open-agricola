@@ -54,9 +54,9 @@
 
 为此补的关键抽象是“flow 叶子节点自定义 choice label”，这让选择文案不再绑死到 action name。
 
-### 3. 阶段型卡牌的抽象缺口
+### 3. 阶段型卡牌的抽象补齐
 
-和 BGA 相比，阶段型卡牌当前最大的缺口不是规则表达能力，而是“还没有统一的 helper 层”：
+和 BGA 相比，阶段型卡牌此前最大的缺口是“缺少统一 helper 层，以及阶段钩子还不能稳定回流到引擎 flow”：
 
 - `shared/cards/B/B70_NewPurchase.ts`
 - `shared/cards/A/A166_Haydryer.ts`
@@ -65,31 +65,32 @@
 - `shared/cards/major/pottery.ts`
 - `shared/cards/major/basketmaker.ts`
 
-本轮新增 `shared/cards/helpers/stage-effects.ts`，把下面几类共性提出来：
+现在已经有两层补齐：
 
-- 回合阈值标记：`markCardCounterIfBoughtByRound`
-- 阶段型支付换收益：`tryStagePayGain`
-- 支付资源换 bonus VP：`payForCardBonusVp`
-- 单次收获兑换：`createSingleHarvestExchange`
+- `shared/cards/helpers/stage-effects.ts`
+  - 回合阈值标记：`markCardCounterIfBoughtByRound`
+  - 阶段型支付换收益：`tryStagePayGain`
+  - 支付资源换 bonus VP：`payForCardBonusVp`
+  - 单次收获兑换：`createSingleHarvestExchange`
+- `GameSession` 阶段 flow
+  - `onBeforeHarvest`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已可返回 `ActionFlow`
+  - `C71_SlurrySpreader` 这类“繁殖后追加播种”的 BGA 语义，已经不需要在单卡里写即时 imperative 分支
 
-这样阶段型卡至少不再在单卡里重复写“能否支付 / 扣资源 / 加资源 / 记 VP / 标记状态”的样板。
+这样阶段型卡不只是减少样板代码，也已经能在多个阶段点上暂停、恢复，并走和普通行动一致的引擎执行链。
 
-### 4. 仍有协议层缺口的阶段可选行为
+### 4. 仍有差距的阶段行为
 
-这轮没有完全抹平的一点，是 BGA 在阶段钩子里常直接返回 `NODE_OR` / `payGainNode`，而我们现在的多数 `card-effects` 钩子仍是即时执行。
+这轮已经把阶段 hook 的主要协议层缺口补上，但和 BGA 仍有两类差距：
 
 受影响最明显的是：
 
-- `shared/cards/B/B70_NewPurchase.ts`
-- `shared/cards/A/A166_Haydryer.ts`
-- `shared/cards/D/D99_EarthenwarePotter.ts`
-
-这些文件现在已经共用 helper，但依然属于“阶段钩子中的 imperative 实现”，尚未像 BGA 那样变成真正的可选 flow。
+- 仍有一部分阶段卡只完成 helper 收敛，还没完全改写成声明式 flow 分支
+- `onStartHarvest`、`onHarvestFieldPhase`、`onAfterFeed` 这类阶段点虽然已在协议里，但还没有像前述阶段那样被更多真实卡牌覆盖验证
 
 结论是：
 
-- 短期先收敛样板，避免单卡继续膨胀
-- 后续若要完全贴齐 BGA，需要把 `onBeforeHarvest` / `onAfterHarvest` / `onBeforeStartOfTurn` 也演进到可返回 flow 的协议层
+- 短期内，阶段卡的“可暂停 flow”主干已经够用
+- 后续若要继续贴齐 BGA，重点应转向扩大真实卡牌覆盖，而不是再补一轮全新的协议
 
 ## 新增/扩展 helper 清单
 
@@ -126,11 +127,13 @@
   - `A74` 现在统一复用 action snapshot，`after(stables)` 与 `onBuy` 共用同一段“本行动是否已建畜栏、且本行动未触发过”判断
   - 原先按整轮去重的 `usedRound` 已去掉，改为更接近 BGA 的“同一 turn 只触发一次、后续 turn 可再次触发”
 - 阶段型 helper：`B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter`、`Major_Joinery`、`Major_Pottery`、`Major_Basket`
+- 阶段 flow 落点：`C71_SlurrySpreader`
+  - `onEndHarvestFeedingPhase` 快照繁殖前动物数，`onEndHarvest` 判断是否达到“两种新生动物”并返回可选 `sow` flow
 
 ## 下一阶段建议
 
 若继续往 BGA 靠齐，优先级建议如下：
 
-1. 把 `card-effects` 的阶段钩子逐步升级为可返回 `ActionFlow`，先覆盖 `onBeforeHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn`
+1. 扩大阶段 flow 的真实卡牌覆盖，优先补 `onStartHarvest`、`onHarvestFieldPhase`、`onAfterFeed` 上仍缺实现样本的牌
 2. 继续把还在走 `card-choice` 的实现迁到“自定义 label 的 flow choice” 抽象，复用 `D119_WoodBarterer` / `C75_Firewood` 这轮模式
-3. 再处理 `usedRound`、`flagged`、`processedBigPastures` 这类纯流程状态，让更多时序卡回到声明式 helper
+3. 继续清理 `usedRound`、`flagged`、`processedBigPastures` 这类流程状态，让更多时序卡回到声明式 helper

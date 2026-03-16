@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { incCounter } from '../__stubs__/helpers'
+import { getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 
 const CARD_ID = 'B94_StockProtector'
 
@@ -40,8 +41,24 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'B94-stock-protector-isdoable-fencing',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.player.fences + minimumFenceSegments > maxFences) return
+    if (getTotalPastureCells(context.player) >= maxPastureCells) return
+    return (context.player.resources.wood + 2 >= minimumFenceSegments)
+      ? { doable: true }
+      : undefined
+  },
+}
+
 registerCardListener(beforeListener)
 registerCardListener(afterListener)
+registerCardListener(isDoableListener)
 
 export const B94_StockProtector = new MinorImprovement({
   id: CARD_ID,

@@ -128,11 +128,13 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `shared/cards/helpers/stage-effects.ts`：统一阶段型支付、标记、bonus VP 与收获兑换；新增 `stagePayGainFlow`
 - `shared/cards/helpers/card-state.ts`、`round-placement.ts`：统一一次性卡牌标记与“本轮放人顺序”这类时序状态
 - `shared/cards/helpers/action-snapshot.ts`：统一记录单次行动起点快照，供 `A74_StableTree` 这类“同一行动前后”卡复用
+- `shared/cards/helpers/pending-fence-bonus.ts` + `server/farm-choice.ts`：统一“免费围栏 / 围栏折扣”在 farm-choice 提交链中的结算，避免卡牌各自改围栏主路径
+- `shared/actions/effects/fencing.ts` 的 `costPreview`：让围栏行动的 `computeCosts` / `isDoable` 能走同一套最低成本预览
 - `shared/actions/effects/mark-card-trigger.ts`：把阶段型触发计数收敛成可复用内部 action
 - `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
 - `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
-248 个卡牌定义（A/B/C/D/E 五个 deck），30+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+248 个卡牌定义（A/B/C/D/E 五个 deck），40+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
@@ -193,7 +195,7 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 部分卡牌仅完成数据接入，复杂行为待补全（45+/251 已实现 hook）。
+- 部分卡牌仅完成数据接入，复杂行为待补全（50+/251 已实现 hook）。
 - Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。

@@ -85,4 +85,26 @@ describe('farm choice', () => {
     })
     expect(result.meta?.newPastures).toHaveLength(1)
   })
+
+  it('treats fencing cost overrides as free fences', () => {
+    const player = createPlayer()
+    player.resources.wood = 1
+
+    const result = applyFarmChoice(
+      player,
+      'fence',
+      {
+        edges: edgesForTile(1, 1),
+        extraWood: 0,
+      },
+      {
+        costOverride: { wood: -3 },
+      },
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.player.resources.wood).toBe(0)
+    expect(result.meta?.usedFreeFences).toBeUndefined()
+  })
 })

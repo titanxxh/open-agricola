@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .oh-my-opencode.json
+open-agricola.code-workspace
 
 *.pdf
 data/
