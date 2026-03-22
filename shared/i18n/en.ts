@@ -299,6 +299,8 @@ export const en = {
     cardCopy: 'Copy ID',
     cardCopied: 'Copied!',
     interactionPaymentFree: 'Free',
+    'prompt.selectPayment': 'Choose payment method',
+    'prompt.selectPaymentOption': 'Payment option',
     interactionPaymentReturn: 'Return',
     exchangeCenterTitle: 'Exchange Center',
     bakeBreadTitle: 'Bake Bread',

@@ -287,6 +287,8 @@ export const zh = {
     cardCopy: '复制ID',
     cardCopied: '已复制!',
     interactionPaymentFree: '免费',
+    'prompt.selectPayment': '选择支付方式',
+    'prompt.selectPaymentOption': '支付选项',
     interactionPaymentReturn: '返还',
     exchangeCenterTitle: '交换中心',
     bakeBreadTitle: '烤面包',
