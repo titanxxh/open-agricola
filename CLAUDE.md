@@ -137,3 +137,34 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 ?room=<id>          # Join specific room
 ?devMode=1          # Enable dev panel (resource editing, round jump, card tools)
 ```
+
+## gstack
+
+Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+
+Available gstack skills:
+- `/office-hours` — Brainstorming and idea exploration
+- `/plan-ceo-review` — Strategy-level plan review
+- `/plan-eng-review` — Architecture-level plan review
+- `/plan-design-review` — Design-level plan review
+- `/design-consultation` — Creating a design system
+- `/review` — Code review before merge
+- `/ship` — Create PR / deploy
+- `/land-and-deploy` — Land and deploy changes
+- `/canary` — Canary deployment
+- `/benchmark` — Performance benchmarking
+- `/browse` — Web browsing and navigation
+- `/qa` — QA testing
+- `/qa-only` — QA testing (no code changes)
+- `/design-review` — Visual design audit
+- `/setup-browser-cookies` — Set up browser cookies
+- `/setup-deploy` — Set up deployment
+- `/retro` — Weekly retrospective
+- `/investigate` — Debugging errors
+- `/document-release` — Post-ship documentation
+- `/codex` — Adversarial code review / second opinion
+- `/careful` — Working with production / live systems
+- `/freeze` — Scope edits to one module/directory
+- `/guard` — Maximum safety mode
+- `/unfreeze` — Remove edit restrictions
+- `/gstack-upgrade` — Upgrade gstack to latest version
