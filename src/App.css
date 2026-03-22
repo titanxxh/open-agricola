@@ -599,6 +599,14 @@
   flex-flow: row-reverse;
 }
 
+.action-card-holder.round .resource-holder .res-icon {
+  margin: 0 0 0 -0.45em;
+}
+
+.action-card-holder.round .resource-holder .res-icon:last-child {
+  margin-left: 0;
+}
+
 .action-card-holder.round .action-header {
   font-family: var(--agricola-font);
   font-size: 10px;

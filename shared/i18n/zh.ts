@@ -287,8 +287,6 @@ export const zh = {
     cardCopy: '复制ID',
     cardCopied: '已复制!',
     interactionPaymentFree: '免费',
-    'prompt.selectPayment': '选择支付方式',
-    'prompt.selectPaymentOption': '支付选项',
     interactionPaymentReturn: '返还',
     exchangeCenterTitle: '交换中心',
     bakeBreadTitle: '烤面包',
@@ -301,6 +299,10 @@ export const zh = {
     harvestFeedBasic: '基础',
     harvestFeedConfirm: '确认喂养',
     harvestFeedProgress: '{fed}/{required} · 乞讨 {begging}',
+  },
+  prompt: {
+    selectPayment: '选择支付方式',
+    selectPaymentOption: '支付选项',
   },
   resources: {
     wood: '木材',

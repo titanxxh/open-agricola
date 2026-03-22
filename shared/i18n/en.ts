@@ -299,8 +299,6 @@ export const en = {
     cardCopy: 'Copy ID',
     cardCopied: 'Copied!',
     interactionPaymentFree: 'Free',
-    'prompt.selectPayment': 'Choose payment method',
-    'prompt.selectPaymentOption': 'Payment option',
     interactionPaymentReturn: 'Return',
     exchangeCenterTitle: 'Exchange Center',
     bakeBreadTitle: 'Bake Bread',
@@ -313,6 +311,10 @@ export const en = {
     harvestFeedBasic: 'Basic',
     harvestFeedConfirm: 'Confirm feeding',
     harvestFeedProgress: '{fed}/{required} · Begging {begging}',
+  },
+  prompt: {
+    selectPayment: 'Choose payment method',
+    selectPaymentOption: 'Payment option',
   },
   resources: {
     wood: 'Wood',

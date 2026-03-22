@@ -154,14 +154,14 @@ export const InteractionBar = ({
                   {option.labelKey === 'prompt.selectPaymentOption' && option.labelParams && typeof option.labelParams === 'object' && 'resourcesPaid' in option.labelParams ? (
                     <span className="payment-option-content">
                       {Object.keys(option.labelParams.resourcesPaid as Partial<Resource>).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
-                        <span>{t(locale, 'interactionPaymentFree')}</span>
+                        <span>{t(locale, 'ui.interactionPaymentFree')}</span>
                       ) : (
                         <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
                       )}
                       {option.labelParams.cardUsed && (
                         <span className="payment-option-card">
                           {' '}
-                          ({t(locale, 'interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
+                          ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
                         </span>
                       )}
                     </span>
