@@ -119,7 +119,7 @@ const buildTradeFees = (
   }
   const perUseLimit = Math.floor((fee[toKey] ?? 0) / toAmount)
   const modifierLimit = Number.isFinite(maxAmount)
-    ? Math.floor((maxAmount ?? 0) / toAmount)
+    ? Math.floor(maxAmount ?? 0)
     : perUseLimit
   const limit = Math.max(0, Math.min(perUseLimit, modifierLimit))
   const nextFees: Partial<Resource>[] = []

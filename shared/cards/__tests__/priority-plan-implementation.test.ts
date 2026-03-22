@@ -6,7 +6,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 
 import '../A/A29_AleBenches'
 import '../A/A81_InterimStorage'
-import '../A/A123_FrameBuilder'
+import { A123_FrameBuilder as A123Card } from '../A/A123_FrameBuilder'
 import '../B/B94_StockProtector'
 import '../B/B103_FieldMerchant'
 import '../B/B34_SpecialFood'
@@ -17,7 +17,7 @@ import '../C/C120_AgriculturalLabourer'
 import '../D/D115_FodderPlanter'
 import '../E/E52_Cubbyhole'
 import '../E/E101_Blighter'
-import { canRenovate } from '../../actions/effects/renovation'
+import { canRenovate, renovateHouseAction } from '../../actions/effects/renovation'
 import { playImprovement } from '../../actions/effects/improvement'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
@@ -282,20 +282,12 @@ describe('priority plan implementations', () => {
     player.houseType = 'clay'
     player.resources.wood = 1
     player.resources.reed = 2
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('renovate-house'),
-      actionId: 'renovate-house',
-      phase: 'isDoable',
-      doable: false,
-    } as any)
-
-    expect(result?.doable).toBe(true)
     player.activeModifiers = [
-      { type: 'trade', cardId: 'A123_FrameBuilder', appliesTo: ['construct', 'renovation'], from: { wood: 1 }, to: { stone: 2 }, max: 2 },
-    ] as any
+      ...((A123Card as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+    ]
+
+    expect(listener).toBeUndefined()
+    expect(renovateHouseAction.canBeExecutedByPlayer(createState(player), player)).toBe(true)
     expect(canRenovate(player)).toBe(true)
   })
 

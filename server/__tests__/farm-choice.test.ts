@@ -152,8 +152,9 @@ describe('farm choice', () => {
 
   it('pays frame builder room costs using alternate clay payment', () => {
     const player = createPlayer()
-    player.resources.wood = 4
-    player.resources.clay = 2
+    player.houseType = 'clay'
+    player.resources.wood = 1
+    player.resources.clay = 3
     player.resources.reed = 2
     player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
 
@@ -175,9 +176,9 @@ describe('farm choice', () => {
 
   it('requires an explicit payment choice when multiple room payments are legal', () => {
     const player = createPlayer()
-    player.resources.wood = 4
-    player.resources.clay = 2
-    player.resources.stone = 2
+    player.houseType = 'stone'
+    player.resources.wood = 1
+    player.resources.stone = 5
     player.resources.reed = 2
     player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
 

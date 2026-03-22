@@ -73,6 +73,7 @@ export const renovate = (player: PlayerState): ActionExecutionResult => {
 
 export const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) => getRenovation(player) !== null,
+  canExecute: ({ player }, costOverride) => canRenovate(player, costOverride),
   getBaseCost: ({ player }) => getRenovation(player)?.cost ?? {},
 }
 

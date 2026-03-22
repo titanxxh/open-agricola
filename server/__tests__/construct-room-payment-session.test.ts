@@ -13,11 +13,11 @@ describe('construct room payment session', () => {
     const player = state.players[0]!
     player.resources = {
       ...player.resources,
-      wood: 4,
-      clay: 2,
-      stone: 2,
+      wood: 1,
+      stone: 5,
       reed: 2,
     }
+    player.houseType = 'stone'
     player.occupationPlayed.push('A123_FrameBuilder')
     player.playedCards.push('occupation:A123_FrameBuilder')
     player.activeModifiers = [
@@ -34,15 +34,6 @@ describe('construct room payment session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-
-    const constructOption = resp.pending.options.find(
-      (option) => option.labelKey === 'actions.construct.name',
-    )
-    expect(constructOption).toBeDefined()
-
-    resp = session.resolveChoice(0, constructOption!.value)
-    expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('farmSelect')
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
@@ -57,20 +48,22 @@ describe('construct room payment session', () => {
     expect(resp.pending.promptKey).toBe('prompt.selectPayment')
     expect(resp.pending.options).toHaveLength(2)
 
-    const stoneOption = resp.pending.options.find(
+    const woodSwapOption = resp.pending.options.find(
       (option) =>
         typeof option.labelParams === 'object' &&
-        typeof (option.labelParams as { resourcesPaid?: { stone?: number } }).resourcesPaid?.stone === 'number' &&
-        (option.labelParams as { resourcesPaid?: { stone?: number } }).resourcesPaid?.stone === 2,
+        typeof (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.stone === 'number' &&
+        typeof (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.wood === 'number' &&
+        (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.stone === 3 &&
+        (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.wood === 1,
     )
-    expect(stoneOption).toBeDefined()
+    expect(woodSwapOption).toBeDefined()
 
-    resp = session.resolveChoice(0, stoneOption!.value)
+    resp = session.resolveChoice(0, woodSwapOption!.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.state.players[0]!.resources.stone).toBe(0)
-    expect(resp.state.players[0]!.resources.clay).toBe(2)
+    expect(resp.state.players[0]!.resources.stone).toBe(2)
+    expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
   })
 

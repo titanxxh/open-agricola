@@ -101,8 +101,9 @@ describe('farm interaction builders', () => {
 
   it('counts frame builder replacement costs when computing room selections', () => {
     const player = createPlayer()
-    player.resources.wood = 8
-    player.resources.clay = 4
+    player.houseType = 'clay'
+    player.resources.wood = 2
+    player.resources.clay = 6
     player.resources.reed = 4
     player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
 
