@@ -99,12 +99,26 @@ describe('pending choice types + undo regression', () => {
       expect(hasAvailableAction(session, 'farm-expansion')).toBe(true)
     })
 
-    it('major-improvement is available when child isDoable hook makes improvement-any doable', () => {
+    it('major-improvement is unavailable when Wood Workshop still cannot unlock any improvement', () => {
       const state = createInitialState(42)
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('major-improvement')
       state.availableMajorImprovements = []
-      player.minorHand = []
+      player.minorHand = ['C60_SmallPottersOven']
+
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'B75_WoodWorkshop')
+
+      expect(hasAvailableAction(session, 'major-improvement')).toBe(false)
+    })
+
+    it('major-improvement is available when Wood Workshop gain unlocks an improvement', () => {
+      const state = createInitialState(42)
+      const player = state.players[0]!
+      state.roundActionOrder = openRoundAction('major-improvement')
+      state.availableMajorImprovements = []
+      player.minorHand = ['A7_GardenersKnife']
+      player.resources.wood = 0
 
       const session = new GameSession(state)
       session.devPlayCard(0, 'B75_WoodWorkshop')

@@ -29,16 +29,11 @@ const resolveImprovementActionCardId = (mode: ImprovementPlayMode) =>
   mode === 'minor' ? 'minor-improvement' : 'improvement-any'
 
 const getMinorImprovementBaseCost = (
-  player: PlayerState,
   improvementId: string,
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
-  const cost = { ...improvement.cost }
-  if (player.minorPlayed.includes('B75_WoodWorkshop') && (cost.wood ?? 0) > 0) {
-    cost.wood = Math.max(0, (cost.wood ?? 0) - 1)
-  }
-  return cost
+  return { ...improvement.cost }
 }
 
 const getMinorImprovementEffectiveCost = (
@@ -48,7 +43,7 @@ const getMinorImprovementEffectiveCost = (
   if (improvement.altCosts && improvement.altCosts.length > 0) {
     return { fees: improvement.altCosts } as ComplexCost
   }
-  return getMinorImprovementBaseCost(player, improvement.id) ?? improvement.cost ?? {}
+  return getMinorImprovementBaseCost(improvement.id) ?? improvement.cost ?? {}
 }
 
 const getPositiveResourceLog = (

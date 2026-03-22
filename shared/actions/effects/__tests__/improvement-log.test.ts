@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../game/types'
 import { playImprovement } from '../improvement'
 
+import '../../../cards/A/A7_GardenersKnife'
+import '../../../cards/B/B75_WoodWorkshop'
 import '../../../cards/C/C60_SmallPottersOven'
 import '../../../cards/E/E130_Overachiever'
 
@@ -89,6 +91,22 @@ describe('improvement logging', () => {
       improvements: 'Major_Fireplace1',
       costResources: { clay: 2 },
     })
+  })
+
+  it('does not apply Wood Workshop as a direct wood discount', () => {
+    const state = createState()
+    state.availableMajorImprovements = []
+    const player = createPlayer()
+    player.resources.clay = 0
+    player.resources.wood = 0
+    player.minorHand = ['A7_GardenersKnife']
+    player.minorPlayed = ['B75_WoodWorkshop']
+
+    const result = playImprovement(state, player, 'minor:A7_GardenersKnife', 'any')
+
+    expect(result.type).toBe('fail')
+    expect(player.minorPlayed).toEqual(['B75_WoodWorkshop'])
+    expect(player.resources.wood).toBe(0)
   })
 
   it('returns onBuy gain flow for Small Potter\'s Oven after payment resolves', () => {

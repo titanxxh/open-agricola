@@ -29,6 +29,8 @@ export type CardDefinition = {
   implemented?: boolean
 }
 
+const registeredMinorImprovements = new Map<string, CardBase>()
+
 export class CardBase {
   id!: string
   name!: string
@@ -54,6 +56,9 @@ export class CardBase {
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)
+    if (this instanceof MinorImprovement || this instanceof PlayerActionCard) {
+      registeredMinorImprovements.set(this.id, this)
+    }
   }
 }
 
@@ -62,3 +67,6 @@ export class MinorImprovement extends CardBase {}
 export class Occupation extends CardBase {}
 
 export class PlayerActionCard extends CardBase {}
+
+export const getRegisteredMinorImprovement = (id: string) =>
+  registeredMinorImprovements.get(id)
