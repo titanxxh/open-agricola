@@ -13,6 +13,9 @@ type Props = {
 
 type CardRef = { id: string; type: CardType; name: string }
 
+const joinCardNames = (locale: Locale, names: string[]) =>
+  locale === 'zh' ? names.join('、') : names.join(', ')
+
 const resolveCardName = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
     const name = t(locale, `${prefix}.${id}.name`)
@@ -21,6 +24,9 @@ const resolveCardName = (locale: Locale, id: string): CardRef | null => {
   }
   return tryKey('improvements', 'major') ?? tryKey('minorImprovements', 'minor') ?? tryKey('occupations', 'occupation')
 }
+
+const resolveCardDisplayName = (locale: Locale, id: string) =>
+  resolveCardName(locale, id)?.name ?? id
 
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const prefix = ref.type === 'major' ? 'improvements' : ref.type === 'minor' ? 'minorImprovements' : 'occupations'
@@ -170,7 +176,9 @@ export const LogPanel = ({ locale, log }: Props) => (
               t(locale, `${prefix}.${id}.name`).replace(/\s*[（(].*$/, ''),
             )
             .filter((name) => name)
-          params.improvements = names.join('、')
+          params.improvements = joinCardNames(locale, names)
+          params.cost = ''
+          params.returned = ''
           const costResources = params.costResources as Partial<Resource> | undefined
           if (costResources && typeof costResources === 'object') {
             const costText = formatResources(
@@ -182,27 +190,23 @@ export const LogPanel = ({ locale, log }: Props) => (
               ? ` ${t(locale, 'log.costs', { resources: costText })}`
               : ''
           }
+          const returnedCardsRaw = params.returnedCards
+          const returnedCardIds = Array.isArray(returnedCardsRaw)
+            ? returnedCardsRaw.map((id) => String(id).trim()).filter(Boolean)
+            : typeof returnedCardsRaw === 'string'
+              ? returnedCardsRaw.split(',').map((id) => id.trim()).filter(Boolean)
+              : []
+          if (returnedCardIds.length > 0) {
+            const returnedNames = returnedCardIds.map((id) =>
+              resolveCardDisplayName(locale, id),
+            )
+            params.returned = ` ${t(locale, 'log.returns', {
+              cards: joinCardNames(locale, returnedNames),
+            })}`
+          }
         }
         if (params && params.cardId && entry.key === 'log.cardEffectGain') {
-          const id = String(params.cardId)
-          let name = id
-          if (id.startsWith('A') || id.startsWith('B') || id.startsWith('C') || id.startsWith('D') || id.startsWith('E')) {
-            if (id.includes('_')) {
-              // Probably an occupation
-              name = t(locale, `occupations.${id}.name`).replace(/\s*[（(].*$/, '')
-            }
-          }
-          if (name === id || name.includes('.name')) {
-            // Try major or minor improvements
-            let temp = t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
-            if (temp.includes('.name')) {
-              temp = t(locale, `minorImprovements.${id}.name`).replace(/\s*[（(].*$/, '')
-            }
-            if (!temp.includes('.name')) {
-              name = temp
-            }
-          }
-          params.cardId = name
+          params.cardId = resolveCardDisplayName(locale, String(params.cardId))
         }
         if (params && entry.key === 'log.cardEffectGain' && typeof params.gain === 'object') {
           const gainResources = params.gain as Partial<Resource>
@@ -346,6 +350,14 @@ export const LogPanel = ({ locale, log }: Props) => (
           if (raw.improvements) {
             const ids = Array.isArray(raw.improvements) ? raw.improvements : String(raw.improvements).split(',')
             ids.forEach((id) => { if (typeof id === 'string') cardIds.push(id.trim()) })
+          }
+          if (raw.returnedCards) {
+            const ids = Array.isArray(raw.returnedCards)
+              ? raw.returnedCards
+              : String(raw.returnedCards).split(',')
+            ids.forEach((id) => {
+              if (typeof id === 'string') cardIds.push(id.trim())
+            })
           }
           const dp = raw.detailParts as Record<string, unknown> | undefined
           if (dp?.improvements) (dp.improvements as string[]).forEach((id) => cardIds.push(id))

@@ -321,9 +321,11 @@ type SessionResponse = {
   ok: boolean
   state: GameState
   pending: PendingAction
+  interaction: InteractionState
   historyLength: number
   hasActionStartSnapshot: boolean
-  scores?: ScoreResult
+  scores?: PlayerScoreSummary[]
+  actionAvailability?: Record<string, boolean>
   error?: string
 }
 ```
@@ -1094,7 +1096,7 @@ type ActionHookResult = {
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
-当前实现里，`onBeforeHarvest`、`onHarvest`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、繁殖后追加播种、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。
+当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer` 这类“按本次实际收割田地数结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取。
 
 #### 11.6.2a ActivateCardNode 架构
 
@@ -1108,15 +1110,14 @@ type ActionHookResult = {
 为减少单卡重复流程代码，`shared/cards/helpers/` 现在承接一层 BGA 风格糖衣：
 
 - `pay-gain-node.ts`：封装支付后得收益、支付后追加行动、返还到当前格后再得收益
-- `pending-choice.ts`：统一 `card-choice` 的 pending 数据搬运与清理
-- `stage-effects.ts`：统一阶段型 `card-effects` 的支付、标记、bonus VP、单次收获兑换；`stagePayGainFlow` 可直接表达 BGA 风格阶段可选支付 flow
+- `stage-effects.ts`：统一阶段型 `card-effects` 的标记、即时支付、bonus VP、单次收获兑换
 - `card-state.ts` / `round-placement.ts`：统一一次性卡牌的 `flagged/extraData` 与“本轮放人顺序”运行时状态
 - `action-snapshot.ts`：统一单次行动起点快照，让 `A74_StableTree` 这类“同一行动里先做 A 再买卡”的 onBuy 卡可以直接复用
 - `mark-card-trigger` 内部 action：把阶段型触发计数从单卡 imperative 代码收敛到通用 flow leaf
-- `flow` leaf 自定义 choice label：允许卡牌直接返回带文案的 `xor/or` 分支，而不必额外包一层 `card-choice`
+- `flow` leaf 自定义 choice label：允许卡牌直接返回带文案的 `xor/or` 分支，而不必回退到旧的 `card-choice` 中转写法
 - `resolveChoice()` 现在会把分支叶子的 `params` 一并透传到 action 执行上下文，避免 `xor/or` 叶子参数在真实执行时丢失
 
-目标是让卡牌文件尽量只描述“触发条件 + 业务参数”，而不是反复手写 `__pendingChoice__`、临时标记和支付样板。
+目标是让卡牌文件尽量只描述“触发条件 + 业务参数”，而不是反复手写临时标记、旧式 choice 中转和支付样板。
 
 ```text
 ActionNode(collect)
@@ -1162,8 +1163,10 @@ PlayerSwitchNode(→ p1)
 引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，传递给 `commitFarmChoice()`。
 
 在 `commitFarmChoice` 中：
-- `room` 路径：`applyCostOverride(baseCost, override)` 直接修改每间房的基础成本
-- `fence` 路径：从 `override.wood` 中提取折扣，减少额外木头需求
+- `room` 路径：先用 `shared/actions/effects/room-payment.ts` 展开“每间房”的费用变体，再按已选房间数合成为总成本；若存在多个可行支付解，会先转成统一的 `prompt.selectPayment` pending，待玩家选定后再真正落房与扣费
+- `stable` / `plow` 路径：改为复用 typed flat payment 解析；即使当前多数情况下仍只有单一支付法，也不再各自手写 `canPayResources/payResources`，后续若接入 trade / bonus modifier 可直接复用同一套 payment choice 协议
+- `fence` 路径：先校验选边/连通/封闭区域，并在得到 `newEdges` 后计算最终 payable wood（考虑 `freeFences`、`extraWood`，以及从 `override.wood` 提取出来的额外折扣）；若存在多个围栏支付解，同样先进入统一的 `prompt.selectPayment` 再落围栏
+- payment option 文案：`prompt.selectPayment` 中若方案带 `cardUsed`（如 `returnCards`），文案层会优先把 card id 映射为可读卡名，避免直接显示 `Major_*` 这类内部标识
 
 #### 11.6.2e gain params（参数化资源获取）
 

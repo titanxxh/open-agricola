@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../game/types'
 import { playImprovement } from '../improvement'
 
+import '../../../cards/C/C60_SmallPottersOven'
 import '../../../cards/E/E130_Overachiever'
 
 const createState = (): GameState => ({
@@ -88,6 +89,34 @@ describe('improvement logging', () => {
       improvements: 'Major_Fireplace1',
       costResources: { clay: 2 },
     })
+  })
+
+  it('returns onBuy gain flow for Small Potter\'s Oven after payment resolves', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.resources.clay = 2
+    player.minorHand = ['C60_SmallPottersOven']
+    player.improvements = ['Major_ClayOven']
+
+    const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
+
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    expect(result.flow).toMatchObject({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'C60_SmallPottersOven',
+          params: { food: 5 },
+        },
+      ],
+    })
+    expect(player.resources.clay).toBe(0)
+    expect(player.resources.food).toBe(0)
+    expect(player.improvements).not.toContain('Major_ClayOven')
+    expect(state.availableMajorImprovements).toContain('Major_ClayOven')
   })
 
   it('improvement-any with sourceCard applies computeCardCosts discount', () => {

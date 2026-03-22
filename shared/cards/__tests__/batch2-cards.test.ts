@@ -188,12 +188,11 @@ describe('C88_CarpentersApprentice', () => {
     expect(result).toBeUndefined()
   })
 
-  it('has correct modifier definition', () => {
+  it('uses listeners instead of a global construct modifier', () => {
     const card = C88Card as any
-    expect(card.modifier).toBeDefined()
-    expect(card.modifier.type).toBe('bonus')
-    expect(card.modifier.discount.wood).toBe(2)
-    expect(card.modifier.appliesTo).toContain('construct')
+    expect(card.modifier).toBeUndefined()
+    expect(findListener('C88-carpenters-apprentice-costs-construct')).toBeDefined()
+    expect(findListener('C88-carpenters-apprentice-before-fence')).toBeDefined()
   })
 })
 

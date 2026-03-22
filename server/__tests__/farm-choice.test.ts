@@ -2,6 +2,46 @@ import { describe, expect, it } from 'vitest'
 import { applyFarmChoice } from '../farm-choice.ts'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import type { PlayerState } from '../../shared/game/types.ts'
+import { buildRoomFarmInteraction } from '../farm-interaction.ts'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+
+const stableTradeModifiers: PlayerState['activeModifiers'] = [
+  {
+    type: 'trade',
+    cardId: 'Test_Stable_Clay',
+    appliesTo: ['stables'],
+    from: { clay: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+  {
+    type: 'trade',
+    cardId: 'Test_Stable_Stone',
+    appliesTo: ['stables'],
+    from: { stone: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+]
+
+const fenceTradeModifiers: PlayerState['activeModifiers'] = [
+  {
+    type: 'trade',
+    cardId: 'Test_Fence_Clay',
+    appliesTo: ['fencing'],
+    from: { clay: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+  {
+    type: 'trade',
+    cardId: 'Test_Fence_Stone',
+    appliesTo: ['fencing'],
+    from: { stone: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+]
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -86,25 +126,85 @@ describe('farm choice', () => {
     expect(result.meta?.newPastures).toHaveLength(1)
   })
 
-  it('treats fencing cost overrides as free fences', () => {
+  it('requires an explicit payment choice when multiple fence payments are legal', () => {
     const player = createPlayer()
-    player.resources.wood = 1
+    player.resources.wood = 0
+    player.resources.clay = 2
+    player.resources.stone = 2
+    player.activeModifiers = [...fenceTradeModifiers]
+    storePendingFenceBonus(player, {
+      sourceCard: 'E74_AshTrees',
+      counterKey: 'fences',
+      freeFences: 2,
+      incrementTriggerCount: true,
+    })
 
-    const result = applyFarmChoice(
-      player,
-      'fence',
-      {
-        edges: edgesForTile(1, 1),
-        extraWood: 0,
-      },
-      {
-        costOverride: { wood: -3 },
-      },
-    )
+    const result = applyFarmChoice(player, 'fence', {
+      edges: edgesForTile(1, 1),
+      extraWood: 0,
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe('payment choice required')
+  })
+
+  it('pays frame builder room costs using alternate clay payment', () => {
+    const player = createPlayer()
+    player.resources.wood = 4
+    player.resources.clay = 2
+    player.resources.reed = 2
+    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+
+    const interaction = buildRoomFarmInteraction(player)
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+
+    const result = applyFarmChoice(player, 'room', {
+      rooms: [interaction.selectableTiles[0]!],
+    })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.player.resources.wood).toBe(0)
-    expect(result.meta?.usedFreeFences).toBeUndefined()
+    expect(result.player.resources.clay).toBe(0)
+    expect(result.player.resources.reed).toBe(0)
+    expect(result.player.rooms).toBe(3)
+  })
+
+  it('requires an explicit payment choice when multiple room payments are legal', () => {
+    const player = createPlayer()
+    player.resources.wood = 4
+    player.resources.clay = 2
+    player.resources.stone = 2
+    player.resources.reed = 2
+    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+
+    const interaction = buildRoomFarmInteraction(player)
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+
+    const result = applyFarmChoice(player, 'room', {
+      rooms: [interaction.selectableTiles[0]!],
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe('payment choice required')
+  })
+
+  it('requires an explicit payment choice when multiple stable payments are legal', () => {
+    const player = createPlayer()
+    player.resources.clay = 2
+    player.resources.stone = 2
+    player.activeModifiers = [...stableTradeModifiers]
+
+    const result = applyFarmChoice(player, 'stable', {
+      stables: [{ row: 0, col: 1 }],
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe('payment choice required')
   })
 })

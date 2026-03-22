@@ -107,9 +107,6 @@ const totalTiles = FARM_ROWS * FARM_COLS
 export const computeScores = (state: GameState): PlayerScoreSummary[] =>
   state.players.map((player) => {
     const categories: ScoreCategoryResult[] = []
-    const soldierPairs = player.occupationPlayed.includes('C133_Soldier')
-      ? Math.min(player.resources.wood, player.resources.stone)
-      : 0
 
     const fieldCount = player.fields.length
     const fieldScore = scoreByRanges(fieldCount, ['0-1', '2', '3', '4', '5+'])
@@ -244,11 +241,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       if (!card) return
       cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
       if (card.scoring) {
-        const reservedBySoldier = card.scoring.resource === 'wood' ? soldierPairs : 0
-        const resourceCount = Math.max(
-          0,
-          (player.resources[card.scoring.resource] ?? 0) - reservedBySoldier,
-        )
+        const resourceCount = player.resources[card.scoring.resource] ?? 0
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
@@ -292,15 +285,29 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
         }
       })
     }
-    if (soldierPairs > 0) {
-      cardStateBonusVp += soldierPairs
-    }
     if (cardStateBonusVp > 0) {
       categories.push({
         key: 'cardStateBonusVp',
         total: cardStateBonusVp,
         entries: [{ type: 'bonus' as const, score: cardStateBonusVp }],
       })
+    }
+
+    const soldierBonus = player.occupationPlayed.includes('C133_Soldier')
+      ? Math.min(player.resources.wood, player.resources.stone)
+      : 0
+    if (soldierBonus > 0) {
+      const existing = categories.find((category) => category.key === 'cardStateBonusVp')
+      if (existing) {
+        existing.total += soldierBonus
+        existing.entries.push({ type: 'bonus' as const, score: soldierBonus })
+      } else {
+        categories.push({
+          key: 'cardStateBonusVp',
+          total: soldierBonus,
+          entries: [{ type: 'bonus' as const, score: soldierBonus }],
+        })
+      }
     }
 
     const beggingCount = player.resources.begging

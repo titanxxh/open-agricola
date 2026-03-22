@@ -1,4 +1,4 @@
-import type { FarmTilePosition, Resource } from '../../shared/game/types'
+import type { FarmTilePosition } from '../../shared/game/types'
 
 const backendHost =
   typeof window !== 'undefined' ? window.location.hostname : 'localhost'
@@ -21,12 +21,11 @@ export const validateFence = async (
 export const validateRoom = async (
   playerId: string,
   rooms: FarmTilePosition[],
-  costPerRoom: Partial<Resource>,
 ) => {
   const response = await fetch(`${apiBase}/api/game/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'room', playerId, payload: { rooms, costPerRoom } }),
+    body: JSON.stringify({ type: 'room', playerId, payload: { rooms } }),
   })
   return response.json()
 }

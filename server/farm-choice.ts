@@ -1,6 +1,16 @@
-import type { FarmTilePosition, Resource } from '../shared/game/types.ts'
-import { getBuildRoomCost } from '../shared/actions/effects/construct.ts'
-import { applyCostOverride, canPayResources } from '../shared/actions/effects/pay.ts'
+import type { ComplexCost, FarmTilePosition, PlayerState, Resource } from '../shared/game/types.ts'
+import { applyCostOverride, canPayResources, isComplexCost } from '../shared/actions/effects/pay.ts'
+import {
+  PAYMENT_CHOICE_REQUIRED_ERROR,
+  executeResolvedTypedFlatPayment,
+  resolveTypedFlatPaymentSelection,
+} from '../shared/actions/effects/pay-helpers.ts'
+import {
+  buildRoomCostPerUnit,
+  buildTotalRoomCost,
+  executeResolvedRoomPayment,
+  resolveRoomPaymentSelection,
+} from '../shared/actions/effects/room-payment.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import {
   normalizePlayerFarm,
@@ -27,8 +37,12 @@ type FarmChoicePayloadMap = {
 
 type FarmChoiceOptions = {
   costOverride?: Partial<Resource>
-  roomCostPerUnit?: Partial<Resource>
   maxUnits?: number
+  paymentChoice?: string
+  sowOptions?: {
+    maxSelections?: number
+    excludedFields?: FarmTilePosition[]
+  }
 }
 
 export type FarmChoiceApplyResult<T extends PlayerFarmState = PlayerFarmState> =
@@ -94,6 +108,14 @@ const payResourceCost = <T extends PlayerFarmState>(
   }
 }
 
+const getComplexCostError = (
+  player: PlayerFarmState,
+  cost: ComplexCost,
+) => {
+  const firstFee = cost.fees?.[0] ?? cost.fee
+  return firstFee ? getInsufficientResourceError(player, firstFee) : 'Not enough resources'
+}
+
 export const applyFarmChoice = <T extends PlayerFarmState>(
   player: T,
   farmType: FarmChoiceType,
@@ -105,31 +127,51 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
   switch (farmType) {
     case 'fence': {
       const { edges, extraWood } = payload as FarmChoicePayloadMap['fence']
-      const freeFencesFromCard =
-        readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
-      const freeFencesFromCost = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
-      const result = validateFenceSelection(
+      const freeFences = readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
+      const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
+      const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
+      const validated = validateFenceSelection(
         normalized,
         edges,
-        extraWood ?? 0,
-        freeFencesFromCard + freeFencesFromCost,
+        adjustedExtraWood,
+        freeFences,
+        { skipPayment: true },
       )
-      if (!result.ok) {
-        return { ok: false, error: result.error?.code ?? 'validation failed' }
+      if (!validated.ok) {
+        return { ok: false, error: validated.error?.code ?? 'validation failed' }
       }
+      const resolvedPayment = resolveTypedFlatPaymentSelection(
+        validated.player as unknown as PlayerState,
+        { wood: validated.payableWoodCost },
+        'pay:fence',
+        options.paymentChoice,
+        { type: 'fail', logKey: 'log.fencingFail' },
+        'fencing',
+      )
+      if (resolvedPayment.type !== 'selected') {
+        if (resolvedPayment.type === 'choice') {
+          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
+        }
+        if (options.paymentChoice) {
+          return { ok: false, error: 'invalid payment choice' }
+        }
+        return { ok: false, error: getInsufficientResourceError(normalized, { wood: validated.payableWoodCost }) }
+      }
+      const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
       const consumed = consumePendingFenceBonus(
-        result.player as unknown as PlayerState,
-        result.newEdges.length,
+        nextPlayer,
+        validated.newEdges.length,
       )
       return {
         ok: true,
-        player: result.player as T,
+        player: nextPlayer as unknown as T,
         meta: {
           ...(consumed
             ? { usedFreeFences: consumed.usedFreeFences, sourceCard: consumed.sourceCard }
             : {}),
-          newEdges: result.newEdges,
-          newPastures: result.newPastures as T['pastures'],
+          newEdges: validated.newEdges,
+          newPastures: validated.newPastures as T['pastures'],
         },
       }
     }
@@ -143,22 +185,39 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       ) {
         return { ok: false, error: 'too many rooms selected' }
       }
-      const costPerRoom = options.roomCostPerUnit ??
-        applyCostOverride(
-          getBuildRoomCost(normalized.houseType),
-          options.costOverride,
-        )
-      const totalCost = scaleCost(costPerRoom, rooms.length)
-      if (!canPayResources(normalized as any, totalCost)) {
-        return { ok: false, error: getInsufficientResourceError(normalized, totalCost) }
+      const costPerRoom = buildRoomCostPerUnit(
+        normalized as unknown as Pick<PlayerState, 'resources' | 'houseType' | 'activeModifiers'>,
+        options.costOverride,
+      )
+      const resolvedPayment = resolveRoomPaymentSelection(
+        normalized as unknown as PlayerState,
+        costPerRoom,
+        rooms.length,
+        options.paymentChoice,
+      )
+      if (resolvedPayment.type !== 'selected') {
+        if (resolvedPayment.type === 'choice') {
+          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
+        }
+        const totalCost = buildTotalRoomCost(costPerRoom, rooms.length)
+        if (options.paymentChoice) {
+          return { ok: false, error: 'invalid payment choice' }
+        }
+        return {
+          ok: false,
+          error: isComplexCost(totalCost)
+            ? getComplexCostError(normalized, totalCost)
+            : getInsufficientResourceError(normalized, totalCost),
+        }
       }
-      const updated = payResourceCost(normalized, totalCost)
+      const nextPlayer = JSON.parse(JSON.stringify(normalized)) as PlayerState
+      executeResolvedRoomPayment(nextPlayer, resolvedPayment)
       return {
         ok: true,
         player: {
-          ...updated,
-          roomTiles: [...updated.roomTiles, ...rooms],
-          rooms: updated.rooms + rooms.length,
+          ...(nextPlayer as unknown as T),
+          roomTiles: [...nextPlayer.roomTiles, ...rooms],
+          rooms: nextPlayer.rooms + rooms.length,
         } as T,
       }
     }
@@ -171,15 +230,30 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
         options.costOverride,
       )
       const totalCost = scaleCost(costPerStable, stables.length)
-      if (!canPayResources(normalized as any, totalCost)) {
+      const resolvedPayment = resolveTypedFlatPaymentSelection(
+        normalized as unknown as PlayerState,
+        totalCost,
+        'pay:stable',
+        options.paymentChoice,
+        { type: 'fail', logKey: 'log.buildStableFail' },
+        'stables',
+      )
+      if (resolvedPayment.type !== 'selected') {
+        if (resolvedPayment.type === 'choice') {
+          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
+        }
+        if (options.paymentChoice) {
+          return { ok: false, error: 'invalid payment choice' }
+        }
         return { ok: false, error: getInsufficientResourceError(normalized, totalCost) }
       }
-      const updated = payResourceCost(normalized, totalCost)
+      const nextPlayer = JSON.parse(JSON.stringify(normalized)) as PlayerState
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
       return {
         ok: true,
         player: {
-          ...updated,
-          stableTiles: [...updated.stableTiles, ...stables],
+          ...(nextPlayer as unknown as T),
+          stableTiles: [...nextPlayer.stableTiles, ...stables],
         } as T,
       }
     }
@@ -188,14 +262,30 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       const result = validatePlowSelection(normalized, tile)
       if (!result.ok) return { ok: false, error: result.error?.code ?? 'validation failed' }
       const plowCost = sanitizePayableCost(options.costOverride)
-      if (!canPayResources(result.player as any, plowCost)) {
+      const resolvedPayment = resolveTypedFlatPaymentSelection(
+        result.player as unknown as PlayerState,
+        plowCost,
+        'pay:plow',
+        options.paymentChoice,
+        { type: 'fail', logKey: 'log.action' },
+        'plow',
+      )
+      if (resolvedPayment.type !== 'selected') {
+        if (resolvedPayment.type === 'choice') {
+          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
+        }
+        if (options.paymentChoice) {
+          return { ok: false, error: 'invalid payment choice' }
+        }
         return { ok: false, error: getInsufficientResourceError(result.player, plowCost) }
       }
-      return { ok: true, player: payResourceCost(result.player, plowCost) as T }
+      const nextPlayer = JSON.parse(JSON.stringify(result.player)) as PlayerState
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
+      return { ok: true, player: nextPlayer as unknown as T }
     }
     case 'sow': {
       const { crops } = payload as FarmChoicePayloadMap['sow']
-      const result = validateSowSelection(normalized, crops)
+      const result = validateSowSelection(normalized, crops, options.sowOptions)
       return result.ok
         ? { ok: true, player: result.player as T }
         : { ok: false, error: result.error?.code ?? 'validation failed' }

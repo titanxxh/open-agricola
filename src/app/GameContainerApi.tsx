@@ -350,7 +350,6 @@ export const GameContainerApi = () => {
       if (interaction.farm.farmType === 'room') {
         void transport.commitFarm(pendingPlayerIndex, 'room', {
           rooms: pendingRoomTiles,
-          costPerRoom: interaction.farm.costPerRoom ?? {},
         }).catch((e) => console.error(e))
         return
       }
@@ -651,6 +650,10 @@ export const GameContainerApi = () => {
     () => (farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0),
     [farmInteraction],
   )
+  const maxSowSelections = useMemo(
+    () => (farmInteraction?.farmType === 'sow' ? farmInteraction.maxSelections : undefined),
+    [farmInteraction],
+  )
   const sowSelectedCount = Object.keys(pendingSowSelections).length
   const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
   const roomErrorText: string | null = roomError ? (typeof roomError === 'string' ? roomError : '') : null
@@ -783,7 +786,7 @@ export const GameContainerApi = () => {
   const wrappedTogglePlow = (tile: FarmTilePosition) =>
     togglePlowTileInternal(tile, positionKey)
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
-    updateSowSelectionInternal(tile, value, positionKey)
+    updateSowSelectionInternal(tile, value, maxSowSelections, positionKey)
   const setViewPlayerIdSafe = useCallback((value: string) => {
     if (lockedViewPlayerId) return
     setViewPlayerId(value)

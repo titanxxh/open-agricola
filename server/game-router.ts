@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game-session.ts'
 import { serializeState } from '../shared/game/serialization.ts'
-import type { Resource } from '../shared/game/types.ts'
 import { normalizePlayerFarm } from './fence-validation.ts'
 import { applyFarmChoice } from './farm-choice.ts'
 
@@ -201,10 +200,7 @@ export const handleGameRoute = async (
       return true
     }
     if (body.type === 'room') {
-      const { costPerRoom } = body.payload as { costPerRoom: Partial<Resource> }
-      const result = applyFarmChoice(player, 'room', body.payload as any, {
-        roomCostPerUnit: costPerRoom,
-      })
+      const result = applyFarmChoice(player, 'room', body.payload as any)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }

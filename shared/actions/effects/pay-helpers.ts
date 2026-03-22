@@ -19,8 +19,11 @@ import {
   executePaymentSolution,
   getModifiersForCostType,
   isComplexCost,
+  PAYMENT_RESOURCE_ORDER,
   payResources,
+  sortPaymentSolutions,
 } from './pay'
+import { en } from '../../i18n/en'
 import {
   executeCardListener,
   getMatchingListeners,
@@ -112,6 +115,8 @@ export const canAffordFlatCost = (
   costOverride?: Partial<Resource>,
 ) => canAffordCost(player, resolveFlatCost(baseCost, costOverride))
 
+export const PAYMENT_CHOICE_REQUIRED_ERROR = 'payment choice required'
+
 const getTypedCostModifiers = (
   player: PlayerState,
   costType?: CostModifierType,
@@ -201,6 +206,87 @@ const resolveTypedFlatPaymentSolution = (
     type: 'solution' as const,
     solution,
   }
+}
+
+type TypedFlatPaymentSelection =
+  | ActionExecutionResult
+  | {
+      type: 'selected'
+      solution: PaymentSolution
+    }
+
+const normalizePaymentChoiceValue = (
+  paymentChoice: string | undefined,
+  optionValuePrefix: string,
+) => {
+  if (!paymentChoice) return undefined
+  const prefix = `${optionValuePrefix}:`
+  return paymentChoice.startsWith(prefix)
+    ? paymentChoice.slice(prefix.length)
+    : paymentChoice
+}
+
+type ResolveCostPaymentSelectionOptions = {
+  costType?: CostModifierType
+  includeReturnedCard?: boolean
+}
+
+export const resolveCostPaymentSelection = (
+  player: PlayerState,
+  cost: Partial<Resource> | ComplexCost,
+  optionValuePrefix: string,
+  paymentChoice: string | undefined,
+  failure: ActionExecutionResult,
+  options: ResolveCostPaymentSelectionOptions = {},
+):
+  | ActionExecutionResult
+  | {
+      type: 'selected'
+      solution: PaymentSolution
+    } => {
+  const normalizedCost = isComplexCost(cost)
+    ? cost
+    : { fee: cost }
+  const solutions = computeAllBuyableCombinations(
+    player,
+    normalizedCost,
+    undefined,
+    options.costType,
+  )
+  return resolvePaymentSolutionSelection(
+    solutions,
+    normalizePaymentChoiceValue(paymentChoice, optionValuePrefix),
+    optionValuePrefix,
+    options.includeReturnedCard ?? false,
+    failure,
+  )
+}
+
+export const resolveTypedFlatPaymentSelection = (
+  player: PlayerState,
+  baseCost: Partial<Resource>,
+  optionValuePrefix: string,
+  paymentChoice: string | undefined,
+  failure: ActionExecutionResult,
+  costType?: CostModifierType,
+): TypedFlatPaymentSelection => {
+  return resolveCostPaymentSelection(
+    player,
+    baseCost,
+    optionValuePrefix,
+    paymentChoice,
+    failure,
+    {
+      costType,
+    },
+  )
+}
+
+export const executeResolvedTypedFlatPayment = (
+  player: PlayerState,
+  payment: Extract<TypedFlatPaymentSelection, { type: 'selected' }>,
+) => {
+  executePaymentSolution(player, payment.solution)
 }
 
 export const canAffordTypedFlatCost = (
@@ -321,30 +407,59 @@ const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
 ) => {
-  const resourcesDesc = Object.entries(solution.resourcesPaid)
-    .filter(([, v]) => (v ?? 0) > 0)
-    .map(([k, v]) => `${k}:${v}`)
+  const resourcesDesc = PAYMENT_RESOURCE_ORDER
+    .map((key) => [key, solution.resourcesPaid[key] ?? 0] as const)
+    .filter(([, amount]) => amount > 0)
+    .map(([key, amount]) => `${key}:${amount}`)
     .join(', ')
 
+  const baseDesc = resourcesDesc || 'free'
+
   if (!includeReturnedCard || !solution.cardUsed) {
-    return resourcesDesc
+    return baseDesc
   }
 
-  return `${resourcesDesc} (return ${solution.cardUsed})`
+  return `${baseDesc} (return ${getPaymentCardDisplayName(solution.cardUsed)})`
+}
+
+const getPaymentCardDisplayName = (cardId: string) => {
+  const majorName = (en as unknown as {
+    improvements?: Record<string, { name?: string }>
+  }).improvements?.[cardId]?.name
+  if (majorName) return majorName
+
+  const minorName = (en as unknown as {
+    minorImprovements?: Record<string, { name?: string }>
+  }).minorImprovements?.[cardId]?.name
+  if (minorName) return minorName
+
+  const occupationName = (en as unknown as {
+    occupations?: Record<string, { name?: string }>
+  }).occupations?.[cardId]?.name
+  if (occupationName) return occupationName
+
+  if (cardId.startsWith('Major_')) {
+    return cardId.slice('Major_'.length).replaceAll('_', ' ')
+  }
+
+  return cardId
 }
 
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
   optionValuePrefix: string,
   includeReturnedCard = false,
-): ActionExecutionResult => ({
+): ActionExecutionResult => {
+  const orderedSolutions = sortPaymentSolutions(solutions)
+  return {
   type: 'choice',
   promptKey: 'prompt.selectPayment',
-  options: solutions.map((solution, idx) => ({
+  options: orderedSolutions.map((solution, idx) => ({
     value: `${optionValuePrefix}:${idx}`,
     labelKey: describePaymentSolution(solution, includeReturnedCard),
   })),
-})
+}
+}
 
 export const resolvePaymentSolutionSelection = (
   solutions: PaymentSolution[],
@@ -355,17 +470,18 @@ export const resolvePaymentSolutionSelection = (
 ):
   | ActionExecutionResult
   | { type: 'selected'; solution: PaymentSolution } => {
-  if (solutions.length === 0) {
+  const orderedSolutions = sortPaymentSolutions(solutions)
+  if (orderedSolutions.length === 0) {
     return failure
   }
 
-  if (solutions.length === 1 && paymentChoice === undefined) {
-    return { type: 'selected', solution: solutions[0] }
+  if (orderedSolutions.length === 1 && paymentChoice === undefined) {
+    return { type: 'selected', solution: orderedSolutions[0] }
   }
 
   if (paymentChoice !== undefined) {
     const choiceIndex = parseInt(paymentChoice, 10)
-    const solution = solutions[choiceIndex]
+    const solution = orderedSolutions[choiceIndex]
     if (!solution) {
       return failure
     }
@@ -373,7 +489,7 @@ export const resolvePaymentSolutionSelection = (
   }
 
   return buildPaymentChoiceResult(
-    solutions,
+    orderedSolutions,
     optionValuePrefix,
     includeReturnedCard,
   )

@@ -83,6 +83,7 @@ export const useFarmSelection = () => {
   const updateSowSelection = (
     tile: FarmTilePosition,
     value: string,
+    maxSowSelections: number | undefined,
     positionKey: (tile: FarmTilePosition) => string,
   ) => {
     const key = positionKey(tile)
@@ -93,6 +94,15 @@ export const useFarmSelection = () => {
         return next
       }
       if (value !== 'grain' && value !== 'vegetable') return prev
+      const alreadySelected = Object.prototype.hasOwnProperty.call(prev, key)
+      if (
+        !alreadySelected &&
+        typeof maxSowSelections === 'number' &&
+        maxSowSelections >= 0 &&
+        Object.keys(prev).length >= maxSowSelections
+      ) {
+        return prev
+      }
       return { ...prev, [key]: value }
     })
     setSowError(null)

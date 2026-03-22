@@ -54,7 +54,7 @@ export type ComplexCost = {
   fee?: Partial<Resource>
   fees?: Partial<Resource>[]
   trades?: Trade[]
-  cards?: { type: string; list: string[]; cost?: Partial<Resource> }
+  cards?: { type: string; list: string[]; cost?: Partial<Resource>; required?: boolean }
   bonuses?: Bonus[]
 }
 
@@ -154,6 +154,18 @@ export type FutureMeepleRequest = {
   resources: Partial<Resource>
 }
 
+export type HarvestReapSummary = {
+  resources: Partial<Resource>
+  grainFields: number
+  vegetableFields: number
+}
+
+export type HarvestBreedSummary = {
+  resources: Partial<Resource>
+  animalTypes: number
+  animalCount: number
+}
+
 export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' | 'field' | 'feeding' | 'breeding'
 
 export type GameState = {
@@ -171,6 +183,8 @@ export type GameState = {
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
   workPhaseObtainedResources: Record<string, Partial<Resource>>
+  harvestReapSummary?: Record<string, HarvestReapSummary>
+  harvestBreedSummary?: Record<string, HarvestBreedSummary>
 }
 
 export type CanBeExecutedByPlayer = (
@@ -302,7 +316,6 @@ export type InteractionFarmSelection =
       farmType: 'room'
       selectableTiles: FarmTilePosition[]
       maxSelections: number
-      costPerRoom?: Partial<Resource>
     }
   | {
       farmType: 'stable'
@@ -319,6 +332,7 @@ export type InteractionFarmSelection =
         tile: FarmTilePosition
         allowedCrops: ('grain' | 'vegetable')[]
       }[]
+      maxSelections?: number
     }
 
 type InteractionBase = {

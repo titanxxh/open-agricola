@@ -9,13 +9,8 @@ import { constructAction } from '../../actions/effects/construct'
 import { A28_ForestSchool as A28Card } from '../A/A28_ForestSchool'
 
 import '../A/A28_ForestSchool'
-import '../A/A88_HedgeKeeper'
-import '../A/A123_FrameBuilder'
 import '../A/A128_RiparianBuilder'
-import '../B/B94_StockProtector'
 import '../B/B109_PaperMaker'
-import '../C/C88_CarpentersApprentice'
-import '../D/D14_HammerCrusher'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -224,127 +219,6 @@ describe('A128_RiparianBuilder', () => {
     } as any, constructAction, false)
 
     expect(result).toBe(true)
-  })
-})
-
-describe('A88_HedgeKeeper', () => {
-  it('returns a 3-wood fence discount via computeCosts', () => {
-    const listener = findListener('A88-hedge-keeper-costs-fence')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.occupationPlayed = ['A88_HedgeKeeper']
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('fencing'),
-      actionId: 'fence',
-      phase: 'computeCosts',
-    } as any)
-
-    expect(result?.costs).toEqual({ wood: -3 })
-  })
-})
-
-describe('A123_FrameBuilder', () => {
-  it('replaces 2 clay with 1 wood when building clay rooms', () => {
-    const listener = findListener('A123-frame-builder-costs')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.occupationPlayed = ['A123_FrameBuilder']
-    player.houseType = 'clay'
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('farm-expansion'),
-      actionId: 'construct',
-      phase: 'computeCosts',
-    } as any)
-
-    expect(result?.costs).toEqual({ wood: 1, clay: -2 })
-  })
-
-  it('replaces 2 stone with 1 wood when renovating/building stone rooms', () => {
-    const listener = findListener('A123-frame-builder-costs')
-    const player = createPlayer()
-    player.occupationPlayed = ['A123_FrameBuilder']
-    player.houseType = 'stone'
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('house-redevelopment'),
-      actionId: 'renovate-house',
-      phase: 'computeCosts',
-    } as any)
-
-    expect(result?.costs).toEqual({ wood: 1, stone: -2 })
-  })
-})
-
-describe('B94_StockProtector', () => {
-  it('makes fencing doable when its 2 wood gain covers the missing cost', () => {
-    const listener = findListener('B94-stock-protector-isdoable-fencing')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.minorPlayed = ['B94_StockProtector']
-    player.resources.wood = 2
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('fencing'),
-      actionId: 'fence',
-      phase: 'isDoable',
-      doable: false,
-    } as any)
-
-    expect(result?.doable).toBe(true)
-  })
-})
-
-describe('C88_CarpentersApprentice fence discount', () => {
-  it('discounts the 13th to 15th fences only', () => {
-    const listener = findListener('C88-carpenters-apprentice-costs-fence')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.occupationPlayed = ['C88_CarpentersApprentice']
-    player.fences = 13
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('fencing'),
-      actionId: 'fence',
-      phase: 'computeCosts',
-    } as any)
-
-    expect(result?.costs).toEqual({ wood: -2 })
-  })
-})
-
-describe('D14_HammerCrusher', () => {
-  it('makes stone renovation doable after its before-gain bonus', () => {
-    const listener = findListener('D14-hammer-crusher-isdoable-renovate')
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.minorPlayed = ['D14_HammerCrusher']
-    player.houseType = 'clay'
-    player.rooms = 2
-    player.resources.stone = 2
-    player.resources.reed = 1
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('house-redevelopment'),
-      actionId: 'renovate-house',
-      phase: 'isDoable',
-      doable: false,
-    } as any)
-
-    expect(result?.doable).toBe(true)
   })
 })
 

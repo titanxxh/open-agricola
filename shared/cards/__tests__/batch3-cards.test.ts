@@ -102,8 +102,8 @@ describe('C144_ReedRoofRenovator', () => {
 })
 
 describe('B100_Clutterer', () => {
-  it('grants bonus vp when a later occupation mentions accumulation spaces', () => {
-    const listener = findListener('B100-clutterer-after-card')
+  it('increments triggerCount after playing occupation', () => {
+    const listener = findListener('B100-clutterer-after-occupation')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -112,40 +112,27 @@ describe('B100_Clutterer', () => {
 
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'after', choice: 'A108_MushroomCollector',
+      actionId: 'play-occupation', phase: 'after',
     } as any)
     expect(result?.logKey).toBe('log.cardEffectTrigger')
     expect(result?.logParams?.cardId).toBe('B100_Clutterer')
-    expect(player.cardStates?.B100_Clutterer?.counters?.bonusVp).toBe(1)
     expect(player.cardStates?.B100_Clutterer?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger when card not played', () => {
-    const listener = findListener('B100-clutterer-after-card')
+    const listener = findListener('B100-clutterer-after-occupation')
     const player = createPlayer()
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'after', choice: 'A108_MushroomCollector',
+      actionId: 'play-occupation', phase: 'after',
     } as any)
     expect(result).toBeUndefined()
   })
 
-  it('ignores later cards without accumulation-space text', () => {
-    const listener = findListener('B100-clutterer-after-card')
-    const player = createPlayer()
-    player.occupationPlayed = ['B100_Clutterer']
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('play-occupation'),
-      actionId: 'play-occupation',
-      phase: 'after',
-      choice: 'A123_FrameBuilder',
-    } as any)
-
-    expect(result).toBeUndefined()
+  it('only matches play-occupation action', () => {
+    const listener = findListener('B100-clutterer-after-occupation')
+    expect(listener!.actions).toEqual(['play-occupation'])
   })
 })

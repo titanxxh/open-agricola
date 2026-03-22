@@ -2,34 +2,61 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { TradeModifier } from '../../game/types'
+import type { PlayerState, TradeModifier } from '../../game/types'
+import { canAffordCost } from '../../actions/effects/pay-helpers'
+import { getBuildRoomCost } from '../../actions/effects/construct'
+import { getRenovation } from '../../actions/effects/renovation'
 
 const CARD_ID = 'A123_FrameBuilder'
 
-const buildCostAdjustment = (context: CardListenerContext) => {
-  if (context.player.houseType === 'clay') {
-    return { wood: 1, clay: -2 }
+const buildConstructOptions = (player: PlayerState) => {
+  const baseCost = getBuildRoomCost(player.houseType)
+  const options = [{ ...baseCost }]
+  if ((baseCost.wood ?? 0) >= 1) {
+    options.push({ ...baseCost, wood: (baseCost.wood ?? 0) - 1, clay: (baseCost.clay ?? 0) + 2 })
+    options.push({ ...baseCost, wood: (baseCost.wood ?? 0) - 1, stone: (baseCost.stone ?? 0) + 2 })
   }
-  if (context.player.houseType === 'stone') {
-    return { wood: 1, stone: -2 }
+  if ((baseCost.clay ?? 0) >= 2) {
+    options.push({ ...baseCost, clay: (baseCost.clay ?? 0) - 2, wood: (baseCost.wood ?? 0) + 1 })
   }
-  return undefined
+  if ((baseCost.stone ?? 0) >= 2) {
+    options.push({ ...baseCost, stone: (baseCost.stone ?? 0) - 2, wood: (baseCost.wood ?? 0) + 1 })
+  }
+  return options
 }
 
-const computeCostsListener: CardListenerRegistration = {
-  id: 'A123-frame-builder-costs',
+const buildRenovationOptions = (player: PlayerState) => {
+  const renovation = getRenovation(player)
+  if (!renovation) return []
+  const baseCost = renovation.cost
+  const options = [{ ...baseCost }]
+  if ((baseCost.clay ?? 0) >= 2) {
+    options.push({ ...baseCost, clay: (baseCost.clay ?? 0) - 2, wood: (baseCost.wood ?? 0) + 1 })
+  }
+  if ((baseCost.stone ?? 0) >= 2) {
+    options.push({ ...baseCost, stone: (baseCost.stone ?? 0) - 2, wood: (baseCost.wood ?? 0) + 1 })
+  }
+  return options
+}
+
+const isDoableListener: CardListenerRegistration = {
+  id: 'A123-frame-builder-isdoable-building',
   cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
+  phases: ['isDoable' as ActionHookPhase],
   actions: ['construct', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    const costs = buildCostAdjustment(context)
-    if (!costs) return
-    return { costs }
+    if (context.doable) return
+    const options =
+      context.actionId === 'construct'
+        ? buildConstructOptions(context.player)
+        : buildRenovationOptions(context.player)
+    if (options.some((cost) => canAffordCost(context.player, cost))) {
+      return { doable: true }
+    }
   },
 }
 
-registerCardListener(computeCostsListener)
+registerCardListener(isDoableListener)
 
 export const A123_FrameBuilder = new Occupation({
   id: CARD_ID,
@@ -40,12 +67,38 @@ export const A123_FrameBuilder = new Occupation({
   desc: ["Each time you build a room/renovate, but only once per room/action, you can replace exactly 2 <CLAY> or 2 <STONE> with 1 <WOOD>."],
   cost: {},
   players: "1+",
-  modifier: {
-    type: 'trade',
-    cardId: CARD_ID,
-    appliesTo: ['construct', 'renovation'],
-    from: { clay: 2 },
-    to: { wood: 1 },
-    max: 1,
-  } as TradeModifier,
+  modifiers: [
+    {
+      type: 'trade',
+      cardId: CARD_ID,
+      appliesTo: ['construct'],
+      from: { clay: 2 },
+      to: { wood: 1 },
+      max: 1,
+    },
+    {
+      type: 'trade',
+      cardId: CARD_ID,
+      appliesTo: ['construct'],
+      from: { stone: 2 },
+      to: { wood: 1 },
+      max: 1,
+    },
+    {
+      type: 'trade',
+      cardId: CARD_ID,
+      appliesTo: ['construct', 'renovation'],
+      from: { wood: 1 },
+      to: { clay: 2 },
+      max: 2,
+    },
+    {
+      type: 'trade',
+      cardId: CARD_ID,
+      appliesTo: ['construct', 'renovation'],
+      from: { wood: 1 },
+      to: { stone: 2 },
+      max: 2,
+    },
+  ] as TradeModifier[],
 })
