@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState, type SerializedGameState } from '../shared/game/serialization'
 import { createInitialState } from '../shared/logic/state'
+import { getCardModifiers } from '../shared/cards/card-modifiers'
 
 describe('shared/game/serialization', () => {
   const state = createInitialState(42)
@@ -82,6 +83,22 @@ describe('shared/game/serialization', () => {
       expect(restored.round).toBe(state.round)
       expect(restored.players.length).toBe(state.players.length)
       expect(restored.actionSpaces.length).toBeGreaterThan(0)
+    })
+
+    it('rebuilds missing activeModifiers from played cards', () => {
+      const modified = createInitialState(42)
+      const player = modified.players[0]!
+      player.minorPlayed.push('A14_CarpentersHammer')
+      player.playedCards.push('minor:A14_CarpentersHammer')
+      player.activeModifiers = []
+
+      const serialized = serializeState(modified)
+      serialized.players[0]!.activeModifiers = []
+
+      const restored = rehydrateState(serialized)
+      expect(restored.players[0]!.activeModifiers).toEqual(
+        getCardModifiers('A14_CarpentersHammer'),
+      )
     })
   })
 })

@@ -1,6 +1,7 @@
 import type { ActionSpace, GameState } from './types'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
+import { getCardModifiers } from '../cards/card-modifiers'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
@@ -30,6 +31,20 @@ export const serializeState = (state: GameState): SerializedGameState => {
 export const rehydrateState = (raw: SerializedGameState): GameState => {
   const templates = createActionSpaces()
   const restored = normalizeState(raw as unknown as GameState)
+  restored.players.forEach((player) => {
+    const existing = player.activeModifiers ?? []
+    const next = [...existing]
+    const playedCardIds = [...(player.minorPlayed ?? []), ...(player.occupationPlayed ?? [])]
+    playedCardIds.forEach((cardId) => {
+      const modifiers = getCardModifiers(cardId)
+      modifiers.forEach((modifier) => {
+        if (!next.some((entry) => JSON.stringify(entry) === JSON.stringify(modifier))) {
+          next.push(modifier)
+        }
+      })
+    })
+    player.activeModifiers = next
+  })
   restored.actionSpaces = templates.map((template) => {
     const saved = raw.actionSpaces?.find((s) => s.id === template.id)
     return {
