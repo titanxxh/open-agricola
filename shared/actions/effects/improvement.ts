@@ -4,6 +4,7 @@ import { getMinorImprovement } from '../../game/minor-improvements'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
 import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
+import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
 import {
   canAffordCost,
@@ -151,6 +152,19 @@ const canAffordMajorImprovement = (
     actionCardId,
   )
 
+export const isMajorImprovementPlayable = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  actionCardId = 'improvement-any',
+  allowedPurchases?: string[],
+) => {
+  if (allowedPurchases && !allowedPurchases.includes(improvementId)) {
+    return false
+  }
+  return canAffordMajorImprovement(state, player, improvementId, actionCardId)
+}
+
 const canAffordMinorImprovement = (
   state: GameState,
   player: PlayerState,
@@ -174,6 +188,22 @@ const canAffordMinorImprovement = (
   return canAffordCost(player, previewCost)
 }
 
+export const isMinorImprovementPlayable = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  actionCardId = 'minor-improvement',
+  allowedPurchases?: string[],
+) => {
+  const improvement = getMinorImprovement(improvementId)
+  if (!improvement || !player.minorHand.includes(improvement.id)) return false
+  if (allowedPurchases && !allowedPurchases.includes(improvement.id)) {
+    return false
+  }
+  if (!meetsCardPrerequisites(player, improvement)) return false
+  return canAffordMinorImprovement(state, player, improvement, actionCardId)
+}
+
 const buildPlayableMinorOptions = (
   state: GameState,
   player: PlayerState,
@@ -185,6 +215,7 @@ const buildPlayableMinorOptions = (
       (improvement): improvement is ResolvedMinorImprovement =>
         !!improvement,
     )
+    .filter((improvement) => meetsCardPrerequisites(player, improvement))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -225,6 +256,7 @@ const buildMinorImprovementOptions = (
       (improvement): improvement is ResolvedMinorImprovement =>
         !!improvement,
     )
+    .filter((improvement) => meetsCardPrerequisites(player, improvement))
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
@@ -437,6 +469,9 @@ const playMinorImprovement = (
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
   if (!player.minorHand.includes(improvement.id)) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
+  if (!meetsCardPrerequisites(player, improvement)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
   const targetImprovement: ResolvedMinorImprovement = improvement

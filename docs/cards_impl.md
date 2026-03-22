@@ -1,5 +1,7 @@
 # 卡牌实现与 Hook 覆盖清单
 
+注：`A92_AdoptiveParents` 已更正为职业卡，并从小改良注册表移至职业注册表。
+
 ## 原子行动 Hook 覆盖矩阵
 
 每个原子行动在各 Hook 点至少给出一张卡牌示例。一张卡牌如果注册了多个 hook，应在所有对应的格子中出现。
@@ -51,6 +53,7 @@
 注：`card-choice` 与农场类选择现在统一走服务端 `interaction` 协议对外暴露；前端不再依赖本地 `promptKey` 规则推导可选格/可选边，只消费服务端下发的白名单 args。
 注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。
 注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
+注：`minor-improvement` / `improvement-any` 现在还会统一复用卡面 prerequisite 校验；除了 `occupationPrerequisites` / `improvementPrerequisites` 这类结构化字段外，也已接入一批常见文本前提（如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`）。因此这类前提会同时影响行动格开放性、改良选项列表，以及最终服务端提交校验。
 注：近期新增了几层 BGA 风格卡牌 helper：`pay-gain-node`（含 `payGainFlow/payThenGainFlow/payThenActionFlow/returnToSpaceThenGainFlow`）、`stage-effects`、`card-state/round-placement`、`action-snapshot`，并给 flow 叶子节点补了自定义 choice label。像 `A108_MushroomCollector`、`B109_PaperMaker`、`C96_Merchant`、`E128_Saddler`、`A37_Bucksaw`、`C75_Firewood`、`D119_WoodBarterer` 已从单卡手写流程收敛到公共抽象；`A17_ReclamationPlow`、`D150_GodlySpouse`、`A74_StableTree` 这类时序卡也不再手写散落的 `flagged/placedThisTurn/usedRound` 过程状态；同时 `B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter` 的阶段型 hook 已切到服务端 `Engine` 驱动的 `ActionFlow`，不再走即时 imperative 结算。
 注：`fence` 的提交链现已把“本次新建 pasture delta”连同 `newEdges` 一起挂到 `ActionExecutionResult.extraData`，因此 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接读取 `result.extraData.newPastures` / `result.extraData.newEdges`。`A83_ShepherdsCrook` 已切到这条通用链路，不再维护额外的累计 pasture 计数。
 注：e2e 回归默认使用 2 人局，减少回合内放置次数与状态噪声。

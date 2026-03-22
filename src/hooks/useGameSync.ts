@@ -15,10 +15,12 @@ export const useGameSync = () => {
     anytimeActions: [],
   })
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
+  const [pastureCapacities, setPastureCapacities] = useState<Record<string, Record<string, number>>>({})
   const [error, setError] = useState<string | null>(null)
   const [historyLength, setHistoryLength] = useState(0)
   const [hasActionStartSnapshot, setHasActionStartSnapshot] = useState(false)
   const [actionAvailability, setActionAvailability] = useState<Record<string, boolean>>({})
+  const [cardAvailability, setCardAvailability] = useState<Record<string, boolean>>({})
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -33,10 +35,12 @@ export const useGameSync = () => {
     setPending(payload.pending)
     setInteraction(payload.interaction)
     setScores(payload.scores ?? null)
+    setPastureCapacities(payload.pastureCapacities ?? {})
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
     setHistoryLength(payload.historyLength ?? 0)
     setHasActionStartSnapshot(payload.hasActionStartSnapshot ?? false)
     setActionAvailability(payload.actionAvailability ?? {})
+    setCardAvailability(payload.cardAvailability ?? {})
   }, [])
 
   return {
@@ -44,10 +48,12 @@ export const useGameSync = () => {
     pending,
     interaction,
     scores,
+    pastureCapacities,
     error,
     historyLength,
     hasActionStartSnapshot,
     actionAvailability,
+    cardAvailability,
     applySnapshot,
   }
 }

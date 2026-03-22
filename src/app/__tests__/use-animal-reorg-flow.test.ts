@@ -71,10 +71,10 @@ const player = (): PlayerState => ({
 const animalReorgState = (): AnimalReorgState => ({
   confirmDiscard: false,
   zones: [
-    { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 4 },
-    { id: 'pasture-2', zoneType: 'pasture', animalType: null, animalCount: 0 },
-    { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 3 },
-    { id: 'stable:1-1', zoneType: 'stable', animalType: 'cattle', animalCount: 1 },
+    { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 4, capacity: 4 },
+    { id: 'pasture-2', zoneType: 'pasture', animalType: null, animalCount: 0, capacity: 4 },
+    { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 3, capacity: 1 },
+    { id: 'stable:1-1', zoneType: 'stable', animalType: 'cattle', animalCount: 1, capacity: 1 },
   ],
 })
 

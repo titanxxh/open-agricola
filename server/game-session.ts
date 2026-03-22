@@ -9,6 +9,7 @@ import type {
   PendingAction,
   PlayerState,
   Resource,
+  InteractionAnimalReorgZone,
 } from '../shared/game/types.ts'
 import { actionDefinitions } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
@@ -60,7 +61,7 @@ import {
 import { positionKey } from '../shared/game/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
-import { getPastureCapacity } from '../shared/actions/effects/animals.ts'
+import { getLooseStableKeys, getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
@@ -72,6 +73,14 @@ import { applyFarmChoice } from './farm-choice.ts'
 import {
   applyCostOverride,
 } from '../shared/actions/effects/pay.ts'
+import {
+  isMajorImprovementPlayable,
+  isMinorImprovementPlayable,
+} from '../shared/actions/effects/improvement.ts'
+import {
+  getOccupationActionCost,
+  isOccupationPlayable,
+} from '../shared/actions/effects/occupation.ts'
 import {
   resolveTypedFlatPaymentSelection,
 } from '../shared/actions/effects/pay-helpers.ts'
@@ -154,7 +163,9 @@ export type SessionResponse = {
   historyLength: number
   hasActionStartSnapshot: boolean
   scores?: PlayerScoreSummary[]
+  pastureCapacities?: Record<string, Record<string, number>>
   actionAvailability?: Record<string, boolean>
+  cardAvailability?: Record<string, boolean>
   error?: string
 }
 
@@ -485,13 +496,43 @@ export class GameSession {
     return anytimeEntries
   }
 
+  private buildAnimalReorgZones(
+    player: PlayerState,
+  ): InteractionAnimalReorgZone[] {
+    return [
+      ...player.pastures.map((pasture) => ({
+        id: pasture.id,
+        zoneType: 'pasture' as const,
+        animalType: pasture.animalType,
+        animalCount: pasture.animalCount,
+        capacity: getPastureCapacity(pasture),
+      })),
+      {
+        id: 'house',
+        zoneType: 'house' as const,
+        animalType: player.houseAnimalType ?? null,
+        animalCount: player.houseAnimalCount ?? 0,
+        capacity: 1,
+      },
+      ...getLooseStableKeys(player).map((key) => ({
+        id: `stable:${key}`,
+        zoneType: 'stable' as const,
+        animalType: player.stableAnimals?.[key] ?? null,
+        animalCount: player.stableAnimals?.[key] ? 1 : 0,
+        capacity: 1,
+      })),
+    ]
+  }
+
   private buildInteraction(): InteractionState {
     // Fast paths: skip expensive anytime/farm computation for states that don't need them
     if (this.pending.type === 'animalReorg') {
+      const player = this.state.players[this.pending.playerIndex]
       return {
         stateId: 'animalReorg',
         playerIndex: this.pending.playerIndex,
         spaceId: this.pending.spaceId,
+        zones: player ? this.buildAnimalReorgZones(player) : [],
         allowedCommands: ['confirmReorg', 'undoStep', 'undoAction'],
         anytimeActions: [],
       }
@@ -571,13 +612,17 @@ export class GameSession {
       interaction: this.buildInteraction(),
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
+      scores: computeScores(this.state),
+      pastureCapacities: this.getPastureCapacities(),
     }
-    if (this.state.gameOver) {
-      resp.scores = computeScores(this.state)
-    }
-    // Include action availability for current player
+    // Include backend-computed availability for current player
     if (!this.state.gameOver && this.pending.type === 'none') {
-      resp.actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
+      const actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
+      resp.actionAvailability = actionAvailability
+      resp.cardAvailability = this.getCardAvailability(
+        this.state.currentPlayerIndex,
+        actionAvailability,
+      )
     }
     if (error) resp.error = error
     return resp
@@ -1221,6 +1266,78 @@ export class GameSession {
       )
     }
 
+    return result
+  }
+
+  getCardAvailability(
+    playerIndex: number,
+    actionAvailability = this.getActionAvailability(playerIndex),
+  ): Record<string, boolean> {
+    const player = this.state.players[playerIndex]
+    if (!player) return {}
+
+    const canUseMinorImprovement =
+      actionAvailability['meeting-place'] === true ||
+      actionAvailability['wish-children'] === true
+    const canUseImprovementAny =
+      actionAvailability['major-improvement'] === true ||
+      actionAvailability['house-redevelopment'] === true
+
+    const occupationCosts: Partial<Resource>[] = []
+    if (actionAvailability.lessons === true) {
+      occupationCosts.push(getOccupationActionCost(player, 'lessons'))
+    }
+    if (actionAvailability['lessons-4'] === true) {
+      occupationCosts.push(getOccupationActionCost(player, 'lessons-4'))
+    }
+
+    const result: Record<string, boolean> = {}
+
+    player.occupationHand.forEach((occupationId) => {
+      result[`occupation:${occupationId}`] = occupationCosts.some((cost) =>
+        isOccupationPlayable(player, occupationId, cost),
+      )
+    })
+
+    player.minorHand.forEach((improvementId) => {
+      result[`minor:${improvementId}`] =
+        (canUseMinorImprovement &&
+          isMinorImprovementPlayable(
+            this.state,
+            player,
+            improvementId,
+            'minor-improvement',
+          )) ||
+        (canUseImprovementAny &&
+          isMinorImprovementPlayable(
+            this.state,
+            player,
+            improvementId,
+            'improvement-any',
+          ))
+    })
+
+    this.state.availableMajorImprovements.forEach((improvementId) => {
+      result[`major:${improvementId}`] =
+        canUseImprovementAny &&
+        isMajorImprovementPlayable(
+          this.state,
+          player,
+          improvementId,
+          'improvement-any',
+        )
+    })
+
+    return result
+  }
+
+  getPastureCapacities(): Record<string, Record<string, number>> {
+    const result: Record<string, Record<string, number>> = {}
+    this.state.players.forEach((player) => {
+      result[player.id] = Object.fromEntries(
+        player.pastures.map((pasture) => [pasture.id, getPastureCapacity(pasture)]),
+      )
+    })
     return result
   }
 

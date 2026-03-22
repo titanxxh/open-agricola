@@ -306,6 +306,14 @@ export type AnytimeAction = {
   sourceCard?: string
 }
 
+export type InteractionAnimalReorgZone = {
+  id: string
+  zoneType: 'pasture' | 'house' | 'stable'
+  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalCount: number
+  capacity: number
+}
+
 export type InteractionFarmSelection =
   | {
       farmType: 'fence'
@@ -363,6 +371,7 @@ export type InteractionState =
       stateId: 'animalReorg'
       playerIndex: number
       spaceId: string
+      zones: InteractionAnimalReorgZone[]
     })
   | (InteractionBase & {
       stateId: 'harvestFeed'

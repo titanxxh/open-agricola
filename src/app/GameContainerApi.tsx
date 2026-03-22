@@ -4,16 +4,10 @@ import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
-import { getLooseStableKeys, getPastureCapacity } from '../../shared/actions/effects/animals'
-import { computeScores } from '../../shared/logic/scoring'
-import { applyIsDoableHooks } from '../../shared/actions/hooks'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
 import { occupationIds } from '../../shared/game/occupations'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state'
-import {
-  baseActionOrder,
-  createRoundOpenById,
-} from '../../shared/logic/state'
+import { baseActionOrder } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
@@ -208,7 +202,7 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
-  const { state, pending, interaction, historyLength, hasActionStartSnapshot, actionAvailability, applySnapshot } =
+  const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>(detectInitialLocale)
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
@@ -254,26 +248,16 @@ export const GameContainerApi = () => {
 
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
     applySnapshot(payload)
-    if (payload.pending.type === 'animalReorg') {
+    if (payload.interaction.stateId === 'animalReorg') {
+      setAnimalReorg({
+        zones: payload.interaction.zones,
+        confirmDiscard: false,
+      })
+    } else if (payload.pending.type === 'animalReorg') {
       const hydrated = rehydrateState(payload.state)
       const player = hydrated.players[payload.pending.playerIndex]
       if (player) {
-        const stableKeys = getLooseStableKeys(player)
-        setAnimalReorg({
-          zones: [
-            ...player.pastures.map((p) => ({
-              id: p.id, zoneType: 'pasture' as const,
-              animalType: p.animalType, animalCount: p.animalCount,
-            })),
-            { id: 'house', zoneType: 'house' as const, animalType: player.houseAnimalType ?? null, animalCount: player.houseAnimalCount ?? 0 },
-            ...stableKeys.map((key) => ({
-              id: `stable:${key}`, zoneType: 'stable' as const,
-              animalType: player.stableAnimals?.[key] ?? null,
-              animalCount: player.stableAnimals?.[key] ? 1 : 0,
-            })),
-          ],
-          confirmDiscard: false,
-        })
+        setAnimalReorg(null)
       }
     } else {
       setAnimalReorg(null)
@@ -483,26 +467,11 @@ export const GameContainerApi = () => {
       : null
   const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
 
-  const roundOpenById = useMemo(() => state ? createRoundOpenById(state.roundActionOrder) : new Map<string, number>(), [state?.roundActionOrder])
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
-    if (space.takenBy) {
-      // Allow card hooks to override the taken check (e.g., SheepRug)
-      const canUseWhenTaken = applyIsDoableHooks(
-        { state, player: currentPlayer, space, actionId: space.id },
-        false, // Default: cannot use when taken
-      )
-      if (!canUseWhenTaken) return false
-    }
-    const openRound = roundOpenById.get(space.id) ?? space.roundAvailable
-    if (state.round < openRound) return false
-    if (currentPlayer.workersAvailable <= 0) return false
-    if (state.gameOver) return false
     if (interaction.stateId !== 'idle') return false
-    // Use backend-provided action availability
-    if (actionAvailability[space.id] === false) return false
-    return true
-  }, [state, currentPlayer, roundOpenById, interaction.stateId, isInteractive, actionAvailability])
+    return actionAvailability[space.id] === true
+  }, [state, currentPlayer, interaction.stateId, isInteractive, actionAvailability])
 
   const actionMap = useMemo(() => {
     if (!state) return new Map<string, ActionSpace>()
@@ -522,8 +491,6 @@ export const GameContainerApi = () => {
     baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s),
   [actionMap])
 
-  const scoreSummaries = useMemo(() => state ? computeScores(state) : [], [state])
-
   const playedCards = displayPlayer?.playedCards ?? [
     ...(displayPlayer?.improvements ?? []).map((id: string) => `major:${id}`),
     ...(displayPlayer?.minorPlayed ?? []).map((id: string) => `minor:${id}`),
@@ -538,6 +505,30 @@ export const GameContainerApi = () => {
   const isSelectingMinor = pendingChoice?.promptKey === 'ui.interactionChooseMinorImprovement' || pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
   const isSelectingOccupation = pendingChoice?.promptKey === 'ui.interactionChooseOccupation'
   const isSelectingImprovementAny = pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
+  const selectableMinorIds = useMemo(() => {
+    if (!pendingChoice || !isSelectingMinor) return new Set<string>()
+    return new Set(
+      pendingChoice.options
+        .map((option) =>
+          option.value.startsWith('minor:') ? option.value.slice('minor:'.length) : option.value,
+        )
+        .filter((value) => !value.startsWith('major:')),
+    )
+  }, [pendingChoice, isSelectingMinor])
+  const selectableOccupationIds = useMemo(() => {
+    if (!pendingChoice || !isSelectingOccupation) return new Set<string>()
+    return new Set(pendingChoice.options.map((option) => option.value))
+  }, [pendingChoice, isSelectingOccupation])
+  const selectableMajorIds = useMemo(() => {
+    if (!pendingChoice || !isSelectingImprovementAny) return new Set<string>()
+    return new Set(
+      pendingChoice.options
+        .map((option) =>
+          option.value.startsWith('major:') ? option.value.slice('major:'.length) : option.value,
+        )
+        .filter((value) => state?.availableMajorImprovements.includes(value)),
+    )
+  }, [pendingChoice, isSelectingImprovementAny, state?.availableMajorImprovements])
 
   const bakeExchangeInfo = useMemo<Record<string, { food: number; max: number }>>(
     () => ({
@@ -699,9 +690,13 @@ export const GameContainerApi = () => {
   }, [displayPlayer?.pastures])
   const pastureCapacityMap = useMemo(() => {
     const map = new Map<string, number>()
-    ;(displayPlayer?.pastures ?? []).forEach((p) => { if (p.tiles.length > 0) map.set(positionKey(p.tiles[0]), getPastureCapacity(p)) })
+    ;(displayPlayer?.pastures ?? []).forEach((p) => {
+      if (p.tiles.length > 0) {
+        map.set(p.id, pastureCapacities[displayPlayer?.id ?? '']?.[p.id] ?? 0)
+      }
+    })
     return map
-  }, [displayPlayer?.pastures])
+  }, [displayPlayer?.pastures, displayPlayer?.id, pastureCapacities])
   const isReorgActive = !!animalReorg
 
   const houseDisplay = useMemo(() => {
@@ -799,17 +794,9 @@ export const GameContainerApi = () => {
       if (!player) return prev
       
       let capacity = 0
-      if (zoneId === 'house') {
-        capacity = 1
-      } else if (zoneId.startsWith('stable:')) {
-        capacity = 1
-      } else {
-        const pasture = player.pastures.find((p) => p.id === zoneId)
-        if (pasture) capacity = getPastureCapacity(pasture)
-      }
-
       const current = prev.zones.find((zone) => zone.id === zoneId)
       if (!current) return prev
+      capacity = current.capacity
 
       const totals = prev.zones.reduce(
         (acc, zone) => {
@@ -909,32 +896,6 @@ export const GameContainerApi = () => {
     
     await transport.loadGame(clone)
     
-    if (devResource === 'sheep' || devResource === 'boar' || devResource === 'cattle') {
-      const stKeys = getLooseStableKeys(player)
-      setAnimalReorg({ 
-        zones: [
-          ...player.pastures.map((p) => ({ 
-            id: p.id, 
-            zoneType: 'pasture' as const, 
-            animalType: p.animalType, 
-            animalCount: p.animalCount 
-          })),
-          { 
-            id: 'house', 
-            zoneType: 'house' as const, 
-            animalType: player.houseAnimalType ?? null, 
-            animalCount: player.houseAnimalCount ?? 0 
-          },
-          ...stKeys.map((key) => ({ 
-            id: `stable:${key}`, 
-            zoneType: 'stable' as const, 
-            animalType: player.stableAnimals?.[key] ?? null, 
-            animalCount: player.stableAnimals?.[key] ? 1 : 0 
-          })),
-        ], 
-        confirmDiscard: false 
-      })
-    }
   }, [devPlayerId, devResource, devAmount, state, transport])
 
   const applyDevRound = useCallback(() => {
@@ -1176,7 +1137,7 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
-      {showScoringPad ? <ScoringPad locale={locale} scores={scoreSummaries} onClose={() => setShowScoringPad(false)} /> : null}
+      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} onClose={() => setShowScoringPad(false)} /> : null}
       {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}
@@ -1208,7 +1169,7 @@ export const GameContainerApi = () => {
         hasActionStartSnapshot={hasActionStartSnapshot}
         isInteractive={isInteractive}
       />
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} currentPlayer={currentPlayer} isSelectingMajor={isSelectingImprovementAny} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
       <main className="board">
         <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
         <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
@@ -1230,7 +1191,8 @@ export const GameContainerApi = () => {
           toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
           confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
           setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-          isSelectingImprovementAny={isSelectingImprovementAny} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+          isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
+          selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
           isInteractive={isInteractive}
         />
       </main>

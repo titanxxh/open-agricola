@@ -16,6 +16,18 @@ const canAffordWithPaperMaker = (
   return player.resources.food + generatedFood >= foodNeeded
 }
 
+export const isOccupationPlayable = (
+  player: PlayerState,
+  occupationId: string,
+  costOverride?: Partial<PlayerState['resources']>,
+) => {
+  const occupation = getOccupation(occupationId)
+  if (!occupation || !player.occupationHand.includes(occupation.id)) return false
+  const baseCost =
+    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
+  return canAffordWithPaperMaker(player, baseCost)
+}
+
 export const playOccupation = (
   player: PlayerState,
   occupationId: string,
@@ -87,6 +99,8 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
   }
   return food > 0 ? { food } : {}
 }
+
+export const getOccupationActionCost = getLessonsCost
 
 const buildPlayableOccupationOptions = (
   player: PlayerState,
