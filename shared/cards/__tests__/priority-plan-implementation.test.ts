@@ -366,9 +366,9 @@ describe('priority plan implementations', () => {
       'pay:minor:C60_SmallPottersOven:0',
       'pay:minor:C60_SmallPottersOven:1',
     ])
-    expect(result.options.map((option) => option.labelKey)).toEqual([
-      'clay:2 (return Clay Oven)',
-      'clay:2 (return Stone Oven)',
+    expect(result.options.map((option) => option.labelParams)).toMatchObject([
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
     ])
   })
 

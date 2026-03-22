@@ -19,11 +19,9 @@ import {
   executePaymentSolution,
   getModifiersForCostType,
   isComplexCost,
-  PAYMENT_RESOURCE_ORDER,
   payResources,
   sortPaymentSolutions,
 } from './pay'
-import { en } from '../../i18n/en'
 import {
   executeCardListener,
   getMatchingListeners,
@@ -406,44 +404,13 @@ export const canAffordCardPreviewCostByProvider = (
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
-) => {
-  const resourcesDesc = PAYMENT_RESOURCE_ORDER
-    .map((key) => [key, solution.resourcesPaid[key] ?? 0] as const)
-    .filter(([, amount]) => amount > 0)
-    .map(([key, amount]) => `${key}:${amount}`)
-    .join(', ')
-
-  const baseDesc = resourcesDesc || 'free'
-
-  if (!includeReturnedCard || !solution.cardUsed) {
-    return baseDesc
+): { resourcesPaid: Partial<Resource>, cardUsed?: string } => {
+  return {
+    resourcesPaid: solution.resourcesPaid,
+    cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined
   }
-
-  return `${baseDesc} (return ${getPaymentCardDisplayName(solution.cardUsed)})`
 }
 
-const getPaymentCardDisplayName = (cardId: string) => {
-  const majorName = (en as unknown as {
-    improvements?: Record<string, { name?: string }>
-  }).improvements?.[cardId]?.name
-  if (majorName) return majorName
-
-  const minorName = (en as unknown as {
-    minorImprovements?: Record<string, { name?: string }>
-  }).minorImprovements?.[cardId]?.name
-  if (minorName) return minorName
-
-  const occupationName = (en as unknown as {
-    occupations?: Record<string, { name?: string }>
-  }).occupations?.[cardId]?.name
-  if (occupationName) return occupationName
-
-  if (cardId.startsWith('Major_')) {
-    return cardId.slice('Major_'.length).replaceAll('_', ' ')
-  }
-
-  return cardId
-}
 
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
@@ -452,13 +419,14 @@ export const buildPaymentChoiceResult = (
 ): ActionExecutionResult => {
   const orderedSolutions = sortPaymentSolutions(solutions)
   return {
-  type: 'choice',
-  promptKey: 'prompt.selectPayment',
-  options: orderedSolutions.map((solution, idx) => ({
-    value: `${optionValuePrefix}:${idx}`,
-    labelKey: describePaymentSolution(solution, includeReturnedCard),
-  })),
-}
+    type: 'choice',
+    promptKey: 'prompt.selectPayment',
+    options: orderedSolutions.map((solution, idx) => ({
+      value: `${optionValuePrefix}:${idx}`,
+      labelKey: 'prompt.selectPaymentOption', // A generic key, we will render it correctly in the UI
+      labelParams: describePaymentSolution(solution, includeReturnedCard),
+    })),
+  }
 }
 
 export const resolvePaymentSolutionSelection = (

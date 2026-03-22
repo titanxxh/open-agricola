@@ -57,7 +57,7 @@ describe('construct room payment session', () => {
     expect(resp.pending.options).toHaveLength(2)
 
     const stoneOption = resp.pending.options.find(
-      (option) => typeof option.labelKey === 'string' && option.labelKey.includes('stone:2'),
+      (option) => typeof option.labelParams === 'object' && option.labelParams?.resourcesPaid?.stone === 2,
     )
     expect(stoneOption).toBeDefined()
 

@@ -357,7 +357,11 @@ describe('payment choice ordering', () => {
 
     expect(result.type).toBe('choice')
     if (result.type !== 'choice') return
-    expect(result.options[0]?.labelKey).toBe('wood:2, reed:1, stone:1')
+    expect(result.options[0]?.labelKey).toBe('prompt.selectPaymentOption')
+    expect(result.options[0]?.labelParams).toEqual({
+      resourcesPaid: { stone: 1, wood: 2, reed: 1 },
+      cardUsed: undefined,
+    })
   })
 
   it('sorts same-cost returned-card solutions deterministically', () => {
@@ -368,9 +372,9 @@ describe('payment choice ordering', () => {
 
     expect(result.type).toBe('choice')
     if (result.type !== 'choice') return
-    expect(result.options.map((option) => option.labelKey)).toEqual([
-      'clay:2 (return Clay Oven)',
-      'clay:2 (return Stone Oven)',
+    expect(result.options.map((option) => option.labelParams)).toMatchObject([
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
     ])
   })
 })

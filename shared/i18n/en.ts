@@ -298,6 +298,8 @@ export const en = {
     devTargetHint: '↓ Actions below target this player',
     cardCopy: 'Copy ID',
     cardCopied: 'Copied!',
+    interactionPaymentFree: 'Free',
+    interactionPaymentReturn: 'Return',
     exchangeCenterTitle: 'Exchange Center',
     bakeBreadTitle: 'Bake Bread',
     bakeBreadRate: '1 grain → {food} food',

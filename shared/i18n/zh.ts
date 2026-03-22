@@ -286,6 +286,8 @@ export const zh = {
     devTargetHint: '↓ 以下操作针对该玩家',
     cardCopy: '复制ID',
     cardCopied: '已复制!',
+    interactionPaymentFree: '免费',
+    interactionPaymentReturn: '返还',
     exchangeCenterTitle: '交换中心',
     bakeBreadTitle: '烤面包',
     bakeBreadRate: '1 谷物 → {food} 食物',
