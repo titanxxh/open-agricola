@@ -370,7 +370,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.ok).toBe(false)
     })
 
-    it('multiple undoSteps work sequentially', () => {
+    it('undoStep on direct farm selection cancels the substep before undoing the action', () => {
       const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
       if (!farmland) return
 
@@ -380,9 +380,15 @@ describe('pending choice types + undo regression', () => {
 
       const undo1 = session.undoStep()
       expect(undo1.ok).toBe(true)
+      expect(undo1.pending.type).toBe('confirmNextPlayer')
+      expect(undo1.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toBe(
+        undo1.state.players[0]!.id,
+      )
 
       const undo2 = session.undoStep()
-      expect(undo2.ok).toBe(false)
+      expect(undo2.ok).toBe(true)
+      expect(undo2.pending.type).toBe('none')
+      expect(undo2.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toBeNull()
     })
   })
 

@@ -1421,13 +1421,17 @@ export class GameSession {
     return this.respond()
   }
 
-  resolveChoice(playerIndex: number, value: string): SessionResponse {
+  private resolvePendingChoice(
+    playerIndex: number,
+    value: string,
+    pushHistoryEntry: boolean,
+  ): SessionResponse {
     const pending = this.pending
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
     if (!this.engine) {
-      if (pending.promptKey === 'ui.interactionFenceSelect') {
+      if (pending.promptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
         this.pending = { type: 'none' }
         return this.respond()
       }
@@ -1443,7 +1447,9 @@ export class GameSession {
     }
 
     const promptKey = pending.promptKey
-    this.pushHistory()
+    if (pushHistoryEntry) {
+      this.pushHistory()
+    }
     const before = this.clonePlayer(player)
     const isBakeChoice =
       promptKey === 'ui.interactionBakeBreadChoice' ||
@@ -1485,6 +1491,10 @@ export class GameSession {
     }
     this.runEngineSteps()
     return this.respond()
+  }
+
+  resolveChoice(playerIndex: number, value: string): SessionResponse {
+    return this.resolvePendingChoice(playerIndex, value, true)
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
@@ -2174,6 +2184,36 @@ export class GameSession {
   }
 
   undoStep(): SessionResponse {
+    const farmPrompt = this.pending.type === 'choice'
+      ? this.isFarmPromptKey(this.pending.promptKey)
+      : null
+    if (this.pending.type === 'choice' && farmPrompt) {
+      const currentPromptKey = this.pending.promptKey
+      const currentSpaceId = this.pending.spaceId
+      const entry = this.history[this.history.length - 1]
+      const canRestorePriorChoice =
+        !!entry &&
+        entry.undoBoundary !== true &&
+        entry.activeSpaceId === this.activeSpaceId &&
+        entry.activePlayerIndex === this.activePlayerIndex &&
+        entry.pending.type === 'choice'
+      if (canRestorePriorChoice) {
+        this.history.pop()
+        this.restoreHistory(entry)
+        this.recomputeActionStartIndex()
+        return this.respond()
+      }
+      const cancelResult = this.resolvePendingChoice(this.pending.playerIndex, 'cancel', false)
+      const stillOnSameFarmPrompt =
+        cancelResult.ok &&
+        cancelResult.pending.type === 'choice' &&
+        cancelResult.pending.promptKey === currentPromptKey &&
+        cancelResult.pending.spaceId === currentSpaceId &&
+        cancelResult.interaction.stateId === 'farmSelect'
+      if (!stillOnSameFarmPrompt) {
+        return cancelResult
+      }
+    }
     if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
       return this.respond(false, 'cannot undo past boundary')
     }

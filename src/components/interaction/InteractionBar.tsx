@@ -65,10 +65,18 @@ export const InteractionBar = ({
   harvestFeedPlayerName,
   confirmHarvestFeed,
 }: Props) => {
+  const isFarmSelectionPrompt =
+    pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionRoomSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionStableSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionPlowSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionSowSelect'
   const visibleOptions =
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
-      : pendingChoice?.options ?? []
+      : isFarmSelectionPrompt
+        ? (pendingChoice?.options ?? []).filter((option) => option.value !== 'cancel')
+        : pendingChoice?.options ?? []
   const isRoomConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionRoomSelect' &&
     pendingRoomTilesLength === 0
