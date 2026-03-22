@@ -98,6 +98,7 @@ import {
   buildStableFarmInteraction,
 } from './farm-interaction.ts'
 import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bonus.ts'
+import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validateFenceSelection } from './fence-validation.ts'
@@ -1731,7 +1732,7 @@ export class GameSession {
   }
 
   loadState(raw: unknown): SessionResponse {
-    this.state = normalizeState(raw as GameState)
+    this.state = rebuildActiveModifiers(normalizeState(raw as GameState))
     if (!this.state.roundStartSnapshot) {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     }
@@ -1860,6 +1861,9 @@ export class GameSession {
     const normalized = normalizePlayerFarm(player)
     const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
     let farmChoiceMeta: Record<string, unknown> | undefined
+    const requireAtLeastOnePlacement =
+      this.activeSpaceId === 'farm-expansion' &&
+      (farmType === 'room' || farmType === 'stable')
 
     switch (farmType) {
       case 'fence': {
@@ -1924,6 +1928,9 @@ export class GameSession {
         const rooms = Array.isArray((payload as { rooms?: FarmTilePosition[] }).rooms)
           ? (payload as { rooms: FarmTilePosition[] }).rooms
           : []
+        if (requireAtLeastOnePlacement && rooms.length === 0) {
+          return this.respond(false, 'farm-expansion requires building at least one room')
+        }
         const maxUnits =
           typeof this.pending.actionContext?.maxRooms === 'number'
             ? this.pending.actionContext.maxRooms
@@ -1983,6 +1990,9 @@ export class GameSession {
         const stables = Array.isArray((payload as { stables?: FarmTilePosition[] }).stables)
           ? (payload as { stables: FarmTilePosition[] }).stables
           : []
+        if (requireAtLeastOnePlacement && stables.length === 0) {
+          return this.respond(false, 'farm-expansion requires building at least one stable')
+        }
         const selection = validateStableSelection(normalized, stables)
         if (!selection.ok) return this.respond(false, selection.code)
 

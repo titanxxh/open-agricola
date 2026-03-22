@@ -79,4 +79,32 @@ describe('stable payment session', () => {
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
   })
+
+  it('requires farm-expansion stable mode to build at least one stable', () => {
+    const session = setup()
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const stableOption = resp.pending.options.find(
+      (option) => option.labelKey === 'actions.stables.name',
+    )
+    expect(stableOption).toBeDefined()
+
+    resp = session.resolveChoice(0, stableOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('stable')
+
+    const commitResp = session.commitFarmChoice(0, 'stable', { stables: [] })
+    expect(commitResp.ok).toBe(false)
+    expect(commitResp.error).toBe('farm-expansion requires building at least one stable')
+    expect(commitResp.pending.type).toBe('choice')
+    expect(commitResp.interaction.stateId).toBe('farmSelect')
+    if (commitResp.interaction.stateId !== 'farmSelect') return
+    expect(commitResp.interaction.farm.farmType).toBe('stable')
+  })
 })

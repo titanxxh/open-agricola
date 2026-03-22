@@ -69,6 +69,12 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
       : pendingChoice?.options ?? []
+  const isRoomConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionRoomSelect' &&
+    pendingRoomTilesLength === 0
+  const isStableConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
+    pendingStableTilesLength === 0
 
   return (
     <div className="interaction-bar">
@@ -143,6 +149,12 @@ export const InteractionBar = ({
                   onClick={() => resolveChoice(option.value)}
                   disabled={
                     !isInteractive ||
+                    (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
+                      option.value === 'confirm' &&
+                      isRoomConfirmDisabled) ||
+                    (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
+                      option.value === 'confirm' &&
+                      isStableConfirmDisabled) ||
                     (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
                       option.value === 'confirm' &&
                       !hasPendingPlowSelection) ||

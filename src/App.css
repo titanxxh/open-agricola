@@ -110,6 +110,13 @@
   cursor: pointer;
 }
 
+.interaction-actions button:disabled {
+  background: #93a68a;
+  color: #eef2ea;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
 .header {
   display: flex;
   justify-content: space-between;

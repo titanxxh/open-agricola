@@ -67,6 +67,24 @@ describe('construct room payment session', () => {
     expect(resp.state.players[0]!.resources.reed).toBe(0)
   })
 
+  it('requires farm-expansion room mode to build at least one room', () => {
+    const session = setup()
+
+    const resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+
+    const commitResp = session.commitFarmChoice(0, 'room', { rooms: [] })
+    expect(commitResp.ok).toBe(false)
+    expect(commitResp.error).toBe('farm-expansion requires building at least one room')
+    expect(commitResp.pending.type).toBe('choice')
+    expect(commitResp.interaction.stateId).toBe('farmSelect')
+    if (commitResp.interaction.stateId !== 'farmSelect') return
+    expect(commitResp.interaction.farm.farmType).toBe('room')
+  })
+
   it('lets Carpenter\'s Hammer unlock a discounted two-room build', () => {
     const session = new GameSession()
     const state = session.getState().state

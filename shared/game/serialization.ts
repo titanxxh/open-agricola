@@ -28,10 +28,8 @@ export const serializeState = (state: GameState): SerializedGameState => {
   }
 }
 
-export const rehydrateState = (raw: SerializedGameState): GameState => {
-  const templates = createActionSpaces()
-  const restored = normalizeState(raw as unknown as GameState)
-  restored.players.forEach((player) => {
+export const rebuildActiveModifiers = (state: GameState): GameState => {
+  state.players.forEach((player) => {
     const existing = player.activeModifiers ?? []
     const next = [...existing]
     const playedCardIds = [...(player.minorPlayed ?? []), ...(player.occupationPlayed ?? [])]
@@ -45,6 +43,12 @@ export const rehydrateState = (raw: SerializedGameState): GameState => {
     })
     player.activeModifiers = next
   })
+  return state
+}
+
+export const rehydrateState = (raw: SerializedGameState): GameState => {
+  const templates = createActionSpaces()
+  const restored = rebuildActiveModifiers(normalizeState(raw as unknown as GameState))
   restored.actionSpaces = templates.map((template) => {
     const saved = raw.actionSpaces?.find((s) => s.id === template.id)
     return {
