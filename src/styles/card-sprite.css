@@ -193,6 +193,23 @@
   color: #1a3a6a;
 }
 
+.card-infobox {
+  position: absolute;
+  top: -7px;
+  left: 0;
+  z-index: 2;
+  min-width: 22px;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 1px;
+  border: 1px solid #000;
+  background-color: orange;
+  color: #000;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
 /* Card numbering */
 .card-numbering {
   position: absolute;

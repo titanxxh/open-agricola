@@ -24,6 +24,27 @@ export const setCardFlag = (
   ensureCardState(player, cardId).flagged = flagged
 }
 
+export const readCardInfobox = (
+  player: PlayerState,
+  cardId: string,
+): string | undefined => player.cardStates?.[cardId]?.infobox
+
+export const writeCardInfobox = (
+  player: PlayerState,
+  cardId: string,
+  infobox: string,
+) => {
+  ensureCardState(player, cardId).infobox = infobox
+}
+
+export const clearCardInfobox = (
+  player: PlayerState,
+  cardId: string,
+) => {
+  if (!player.cardStates?.[cardId]) return
+  delete player.cardStates[cardId]!.infobox
+}
+
 export const readCardExtraData = <T>(
   player: PlayerState,
   cardId: string,

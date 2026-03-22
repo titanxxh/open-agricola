@@ -208,6 +208,65 @@ describe('Engine flow nodes', () => {
     expect(done.type).toBe('done')
   })
 
+  it('xor node completes after a nested choice action resolves', () => {
+    const plow: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'actions.plow.name',
+      descriptionKey: 'actions.plow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'choice',
+        promptKey: 'ui.interactionPlowSelect',
+        options: [{ value: 'confirm', labelKey: 'ui.interactionPlowConfirm' }],
+      }),
+      resolveChoice: () => ({ type: 'ok' }),
+    }
+    const skip: ActionDefinition = {
+      id: 'skip',
+      nameKey: 'actions.noop.name',
+      descriptionKey: 'actions.noop.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(plow)
+    registry.register(skip)
+    const plowSeq = new SequenceNode('seq-plow', [
+      new ActionNode('action-plow', plow.id),
+      new ChoiceNode('choice-plow', []),
+    ])
+    const root = new XorNode('xor-root', [
+      plowSeq,
+      new ActionNode('action-skip', skip.id),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(plow)
+
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+
+    const choosePlow = engine.resolveChoice('seq-plow', { state, player, space })
+    expect(choosePlow.type).toBe('choice')
+
+    const confirm = engine.resolveChoice('confirm', { state, player, space })
+    expect(confirm.type).toBe('ok')
+
+    const done = engine.proceed({ state, player, space })
+    expect(done.type).toBe('done')
+  })
+
   it('xor node prefers custom choice labels from flow leaves', () => {
     const a: ActionDefinition = {
       id: 'a',

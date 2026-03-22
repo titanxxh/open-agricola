@@ -22,6 +22,8 @@ import { takeFromCardAction } from './effects/take-from-card'
 import { markCardTriggerAction } from './effects/mark-card-trigger'
 import { flagCardAction } from './effects/flag-card'
 import { unflagCardAction } from './effects/unflag-card'
+import { setCardInfoboxAction } from './effects/set-card-infobox'
+import { clearCardInfoboxAction } from './effects/clear-card-infobox'
 import { noopAction } from './effects/noop'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
@@ -56,6 +58,8 @@ export const internalActionDefinitions: ActionDefinition[] = [
   markCardTriggerAction,
   flagCardAction,
   unflagCardAction,
+  setCardInfoboxAction,
+  clearCardInfoboxAction,
   noopAction,
   returnFirstWorkerHomeAction,
   reserveFenceBonusAction,

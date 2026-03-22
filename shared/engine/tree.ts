@@ -35,6 +35,11 @@ export class EngineTree {
     return visit(this.root)
   }
 
+  findParent(id: string) {
+    const found = this.findNodeWithParent(id, this.root)
+    return found?.parent ?? null
+  }
+
   allNodes() {
     const nodes: EngineNode[] = []
     const visit = (node: EngineNode) => {

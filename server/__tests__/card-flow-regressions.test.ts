@@ -42,7 +42,60 @@ describe('card flow regressions', () => {
 
     resp = session.resolveChoice(0, skip!.value)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')
     expect(resp.pending.type).toBe('confirmNextPlayer')
+  })
+
+  it('A17_ReclamationPlow does not prompt again after confirming the plow choice', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push('A17_ReclamationPlow')
+    player.playedCards.push(playedKey('A17_ReclamationPlow', 'minor'))
+
+    const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
+    if (!sheepMarket) throw new Error('sheep-market missing')
+    sheepMarket.resources.sheep = 1
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'sheep-market')
+    expect(resp.pending.type).toBe('animalReorg')
+
+    resp = session.confirmAnimalReorg(0, [
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+    ])
+    expect(resp.pending.type).toBe('choice')
+    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+      .toBe('ui.interactionReclamationPlow')
+
+    if (resp.pending.type !== 'choice') {
+      throw new Error('expected reclamation plow choice')
+    }
+
+    const use = resp.pending.options.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
+    expect(use).toBeDefined()
+
+    resp = session.resolveChoice(0, use!.value)
+    expect(resp.pending.type).toBe('choice')
+    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+      .toBe('ui.interactionPlowSelect')
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') {
+      throw new Error('expected plow farm interaction')
+    }
+
+    const tile = resp.interaction.farm.selectableTiles[0]
+    expect(tile).toBeDefined()
+
+    resp = session.commitFarmChoice(0, 'plow', { tile })
+    expect(resp.state.players[0]!.fields.length).toBe(1)
+    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')
+    expect(resp.pending.type).not.toBe('choice')
   })
 
   it('D150_GodlySpouse returns the first placed worker based on round placement order', () => {

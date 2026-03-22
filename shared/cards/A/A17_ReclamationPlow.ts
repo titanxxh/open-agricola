@@ -8,12 +8,14 @@ import {
   isCardFlagged,
   readCardExtraData,
   setCardFlag,
+  writeCardInfobox,
   writeCardExtraData,
 } from '../helpers/card-state'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 const CARD_ID = 'A17_ReclamationPlow'
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
+const USED_INFOBOX = '✓'
 
 const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
   const gainPerRound = space.gainPerRound ?? {}
@@ -58,6 +60,7 @@ const buildReclamationPlowUseFlow = (ambiguous: boolean): ActionFlow => ({
           type: 'leaf',
           actionId: 'flag-card',
           sourceCard: CARD_ID,
+          params: { infoboxText: USED_INFOBOX } as any,
           choiceLabelKey: 'ui.interactionReclamationPlowSkip',
         },
   ],
@@ -133,6 +136,7 @@ const reclamationPlowAfterPlowListener: CardListenerRegistration = {
     if (context.sourceCard !== CARD_ID) return
     if (isCardFlagged(context.player, CARD_ID)) return
     setCardFlag(context.player, CARD_ID, true)
+    writeCardInfobox(context.player, CARD_ID, USED_INFOBOX)
   },
 }
 

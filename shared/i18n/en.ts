@@ -391,6 +391,8 @@ export const en = {
     'mark-card-trigger': { name: 'Mark Card Trigger', description: 'Increase the trigger counter for the source card' },
     'flag-card': { name: 'Flag Card', description: 'Mark the source card as used' },
     'unflag-card': { name: 'Unflag Card', description: 'Clear the used mark from the source card' },
+    'set-card-infobox': { name: 'Set Card Infobox', description: 'Set the infobox text shown on the source card' },
+    'clear-card-infobox': { name: 'Clear Card Infobox', description: 'Remove the infobox text shown on the source card' },
     noop: { name: 'No Effect', description: 'Do nothing' },
     'return-first-worker-home': { name: 'Return First Worker Home', description: 'Return the first worker placed this round back home' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },

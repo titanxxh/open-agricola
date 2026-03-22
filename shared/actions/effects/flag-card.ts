@@ -1,5 +1,5 @@
 import type { ActionDefinition } from '../../game/types'
-import { setCardFlag } from '../../cards/helpers/card-state'
+import { setCardFlag, writeCardInfobox } from '../../cards/helpers/card-state'
 
 export const flagCardAction: ActionDefinition = {
   id: 'flag-card',
@@ -8,11 +8,15 @@ export const flagCardAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, sourceCard }) => {
+  execute: ({ player, sourceCard, params }) => {
+    const infoboxText = (params as { infoboxText?: string } | undefined)?.infoboxText
     if (!sourceCard) {
       return { type: 'fail', logKey: 'log.exchangeFail' }
     }
     setCardFlag(player, sourceCard, true)
+    if (typeof infoboxText === 'string') {
+      writeCardInfobox(player, sourceCard, infoboxText)
+    }
     return { type: 'ok' }
   },
 }

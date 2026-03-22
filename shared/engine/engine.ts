@@ -39,6 +39,7 @@ export class Engine {
   private log: LogStore
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
+  private pendingChoiceOwnerNodeId: string | null = null
   private pendingChoiceContext:
     | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     | null = null
@@ -254,6 +255,7 @@ export class Engine {
       nodeStates,
       pendingChoiceNodeId: this.pendingChoiceNodeId,
       pendingChoiceActionId: this.pendingChoiceActionId,
+      pendingChoiceOwnerNodeId: this.pendingChoiceOwnerNodeId,
       pendingChoiceContext: this.pendingChoiceContext,
       choiceData,
     }
@@ -267,6 +269,7 @@ export class Engine {
     }[]
     pendingChoiceNodeId: string | null
     pendingChoiceActionId: string | null
+    pendingChoiceOwnerNodeId: string | null
     pendingChoiceContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
@@ -304,6 +307,7 @@ export class Engine {
     }
     this.pendingChoiceNodeId = snapshot.pendingChoiceNodeId
     this.pendingChoiceActionId = snapshot.pendingChoiceActionId
+    this.pendingChoiceOwnerNodeId = snapshot.pendingChoiceOwnerNodeId
     this.pendingChoiceContext = snapshot.pendingChoiceContext
   }
 
@@ -571,9 +575,11 @@ result.options = [...result.options, ...extraOptions]
           choiceNode.setChoice(result.promptKey, result.options)
           this.pendingChoiceNodeId = choiceNode.id
           this.pendingChoiceActionId = replacedActionId
+          this.pendingChoiceOwnerNodeId = null
         } else {
           this.pendingChoiceNodeId = node.id
           this.pendingChoiceActionId = replacedActionId
+          this.pendingChoiceOwnerNodeId = null
         }
         this.pendingChoiceContext = {
           params: executionContext.params,
@@ -661,12 +667,14 @@ choice: { promptKey: result.promptKey, options: result.options },
           node.resolve()
           this.pendingChoiceNodeId = null
           this.pendingChoiceActionId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
         node.active = true
         this.pendingChoiceNodeId = null
         this.pendingChoiceActionId = null
+        this.pendingChoiceOwnerNodeId = null
         this.pendingChoiceContext = null
         return { type: 'ok' }
       }
@@ -674,6 +682,7 @@ choice: { promptKey: result.promptKey, options: result.options },
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
           this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
@@ -681,6 +690,7 @@ choice: { promptKey: result.promptKey, options: result.options },
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
           this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
@@ -688,6 +698,7 @@ choice: { promptKey: result.promptKey, options: result.options },
         const action = this.registry.get(actionId)
         if (!action) {
           this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
@@ -727,9 +738,11 @@ choice: { promptKey: result.promptKey, options: result.options },
             choiceNode.setChoice(result.promptKey, result.options)
             this.pendingChoiceNodeId = choiceNode.id
             this.pendingChoiceActionId = actionId
+            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
           } else {
             this.pendingChoiceNodeId = child.id
             this.pendingChoiceActionId = actionId
+            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
           }
           this.pendingChoiceContext = {
             params: executionContext.params,
@@ -795,13 +808,14 @@ choice: { promptKey: result.promptKey, options: result.options },
           ...afterActivateNodes,
         ]
         if (allInsertNodes.length > 0) {
-          this.tree.insertAfter(child.id, allInsertNodes)
+          this.tree.insertAfter(node instanceof XorNode ? node.id : child.id, allInsertNodes)
         }
         child.resolve(result)
         if (node instanceof XorNode) {
           node.resolve(choice)
         }
         this.pendingChoiceNodeId = null
+        this.pendingChoiceOwnerNodeId = null
         this.pendingChoiceContext = null
         return result
       }
@@ -845,10 +859,11 @@ choice: { promptKey: result.promptKey, options: result.options },
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
+    const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
     if (result.type === 'flow') {
       const flowNode = this.buildFlowNode(result.flow)
-      if (this.pendingChoiceNodeId) {
-        this.tree.insertAfter(this.pendingChoiceNodeId, [flowNode])
+      if (insertionTargetId) {
+        this.tree.insertAfter(insertionTargetId, [flowNode])
       }
     }
     // Use result's logKey if present, otherwise use generic action log
@@ -891,12 +906,12 @@ choice: { promptKey: result.promptKey, options: result.options },
     )
     const allInsertNodes = [
       ...hookFlows,
-      ...this.buildFollowUpNodes(followUps, this.pendingChoiceNodeId ?? '', context.player),
+      ...this.buildFollowUpNodes(followUps, insertionTargetId ?? '', context.player),
       ...immediateActivateNodes,
       ...afterActivateNodes,
     ]
-    if (allInsertNodes.length > 0 && this.pendingChoiceNodeId) {
-      this.tree.insertAfter(this.pendingChoiceNodeId, allInsertNodes)
+    if (allInsertNodes.length > 0 && insertionTargetId) {
+      this.tree.insertAfter(insertionTargetId, allInsertNodes)
     }
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -911,8 +926,15 @@ choice: { promptKey: result.promptKey, options: result.options },
         }
       }
     }
+    if (this.pendingChoiceOwnerNodeId) {
+      const ownerNode = this.tree.findNodeById(this.pendingChoiceOwnerNodeId)
+      if (ownerNode instanceof XorNode) {
+        ownerNode.resolve()
+      }
+    }
     this.pendingChoiceNodeId = null
     this.pendingChoiceActionId = null
+    this.pendingChoiceOwnerNodeId = null
     this.pendingChoiceContext = null
     return result
   }

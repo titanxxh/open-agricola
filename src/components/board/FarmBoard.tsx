@@ -638,6 +638,7 @@ export const FarmBoard = ({
           const isOccupation = kind === 'occupation'
           const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
+          const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
           const internalKeys = new Set(['triggerCount', 'usedRound'])
           const displayCounters = Object.fromEntries(
@@ -651,6 +652,7 @@ export const FarmBoard = ({
                 locale={locale}
                 cardId={rawId}
                 cardType={cardType}
+                infobox={cardInfobox}
                 devMode={devMode}
               />
               {futureEntries.length > 0 || hasCounters ? (

@@ -127,6 +127,7 @@ export type MajorEffectState = {
 
 export type CardState = {
   flagged?: boolean
+  infobox?: string
   counters?: Record<string, number>
   extraData?: Record<string, unknown>
 }

@@ -373,6 +373,8 @@ export const zh = {
     'mark-card-trigger': { name: '标记卡牌触发', description: '为来源卡牌增加一次触发计数' },
     'flag-card': { name: '标记卡牌', description: '将来源卡牌标记为已使用' },
     'unflag-card': { name: '清除卡牌标记', description: '清除来源卡牌的已使用标记' },
+    'set-card-infobox': { name: '设置卡牌标签', description: '设置显示在来源卡牌上的 infobox 文本' },
+    'clear-card-infobox': { name: '清除卡牌标签', description: '移除显示在来源卡牌上的 infobox 文本' },
     noop: { name: '无效果', description: '不执行任何效果' },
     'return-first-worker-home': { name: '收回首个工人', description: '将本轮第一个放置的工人收回家中' },
     'reserve-fence-bonus': { name: '预留围栏优惠', description: '为当前围栏行动预留来源卡牌上的免费围栏' },
