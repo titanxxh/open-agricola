@@ -95,7 +95,7 @@ export const InteractionBar = ({
       ) : pendingChoice && isInteractive ? (
         <>
           <div className="interaction-title">
-            {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+            {t(locale, pendingChoice.promptKey as TranslationKey ?? 'ui.interactionChooseOne')}
           </div>
           {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
             <div className="interaction-subtitle">

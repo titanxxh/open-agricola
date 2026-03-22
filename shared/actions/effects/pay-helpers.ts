@@ -404,7 +404,7 @@ export const canAffordCardPreviewCostByProvider = (
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
-): { resourcesPaid: Partial<Resource>, cardUsed?: string } => {
+): Record<string, any> => {
   return {
     resourcesPaid: solution.resourcesPaid,
     cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined
@@ -420,12 +420,12 @@ export const buildPaymentChoiceResult = (
   const orderedSolutions = sortPaymentSolutions(solutions)
   return {
     type: 'choice',
-    promptKey: 'prompt.selectPayment',
-    options: orderedSolutions.map((solution, idx) => ({
-      value: `${optionValuePrefix}:${idx}`,
-      labelKey: 'prompt.selectPaymentOption', // A generic key, we will render it correctly in the UI
-      labelParams: describePaymentSolution(solution, includeReturnedCard),
-    })),
+  promptKey: 'prompt.selectPayment',
+  options: orderedSolutions.map((solution, idx) => ({
+    value: `${optionValuePrefix}:${idx}`,
+    labelKey: 'prompt.selectPaymentOption',
+    labelParams: describePaymentSolution(solution, includeReturnedCard) as unknown as Record<string, string | number>,
+  })),
   }
 }
 
