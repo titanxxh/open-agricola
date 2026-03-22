@@ -54,7 +54,7 @@ test.describe('Agricola Action Cards End-to-End Tests', () => {
     await clayPitCard.click();
 
     // Verify player gained 1 clay
-    const playerA = page.locator('.farm-header', { hasText: '玩家 A' });
+    const playerA = page.locator('.farm-header', { hasText: 'PlayerA' });
     await expect(playerA.locator('.resource-inline-item.resource-clay')).toContainText('1');
 
     // 3. Undo step
@@ -72,7 +72,7 @@ test.describe('Agricola Action Cards End-to-End Tests', () => {
     await dayLaborerCard.click();
 
     // Verify player gained 2 food
-    const playerA = page.locator('.farm-header', { hasText: '玩家 A' });
+    const playerA = page.locator('.farm-header', { hasText: 'PlayerA' });
     await expect(playerA.locator('.resource-inline-item.resource-food')).toContainText('2');
 
     // 2. Undo step
