@@ -161,7 +161,7 @@ export const InteractionBar = ({
                       {option.labelParams.cardUsed && (
                         <span className="payment-option-card">
                           {' '}
-                          ({t(locale, 'interactionPaymentReturn')} {t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
+                          ({t(locale, 'interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
                         </span>
                       )}
                     </span>
