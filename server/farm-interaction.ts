@@ -4,8 +4,9 @@ import type {
   PlayerState,
   Resource,
 } from '../shared/game/types.ts'
-import { getBuildRoomCost } from '../shared/actions/effects/construct.ts'
-import { applyCostOverride, canPayResources } from '../shared/actions/effects/pay.ts'
+import { applyCostOverride } from '../shared/actions/effects/pay.ts'
+import { canAffordTypedFlatCost } from '../shared/actions/effects/pay-helpers.ts'
+import { getMaxBuildableRooms } from '../shared/actions/effects/room-payment.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
@@ -22,33 +23,37 @@ const sanitizePayableCost = (
   return payable
 }
 
+const scaleCost = (
+  costPerUnit: Partial<Resource>,
+  count: number,
+): Partial<Resource> => {
+  const total: Partial<Resource> = {}
+  Object.entries(costPerUnit).forEach(([key, value]) => {
+    if (typeof value !== 'number') return
+    total[key as keyof Resource] = value * count
+  })
+  return sanitizePayableCost(total)
+}
+
 export const buildRoomFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
   const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
-  const costPerRoom = applyCostOverride(getBuildRoomCost(player.houseType), costOverride)
-  const resourceMax = Object.entries(costPerRoom).reduce((max, [key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return max
-    const available = player.resources[key as keyof Resource] ?? 0
-    return Math.min(max, Math.floor(available / value))
-  }, Number.POSITIVE_INFINITY)
   const maxSelections = Math.min(
     selectableTiles.length,
-    Number.isFinite(resourceMax) ? resourceMax : selectableTiles.length,
-    typeof actionContext?.maxRooms === 'number' ? Math.max(0, Math.floor(actionContext.maxRooms)) : selectableTiles.length,
+    getMaxBuildableRooms(player, costOverride, actionContext),
   )
   return {
     farmType: 'room',
     selectableTiles,
     maxSelections: Math.max(0, maxSelections),
-    costPerRoom,
   }
 }
 
@@ -56,29 +61,25 @@ export const buildStableFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
-  const payableCost = sanitizePayableCost(costPerStable)
-  const maxByCost =
-    Object.keys(payableCost).length === 0
-      ? Math.max(0, 4 - normalized.stableTiles.length)
-      : Object.entries(payableCost).reduce((max, [key, value]) => {
-          if (typeof value !== 'number' || value <= 0) return max
-          const available = player.resources[key as keyof Resource] ?? 0
-          return Math.min(max, Math.floor(available / value))
-        }, Number.POSITIVE_INFINITY)
-  const maxSelections = Math.min(
+  const structuralMax = Math.min(
+    selectableTiles.length,
     Math.max(0, 4 - normalized.stableTiles.length),
-    Number.isFinite(maxByCost) ? maxByCost : Math.max(0, 4 - normalized.stableTiles.length),
   )
+  let resourceMax = 0
+  for (let count = 1; count <= structuralMax; count += 1) {
+    if (!canAffordTypedFlatCost(player, scaleCost(costPerStable, count), 'stables')) break
+    resourceMax = count
+  }
   return {
     farmType: 'stable',
     selectableTiles,
-    maxSelections,
+    maxSelections: resourceMax,
   }
 }
 
@@ -86,9 +87,9 @@ export const buildPlowFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const payableCost = sanitizePayableCost(costOverride)
-  const canAffordPlow = canPayResources(normalized as PlayerState, payableCost)
+  const canAffordPlow = canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const selectableTiles = canAffordPlow
     ? getAllTilePositions().filter(
         (tile) => validatePlowSelection(normalized, tile).ok,
@@ -99,10 +100,22 @@ export const buildPlowFarmInteraction = (
 
 export const buildSowFarmInteraction = (
   player: PlayerState,
+  actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
+  const excludedKeys = new Set(
+    Array.isArray(actionContext?.excludedFields)
+      ? actionContext.excludedFields.flatMap((field) => {
+        const row = Number((field as { row?: unknown }).row)
+        const col = Number((field as { col?: unknown }).col)
+        if (!Number.isFinite(row) || !Number.isFinite(col)) return []
+        return [positionKey({ row, col })]
+      })
+      : [],
+  )
   const selectableFields = normalized.fields.flatMap((field) => {
     if (field.crop !== null) return []
+    if (excludedKeys.has(positionKey({ row: field.row, col: field.col }))) return []
     const allowedCrops: ('grain' | 'vegetable')[] = []
     if ((normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
@@ -113,14 +126,20 @@ export const buildSowFarmInteraction = (
     if (allowedCrops.length === 0) return []
     return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
   })
-  return { farmType: 'sow', selectableFields }
+  const rawMaxSelections = typeof actionContext?.maxSelections === 'number'
+    ? Math.max(0, Math.floor(actionContext.maxSelections))
+    : undefined
+  const maxSelections = rawMaxSelections === undefined
+    ? undefined
+    : Math.min(rawMaxSelections, selectableFields.length)
+  return { farmType: 'sow', selectableFields, maxSelections }
 }
 
 export const buildFenceFarmInteraction = (
   player: PlayerState,
   pending: Extract<PendingAction, { type: 'choice' }>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const existing = new Set(normalized.fenceSegments ?? [])
   const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
   const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0

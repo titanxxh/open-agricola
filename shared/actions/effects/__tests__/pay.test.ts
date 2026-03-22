@@ -11,6 +11,7 @@ import {
   returnCardToBoard,
   clearPaymentCache,
 } from '../pay'
+import { buildPaymentChoiceResult } from '../pay-helpers'
 
 beforeEach(() => {
   clearPaymentCache()
@@ -241,6 +242,43 @@ describe('computeAllBuyableCombinations', () => {
     expect(solutions.length).toBeGreaterThan(0)
   })
 
+  it('filters overproduced negative-resource solutions for typed modifier costs', () => {
+    const player = createMockPlayer({ clay: 2, stone: 2 })
+    player.activeModifiers = [
+      {
+        type: 'trade',
+        cardId: 'Test_Stable_Clay',
+        appliesTo: ['stables'],
+        from: { clay: 2 },
+        to: { wood: 2 },
+        max: 1,
+      },
+      {
+        type: 'trade',
+        cardId: 'Test_Stable_Stone',
+        appliesTo: ['stables'],
+        from: { stone: 2 },
+        to: { wood: 2 },
+        max: 1,
+      },
+    ]
+
+    const solutions = computeAllBuyableCombinations(player, { fee: { wood: 2 } }, undefined, 'stables')
+
+    expect(solutions).toHaveLength(2)
+    expect(
+      solutions.every((solution) =>
+        Object.values(solution.resourcesPaid).every((value) => (value ?? 0) >= 0),
+      ),
+    ).toBe(true)
+    expect(solutions.map((solution) => solution.resourcesPaid)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ clay: 2, stone: 0, wood: 0 }),
+        expect.objectContaining({ clay: 0, stone: 2, wood: 0 }),
+      ]),
+    )
+  })
+
   it('handles empty cost (free)', () => {
     const player = createMockPlayer({ wood: 5 })
     const cost: ComplexCost = {}
@@ -308,6 +346,36 @@ describe('executePaymentSolution', () => {
     }
     executePaymentSolution(player, solution)
     expect(player.resources.wood).toBe(5)
+  })
+})
+
+describe('payment choice ordering', () => {
+  it('uses stable resource display order in payment labels', () => {
+    const result = buildPaymentChoiceResult([
+      { resourcesPaid: { stone: 1, wood: 2, reed: 1 }, tradesUsed: [] },
+    ], 'pay:test')
+
+    expect(result.type).toBe('choice')
+    if (result.type !== 'choice') return
+    expect(result.options[0]?.labelKey).toBe('prompt.selectPaymentOption')
+    expect(result.options[0]?.labelParams).toEqual({
+      resourcesPaid: { stone: 1, wood: 2, reed: 1 },
+      cardUsed: undefined,
+    })
+  })
+
+  it('sorts same-cost returned-card solutions deterministically', () => {
+    const result = buildPaymentChoiceResult([
+      { resourcesPaid: { clay: 2 }, tradesUsed: [], cardUsed: 'Major_StoneOven' },
+      { resourcesPaid: { clay: 2 }, tradesUsed: [], cardUsed: 'Major_ClayOven' },
+    ], 'pay:test', true)
+
+    expect(result.type).toBe('choice')
+    if (result.type !== 'choice') return
+    expect(result.options.map((option) => option.labelParams)).toMatchObject([
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
+      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
+    ])
   })
 })
 
@@ -419,6 +487,66 @@ describe('Card-based payment', () => {
     const cardUsed = executePaymentSolution(player, solution)
     expect(cardUsed).toBe('Major_Fireplace1')
     expect(player.resources.clay).toBe(0)
+  })
+
+  it('combines required returned card with resource payment', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_ClayOven']
+    const cost: ComplexCost = {
+      fee: { clay: 2 },
+      cards: {
+        type: 'Major',
+        list: ['Major_ClayOven', 'Major_StoneOven'],
+        required: true,
+      },
+    }
+
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+
+    expect(solutions).toHaveLength(1)
+    expect(solutions[0]).toMatchObject({
+      resourcesPaid: { clay: 2 },
+      tradesUsed: [],
+      cardUsed: 'Major_ClayOven',
+    })
+  })
+
+  it('keeps separate required-card solutions when multiple returned cards match', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_ClayOven', 'Major_StoneOven']
+    const cost: ComplexCost = {
+      fee: { clay: 2 },
+      cards: {
+        type: 'Major',
+        list: ['Major_ClayOven', 'Major_StoneOven'],
+        required: true,
+      },
+    }
+
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+
+    expect(solutions).toHaveLength(2)
+    expect(solutions.map((solution) => solution.cardUsed).sort()).toEqual([
+      'Major_ClayOven',
+      'Major_StoneOven',
+    ])
+    expect(solutions.every((solution) => (solution.resourcesPaid.clay ?? 0) === 2)).toBe(true)
+  })
+
+  it('fails required-card payment when matching card is missing', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = []
+    const cost: ComplexCost = {
+      fee: { clay: 2 },
+      cards: {
+        type: 'Major',
+        list: ['Major_ClayOven', 'Major_StoneOven'],
+        required: true,
+      },
+    }
+
+    const solutions = computeAllBuyableCombinations(player, cost, player.improvements)
+    expect(solutions).toEqual([])
   })
 })
 

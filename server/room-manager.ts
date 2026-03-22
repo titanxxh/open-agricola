@@ -150,10 +150,12 @@ const toSyncPayload = (resp: SessionResponse): GameSyncPayload => ({
   pending: resp.pending,
   interaction: resp.interaction,
   scores: resp.scores ?? null,
+  pastureCapacities: resp.pastureCapacities,
   historyLength: resp.historyLength,
   hasActionStartSnapshot: resp.hasActionStartSnapshot,
   ok: resp.ok,
   actionAvailability: resp.actionAvailability,
+  cardAvailability: resp.cardAvailability,
   error: resp.error,
 })
 

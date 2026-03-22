@@ -4,6 +4,7 @@ import { getMajorCardEffect } from './major'
 export type PaymentInfo = {
   resourcesPaid: Partial<Resource>
   feeIndex?: number
+  returnedCardId?: string
 }
 
 export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onReturnHome'
@@ -36,13 +37,13 @@ export type CardEffect = {
   onStartHarvestFieldPhase?: EffectHandler
   onHarvestFieldPhase?: EffectHandler
   onEndHarvestFieldPhase?: EffectHandler
-  onAfterReap?: EffectHandler
-  onStartHarvestFeedingPhase?: EffectHandler
+  onAfterReap?: FlowEffectHandler
+  onStartHarvestFeedingPhase?: FlowEffectHandler
   onHarvestFeedingPhase?: EffectHandler
   onEndHarvestFeedingPhase?: EffectHandler
   onBeforeFeed?: EffectHandler
   onAfterFeed?: EffectHandler
-  onEndHarvest?: EffectHandler
+  onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
 }

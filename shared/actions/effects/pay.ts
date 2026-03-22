@@ -52,6 +52,20 @@ const RESOURCE_ID: Record<string, number> = {
   sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10
 }
 
+export const PAYMENT_RESOURCE_ORDER: ResourceKey[] = [
+  'wood',
+  'clay',
+  'reed',
+  'stone',
+  'food',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+]
+
 function hashSolution(solution: PaymentSolution): number {
   let h = 0
   const paid = solution.resourcesPaid
@@ -67,17 +81,28 @@ function hashSolution(solution: PaymentSolution): number {
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
   }
+  if (solution.cardUsed) {
+    for (const ch of solution.cardUsed) {
+      h = ((h + ch.charCodeAt(0) * 19) * 31) >>> 0
+    }
+  }
   return h
 }
 
-function makeCacheKey(player: PlayerState, cost: ComplexCost, costType?: CostModifierType): string {
+function makeCacheKey(
+  player: PlayerState,
+  cost: ComplexCost,
+  costType?: CostModifierType,
+  playedCards?: string[],
+): string {
   const reserveKey = Object.entries(player.resources)
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([k, v]) => `${k}:${v}`)
     .join(',')
   const costKey = JSON.stringify(cost)
   const typeKey = costType ?? 'none'
-  return `${reserveKey}|${costKey}|${typeKey}`
+  const playedCardsKey = [...(playedCards ?? [])].sort().join(',')
+  return `${reserveKey}|${costKey}|${typeKey}|${playedCardsKey}`
 }
 
 export const payResources = (
@@ -201,6 +226,71 @@ export const keepOnlyOptimals = (
   return optimal
 }
 
+const getPositiveResourceEntries = (solution: PaymentSolution) =>
+  PAYMENT_RESOURCE_ORDER
+    .map((key) => [key, solution.resourcesPaid[key] ?? 0] as const)
+    .filter(([, amount]) => amount > 0)
+
+const comparePositiveResourceEntries = (
+  left: ReturnType<typeof getPositiveResourceEntries>,
+  right: ReturnType<typeof getPositiveResourceEntries>,
+) => {
+  const maxLength = Math.max(left.length, right.length)
+  for (let index = 0; index < maxLength; index += 1) {
+    const a = left[index]
+    const b = right[index]
+    if (!a && !b) return 0
+    if (!a) return -1
+    if (!b) return 1
+    const keyCompare = PAYMENT_RESOURCE_ORDER.indexOf(a[0]) - PAYMENT_RESOURCE_ORDER.indexOf(b[0])
+    if (keyCompare !== 0) return keyCompare
+    if (a[1] !== b[1]) return a[1] - b[1]
+  }
+  return 0
+}
+
+export const sortPaymentSolutions = (
+  solutions: PaymentSolution[],
+): PaymentSolution[] => {
+  return [...solutions].sort((left, right) => {
+    const leftEntries = getPositiveResourceEntries(left)
+    const rightEntries = getPositiveResourceEntries(right)
+
+    const leftTotal = leftEntries.reduce((sum, [, amount]) => sum + amount, 0)
+    const rightTotal = rightEntries.reduce((sum, [, amount]) => sum + amount, 0)
+    if (leftTotal !== rightTotal) return leftTotal - rightTotal
+
+    if (leftEntries.length !== rightEntries.length) {
+      return leftEntries.length - rightEntries.length
+    }
+
+    const leftTradeTimes = left.tradesUsed.reduce((sum, entry) => sum + entry.times, 0)
+    const rightTradeTimes = right.tradesUsed.reduce((sum, entry) => sum + entry.times, 0)
+    if (leftTradeTimes !== rightTradeTimes) return leftTradeTimes - rightTradeTimes
+
+    const leftTradeKinds = left.tradesUsed.filter((entry) => entry.times > 0).length
+    const rightTradeKinds = right.tradesUsed.filter((entry) => entry.times > 0).length
+    if (leftTradeKinds !== rightTradeKinds) return leftTradeKinds - rightTradeKinds
+
+    const entryCompare = comparePositiveResourceEntries(leftEntries, rightEntries)
+    if (entryCompare !== 0) return entryCompare
+
+    const leftBonus = left.bonusUsed ?? ''
+    const rightBonus = right.bonusUsed ?? ''
+    if (leftBonus !== rightBonus) return leftBonus.localeCompare(rightBonus)
+
+    const leftCard = left.cardUsed ?? ''
+    const rightCard = right.cardUsed ?? ''
+    if (leftCard !== rightCard) return leftCard.localeCompare(rightCard)
+
+    const leftFeeIndex = left.feeIndex ?? -1
+    const rightFeeIndex = right.feeIndex ?? -1
+    if (leftFeeIndex !== rightFeeIndex) return leftFeeIndex - rightFeeIndex
+
+    return JSON.stringify(left.tradesUsed).localeCompare(JSON.stringify(right.tradesUsed))
+  })
+}
+
 const applyBonus = (
   cost: Partial<Resource>,
   bonus: Bonus,
@@ -245,11 +335,10 @@ const generateTradeCombinations = (
 
   const [firstTrade, ...restTrades] = trades
   const restCombinations = generateTradeCombinations(restTrades, playerResources)
-  const maxTimes = getMaxTradeTimesFromPartial(firstTrade, playerResources)
-
   const results: { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] = []
   
   for (const combo of restCombinations) {
+    const maxTimes = getMaxTradeTimesFromPartial(firstTrade, combo.result)
     for (let t = 0; t <= maxTimes; t++) {
       const afterTrade = convertResources(combo.result, firstTrade, t)
       if (hasValidResources(afterTrade)) {
@@ -305,6 +394,7 @@ export const applyBonusModifier = (
     discount: modifier.discount,
     optional: modifier.optional ?? true,
     sources: [modifier.cardId],
+    conditions: modifier.conditions,
   }
   modifiedBonuses.push(newBonus)
 
@@ -336,12 +426,9 @@ export const applyCostModifiers = (
   modifiers: CostModifier[],
 ): ComplexCost => {
   let result: ComplexCost = { ...baseCost }
-  
-  if (!result.trades) result.trades = []
-  if (!result.bonuses) result.bonuses = []
 
-  const effectiveTrades: Trade[] = [...result.trades]
-  const effectiveBonuses: Bonus[] = [...result.bonuses]
+  const effectiveTrades: Trade[] = [...(result.trades ?? [])]
+  const effectiveBonuses: Bonus[] = [...(result.bonuses ?? [])]
 
   for (const mod of modifiers) {
     if (mod.type === 'trade') {
@@ -363,10 +450,16 @@ export const applyCostModifiers = (
     }
   }
 
-  result = {
-    ...result,
-    trades: effectiveTrades,
-    bonuses: effectiveBonuses,
+  result = { ...result }
+  if (effectiveTrades.length > 0) {
+    result.trades = effectiveTrades
+  } else {
+    delete result.trades
+  }
+  if (effectiveBonuses.length > 0) {
+    result.bonuses = effectiveBonuses
+  } else {
+    delete result.bonuses
   }
 
   return result
@@ -382,7 +475,7 @@ export const computeAllBuyableCombinations = (
     ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
     : cost
 
-  const cacheKey = makeCacheKey(player, effectiveCost)
+  const cacheKey = makeCacheKey(player, effectiveCost, costType, playedCards)
   const cached = solutionCache.get(cacheKey)
   if (cached) return cached
 
@@ -431,8 +524,12 @@ export const computeAllBuyableCombinations = (
   const seenHashes = new Set<number>()
 
   for (const sol of rawSolutions) {
+    const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
+    if (costType && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)) {
+      continue
+    }
     const solution: PaymentSolution = {
-      resourcesPaid: subtractResources(playerResources, sol.resourcesRemaining),
+      resourcesPaid,
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
       feeIndex: sol.feeIndex,
@@ -445,21 +542,39 @@ export const computeAllBuyableCombinations = (
     }
   }
 
-  // Add card-based payment solutions if cards are specified
-  if (cost.cards?.list && cost.cards.list.length > 0 && playedCards) {
-    for (const cardId of cost.cards.list) {
-      if (playedCards.includes(cardId)) {
+  // Add or combine card-based payment solutions if cards are specified
+  if (cost.cards?.list && cost.cards.list.length > 0) {
+    const eligibleCards = playedCards
+      ? cost.cards.list.filter((cardId) => playedCards.includes(cardId))
+      : []
+
+    if (cost.cards.required) {
+      const requiredCardSolutions: PaymentSolution[] = []
+      if (eligibleCards.length > 0) {
+        paymentSolutions.forEach((solution) => {
+          eligibleCards.forEach((cardId) => {
+            requiredCardSolutions.push({
+              ...solution,
+              cardUsed: cardId,
+            })
+          })
+        })
+      }
+      paymentSolutions.length = 0
+      paymentSolutions.push(...requiredCardSolutions)
+    } else {
+      eligibleCards.forEach((cardId) => {
         const cardSolution: PaymentSolution = {
-          resourcesPaid: cost.cards.cost ?? {},
+          resourcesPaid: cost.cards?.cost ?? {},
           tradesUsed: [],
           cardUsed: cardId,
         }
         paymentSolutions.push(cardSolution)
-      }
+      })
     }
   }
 
-  const result = keepOnlyOptimals(paymentSolutions)
+  const result = sortPaymentSolutions(keepOnlyOptimals(paymentSolutions))
   solutionCache.set(cacheKey, result)
   return result
 }

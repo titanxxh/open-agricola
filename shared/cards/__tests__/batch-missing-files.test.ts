@@ -3,7 +3,6 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../D/D152_Patron'
@@ -96,36 +95,25 @@ describe('D49_Bookshelf', () => {
 })
 
 describe('E101_Blighter', () => {
-  it('stores bonus vp on buy based on remaining stages', () => {
-    const effect = getCardEffect('E101_Blighter')
-    expect(effect?.onBuy).toBeDefined()
-    const player = createPlayer()
-    const state = createState(player)
-    state.round = 5
-
-    effect?.onBuy?.(state, player)
-
-    expect(player.cardStates?.E101_Blighter?.counters?.bonusVp).toBe(4)
-  })
-
-  it('blocks future occupation actions via isDoable', () => {
-    const listener = findListener('E101-blighter-isdoable-occupation')
+  it('triggers before play-occupation and logs block', () => {
+    const listener = findListener('E101-blighter-before-occupation')
     expect(listener).toBeDefined()
     const player = createPlayer()
     player.occupationPlayed = ['E101_Blighter']
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'isDoable', doable: true,
+      actionId: 'play-occupation', phase: 'before',
     } as any)
-    expect(result?.doable).toBe(false)
+    expect(result?.logKey).toBe('log.cardEffectBlock')
+    expect(player.cardStates?.E101_Blighter?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger when card not played', () => {
-    const listener = findListener('E101-blighter-isdoable-occupation')
+    const listener = findListener('E101-blighter-before-occupation')
     const player = createPlayer()
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'isDoable', doable: true,
+      actionId: 'play-occupation', phase: 'before',
     } as any)
     expect(result).toBeUndefined()
   })

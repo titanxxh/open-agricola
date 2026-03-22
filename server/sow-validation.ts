@@ -19,6 +19,11 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
   | { ok: true; player: T }
   | { ok: false; error: SowValidationError }
 
+type SowValidationOptions = {
+  maxSelections?: number
+  excludedFields?: FarmTilePosition[]
+}
+
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
 
 const isWithinFarm = (pos: FarmTilePosition) =>
@@ -35,6 +40,7 @@ const buildFieldMap = (fields: FarmField[]) => {
 export const validateSowSelection = <T extends PlayerFarmState>(
   player: T,
   selections: SowSelection[],
+  options: SowValidationOptions = {},
 ): SowValidationResult<T> => {
   if (!Array.isArray(selections) || selections.length === 0) {
     return { ok: false, error: { code: 'NO_SELECTION' } }
@@ -42,6 +48,9 @@ export const validateSowSelection = <T extends PlayerFarmState>(
   const normalized = normalizePlayerFarm(player)
   const fieldMap = buildFieldMap(normalized.fields)
   const used = new Set<string>()
+  const excluded = new Set(
+    (options.excludedFields ?? []).map((field) => positionKey(field)),
+  )
   let grainCount = 0
   let vegetableCount = 0
   for (const selection of selections) {
@@ -60,6 +69,9 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     }
     const key = positionKey(pos)
     if (used.has(key)) continue
+    if (excluded.has(key)) {
+      return { ok: false, error: { code: 'INVALID_POSITION' } }
+    }
     const field = fieldMap.get(key)
     if (!field || field.crop !== null) {
       return { ok: false, error: { code: 'NOT_EMPTY' } }
@@ -67,6 +79,12 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     used.add(key)
     if (crop === 'grain') grainCount += 1
     if (crop === 'vegetable') vegetableCount += 1
+  }
+  if (
+    typeof options.maxSelections === 'number' &&
+    used.size > Math.max(0, Math.floor(options.maxSelections))
+  ) {
+    return { ok: false, error: { code: 'INVALID_POSITION' } }
   }
   if (grainCount > (normalized.resources?.grain ?? 0)) {
     return { ok: false, error: { code: 'NOT_ENOUGH_SEEDS' } }

@@ -4,6 +4,8 @@
 
 WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 
+注：`A92_AdoptiveParents` 已从小改良归类修正为职业卡，当前应经由职业注册与职业手牌/已打出区路径参与流程。
+
 | 层 | 目录 | 职责 |
 |---|---|---|
 | 共享领域 | `shared/` | 引擎、行动、效果、Hook、卡牌定义、状态模型、计分、i18n、协议类型 |
@@ -25,6 +27,7 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 - 内部维护 `history` 快照栈 + `actionStartIndex` 用于撤销。
 - 所有方法返回 `SessionResponse`（state + pending + interaction + scores + 元数据）。
 - `commitFarmChoice('fence')` 现在会把 `validateFenceSelection/applyFarmChoice` 计算出的 `newPastures/newEdges` 挂到本次 `ActionExecutionResult.extraData`，供 `immediatelyAfter/after` listener 直接消费。
+- `commitFarmChoice('room'|'stable'|'plow'|'fence')` 现在统一先走服务端 payment 求解；若存在多种合法支付法，会继续进入 `prompt.selectPayment`，而不是在提交农场选择时默认取第一个可支付方案。
 
 ### 2.2 WS 房间管理
 
@@ -113,7 +116,7 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 - `pending` 仍保留，用于兼容旧测试、undo 历史与逐步迁移。
 - `takeAction` 在存在未完成交互时会被协议层拒绝；只有 `allowedCommands` 与显式 `anytime` 能继续推进。
 - `takeAnytimeAction` 通过 `Engine.prependFlow()` 把 flow 插到当前未完成节点之前，执行完成后自然回到原交互。
-- 阶段型 `card-effects` 现已可复用同一套 `Engine` / `pending` / `interaction` 协议推进；`GameSession` 为阶段 flow 维护 resume cursor，使 `onBeforeHarvest`、`onHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 都可以像普通行动 flow 一样暂停与恢复。
+- 阶段型 `card-effects` 现已可复用同一套 `Engine` / `pending` / `interaction` 协议推进；`GameSession` 为阶段 flow 维护 resume cursor，使 `onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 都可以像普通行动 flow 一样暂停与恢复。
 
 行动格可执行性与 flow 推导已部分统一：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，现在可以递归读取 `flow.children` 的原子行动 `isDoable` 结果，并继续应用子行动自己的 `isDoable` hook / CardListener，避免像 `grain-utilization`、`cultivation`、`farm-expansion`、`farmland`、`major-improvement` 这类行动格维护两套手写条件。
 
@@ -121,33 +124,33 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引擎节点，延迟执行 handler。handler 返回的 flow 通过 buildFlowNode 插入引擎树继续执行。
 
-卡牌糖衣层最近补了三组公共抽象，减少单卡重复流程代码：
+卡牌糖衣层最近补了几组公共抽象，减少单卡重复流程代码：
 
-- `shared/cards/helpers/pay-gain-node.ts`：`payThenGainFlow`、`payThenActionFlow`、`returnToSpaceThenGainFlow`
-- `shared/cards/helpers/pending-choice.ts`：统一 `card-choice` 的 pending 数据存取
-- `shared/cards/helpers/stage-effects.ts`：统一阶段型支付、标记、bonus VP 与收获兑换；新增 `stagePayGainFlow`
+- `shared/cards/helpers/pay-gain-node.ts`：`payGainFlow`、`payThenGainFlow`、`payThenActionFlow`、`returnToSpaceThenGainFlow`
+- `shared/cards/helpers/stage-effects.ts`：统一阶段型标记、即时支付、bonus VP 与收获兑换
 - `shared/cards/helpers/card-state.ts`、`round-placement.ts`：统一一次性卡牌标记与“本轮放人顺序”这类时序状态
 - `shared/cards/helpers/action-snapshot.ts`：统一记录单次行动起点快照，供 `A74_StableTree` 这类“同一行动前后”卡复用
-- `shared/cards/helpers/pending-fence-bonus.ts` + `server/farm-choice.ts`：统一“免费围栏 / 围栏折扣”在 farm-choice 提交链中的结算，避免卡牌各自改围栏主路径
-- `shared/actions/effects/fencing.ts` 的 `costPreview`：让围栏行动的 `computeCosts` / `isDoable` 能走同一套最低成本预览
 - `shared/actions/effects/mark-card-trigger.ts`：把阶段型触发计数收敛成可复用内部 action
 - `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
 - `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
-248 个卡牌定义（A/B/C/D/E 五个 deck），40+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+251 个 A/B/C/D/E 牌文件，30+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
 - `ComplexCost`：fee / fees / trades / bonuses / cards。
 - `computeAllBuyableCombinations`：穷举可用支付方案 + Pareto 过滤。
 - LRU 缓存加速重复查询（复杂场景 100x+ 提升）。
+- `prompt.selectPayment`：统一支付选项协议；涉及返还/使用卡牌的方案会优先展示可读卡名，而不是直接暴露内部 card id。
+- 小改良/行动卡出牌前提：`minor-improvement` / `improvement-any` 已接入统一 prerequisite 校验；当前覆盖结构化的 `occupationPrerequisites` / `improvementPrerequisites`，以及常见文本前提如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`。
+- 改良日志：`log.playImprovement` / `log.playMinorImprovement` 现统一携带支付资源与返还卡牌；像 `C60_SmallPottersOven` 这类 `onBuy` 立即得资源效果，会额外产出独立的 `log.cardEffectGain`。当前实现卡牌中已无遗留 `reward:` 字段用法。
 - `CostModifier` 系统：`TradeModifier` / `BonusModifier`，30+ 卡牌注册了支付修改器。
 
 ## 5. 测试
 
 ### 5.1 单元测试
 
-vitest，58 文件 470 用例。
+vitest；当前仓库内 `*.test.ts` 约 65 个文件，用例数以实际测试输出为准。
 
 | 类别 | 文件 |
 |---|---|
@@ -155,7 +158,7 @@ vitest，58 文件 470 用例。
 | 会话契约 | `tests/game-session-contract.test.ts` |
 | 状态管线 | `tests/game-sync-pipeline.test.ts` |
 | Pending/Undo 回归 | `tests/pending-undo-regression.test.ts` |
-| 支付系统 | `tests/pay.test.ts`、`tests/pay-dp.test.ts`、`tests/exchange.test.ts` |
+| 支付系统 | `shared/actions/effects/__tests__/pay.test.ts`、`tests/pay-dp.test.ts`、`shared/actions/effects/__tests__/exchange.test.ts` |
 | 引擎 Pipeline | `shared/engine/__tests__/engine-pipeline.test.ts` |
 | Hook 分发 | `shared/engine/__tests__/hook-dispatch.test.ts` |
 | Stub 卡牌 Hook 矩阵 | `shared/cards/__stubs__/__tests__/hook-coverage-matrix.test.ts` |
@@ -195,7 +198,7 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 部分卡牌仅完成数据接入，复杂行为待补全（50+/251 已实现 hook）。
+- 251 个 A/B/C/D/E 牌文件中，当前有 45+ 张已接入 hook；仍有部分卡牌仅完成数据接入，复杂行为待补全。
 - Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。

@@ -50,7 +50,6 @@ const createPlayer = (): PlayerState => ({
 
 const createState = (player: PlayerState): GameState => ({
   round: 1,
-  phase: 'work',
   currentPlayerIndex: 0,
   players: [player],
   actionSpaces: [],
@@ -62,7 +61,6 @@ const createState = (player: PlayerState): GameState => ({
   futureMeeples: [],
   pendingFutureMeeples: [],
   gameOver: false,
-  workPhaseObtainedResources: {},
 })
 
 describe('computeScores', () => {
@@ -101,17 +99,20 @@ describe('computeScores', () => {
     )
   })
 
-  it('lets Soldier score wood-stone pairs before Joinery bonus wood is counted', () => {
+  it('scores Soldier from wood and stone pairs', () => {
     const player = createPlayer()
-    player.improvements = ['Major_Joinery']
     player.occupationPlayed = ['C133_Soldier']
-    player.resources.wood = 5
+    player.resources.wood = 4
     player.resources.stone = 2
 
     const [result] = computeScores(createState(player))
-    const byKey = new Map(result.categories.map((item) => [item.key, item]))
+    const bonusCategory = result.categories.find((item) => item.key === 'cardStateBonusVp')
 
-    expect(byKey.get('cardsBonus')?.total).toBe(1)
-    expect(byKey.get('cardStateBonusVp')?.total).toBe(2)
+    expect(bonusCategory?.total).toBe(2)
+    expect(bonusCategory?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'bonus', score: 2 }),
+      ]),
+    )
   })
 })

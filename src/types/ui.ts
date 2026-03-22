@@ -1,5 +1,5 @@
 import type { ActionChoiceOption } from '../../shared/game/types'
-import type { FarmTilePosition, GameState } from '../../shared/game/types'
+import type { FarmTilePosition, GameState, InteractionAnimalReorgZone } from '../../shared/game/types'
 
 export type PendingChoice = {
   promptKey?: string
@@ -15,12 +15,7 @@ export type PendingAnimalReorg = {
 }
 
 export type AnimalReorgState = {
-  zones: {
-    id: string
-    zoneType: 'pasture' | 'house' | 'stable'
-    animalType: 'sheep' | 'boar' | 'cattle' | null
-    animalCount: number
-  }[]
+  zones: InteractionAnimalReorgZone[]
   confirmDiscard: boolean
 }
 

@@ -7,10 +7,12 @@ export type GameSyncPayload = {
   pending: PendingAction
   interaction: InteractionState
   scores: PlayerScoreSummary[] | null
+  pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
   hasActionStartSnapshot: boolean
   ok: boolean
   actionAvailability?: Record<string, boolean>
+  cardAvailability?: Record<string, boolean>
   error?: string
 }
 

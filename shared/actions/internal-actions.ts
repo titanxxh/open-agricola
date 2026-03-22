@@ -26,6 +26,8 @@ import { noopAction } from './effects/noop'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
+import { storeOnCardAction } from './effects/store-on-card'
+import { gainOtherPlayersAction } from './effects/gain-other-players'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -58,6 +60,8 @@ export const internalActionDefinitions: ActionDefinition[] = [
   returnFirstWorkerHomeAction,
   reserveFenceBonusAction,
   payGrainAnyAction,
+  storeOnCardAction,
+  gainOtherPlayersAction,
   constructAction,
   placeFarmerAction,
 ]

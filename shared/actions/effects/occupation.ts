@@ -1,8 +1,7 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
-import { gainResources } from './gain'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
-import { getCardModifier } from '../../cards/card-modifiers'
+import { getCardModifiers } from '../../cards/card-modifiers'
 
 const canAffordWithPaperMaker = (
   player: PlayerState,
@@ -15,6 +14,18 @@ const canAffordWithPaperMaker = (
   const generatedFood = player.occupationPlayed.length
   if (foodNeeded <= 0 || generatedFood <= 0) return false
   return player.resources.food + generatedFood >= foodNeeded
+}
+
+export const isOccupationPlayable = (
+  player: PlayerState,
+  occupationId: string,
+  costOverride?: Partial<PlayerState['resources']>,
+) => {
+  const occupation = getOccupation(occupationId)
+  if (!occupation || !player.occupationHand.includes(occupation.id)) return false
+  const baseCost =
+    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
+  return canAffordWithPaperMaker(player, baseCost)
 }
 
 export const playOccupation = (
@@ -34,19 +45,17 @@ export const playOccupation = (
   if (!payTypedFlatCost(player, baseCost, 'occupation')) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
-  if (occupation.reward) {
-    gainResources(player, occupation.reward)
-  }
   player.occupationHand = player.occupationHand.filter(
     (id) => id !== occupation.id,
   )
   player.occupationPlayed.push(occupation.id)
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`occupation:${occupation.id}`)
-  const modifier = getCardModifier(occupation.id)
-  if (modifier && !player.activeModifiers.some(m => m.cardId === modifier.cardId)) {
-    player.activeModifiers.push(modifier)
-  }
+  getCardModifiers(occupation.id).forEach((modifier) => {
+    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
+      player.activeModifiers.push(modifier)
+    }
+  })
   return { type: 'ok' }
 }
 
@@ -90,6 +99,8 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
   }
   return food > 0 ? { food } : {}
 }
+
+export const getOccupationActionCost = getLessonsCost
 
 const buildPlayableOccupationOptions = (
   player: PlayerState,

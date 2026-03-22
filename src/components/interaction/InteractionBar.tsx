@@ -1,6 +1,8 @@
 import type { Locale } from '../../../shared/i18n'
-import { t } from '../../../shared/i18n'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
+import { ResourceLine } from '../common/ResourceLine'
+import type { Resource } from '../../../shared/game/types'
 
 type Props = {
   pendingAnimalReorg: PendingAnimalReorg | null
@@ -67,6 +69,12 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
       : pendingChoice?.options ?? []
+  const isRoomConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionRoomSelect' &&
+    pendingRoomTilesLength === 0
+  const isStableConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
+    pendingStableTilesLength === 0
 
   return (
     <div className="interaction-bar">
@@ -93,7 +101,7 @@ export const InteractionBar = ({
       ) : pendingChoice && isInteractive ? (
         <>
           <div className="interaction-title">
-            {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+            {t(locale, pendingChoice.promptKey as TranslationKey ?? 'ui.interactionChooseOne')}
           </div>
           {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
             <div className="interaction-subtitle">
@@ -141,6 +149,12 @@ export const InteractionBar = ({
                   onClick={() => resolveChoice(option.value)}
                   disabled={
                     !isInteractive ||
+                    (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
+                      option.value === 'confirm' &&
+                      isRoomConfirmDisabled) ||
+                    (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
+                      option.value === 'confirm' &&
+                      isStableConfirmDisabled) ||
                     (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
                       option.value === 'confirm' &&
                       !hasPendingPlowSelection) ||
@@ -149,7 +163,23 @@ export const InteractionBar = ({
                       (pendingSowSelectionsLength ?? 0) === 0)
                   }
                 >
-                  {t(locale, option.labelKey, option.labelParams)}
+                  {option.labelKey === 'prompt.selectPaymentOption' && option.labelParams && typeof option.labelParams === 'object' && 'resourcesPaid' in option.labelParams ? (
+                    <span className="payment-option-content">
+                      {Object.keys(option.labelParams.resourcesPaid as Partial<Resource>).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
+                        <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+                      ) : (
+                        <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
+                      )}
+                      {option.labelParams.cardUsed && (
+                        <span className="payment-option-card">
+                          {' '}
+                          ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    t(locale, option.labelKey, option.labelParams)
+                  )}
                 </button>
               ))}
             </div>

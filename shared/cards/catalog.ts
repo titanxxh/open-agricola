@@ -118,6 +118,7 @@ import { C37_DwellingMound } from './C/C37_DwellingMound'
 import { C51_FishingNet } from './C/C51_FishingNet'
 import { C52_HuntsmansHat } from './C/C52_HuntsmansHat'
 import { C57_Crudite } from './C/C57_Crudite'
+import { C60_SmallPottersOven } from './C/C60_SmallPottersOven'
 import { C63_CraftBrewery } from './C/C63_CraftBrewery'
 import { C71_Slurry } from './C/C71_Slurry'
 import { C71_SlurrySpreader } from './C/C71_SlurrySpreader'
@@ -271,7 +272,6 @@ export const minorImprovementCards = [
   A82_WorkCertificate,
   A83_ShepherdsCrook,
   A84_Silage,
-  A92_AdoptiveParents,
   A1_Shelter,
   A2_ShiftingCultivation,
   A4_Baseboards,
@@ -323,6 +323,7 @@ export const minorImprovementCards = [
   C51_FishingNet,
   C52_HuntsmansHat,
   C57_Crudite,
+  C60_SmallPottersOven,
   C63_CraftBrewery,
   C71_Slurry,
   C71_SlurrySpreader,
@@ -413,6 +414,7 @@ export const occupationCards = [
   A87_Conservator,
   A88_HedgeKeeper,
   A89_StablePlanner,
+  A92_AdoptiveParents,
   A94_LazySowman,
   A97_Freshman,
   B100_Clutterer,

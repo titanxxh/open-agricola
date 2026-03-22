@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import type { GameState } from '../../../../shared/game/types'
+import { LogPanel } from '../LogPanel'
+
+const stripHtml = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+
+describe('LogPanel', () => {
+  it('renders returned card in improvement log and separate card gain log', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          player: 'Player B',
+          improvements: 'C60_SmallPottersOven',
+          costResources: { clay: 2 },
+          returnedCards: ['Major_ClayOven'],
+        },
+      },
+      {
+        key: 'log.cardEffectGain',
+        params: {
+          player: 'Player B',
+          cardId: 'C60_SmallPottersOven',
+          gain: { food: 5 },
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="en" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain("Player B plays minor improvement: Small Potter's Oven")
+    expect(text).toContain('Pays Clay 2')
+    expect(text).toContain('Returns Clay Oven')
+    expect(text).toContain("Player B gains Food 5 from Small Potter's Oven")
+  })
+})

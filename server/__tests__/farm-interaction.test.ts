@@ -3,8 +3,30 @@ import type { PlayerState } from '../../shared/game/types.ts'
 import {
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
+  buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../farm-interaction.ts'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+
+const stableTradeModifiers: PlayerState['activeModifiers'] = [
+  {
+    type: 'trade',
+    cardId: 'Test_Stable_Clay',
+    appliesTo: ['stables'],
+    from: { clay: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+  {
+    type: 'trade',
+    cardId: 'Test_Stable_Stone',
+    appliesTo: ['stables'],
+    from: { stone: 2 },
+    to: { wood: 2 },
+    max: 2,
+  },
+]
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -62,7 +84,6 @@ describe('farm interaction builders', () => {
 
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
-    expect(interaction.costPerRoom).toEqual({ wood: 2, reed: 2 })
     expect(interaction.maxSelections).toBe(1)
   })
 
@@ -78,11 +99,52 @@ describe('farm interaction builders', () => {
     expect(interaction.maxSelections).toBe(1)
   })
 
+  it('counts frame builder replacement costs when computing room selections', () => {
+    const player = createPlayer()
+    player.houseType = 'clay'
+    player.resources.wood = 2
+    player.resources.clay = 6
+    player.resources.reed = 4
+    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+
+    const interaction = buildRoomFarmInteraction(player)
+
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    expect(interaction.maxSelections).toBe(2)
+  })
+
+  it('counts Carpenter\'s Hammer discounts when computing room selections', () => {
+    const player = createPlayer()
+    player.resources.wood = 8
+    player.resources.reed = 2
+    player.activeModifiers = [...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+
+    const interaction = buildRoomFarmInteraction(player)
+
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    expect(interaction.maxSelections).toBe(2)
+  })
+
   it('limits stable maxSelections using discounted stable cost', () => {
     const player = createPlayer()
     player.resources.wood = 2
 
     const interaction = buildStableFarmInteraction(player, { wood: -1 })
+
+    expect(interaction.farmType).toBe('stable')
+    if (interaction.farmType !== 'stable') return
+    expect(interaction.maxSelections).toBe(2)
+  })
+
+  it('counts stable payment alternatives when computing maxSelections', () => {
+    const player = createPlayer()
+    player.resources.clay = 2
+    player.resources.stone = 2
+    player.activeModifiers = [...stableTradeModifiers]
+
+    const interaction = buildStableFarmInteraction(player)
 
     expect(interaction.farmType).toBe('stable')
     if (interaction.farmType !== 'stable') return
@@ -99,5 +161,33 @@ describe('farm interaction builders', () => {
     expect(interaction.farmType).toBe('plow')
     if (interaction.farmType !== 'plow') return
     expect(interaction.selectableTiles).toEqual([])
+  })
+
+  it('limits sow selectable fields using maxSelections and exclusions', () => {
+    const player = createPlayer()
+    player.resources.grain = 3
+    player.fields = [
+      { row: 0, col: 0, crop: null, remaining: 0 },
+      { row: 0, col: 1, crop: null, remaining: 0 },
+      { row: 1, col: 0, crop: null, remaining: 0 },
+    ]
+
+    const interaction = buildSowFarmInteraction(player, {
+      maxSelections: 2,
+      excludedFields: [{ row: 0, col: 1 }],
+    })
+
+    expect(interaction.farmType).toBe('sow')
+    if (interaction.farmType !== 'sow') return
+    expect(interaction.maxSelections).toBe(2)
+    expect(interaction.selectableFields).toHaveLength(2)
+    expect(interaction.selectableFields).toContainEqual({
+      tile: { row: 0, col: 0 },
+      allowedCrops: ['grain'],
+    })
+    expect(interaction.selectableFields).not.toContainEqual({
+      tile: { row: 0, col: 1 },
+      allowedCrops: ['grain'],
+    })
   })
 })

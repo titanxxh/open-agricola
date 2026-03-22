@@ -6,6 +6,7 @@ import {
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../B/B75_WoodWorkshop'
+import '../A/A7_GardenersKnife'
 import '../A/A55_JunkRoom'
 import '../A/A65_SeedPellets'
 import '../A/A79_GardenHoe'
@@ -81,16 +82,29 @@ describe('B75_WoodWorkshop', () => {
     expect(player.cardStates?.B75_WoodWorkshop?.counters?.triggerCount).toBe(1)
   })
 
-  it('isDoable returns true for improvement', () => {
+  it('isDoable returns true only when the preview wood unlocks an improvement', () => {
+    const listener = findListener('B75-wood-workshop-isdoable-improvement')
+    expect(listener).toBeDefined()
+    const player = createPlayer()
+    player.minorPlayed = ['B75_WoodWorkshop']
+    player.minorHand = ['A7_GardenersKnife']
+    const result = executeCardListener(listener!, {
+      state: createState(player), player, space: createSpace('improvement-any'),
+      actionId: 'improvement-any', phase: 'isDoable', doable: false,
+    } as any)
+    expect(result?.doable).toBe(true)
+  })
+
+  it('isDoable stays false when preview wood still cannot unlock any improvement', () => {
     const listener = findListener('B75-wood-workshop-isdoable-improvement')
     expect(listener).toBeDefined()
     const player = createPlayer()
     player.minorPlayed = ['B75_WoodWorkshop']
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'isDoable',
+      actionId: 'improvement-any', phase: 'isDoable', doable: false,
     } as any)
-    expect(result?.doable).toBe(true)
+    expect(result).toBeUndefined()
   })
 
   it('does not trigger when card not played', () => {
@@ -188,12 +202,11 @@ describe('C88_CarpentersApprentice', () => {
     expect(result).toBeUndefined()
   })
 
-  it('has correct modifier definition', () => {
+  it('uses listeners instead of a global construct modifier', () => {
     const card = C88Card as any
-    expect(card.modifier).toBeDefined()
-    expect(card.modifier.type).toBe('bonus')
-    expect(card.modifier.discount.wood).toBe(2)
-    expect(card.modifier.appliesTo).toContain('construct')
+    expect(card.modifier).toBeUndefined()
+    expect(findListener('C88-carpenters-apprentice-costs-construct')).toBeDefined()
+    expect(findListener('C88-carpenters-apprentice-before-fence')).toBeDefined()
   })
 })
 

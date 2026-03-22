@@ -59,8 +59,12 @@ export type FenceValidationError = {
 }
 
 export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
-  | { ok: true; player: T; newEdges: string[]; newPastures: Pasture[] }
+  | { ok: true; player: T; newEdges: string[]; newPastures: Pasture[]; payableWoodCost: number }
   | { ok: false; error: FenceValidationError }
+
+type FenceValidationOptions = {
+  skipPayment?: boolean
+}
 
 export const FARM_ROWS = 3
 export const FARM_COLS = 5
@@ -332,6 +336,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   edges: string[],
   extraWood = 0,
   freeFences = 0,
+  options: FenceValidationOptions = {},
 ): FenceValidationResult<T> => {
   const extraCost = Number.isFinite(extraWood) ? Math.max(0, extraWood) : 0
   const freeFenceCount = Number.isFinite(freeFences) ? Math.max(0, freeFences) : 0
@@ -352,7 +357,8 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
   const payableFenceCount = Math.max(0, newEdges.length - freeFenceCount)
-  if ((normalized.resources?.wood ?? 0) < payableFenceCount + extraCost) {
+  const payableWoodCost = payableFenceCount + extraCost
+  if (!options.skipPayment && (normalized.resources?.wood ?? 0) < payableWoodCost) {
     return {
       ok: false,
       error: { code: 'NOT_ENOUGH_WOOD', edges, newEdges },
@@ -441,12 +447,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     ...normalized,
     resources: {
       ...normalized.resources,
-      wood: (normalized.resources?.wood ?? 0) - payableFenceCount - extraCost,
+      wood: options.skipPayment
+        ? (normalized.resources?.wood ?? 0)
+        : (normalized.resources?.wood ?? 0) - payableWoodCost,
     },
     fenceSegments: Array.from(edgeSet),
     fences: edgeSet.size,
     pastures,
   }
   enforceAnimalCapacity(updated)
-  return { ok: true, player: updated as T, newEdges, newPastures }
+  return { ok: true, player: updated as T, newEdges, newPastures, payableWoodCost }
 }

@@ -1,7 +1,6 @@
 import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState, Resource } from '../../game/types'
-import { payResources } from './pay'
 import { canExecuteWithCostPreview } from './cost-preview'
-import { canAffordFlatCost, resolveFlatCost } from './pay-helpers'
+import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 
 export const getRenovation = (player: PlayerState) => {
   if (player.houseType === 'wood') {
@@ -25,7 +24,18 @@ export const canRenovate = (
 ) => {
   const renovation = getRenovation(player)
   if (!renovation) return false
-  return canAffordFlatCost(player, renovation.cost, costOverride)
+  const cost = costOverride
+    ? {
+        ...renovation.cost,
+        ...Object.fromEntries(
+          Object.entries(costOverride).map(([key, value]) => [
+            key,
+            Math.max(0, (renovation.cost[key as keyof Resource] ?? 0) + (value ?? 0)),
+          ]),
+        ),
+      }
+    : renovation.cost
+  return canAffordTypedFlatCost(player, cost, 'renovation')
 }
 
 export const renovateHouse = (
@@ -34,9 +44,18 @@ export const renovateHouse = (
 ) => {
   const renovation = getRenovation(player)
   if (!renovation) return false
-  const cost = resolveFlatCost(renovation.cost, costOverride)
-  if (!canAffordFlatCost(player, renovation.cost, costOverride)) return false
-  payResources(player, cost)
+  const cost = costOverride
+    ? {
+        ...renovation.cost,
+        ...Object.fromEntries(
+          Object.entries(costOverride).map(([key, value]) => [
+            key,
+            Math.max(0, (renovation.cost[key as keyof Resource] ?? 0) + (value ?? 0)),
+          ]),
+        ),
+      }
+    : renovation.cost
+  if (!payTypedFlatCost(player, cost, 'renovation')) return false
   player.houseType = renovation.nextType
   return true
 }
@@ -54,6 +73,7 @@ export const renovate = (player: PlayerState): ActionExecutionResult => {
 
 export const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) => getRenovation(player) !== null,
+  canExecute: ({ player }, costOverride) => canRenovate(player, costOverride),
   getBaseCost: ({ player }) => getRenovation(player)?.cost ?? {},
 }
 
@@ -71,7 +91,7 @@ export const renovateHouseAction: ActionDefinition = {
     if (!renovation) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
-    if (!canAffordFlatCost(player, renovation.cost, costs)) {
+    if (!canRenovate(player, costs)) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
     if (!renovateHouse(player, costs)) {

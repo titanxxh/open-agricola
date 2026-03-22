@@ -315,9 +315,9 @@
   background-size: 1861.82%;
 }
 .player-card.major .card-cost-text {
-  background-image: url('/bga-img/meeples.png');
-  background-position: 76.3186% 0.52687%;
-  background-size: 1106.89% 1328%;
+  background-image: none;
+  color: white;
+  text-shadow: -1px 0px 0px black, 0px -1px 0px black, 1px 0px 0px black, 0px 1px 0px black;
 }
 
 /* Alt cost (multi-choice, e.g. 2W/2C/2S) */
@@ -517,10 +517,6 @@
 .player-card.minor .card-cost-text {
   text-shadow: -1px 0px 0px white, 0px -1px 0px white, 1px 0px 0px white, 0px 1px 0px white;
   color: black;
-}
-.player-card.major .card-cost-text {
-  color: white;
-  text-shadow: -1px 0px 0px black, 0px -1px 0px black, 1px 0px 0px black, 0px 1px 0px black;
 }
 .card-cost-item {
   display: flex;

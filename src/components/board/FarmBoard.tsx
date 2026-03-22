@@ -2,9 +2,6 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { FarmTilePosition, PlayerState, Resource } from '../../../shared/game/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
-import { getMinorImprovement } from '../../../shared/game/minor-improvements'
-import { getOccupation } from '../../../shared/game/occupations'
-import { canPayResources } from '../../../shared/actions/effects/pay'
 import { emptyResources } from '../../../shared/logic/state'
 import type { AnimalReorgState } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
@@ -105,6 +102,9 @@ type Props = {
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
   isSelectingImprovementAny: boolean
+  selectableMinorIds: Set<string>
+  selectableOccupationIds: Set<string>
+  cardAvailability: Record<string, boolean>
   futureCardResources: Record<
     string,
     {
@@ -165,6 +165,9 @@ export const FarmBoard = ({
   isSelectingMinor,
   isSelectingOccupation,
   isSelectingImprovementAny,
+  selectableMinorIds,
+  selectableOccupationIds,
+  cardAvailability,
   futureCardResources,
   resolveChoice,
   devMode,
@@ -713,11 +716,13 @@ export const FarmBoard = ({
                 <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
               ) : (
                 displayPlayer.occupationHand.map((cardId) => {
-                  const occupation = getOccupation(cardId)
-                  const canPlay = occupation
-                    ? canPayResources(displayPlayer, occupation.cost ?? {})
-                    : false
-                  const canInteract = canInteractHand && canPlay
+                  const canPlay = cardAvailability[`occupation:${cardId}`] !== false
+                  const isSelectingThisHand = isSelectingOccupation
+                  const isOptionSelectable =
+                    !isSelectingThisHand || selectableOccupationIds.has(cardId)
+                  const canInteract = isSelectingThisHand
+                    ? canInteractHand && isOptionSelectable
+                    : canInteractHand && canPlay && isOptionSelectable
                   return (
                     <PlayerCard
                       key={`occupation-${cardId}`}
@@ -730,7 +735,11 @@ export const FarmBoard = ({
                           resolveChoice(cardId)
                         }
                       }}
-                      disabled={!canInteract}
+                      disabled={
+                        isSelectingThisHand
+                          ? !canInteractHand || !isOptionSelectable
+                          : !canInteractHand || !canPlay || !isOptionSelectable
+                      }
                       selectable={isSelectingOccupation && canInteract}
                     />
                   )
@@ -745,13 +754,17 @@ export const FarmBoard = ({
                 <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
               ) : (
                 displayPlayer.minorHand.map((cardId) => {
-                  const improvement = getMinorImprovement(cardId)
-                  const canPlay = improvement
-                    ? canPayResources(displayPlayer, improvement.cost ?? {})
-                    : false
-                  const canInteract = canInteractHand && canPlay
+                  const canPlay = cardAvailability[`minor:${cardId}`] !== false
+                  const isSelectingThisHand =
+                    isSelectingMinor || isSelectingImprovementAny
+                  const isOptionSelectable =
+                    !isSelectingThisHand ||
+                    selectableMinorIds.has(cardId)
+                  const canInteract = isSelectingThisHand
+                    ? canInteractHand && isOptionSelectable
+                    : canInteractHand && canPlay && isOptionSelectable
                   const canSelect =
-                    (isSelectingMinor || isSelectingImprovementAny) && canInteract
+                    isSelectingThisHand && canInteract
                   return (
                     <PlayerCard
                       key={`hand-${cardId}`}
@@ -767,7 +780,11 @@ export const FarmBoard = ({
                           resolveChoice(value)
                         }
                       }}
-                      disabled={!canInteract}
+                      disabled={
+                        isSelectingThisHand
+                          ? !canInteractHand || !isOptionSelectable
+                          : !canInteractHand || !canPlay || !isOptionSelectable
+                      }
                       selectable={canSelect}
                     />
                   )

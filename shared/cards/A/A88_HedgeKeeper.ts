@@ -1,26 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
-import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { BonusModifier } from '../../game/types'
 
-const CARD_ID = 'A88_HedgeKeeper'
-
-const computeCostsListener: CardListenerRegistration = {
-  id: 'A88-hedge-keeper-costs-fence',
-  cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['fence'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    return { costs: { wood: -3 } }
-  },
-}
-
-registerCardListener(computeCostsListener)
-
 export const A88_HedgeKeeper = new Occupation({
-  id: CARD_ID,
+  id: "A88_HedgeKeeper",
   name: "Hedge Keeper",
   deck: "A",
   number: 88,
@@ -30,7 +12,7 @@ export const A88_HedgeKeeper = new Occupation({
   players: "1+",
   modifier: {
     type: 'bonus',
-    cardId: CARD_ID,
+    cardId: 'A88_HedgeKeeper',
     appliesTo: ['fencing'],
     discount: { wood: 3 },
   } as BonusModifier,

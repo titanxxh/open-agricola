@@ -1,18 +1,17 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ComplexCost, PlayerState, Resource } from '../../../shared/game/types'
+import type { PlayerState, Resource } from '../../../shared/game/types'
 import { formatResources } from '../../../shared/logic/format'
-import { getMajorCardEffect } from '../../../shared/cards/major'
 import { emptyResources } from '../../../shared/logic/state'
-import { canPayResources, computeAllBuyableCombinations } from '../../../shared/actions/effects/pay'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard } from '../common/PlayerCard'
 
 type Props = {
   locale: Locale
   availableMajorImprovements: string[]
-  currentPlayer: PlayerState
   isSelectingMajor: boolean
+  selectableMajorIds: Set<string>
+  cardAvailability: Record<string, boolean>
   isInteractive: boolean
   resolveChoice: (value: string) => void
   futureCardResources: Record<
@@ -30,8 +29,9 @@ type Props = {
 export const MajorImprovements = ({
   locale,
   availableMajorImprovements,
-  currentPlayer,
   isSelectingMajor,
+  selectableMajorIds,
+  cardAvailability,
   isInteractive,
   resolveChoice,
   futureCardResources,
@@ -41,20 +41,14 @@ export const MajorImprovements = ({
     <h2>{t(locale, 'ui.majorImprovements')}</h2>
     <div className="major-row">
       {availableMajorImprovements.map((cardId) => {
-        const major = getMajorCardEffect(cardId)
-        const isComplex = !!major && (
-          'fee' in major.cost ||
-          'fees' in major.cost ||
-          'trades' in major.cost ||
-          'cards' in major.cost ||
-          'bonuses' in major.cost
-        )
-        const canBuy = !!major && (
-          isComplex
-            ? computeAllBuyableCombinations(currentPlayer, major.cost as ComplexCost, currentPlayer.improvements).length > 0
-            : canPayResources(currentPlayer, (major?.cost ?? {}) as Partial<Resource>)
-        )
-        const canInteract = isInteractive && isSelectingMajor && canBuy
+        const canBuy = cardAvailability[`major:${cardId}`] !== false
+        const isPendingSelectable = !isSelectingMajor || selectableMajorIds.has(cardId)
+        const canInteract = isSelectingMajor
+          ? isInteractive && isPendingSelectable
+          : isInteractive && canBuy && isPendingSelectable
+        const isDisabled = isSelectingMajor
+          ? !isPendingSelectable
+          : !canBuy || !isPendingSelectable
         const futureEntries = futureCardResources[cardId] ?? []
         return (
           <div key={`major-${cardId}`} className="major-card-wrapper">
@@ -68,9 +62,9 @@ export const MajorImprovements = ({
                   resolveChoice(`major:${cardId}`)
                 }
               }}
-              disabled={!canBuy}
-              selectable={isSelectingMajor && canBuy}
-              className={canBuy ? '' : 'disabled'}
+              disabled={isDisabled}
+              selectable={isSelectingMajor && isPendingSelectable}
+              className={isDisabled ? 'disabled' : ''}
             />
             {futureEntries.length > 0 ? (
               <div className="card-future">

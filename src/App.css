@@ -110,6 +110,13 @@
   cursor: pointer;
 }
 
+.interaction-actions button:disabled {
+  background: #93a68a;
+  color: #eef2ea;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -597,6 +604,14 @@
 
 .action-card-holder.round .resource-holder {
   flex-flow: row-reverse;
+}
+
+.action-card-holder.round .resource-holder .res-icon {
+  margin: 0 0 0 -0.45em;
+}
+
+.action-card-holder.round .resource-holder .res-icon:last-child {
+  margin-left: 0;
 }
 
 .action-card-holder.round .action-header {

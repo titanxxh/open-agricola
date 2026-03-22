@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow } from '../../game/types'
-import type { ActionHookPhase, ActionHookResult, } from '../../actions/hooks'
-import type { ActionSpace, PlayerState, Pasture } from '../../game/types'
+import type { ActionFlow, Pasture, PlayerState } from '../../game/types'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   isCardFlagged,
   readCardExtraData,
@@ -15,30 +14,34 @@ type AnimalType = 'sheep' | 'boar' | 'cattle'
 const CARD_ID = 'B34_SpecialFood'
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
 
-const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
-  const gainPerRound = space.gainPerRound ?? {}
-  return (gainPerRound.sheep ?? 0) > 0 ||
-    (gainPerRound.boar ?? 0) > 0 ||
-    (gainPerRound.cattle ?? 0) > 0
+const isAnimalAccumulationSpace = (context: CardListenerContext) => {
+  const gained = context.result?.type === 'ok' ? context.result.resourcesGained : undefined
+  return (gained?.sheep ?? 0) > 0 || (gained?.boar ?? 0) > 0 || (gained?.cattle ?? 0) > 0
 }
 
 const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> => ({
-  sheep: (player.houseAnimalType === 'sheep' ? player.houseAnimalCount : 0) +
+  sheep:
+    (player.houseAnimalType === 'sheep' ? player.houseAnimalCount : 0) +
     Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'sheep').length +
     (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) => sum + (pasture.animalType === 'sheep' ? pasture.animalCount : 0),
+      (sum: number, pasture: Pasture) =>
+        sum + (pasture.animalType === 'sheep' ? pasture.animalCount : 0),
       0,
     ),
-  boar: (player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0) +
+  boar:
+    (player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0) +
     Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'boar').length +
     (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) => sum + (pasture.animalType === 'boar' ? pasture.animalCount : 0),
+      (sum: number, pasture: Pasture) =>
+        sum + (pasture.animalType === 'boar' ? pasture.animalCount : 0),
       0,
     ),
-  cattle: (player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0) +
+  cattle:
+    (player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0) +
     Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'cattle').length +
     (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) => sum + (pasture.animalType === 'cattle' ? pasture.animalCount : 0),
+      (sum: number, pasture: Pasture) =>
+        sum + (pasture.animalType === 'cattle' ? pasture.animalCount : 0),
       0,
     ),
 })
@@ -46,27 +49,44 @@ const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> =
 const buildBonusVpFlow = (count: number): ActionFlow => ({
   type: 'seq',
   children: [
+    { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+    { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
     ...Array.from({ length: count }, () => ({
       type: 'leaf' as const,
       actionId: 'bonus-vp',
       sourceCard: CARD_ID,
     })),
-    {
-      type: 'leaf',
-      actionId: 'flag-card',
-      sourceCard: CARD_ID,
-    },
   ],
 })
 
-const beforeCollectListener: CardListenerRegistration = {
+const buildSpecialFoodFlow = (count: number, ambiguous: boolean): ActionFlow => {
+  if (!ambiguous) {
+    return buildBonusVpFlow(count)
+  }
+  return {
+    type: 'xor',
+    promptKey: 'ui.interactionReclamationPlowAmbiguous',
+    children: [
+      {
+        ...buildBonusVpFlow(count),
+        choiceLabelKey: 'ui.interactionReclamationPlowUse',
+      },
+      {
+        type: 'leaf',
+        actionId: 'noop',
+        choiceLabelKey: 'ui.interactionReclamationPlowDecline',
+      },
+    ],
+  }
+}
+
+const beforeListener: CardListenerRegistration = {
   id: 'B34-special-food-before-collect',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (!isAnimalAccumulationSpace(context.space)) return
     writeCardExtraData(
       context.player,
       CARD_ID,
@@ -76,46 +96,52 @@ const beforeCollectListener: CardListenerRegistration = {
   },
 }
 
-const afterCollectListener: CardListenerRegistration = {
+const afterListener: CardListenerRegistration = {
   id: 'B34-special-food-after-collect',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (!isAnimalAccumulationSpace(context.space)) return
-    const animalsBefore = readCardExtraData<Record<AnimalType, number>>(
+    if (!isAnimalAccumulationSpace(context)) return
+
+    const animalsBeforeCollecting = readCardExtraData<Record<AnimalType, number>>(
       context.player,
       CARD_ID,
       ANIMALS_BEFORE_KEY,
     )
+    if (!animalsBeforeCollecting) return
+
     const resourcesGained =
       context.result?.type === 'ok' ? context.result.resourcesGained : undefined
-    if (!animalsBefore || !resourcesGained) return
     const obtainedAnimals: Record<AnimalType, number> = {
-      sheep: resourcesGained.sheep ?? 0,
-      boar: resourcesGained.boar ?? 0,
-      cattle: resourcesGained.cattle ?? 0,
+      sheep: resourcesGained?.sheep ?? 0,
+      boar: resourcesGained?.boar ?? 0,
+      cattle: resourcesGained?.cattle ?? 0,
     }
-    const totalObtained = obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
+    const totalObtained =
+      obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return
 
-    const animalsAfter = getAnimalCountByType(context.player)
+    const animalsAfterCollecting = getAnimalCountByType(context.player)
+    let ambiguous = false
     for (const animalType of ['sheep', 'boar', 'cattle'] as AnimalType[]) {
-      if (animalsAfter[animalType] < animalsBefore[animalType] + obtainedAnimals[animalType]) {
+      const after = animalsAfterCollecting[animalType]
+      const obtained = obtainedAnimals[animalType]
+      if (after < obtained) {
         return
+      }
+      if (after < obtained + animalsBeforeCollecting[animalType]) {
+        ambiguous = true
       }
     }
 
-    return {
-      flow: buildBonusVpFlow(totalObtained),
-      sourceCard: CARD_ID,
-    }
+    return { flow: buildSpecialFoodFlow(totalObtained, ambiguous) }
   },
 }
 
-registerCardListener(beforeCollectListener)
-registerCardListener(afterCollectListener)
+registerCardListener(beforeListener)
+registerCardListener(afterListener)
 
 export const B34_SpecialFood = new MinorImprovement({
   id: CARD_ID,
