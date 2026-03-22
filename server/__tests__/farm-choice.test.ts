@@ -3,6 +3,7 @@ import { applyFarmChoice } from '../farm-choice.ts'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import type { PlayerState } from '../../shared/game/types.ts'
 import { buildRoomFarmInteraction } from '../farm-interaction.ts'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
@@ -191,6 +192,28 @@ describe('farm choice', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error).toBe('payment choice required')
+  })
+
+  it('rejects room selections above the true max buildable room count', () => {
+    const player = createPlayer()
+    player.resources.wood = 8
+    player.resources.reed = 2
+    player.activeModifiers = [
+      ...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+    ]
+
+    const interaction = buildRoomFarmInteraction(player)
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    expect(interaction.maxSelections).toBe(2)
+
+    const result = applyFarmChoice(player, 'room', {
+      rooms: interaction.selectableTiles.slice(0, 3),
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe('too many rooms selected')
   })
 
   it('requires an explicit payment choice when multiple stable payments are legal', () => {

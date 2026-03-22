@@ -21,5 +21,8 @@ export const canExecuteWithCostPreview = (
   if (preview.isStructurallyPossible && !preview.isStructurallyPossible(context)) {
     return false
   }
+  if (preview.canExecute) {
+    return preview.canExecute(context, costOverride)
+  }
   return canAffordActionPreviewCost(context, preview.getBaseCost, costOverride)
 }

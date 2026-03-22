@@ -192,7 +192,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { valid: false, error: 'Player not found' })
       return true
     }
-    const player = normalizePlayerFarm(state.players[playerIndex] as Parameters<typeof normalizePlayerFarm>[0])
+    const player = normalizePlayerFarm(state.players[playerIndex]!)
 
     if (body.type === 'fence') {
       const result = applyFarmChoice(player, 'fence', body.payload as any)

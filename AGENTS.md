@@ -69,18 +69,10 @@
 
 **总体规范：卡牌能力尽量在卡牌文件内部闭环，不能扩散。卡牌文件行数尽量贴近 BGA，甚至更少**
 
-### 1. Modifier 定义位置
-
-- 卡牌的 payment modifier（`TradeModifier`、`BonusModifier`）必须定义在卡牌自己的文件中。
-- 不要把 modifier 放到集中的注册表中。
-
-### 2. 扩展原则
-
-无特殊原因不要改动主路径（如 `pay.ts`、`improvement.ts`、`game-session.ts` 等核心路径），优先使用已有通用扩展点。
+扩展原则：无特殊原因不要改动主路径（如 `pay.ts`、`improvement.ts`、`game-session.ts` 等核心路径），优先使用已有通用扩展点。
 
 优先使用：
 
-- 卡牌定义中的 `modifier`
 - Hook 系统
 - Card Definition 的通用字段，如 `cost`、`reward`、`prerequisite`
 - 卡牌自己的局部状态，如 `player.cardStates[cardId]`
@@ -154,14 +146,4 @@
   - `http://<host>:5173/?player=p2`
  - 同机本地调试可将 `<host>` 视为 `localhost`
  - 局域网 / intranet 调试优先使用 `./restart-intranet.sh` 输出的地址
-
-## Cursor Cloud specific instructions
-
-### System dependencies
-
-The `canvas` npm package requires native C libraries. These are pre-installed in the VM snapshot: `libcairo2-dev`, `libpango1.0-dev`, `libjpeg-dev`, `libgif-dev`, `librsvg2-dev`, `libpixman-1-dev`. If `npm install` fails with canvas build errors, reinstall them via `sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`.
-
-### Gotchas
-
-- `npm run build` 可能因测试文件中的既有 TypeScript 严格模式错误失败；这不影响 `npm run dev` / `npm run server`。
-- Vite 会尝试从 `../bga-agricola/img` 提供卡图；云环境中该目录可能不存在，缺图通常只影响显示，不影响规则。
+ 

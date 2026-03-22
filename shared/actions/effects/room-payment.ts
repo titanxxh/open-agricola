@@ -1,11 +1,12 @@
 import type {
   ActionExecutionResult,
+  Bonus,
   ComplexCost,
   PaymentSolution,
   PlayerState,
   Resource,
 } from '../../game/types'
-import { getBuildRoomCost } from './construct'
+import { getAllTilePositions, positionKey } from '../../game/farm'
 import {
   resolveCostPaymentSelection,
   executeResolvedTypedFlatPayment,
@@ -19,7 +20,44 @@ import {
 
 export type RoomUnitCost = Partial<Resource> | ComplexCost
 
-type RoomCostPlayer = Pick<PlayerState, 'resources' | 'houseType' | 'activeModifiers'>
+export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
+  if (houseType === 'clay') return { clay: 5, reed: 2 }
+  if (houseType === 'stone') return { stone: 5, reed: 2 }
+  return { wood: 5, reed: 2 }
+}
+
+const applyBonusToFee = (
+  cost: Partial<Resource>,
+  bonus: Bonus,
+) => {
+  const result = { ...cost }
+  Object.entries(bonus.discount).forEach(([key, value]) => {
+    if (typeof value !== 'number') return
+    result[key as keyof Resource] = Math.max(0, (result[key as keyof Resource] ?? 0) - value)
+  })
+  return sanitizeCost(result)
+}
+
+const bonusAppliesToRoomCount = (
+  player: PlayerState,
+  conditions: Record<string, number> | undefined,
+  roomCount: number,
+) => {
+  if (!conditions) return true
+  if (typeof conditions.minNumRooms === 'number' && roomCount < conditions.minNumRooms) {
+    return false
+  }
+  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') {
+    return false
+  }
+  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') {
+    return false
+  }
+  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') {
+    return false
+  }
+  return true
+}
 
 export const ROOM_PAYMENT_OPTION_PREFIX = 'pay:room'
 
@@ -110,13 +148,25 @@ const getUnitFees = (costPerRoom: RoomUnitCost): Partial<Resource>[] => {
   return [{}]
 }
 
+const countAvailableRoomTiles = (player: PlayerState) => {
+  const occupied = new Set(player.roomTiles.map(positionKey))
+  player.fields.forEach((field) =>
+    occupied.add(positionKey({ row: field.row, col: field.col })),
+  )
+  player.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
+  player.pastures
+    .flatMap((pasture) => pasture.tiles)
+    .forEach((tile) => occupied.add(positionKey(tile)))
+  return getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile))).length
+}
+
 export const buildRoomCostPerUnit = (
-  player: RoomCostPlayer,
+  player: PlayerState,
   costOverride?: Partial<Resource>,
 ): RoomUnitCost => {
   const baseFee = applyCostOverride(getBuildRoomCost(player.houseType), costOverride)
   let fees: Partial<Resource>[] = [sanitizeCost(baseFee)]
-  const modifiers = getModifiersForCostType(player as PlayerState, 'construct')
+  const modifiers = getModifiersForCostType(player, 'construct')
 
   const modifiersByCard = new Map<string, typeof modifiers>()
   modifiers.forEach((modifier) => {
@@ -129,6 +179,9 @@ export const buildRoomCostPerUnit = (
     const cardAlternatives: Partial<Resource>[] = [...fees]
     cardModifiers.forEach((modifier) => {
       if (modifier.type === 'bonus') {
+        if (modifier.conditions && Object.keys(modifier.conditions).length > 0) {
+          return
+        }
         const discounted = fees.map((fee) =>
           sanitizeCost(
             Object.entries(modifier.discount).reduce<Partial<Resource>>(
@@ -163,21 +216,69 @@ export const buildRoomCostPerUnit = (
   return fees.length === 1 ? fees[0]! : { fees }
 }
 
+const applyRoomCountBonuses = (
+  player: PlayerState,
+  totalCost: Partial<Resource> | ComplexCost,
+  roomCount: number,
+): Partial<Resource> | ComplexCost => {
+  if (roomCount <= 0) return totalCost
+  const bonuses = getModifiersForCostType(player, 'construct')
+    .filter((modifier): modifier is Extract<typeof modifier, { type: 'bonus' }> => modifier.type === 'bonus')
+    .filter((modifier) => bonusAppliesToRoomCount(player, modifier.conditions, roomCount))
+    .map((modifier) => ({
+      discount: modifier.discount,
+      optional: modifier.optional ?? true,
+      sources: [modifier.cardId],
+      conditions: modifier.conditions,
+    }))
+
+  if (bonuses.length === 0) return totalCost
+
+  const mandatoryBonuses = bonuses.filter((bonus) => bonus.optional === false)
+  const optionalBonuses = bonuses.filter((bonus) => bonus.optional !== false)
+
+  if (!isComplexCost(totalCost)) {
+    const mandatoryFee = mandatoryBonuses.reduce(
+      (fee, bonus) => applyBonusToFee(fee, bonus),
+      sanitizeCost(totalCost),
+    )
+    const discountedFees = dedupeFees([
+      mandatoryFee,
+      ...optionalBonuses.map((bonus) => applyBonusToFee(mandatoryFee, bonus)),
+    ])
+    return discountedFees.length === 1 ? discountedFees[0]! : { fees: discountedFees }
+  }
+
+  const baseFees = getUnitFees(totalCost).map((fee) =>
+    mandatoryBonuses.reduce(
+      (nextFee, bonus) => applyBonusToFee(nextFee, bonus),
+      fee,
+    ),
+  )
+  const discountedFees = dedupeFees([
+    ...baseFees,
+    ...optionalBonuses.flatMap((bonus) => baseFees.map((fee) => applyBonusToFee(fee, bonus))),
+  ])
+  return discountedFees.length === 1 ? discountedFees[0]! : { fees: discountedFees }
+}
+
 export const buildTotalRoomCost = (
   costPerRoom: RoomUnitCost,
   roomCount: number,
+  player?: PlayerState,
 ): Partial<Resource> | ComplexCost => {
   if (roomCount <= 0) {
     return {}
   }
   if (!isComplexCost(costPerRoom)) {
-    return sanitizeCost(
+    const totalCost = sanitizeCost(
       Object.entries(costPerRoom).reduce<Partial<Resource>>((acc, [key, value]) => {
         if (typeof value !== 'number') return acc
         acc[key as keyof Resource] = value * roomCount
         return acc
       }, {}),
     )
+    return player ? applyRoomCountBonuses(player, totalCost, roomCount) : totalCost
   }
 
   let totals: Partial<Resource>[] = [{}]
@@ -192,14 +293,33 @@ export const buildTotalRoomCost = (
     totals = dedupeFees(nextTotals)
   }
 
-  return totals.length === 1 ? totals[0]! : { fees: totals }
+  const totalCost = totals.length === 1 ? totals[0]! : { fees: totals }
+  return player ? applyRoomCountBonuses(player, totalCost, roomCount) : totalCost
 }
 
 export const canAffordRoomCount = (
-  player: RoomCostPlayer,
+  player: PlayerState,
   costPerRoom: RoomUnitCost,
   roomCount: number,
-) => canPayCost(player as PlayerState, buildTotalRoomCost(costPerRoom, roomCount))
+) => canPayCost(player, buildTotalRoomCost(costPerRoom, roomCount, player))
+
+export const getMaxBuildableRooms = (
+  player: PlayerState,
+  costOverride?: Partial<Resource>,
+  actionContext?: Record<string, unknown>,
+) => {
+  const costPerRoom = buildRoomCostPerUnit(player, costOverride)
+  const argMax = typeof actionContext?.maxRooms === 'number'
+    ? Math.max(0, Math.floor(actionContext.maxRooms))
+    : 99
+  const structuralMax = Math.min(countAvailableRoomTiles(player), argMax)
+  let maxBuyable = 0
+  for (let count = 1; count <= structuralMax; count += 1) {
+    if (!canAffordRoomCount(player, costPerRoom, count)) break
+    maxBuyable = count
+  }
+  return maxBuyable
+}
 
 export const resolveRoomPaymentSelection = (
   player: PlayerState,
@@ -207,7 +327,7 @@ export const resolveRoomPaymentSelection = (
   roomCount: number,
   paymentChoice?: string,
 ): RoomPaymentSelectionResult => {
-  const totalCost = buildTotalRoomCost(costPerRoom, roomCount)
+  const totalCost = buildTotalRoomCost(costPerRoom, roomCount, player)
   const resolved = resolveCostPaymentSelection(
     player,
     totalCost,

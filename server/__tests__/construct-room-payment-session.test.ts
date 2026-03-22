@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/game/types.ts'
 
@@ -57,7 +58,10 @@ describe('construct room payment session', () => {
     expect(resp.pending.options).toHaveLength(2)
 
     const stoneOption = resp.pending.options.find(
-      (option) => typeof option.labelParams === 'object' && option.labelParams?.resourcesPaid?.stone === 2,
+      (option) =>
+        typeof option.labelParams === 'object' &&
+        typeof (option.labelParams as { resourcesPaid?: { stone?: number } }).resourcesPaid?.stone === 'number' &&
+        (option.labelParams as { resourcesPaid?: { stone?: number } }).resourcesPaid?.stone === 2,
     )
     expect(stoneOption).toBeDefined()
 
@@ -67,6 +71,56 @@ describe('construct room payment session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.resources.clay).toBe(2)
+    expect(resp.state.players[0]!.resources.reed).toBe(0)
+  })
+
+  it('lets Carpenter\'s Hammer unlock a discounted two-room build', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 8,
+      reed: 2,
+    }
+    player.minorPlayed.push('A14_CarpentersHammer')
+    player.playedCards.push('minor:A14_CarpentersHammer')
+    player.activeModifiers = [
+      ...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+    ]
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const constructOption = resp.pending.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.farm.maxSelections).toBe(2)
+
+    const [roomA, roomB] = resp.interaction.farm.selectableTiles
+    expect(roomA).toBeDefined()
+    expect(roomB).toBeDefined()
+    if (!roomA || !roomB) return
+
+    resp = session.commitFarmChoice(0, 'room', { rooms: [roomA, roomB] })
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.state.players[0]!.rooms).toBe(4)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
   })
 })

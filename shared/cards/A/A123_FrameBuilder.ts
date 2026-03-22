@@ -4,7 +4,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState, TradeModifier } from '../../game/types'
 import { canAffordCost } from '../../actions/effects/pay-helpers'
-import { getBuildRoomCost } from '../../actions/effects/construct'
+import { getBuildRoomCost } from '../../actions/effects/room-payment'
 import { getRenovation } from '../../actions/effects/renovation'
 
 const CARD_ID = 'A123_FrameBuilder'

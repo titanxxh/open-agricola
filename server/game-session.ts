@@ -86,6 +86,7 @@ import {
 } from '../shared/actions/effects/pay-helpers.ts'
 import {
   buildRoomCostPerUnit,
+  getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../shared/actions/effects/room-payment.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
@@ -1827,7 +1828,7 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const normalized = normalizePlayerFarm(player)
     const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as any, {
       costOverride: this.pending.costOverride,
       maxUnits:
@@ -1856,7 +1857,7 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+    const normalized = normalizePlayerFarm(player)
     const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
     let farmChoiceMeta: Record<string, unknown> | undefined
 
@@ -1865,7 +1866,7 @@ export class GameSession {
         const { edges, extraWood } = payload as { edges?: string[]; extraWood?: number }
         const safeEdges = Array.isArray(edges) ? edges : []
         const freeFences =
-          readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
+          readPendingFenceBonus(normalized)?.freeFences ?? 0
         const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
         const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
         const validated = validateFenceSelection(
@@ -1929,16 +1930,21 @@ export class GameSession {
             : undefined
         const selection = validateRoomSelection(normalized, rooms)
         if (!selection.ok) return this.respond(false, selection.code)
-        if (typeof maxUnits === 'number' && rooms.length > Math.max(0, Math.floor(maxUnits))) {
+        const maxBuildableRooms = getMaxBuildableRooms(
+          normalized,
+          override,
+          typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
+        )
+        if (rooms.length > maxBuildableRooms) {
           return this.respond(false, 'too many rooms selected')
         }
 
         const costPerRoom = buildRoomCostPerUnit(
-          normalized as unknown as Pick<PlayerState, 'resources' | 'houseType' | 'activeModifiers'>,
+          normalized,
           override,
         )
         const payment = resolveRoomPaymentSelection(
-          normalized as unknown as PlayerState,
+          normalized,
           costPerRoom,
           rooms.length,
         )

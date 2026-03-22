@@ -394,6 +394,7 @@ export const applyBonusModifier = (
     discount: modifier.discount,
     optional: modifier.optional ?? true,
     sources: [modifier.cardId],
+    conditions: modifier.conditions,
   }
   modifiedBonuses.push(newBonus)
 

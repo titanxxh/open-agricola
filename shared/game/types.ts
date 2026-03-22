@@ -46,6 +46,7 @@ export type BonusModifier = {
   appliesTo: CostModifierType[]
   discount: Partial<Resource>
   optional?: boolean
+  conditions?: Record<string, number>
 }
 
 export type CostModifier = TradeModifier | BonusModifier
@@ -212,6 +213,10 @@ export type ActionExecutionContext = {
 
 export type ActionCostPreview = {
   isStructurallyPossible?: (context: ActionAvailabilityContext) => boolean
+  canExecute?: (
+    context: ActionAvailabilityContext,
+    costOverride?: Partial<Resource>,
+  ) => boolean
   getBaseCost: (context: ActionAvailabilityContext) => Partial<Resource>
 }
 

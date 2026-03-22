@@ -6,6 +6,7 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../farm-interaction.ts'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
@@ -104,6 +105,19 @@ describe('farm interaction builders', () => {
     player.resources.clay = 4
     player.resources.reed = 4
     player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+
+    const interaction = buildRoomFarmInteraction(player)
+
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    expect(interaction.maxSelections).toBe(2)
+  })
+
+  it('counts Carpenter\'s Hammer discounts when computing room selections', () => {
+    const player = createPlayer()
+    player.resources.wood = 8
+    player.resources.reed = 2
+    player.activeModifiers = [...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
 

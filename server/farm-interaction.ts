@@ -6,7 +6,7 @@ import type {
 } from '../shared/game/types.ts'
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
 import { canAffordTypedFlatCost } from '../shared/actions/effects/pay-helpers.ts'
-import { buildRoomCostPerUnit, canAffordRoomCount } from '../shared/actions/effects/room-payment.ts'
+import { getMaxBuildableRooms } from '../shared/actions/effects/room-payment.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
@@ -40,26 +40,15 @@ export const buildRoomFarmInteraction = (
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
   const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
-  const costPerRoom = buildRoomCostPerUnit(player, costOverride)
-  let resourceMax = 0
-  const structuralMax = Math.min(
-    selectableTiles.length,
-    typeof actionContext?.maxRooms === 'number' ? Math.max(0, Math.floor(actionContext.maxRooms)) : selectableTiles.length,
-  )
-  for (let count = 1; count <= structuralMax; count += 1) {
-    if (!canAffordRoomCount(player, costPerRoom, count)) break
-    resourceMax = count
-  }
   const maxSelections = Math.min(
     selectableTiles.length,
-    resourceMax,
-    typeof actionContext?.maxRooms === 'number' ? Math.max(0, Math.floor(actionContext.maxRooms)) : selectableTiles.length,
+    getMaxBuildableRooms(player, costOverride, actionContext),
   )
   return {
     farmType: 'room',
@@ -72,7 +61,7 @@ export const buildStableFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
@@ -98,7 +87,7 @@ export const buildPlowFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const payableCost = sanitizePayableCost(costOverride)
   const canAffordPlow = canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const selectableTiles = canAffordPlow
@@ -113,7 +102,7 @@ export const buildSowFarmInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const excludedKeys = new Set(
     Array.isArray(actionContext?.excludedFields)
       ? actionContext.excludedFields.flatMap((field) => {
@@ -150,7 +139,7 @@ export const buildFenceFarmInteraction = (
   player: PlayerState,
   pending: Extract<PendingAction, { type: 'choice' }>,
 ): InteractionFarmSelection => {
-  const normalized = normalizePlayerFarm(player as Parameters<typeof normalizePlayerFarm>[0])
+  const normalized = normalizePlayerFarm(player)
   const existing = new Set(normalized.fenceSegments ?? [])
   const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
   const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0

@@ -1,5 +1,5 @@
 import type { ComplexCost, FarmTilePosition, PlayerState, Resource } from '../shared/game/types.ts'
-import { applyCostOverride, canPayResources, isComplexCost } from '../shared/actions/effects/pay.ts'
+import { applyCostOverride, isComplexCost } from '../shared/actions/effects/pay.ts'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
   executeResolvedTypedFlatPayment,
@@ -9,6 +9,7 @@ import {
   buildRoomCostPerUnit,
   buildTotalRoomCost,
   executeResolvedRoomPayment,
+  getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../shared/actions/effects/room-payment.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
@@ -45,7 +46,7 @@ type FarmChoiceOptions = {
   }
 }
 
-export type FarmChoiceApplyResult<T extends PlayerFarmState = PlayerFarmState> =
+export type FarmChoiceApplyResult<T extends PlayerState = PlayerState> =
   | {
       ok: true
       player: T
@@ -92,22 +93,6 @@ const getInsufficientResourceError = (
   return missing ? `Not enough ${missing[0]}` : 'Not enough resources'
 }
 
-const payResourceCost = <T extends PlayerFarmState>(
-  player: T,
-  cost: Partial<Resource>,
-): T => {
-  const nextResources = { ...player.resources }
-  Object.entries(cost).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return
-    nextResources[key as keyof Resource] =
-      (nextResources[key as keyof Resource] ?? 0) - value
-  })
-  return {
-    ...player,
-    resources: nextResources,
-  }
-}
-
 const getComplexCostError = (
   player: PlayerFarmState,
   cost: ComplexCost,
@@ -116,7 +101,7 @@ const getComplexCostError = (
   return firstFee ? getInsufficientResourceError(player, firstFee) : 'Not enough resources'
 }
 
-export const applyFarmChoice = <T extends PlayerFarmState>(
+export const applyFarmChoice = <T extends PlayerState>(
   player: T,
   farmType: FarmChoiceType,
   payload: FarmChoicePayloadMap[FarmChoiceType],
@@ -127,7 +112,7 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
   switch (farmType) {
     case 'fence': {
       const { edges, extraWood } = payload as FarmChoicePayloadMap['fence']
-      const freeFences = readPendingFenceBonus(normalized as unknown as PlayerState)?.freeFences ?? 0
+      const freeFences = readPendingFenceBonus(normalized)?.freeFences ?? 0
       const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
       const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
       const validated = validateFenceSelection(
@@ -141,7 +126,7 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
         return { ok: false, error: validated.error?.code ?? 'validation failed' }
       }
       const resolvedPayment = resolveTypedFlatPaymentSelection(
-        validated.player as unknown as PlayerState,
+        validated.player,
         { wood: validated.payableWoodCost },
         'pay:fence',
         options.paymentChoice,
@@ -179,18 +164,22 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       const { rooms } = payload as FarmChoicePayloadMap['room']
       const selection = validateRoomSelection(normalized, rooms)
       if (!selection.ok) return { ok: false, error: selection.code }
-      if (
-        typeof options.maxUnits === 'number' &&
-        rooms.length > Math.max(0, Math.floor(options.maxUnits))
-      ) {
+      const maxBuildableRooms = getMaxBuildableRooms(
+        normalized,
+        options.costOverride,
+        typeof options.maxUnits === 'number'
+          ? { maxRooms: options.maxUnits }
+          : undefined,
+      )
+      if (rooms.length > maxBuildableRooms) {
         return { ok: false, error: 'too many rooms selected' }
       }
       const costPerRoom = buildRoomCostPerUnit(
-        normalized as unknown as Pick<PlayerState, 'resources' | 'houseType' | 'activeModifiers'>,
+        normalized,
         options.costOverride,
       )
       const resolvedPayment = resolveRoomPaymentSelection(
-        normalized as unknown as PlayerState,
+        normalized,
         costPerRoom,
         rooms.length,
         options.paymentChoice,
@@ -231,7 +220,7 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       )
       const totalCost = scaleCost(costPerStable, stables.length)
       const resolvedPayment = resolveTypedFlatPaymentSelection(
-        normalized as unknown as PlayerState,
+        normalized,
         totalCost,
         'pay:stable',
         options.paymentChoice,
@@ -263,7 +252,7 @@ export const applyFarmChoice = <T extends PlayerFarmState>(
       if (!result.ok) return { ok: false, error: result.error?.code ?? 'validation failed' }
       const plowCost = sanitizePayableCost(options.costOverride)
       const resolvedPayment = resolveTypedFlatPaymentSelection(
-        result.player as unknown as PlayerState,
+        result.player,
         plowCost,
         'pay:plow',
         options.paymentChoice,

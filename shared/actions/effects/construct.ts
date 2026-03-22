@@ -1,18 +1,14 @@
 import type { ActionCostPreview, ActionDefinition, PlayerState, Resource } from '../../game/types'
-import { canExecuteWithCostPreview } from './cost-preview'
 import { canAffordCost } from './pay-helpers'
-
-export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
-  if (houseType === 'clay') return { clay: 5, reed: 2 }
-  if (houseType === 'stone') return { stone: 5, reed: 2 }
-  return { wood: 5, reed: 2 }
-}
+import { getBuildRoomCost, getMaxBuildableRooms } from './room-payment'
 
 export const canAfford = (player: PlayerState, cost: Partial<Resource>) =>
   canAffordCost(player, cost)
 
 export const constructCostPreview: ActionCostPreview = {
   getBaseCost: ({ player }) => getBuildRoomCost(player.houseType),
+  canExecute: (context, costOverride) =>
+    getMaxBuildableRooms(context.player, costOverride) > 0,
 }
 
 export const constructAction: ActionDefinition = {
@@ -21,8 +17,7 @@ export const constructAction: ActionDefinition = {
   descriptionKey: 'actions.construct.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    canExecuteWithCostPreview(constructCostPreview, { state, player }),
+  canBeExecutedByPlayer: (_state, player) => getMaxBuildableRooms(player) > 0,
   costPreview: constructCostPreview,
   execute: () => ({
     type: 'choice',
