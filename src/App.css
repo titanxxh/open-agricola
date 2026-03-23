@@ -349,6 +349,10 @@
   filter: grayscale(75%);
 }
 
+.action-card-holder.occupied-available .action-card {
+  filter: none;
+}
+
 /* --- Action card (3-section frame) --- */
 
 .action-card {
@@ -578,11 +582,46 @@
   left: 0;
   width: 100%;
   height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   pointer-events: none;
   z-index: 15;
+}
+
+.action-farmer {
+  position: absolute;
+  width: 22px;
+  height: 28px;
+  background: #d74a3a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  -webkit-mask-image: url('/bga-img/farmers.png');
+  -webkit-mask-size: 500% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: url('/bga-img/farmers.png');
+  mask-size: 500% 100%;
+  mask-repeat: no-repeat;
+}
+
+.action-farmer-red {
+  background: #d74a3a;
+  -webkit-mask-position: 0% 0%;
+  mask-position: 0% 0%;
+}
+
+.action-farmer-yellow {
+  background: #d6b332;
+  -webkit-mask-position: 25% 0%;
+  mask-position: 25% 0%;
+}
+
+.action-farmer-blue {
+  background: #3f6ee8;
+  -webkit-mask-position: 50% 0%;
+  mask-position: 50% 0%;
+}
+
+.action-farmer-black {
+  background: #1f2937;
+  -webkit-mask-position: 75% 0%;
+  mask-position: 75% 0%;
 }
 
 /* --- Round action cards (actions_background.png sprite behind frame) --- */

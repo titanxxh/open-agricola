@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
+import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
 
 const BOARD_W = 1000
 const BOARD_H = 795
@@ -205,6 +206,11 @@ type TooltipInfo = {
   y: number
 }
 
+type SpaceFarmerMarker = {
+  player: PlayerState
+  key: string
+}
+
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
@@ -232,6 +238,23 @@ export const ActionBoard = ({
     () => new Map(players.map((p) => [p.id, p])),
     [players],
   )
+
+  const farmerMarkersBySpace = useMemo(() => {
+    const markers = new Map<string, SpaceFarmerMarker[]>()
+    const push = (spaceId: string, marker: SpaceFarmerMarker) => {
+      const current = markers.get(spaceId) ?? []
+      current.push(marker)
+      markers.set(spaceId, current)
+    }
+
+    players.forEach((player) => {
+      getRoundPlacementOrder(player).forEach((spaceId, index) => {
+        push(spaceId, { player, key: `${player.id}-${spaceId}-${index}` })
+      })
+    })
+
+    return markers
+  }, [players])
 
   const buildStackItems = (action: ActionSpace) => {
     const items: { resource: keyof Resource; amount: number; player?: PlayerState }[] = []
@@ -275,13 +298,27 @@ export const ActionBoard = ({
   }
 
   const renderFarmerHolder = (space: ActionSpace) => {
-    const p = players.find((pl) => pl.id === space.takenBy)
-    if (!p) return null
+    const markers = farmerMarkersBySpace.get(space.id)
+    const fallbackPlayer = space.takenBy ? players.find((pl) => pl.id === space.takenBy) : null
+    const entries = markers && markers.length > 0
+      ? markers
+      : fallbackPlayer
+        ? [{ player: fallbackPlayer, key: `${fallbackPlayer.id}-${space.id}-fallback` }]
+        : []
+    if (entries.length === 0) return null
     return (
-      <div className="farmer-holder">
-        <div className={`meeple meeple-${p.color}`}>
-          <span className="meeple-text">{p.name}</span>
-        </div>
+      <div className="farmer-holder" data-n={entries.length}>
+        {entries.map((entry, index) => (
+          <div
+            key={entry.key}
+            className={`action-farmer action-farmer-${entry.player.color}`}
+            style={{
+              right: 6 + (index % 2) * 18,
+              bottom: 4 + Math.floor(index / 2) * 14,
+            } as React.CSSProperties}
+            title={entry.player.name}
+          />
+        ))}
       </div>
     )
   }
@@ -332,13 +369,16 @@ export const ActionBoard = ({
             const pos = BASE_POS[space.id]
             if (!pos) return null
             const accDir = ACCUMULATE_DIR[space.id]
+            const canTake = canTakeAction(space, currentPlayer)
+            const hasFarmer = (farmerMarkersBySpace.get(space.id)?.length ?? 0) > 0 || !!space.takenBy
             return (
               <div
                 key={space.id}
                 className={[
                   'action-card-holder',
                   accDir && `accumulate-${accDir}`,
-                  space.takenBy && 'taken',
+                  hasFarmer && !canTake && 'taken',
+                  hasFarmer && canTake && 'occupied-available',
                 ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
@@ -348,7 +388,7 @@ export const ActionBoard = ({
                 <button
                   className={`action-card action-${pos.size}`}
                   onClick={() => takeAction(space)}
-                  disabled={!canTakeAction(space, currentPlayer)}
+                  disabled={!canTake}
                 >
                   <h4 className="action-header">{t(locale, space.nameKey)}</h4>
                   <div className="action-desc">
@@ -372,6 +412,10 @@ export const ActionBoard = ({
             const isOpen = devMode || currentRound >= slot.round
             const action = slot.action
             const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
+            const canTake = action ? canTakeAction(action, currentPlayer) : false
+            const hasFarmer = action
+              ? (farmerMarkersBySpace.get(action.id)?.length ?? 0) > 0 || !!action.takenBy
+              : false
             return (
               <div
                 key={`r-${slot.round}`}
@@ -383,7 +427,8 @@ export const ActionBoard = ({
                     className={[
                       'action-card-holder round',
                       accDir && `accumulate-${accDir}`,
-                      action.takenBy && 'taken',
+                      hasFarmer && !canTake && 'taken',
+                      hasFarmer && canTake && 'occupied-available',
                     ].filter(Boolean).join(' ')}
                     data-action-id={action.id}
                     onMouseEnter={(e) => showTooltip(e, action)}
@@ -392,7 +437,7 @@ export const ActionBoard = ({
                     <button
                       className="action-card"
                       onClick={() => takeAction(action)}
-                      disabled={!canTakeAction(action, currentPlayer)}
+                      disabled={!canTake}
                     >
                       <h4 className="action-header">{t(locale, action.nameKey)}</h4>
                       <div className="action-desc">
