@@ -694,14 +694,6 @@ choice: { promptKey: result.promptKey, options: result.options },
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
-        const actionId = child.actionId
-        const action = this.registry.get(actionId)
-        if (!action) {
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
-        }
         const executionContext: ActionExecutionContext = {
           state: context.state,
           player: context.player,
@@ -709,6 +701,29 @@ choice: { promptKey: result.promptKey, options: result.options },
           params: child.params,
           sourceCard: child.sourceCard,
           actionContext: child.actionContext,
+        }
+        const replaceResult = this.hooks.applyComputeReplace({
+          ...executionContext,
+          actionId: child.actionId,
+        })
+        const actionId = replaceResult.actionId
+        if (replaceResult.declined && replaceResult.alternativeFlow) {
+          const flowNode = this.buildFlowNode(replaceResult.alternativeFlow)
+          this.tree.insertAfter(node.id, [flowNode])
+          targetNode.resolve(choice)
+          node.resolve(choice)
+          this.pendingChoiceNodeId = null
+          this.pendingChoiceActionId = null
+          this.pendingChoiceOwnerNodeId = null
+          this.pendingChoiceContext = null
+          return { type: 'ok' }
+        }
+        const action = this.registry.get(actionId)
+        if (!action) {
+          this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
+          this.pendingChoiceContext = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const costResults = this.hooks.computeCosts({
           ...executionContext,
@@ -795,11 +810,11 @@ choice: { promptKey: result.promptKey, options: result.options },
           .filter((action) => action)
         const immediateActivateNodes = this.buildActivateCardNodes(
           immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-          this.buildListenerEvent(executionContext, { result }),
+          this.buildListenerEvent(executionContext, { result, choice }),
         )
         const afterActivateNodes = this.buildActivateCardNodes(
           afterPhase.matchedListeners, 'after', actionId,
-          this.buildListenerEvent(executionContext, { result }),
+          this.buildListenerEvent(executionContext, { result, choice }),
         )
         const allInsertNodes = [
           ...hookFlows,
@@ -898,11 +913,11 @@ choice: { promptKey: result.promptKey, options: result.options },
       .filter((action) => action)
     const immediateActivateNodes = this.buildActivateCardNodes(
       immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-      this.buildListenerEvent(executionContext, { result }),
+      this.buildListenerEvent(executionContext, { result, choice }),
     )
     const afterActivateNodes = this.buildActivateCardNodes(
       afterPhase.matchedListeners, 'after', actionId,
-      this.buildListenerEvent(executionContext, { result }),
+      this.buildListenerEvent(executionContext, { result, choice }),
     )
     const allInsertNodes = [
       ...hookFlows,

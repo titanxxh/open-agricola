@@ -28,6 +28,7 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 - 所有方法返回 `SessionResponse`（state + pending + interaction + scores + 元数据）。
 - `commitFarmChoice('fence')` 现在会把 `validateFenceSelection/applyFarmChoice` 计算出的 `newPastures/newEdges` 挂到本次 `ActionExecutionResult.extraData`，供 `immediatelyAfter/after` listener 直接消费。
 - `commitFarmChoice('room'|'stable'|'plow'|'fence')` 现在统一先走服务端 payment 求解；若存在多种合法支付法，会继续进入 `prompt.selectPayment`，而不是在提交农场选择时默认取第一个可支付方案。
+- 行动位开放性与 `takeAction()` 现在统一接入 `canUseOccupied` 判定，避免在主路径里为 `A28_ForestSchool`、`E21_SheepRug`、`B151_LittlePeasant` 这类卡牌硬编码占位例外。
 
 ### 2.2 WS 房间管理
 
@@ -107,7 +108,7 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 4.2 Hook 系统
 
-8 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
+9 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`、`canUseOccupied`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
 
 ### 4.2.1 BGA 风格交互协议
 

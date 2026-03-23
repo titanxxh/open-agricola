@@ -8,7 +8,7 @@
 
 | 原子行动 | Before | During | ImmediatelyAfter | After | ComputeCosts | ComputeArgs | ComputeReplace | IsDoable |
 |---|---|---|---|---|---|---|---|---|
-| PlaceFarmer | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | — | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | — | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts) | — | — |
+| PlaceFarmer | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | — | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | — | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts)、[A94_LazySowman](../shared/cards/A/A94_LazySowman.ts)、[B151_LittlePeasant](../shared/cards/B/B151_LittlePeasant.ts) | — | — |
 | Collect | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts)、[C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | — | — | — | — |
 | Gain | — | [E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts)、[E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | — | [A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
 | Construct | — | — | — | [A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts)、[C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | — | — | [D119_WoodBarterer](../shared/cards/D/D119_WoodBarterer.ts)、[A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) |
@@ -23,7 +23,7 @@
 | Pay | — | — | — | [B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts) | — | — | — | — |
 | Reorganize | — | — | — | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts) | — | — | — | — |
 | Exchange | [B67_HandTruck](../shared/cards/B/B67_HandTruck.ts) | — | — | [E57_CheeseFondue](../shared/cards/E/E57_CheeseFondue.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
-| Occupation | [E101_Blighter](../shared/cards/E/E101_Blighter.ts)、[B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) | — | — | [B100_Clutterer](../shared/cards/B/B100_Clutterer.ts) | [A28_ForestSchool](../shared/cards/A/A28_ForestSchool.ts) | — | — | [B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) |
+| Occupation | [E101_Blighter](../shared/cards/E/E101_Blighter.ts)、[B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) | — | — | [B100_Clutterer](../shared/cards/B/B100_Clutterer.ts)、[B151_LittlePeasant](../shared/cards/B/B151_LittlePeasant.ts) | [A28_ForestSchool](../shared/cards/A/A28_ForestSchool.ts) | — | — | [B109_PaperMaker](../shared/cards/B/B109_PaperMaker.ts)、[D152_Patron](../shared/cards/D/D152_Patron.ts)、[D49_Bookshelf](../shared/cards/D/D49_Bookshelf.ts) |
 | ActivateCard | — | — | — | — | — | — | — | — |
 | SpecialEffect | — | — | — | — | — | — | — | — |
 | Receive | — | [C120_AgriculturalLabourer](../shared/cards/C/C120_AgriculturalLabourer.ts)、[E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | — | [E128_Saddler](../shared/cards/E/E128_Saddler.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
@@ -47,8 +47,10 @@
 | ComputeArgs | 计算行动参数时 | 修改行动可选参数 |
 | ComputeReplace | 判断行动替代时 | 允许用其他行动替代当前行动 |
 | IsDoable | 判断行动可行性时 | 放宽行动执行条件 |
+| CanUseOccupied | 判断占用格是否仍可用时 | 允许把已占用行动位视为可选 |
 
-注：部分顶层行动卡的开放性不再单独手写，而是由 `flow` 递归合成。当前已接入顶层 `or` / `xor` 行动格，以及一批安全 `seq` 包装行动格；递归到 `leaf` 时会继续应用子行动自己的 `IsDoable` hook / CardListener，因此诸如 `A94_LazySowman` 挂在 `sow` 上的放宽效果、`B75_WoodWorkshop` 挂在 `improvement-any` 上的放宽效果，也能反映到顶层复合行动格的可执行性上。
+注：部分顶层行动卡的开放性不再单独手写，而是由 `flow` 递归合成。当前已接入顶层 `or` / `xor` 行动格，以及一批安全 `seq` 包装行动格；递归到 `leaf` 时会继续应用子行动自己的 `IsDoable` / `ComputeReplace` hook / CardListener，因此诸如 `A94_LazySowman` 挂在 `sow` 上的放宽与替代效果、`B75_WoodWorkshop` 挂在 `improvement-any` 上的放宽效果，也能反映到顶层复合行动格的可执行性上。
+注：`canUseOccupied` 已接入 `GameSession` 的行动开放性与直接 `takeAction()` 占位校验；像 `A28_ForestSchool`、`E21_SheepRug`、`B151_LittlePeasant` 这类“已被占用但仍可用”的卡牌不再需要往主路径塞卡牌 id 判断。
 注：本矩阵现在同时保留“已接入示例”和“排期目标示例”。实际完成状态以 `docs/card_progress.md` 为准；其中 `Harvest`、`StartOfTurn` 等格子当前可能由 `card-effects.ts` 承担，而不是原子行动 listener。
 注：`card-choice` 与农场类选择现在统一走服务端 `interaction` 协议对外暴露；前端不再依赖本地 `promptKey` 规则推导可选格/可选边，只消费服务端下发的白名单 args。
 注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。

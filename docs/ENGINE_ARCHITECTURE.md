@@ -1010,7 +1010,7 @@ type PendingAction =
 
 行动生命周期 Hook 负责拦截或扩展某个 action 的执行过程。
 
-对于由多个子动作组成的行动格，当前实现补充了一条重要约束：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，`canBeExecutedByPlayer` 可以由 `flow` 递归合成，而不是在行动卡文件里再手写一份平行条件。递归到 `leaf` 时，应继续复用子 action 自身的 `isDoable` 判定，并继续应用该子 action 的 `isDoable` hooks / CardListener；这样像 `grain-utilization` 里的 `sow`、`farm-expansion` 里的 `construct` / `stables`、`major-improvement` 里的 `improvement-any`，以及被卡牌放宽的子行动，都能在行动格开放性判断阶段保持一致。
+对于由多个子动作组成的行动格，当前实现补充了两条重要约束：顶层 `or` / `xor` 行动格，以及一批“顶层语义等于必选 child”的安全 `seq` 行动格，`canBeExecutedByPlayer` 可以由 `flow` 递归合成，而不是在行动卡文件里再手写一份平行条件；递归到 `leaf` 时，应继续复用子 action 自身的 `isDoable` / `computeReplace` 判定，并继续应用该子 action 的相关 hooks / CardListener。这样像 `grain-utilization` 里的 `sow`、`farm-expansion` 里的 `construct` / `stables`、`major-improvement` 里的 `improvement-any`，以及被卡牌放宽或替代的子行动，都能在行动格开放性与实际执行阶段保持一致。
 
 对于改良/行动卡的出牌，本轮又补了一层与 BGA 更接近的统一校验：`minor-improvement` 与 `improvement-any` 在构造候选项和真正提交购买时，都会复用同一个 prerequisite helper。当前 helper 已覆盖结构化字段 `occupationPrerequisites` / `improvementPrerequisites`，以及一批常见文本 prerequisite（如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`）。这样 `E81_AlchemistsLab`、`A84_Silage` 这类卡不会再只在卡面上“声明前提”，而是会真正影响服务端判定。
 
@@ -1020,10 +1020,13 @@ type PendingAction =
 - `computeReplace`：把一个行动替换成另一个行动
 - `computeCosts`：调整支付成本
 - `computeArgs`：追加选项、额外参数
+- `canUseOccupied`：允许把已占用行动位视为仍可用
 - `before`：主动作执行前
 - `during`：主动作执行中
 - `immediatelyAfter`：主动作完成后立刻触发
 - `after`：整个动作收尾阶段触发
+
+补充说明：对于 `resolveChoice()` 型 action，`choice` 现在也会继续透传到后续 `ActivateCardNode` 事件上下文，因此像 `B151_LittlePeasant` 这种依赖“本次到底打出了哪张职业”的 after listener，可以通过统一引擎链路结算，而不需要在主路径额外写分支。
 
 推荐上下文：
 
