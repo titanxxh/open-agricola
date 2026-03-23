@@ -1215,22 +1215,33 @@ export class GameSession {
     return this.respond()
   }
 
+  private canUseOccupiedActionSpace(player: PlayerState, space: ActionSpace): boolean {
+    if (!space.takenBy) return false
+    return this.hookDispatcher.applyCanUseOccupied(
+      { state: this.state, player, space, actionId: space.id },
+      false,
+    )
+  }
+
+  private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
+    const openRound = roundOpen.get(space.id) ?? space.roundAvailable
+    if (this.state.round < openRound) return false
+    if (player.workersAvailable <= 0) return false
+    const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
+    if (space.takenBy && !canUseOccupied) return false
+    return this.hookDispatcher.applyIsDoable(
+      { state: this.state, player, space, actionId: space.id },
+      space,
+      space.canBeExecutedByPlayer(this.state, player),
+    )
+  }
+
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
     const player = this.state.players[playerIndex]
     if (!player) return []
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     return this.state.actionSpaces
-      .filter((space) => {
-        if (space.takenBy) return false
-        const openRound = roundOpen.get(space.id) ?? space.roundAvailable
-        if (this.state.round < openRound) return false
-        if (player.workersAvailable <= 0) return false
-        return this.hookDispatcher.applyIsDoable(
-          { state: this.state, player, space, actionId: space.id },
-          space,
-          space.canBeExecutedByPlayer(this.state, player),
-        )
-      })
+      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space, roundOpen))
       .map((space) => ({ spaceId: space.id, nameKey: space.nameKey }))
   }
 
@@ -1246,26 +1257,7 @@ export class GameSession {
     const result: Record<string, boolean> = {}
 
     for (const space of this.state.actionSpaces) {
-      // Basic availability checks (same as getAvailableActions)
-      if (space.takenBy) {
-        result[space.id] = false
-        continue
-      }
-      const openRound = roundOpen.get(space.id) ?? space.roundAvailable
-      if (this.state.round < openRound) {
-        result[space.id] = false
-        continue
-      }
-      if (player.workersAvailable <= 0) {
-        result[space.id] = false
-        continue
-      }
-      // Backend-executability check
-      result[space.id] = this.hookDispatcher.applyIsDoable(
-        { state: this.state, player, space, actionId: space.id },
-        space,
-        space.canBeExecutedByPlayer(this.state, player),
-      )
+      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space, roundOpen)
     }
 
     return result
@@ -1350,13 +1342,17 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player || player.workersAvailable <= 0) return this.respond(false, 'no workers available')
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
-    if (!space || space.takenBy) return this.respond(false, 'space unavailable')
+    if (!space) return this.respond(false, 'space unavailable')
+    const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
+    if (space.takenBy && !canUseOccupied) return this.respond(false, 'space unavailable')
 
     this.pushHistory(true)
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
-    space.takenBy = player.id
+    if (!space.takenBy) {
+      space.takenBy = player.id
+    }
     player.workersAvailable -= 1
     recordRoundPlacement(player, spaceId)
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })

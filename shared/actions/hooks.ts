@@ -15,6 +15,7 @@ export type ActionHookPhase =
   | 'computeArgs'
   | 'computeReplace'
   | 'isDoable'
+  | 'canUseOccupied'
   | 'computeCardCosts'
 
 export const actionHookPhases: ActionHookPhase[] = [
@@ -26,6 +27,7 @@ export const actionHookPhases: ActionHookPhase[] = [
   'computeArgs',
   'computeReplace',
   'isDoable',
+  'canUseOccupied',
 ]
 
 export type ActionHookContext = ActionExecutionContext & {
@@ -34,12 +36,14 @@ export type ActionHookContext = ActionExecutionContext & {
   result?: ActionExecutionResult
   choice?: string
   doable?: boolean
+  canUseOccupied?: boolean
 }
 
 export type FollowUpAction = string | { actionId: string; sourceCard?: string }
 
 export type ActionHookResult = {
   doable?: boolean
+  canUseOccupied?: boolean
   actionId?: string
   extraData?: Record<string, unknown>
   extraOptions?: ActionChoiceOption[]
@@ -134,6 +138,28 @@ export const applyIsDoableHooks = (
     }
   })
   return doable
+}
+
+export const applyCanUseOccupiedHooks = (
+  context: ActionExecutionContext & { actionId: string },
+  initialCanUseOccupied: boolean,
+) => {
+  let canUseOccupied = initialCanUseOccupied
+  const hookContext: ActionHookContext = {
+    ...context,
+    phase: 'canUseOccupied',
+    canUseOccupied,
+  }
+  getOrderedHooks(hookContext).forEach((registration) => {
+    const result = registration.handler({
+      ...hookContext,
+      canUseOccupied,
+    })
+    if (typeof result?.canUseOccupied === 'boolean') {
+      canUseOccupied = result.canUseOccupied
+    }
+  })
+  return canUseOccupied
 }
 
 export const applyComputeReplaceHooks = (

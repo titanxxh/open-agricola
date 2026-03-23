@@ -31,7 +31,19 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
   },
 }
 
+const lessonsCanUseOccupiedListener: CardListenerRegistration = {
+  id: 'A28-forest-school-can-use-occupied-lessons',
+  cardIds: [CARD_ID],
+  phases: ['canUseOccupied' as ActionHookPhase],
+  actions: LESSONS_SPACE_IDS,
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.space.takenBy) return
+    return { canUseOccupied: true }
+  },
+}
+
 registerCardListener(lessonsComputeArgsListener)
+registerCardListener(lessonsCanUseOccupiedListener)
 
 export const A28_ForestSchool = new MinorImprovement({
   id: "A28_ForestSchool",
