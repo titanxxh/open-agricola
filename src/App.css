@@ -586,18 +586,38 @@
   z-index: 15;
 }
 
-.action-farmer {
+.action-farmer-stack {
   position: absolute;
-  width: 22px;
-  height: 28px;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: auto;
+  height: 32px;
+}
+
+.action-farmer {
+  position: relative;
+  width: 24px;
+  height: 30px;
   background: #d74a3a;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
   -webkit-mask-image: url('/bga-img/farmers.png');
   -webkit-mask-size: 500% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-image: url('/bga-img/farmers.png');
   mask-size: 500% 100%;
   mask-repeat: no-repeat;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.18))
+    drop-shadow(0 2px 2px rgba(0, 0, 0, 0.28))
+    drop-shadow(-1px 4px 4px rgba(0, 0, 0, 0.18));
+}
+
+.action-farmer.child {
+  width: 17px;
+  height: 21px;
+  align-self: flex-end;
+  opacity: 0.98;
+  z-index: 1;
 }
 
 .action-farmer-red {

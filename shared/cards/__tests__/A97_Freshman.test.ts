@@ -87,6 +87,7 @@ describe('A97_Freshman', () => {
       type: 'seq',
       optional: true,
       promptKey: 'ui.interactionFreshmanOccupation',
+      choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [
         { type: 'leaf', actionId: 'flag-card', sourceCard: 'A97_Freshman' },
         { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: 'A97_Freshman' },

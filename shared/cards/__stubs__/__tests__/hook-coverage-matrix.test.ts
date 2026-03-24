@@ -26,6 +26,7 @@ import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
+const markCardTriggerAction = internalActionDefinitions.find(a => a.id === 'mark-card-trigger')!
 
 const runToCompletion = (engine: Engine, context: { state: GameState; player: PlayerState; space: ActionSpace }) => {
   let step = engine.proceed(context)
@@ -668,7 +669,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     registerStubCards()
   })
 
-  it('declines sow and executes alternative gain flow', () => {
+  it('declines sow by offering xor and can execute the alternative gain flow', () => {
     const player = createPlayer()
     player.minorPlayed = [DECLINE_ID]
     player.resources.food = 0
@@ -688,6 +689,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const registry = new ActionRegistry()
     registry.register(sowAction)
     if (gainAction) registry.register(gainAction)
+    if (markCardTriggerAction) registry.register(markCardTriggerAction)
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'sow')),
       registry,
@@ -698,7 +700,17 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const state = createState(player)
 
     const originalFieldCount = player.fields.length
-    runToCompletion(engine, { state, player, space })
+    const step = runToCompletion(engine, { state, player, space })
+    expect(step.type).toBe('choice')
+    if (step.type !== 'choice') return
+
+    const gainOption = step.choice.options.find((option) => option.labelKey === 'actions.gain.name')
+    expect(gainOption).toBeDefined()
+
+    const result = engine.resolveChoice(gainOption!.value, { state, player, space })
+    expect(result.type).toBe('ok')
+    const completion = runToCompletion(engine, { state, player, space })
+    expect(completion.type).toBe('done')
 
     expect(player.fields.length).toBe(originalFieldCount)
     expect(player.resources.food).toBe(1)

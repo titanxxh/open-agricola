@@ -2199,6 +2199,12 @@ export class GameSession {
         this.recomputeActionStartIndex()
         return this.respond()
       }
+      if (entry && this.engine?.hasPendingChoiceCompositeAncestor()) {
+        this.history.pop()
+        this.restoreHistory(entry)
+        this.recomputeActionStartIndex()
+        return this.respond()
+      }
       const cancelResult = this.resolvePendingChoice(this.pending.playerIndex, 'cancel', false)
       const stillOnSameFarmPrompt =
         cancelResult.ok &&

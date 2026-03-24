@@ -8,6 +8,18 @@ const isCompositeNode = (node: EngineNode) =>
   node instanceof XorNode ||
   node instanceof OptionalNode
 
+const hasStartedDescendant = (node: EngineNode): boolean => {
+  if (node instanceof OptionalNode) {
+    return node.active || hasStartedDescendant(node.child)
+  }
+  if (node instanceof SequenceNode || node instanceof ParallelNode || node instanceof OrNode || node instanceof XorNode) {
+    return node.children.some((child) =>
+      child.getState() === 'resolved' || hasStartedDescendant(child),
+    )
+  }
+  return node.getState() === 'resolved'
+}
+
 export class EngineTree {
   public root: EngineNode
 
@@ -140,6 +152,13 @@ export class EngineTree {
         return null
       }
       if (node instanceof OrNode || node instanceof XorNode) {
+        for (const child of node.children) {
+          if (child.getState() === 'resolved' || !hasStartedDescendant(child)) {
+            continue
+          }
+          const next = visit(child)
+          if (next) return next
+        }
         if (node.getState() === 'ready') {
           return node
         }

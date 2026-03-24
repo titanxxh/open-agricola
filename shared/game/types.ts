@@ -250,6 +250,8 @@ export type ActionFlow =
       promptKey?: string
       children: ActionFlow[]
       optional?: boolean
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
     }
 
 export type ActionDefinition = {

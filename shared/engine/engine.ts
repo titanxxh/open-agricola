@@ -110,6 +110,9 @@ export class Engine {
   }
   private findActionNode(node: EngineNode): ActionNode | null {
     if (node instanceof ActionNode) return node
+    if (node instanceof OptionalNode) {
+      return this.findActionNode(node.child)
+    }
     if ('children' in node) {
       const composite = node as { children: EngineNode[] }
       for (const child of composite.children) {
@@ -139,6 +142,84 @@ export class Engine {
     })
   }
 
+  private attachChoiceLabel(
+    node: EngineNode,
+    choiceLabelKey?: string,
+    choiceLabelParams?: Record<string, string | number>,
+  ) {
+    if (!choiceLabelKey) return node
+    const labeledNode = node as EngineNode & {
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
+    }
+    labeledNode.choiceLabelKey = choiceLabelKey
+    labeledNode.choiceLabelParams = choiceLabelParams
+    return node
+  }
+
+  private getChoiceLabel(
+    node: EngineNode,
+  ): { labelKey: string; labelParams?: Record<string, string | number> } | null {
+    const labeledNode = node as EngineNode & {
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
+    }
+    if (labeledNode.choiceLabelKey) {
+      return {
+        labelKey: labeledNode.choiceLabelKey,
+        labelParams: labeledNode.choiceLabelParams,
+      }
+    }
+    if (node instanceof OptionalNode) {
+      return this.getChoiceLabel(node.child)
+    }
+    if (node instanceof ActionNode) {
+      const action = this.registry.get(node.actionId)
+      if (!action) return null
+      return {
+        labelKey: node.choiceLabelKey ?? action.nameKey,
+        labelParams: node.choiceLabelParams,
+      }
+    }
+    if ('children' in node) {
+      const composite = node as { children: EngineNode[] }
+      for (const child of composite.children) {
+        const label = this.getChoiceLabel(child)
+        if (label) return label
+      }
+    }
+    return null
+  }
+
+  private markCheckedReplaceAction(actionContext?: Record<string, unknown>) {
+    return {
+      ...(actionContext ?? {}),
+      checkedReplaceAction: true,
+    }
+  }
+
+  private buildReplaceChoiceFlow(
+    actionNode: Pick<ActionNode, 'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'>,
+    alternativeFlow: ActionFlow,
+    replacedActionId: string,
+  ): ActionFlow {
+    return {
+      type: 'xor',
+      children: [
+        alternativeFlow,
+        {
+          type: 'leaf',
+          actionId: replacedActionId,
+          params: actionNode.params,
+          sourceCard: actionNode.sourceCard,
+          actionContext: this.markCheckedReplaceAction(actionNode.actionContext),
+          choiceLabelKey: actionNode.choiceLabelKey,
+          choiceLabelParams: actionNode.choiceLabelParams,
+        },
+      ],
+    }
+  }
+
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
@@ -157,33 +238,39 @@ export class Engine {
           actionNode,
           new ChoiceNode(nextId(), []),
         ])
-        return flow.optional
+        const node = flow.optional
           ? new OptionalNode(nextId(), sequence, flow.promptKey)
           : sequence
+        return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
       }
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), actionNode, flow.promptKey)
         : actionNode
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const children = flow.children.map((child) => this.buildFlowNode(child))
     if (flow.type === 'seq') {
       const sequence = new SequenceNode(nextId(), children)
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), sequence, flow.promptKey)
         : sequence
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(nextId(), children)
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), parallel, flow.promptKey)
         : parallel
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(nextId(), children, flow.promptKey)
-      return flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+      const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const or = new OrNode(nextId(), children, flow.promptKey)
-    return flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+    const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+    return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
 
   private findChoiceNode(node: EngineNode): ChoiceNode | null {
@@ -259,6 +346,18 @@ export class Engine {
       pendingChoiceContext: this.pendingChoiceContext,
       choiceData,
     }
+  }
+
+  hasPendingChoiceCompositeAncestor() {
+    if (!this.pendingChoiceNodeId) return false
+    let parent = this.tree.findParent(this.pendingChoiceNodeId)
+    while (parent) {
+      if (parent instanceof OrNode || parent instanceof XorNode) {
+        return true
+      }
+      parent = this.tree.findParent(parent.id)
+    }
+    return false
   }
 
   restore(snapshot: {
@@ -341,13 +440,18 @@ export class Engine {
       }[]
       const options = availableActions
         .map((entry) => {
-          const action = this.registry.get(entry.actionNode.actionId)
-          if (!action) return null
+          const label = this.getChoiceLabel(this.tree.findNodeById(entry.nodeId) ?? entry.actionNode)
+          if (!label) return null
           const executionContext: ActionExecutionContext = {
             state: context.state,
             player: context.player,
             space: context.space,
+            params: entry.actionNode.params,
+            sourceCard: entry.actionNode.sourceCard,
+            actionContext: entry.actionNode.actionContext,
           }
+          const action = this.registry.get(entry.actionNode.actionId)
+          if (!action) return null
           const doable = this.hooks.applyIsDoable(
             { ...executionContext, actionId: entry.actionNode.actionId },
             action,
@@ -359,8 +463,8 @@ export class Engine {
           if (!doable) return null
           return {
             value: entry.nodeId,
-            labelKey: entry.actionNode.choiceLabelKey ?? action.nameKey,
-            labelParams: entry.actionNode.choiceLabelParams,
+            labelKey: label.labelKey,
+            labelParams: label.labelParams,
           }
         })
         .filter((option) => option !== null) as {
@@ -496,11 +600,16 @@ export class Engine {
     if (node instanceof ActionNode) {
       const replaceResult = this.hooks.applyComputeReplace({
         ...context,
+        params: node.params,
+        sourceCard: node.sourceCard,
+        actionContext: node.actionContext,
         actionId: node.actionId,
       })
       const replacedActionId = replaceResult.actionId
       if (replaceResult.declined && replaceResult.alternativeFlow) {
-        const flowNode = this.buildFlowNode(replaceResult.alternativeFlow)
+        const flowNode = this.buildFlowNode(
+          this.buildReplaceChoiceFlow(node, replaceResult.alternativeFlow, replacedActionId),
+        )
         this.tree.insertAfter(node.id, [flowNode])
         node.resolve({ type: 'ok' })
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -708,7 +817,9 @@ choice: { promptKey: result.promptKey, options: result.options },
         })
         const actionId = replaceResult.actionId
         if (replaceResult.declined && replaceResult.alternativeFlow) {
-          const flowNode = this.buildFlowNode(replaceResult.alternativeFlow)
+          const flowNode = this.buildFlowNode(
+            this.buildReplaceChoiceFlow(child, replaceResult.alternativeFlow, actionId),
+          )
           this.tree.insertAfter(node.id, [flowNode])
           targetNode.resolve(choice)
           node.resolve(choice)

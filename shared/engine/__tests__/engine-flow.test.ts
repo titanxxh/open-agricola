@@ -20,7 +20,7 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -542,6 +542,80 @@ describe('Engine flow nodes', () => {
     const space = createSpace(a)
     const result = engine.proceed({ state, player, space })
     expect(result.type).toBe('blocked')
+  })
+
+  it('computeReplace decline offers xor between replacement and original action', () => {
+    const events: string[] = []
+    const original: ActionDefinition = {
+      id: 'original',
+      nameKey: 'actions.construct.name',
+      descriptionKey: 'actions.construct.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('original')
+        return { type: 'ok' }
+      },
+    }
+    const replacement: ActionDefinition = {
+      id: 'replacement',
+      nameKey: 'actions.place-farmer.name',
+      descriptionKey: 'actions.place-farmer.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('replacement')
+        return { type: 'ok' }
+      },
+    }
+    registerCardListener({
+      id: 'offer-replacement',
+      actions: ['original'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'leaf',
+            actionId: 'replacement',
+            choiceLabelKey: 'ui.interactionLazySowmanPlace',
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(replacement)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-original', 'original')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(original)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    expect(choiceStep.choice.options.map((option) => option.labelKey)).toEqual([
+      'ui.interactionLazySowmanPlace',
+      'actions.construct.name',
+    ])
+
+    const originalOption = choiceStep.choice.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(originalOption).toBeDefined()
+
+    const result = engine.resolveChoice(originalOption!.value, { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(events).toEqual(['original'])
   })
 
   it('optional node auto-skips when child is not doable', () => {

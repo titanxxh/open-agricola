@@ -209,7 +209,11 @@ type TooltipInfo = {
 type SpaceFarmerMarker = {
   player: PlayerState
   key: string
+  hasOffspring?: boolean
 }
+
+const isFamilyGrowthAction = (spaceId: string) =>
+  spaceId.startsWith('wish-children') || spaceId.startsWith('urgent-wish-children')
 
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
@@ -249,7 +253,11 @@ export const ActionBoard = ({
 
     players.forEach((player) => {
       getRoundPlacementOrder(player).forEach((spaceId, index) => {
-        push(spaceId, { player, key: `${player.id}-${spaceId}-${index}` })
+        push(spaceId, {
+          player,
+          key: `${player.id}-${spaceId}-${index}`,
+          hasOffspring: isFamilyGrowthAction(spaceId),
+        })
       })
     })
 
@@ -303,7 +311,11 @@ export const ActionBoard = ({
     const entries = markers && markers.length > 0
       ? markers
       : fallbackPlayer
-        ? [{ player: fallbackPlayer, key: `${fallbackPlayer.id}-${space.id}-fallback` }]
+        ? [{
+            player: fallbackPlayer,
+            key: `${fallbackPlayer.id}-${space.id}-fallback`,
+            hasOffspring: false,
+          }]
         : []
     if (entries.length === 0) return null
     return (
@@ -311,13 +323,18 @@ export const ActionBoard = ({
         {entries.map((entry, index) => (
           <div
             key={entry.key}
-            className={`action-farmer action-farmer-${entry.player.color}`}
+            className="action-farmer-stack"
             style={{
               right: 6 + (index % 2) * 18,
               bottom: 4 + Math.floor(index / 2) * 14,
             } as React.CSSProperties}
             title={entry.player.name}
-          />
+          >
+            {entry.hasOffspring && (
+              <div className={`action-farmer action-farmer-${entry.player.color} child`} />
+            )}
+            <div className={`action-farmer action-farmer-${entry.player.color}`} />
+          </div>
         ))}
       </div>
     )

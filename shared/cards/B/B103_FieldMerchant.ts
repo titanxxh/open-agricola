@@ -13,15 +13,21 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       decline: true,
       alternativeFlow: {
-        type: 'xor',
-        promptKey: 'ui.interactionFieldMerchantChoose',
+        type: 'seq',
+        choiceLabelKey: 'ui.interactionFieldMerchantChoose',
         children: [
-          { type: 'leaf', actionId: 'gain', params: { food: 1 } },
-          { type: 'leaf', actionId: 'gain', params: { vegetable: 1 } },
+          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
+          {
+            type: 'xor',
+            promptKey: 'ui.interactionFieldMerchantChoose',
+            children: [
+              { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+              { type: 'leaf', actionId: 'gain', params: { vegetable: 1 } },
+            ],
+          },
         ],
       },
     }

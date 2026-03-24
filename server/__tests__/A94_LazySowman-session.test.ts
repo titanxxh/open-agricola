@@ -8,6 +8,7 @@ const setup = (options?: {
   grain?: number
   vegetable?: number
   workersAvailable?: number
+  actionId?: string
 }) => {
   const session = new GameSession()
   const state = session.getState().state
@@ -15,7 +16,7 @@ const setup = (options?: {
   state.currentPlayerIndex = 0
   state.round = 1
   state.roundActionOrder = state.roundActionOrder.map(() => null)
-  state.roundActionOrder[0] = 'grain-utilization'
+  state.roundActionOrder[0] = options?.actionId ?? 'grain-utilization'
 
   const player = state.players[0]!
   player.workersAvailable = options?.workersAvailable ?? 2
@@ -79,15 +80,64 @@ describe('A94_LazySowman session', () => {
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
   })
 
-  it('does not replace a normal sow that can already be executed', () => {
+  it('offers normal sow and replacement when sow can already be executed', () => {
     const session = setup({ withCard: true, grain: 1 })
 
-    const resp = session.takeAction(0, 'grain-utilization')
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionLazySowmanPlace')
+    expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
+
+    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    expect(sowOption).toBeDefined()
+
+    resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionSowSelect')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
     expect(resp.interaction?.stateId).toBe('farmSelect')
+  })
+
+  it('still allows replacing sow on cultivation when sow prerequisites are not met', () => {
+    const session = setup({ withCard: true, actionId: 'cultivation' })
+
+    let resp = session.takeAction(0, 'cultivation')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    expect(sowOption).toBeDefined()
+
+    resp = session.resolveChoice(0, sowOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.promptKey).toBe('ui.interactionLazySowmanPlace')
+    expect(resp.state.players[0]!.cardStates?.A94_LazySowman?.counters?.triggerCount).toBe(1)
+  })
+
+  it('shows both sow and replacement after choosing cultivation -> sow when sow is executable', () => {
+    const session = setup({ withCard: true, grain: 1, actionId: 'cultivation' })
+
+    let resp = session.takeAction(0, 'cultivation')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    expect(sowOption).toBeDefined()
+
+    resp = session.resolveChoice(0, sowOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionLazySowmanPlace')
   })
 })

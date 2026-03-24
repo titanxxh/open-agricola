@@ -3,7 +3,6 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState } from '../../game/types'
-import { incCounter } from '../__stubs__/helpers'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { canSow } from '../../actions/effects/sow'
 
@@ -20,6 +19,12 @@ const isOpenSpace = (state: GameState, space: ActionSpace) => {
   return state.round >= getOpenRound(state, space)
 }
 
+const isUnconditionalSow = (context: CardListenerContext) => {
+  const actionContext = context.actionContext ?? {}
+  if (actionContext.checkedReplaceAction === true) return false
+  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
+}
+
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A94-lazy-sowman-replace-sow',
   cardIds: [CARD_ID],
@@ -27,17 +32,20 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (canSow(context.player)) return
+    if (context.state.phase !== 'work') return
+    if (!isUnconditionalSow(context)) return
     if (context.player.workersAvailable <= 0) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       decline: true,
       alternativeFlow: {
-        type: 'leaf',
-        actionId: 'place-farmer',
+        type: 'seq',
         optional: true,
         promptKey: 'ui.interactionLazySowmanPlace',
-        sourceCard: CARD_ID,
+        choiceLabelKey: 'ui.interactionLazySowmanPlace',
+        children: [
+          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID },
+        ],
       },
       sourceCard: CARD_ID,
     }
@@ -51,6 +59,8 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.state.phase !== 'work') return
+    if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
     if (context.player.workersAvailable <= 0) return
     return { doable: true }

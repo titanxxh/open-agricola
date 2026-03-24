@@ -21,6 +21,7 @@ const computeReplaceListener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         promptKey: 'ui.interactionFreshmanOccupation',
+        choiceLabelKey: 'ui.interactionFreshmanOccupation',
         children: [
           { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },

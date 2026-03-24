@@ -10,6 +10,8 @@ import type { ActionHookPhase } from '../actions/hooks'
 abstract class BaseNode implements EngineNode {
   public id: string
   public type: EngineNodeType
+  public choiceLabelKey?: string
+  public choiceLabelParams?: Record<string, string | number>
   protected state: NodeState
 
   protected constructor(id: string, type: EngineNodeType) {
