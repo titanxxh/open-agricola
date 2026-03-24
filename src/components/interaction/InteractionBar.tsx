@@ -185,6 +185,18 @@ export const InteractionBar = ({
                         </span>
                       )}
                     </span>
+                  ) : option.labelKey === 'ui.interactionActionOrReplace' &&
+                    option.labelParams &&
+                    typeof option.labelParams.actionNameKey === 'string' ? (
+                    t(locale, option.labelKey, {
+                      action: t(locale, option.labelParams.actionNameKey),
+                    })
+                  ) : option.labelKey === 'ui.interactionUseCard' &&
+                    option.labelParams &&
+                    typeof option.labelParams.cardNameKey === 'string' ? (
+                    t(locale, option.labelKey, {
+                      card: t(locale, option.labelParams.cardNameKey),
+                    })
                   ) : (
                     t(locale, option.labelKey, option.labelParams)
                   )}

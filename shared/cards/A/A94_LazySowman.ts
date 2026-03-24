@@ -41,7 +41,10 @@ const computeReplaceListener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         promptKey: 'ui.interactionLazySowmanPlace',
-        choiceLabelKey: 'ui.interactionLazySowmanPlace',
+        choiceLabelKey: 'ui.interactionUseCard',
+        choiceLabelParams: {
+          cardNameKey: 'occupations.A94_LazySowman.name',
+        },
         children: [
           { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID },

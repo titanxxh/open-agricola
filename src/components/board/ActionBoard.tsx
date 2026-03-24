@@ -320,14 +320,10 @@ export const ActionBoard = ({
     if (entries.length === 0) return null
     return (
       <div className="farmer-holder" data-n={entries.length}>
-        {entries.map((entry, index) => (
+        {entries.map((entry) => (
           <div
             key={entry.key}
-            className="action-farmer-stack"
-            style={{
-              right: 6 + (index % 2) * 18,
-              bottom: 4 + Math.floor(index / 2) * 14,
-            } as React.CSSProperties}
+            className={`action-farmer-stack${entry.hasOffspring ? ' has-offspring' : ''}`}
             title={entry.player.name}
           >
             {entry.hasOffspring && (

@@ -49,6 +49,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionLazySowmanPlace')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman?.counters?.triggerCount).toBe(1)
 
     const continueOption = resp.pending.options.find((option) => option.value !== '__skip__')
@@ -88,7 +89,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionLazySowmanPlace')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
 
     const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
@@ -110,8 +111,8 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-
-    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
+    const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
 
     resp = session.resolveChoice(0, sowOption!.value)
@@ -129,8 +130,8 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-
-    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
+    const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
 
     resp = session.resolveChoice(0, sowOption!.value)
@@ -138,6 +139,6 @@ describe('A94_LazySowman session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionLazySowmanPlace')
+    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
   })
 })

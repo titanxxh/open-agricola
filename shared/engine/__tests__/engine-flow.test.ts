@@ -618,6 +618,69 @@ describe('Engine flow nodes', () => {
     expect(events).toEqual(['original'])
   })
 
+  it('or choices show action-or-replace when computeReplace is available', () => {
+    const plow: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'actions.plow.name',
+      descriptionKey: 'actions.plow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const sow: ActionDefinition = {
+      id: 'sow',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    registerCardListener({
+      id: 'offer-sow-replacement',
+      actions: ['sow'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'leaf',
+            actionId: 'plow',
+            choiceLabelKey: 'ui.interactionUseCard',
+            choiceLabelParams: { cardNameKey: 'occupations.A94_LazySowman.name' },
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(plow)
+    registry.register(sow)
+    const engine = new Engine({
+      tree: new EngineTree(new OrNode('root-or', [
+        new ActionNode('action-plow', 'plow'),
+        new ActionNode('action-sow', 'sow'),
+      ], 'ui.interactionCultivationSelect')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(sow)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    if (step.type !== 'choice') return
+    expect(step.choice.options.map((option) => option.labelKey)).toEqual([
+      'actions.plow.name',
+      'ui.interactionActionOrReplace',
+    ])
+    const sowOption = step.choice.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
+    expect(sowOption?.labelParams).toEqual({ actionNameKey: 'actions.sow.name' })
+  })
+
   it('optional node auto-skips when child is not doable', () => {
     const action: ActionDefinition = {
       id: 'blocked-action',

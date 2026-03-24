@@ -220,6 +220,25 @@ export class Engine {
     }
   }
 
+  private getReplaceAwareChoiceLabel(
+    actionNode: ActionNode,
+    executionContext: ActionExecutionContext,
+    defaultLabel: { labelKey: string; labelParams?: Record<string, string | number> },
+  ) {
+    if (actionNode.choiceLabelKey) return defaultLabel
+    const replaceResult = this.hooks.applyComputeReplace({
+      ...executionContext,
+      actionId: actionNode.actionId,
+    })
+    if (!replaceResult.declined || !replaceResult.alternativeFlow) {
+      return defaultLabel
+    }
+    return {
+      labelKey: 'ui.interactionActionOrReplace',
+      labelParams: { actionNameKey: defaultLabel.labelKey },
+    }
+  }
+
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
@@ -440,8 +459,6 @@ export class Engine {
       }[]
       const options = availableActions
         .map((entry) => {
-          const label = this.getChoiceLabel(this.tree.findNodeById(entry.nodeId) ?? entry.actionNode)
-          if (!label) return null
           const executionContext: ActionExecutionContext = {
             state: context.state,
             player: context.player,
@@ -461,6 +478,9 @@ export class Engine {
             ),
           )
           if (!doable) return null
+          const baseLabel = this.getChoiceLabel(this.tree.findNodeById(entry.nodeId) ?? entry.actionNode)
+          if (!baseLabel) return null
+          const label = this.getReplaceAwareChoiceLabel(entry.actionNode, executionContext, baseLabel)
           return {
             value: entry.nodeId,
             labelKey: label.labelKey,
@@ -527,13 +547,17 @@ export class Engine {
       }
       this.pendingChoiceNodeId = node.id
       this.pendingChoiceActionId = null
+      const label = this.getChoiceLabel(node) ?? {
+        labelKey: actionNode.choiceLabelKey ?? action.nameKey,
+        labelParams: actionNode.choiceLabelParams,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
           promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
           options: [
-            { value: actionNode.id, labelKey: actionNode.choiceLabelKey ?? action.nameKey },
+            { value: actionNode.id, labelKey: label.labelKey, labelParams: label.labelParams },
             { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
           ],
         },

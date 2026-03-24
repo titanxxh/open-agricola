@@ -195,6 +195,8 @@ export const en = {
     interactionMerchantPay: 'Pay 1 food',
     interactionMerchantSkip: 'Skip',
     interactionPlaceFarmerExtra: 'Place an additional worker on an action space',
+    interactionActionOrReplace: '{action} or replace',
+    interactionUseCard: 'Use {card}',
     interactionStockProtectorPlace: 'Stock Protector: Place another worker?',
     interactionLazySowmanPlace: 'Lazy Sowman: Place a worker instead of sowing?',
     interactionFreshmanOccupation: 'Freshman: Play an occupation for free?',

@@ -189,6 +189,8 @@ export const zh = {
     interactionMerchantPay: '支付 1 食物',
     interactionMerchantSkip: '跳过',
     interactionPlaceFarmerExtra: '放置一个额外的工人到行动格',
+    interactionActionOrReplace: '{action}或替换',
+    interactionUseCard: '使用{card}',
     interactionStockProtectorPlace: '畜牧守护者：放置另一个工人？',
     interactionLazySowmanPlace: '懒惰播种者：放置工人代替播种？',
     interactionFreshmanOccupation: '新手：免费打出一张职业？',
