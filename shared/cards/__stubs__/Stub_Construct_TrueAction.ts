@@ -11,7 +11,7 @@ export const listener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context) => {
     if (context.trueAction === false) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.player, CARD_ID, 'observedCount')
   },
 }
 

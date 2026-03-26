@@ -1,5 +1,6 @@
 import type { ActionDefinition, Resource } from '../../game/types'
 import { initCardState } from '../../cards/__stubs__/helpers'
+import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainResources } from './gain'
 
 const canTakeFromCard = (
@@ -34,6 +35,7 @@ export const takeFromCardAction: ActionDefinition = {
       cardCounters[key] = Math.max(0, (cardCounters[key] ?? 0) - value)
     })
     gainResources(player, gain)
+    addCardResourceGained(player, sourceCard, gain)
 
     return {
       type: 'ok',

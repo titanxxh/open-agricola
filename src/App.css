@@ -1817,6 +1817,20 @@
   gap: 4px;
 }
 
+.played-card-wrapper {
+  position: relative;
+}
+
+.played-card-wrapper.has-stats {
+  cursor: help;
+}
+
+.played-card-wrapper.has-stats:focus-visible {
+  outline: 2px solid #8c6a2a;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
 .card-future-item {
   display: inline-flex;
   align-items: center;
@@ -1837,6 +1851,44 @@
 
 .card-future-text {
   white-space: nowrap;
+}
+
+.played-card-stats-tooltip {
+  position: fixed;
+  z-index: 40;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(33, 25, 17, 0.96);
+  color: #f8f0df;
+  border: 1px solid rgba(226, 193, 141, 0.45);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+}
+
+.played-card-stats-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.played-card-stats-section + .played-card-stats-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.played-card-stats-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #d9c49a;
+}
+
+.played-card-stats-line {
+  color: inherit;
 }
 
 .hand-empty,

@@ -15,7 +15,6 @@ registerCardEffect({
       cost: { food: cost },
       gain: { cattle: 1 },
       promptKey: 'ui.interactionHaydryer',
-      markTrigger: true,
     })
   },
 })

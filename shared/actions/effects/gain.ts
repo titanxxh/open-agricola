@@ -1,4 +1,5 @@
 import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
+import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
 
 export const gainResources = (
@@ -32,6 +33,9 @@ export const gainAction: ActionDefinition = {
         }
       })
       gainResources(player, gain)
+      if (sourceCard) {
+        addCardResourceGained(player, sourceCard, gained)
+      }
     }
     if (sourceCard) {
       return {

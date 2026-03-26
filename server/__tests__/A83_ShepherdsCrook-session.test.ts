@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A83_ShepherdsCrook'
 
@@ -41,7 +42,10 @@ describe('A83_ShepherdsCrook session flow', () => {
     })
 
     expect(resp.pending.type).toBe('animalReorg')
-    expect(resp.state.players[0]!.cardStates?.A83_ShepherdsCrook?.counters?.triggerCount).toBe(1)
     expect(resp.state.players[0]!.resources.sheep).toBe(2)
+    expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toEqual({
+      paid: {},
+      gained: { sheep: 2 },
+    })
   })
 })

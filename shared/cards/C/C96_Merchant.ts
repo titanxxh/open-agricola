@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'C96_Merchant'
@@ -15,7 +14,6 @@ const immediatelyAfterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.sourceCard === CARD_ID) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return payThenActionFlow({
       cardId: CARD_ID,
       cost: { food: 1 },

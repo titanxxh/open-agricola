@@ -2,6 +2,7 @@ import type { GameState, PlayerState, Resource } from '../../game/types'
 import { canPayResources, payResources } from '../../actions/effects/pay'
 import { incCounter, initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
+import { addCardResourcePaid } from './card-state'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -29,6 +30,9 @@ export const applyStagePayGain = (
 ) => {
   if (!canPayResources(player, cost)) return false
   payResources(player, cost)
+  if (cardId) {
+    addCardResourcePaid(player, cardId, cost)
+  }
   applyCardGain(player, gain, cardId)
   return true
 }
@@ -42,8 +46,8 @@ export const payForCardBonusVp = (
   const amount = Math.min(player.resources[resource] ?? 0, count)
   if (amount <= 0) return 0
   player.resources[resource] -= amount
+  addCardResourcePaid(player, cardId, { [resource]: amount })
   incCounter(player, cardId, 'bonusVp', amount)
-  incCounter(player, cardId, 'triggerCount')
   return amount
 }
 

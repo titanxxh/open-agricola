@@ -46,7 +46,6 @@ const computeReplaceListener: CardListenerRegistration = {
           cardNameKey: 'occupations.A94_LazySowman.name',
         },
         children: [
-          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID },
         ],
       },

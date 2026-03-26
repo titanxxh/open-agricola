@@ -193,7 +193,7 @@ describe('priority plan implementations', () => {
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type !== 'seq') return
     expect(result.flow.children[0]).toMatchObject({ type: 'leaf', actionId: 'flag-card' })
-    expect(result.flow.children[2]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
+    expect(result.flow.children[1]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
   })
 
   it('B103 Field Merchant gains wood and reed when played', () => {
@@ -516,11 +516,6 @@ describe('priority plan implementations', () => {
           type: 'leaf',
           actionId: 'gain',
           params: { food: 2 },
-          sourceCard: 'A64_BarleyMill',
-        },
-        {
-          type: 'leaf',
-          actionId: 'mark-card-trigger',
           sourceCard: 'A64_BarleyMill',
         },
       ],

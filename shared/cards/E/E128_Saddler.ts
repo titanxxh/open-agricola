@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E128_Saddler'
@@ -16,7 +15,6 @@ const listener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const choice = context.choice
     if (!choice || !choice.startsWith('major:')) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       ...payThenActionFlow({
         cardId: CARD_ID,

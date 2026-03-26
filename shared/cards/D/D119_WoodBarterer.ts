@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D119_WoodBarterer'
@@ -14,7 +13,6 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       flow: {
         type: 'xor',

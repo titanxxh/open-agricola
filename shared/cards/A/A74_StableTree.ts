@@ -3,7 +3,6 @@ import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 import {
   getStableTilesBuiltThisAction,
@@ -24,7 +23,6 @@ const queueStableTreeWood = (
   if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
 
   writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-  incCounter(player, CARD_ID, 'triggerCount')
   return queueFutureMeeplesFlow(state, {
     cardId: CARD_ID,
     playerId: player.id,

@@ -50,7 +50,6 @@ const buildBonusVpFlow = (count: number): ActionFlow => ({
   type: 'seq',
   children: [
     { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
-    { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
     ...Array.from({ length: count }, () => ({
       type: 'leaf' as const,
       actionId: 'bonus-vp',

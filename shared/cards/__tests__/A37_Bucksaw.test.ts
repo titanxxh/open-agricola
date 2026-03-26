@@ -4,10 +4,12 @@ import {
   executeCardListener,
 } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import { readCardResourceStats } from '../helpers/card-state'
 
 import '../A/A37_Bucksaw'
 import { payResourcesAction } from '../../actions/effects/pay-resources'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
+import { gainAction } from '../../actions/effects/gain'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -65,7 +67,6 @@ describe('A37_Bucksaw', () => {
         { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: 'A37_Bucksaw' },
       ])
     }
-    expect(player.cardStates?.A37_Bucksaw?.counters?.triggerCount).toBe(1)
   })
 
   it('bonus-vp action records card bonus points', () => {
@@ -92,5 +93,31 @@ describe('A37_Bucksaw', () => {
     })
     expect(payResult.type).toBe('ok')
     expect(player.resources.wood).toBe(4)
+  })
+
+  it('tracks paid and gained resources under card resource stats', () => {
+    const player = createPlayer()
+
+    const payResult = payResourcesAction.execute({
+      state: createState(player),
+      player,
+      space: createSpace('renovate-house'),
+      params: { wood: 1 },
+      sourceCard: 'A37_Bucksaw',
+    })
+    expect(payResult.type).toBe('ok')
+
+    const gainResult = gainAction.execute({
+      state: createState(player),
+      player,
+      space: createSpace('renovate-house'),
+      params: { grain: 1 },
+      sourceCard: 'A37_Bucksaw',
+    })
+    expect(gainResult.type).toBe('ok')
+    expect(readCardResourceStats(player, 'A37_Bucksaw')).toEqual({
+      paid: { wood: 1 },
+      gained: { grain: 1 },
+    })
   })
 })

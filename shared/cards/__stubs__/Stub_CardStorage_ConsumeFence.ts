@@ -14,7 +14,7 @@ export const computeCostsListener: CardListenerRegistration = {
     const stored = counters['fences'] ?? 0
     if (stored <= 0) return
     counters['fences'] = stored - 1
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.player, CARD_ID, 'observedCount')
     return { costs: { wood: -1 } }
   },
 }

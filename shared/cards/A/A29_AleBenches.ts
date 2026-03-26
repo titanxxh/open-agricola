@@ -16,7 +16,6 @@ registerCardEffect({
         { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
-        { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
       ],
     }
   },

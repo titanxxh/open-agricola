@@ -16,7 +16,6 @@ export const reserveFenceBonusAction: ActionDefinition = {
       sourceCard,
       counterKey: typeof params.counterKey === 'string' ? params.counterKey : 'fences',
       freeFences: params.freeFences,
-      incrementTriggerCount: params.incrementTriggerCount === true,
     })
     return { type: 'ok' }
   },

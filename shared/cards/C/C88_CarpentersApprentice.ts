@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
 
@@ -16,7 +15,6 @@ const constructCostListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return { costs: { wood: -2 } }
   },
 }
@@ -30,7 +28,6 @@ const stablesCostListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stablesBuilt = context.player.stableTiles.length
     if (stablesBuilt >= 2) {
-      incCounter(context.player, CARD_ID, 'triggerCount')
       return { costs: { wood: -1 } }
     }
   },
@@ -75,7 +72,6 @@ const fenceBeforeListener: CardListenerRegistration = {
         params: {
           freeFences,
           counterKey: 'fencesDiscounted',
-          incrementTriggerCount: true,
         },
       },
     }

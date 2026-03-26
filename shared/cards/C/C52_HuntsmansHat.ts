@@ -16,7 +16,7 @@ const huntsmansHatListener: CardListenerRegistration = {
     const gained = (result as any)?.resourcesGained?.boar ?? 0
     if (gained <= 0) return
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: gained } },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: gained }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { food: gained }, cardId: CARD_ID },
       sourceCard: CARD_ID,

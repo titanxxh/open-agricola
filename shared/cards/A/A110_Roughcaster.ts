@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'A110_Roughcaster'
 
@@ -14,9 +13,8 @@ const constructListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { food: 3 }, cardId: CARD_ID },
       sourceCard: CARD_ID,
@@ -32,9 +30,8 @@ const renovateListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'stone') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { food: 3 }, cardId: CARD_ID },
       sourceCard: CARD_ID,

@@ -63,7 +63,6 @@ const beforeFenceListener: CardListenerRegistration = {
               params: {
                 freeFences: count,
                 counterKey: 'fences',
-                incrementTriggerCount: true,
               },
               choiceLabelKey: 'ui.interactionAshTreesUseCount',
               choiceLabelParams: { count },

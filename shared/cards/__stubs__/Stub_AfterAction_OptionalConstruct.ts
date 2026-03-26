@@ -10,7 +10,7 @@ export const listener: CardListenerRegistration = {
   actions: ['plow'],
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.player, CARD_ID, 'observedCount')
     return {
       flow: { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.optionalBuildRoom' },
       logKey: 'log.cardGrantedAction',

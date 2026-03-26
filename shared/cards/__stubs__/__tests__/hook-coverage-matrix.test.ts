@@ -26,7 +26,7 @@ import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
-const markCardTriggerAction = internalActionDefinitions.find(a => a.id === 'mark-card-trigger')!
+const markCardObservedAction = internalActionDefinitions.find(a => a.id === 'mark-card-observed')!
 
 const runToCompletion = (engine: Engine, context: { state: GameState; player: PlayerState; space: ActionSpace }) => {
   let step = engine.proceed(context)
@@ -214,7 +214,7 @@ describe('Stub card: Stub_ImmediatelyAfter_GainFlow', () => {
     runToCompletion(engine, { state, player, space })
 
     expect(player.resources.wood).toBe(5 + 3 + 1)
-    expect(player.cardStates[IMMEDIATELY_AFTER_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates[IMMEDIATELY_AFTER_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('does not trigger on non-forest collect', () => {
@@ -251,7 +251,7 @@ describe('Stub card: Stub_ComputeCosts_BuildDiscount', () => {
 
     expect(player.rooms).toBe(3)
     expect(player.resources.wood).toBe(1)
-    expect(player.cardStates[COMPUTE_COSTS_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates[COMPUTE_COSTS_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('does not trigger on non-build actions', () => {
@@ -287,7 +287,7 @@ describe('Stub card: Stub_After_GainFlow', () => {
 
     expect(player.resources.sheep).toBe(1)
     expect(player.resources.food).toBe(5 + 1)
-    expect(player.cardStates[AFTER_GAIN_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates[AFTER_GAIN_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('does not trigger on non-sheep-market collect', () => {
@@ -337,7 +337,7 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
     if (step.type !== 'choice') return
     const values = step.choice.options.map((o) => o.value)
     expect(values).toContain('stub-bonus-improvement')
-    expect(player.cardStates[COMPUTE_ARGS_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates[COMPUTE_ARGS_ID]?.counters?.observedCount).toBe(1)
   })
 })
 
@@ -361,7 +361,7 @@ describe('Stub card: Stub_IsDoable_Override', () => {
     const result = engine.proceed({ state, player, space })
 
     expect(result.type).toBe('ok')
-    expect(player.cardStates[IS_DOABLE_ID]?.counters?.triggerCount).toBeGreaterThanOrEqual(1)
+    expect(player.cardStates[IS_DOABLE_ID]?.counters?.observedCount).toBeGreaterThanOrEqual(1)
   })
 
   it('does not override for player without card', () => {
@@ -395,7 +395,7 @@ describe('Stub card: Stub_OnReturnHome_Accumulate', () => {
     runReturnHomeHooks(state, player)
     runReturnHomeHooks(state, player)
 
-    expect(player.cardStates[ON_RETURN_HOME_ID]?.counters?.triggerCount).toBe(3)
+    expect(player.cardStates[ON_RETURN_HOME_ID]?.counters?.observedCount).toBe(3)
     expect(player.cardStates[ON_RETURN_HOME_ID]?.counters?.grain).toBe(3)
   })
 
@@ -427,9 +427,9 @@ describe('Stub card: Stub_Scope_Opponent', () => {
 
     runToCompletion(engine, { state, player: p2, space })
 
-    expect(p1.cardStates[SCOPE_OPPONENT_ID]?.counters?.triggerCount).toBe(1)
+    expect(p1.cardStates[SCOPE_OPPONENT_ID]?.counters?.observedCount).toBe(1)
     expect(p1.resources.food).toBe(6)
-    expect(p2.cardStates[SCOPE_OPPONENT_ID]?.counters?.triggerCount).toBeUndefined()
+    expect(p2.cardStates[SCOPE_OPPONENT_ID]?.counters?.observedCount).toBeUndefined()
   })
 
   it('does not trigger when card owner collects', () => {
@@ -537,7 +537,7 @@ describe('Stub card: Stub_AfterAction_OptionalConstruct', () => {
       safety++
     }
     expect(steps).toContain('choice')
-    expect(player.cardStates?.[OPTIONAL_CONSTRUCT_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates?.[OPTIONAL_CONSTRUCT_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('skip optional construct completes the flow', () => {
@@ -615,7 +615,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
     runToCompletion(engine, { state, player, space })
 
     expect(player.cardStates[STORAGE_ID]?.counters?.fences).toBe(4)
-    expect(player.cardStates[STORAGE_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates[STORAGE_ID]?.counters?.observedCount).toBe(1)
     expect(player.fences).toBe(1)
     // Cost was 1 wood, but discount of -1 makes effective cost 0
     expect(player.resources.wood).toBe(10)
@@ -689,7 +689,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const registry = new ActionRegistry()
     registry.register(sowAction)
     if (gainAction) registry.register(gainAction)
-    if (markCardTriggerAction) registry.register(markCardTriggerAction)
+    if (markCardObservedAction) registry.register(markCardObservedAction)
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'sow')),
       registry,
@@ -714,7 +714,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
 
     expect(player.fields.length).toBe(originalFieldCount)
     expect(player.resources.food).toBe(1)
-    expect(player.cardStates?.[DECLINE_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates?.[DECLINE_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('does not decline when card not played', () => {

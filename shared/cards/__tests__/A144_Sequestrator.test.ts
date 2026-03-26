@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import { readCardResourceStats } from '../helpers/card-state'
 
 import '../A/A144_Sequestrator'
 
@@ -78,9 +79,10 @@ describe('A144_Sequestrator', () => {
       type: 'leaf',
       actionId: 'gain',
       params: { reed: 3 },
+      sourceCard: 'A144_Sequestrator',
     })
     expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(0)
-    expect(owner.cardStates?.A144_Sequestrator?.counters?.triggerCount).toBe(1)
+    expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
   })
 
   it('gives all stored clay to the first player reaching 5 fields', () => {
@@ -109,8 +111,9 @@ describe('A144_Sequestrator', () => {
       type: 'leaf',
       actionId: 'gain',
       params: { clay: 4 },
+      sourceCard: 'A144_Sequestrator',
     })
     expect(owner.cardStates?.A144_Sequestrator?.counters?.clay).toBe(0)
-    expect(owner.cardStates?.A144_Sequestrator?.counters?.triggerCount).toBe(1)
+    expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
   })
 })

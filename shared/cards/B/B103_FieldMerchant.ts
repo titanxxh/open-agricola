@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'B103_FieldMerchant'
 
@@ -19,13 +18,12 @@ const computeReplaceListener: CardListenerRegistration = {
         type: 'seq',
         choiceLabelKey: 'ui.interactionFieldMerchantChoose',
         children: [
-          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
           {
             type: 'xor',
             promptKey: 'ui.interactionFieldMerchantChoose',
             children: [
-              { type: 'leaf', actionId: 'gain', params: { food: 1 } },
-              { type: 'leaf', actionId: 'gain', params: { vegetable: 1 } },
+              { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID },
+              { type: 'leaf', actionId: 'gain', params: { vegetable: 1 }, sourceCard: CARD_ID },
             ],
           },
         ],
@@ -42,7 +40,6 @@ const onPlayListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { wood: 1, reed: 1 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',

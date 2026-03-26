@@ -10,7 +10,7 @@ export const listener: CardListenerRegistration = {
   actions: ['day-laborer'],
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.player, CARD_ID, 'observedCount')
     return { doable: true }
   },
 }

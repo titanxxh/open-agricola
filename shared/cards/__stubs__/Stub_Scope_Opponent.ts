@@ -11,7 +11,7 @@ export const listener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context) => {
     const effectPlayer = context.effectPlayer ?? context.player
-    incCounter(effectPlayer, CARD_ID, 'triggerCount')
+    incCounter(effectPlayer, CARD_ID, 'observedCount')
     effectPlayer.resources.food += 1
     return {
       logKey: 'log.cardEffectGain',

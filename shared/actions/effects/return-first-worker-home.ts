@@ -1,5 +1,4 @@
 import type { ActionDefinition } from '../../game/types'
-import { incCounter } from '../../cards/__stubs__/helpers'
 import { setCardFlag } from '../../cards/helpers/card-state'
 import { getRoundPlacementOrder } from '../../cards/helpers/round-placement'
 
@@ -18,9 +17,6 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
       if (sourceCard && params?.flagSourceCard) {
         setCardFlag(player, sourceCard, true)
       }
-      if (sourceCard && params?.incrementTriggerCount) {
-        incCounter(player, sourceCard, 'triggerCount')
-      }
       return sourceCard && params?.logCardTrigger
         ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
         : { type: 'ok' }
@@ -30,9 +26,6 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
       if (sourceCard && params?.flagSourceCard) {
         setCardFlag(player, sourceCard, true)
       }
-      if (sourceCard && params?.incrementTriggerCount) {
-        incCounter(player, sourceCard, 'triggerCount')
-      }
       return sourceCard && params?.logCardTrigger
         ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
         : { type: 'ok' }
@@ -41,9 +34,6 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
     player.workersAvailable += 1
     if (sourceCard && params?.flagSourceCard) {
       setCardFlag(player, sourceCard, true)
-    }
-    if (sourceCard && params?.incrementTriggerCount) {
-      incCounter(player, sourceCard, 'triggerCount')
     }
     return sourceCard && params?.logCardTrigger
       ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }

@@ -1,4 +1,5 @@
 import type { ActionDefinition, Resource } from '../../game/types'
+import { addCardResourcePaid } from '../../cards/helpers/card-state'
 import { canPayResources, payResources } from './pay'
 
 export const payResourcesAction: ActionDefinition = {
@@ -11,12 +12,15 @@ export const payResourcesAction: ActionDefinition = {
   costPreview: {
     getBaseCost: ({ params }) => params ?? {},
   },
-  execute: ({ player, params }) => {
+  execute: ({ player, params, sourceCard }) => {
     const cost = params ?? {}
     if (!canPayResources(player, cost as Partial<Resource>)) {
       return { type: 'fail', logKey: 'log.exchangeFail' }
     }
     payResources(player, cost)
+    if (sourceCard) {
+      addCardResourcePaid(player, sourceCard, cost as Partial<Resource>)
+    }
     return { type: 'ok' }
   },
 }

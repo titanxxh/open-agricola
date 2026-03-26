@@ -132,6 +132,11 @@ export type CardState = {
   extraData?: Record<string, unknown>
 }
 
+export type CardResourceStats = {
+  paid: Partial<Resource>
+  gained: Partial<Resource>
+}
+
 export type CardStates = Record<string, CardState>
 
 export type LogEntry = {

@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'D152_Patron'
 
@@ -13,9 +12,8 @@ const beforeListener: CardListenerRegistration = {
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { food: 2 }, cardId: CARD_ID },
       sourceCard: CARD_ID,

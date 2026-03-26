@@ -37,7 +37,6 @@ const afterWishChildrenListener: CardListenerRegistration = {
             sourceCard: CARD_ID,
             params: {
               flagSourceCard: true,
-              incrementTriggerCount: true,
               logCardTrigger: true,
             },
             choiceLabelKey: 'ui.interactionGodlySpouseUse',

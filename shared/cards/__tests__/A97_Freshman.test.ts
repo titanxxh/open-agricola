@@ -90,7 +90,6 @@ describe('A97_Freshman', () => {
       choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [
         { type: 'leaf', actionId: 'flag-card', sourceCard: 'A97_Freshman' },
-        { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: 'A97_Freshman' },
         {
           type: 'leaf',
           actionId: 'play-occupation',
@@ -106,7 +105,7 @@ describe('A97_Freshman', () => {
     const doableListener = findListener('A97-freshman-isdoable-bake')
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
-    player.cardStates = { A97_Freshman: { flagged: true, counters: { triggerCount: 1 } } }
+    player.cardStates = { A97_Freshman: { flagged: true } }
 
     expect(resetListener).toBeDefined()
     expect(doableListener).toBeDefined()

@@ -33,3 +33,4 @@ output/
 artifacts/
 test-results/
 *.traineddata
+.gstack/

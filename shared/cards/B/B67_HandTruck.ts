@@ -2,7 +2,6 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'B67_HandTruck'
 
@@ -22,9 +21,8 @@ const listener: CardListenerRegistration = {
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { grain: workerCount } },
+      flow: { type: 'leaf', actionId: 'gain', params: { grain: workerCount }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { grain: workerCount }, cardId: CARD_ID },
       sourceCard: CARD_ID,

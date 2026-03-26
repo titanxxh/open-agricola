@@ -16,7 +16,7 @@ export const listener: CardListenerRegistration = {
         type: 'seq',
         choiceLabelKey: 'actions.gain.name',
         children: [
-          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'mark-card-observed', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 1 } },
         ],
       },

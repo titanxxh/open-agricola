@@ -16,10 +16,7 @@ registerCardEffect({
     if (grainFields <= 0) return
     return {
       type: 'seq',
-      children: [
-        gainLeaf(CARD_ID, { food: grainFields }),
-        { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
-      ],
+      children: [gainLeaf(CARD_ID, { food: grainFields })],
     }
   },
 })

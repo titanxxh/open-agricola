@@ -107,7 +107,7 @@ describe('Stub_PayGainVp mechanism', () => {
     expect(player.resources.wood).toBe(4)
     expect(player.resources.grain).toBe(1)
     expect(player.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
-    expect(player.cardStates?.[CARD_ID]?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates?.[CARD_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('skip choice does not change resources', () => {
@@ -149,7 +149,7 @@ describe('Stub_PayGainVp mechanism', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.cardStates = {
-      [CARD_ID]: { counters: { bonusVp: 3, triggerCount: 3 } },
+      [CARD_ID]: { counters: { bonusVp: 3, observedCount: 3 } },
     }
     const state = createState(player)
     const scores = computeScores(state)

@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { isCardFlagged } from '../helpers/card-state'
 
 const CARD_ID = 'A97_Freshman'
@@ -24,7 +23,6 @@ const computeReplaceListener: CardListenerRegistration = {
         choiceLabelKey: 'ui.interactionFreshmanOccupation',
         children: [
           { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'mark-card-trigger', sourceCard: CARD_ID },
           {
             type: 'leaf',
             actionId: 'play-occupation',

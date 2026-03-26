@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B70_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'
@@ -51,7 +52,10 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
-    expect(resp.state.players[0]!.cardStates?.B70_NewPurchase?.counters?.triggerCount).toBe(2)
+    expect(readCardResourceStats(resp.state.players[0]!, 'B70_NewPurchase')).toEqual({
+      paid: { food: 6 },
+      gained: { grain: 1, vegetable: 1 },
+    })
   })
 
   it('runs A166_Haydryer through before-harvest flow', () => {
@@ -94,7 +98,10 @@ describe('stage hook flows', () => {
     expect(resp.pending.type).toBe('none')
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!.resources.cattle).toBe(1)
-    expect(resp.state.players[0]!.cardStates?.A166_Haydryer?.counters?.triggerCount).toBe(1)
+    expect(readCardResourceStats(resp.state.players[0]!, 'A166_Haydryer')).toEqual({
+      paid: { food: 3 },
+      gained: { cattle: 1 },
+    })
   })
 
   it('runs D99_EarthenwarePotter through after-harvest flow on round 14', () => {
@@ -127,7 +134,10 @@ describe('stage hook flows', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.bonusVp).toBe(2)
-    expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.triggerCount).toBe(1)
+    expect(readCardResourceStats(resp.state.players[0]!, 'D99_EarthenwarePotter')).toEqual({
+      paid: { clay: 2 },
+      gained: {},
+    })
   })
 
   it('runs A64_BarleyMill through after-reap flow', () => {
@@ -156,7 +166,10 @@ describe('stage hook flows', () => {
     expect(resp.state.phase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
     expect(resp.state.players[0]!.resources.grain).toBe(2)
-    expect(resp.state.players[0]!.cardStates?.A64_BarleyMill?.counters?.triggerCount).toBe(1)
+    expect(readCardResourceStats(resp.state.players[0]!, 'A64_BarleyMill')).toEqual({
+      paid: {},
+      gained: { food: 2 },
+    })
 
     const gainLog = resp.state.log.find(
       (entry) =>

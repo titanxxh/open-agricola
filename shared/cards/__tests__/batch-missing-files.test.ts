@@ -59,8 +59,8 @@ describe('D152_Patron', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 2 })
+      expect(result.flow.sourceCard).toBe('D152_Patron')
     }
-    expect(player.cardStates?.D152_Patron?.counters?.triggerCount).toBe(1)
   })
 
   it('isDoable returns true', () => {
@@ -89,8 +89,8 @@ describe('D49_Bookshelf', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 3 })
+      expect(result.flow.sourceCard).toBe('D49_Bookshelf')
     }
-    expect(player.cardStates?.D49_Bookshelf?.counters?.triggerCount).toBe(1)
   })
 })
 
@@ -105,7 +105,7 @@ describe('E101_Blighter', () => {
       actionId: 'play-occupation', phase: 'before',
     } as any)
     expect(result?.logKey).toBe('log.cardEffectBlock')
-    expect(player.cardStates?.E101_Blighter?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates?.E101_Blighter).toBeUndefined()
   })
 
   it('does not trigger when card not played', () => {

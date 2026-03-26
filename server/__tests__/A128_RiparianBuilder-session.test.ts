@@ -37,8 +37,8 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.pending.type !== 'confirmPlayerSwitch') return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBe(1)
-    expect(resp.state.players[1]!.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A128_RiparianBuilder).toBeUndefined()
+    expect(resp.state.players[1]!.cardStates?.A128_RiparianBuilder).toBeUndefined()
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
   })
@@ -139,6 +139,6 @@ describe('A128_RiparianBuilder session', () => {
 
     resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.triggerCount).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.observedCount).toBeUndefined()
   })
 })

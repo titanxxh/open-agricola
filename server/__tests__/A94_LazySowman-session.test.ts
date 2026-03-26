@@ -48,17 +48,6 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionLazySowmanPlace')
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
-    expect(resp.state.players[0]!.cardStates?.A94_LazySowman?.counters?.triggerCount).toBe(1)
-
-    const continueOption = resp.pending.options.find((option) => option.value !== '__skip__')
-    expect(continueOption).toBeDefined()
-
-    resp = session.resolveChoice(0, continueOption!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionPlaceFarmerExtra')
     expect(resp.pending.options.map((option) => option.value)).toContain('allow-occupied:day-laborer')
     expect(resp.pending.options.map((option) => option.value)).not.toContain('allow-occupied:meeting-place')
@@ -119,8 +108,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionLazySowmanPlace')
-    expect(resp.state.players[0]!.cardStates?.A94_LazySowman?.counters?.triggerCount).toBe(1)
+    expect(resp.pending.promptKey).toBe('ui.interactionPlaceFarmerExtra')
   })
 
   it('shows both sow and replacement after choosing cultivation -> sow when sow is executable', () => {

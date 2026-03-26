@@ -2,7 +2,6 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { canStartFencing } from '../../actions/effects/fencing'
 
 const CARD_ID = 'B94_StockProtector'
@@ -14,9 +13,8 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { wood: 2 }, cardId: CARD_ID },
       sourceCard: CARD_ID,
