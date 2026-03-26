@@ -65,10 +65,18 @@ export const InteractionBar = ({
   harvestFeedPlayerName,
   confirmHarvestFeed,
 }: Props) => {
+  const isFarmSelectionPrompt =
+    pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionRoomSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionStableSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionPlowSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionSowSelect'
   const visibleOptions =
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
-      : pendingChoice?.options ?? []
+      : isFarmSelectionPrompt
+        ? (pendingChoice?.options ?? []).filter((option) => option.value !== 'cancel')
+        : pendingChoice?.options ?? []
   const isRoomConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionRoomSelect' &&
     pendingRoomTilesLength === 0
@@ -177,6 +185,18 @@ export const InteractionBar = ({
                         </span>
                       )}
                     </span>
+                  ) : option.labelKey === 'ui.interactionActionOrReplace' &&
+                    option.labelParams &&
+                    typeof option.labelParams.actionNameKey === 'string' ? (
+                    t(locale, option.labelKey, {
+                      action: t(locale, option.labelParams.actionNameKey),
+                    })
+                  ) : option.labelKey === 'ui.interactionUseCard' &&
+                    option.labelParams &&
+                    typeof option.labelParams.cardNameKey === 'string' ? (
+                    t(locale, option.labelKey, {
+                      card: t(locale, option.labelParams.cardNameKey),
+                    })
                   ) : (
                     t(locale, option.labelKey, option.labelParams)
                   )}

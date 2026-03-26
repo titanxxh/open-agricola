@@ -88,7 +88,7 @@ const createPlayer = (): PlayerState => ({
   startPlayer: false,
   activeModifiers: [],
   cardStates: {
-    E74_AshTrees: { counters: { fences: 5, triggerCount: 0 } },
+    E74_AshTrees: { counters: { fences: 5 } },
   },
 })
 
@@ -106,7 +106,6 @@ describe('farm choice', () => {
       sourceCard: 'E74_AshTrees',
       counterKey: 'fences',
       freeFences: 4,
-      incrementTriggerCount: true,
     })
 
     const result = applyFarmChoice(player, 'fence', {
@@ -118,7 +117,6 @@ describe('farm choice', () => {
     if (!result.ok) return
     expect(result.player.resources.wood).toBe(0)
     expect(result.player.cardStates?.E74_AshTrees?.counters?.fences).toBe(1)
-    expect(result.player.cardStates?.E74_AshTrees?.counters?.triggerCount).toBe(1)
     expect(result.meta).toMatchObject({
       sourceCard: 'E74_AshTrees',
       usedFreeFences: 4,
@@ -137,7 +135,6 @@ describe('farm choice', () => {
       sourceCard: 'E74_AshTrees',
       counterKey: 'fences',
       freeFences: 2,
-      incrementTriggerCount: true,
     })
 
     const result = applyFarmChoice(player, 'fence', {

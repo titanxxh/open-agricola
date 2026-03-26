@@ -28,7 +28,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
     expect(resp.ok).toBe(true)
 
     const p0After = resp.state.players[0]
-    expect(p0After.cardStates?.[ON_ROUND_END_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0After.cardStates?.[ON_ROUND_END_ID]?.counters?.observedCount).toBe(1)
     expect(resp.state.round).toBe(2)
   })
 })

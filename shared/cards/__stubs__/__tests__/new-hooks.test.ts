@@ -39,7 +39,7 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[BEFORE_RETURN_HOME_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[BEFORE_RETURN_HOME_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('onStartReturnHome fires during return home', () => {
@@ -47,7 +47,7 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[START_RETURN_HOME_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[START_RETURN_HOME_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('both ReturnHome sub-phases fire in correct order', () => {
@@ -55,8 +55,8 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[BEFORE_RETURN_HOME_ID]?.counters?.triggerCount).toBe(1)
-    expect(p0.cardStates?.[START_RETURN_HOME_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[BEFORE_RETURN_HOME_ID]?.counters?.observedCount).toBe(1)
+    expect(p0.cardStates?.[START_RETURN_HOME_ID]?.counters?.observedCount).toBe(1)
   })
 })
 
@@ -72,7 +72,7 @@ describe('New hook stubs - AfterRoundEnd', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[AFTER_ROUND_END_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[AFTER_ROUND_END_ID]?.counters?.observedCount).toBe(1)
   })
 })
 
@@ -88,7 +88,7 @@ describe('New hook stubs - Harvest sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[START_HARVEST_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[START_HARVEST_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('HarvestFieldPhase hooks all fire during field phase', () => {
@@ -118,7 +118,7 @@ describe('New hook stubs - Harvest sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[END_HARVEST_ID]?.counters?.triggerCount).toBe(1)
+    expect(p0.cardStates?.[END_HARVEST_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('all harvest hooks fire on non-harvest round (none fire)', () => {
@@ -126,9 +126,9 @@ describe('New hook stubs - Harvest sub-phases', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
-    expect(p0.cardStates?.[START_HARVEST_ID]?.counters?.triggerCount).toBeUndefined()
+    expect(p0.cardStates?.[START_HARVEST_ID]?.counters?.observedCount).toBeUndefined()
     expect(p0.cardStates?.[HARVEST_FIELD_ID]?.counters?.startFieldCount).toBeUndefined()
     expect(p0.cardStates?.[HARVEST_FEEDING_ID]?.counters?.startFeedCount).toBeUndefined()
-    expect(p0.cardStates?.[END_HARVEST_ID]?.counters?.triggerCount).toBeUndefined()
+    expect(p0.cardStates?.[END_HARVEST_ID]?.counters?.observedCount).toBeUndefined()
   })
 })

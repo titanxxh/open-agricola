@@ -349,6 +349,10 @@
   filter: grayscale(75%);
 }
 
+.action-card-holder.occupied-available .action-card {
+  filter: none;
+}
+
 /* --- Action card (3-section frame) --- */
 
 .action-card {
@@ -579,10 +583,82 @@
   width: 100%;
   height: 100%;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
+  align-content: flex-end;
+  align-items: flex-end;
+  gap: 2px 4px;
+  padding: 6px 8px 6px;
+  box-sizing: border-box;
   pointer-events: none;
   z-index: 15;
+}
+
+.action-farmer-stack {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 24px;
+  height: 32px;
+  flex: 0 0 auto;
+}
+
+.action-farmer-stack.has-offspring {
+  width: 34px;
+}
+
+.action-farmer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 30px;
+  background: #d74a3a;
+  -webkit-mask-image: url('/bga-img/farmers.png');
+  -webkit-mask-size: 500% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: url('/bga-img/farmers.png');
+  mask-size: 500% 100%;
+  mask-repeat: no-repeat;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.18))
+    drop-shadow(0 2px 2px rgba(0, 0, 0, 0.28))
+    drop-shadow(-1px 4px 4px rgba(0, 0, 0, 0.18));
+}
+
+.action-farmer.child {
+  width: 17px;
+  height: 21px;
+  left: 0;
+  right: auto;
+  bottom: 1px;
+  opacity: 0.98;
+  z-index: 2;
+}
+
+.action-farmer-red {
+  background: #d74a3a;
+  -webkit-mask-position: 0% 0%;
+  mask-position: 0% 0%;
+}
+
+.action-farmer-yellow {
+  background: #d6b332;
+  -webkit-mask-position: 25% 0%;
+  mask-position: 25% 0%;
+}
+
+.action-farmer-blue {
+  background: #3f6ee8;
+  -webkit-mask-position: 50% 0%;
+  mask-position: 50% 0%;
+}
+
+.action-farmer-black {
+  background: #1f2937;
+  -webkit-mask-position: 75% 0%;
+  mask-position: 75% 0%;
 }
 
 /* --- Round action cards (actions_background.png sprite behind frame) --- */
@@ -1741,6 +1817,20 @@
   gap: 4px;
 }
 
+.played-card-wrapper {
+  position: relative;
+}
+
+.played-card-wrapper.has-stats {
+  cursor: help;
+}
+
+.played-card-wrapper.has-stats:focus-visible {
+  outline: 2px solid #8c6a2a;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
 .card-future-item {
   display: inline-flex;
   align-items: center;
@@ -1761,6 +1851,44 @@
 
 .card-future-text {
   white-space: nowrap;
+}
+
+.played-card-stats-tooltip {
+  position: fixed;
+  z-index: 40;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(33, 25, 17, 0.96);
+  color: #f8f0df;
+  border: 1px solid rgba(226, 193, 141, 0.45);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+}
+
+.played-card-stats-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.played-card-stats-section + .played-card-stats-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.played-card-stats-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #d9c49a;
+}
+
+.played-card-stats-line {
+  color: inherit;
 }
 
 .hand-empty,

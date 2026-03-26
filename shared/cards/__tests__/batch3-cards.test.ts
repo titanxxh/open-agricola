@@ -65,10 +65,11 @@ describe('C144_ReedRoofRenovator', () => {
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('gain')
       expect(result.flow.params).toEqual({ reed: 1 })
+      expect(result.flow.sourceCard).toBe('C144_ReedRoofRenovator')
     }
     expect(result?.logKey).toBe('log.cardEffectGain')
-    expect(p1.cardStates?.C144_ReedRoofRenovator?.counters?.triggerCount).toBe(1)
-    expect(p2.cardStates?.C144_ReedRoofRenovator?.counters?.triggerCount).toBeUndefined()
+    expect(p1.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
+    expect(p2.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
   })
 
   it('matches via getMatchingListeners when opponent renovates', () => {
@@ -102,7 +103,7 @@ describe('C144_ReedRoofRenovator', () => {
 })
 
 describe('B100_Clutterer', () => {
-  it('increments triggerCount after playing occupation', () => {
+  it('logs a trigger after playing occupation', () => {
     const listener = findListener('B100-clutterer-after-occupation')
     expect(listener).toBeDefined()
 
@@ -116,7 +117,7 @@ describe('B100_Clutterer', () => {
     } as any)
     expect(result?.logKey).toBe('log.cardEffectTrigger')
     expect(result?.logParams?.cardId).toBe('B100_Clutterer')
-    expect(player.cardStates?.B100_Clutterer?.counters?.triggerCount).toBe(1)
+    expect(player.cardStates?.B100_Clutterer).toBeUndefined()
   })
 
   it('does not trigger when card not played', () => {

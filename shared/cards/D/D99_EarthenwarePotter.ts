@@ -20,7 +20,6 @@ registerCardEffect({
       cost: { clay: player.familySize },
       gain: { score: player.familySize },
       promptKey: 'ui.interactionEarthenwarePotter',
-      markTrigger: true,
     })
   },
 })

@@ -3,7 +3,6 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, PlayerState } from '../../game/types'
-import { incCounter } from '../__stubs__/helpers'
 import { getMajorCardEffect } from '../major'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import {
@@ -99,9 +98,8 @@ const beforeListener: CardListenerRegistration = {
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { wood: 1 }, cardId: CARD_ID },
       sourceCard: CARD_ID,

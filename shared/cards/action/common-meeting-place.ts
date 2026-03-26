@@ -1,4 +1,3 @@
-import { setFirstPlayer } from '../../actions/effects/first-player'
 import type { ActionDefinition } from '../../game/types'
 import { wrapOptional } from '../../actions/flow'
 
@@ -10,16 +9,12 @@ export const meetingPlace: ActionDefinition = {
   gainPerRound: {},
   players: [2, 3, 4],
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player }) => {
-    setFirstPlayer(state, player)
-    state.log.unshift({
-      key: 'log.startPlayer',
-      params: { player: player.name },
-    })
-    return { type: 'ok' }
-  },
+  execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [wrapOptional({ type: 'leaf', actionId: 'minor-improvement' })],
+    children: [
+      { type: 'leaf', actionId: 'set-first-player' },
+      wrapOptional({ type: 'leaf', actionId: 'minor-improvement' }),
+    ],
   },
 }

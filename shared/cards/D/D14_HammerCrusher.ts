@@ -2,7 +2,6 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'D14_HammerCrusher'
 
@@ -14,12 +13,11 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
     return {
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'gain', params: { clay: 2, reed: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { clay: 2, reed: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.interactionHammerCrusherBuild' },
         ],
       },

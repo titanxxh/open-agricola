@@ -29,7 +29,6 @@ registerCardEffect({
       children: [
         { type: 'leaf' as const, actionId: 'pay-grain-any', sourceCard: CARD_ID },
         { type: 'leaf' as const, actionId: 'gain', params: { [animalType]: 1 }, sourceCard: CARD_ID },
-        { type: 'leaf' as const, actionId: 'mark-card-trigger', sourceCard: CARD_ID },
       ],
       choiceLabelKey: `ui.interactionSilageBreed`,
       choiceLabelParams: { animal: animalType },

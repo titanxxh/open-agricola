@@ -1,8 +1,15 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { FarmTilePosition, PlayerState, Resource } from '../../../shared/game/types'
+import type {
+  CardResourceStats,
+  FarmTilePosition,
+  PlayerState,
+  Resource,
+} from '../../../shared/game/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state'
+import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import type { AnimalReorgState } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -116,6 +123,196 @@ type Props = {
   >
   resolveChoice: (value: string) => void
   isInteractive: boolean
+}
+
+type TooltipPosition = {
+  top: number
+  left: number
+}
+
+const hasAnyResource = (resources: Partial<Resource>) =>
+  Object.values(resources).some((value) => typeof value === 'number' && value > 0)
+
+const PlayedCardStats = ({
+  locale,
+  rawId,
+  cardType,
+  cardInfobox,
+  devMode,
+  futureEntries,
+  displayCounters,
+  resourceStats,
+}: {
+  locale: Locale
+  rawId: string
+  cardType: CardType
+  cardInfobox?: string
+  devMode: boolean
+  futureEntries: {
+    playerId: string
+    name: string
+    color: PlayerState['color']
+    resources: Partial<Resource>
+  }[]
+  displayCounters: Record<string, number>
+  resourceStats?: CardResourceStats
+}) => {
+  const [open, setOpen] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
+  const triggerRef = useRef<HTMLDivElement | null>(null)
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const hasCounters = Object.keys(displayCounters).length > 0
+  const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
+  const hasGained = hasAnyResource(resourceStats?.gained ?? {})
+  const hasResourceStats = hasPaid || hasGained
+
+  useLayoutEffect(() => {
+    if (!open || !hasResourceStats) return
+
+    const updatePosition = () => {
+      if (!triggerRef.current || !tooltipRef.current) return
+
+      const margin = 12
+      const gap = 10
+      const triggerRect = triggerRef.current.getBoundingClientRect()
+      const tooltipRect = tooltipRef.current.getBoundingClientRect()
+
+      let left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2
+      left = Math.max(margin, Math.min(left, window.innerWidth - tooltipRect.width - margin))
+
+      let top = triggerRect.top - tooltipRect.height - gap
+      if (top < margin) {
+        top = triggerRect.bottom + gap
+      }
+      if (top + tooltipRect.height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - tooltipRect.height - margin)
+      }
+
+      setTooltipPosition({ top, left })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, hasResourceStats])
+
+  return (
+    <div
+      ref={triggerRef}
+      className={`played-card-wrapper${hasResourceStats ? ' has-stats' : ''}`}
+      tabIndex={hasResourceStats ? 0 : undefined}
+      onMouseEnter={() => hasResourceStats && setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => hasResourceStats && setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      <PlayerCard
+        locale={locale}
+        cardId={rawId}
+        cardType={cardType}
+        infobox={cardInfobox}
+        devMode={devMode}
+      />
+      {futureEntries.length > 0 || hasCounters ? (
+        <div className="card-future">
+          {Object.entries(displayCounters).map(([resKey, count]) => {
+            if (count <= 0) return null
+            const isKnownResource = resKey in emptyResources
+            return (
+              <div
+                key={`state-${rawId}-${resKey}`}
+                className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
+                title={`${count} ${t(locale, `resources.${resKey}`)}`}
+              >
+                {isKnownResource ? (
+                  <>
+                    <span className={`res-icon res-icon-${resKey}`} />
+                    <span className="resource-chip-count">{count}</span>
+                  </>
+                ) : (
+                  <span className="resource-chip-text">
+                    {count} {t(locale, `resources.${resKey}`)}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+          {futureEntries.map((entry, entryIndex) => {
+            const label = formatResources(
+              locale,
+              { ...emptyResources, ...entry.resources },
+              true,
+            )
+            return (
+              <div
+                key={`future-${rawId}-${entry.playerId}-${entryIndex}`}
+                className="card-future-item"
+                title={`${entry.name}: ${label}`}
+              >
+                <span className={`card-future-dot meeple-${entry.color}`} />
+                <ResourceLine
+                  locale={locale}
+                  resources={{ ...emptyResources, ...entry.resources }}
+                  className="card-future-text"
+                />
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+      {open && hasResourceStats ? (
+        <div
+          ref={tooltipRef}
+          className="played-card-stats-tooltip"
+          role="tooltip"
+          style={{
+            top: tooltipPosition?.top ?? -9999,
+            left: tooltipPosition?.left ?? -9999,
+          }}
+        >
+          <div className="played-card-stats-title">
+            {t(locale, `occupations.${rawId}.name`).includes('.name') &&
+            t(locale, `minorImprovements.${rawId}.name`).includes('.name') &&
+            t(locale, `improvements.${rawId}.name`).includes('.name')
+              ? rawId
+              : t(
+                  locale,
+                  cardType === 'occupation'
+                    ? `occupations.${rawId}.name`
+                    : cardType === 'minor'
+                      ? `minorImprovements.${rawId}.name`
+                      : `improvements.${rawId}.name`,
+                )}
+          </div>
+          {hasPaid ? (
+            <div className="played-card-stats-section">
+              <div className="played-card-stats-label">{t(locale, 'ui.cardStatsPaid')}</div>
+              <ResourceLine
+                locale={locale}
+                resources={{ ...emptyResources, ...(resourceStats?.paid ?? {}) }}
+                className="played-card-stats-line"
+              />
+            </div>
+          ) : null}
+          {hasGained ? (
+            <div className="played-card-stats-section">
+              <div className="played-card-stats-label">{t(locale, 'ui.cardStatsGained')}</div>
+              <ResourceLine
+                locale={locale}
+                resources={{ ...emptyResources, ...(resourceStats?.gained ?? {}) }}
+                className="played-card-stats-line"
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export const FarmBoard = ({
@@ -638,69 +835,26 @@ export const FarmBoard = ({
           const isOccupation = kind === 'occupation'
           const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
           const futureEntries = futureCardResources[rawId] ?? []
+          const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
-          const internalKeys = new Set(['triggerCount', 'usedRound'])
+          const resourceStats = readCardResourceStats(displayPlayer, rawId)
+          const internalKeys = new Set(['usedRound'])
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
           )
-          const hasCounters = Object.keys(displayCounters).length > 0
-          
+
           return (
-            <div key={`played-${index}`} className="played-card-wrapper">
-              <PlayerCard
-                locale={locale}
-                cardId={rawId}
-                cardType={cardType}
-                devMode={devMode}
-              />
-              {futureEntries.length > 0 || hasCounters ? (
-                <div className="card-future">
-                  {Object.entries(displayCounters).map(([resKey, count]) => {
-                    if (count <= 0) return null
-                    const isKnownResource = resKey in emptyResources
-                    return (
-                      <div
-                        key={`state-${rawId}-${resKey}`}
-                        className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
-                        title={`${count} ${t(locale, `resources.${resKey}`)}`}
-                      >
-                        {isKnownResource ? (
-                          <>
-                            <span className={`res-icon res-icon-${resKey}`} />
-                            <span className="resource-chip-count">{count}</span>
-                          </>
-                        ) : (
-                          <span className="resource-chip-text">
-                            {count} {t(locale, `resources.${resKey}`)}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                  {futureEntries.map((entry, entryIndex) => {
-                    const label = formatResources(
-                      locale,
-                      { ...emptyResources, ...entry.resources },
-                      true,
-                    )
-                    return (
-                      <div
-                        key={`future-${rawId}-${entry.playerId}-${entryIndex}`}
-                        className="card-future-item"
-                        title={`${entry.name}: ${label}`}
-                      >
-                        <span className={`card-future-dot meeple-${entry.color}`} />
-                        <ResourceLine
-                          locale={locale}
-                          resources={{ ...emptyResources, ...entry.resources }}
-                          className="card-future-text"
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </div>
+            <PlayedCardStats
+              key={`played-${index}`}
+              locale={locale}
+              rawId={rawId}
+              cardType={cardType}
+              cardInfobox={cardInfobox}
+              devMode={devMode}
+              futureEntries={futureEntries}
+              displayCounters={displayCounters}
+              resourceStats={resourceStats}
+            />
           )
         })}
       </div>

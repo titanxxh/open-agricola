@@ -6,6 +6,7 @@ import type {
 } from '../game/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
+  applyCanUseOccupiedHooks,
   applyComputeReplaceHooks,
   applyIsDoableHooks,
   runActionHooks,
@@ -126,6 +127,28 @@ export class HookDispatcher {
       }
     }
     return doable
+  }
+
+  applyCanUseOccupied(
+    context: ActionExecutionContext & { actionId: string },
+    initialCanUseOccupied: boolean,
+  ) {
+    let canUseOccupied = applyCanUseOccupiedHooks(context, initialCanUseOccupied)
+    const listenerContext: CardListenerContext = {
+      ...context,
+      phase: 'canUseOccupied',
+      canUseOccupied,
+    }
+    const matched = getMatchingListeners(listenerContext)
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (result && typeof result.canUseOccupied === 'boolean') {
+        canUseOccupied = result.canUseOccupied
+      }
+    }
+    return canUseOccupied
   }
 
   computeCosts(context: ActionExecutionContext & { actionId: string }) {

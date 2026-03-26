@@ -28,7 +28,7 @@ describe('E74_AshTrees session flow', () => {
     player.playedCards.push('minor:E74_AshTrees')
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: 4, triggerCount: 0 } },
+      E74_AshTrees: { counters: { fences: 4 } },
     }
 
     session.loadState(state)
@@ -71,6 +71,5 @@ describe('E74_AshTrees session flow', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.cardStates?.E74_AshTrees?.counters?.fences).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.E74_AshTrees?.counters?.triggerCount).toBe(1)
   })
 })

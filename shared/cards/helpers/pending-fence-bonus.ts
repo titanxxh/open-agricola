@@ -1,5 +1,4 @@
 import type { PlayerState } from '../../game/types'
-import { incCounter } from '../__stubs__/helpers'
 import { ensureCardState } from './card-state'
 
 const PENDING_FENCE_BONUS_CARD_ID = '__pendingFenceBonus__'
@@ -8,7 +7,6 @@ type PendingFenceBonus = {
   sourceCard: string
   counterKey: string
   freeFences: number
-  incrementTriggerCount?: boolean
 }
 
 export const storePendingFenceBonus = (
@@ -42,8 +40,5 @@ export const consumePendingFenceBonus = (
   const counters = cardState.counters ?? {}
   cardState.counters = counters
   counters[pending.counterKey] = Math.max(0, (counters[pending.counterKey] ?? 0) - usedFreeFences)
-  if (pending.incrementTriggerCount) {
-    incCounter(player, pending.sourceCard, 'triggerCount')
-  }
   return { sourceCard: pending.sourceCard, usedFreeFences }
 }

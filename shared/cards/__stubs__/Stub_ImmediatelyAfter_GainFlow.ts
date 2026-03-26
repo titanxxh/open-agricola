@@ -11,7 +11,7 @@ export const listener: CardListenerRegistration = {
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space.id !== 'common-forest') return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    incCounter(context.player, CARD_ID, 'observedCount')
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
       logKey: 'log.cardGrantedAction',

@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'A128_RiparianBuilder'
 
@@ -14,7 +13,6 @@ const triggerBuildListener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space.id !== 'reed-bank') return
-    incCounter(context.effectPlayer ?? context.player, CARD_ID, 'triggerCount')
     return {
       flow: {
         type: 'leaf',

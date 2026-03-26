@@ -12,7 +12,7 @@ export const listenerA: CardListenerRegistration = {
   order: 10,
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_A)) return
-    incCounter(context.player, CARD_A, 'triggerCount')
+    incCounter(context.player, CARD_A, 'observedCount')
     return { sourceCard: CARD_A }
   },
 }
@@ -25,7 +25,7 @@ export const listenerB: CardListenerRegistration = {
   order: 20,
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_B)) return
-    incCounter(context.player, CARD_B, 'triggerCount')
+    incCounter(context.player, CARD_B, 'observedCount')
     return { sourceCard: CARD_B }
   },
 }

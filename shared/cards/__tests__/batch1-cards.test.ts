@@ -67,9 +67,9 @@ describe('A105_BarrowPusher', () => {
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('gain')
       expect(result.flow.params).toEqual({ clay: 1, food: 1 })
+      expect(result.flow.sourceCard).toBe('A105_BarrowPusher')
     }
     expect(result?.logKey).toBe('log.cardEffectGain')
-    expect(player.cardStates?.A105_BarrowPusher?.counters?.triggerCount).toBe(1)
   })
 
   it('does not match on non-plow action', () => {
@@ -103,8 +103,8 @@ describe('A110_Roughcaster', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 3 })
+      expect(result.flow.sourceCard).toBe('A110_Roughcaster')
     }
-    expect(player.cardStates?.A110_Roughcaster?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger with wood house', () => {
@@ -159,7 +159,6 @@ describe('A74_StableTree', () => {
     expect(state.pendingFutureMeeples[0].startRound).toBe(6)
     expect(state.pendingFutureMeeples[0].count).toBe(3)
     expect(state.pendingFutureMeeples[0].resources).toEqual({ wood: 1 })
-    expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger twice in same action', () => {
@@ -197,7 +196,6 @@ describe('A74_StableTree', () => {
 
     expect(result?.flow?.type).toBe('leaf')
     expect(state.pendingFutureMeeples.length).toBe(2)
-    expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(2)
   })
 
   it('triggers on buy when stables were already built this action', () => {
@@ -213,7 +211,6 @@ describe('A74_StableTree', () => {
     const flow = effect?.onBuy?.(state, player)
     expect(flow).toMatchObject({ type: 'leaf', actionId: 'future-meeples' })
     expect(state.pendingFutureMeeples.length).toBe(1)
-    expect(player.cardStates?.A74_StableTree?.counters?.triggerCount).toBe(1)
   })
 })
 
@@ -231,8 +228,8 @@ describe('A79_GardenHoe', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ clay: 1, stone: 1 })
+      expect(result.flow.sourceCard).toBe('A79_GardenHoe')
     }
-    expect(player.cardStates?.A79_GardenHoe?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger with only grain fields', () => {
@@ -262,8 +259,8 @@ describe('A55_JunkRoom', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 1 })
+      expect(result.flow.sourceCard).toBe('A55_JunkRoom')
     }
-    expect(player.cardStates?.A55_JunkRoom?.counters?.triggerCount).toBe(1)
   })
 
   it('does not match on plow action', () => {
@@ -288,8 +285,8 @@ describe('A109_SmallTrader', () => {
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 3 })
+      expect(result.flow.sourceCard).toBe('A109_SmallTrader')
     }
-    expect(player.cardStates?.A109_SmallTrader?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger when playing major improvement', () => {

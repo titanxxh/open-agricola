@@ -39,6 +39,7 @@ type PlayerCardProps = {
   locale: Locale
   cardId: string
   cardType: CardType
+  infobox?: string
   devMode?: boolean
   onClick?: () => void
   disabled?: boolean
@@ -102,6 +103,7 @@ export const PlayerCard = ({
   locale,
   cardId,
   cardType,
+  infobox,
   devMode = false,
   onClick,
   disabled = false,
@@ -229,6 +231,8 @@ export const PlayerCard = ({
             <div className="prerequisite-text">{cardData.prerequisite}</div>
           </div>
         )}
+
+        {infobox ? <div className="card-infobox">{infobox}</div> : null}
 
         <div className="card-title">{cardData.name}</div>
         

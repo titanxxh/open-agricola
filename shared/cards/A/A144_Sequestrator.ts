@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 import { registerCardEffect } from '../card-effects'
 import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../game/types'
@@ -28,10 +27,9 @@ const createStorageReleaseListener = (params: {
     if (!owner || !params.shouldTrigger(context.player)) return
     const amount = takeStoredResource(owner, CARD_ID, params.resource)
     if (amount <= 0) return
-    incCounter(owner, CARD_ID, 'triggerCount')
     const gain = { [params.resource]: amount } as Partial<Resource>
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: gain },
+      flow: { type: 'leaf', actionId: 'gain', params: gain, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain, cardId: CARD_ID },
       sourceCard: CARD_ID,

@@ -169,8 +169,8 @@ describe('A128_RiparianBuilder', () => {
       expect(result.flow.sourceCard).toBe('A128_RiparianBuilder')
       expect(result.flow.actionContext).toEqual({ maxRooms: 1, trueAction: false })
     }
-    expect(owner.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBe(1)
-    expect(opponent.cardStates?.A128_RiparianBuilder?.counters?.triggerCount).toBeUndefined()
+    expect(owner.cardStates?.A128_RiparianBuilder).toBeUndefined()
+    expect(opponent.cardStates?.A128_RiparianBuilder).toBeUndefined()
   })
 
   it('discounts clay or stone only when the construct action comes from the card', () => {

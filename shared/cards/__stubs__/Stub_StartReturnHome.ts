@@ -7,6 +7,6 @@ export const effect: CardEffect = {
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    incCounter(player, CARD_ID, 'triggerCount')
+    incCounter(player, CARD_ID, 'observedCount')
   },
 }

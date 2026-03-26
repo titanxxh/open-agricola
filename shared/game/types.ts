@@ -127,8 +127,14 @@ export type MajorEffectState = {
 
 export type CardState = {
   flagged?: boolean
+  infobox?: string
   counters?: Record<string, number>
   extraData?: Record<string, unknown>
+}
+
+export type CardResourceStats = {
+  paid: Partial<Resource>
+  gained: Partial<Resource>
 }
 
 export type CardStates = Record<string, CardState>
@@ -249,6 +255,8 @@ export type ActionFlow =
       promptKey?: string
       children: ActionFlow[]
       optional?: boolean
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
     }
 
 export type ActionDefinition = {

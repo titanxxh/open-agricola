@@ -1,6 +1,7 @@
 import type { PlayerState, Resource } from '../../game/types'
 import { gainResources } from '../../actions/effects/gain'
 import { incCounter } from '../__stubs__/helpers'
+import { addCardResourceGained } from './card-state'
 
 export type CardGain = Partial<Resource> & { score?: number }
 
@@ -28,6 +29,9 @@ export const applyCardGain = (
   const { resources, score } = splitCardGain(gain)
   if (Object.keys(resources).length > 0) {
     gainResources(player, resources)
+    if (cardId) {
+      addCardResourceGained(player, cardId, resources)
+    }
   }
   if (score > 0 && cardId) {
     incCounter(player, cardId, 'bonusVp', score)

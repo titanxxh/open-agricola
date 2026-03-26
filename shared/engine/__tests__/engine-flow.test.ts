@@ -20,7 +20,7 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -204,6 +204,65 @@ describe('Engine flow nodes', () => {
     if (first.type !== 'choice') return
     const choiceId = first.choice.options[0]?.value ?? 'action-a'
     engine.resolveChoice(choiceId, { state, player, space })
+    const done = engine.proceed({ state, player, space })
+    expect(done.type).toBe('done')
+  })
+
+  it('xor node completes after a nested choice action resolves', () => {
+    const plow: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'actions.plow.name',
+      descriptionKey: 'actions.plow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'choice',
+        promptKey: 'ui.interactionPlowSelect',
+        options: [{ value: 'confirm', labelKey: 'ui.interactionPlowConfirm' }],
+      }),
+      resolveChoice: () => ({ type: 'ok' }),
+    }
+    const skip: ActionDefinition = {
+      id: 'skip',
+      nameKey: 'actions.noop.name',
+      descriptionKey: 'actions.noop.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(plow)
+    registry.register(skip)
+    const plowSeq = new SequenceNode('seq-plow', [
+      new ActionNode('action-plow', plow.id),
+      new ChoiceNode('choice-plow', []),
+    ])
+    const root = new XorNode('xor-root', [
+      plowSeq,
+      new ActionNode('action-skip', skip.id),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(plow)
+
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+
+    const choosePlow = engine.resolveChoice('seq-plow', { state, player, space })
+    expect(choosePlow.type).toBe('choice')
+
+    const confirm = engine.resolveChoice('confirm', { state, player, space })
+    expect(confirm.type).toBe('ok')
+
     const done = engine.proceed({ state, player, space })
     expect(done.type).toBe('done')
   })
@@ -483,6 +542,143 @@ describe('Engine flow nodes', () => {
     const space = createSpace(a)
     const result = engine.proceed({ state, player, space })
     expect(result.type).toBe('blocked')
+  })
+
+  it('computeReplace decline offers xor between replacement and original action', () => {
+    const events: string[] = []
+    const original: ActionDefinition = {
+      id: 'original',
+      nameKey: 'actions.construct.name',
+      descriptionKey: 'actions.construct.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('original')
+        return { type: 'ok' }
+      },
+    }
+    const replacement: ActionDefinition = {
+      id: 'replacement',
+      nameKey: 'actions.place-farmer.name',
+      descriptionKey: 'actions.place-farmer.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('replacement')
+        return { type: 'ok' }
+      },
+    }
+    registerCardListener({
+      id: 'offer-replacement',
+      actions: ['original'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'leaf',
+            actionId: 'replacement',
+            choiceLabelKey: 'ui.interactionLazySowmanPlace',
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(replacement)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-original', 'original')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(original)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    expect(choiceStep.choice.options.map((option) => option.labelKey)).toEqual([
+      'ui.interactionLazySowmanPlace',
+      'actions.construct.name',
+    ])
+
+    const originalOption = choiceStep.choice.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(originalOption).toBeDefined()
+
+    const result = engine.resolveChoice(originalOption!.value, { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(events).toEqual(['original'])
+  })
+
+  it('or choices show action-or-replace when computeReplace is available', () => {
+    const plow: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'actions.plow.name',
+      descriptionKey: 'actions.plow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const sow: ActionDefinition = {
+      id: 'sow',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    registerCardListener({
+      id: 'offer-sow-replacement',
+      actions: ['sow'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'leaf',
+            actionId: 'plow',
+            choiceLabelKey: 'ui.interactionUseCard',
+            choiceLabelParams: { cardNameKey: 'occupations.A94_LazySowman.name' },
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(plow)
+    registry.register(sow)
+    const engine = new Engine({
+      tree: new EngineTree(new OrNode('root-or', [
+        new ActionNode('action-plow', 'plow'),
+        new ActionNode('action-sow', 'sow'),
+      ], 'ui.interactionCultivationSelect')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(sow)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    if (step.type !== 'choice') return
+    expect(step.choice.options.map((option) => option.labelKey)).toEqual([
+      'actions.plow.name',
+      'ui.interactionActionOrReplace',
+    ])
+    const sowOption = step.choice.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
+    expect(sowOption?.labelParams).toEqual({ actionNameKey: 'actions.sow.name' })
   })
 
   it('optional node auto-skips when child is not doable', () => {

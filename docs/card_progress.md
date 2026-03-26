@@ -123,6 +123,8 @@
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|
 | E21_SheepRug | PlaceFarmer | 修改放置参数 | ✅ |
+| A94_LazySowman | PlaceFarmer | 为额外放人补充 occupied 目标 | ✅ |
+| B151_LittlePeasant | PlaceFarmer | 为额外放人补充 occupied 非 Meeting Place 目标 | ✅ |
 
 ### ComputeReplace Hook
 | 卡牌 | 行动 | 说明 | 状态 |
@@ -141,6 +143,13 @@
 | D119_WoodBarterer | Construct/Fencing | 放宽建造/围栏条件，并已收敛为直接 xor flow 分支 | ✅ |
 | B109_PaperMaker | Occupation | 打职业前可付 1 木换食物，并放宽 Lessons 可行性 | ✅ |
 | A94_LazySowman | Sow | 放宽播种条件并支持替代放人 | ✅ |
+
+### CanUseOccupied Hook
+| 卡牌 | 行动 | 说明 | 状态 |
+|------|------|------|------|
+| A28_ForestSchool | Lessons | 可无视 Lessons / Lessons-4 占用 | ✅ |
+| E21_SheepRug | WishChildren | 可无视 Wish for Children 占用 | ✅ |
+| B151_LittlePeasant | ActionSpace | 木屋 2 房时可无视非 Meeting Place 占用 | ✅ |
 
 ---
 
@@ -177,7 +186,7 @@
 | A88_HedgeKeeper | ComputeCosts(Fencing) | ✅ |
 | A89_StablePlanner | - | 🔧 |
 | A92_AdoptiveParents | After(PlaceFarmer) | 🔧 |
-| A94_LazySowman | ComputeReplace(Sow), IsDoable(Sow) | ✅ |
+| A94_LazySowman | ComputeReplace(Sow), IsDoable(Sow), ComputeArgs(PlaceFarmer) | ✅ |
 | A97_Freshman | ComputeReplace(BakeBread) | ✅ |
 | A105_BarrowPusher | After(Plow) | ✅ |
 | A106_SlurrySpreader | - | 🔧 |
@@ -200,7 +209,7 @@
 
 ---
 
-## B Deck 卡牌进度 (9✅ + 19🔧 / 180)
+## B Deck 卡牌进度 (10✅ + 18🔧 / 180)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -230,7 +239,7 @@
 | B124_Trimmer | - | 🔧 |
 | B146_Illusionist | - | 🔧 |
 | B149_OpenAirFarmer | - | 🔧 |
-| B151_LittlePeasant | - | 🔧 |
+| B151_LittlePeasant | After(Occupation), ComputeArgs(PlaceFarmer), CanUseOccupied(ActionSpace) | ✅ |
 | B165_GameProvider | - | 🔧 |
 
 ---

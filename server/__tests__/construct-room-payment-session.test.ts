@@ -85,6 +85,54 @@ describe('construct room payment session', () => {
     expect(commitResp.interaction.farm.farmType).toBe('room')
   })
 
+  it('undoStep can be used repeatedly to leave room selection and then undo the whole action', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 5,
+      reed: 2,
+    }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const constructOption = resp.pending.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+
+    const workersAfterTake = resp.state.players[0]!.workersAvailable
+    const undoStepResp = session.undoStep()
+    expect(undoStepResp.ok).toBe(true)
+    expect(undoStepResp.pending.type).toBe('choice')
+    expect(undoStepResp.interaction.stateId).toBe('choice')
+    if (undoStepResp.pending.type !== 'choice') return
+    expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
+    expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
+    expect(undoStepResp.state.players[0]!.workersAvailable).toBe(workersAfterTake)
+    expect(undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBe(
+      undoStepResp.state.players[0]!.id,
+    )
+
+    const secondUndoStepResp = session.undoStep()
+    expect(secondUndoStepResp.ok).toBe(true)
+    expect(secondUndoStepResp.pending.type).toBe('none')
+    expect(secondUndoStepResp.state.players[0]!.workersAvailable).toBe(2)
+    expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBeNull()
+  })
+
   it('lets Carpenter\'s Hammer unlock a discounted two-room build', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -133,5 +181,47 @@ describe('construct room payment session', () => {
     expect(resp.state.players[0]!.rooms).toBe(4)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
+  })
+
+  it('returns to farm-expansion choice after building a room when stables remain possible', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 7,
+      reed: 2,
+    }
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    const constructOption = resp.pending.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.promptKey).toBe('ui.interactionFarmExpansionSelect')
+    expect(resp.pending.options.some((option) => option.labelKey === 'ui.interactionFlowDone')).toBe(true)
+    expect(resp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
   })
 })

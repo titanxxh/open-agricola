@@ -77,9 +77,9 @@ describe('B75_WoodWorkshop', () => {
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('gain')
       expect(result.flow.params).toEqual({ wood: 1 })
+      expect(result.flow.sourceCard).toBe('B75_WoodWorkshop')
     }
     expect(result?.logKey).toBe('log.cardEffectGain')
-    expect(player.cardStates?.B75_WoodWorkshop?.counters?.triggerCount).toBe(1)
   })
 
   it('isDoable returns true only when the preview wood unlocks an improvement', () => {
@@ -132,8 +132,8 @@ describe('A65_SeedPellets', () => {
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('gain')
       expect(result.flow.params).toEqual({ grain: 1 })
+      expect(result.flow.sourceCard).toBe('A65_SeedPellets')
     }
-    expect(player.cardStates?.A65_SeedPellets?.counters?.triggerCount).toBe(1)
   })
 
   it('does not trigger when card not played', () => {
@@ -159,7 +159,6 @@ describe('C88_CarpentersApprentice', () => {
       actionId: 'construct', phase: 'computeCosts',
     } as any)
     expect(result?.costs).toEqual({ wood: -2 })
-    expect(player.cardStates?.C88_CarpentersApprentice?.counters?.triggerCount).toBe(1)
   })
 
   it('does not reduce for clay house', () => {

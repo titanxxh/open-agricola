@@ -1,5 +1,4 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { incCounter } from './helpers'
 
 export const CARD_ID = 'Stub_ComputeReplace_Decline'
 
@@ -10,10 +9,17 @@ export const listener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context) => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    incCounter(context.player, CARD_ID, 'triggerCount')
+    if (context.actionContext?.checkedReplaceAction === true) return
     return {
       decline: true,
-      alternativeFlow: { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+      alternativeFlow: {
+        type: 'seq',
+        choiceLabelKey: 'actions.gain.name',
+        children: [
+          { type: 'leaf', actionId: 'mark-card-observed', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+        ],
+      },
     }
   },
 }

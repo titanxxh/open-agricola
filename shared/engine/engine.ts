@@ -39,6 +39,7 @@ export class Engine {
   private log: LogStore
   private pendingChoiceNodeId: string | null = null
   private pendingChoiceActionId: string | null = null
+  private pendingChoiceOwnerNodeId: string | null = null
   private pendingChoiceContext:
     | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     | null = null
@@ -109,6 +110,9 @@ export class Engine {
   }
   private findActionNode(node: EngineNode): ActionNode | null {
     if (node instanceof ActionNode) return node
+    if (node instanceof OptionalNode) {
+      return this.findActionNode(node.child)
+    }
     if ('children' in node) {
       const composite = node as { children: EngineNode[] }
       for (const child of composite.children) {
@@ -138,6 +142,103 @@ export class Engine {
     })
   }
 
+  private attachChoiceLabel(
+    node: EngineNode,
+    choiceLabelKey?: string,
+    choiceLabelParams?: Record<string, string | number>,
+  ) {
+    if (!choiceLabelKey) return node
+    const labeledNode = node as EngineNode & {
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
+    }
+    labeledNode.choiceLabelKey = choiceLabelKey
+    labeledNode.choiceLabelParams = choiceLabelParams
+    return node
+  }
+
+  private getChoiceLabel(
+    node: EngineNode,
+  ): { labelKey: string; labelParams?: Record<string, string | number> } | null {
+    const labeledNode = node as EngineNode & {
+      choiceLabelKey?: string
+      choiceLabelParams?: Record<string, string | number>
+    }
+    if (labeledNode.choiceLabelKey) {
+      return {
+        labelKey: labeledNode.choiceLabelKey,
+        labelParams: labeledNode.choiceLabelParams,
+      }
+    }
+    if (node instanceof OptionalNode) {
+      return this.getChoiceLabel(node.child)
+    }
+    if (node instanceof ActionNode) {
+      const action = this.registry.get(node.actionId)
+      if (!action) return null
+      return {
+        labelKey: node.choiceLabelKey ?? action.nameKey,
+        labelParams: node.choiceLabelParams,
+      }
+    }
+    if ('children' in node) {
+      const composite = node as { children: EngineNode[] }
+      for (const child of composite.children) {
+        const label = this.getChoiceLabel(child)
+        if (label) return label
+      }
+    }
+    return null
+  }
+
+  private markCheckedReplaceAction(actionContext?: Record<string, unknown>) {
+    return {
+      ...(actionContext ?? {}),
+      checkedReplaceAction: true,
+    }
+  }
+
+  private buildReplaceChoiceFlow(
+    actionNode: Pick<ActionNode, 'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'>,
+    alternativeFlow: ActionFlow,
+    replacedActionId: string,
+  ): ActionFlow {
+    return {
+      type: 'xor',
+      children: [
+        alternativeFlow,
+        {
+          type: 'leaf',
+          actionId: replacedActionId,
+          params: actionNode.params,
+          sourceCard: actionNode.sourceCard,
+          actionContext: this.markCheckedReplaceAction(actionNode.actionContext),
+          choiceLabelKey: actionNode.choiceLabelKey,
+          choiceLabelParams: actionNode.choiceLabelParams,
+        },
+      ],
+    }
+  }
+
+  private getReplaceAwareChoiceLabel(
+    actionNode: ActionNode,
+    executionContext: ActionExecutionContext,
+    defaultLabel: { labelKey: string; labelParams?: Record<string, string | number> },
+  ) {
+    if (actionNode.choiceLabelKey) return defaultLabel
+    const replaceResult = this.hooks.applyComputeReplace({
+      ...executionContext,
+      actionId: actionNode.actionId,
+    })
+    if (!replaceResult.declined || !replaceResult.alternativeFlow) {
+      return defaultLabel
+    }
+    return {
+      labelKey: 'ui.interactionActionOrReplace',
+      labelParams: { actionNameKey: defaultLabel.labelKey },
+    }
+  }
+
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'leaf') {
@@ -156,33 +257,39 @@ export class Engine {
           actionNode,
           new ChoiceNode(nextId(), []),
         ])
-        return flow.optional
+        const node = flow.optional
           ? new OptionalNode(nextId(), sequence, flow.promptKey)
           : sequence
+        return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
       }
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), actionNode, flow.promptKey)
         : actionNode
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const children = flow.children.map((child) => this.buildFlowNode(child))
     if (flow.type === 'seq') {
       const sequence = new SequenceNode(nextId(), children)
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), sequence, flow.promptKey)
         : sequence
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(nextId(), children)
-      return flow.optional
+      const node = flow.optional
         ? new OptionalNode(nextId(), parallel, flow.promptKey)
         : parallel
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(nextId(), children, flow.promptKey)
-      return flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+      const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const or = new OrNode(nextId(), children, flow.promptKey)
-    return flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+    const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+    return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
 
   private findChoiceNode(node: EngineNode): ChoiceNode | null {
@@ -254,9 +361,22 @@ export class Engine {
       nodeStates,
       pendingChoiceNodeId: this.pendingChoiceNodeId,
       pendingChoiceActionId: this.pendingChoiceActionId,
+      pendingChoiceOwnerNodeId: this.pendingChoiceOwnerNodeId,
       pendingChoiceContext: this.pendingChoiceContext,
       choiceData,
     }
+  }
+
+  hasPendingChoiceCompositeAncestor() {
+    if (!this.pendingChoiceNodeId) return false
+    let parent = this.tree.findParent(this.pendingChoiceNodeId)
+    while (parent) {
+      if (parent instanceof OrNode || parent instanceof XorNode) {
+        return true
+      }
+      parent = this.tree.findParent(parent.id)
+    }
+    return false
   }
 
   restore(snapshot: {
@@ -267,6 +387,7 @@ export class Engine {
     }[]
     pendingChoiceNodeId: string | null
     pendingChoiceActionId: string | null
+    pendingChoiceOwnerNodeId: string | null
     pendingChoiceContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
@@ -304,6 +425,7 @@ export class Engine {
     }
     this.pendingChoiceNodeId = snapshot.pendingChoiceNodeId
     this.pendingChoiceActionId = snapshot.pendingChoiceActionId
+    this.pendingChoiceOwnerNodeId = snapshot.pendingChoiceOwnerNodeId
     this.pendingChoiceContext = snapshot.pendingChoiceContext
   }
 
@@ -337,13 +459,16 @@ export class Engine {
       }[]
       const options = availableActions
         .map((entry) => {
-          const action = this.registry.get(entry.actionNode.actionId)
-          if (!action) return null
           const executionContext: ActionExecutionContext = {
             state: context.state,
             player: context.player,
             space: context.space,
+            params: entry.actionNode.params,
+            sourceCard: entry.actionNode.sourceCard,
+            actionContext: entry.actionNode.actionContext,
           }
+          const action = this.registry.get(entry.actionNode.actionId)
+          if (!action) return null
           const doable = this.hooks.applyIsDoable(
             { ...executionContext, actionId: entry.actionNode.actionId },
             action,
@@ -353,10 +478,13 @@ export class Engine {
             ),
           )
           if (!doable) return null
+          const baseLabel = this.getChoiceLabel(this.tree.findNodeById(entry.nodeId) ?? entry.actionNode)
+          if (!baseLabel) return null
+          const label = this.getReplaceAwareChoiceLabel(entry.actionNode, executionContext, baseLabel)
           return {
             value: entry.nodeId,
-            labelKey: entry.actionNode.choiceLabelKey ?? action.nameKey,
-            labelParams: entry.actionNode.choiceLabelParams,
+            labelKey: label.labelKey,
+            labelParams: label.labelParams,
           }
         })
         .filter((option) => option !== null) as {
@@ -419,13 +547,17 @@ export class Engine {
       }
       this.pendingChoiceNodeId = node.id
       this.pendingChoiceActionId = null
+      const label = this.getChoiceLabel(node) ?? {
+        labelKey: actionNode.choiceLabelKey ?? action.nameKey,
+        labelParams: actionNode.choiceLabelParams,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
           promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
           options: [
-            { value: actionNode.id, labelKey: actionNode.choiceLabelKey ?? action.nameKey },
+            { value: actionNode.id, labelKey: label.labelKey, labelParams: label.labelParams },
             { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
           ],
         },
@@ -492,11 +624,16 @@ export class Engine {
     if (node instanceof ActionNode) {
       const replaceResult = this.hooks.applyComputeReplace({
         ...context,
+        params: node.params,
+        sourceCard: node.sourceCard,
+        actionContext: node.actionContext,
         actionId: node.actionId,
       })
       const replacedActionId = replaceResult.actionId
       if (replaceResult.declined && replaceResult.alternativeFlow) {
-        const flowNode = this.buildFlowNode(replaceResult.alternativeFlow)
+        const flowNode = this.buildFlowNode(
+          this.buildReplaceChoiceFlow(node, replaceResult.alternativeFlow, replacedActionId),
+        )
         this.tree.insertAfter(node.id, [flowNode])
         node.resolve({ type: 'ok' })
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -571,9 +708,11 @@ result.options = [...result.options, ...extraOptions]
           choiceNode.setChoice(result.promptKey, result.options)
           this.pendingChoiceNodeId = choiceNode.id
           this.pendingChoiceActionId = replacedActionId
+          this.pendingChoiceOwnerNodeId = null
         } else {
           this.pendingChoiceNodeId = node.id
           this.pendingChoiceActionId = replacedActionId
+          this.pendingChoiceOwnerNodeId = null
         }
         this.pendingChoiceContext = {
           params: executionContext.params,
@@ -661,12 +800,14 @@ choice: { promptKey: result.promptKey, options: result.options },
           node.resolve()
           this.pendingChoiceNodeId = null
           this.pendingChoiceActionId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
         node.active = true
         this.pendingChoiceNodeId = null
         this.pendingChoiceActionId = null
+        this.pendingChoiceOwnerNodeId = null
         this.pendingChoiceContext = null
         return { type: 'ok' }
       }
@@ -674,6 +815,7 @@ choice: { promptKey: result.promptKey, options: result.options },
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
           this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
         }
@@ -681,15 +823,9 @@ choice: { promptKey: result.promptKey, options: result.options },
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
           this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
-        }
-        const actionId = child.actionId
-        const action = this.registry.get(actionId)
-        if (!action) {
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceContext = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const executionContext: ActionExecutionContext = {
           state: context.state,
@@ -698,6 +834,31 @@ choice: { promptKey: result.promptKey, options: result.options },
           params: child.params,
           sourceCard: child.sourceCard,
           actionContext: child.actionContext,
+        }
+        const replaceResult = this.hooks.applyComputeReplace({
+          ...executionContext,
+          actionId: child.actionId,
+        })
+        const actionId = replaceResult.actionId
+        if (replaceResult.declined && replaceResult.alternativeFlow) {
+          const flowNode = this.buildFlowNode(
+            this.buildReplaceChoiceFlow(child, replaceResult.alternativeFlow, actionId),
+          )
+          this.tree.insertAfter(node.id, [flowNode])
+          targetNode.resolve(choice)
+          node.resolve(choice)
+          this.pendingChoiceNodeId = null
+          this.pendingChoiceActionId = null
+          this.pendingChoiceOwnerNodeId = null
+          this.pendingChoiceContext = null
+          return { type: 'ok' }
+        }
+        const action = this.registry.get(actionId)
+        if (!action) {
+          this.pendingChoiceNodeId = null
+          this.pendingChoiceOwnerNodeId = null
+          this.pendingChoiceContext = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const costResults = this.hooks.computeCosts({
           ...executionContext,
@@ -727,9 +888,11 @@ choice: { promptKey: result.promptKey, options: result.options },
             choiceNode.setChoice(result.promptKey, result.options)
             this.pendingChoiceNodeId = choiceNode.id
             this.pendingChoiceActionId = actionId
+            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
           } else {
             this.pendingChoiceNodeId = child.id
             this.pendingChoiceActionId = actionId
+            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
           }
           this.pendingChoiceContext = {
             params: executionContext.params,
@@ -782,11 +945,11 @@ choice: { promptKey: result.promptKey, options: result.options },
           .filter((action) => action)
         const immediateActivateNodes = this.buildActivateCardNodes(
           immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-          this.buildListenerEvent(executionContext, { result }),
+          this.buildListenerEvent(executionContext, { result, choice }),
         )
         const afterActivateNodes = this.buildActivateCardNodes(
           afterPhase.matchedListeners, 'after', actionId,
-          this.buildListenerEvent(executionContext, { result }),
+          this.buildListenerEvent(executionContext, { result, choice }),
         )
         const allInsertNodes = [
           ...hookFlows,
@@ -795,13 +958,14 @@ choice: { promptKey: result.promptKey, options: result.options },
           ...afterActivateNodes,
         ]
         if (allInsertNodes.length > 0) {
-          this.tree.insertAfter(child.id, allInsertNodes)
+          this.tree.insertAfter(node instanceof XorNode ? node.id : child.id, allInsertNodes)
         }
         child.resolve(result)
         if (node instanceof XorNode) {
           node.resolve(choice)
         }
         this.pendingChoiceNodeId = null
+        this.pendingChoiceOwnerNodeId = null
         this.pendingChoiceContext = null
         return result
       }
@@ -845,10 +1009,11 @@ choice: { promptKey: result.promptKey, options: result.options },
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
+    const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
     if (result.type === 'flow') {
       const flowNode = this.buildFlowNode(result.flow)
-      if (this.pendingChoiceNodeId) {
-        this.tree.insertAfter(this.pendingChoiceNodeId, [flowNode])
+      if (insertionTargetId) {
+        this.tree.insertAfter(insertionTargetId, [flowNode])
       }
     }
     // Use result's logKey if present, otherwise use generic action log
@@ -883,20 +1048,20 @@ choice: { promptKey: result.promptKey, options: result.options },
       .filter((action) => action)
     const immediateActivateNodes = this.buildActivateCardNodes(
       immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-      this.buildListenerEvent(executionContext, { result }),
+      this.buildListenerEvent(executionContext, { result, choice }),
     )
     const afterActivateNodes = this.buildActivateCardNodes(
       afterPhase.matchedListeners, 'after', actionId,
-      this.buildListenerEvent(executionContext, { result }),
+      this.buildListenerEvent(executionContext, { result, choice }),
     )
     const allInsertNodes = [
       ...hookFlows,
-      ...this.buildFollowUpNodes(followUps, this.pendingChoiceNodeId ?? '', context.player),
+      ...this.buildFollowUpNodes(followUps, insertionTargetId ?? '', context.player),
       ...immediateActivateNodes,
       ...afterActivateNodes,
     ]
-    if (allInsertNodes.length > 0 && this.pendingChoiceNodeId) {
-      this.tree.insertAfter(this.pendingChoiceNodeId, allInsertNodes)
+    if (allInsertNodes.length > 0 && insertionTargetId) {
+      this.tree.insertAfter(insertionTargetId, allInsertNodes)
     }
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -911,8 +1076,15 @@ choice: { promptKey: result.promptKey, options: result.options },
         }
       }
     }
+    if (this.pendingChoiceOwnerNodeId) {
+      const ownerNode = this.tree.findNodeById(this.pendingChoiceOwnerNodeId)
+      if (ownerNode instanceof XorNode) {
+        ownerNode.resolve()
+      }
+    }
     this.pendingChoiceNodeId = null
     this.pendingChoiceActionId = null
+    this.pendingChoiceOwnerNodeId = null
     this.pendingChoiceContext = null
     return result
   }

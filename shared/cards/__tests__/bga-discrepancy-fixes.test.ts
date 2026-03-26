@@ -272,11 +272,11 @@ describe('A84_Silage — prerequisite, field grain, breeding', () => {
 
     const flow = effect.onReturnHome!(state, player)
     const children = (flow as any).children
-    // Animal branch: seq of [pay-grain-any, gain, mark-card-trigger]
+    // Animal branch: seq of [pay-grain-any, gain]
     expect(children[0].type).toBe('seq')
     expect(children[0].children[0].actionId).toBe('pay-grain-any')
     expect(children[0].children[1].actionId).toBe('gain')
-    expect(children[0].children[2].actionId).toBe('mark-card-trigger')
+    expect(children[0].children).toHaveLength(2)
   })
 
   it('does not return flow on harvest rounds', () => {

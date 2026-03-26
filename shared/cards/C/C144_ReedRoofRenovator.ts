@@ -2,7 +2,6 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { incCounter } from '../__stubs__/helpers'
 
 const CARD_ID = 'C144_ReedRoofRenovator'
 
@@ -13,9 +12,8 @@ const listener: CardListenerRegistration = {
   actions: ['renovate-house'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    incCounter(context.effectPlayer ?? context.player, CARD_ID, 'triggerCount')
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 } },
+      flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain: { reed: 1 }, cardId: CARD_ID },
       sourceCard: CARD_ID,

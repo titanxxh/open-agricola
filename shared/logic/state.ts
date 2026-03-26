@@ -358,10 +358,10 @@ export const createInitialPlayers = (
     color: PlayerState['color']
     startPlayer: boolean
   }> = [
-    { id: 'p1', name: '玩家 A', color: 'red', startPlayer: true },
-    { id: 'p2', name: '玩家 B', color: 'blue', startPlayer: false },
-    { id: 'p3', name: '玩家 C', color: 'black', startPlayer: false },
-    { id: 'p4', name: '玩家 D', color: 'yellow', startPlayer: false },
+    { id: 'p1', name: 'PlayerA', color: 'red', startPlayer: true },
+    { id: 'p2', name: 'PlayerB', color: 'blue', startPlayer: false },
+    { id: 'p3', name: 'PlayerC', color: 'black', startPlayer: false },
+    { id: 'p4', name: 'PlayerD', color: 'yellow', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => ({
     id: info.id,
