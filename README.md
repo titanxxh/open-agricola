@@ -11,7 +11,7 @@ npm install
 ### 启动后端 + 前端
 
 ```bash
-./restart.sh
+./restart-intranet.sh
 ```
 
 或分别启动：
