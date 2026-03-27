@@ -205,10 +205,39 @@ export const LogPanel = ({ locale, log }: Props) => (
             })}`
           }
         }
-        if (params && params.cardId && entry.key === 'log.cardEffectGain') {
+        if (
+          params &&
+          params.cardId &&
+          (entry.key === 'log.cardEffectGain' ||
+            entry.key === 'log.cardEffectPay' ||
+            entry.key === 'log.cardEffectBonusVp' ||
+            entry.key === 'log.cardEffectOtherPlayersGain')
+        ) {
           params.cardId = resolveCardDisplayName(locale, String(params.cardId))
         }
         if (params && entry.key === 'log.cardEffectGain' && typeof params.gain === 'object') {
+          const gainResources = params.gain as Partial<Resource>
+          const gainText = formatResources(
+            locale,
+            { ...emptyResources, ...gainResources },
+            true,
+          )
+          params.gain = gainText
+        }
+        if (params && entry.key === 'log.cardEffectPay' && typeof params.cost === 'object') {
+          const costResources = params.cost as Partial<Resource>
+          const costText = formatResources(
+            locale,
+            { ...emptyResources, ...costResources },
+            true,
+          )
+          params.cost = costText
+        }
+        if (
+          params &&
+          entry.key === 'log.cardEffectOtherPlayersGain' &&
+          typeof params.gain === 'object'
+        ) {
           const gainResources = params.gain as Partial<Resource>
           const gainText = formatResources(
             locale,

@@ -19,6 +19,13 @@ export const gainOtherPlayersAction: ActionDefinition = {
       ) as Partial<Resource>
       addCardResourceGained(player, sourceCard, totalGain)
     }
+    if (sourceCard && recipients.length > 0) {
+      return {
+        type: 'ok',
+        logKey: 'log.cardEffectOtherPlayersGain',
+        logParams: { gain, cardId: sourceCard },
+      }
+    }
     return { type: 'ok' }
   },
 }
