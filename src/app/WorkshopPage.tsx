@@ -3,9 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 import { ResourceText } from '../components/common/ResourceText'
-
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+import { API_BASE } from '../config'
 
 type WorkshopCard = {
   id: string

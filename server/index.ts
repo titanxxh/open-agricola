@@ -11,8 +11,9 @@ import { register, login, logout, validateSession, extractToken, updateDisplayNa
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
 const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': CORS_ORIGIN,
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }

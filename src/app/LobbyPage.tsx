@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
-
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+import { API_BASE } from '../config'
 
 type RoomSummary = {
   id: string
