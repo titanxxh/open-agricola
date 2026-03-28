@@ -120,7 +120,9 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1' })
+          const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
+          const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
+          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
         })
 
         if ('error' in resp) {

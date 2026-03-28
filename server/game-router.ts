@@ -285,6 +285,10 @@ export const handleGameRoute = async (
     }
 
     session = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
+    // Set player name from authenticated user
+    if (requestUser) {
+      session.updatePlayerName(0, requestUser.displayName)
+    }
     const resp = getSingletonSession().getState()
     sendJson(res, 200, { ...respondWith(resp), customCardsLoaded: customCards.length })
     return true

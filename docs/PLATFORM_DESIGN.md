@@ -554,3 +554,52 @@ WorkshopPage
 - **LLM 设计**：输入 API key → 描述卡牌 → 预览 → 迭代修改 → 保存
 - **沙盒测试**：选中自定义卡牌 → 创建测试游戏 → 卡牌在游戏中正常触发
 - **安全**：确认 API key 不出现在任何网络请求中（DevTools Network 检查）
+
+---
+
+## J. 实现状态（platform 分支）
+
+> 更新于 2026-03-28
+
+### 已完成
+
+| 功能 | 文件 |
+|------|------|
+| 注册/登录/登出/会话验证 | `server/auth.ts`, `src/app/LoginPage.tsx`, `src/contexts/AuthContext.tsx` |
+| SQLite 数据库 + migration | `server/db.ts` |
+| WebSocket 认证握手 | `server/room-manager.ts`, `shared/protocol/ws.ts` |
+| WS 房间 → SQLite 写入 | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer) |
+| 服务器重启恢复房间 | `server/room-manager.ts` (restoreRoomsFromSqlite) |
+| 游戏状态持久化（JSON/SQLite） | `server/room-manager.ts` (PERSIST_ROOMS 环境变量) |
+| 游戏结束更新房间状态 | `server/room-manager.ts` (broadcastState → rooms.status=finished) |
+| 房间 TTL 清理 | `server/room-manager.ts` (startRoomCleanup, 30min TTL) |
+| 大厅页面 | `src/app/LobbyPage.tsx`, `/api/lobby/my-rooms` |
+| 页面路由 (?page=) | `src/app/PageRouter.tsx` |
+| URL params 实时读取 | `src/app/GameContainerApi.tsx` (移出模块级) |
+| 返回大厅按钮 | `src/components/header/GameHeader.tsx` |
+| Dev 模式默认关闭 | `src/app/GameContainerApi.tsx` (?devMode=1) |
+| Auth 401 自动登出 | `src/contexts/AuthContext.tsx` (apiFetch) |
+| 游戏中玩家名与登录用户同步 | `server/game-session.ts` (updatePlayerName), `server/room-manager.ts`, `server/game-router.ts` |
+| 工坊卡牌 CRUD | `server/workshop.ts`, `src/app/WorkshopPage.tsx` |
+| 工坊社交（点赞/评论） | `server/workshop.ts` |
+| 工坊沙盒 | `server/workshop.ts`, WorkshopPage SandboxView |
+| 自定义 DSL 效果系统 | `shared/cards/custom-dsl-runner.ts` |
+| 自定义卡牌注册表 | `shared/cards/custom-registry.ts` |
+| 单人沙盒游戏（含自定义卡牌） | `/api/game/new-sandbox`, `server/game-router.ts` |
+| WS 多人游戏含自定义卡牌 | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts` |
+| LLM 卡牌设计师 | `src/app/workshop/AiCardDesigner.tsx`, `src/services/llmService.ts` |
+| 多 LLM Provider 支持 | OpenAI / Anthropic / 自定义端点 |
+| API Key 浏览器隔离 | localStorage 存储，绝不发往服务器 |
+| 卡牌美术生成 + 上传 | DALL-E 3 + `POST /api/workshop/art` + `/card-art/` 静态服务 |
+| 资源图标解析 | `src/components/common/ResourceText.tsx` |
+| auth/workshop 单元测试 | `server/__tests__/auth.test.ts`, `workshop-api.test.ts` |
+
+### 未完成（Phase 5 可选）
+
+| 功能 | 说明 |
+|------|------|
+| TypeScript AST 验证 | 允许完整 TS 卡牌代码，AST 白名单验证后 vm.runInContext() 执行 |
+| 卡牌版本历史 | 更新卡牌时保留旧版本快照 |
+| 工坊 Featured 页面 | 编辑推荐/精选卡牌展示 |
+| 邮箱验证 | 注册后验证邮件（当前无邮件系统）|
+| Nginx 生产配置 | WebSocket 代理 + 静态文件 |

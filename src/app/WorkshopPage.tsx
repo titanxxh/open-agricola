@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
+import { ResourceText } from '../components/common/ResourceText'
 
 const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
 const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
@@ -57,7 +58,9 @@ function CardTile({ card, onSelect, onLike, mine }: {
           {mine && <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? '已发布' : '草稿'}</span>}
           <span className="ws-author">by {card.author_name}</span>
         </div>
-        <div className="ws-card-desc">{card.description.slice(0, 80)}{card.description.length > 80 ? '…' : ''}</div>
+        <div className="ws-card-desc">
+          <ResourceText text={card.description.slice(0, 80) + (card.description.length > 80 ? '…' : '')} />
+        </div>
       </div>
       <div className="ws-card-tile-footer">
         <button
@@ -146,7 +149,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox }: {
           {vp !== undefined && vp > 0 && (
             <div className="ws-detail-vp">{vp} 分</div>
           )}
-          <p className="ws-detail-desc">{card.description}</p>
+          <p className="ws-detail-desc"><ResourceText text={card.description} /></p>
 
           <div className="ws-detail-actions">
             <button
@@ -406,7 +409,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
 function SandboxView({ token, onSelect, onStartGame }: {
   token: string | null
   onSelect: (c: WorkshopCard) => void
-  onStartGame: (cardIds: string[]) => void
+  onStartGame: (cardIds: string[], mode: 'single' | 'multi') => void
 }) {
   const [cards, setCards] = useState<WorkshopCard[]>([])
 
@@ -443,13 +446,22 @@ function SandboxView({ token, onSelect, onStartGame }: {
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => onStartGame(cards.map(c => c.id))}
-          >
-            开始沙盒测试游戏
-          </button>
+          <div className="ws-sandbox-btns">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => onStartGame(cards.map(c => c.id), 'single')}
+            >
+              单人测试
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => onStartGame(cards.map(c => c.id), 'multi')}
+            >
+              多人测试（创建房间）
+            </button>
+          </div>
         </>
       )}
     </div>
@@ -536,8 +548,13 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = async (cardIds: string[]) => {
-    // Start a new single-player HTTP game with custom cards loaded server-side
+  const handleStartSandboxGame = async (cardIds: string[], mode: 'single' | 'multi') => {
+    if (mode === 'multi') {
+      // WS multiplayer: pass card IDs via URL param; createRoom will load them from DB
+      setPage('game', { transport: 'ws', customCards: cardIds.join(',') })
+      return
+    }
+    // Single-player HTTP: load custom cards server-side before starting
     try {
       const r = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
@@ -546,7 +563,6 @@ export function WorkshopPage() {
       })
       const d = await r.json()
       if (d.ok) {
-        // Navigate to single-player game (HTTP mode, no ?transport=ws)
         setPage('game')
       } else {
         alert('启动沙盒游戏失败：' + (d.error ?? '未知错误'))

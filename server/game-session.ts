@@ -233,6 +233,14 @@ export class GameSession {
     }
   }
 
+  /** Update a player's display name in the game state (called after WS join). */
+  updatePlayerName(playerIndex: number, name: string): void {
+    const player = this.state.players[playerIndex]
+    if (player && name.trim()) {
+      player.name = name.trim()
+    }
+  }
+
   private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
