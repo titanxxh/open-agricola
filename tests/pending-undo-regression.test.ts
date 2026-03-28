@@ -159,6 +159,24 @@ describe('pending choice types + undo regression', () => {
 
       expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
     })
+
+    it('before-sow resource provider can make grain-utilization available', () => {
+      const state = createInitialState(42)
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      state.players[0]!.fields.push({
+        id: 'field-a65',
+        row: 0,
+        col: 0,
+        crop: null,
+        remaining: 0,
+      })
+      state.players[0]!.resources.grain = 0
+      state.players[0]!.resources.vegetable = 0
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'A65_SeedPellets')
+
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
   })
 
   describe('pending type: none', () => {
