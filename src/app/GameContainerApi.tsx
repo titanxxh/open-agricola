@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
@@ -73,7 +74,7 @@ type WsStatus =
   | { phase: 'ready'; roomId: string; playerIndex: number }
   | { phase: 'error'; message: string }
 
-const useTransportSetup = (playerParam: string | null) => {
+const useTransportSetup = (playerParam: string | null, displayName?: string) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const wsRef = useRef<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
@@ -121,7 +122,7 @@ const useTransportSetup = (playerParam: string | null) => {
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: playerParam ?? 'Player 1' })
+          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1' })
         })
 
         if ('error' in resp) {
@@ -170,7 +171,7 @@ const useTransportSetup = (playerParam: string | null) => {
           rawWs.addEventListener('message', handler)
           ws.sendRoomCommand('joinRoom', {
             roomId: roomId!,
-            name: playerParam ?? 'Player 2',
+            name: displayName ?? playerParam ?? 'Player 2',
             requestedPlayerIndex,
           })
         })
@@ -202,7 +203,8 @@ export const GameContainerApi = () => {
     if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
     return null
   }, [])
-  const { transport, wsStatus, isWs, isReady } = useTransportSetup(requestedPlayerId)
+  const { user } = useAuth()
+  const { transport, wsStatus, isWs, isReady } = useTransportSetup(requestedPlayerId, user?.displayName)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>(detectInitialLocale)

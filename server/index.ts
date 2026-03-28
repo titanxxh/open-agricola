@@ -138,6 +138,27 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  // Rooms the current user has participated in (SQLite mode only)
+  if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
+    const token = extractToken(req.headers.authorization)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    try {
+      const rows = getDb().prepare(`
+        SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index
+        FROM room_players rp
+        JOIN rooms r ON rp.room_id = r.id
+        WHERE rp.user_id = ? AND r.status != 'finished'
+        ORDER BY r.updated_at DESC
+        LIMIT 20
+      `).all(user.id) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number }>
+      sendJson(res, 200, { ok: true, rooms: rows })
+    } catch {
+      sendJson(res, 200, { ok: true, rooms: [] })
+    }
+    return
+  }
+
   // ── Workshop routes ────────────────────────────────────
   if (req.url?.startsWith('/api/workshop/')) {
     const handled = await handleWorkshopRoute(req, res)
