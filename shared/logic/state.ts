@@ -99,10 +99,17 @@ export const shuffleWithRng = (values: string[], rng: () => number) => {
   return result
 }
 
-export const dealHands = (playerCount: number, seed: number) => {
+export const dealHands = (
+  playerCount: number,
+  seed: number,
+  extraMinorIds: string[] = [],
+  extraOccupationIds: string[] = [],
+) => {
   const rng = createRng(seed)
-  const shuffledMinor = shuffleWithRng(minorImprovementIds, rng)
-  const shuffledOccupation = shuffleWithRng(occupationIds, rng)
+  const minorPool = [...minorImprovementIds, ...extraMinorIds]
+  const occupationPool = [...occupationIds, ...extraOccupationIds]
+  const shuffledMinor = shuffleWithRng(minorPool, rng)
+  const shuffledOccupation = shuffleWithRng(occupationPool, rng)
   const minorHands: string[][] = []
   const occupationHands: string[][] = []
   for (let index = 0; index < playerCount; index += 1) {
@@ -349,9 +356,11 @@ export const cloneState = (state: GameState): GameState => {
 export const createInitialPlayers = (
   seed: number,
   playerCount = 2,
+  extraMinorIds: string[] = [],
+  extraOccupationIds: string[] = [],
 ): PlayerState[] => {
   const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
-  const dealtHands = dealHands(count, seed)
+  const dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds)
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -434,7 +443,11 @@ export const applyFutureMeeples = (state: GameState) => {
 
 export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-export const createInitialState = (seed?: number): GameState => {
+export const createInitialState = (
+  seed?: number,
+  extraMinorIds: string[] = [],
+  extraOccupationIds: string[] = [],
+): GameState => {
   const gameSeed =
     typeof seed === 'number' && Number.isFinite(seed)
       ? Math.floor(seed)
@@ -444,7 +457,7 @@ export const createInitialState = (seed?: number): GameState => {
     round: 1,
     phase: 'work',
     currentPlayerIndex: 0,
-    players: createInitialPlayers(gameSeed),
+    players: createInitialPlayers(gameSeed, 2, extraMinorIds, extraOccupationIds),
     actionSpaces: createActionSpaces(),
     log: [{ key: 'log.startGame' }],
     roundStartSnapshot: null,

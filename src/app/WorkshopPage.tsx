@@ -536,9 +536,24 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = (cardIds: string[]) => {
-    // Pass custom card IDs via URL param to the game page (future: server uses them)
-    setPage('game', { transport: 'ws', customCards: cardIds.join(',') })
+  const handleStartSandboxGame = async (cardIds: string[]) => {
+    // Start a new single-player HTTP game with custom cards loaded server-side
+    try {
+      const r = await fetch(`${API_BASE}/api/game/new-sandbox`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        body: JSON.stringify({ customCardIds: cardIds }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        // Navigate to single-player game (HTTP mode, no ?transport=ws)
+        setPage('game')
+      } else {
+        alert('启动沙盒游戏失败：' + (d.error ?? '未知错误'))
+      }
+    } catch {
+      alert('网络错误，请重试')
+    }
   }
 
   const goBack = () => {
