@@ -248,18 +248,8 @@ describe('B109_PaperMaker', () => {
     if (result?.flow?.type === 'seq') {
       expect(result.flow.optional).toBe(true)
       expect(result.flow.children).toEqual([
-        expect.objectContaining({
-          type: 'leaf',
-          actionId: 'pay-resources',
-          params: { wood: 1 },
-          sourceCard: 'B109_PaperMaker',
-        }),
-        expect.objectContaining({
-          type: 'leaf',
-          actionId: 'gain',
-          params: { food: 2 },
-          sourceCard: 'B109_PaperMaker',
-        }),
+        expect.objectContaining({ type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: 'B109_PaperMaker' }),
+        expect.objectContaining({ type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'B109_PaperMaker' }),
       ])
     }
   })
