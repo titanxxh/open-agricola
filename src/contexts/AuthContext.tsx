@@ -21,6 +21,8 @@ type AuthContextValue = AuthState & {
   login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
   register: (username: string, password: string, displayName?: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
+  /** Authenticated fetch: adds Bearer token, auto-logouts on 401. */
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -91,8 +93,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ user: null, token: null, loading: false })
   }, [state.token])
 
+  const apiFetchFn = useCallback(async (path: string, init?: RequestInit): Promise<Response> => {
+    const token = state.token
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string> ?? {}),
+    }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const resp = await fetch(`${API_BASE}${path}`, { ...init, headers })
+    if (resp.status === 401) {
+      // Session expired — auto-logout and let PageRouter redirect to login
+      localStorage.removeItem(TOKEN_KEY)
+      setState({ user: null, token: null, loading: false })
+    }
+    return resp
+  }, [state.token])
+
   return (
-    <AuthContext.Provider value={{ ...state, login: loginFn, register: registerFn, logout: logoutFn }}>
+    <AuthContext.Provider value={{ ...state, login: loginFn, register: registerFn, logout: logoutFn, apiFetch: apiFetchFn }}>
       {children}
     </AuthContext.Provider>
   )

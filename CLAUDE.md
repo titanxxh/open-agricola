@@ -136,7 +136,80 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 ?transport=ws       # Enable WebSocket multiplayer
 ?room=<id>          # Join specific room
 ?devMode=1          # Enable dev panel (resource editing, round jump, card tools)
+?customCards=id1,id2  # Load workshop card IDs into WS room on createRoom
+?page=login         # Force login page (default: lobby when authenticated)
+?page=workshop      # Open workshop
 ```
+
+## Platform Architecture (platform branch)
+
+The `platform` branch extends the game engine with full user/workshop support.
+
+### New Environment Variables
+
+```bash
+PERSIST_ROOMS=sqlite         # Use SQLite for room persistence (default: json files)
+ALLOW_ANONYMOUS_WS=true      # Skip WS auth (default: true in dev, false in production)
+DB_PATH=./data/open-agricola.db  # SQLite file path
+CARD_ART_DIR=./data/card-art     # Generated card art storage
+```
+
+### New API Routes
+
+```
+POST /api/auth/register       Register new user
+POST /api/auth/login          Login → returns session token
+POST /api/auth/logout         Invalidate session
+GET  /api/auth/me             Validate current session
+
+GET  /api/lobby/my-rooms      User's active rooms (SQLite mode)
+GET  /api/rooms               Live in-memory rooms
+
+GET  /api/workshop/cards      Browse published cards (paginated)
+POST /api/workshop/cards      Create/update card
+GET  /api/workshop/cards/:id  Card detail
+DELETE /api/workshop/cards/:id  Delete own card
+POST /api/workshop/cards/:id/like    Toggle like
+GET/POST /api/workshop/cards/:id/comments  Comments
+GET/POST/DELETE /api/workshop/sandbox      Sandbox management
+POST /api/workshop/art        Upload card art (base64 → file)
+
+GET  /card-art/:filename      Serve card art static files
+POST /api/game/new-sandbox    Start single-player game with workshop cards
+```
+
+### New Shared Modules
+
+- `shared/cards/custom-registry.ts` — Runtime custom card registration
+- `shared/cards/custom-dsl-runner.ts` — DSL → ActionFlow (whitelisted actions only)
+- `shared/protocol/ws.ts` — Added `auth` command, `authOk` event, `customCardIds` in `createRoom`
+
+### New Frontend Structure
+
+```
+src/
+  contexts/AuthContext.tsx      Auth state, apiFetch() helper
+  app/
+    PageRouter.tsx              ?page= URL routing
+    LoginPage.tsx               Register / login
+    LobbyPage.tsx               Lobby with room management
+    WorkshopPage.tsx            Card workshop (browse/edit/sandbox)
+    workshop/
+      AiCardDesigner.tsx        LLM chat + DALL-E art (API key stays in browser)
+  services/
+    llmService.ts               OpenAI/Anthropic streaming, art generation
+    llmPrompts.ts               System prompt + few-shot examples
+  components/common/
+    ResourceText.tsx            Parse <WOOD> tags → resource icons
+```
+
+### LLM Card Designer Security Model
+
+- API keys stored **only** in `localStorage('open-agricola-llm-config')`
+- All LLM requests are direct browser→provider CORS fetches
+- The game server **never** sees API keys
+- Generated cards are saved as DSL (no arbitrary code execution in V1)
+- Card art (base64) is uploaded to `/api/workshop/art` and served from `/card-art/`
 
 ## gstack
 

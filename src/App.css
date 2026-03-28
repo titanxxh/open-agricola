@@ -3546,3 +3546,7 @@
   opacity: 1;
   background: rgba(255,255,255,0.1);
 }
+
+.ws-sandbox-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.res-inline-score { color: #c0a030; font-size: 0.9em; }

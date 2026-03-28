@@ -5,6 +5,30 @@ import {
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
+import { ResourceText } from '../../components/common/ResourceText'
+
+const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+const TOKEN_KEY = 'open-agricola-token'
+
+async function uploadArt(dataUrl: string): Promise<string | null> {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY)
+    const resp = await fetch(`${API_BASE}/api/workshop/art`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ dataUrl }),
+    })
+    const d = await resp.json()
+    if (d.ok && d.url) return `${API_BASE}${d.url}`
+    return null
+  } catch {
+    return null
+  }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -170,7 +194,7 @@ function CardPreview({ extracted, artUrl, onGenArt, generatingArt }: {
           <div className="ai-preview-prereq">先决：{card.prerequisite}</div>
         )}
         <div className="ai-preview-desc">
-          {(card.desc ?? []).join(' ')}
+          <ResourceText text={(card.desc ?? []).join(' ')} />
         </div>
         {extracted.effects && Object.keys(extracted.effects).length > 0 && (
           <div className="ai-preview-effects">
@@ -270,9 +294,11 @@ export function AiCardDesigner({ onImport, onClose }: {
     setGeneratingArt(true)
     try {
       const desc = extracted.card.desc?.join(' ') ?? extracted.card.name
-      const url = await generateCardArt(extracted.card.name, desc, config)
-      if (url) setArtUrl(url)
-      else setError('美术生成失败（仅 OpenAI DALL-E 支持）')
+      const dataUrl = await generateCardArt(extracted.card.name, desc, config)
+      if (!dataUrl) { setError('美术生成失败（仅 OpenAI DALL-E 支持）'); return }
+      // Upload to server so the final URL is a persistent path, not a large base64 blob
+      const uploaded = await uploadArt(dataUrl)
+      setArtUrl(uploaded ?? dataUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : '美术生成出错')
     } finally {

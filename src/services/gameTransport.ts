@@ -331,7 +331,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.listeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string }): void
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[] }): void
   sendRoomCommand(type: 'joinRoom', opts: { roomId: string; name?: string; requestedPlayerIndex?: number }): void
   sendRoomCommand(type: string, opts: Record<string, unknown>): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return

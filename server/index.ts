@@ -1,10 +1,15 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { join, extname } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer, getRooms } from './room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { register, login, logout, validateSession, extractToken } from './auth.ts'
+
+const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -155,6 +160,44 @@ const server = createServer(async (req, res) => {
       sendJson(res, 200, { ok: true, rooms: rows })
     } catch {
       sendJson(res, 200, { ok: true, rooms: [] })
+    }
+    return
+  }
+
+  // ── Card art static files ──────────────────────────────
+  if (req.method === 'GET' && req.url?.startsWith('/card-art/')) {
+    const filename = req.url.slice('/card-art/'.length).replace(/[^a-zA-Z0-9._-]/g, '')
+    const filePath = join(CARD_ART_DIR, filename)
+    if (filename && existsSync(filePath)) {
+      const ext = extname(filename).toLowerCase()
+      const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : 'application/octet-stream'
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+      res.end(readFileSync(filePath))
+    } else {
+      sendJson(res, 404, { error: 'Not found' })
+    }
+    return
+  }
+
+  // ── Art upload ─────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/api/workshop/art') {
+    const token = extractToken(req.headers.authorization)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const body = await parseBody<{ dataUrl?: string }>(req)
+    const dataUrl = body?.dataUrl ?? ''
+    const match = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(dataUrl)
+    if (!match) { sendJson(res, 400, { ok: false, error: 'Invalid data URL' }); return }
+    const [, mime, b64] = match
+    const ext = mime === 'image/jpeg' ? '.jpg' : mime === 'image/webp' ? '.webp' : '.png'
+    try {
+      mkdirSync(CARD_ART_DIR, { recursive: true })
+      const filename = `${randomUUID()}${ext}`
+      writeFileSync(join(CARD_ART_DIR, filename), Buffer.from(b64!, 'base64'))
+      sendJson(res, 200, { ok: true, url: `/card-art/${filename}` })
+    } catch (err) {
+      console.error('[art-upload] failed:', err)
+      sendJson(res, 500, { ok: false, error: 'Upload failed' })
     }
     return
   }

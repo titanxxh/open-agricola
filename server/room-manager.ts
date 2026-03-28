@@ -8,6 +8,33 @@ import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws.ts'
 import { validateSession } from './auth.ts'
 import { getDb } from './db.ts'
+import type { CustomCardData } from '../shared/cards/custom-registry.ts'
+
+/** Load custom card data from DB by workshop_cards.id list. Allows published + author's drafts. */
+function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
+  if (!cardDbIds.length) return []
+  const db = getDb()
+  const result: CustomCardData[] = []
+  for (const dbId of cardDbIds) {
+    const row = db.prepare(
+      'SELECT card_type, card_json, effect_dsl, status, author_id FROM workshop_cards WHERE id = ?',
+    ).get(dbId) as {
+      card_type: string; card_json: string; effect_dsl: string | null
+      status: string; author_id: string
+    } | undefined
+    if (!row) continue
+    const allowed = row.status === 'published' || (row.status === 'draft' && requestUserId === row.author_id)
+    if (!allowed) continue
+    try {
+      result.push({
+        cardType: row.card_type as 'minor' | 'occupation',
+        cardJson: JSON.parse(row.card_json),
+        effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+      })
+    } catch { /* skip malformed */ }
+  }
+  return result
+}
 
 /** Fixed room ID for dev: one persistent room, survives backend restart. */
 export const FIXED_DEV_ROOM_ID = process.env.PERSISTENT_ROOM_ID ?? 'dev'
@@ -358,9 +385,39 @@ const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
 
 // ── WebSocket server ─────────────────────────────────────────────────────────
 
+/** TTL for empty rooms (no connected players) before they are cleaned up. */
+const EMPTY_ROOM_TTL_MS = 30 * 60 * 1000  // 30 minutes
+const roomLastActivity = new Map<string, number>()
+
+function startRoomCleanup(): void {
+  setInterval(() => {
+    const now = Date.now()
+    for (const [roomId, room] of rooms) {
+      if (roomId === FIXED_DEV_ROOM_ID) continue
+      if (room.players.length > 0) {
+        roomLastActivity.set(roomId, now)
+        continue
+      }
+      const lastSeen = roomLastActivity.get(roomId) ?? now
+      if (now - lastSeen > EMPTY_ROOM_TTL_MS) {
+        rooms.delete(roomId)
+        roomLastActivity.delete(roomId)
+        if (PERSIST_ROOMS === 'sqlite') {
+          try {
+            getDb().prepare("UPDATE rooms SET status = 'finished', updated_at = ? WHERE id = ?")
+              .run(now, roomId)
+          } catch { /* non-critical */ }
+        }
+        console.log(`[room-manager] cleaned up empty room ${roomId}`)
+      }
+    }
+  }, 5 * 60 * 1000) // check every 5 minutes
+}
+
 export const createWsServer = (server: import('node:http').Server) => {
   ensurePersistentRoom()
   restoreRoomsFromSqlite()
+  startRoomCleanup()
   const wss = new WebSocketServer({ server, path: '/ws' })
 
   wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
@@ -411,7 +468,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         const maxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
           ? (msg as Record<string, unknown>).maxPlayers as number
           : 2
-        const session = new GameSession()
+        // Load custom cards if provided
+        const customCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
+          ? (msg as Record<string, unknown>).customCardIds as string[]
+          : []
+        const customCards = loadCustomCardsFromDb(customCardDbIds, currentUserId)
+        const session = new GameSession(undefined, customCards.length > 0 ? customCards : undefined)
         const room: Room = { id: roomId, session, players: [], maxPlayers, version: 0, createdBy: currentUserId }
         rooms.set(roomId, room)
         currentRoom = room
@@ -460,6 +522,10 @@ export const createWsServer = (server: import('node:http').Server) => {
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, currentPlayerIndex)
         sendTo(ws, { type: 'roomJoined', roomId, playerIndex: currentPlayerIndex })
         if (room.players.length === room.maxPlayers) {
+          // Sync player names from join commands into the game state
+          for (const p of room.players) {
+            room.session.updatePlayerName(p.playerIndex, p.name)
+          }
           const resp = room.session.getState()
           broadcastState(room, resp, 'reconnect')
           broadcast(room, { type: 'gameStarted' })
