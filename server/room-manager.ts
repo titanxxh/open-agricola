@@ -334,6 +334,13 @@ const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCau
   if (PERSIST_ROOMS === 'sqlite' || room.id === FIXED_DEV_ROOM_ID) {
     savePersistedState(room.id, serializeState(resp.state), room)
   }
+  // Mark room as finished in SQLite when game ends
+  if (PERSIST_ROOMS === 'sqlite' && resp.state.gameOver) {
+    try {
+      getDb().prepare("UPDATE rooms SET status = 'finished', updated_at = ? WHERE id = ?")
+        .run(Date.now(), room.id)
+    } catch { /* non-critical */ }
+  }
 }
 
 const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
