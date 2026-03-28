@@ -2497,3 +2497,290 @@
     font-size: 14px;
   }
 }
+
+/* ── Loading screen ─────────────────────────────── */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 18px;
+  color: #5a3a20;
+  background: #fdf6e3;
+}
+
+/* ── Login page ─────────────────────────────────── */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 100%);
+  padding: 20px;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-title {
+  font-size: 28px;
+  color: #3a5a2c;
+  margin: 0 0 4px 0;
+  text-align: center;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: #8a7a60;
+  margin: 0 0 24px 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field label {
+  font-size: 13px;
+  color: #5a3a20;
+  font-weight: 600;
+}
+
+.form-field input {
+  padding: 10px 12px;
+  border: 1px solid #cdb996;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-field input:focus {
+  border-color: #3a5a2c;
+}
+
+.form-error {
+  color: #c0392b;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #fde8e8;
+  border-radius: 6px;
+}
+
+.btn-primary {
+  background: #3a5a2c;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2d4a21;
+}
+
+.btn-primary:disabled {
+  background: #93a68a;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #fff7e6;
+  color: #5a3a20;
+  border: 1px solid #cdb996;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #f0e6d0;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #3a5a2c;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.btn-small {
+  background: #3a5a2c;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background: #2d4a21;
+}
+
+.login-switch {
+  text-align: center;
+  margin-top: 16px;
+  color: #8a7a60;
+  font-size: 14px;
+}
+
+/* ── Lobby page ─────────────────────────────────── */
+.lobby-page {
+  min-height: 100vh;
+  background: #fdf6e3;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.lobby-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.lobby-header h1 {
+  font-size: 24px;
+  color: #3a5a2c;
+  margin: 0;
+}
+
+.lobby-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #5a3a20;
+  font-size: 14px;
+}
+
+.lobby-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.lobby-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.lobby-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-section h2 {
+  font-size: 16px;
+  color: #5a3a20;
+  margin: 0;
+}
+
+.join-form {
+  display: flex;
+  gap: 8px;
+}
+
+.join-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #cdb996;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.join-form input:focus {
+  border-color: #3a5a2c;
+}
+
+.lobby-rooms {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
+}
+
+.lobby-rooms h2 {
+  font-size: 16px;
+  color: #5a3a20;
+  margin: 0 0 12px 0;
+}
+
+.rooms-empty {
+  color: #8a7a60;
+  font-size: 14px;
+  margin: 0;
+}
+
+.room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fdf6e3;
+  border-radius: 8px;
+}
+
+.room-id {
+  font-weight: 600;
+  color: #5a3a20;
+  flex: 1;
+}
+
+.room-players {
+  color: #8a7a60;
+  font-size: 13px;
+}
+
+/* ── Workshop placeholder ───────────────────────── */
+.workshop-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 20px;
+  color: #5a3a20;
+  background: #fdf6e3;
+}

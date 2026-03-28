@@ -1,8 +1,13 @@
-import { GameContainerApi } from './app/GameContainerApi'
+import { AuthProvider } from './contexts/AuthContext'
+import { PageRouter } from './app/PageRouter'
 import './App.css'
 
 function App() {
-  return <GameContainerApi />
+  return (
+    <AuthProvider>
+      <PageRouter />
+    </AuthProvider>
+  )
 }
 
 export default App
