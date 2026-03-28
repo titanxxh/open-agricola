@@ -22,7 +22,11 @@ import {
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
-import { getListenerById, executeCardListener } from '../cards/card-listeners'
+import {
+  getListenerById,
+  executeCardListener,
+  shouldSkipImmediateListenerLog,
+} from '../cards/card-listeners'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 
@@ -606,7 +610,7 @@ export class Engine {
           this.tree.insertAfter(node.id, [flowNode])
         }
       }
-      if (result?.logKey) {
+      if (result?.logKey && !shouldSkipImmediateListenerLog(result)) {
         const effectPlayer =
           (ownerPlayerId ? context.state.players.find((player) => player.id === ownerPlayerId) : null)
           ?? context.player

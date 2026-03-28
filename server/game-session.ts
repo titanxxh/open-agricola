@@ -60,7 +60,11 @@ import {
   runCardEffectHook,
 } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
-import { getMatchingListeners, executeCardListener } from '../shared/cards/card-listeners.ts'
+import {
+  getMatchingListeners,
+  executeCardListener,
+  shouldSkipImmediateListenerLog,
+} from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
 import { getLooseStableKeys, getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
@@ -271,7 +275,7 @@ export class GameSession {
         ownerPlayerId: entry.ownerPlayerId,
       })
       if (!result?.flow) continue
-      if (result.logKey) {
+      if (result.logKey && !shouldSkipImmediateListenerLog(result)) {
         const logPlayer =
           this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
         this.state.log.unshift({
@@ -1698,6 +1702,7 @@ export class GameSession {
 
   private startHarvest(): SessionResponse {
     this.state.phase = 'harvest'
+    this.state.log.unshift({ key: 'log.harvest', params: { round: this.state.round } })
     return this.continueHarvestFromBeforeHarvest()
   }
 
