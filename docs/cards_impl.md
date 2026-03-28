@@ -72,7 +72,7 @@
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
 | onBeforeReturnHome | — | 已接入 | 回家阶段最先触发（BGA: D51_Archway） |
 | onStartReturnHome | — | 已接入 | 回家阶段工人返回前（BGA: A151_Minstrel 等 11 张卡） |
-| onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts) | 已接入 | 每回合回家阶段触发 |
+| onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | 已接入 | 每回合回家阶段触发 |
 | onAfterRoundEnd | — | 已接入 | 回合结束后触发（BGA: D167_PureBreeder） |
 | onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发，支持返回可暂停/恢复的 `ActionFlow` |
 | onStartHarvest | — | 已接入 | 收获开始时触发（BGA: D97_BeggingStudent 等 16 张卡） |
@@ -535,7 +535,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 | StartOfTurn | 30+ | onRoundStart（已接入） | 已有 `A81_InterimStorage` 样板，其他多数仍待落卡 | A81_InterimStorage, E126_TaxCollector, D53_TeaHouse |
 | BeforeReturnHome | 1 | onBeforeReturnHome（已接入） | 暂无卡牌注册 | D51_Archway |
 | StartReturnHome | 11 | onStartReturnHome（已接入） | 暂无卡牌注册 | A151_Minstrel, E20_IronHoe, C97_SeedResearcher, A100_Curator |
-| ReturnHome | 12 | onReturnHome（已接入） | C75_Firewood, A84_Silage, A29_AleBenches | A53_Claypipe, A29_AleBenches, B139_ForestScientist |
+| ReturnHome | 12 | onReturnHome（已接入） | C75_Firewood, A84_Silage, A53_Claypipe, A29_AleBenches | A29_AleBenches, B139_ForestScientist |
 | EndOfRound | 7 | onRoundEnd（已接入） | 暂无卡牌注册 | A70_LiftingMachine, A54_Credit, A165_PigBreeder |
 | AfterEndOfRound | 1 | onAfterRoundEnd（已接入） | 暂无卡牌注册 | D167_PureBreeder |
 | BeforeHarvest | 3 | onBeforeHarvest（已接入） | A166_Haydryer | D98_Transactor, D32_WoodRake, C92_AutumnMother |

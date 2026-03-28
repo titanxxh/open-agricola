@@ -884,6 +884,8 @@ HTTP 不再承担多人对局主链路，但仍然重要：
 - 延迟获得家庭成员：`futureMeeples`、`pendingFutureMeeples`
 - 工作阶段统计：`workPhaseObtainedResources`
 
+`workPhaseObtainedResources` 用于记录某玩家在当前工作阶段通过 `gain` / `collect` / `take-from-card` / `anytime-exchange` 等动作获得的建材总量；该统计在回家阶段结算完毕后清空，供 `A53_Claypipe` 这类“preceding work phase”卡牌复用。
+
 其中 `ActionSpaceState` 表示行动格的可变运行时部分，至少包含：
 
 ```ts

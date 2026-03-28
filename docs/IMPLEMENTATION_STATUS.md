@@ -146,6 +146,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - 小改良/行动卡出牌前提：`minor-improvement` / `improvement-any` 已接入统一 prerequisite 校验；当前覆盖结构化的 `occupationPrerequisites` / `improvementPrerequisites`，以及常见文本前提如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`。
 - 改良日志：`log.playImprovement` / `log.playMinorImprovement` 现统一携带支付资源与返还卡牌；像 `C60_SmallPottersOven` 这类 `onBuy` 立即得资源效果，会额外产出独立的 `log.cardEffectGain`。当前实现卡牌中已无遗留 `reward:` 字段用法。
 - 翻修成本已对齐 BGA：木屋/泥屋翻修分别为“每房间 1 Clay/Stone + 一次性 1 Reed”，`house-redevelopment` 可用性也按该规则判定。
+- 工作阶段建材统计已下沉到通用资源获得动作；`A53_Claypipe` 现可回溯“本回合先获得建材、后打出卡牌”的 BGA 语义，并在回家阶段统一结算。
 - `CostModifier` 系统：`TradeModifier` / `BonusModifier`，30+ 卡牌注册了支付修改器。
 
 ## 5. 测试

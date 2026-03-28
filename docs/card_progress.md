@@ -91,7 +91,7 @@
 |------|------|------|------|
 | C75_Firewood | Improvement | 打改良后以直接 xor flow 取卡上木材，并记录 cardEffectGain 日志 | ✅ |
 | A17_ReclamationPlow | Collect | 收取前快照动物板面，收取后以 xor flow 决定是否触发犁地 | ✅ |
-| A53_Claypipe | Gain/Receive | 获得/接收后交换 | ✅ |
+| A53_Claypipe | onBuy / onReturnHome | 支持回溯本工作阶段打牌前已获得的建材，并在回家阶段按 BGA 结算 2 食物 | ✅ |
 | A110_Roughcaster | Construct/Renovation | 建造/翻新后 | ✅ |
 | A105_BarrowPusher | Plow | 犁地后 | ✅ |
 | A109_SmallTrader | Improvement | 打改良后 | ✅ |
@@ -170,7 +170,7 @@
 | A39_Chapel | - | 🔧 |
 | A40_PottersYard | - | 🔧 |
 | A41_VegetableSlicer | - | 🔧 |
-| A53_Claypipe | After(Gain, Receive), ImmediatelyAfter(Obtain) | ✅ |
+| A53_Claypipe | onBuy, onReturnHome + workPhaseObtainedResources | ✅ |
 | A55_JunkRoom | During(Improvement) | ✅ |
 | A64_BarleyMill | After(Reap) | ✅ |
 | A65_SeedPellets | Before(Sow) | ✅ |

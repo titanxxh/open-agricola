@@ -41,6 +41,7 @@ import {
   applyRoundGrowth,
   applyFutureMeeples,
 } from '../shared/logic/state.ts'
+import { clearWorkPhaseBuildingResources } from '../shared/logic/work-phase-resources.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
 import {
@@ -1679,6 +1680,7 @@ export class GameSession {
     if (this.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
     this.state.actionSpaces.forEach((s) => { s.takenBy = null })
 

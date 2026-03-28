@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
+  GameState,
   PlayerState,
   Resource,
   Trade,
@@ -10,6 +11,7 @@ import type {
 import { payResources } from './pay'
 import { gainResources } from './gain'
 import { canAffordFlatCost } from './pay-helpers'
+import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -21,6 +23,19 @@ const scaleResources = (resources: Partial<Resource>, times: number) => {
     }
   })
   return scaled
+}
+
+const mergePositiveResources = (
+  base: Partial<Resource>,
+  delta: Partial<Resource>,
+): Partial<Resource> => {
+  const next: Partial<Resource> = { ...base }
+  Object.entries(delta).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    const resourceKey = key as keyof Resource
+    next[resourceKey] = (next[resourceKey] ?? 0) + value
+  })
+  return next
 }
 
 /**
@@ -272,6 +287,7 @@ const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
 }
 
 const resolveExchangeChoice = (
+  state: GameState,
   player: PlayerState,
   choice: string,
 ): ActionExecutionResult => {
@@ -282,6 +298,7 @@ const resolveExchangeChoice = (
     const trades = getPlayerCookeryTrades(player)
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
+    let gained: Partial<Resource> = {}
     payload.split(',').forEach((entry) => {
       const [indexStr, countStr] = entry.split('=')
       const index = Number(indexStr)
@@ -293,9 +310,11 @@ const resolveExchangeChoice = (
       const times = Math.min(count, max)
       if (times > 0) {
         applyTrade(player, trade, times)
+        gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
-    return { type: 'ok' }
+    trackWorkPhaseBuildingResources(state, player.id, gained)
+    return { type: 'ok', resourcesGained: gained }
   }
   if (choice.startsWith('trade:')) {
     const parts = choice.split(':')
@@ -309,7 +328,9 @@ const resolveExchangeChoice = (
     if (times > 0) {
       applyTrade(player, trade, times)
     }
-    return { type: 'ok' }
+    const gained = times > 0 ? scaleResources(trade.to, times) : {}
+    trackWorkPhaseBuildingResources(state, player.id, gained)
+    return { type: 'ok', resourcesGained: gained }
   }
   return { type: 'ok' }
 }
@@ -327,5 +348,5 @@ export const anytimeExchangeAction: ActionDefinition = {
     promptKey: 'ui.interactionExchangeChoice',
     options: buildExchangeOptions(player),
   }),
-  resolveChoice: ({ player }, choice) => resolveExchangeChoice(player, choice),
+  resolveChoice: ({ state, player }, choice) => resolveExchangeChoice(state, player, choice),
 }

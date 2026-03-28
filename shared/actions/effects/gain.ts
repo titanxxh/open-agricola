@@ -1,6 +1,7 @@
 import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
+import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 export const gainResources = (
   player: PlayerState,
@@ -22,7 +23,7 @@ export const gainAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, space, params, sourceCard }) => {
+  execute: ({ state, player, space, params, sourceCard }) => {
     const gain = params ?? gainConfigByActionId.get(space.id)
     const gained: Record<string, number> = {}
     if (gain) {
@@ -33,6 +34,7 @@ export const gainAction: ActionDefinition = {
         }
       })
       gainResources(player, gain)
+      trackWorkPhaseBuildingResources(state, player.id, gained)
       if (sourceCard) {
         addCardResourceGained(player, sourceCard, gained)
       }
@@ -59,8 +61,9 @@ const createBonusAction = (
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => {
+  execute: ({ state, player }) => {
     gainResources(player, gain)
+    trackWorkPhaseBuildingResources(state, player.id, gain)
     return { type: 'ok' }
   },
 })
