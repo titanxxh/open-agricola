@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
+import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 
 const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
 const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
@@ -218,8 +219,24 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
     ((initial?.card_json as Record<string, unknown>)?.cost as Record<string, number>) ?? {}
   )
   const [dslText, setDslText] = useState(initial?.effect_dsl ? JSON.stringify(initial.effect_dsl, null, 2) : '')
+  const [artUrl, setArtUrl] = useState<string | null>(initial?.art_url ?? null)
+  const [showAi, setShowAi] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const handleAiImport = (extracted: ExtractedCard, importedArtUrl: string | null) => {
+    setName(extracted.card.name)
+    setCardId(extracted.card.id)
+    setCardType(extracted.card.card_type)
+    setDesc((extracted.card.desc ?? []).join(' '))
+    setVp(String(extracted.card.vp ?? 0))
+    setCost(extracted.card.cost ?? {})
+    if (extracted.effects && Object.keys(extracted.effects).length > 0) {
+      setDslText(JSON.stringify(extracted.effects, null, 2))
+    }
+    if (importedArtUrl) setArtUrl(importedArtUrl)
+    setShowAi(false)
+  }
 
   const handleCostChange = (res: string, val: string) => {
     const n = Number(val)
@@ -266,6 +283,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
           description: desc,
           card_json: cardJson,
           effect_dsl: effectDsl,
+          art_url: artUrl,
           status: publishStatus,
         }),
       })
@@ -282,12 +300,29 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
     }
   }
 
+  if (showAi) {
+    return (
+      <div className="ws-editor">
+        <AiCardDesigner
+          onImport={handleAiImport}
+          onClose={() => setShowAi(false)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="ws-editor">
       <div className="ws-editor-header">
         <h2>{initial ? '编辑卡牌' : '创建卡牌'}</h2>
-        <button type="button" className="btn-link" onClick={onCancel}>取消</button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button type="button" className="btn-secondary ws-btn-sm ai-open-btn" onClick={() => setShowAi(true)}>
+            ✦ AI 设计师
+          </button>
+          <button type="button" className="btn-link" onClick={onCancel}>取消</button>
+        </div>
       </div>
+      {artUrl && <img src={artUrl} alt="card art" className="ws-editor-art-preview" />}
 
       <div className="ws-editor-form">
         <div className="ws-form-row">
