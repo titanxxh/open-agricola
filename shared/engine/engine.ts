@@ -145,12 +145,12 @@ export class Engine {
   private attachChoiceLabel(
     node: EngineNode,
     choiceLabelKey?: string,
-    choiceLabelParams?: Record<string, string | number>,
+    choiceLabelParams?: Record<string, unknown>,
   ) {
     if (!choiceLabelKey) return node
     const labeledNode = node as EngineNode & {
       choiceLabelKey?: string
-      choiceLabelParams?: Record<string, string | number>
+      choiceLabelParams?: Record<string, unknown>
     }
     labeledNode.choiceLabelKey = choiceLabelKey
     labeledNode.choiceLabelParams = choiceLabelParams
@@ -159,10 +159,10 @@ export class Engine {
 
   private getChoiceLabel(
     node: EngineNode,
-  ): { labelKey: string; labelParams?: Record<string, string | number> } | null {
+  ): { labelKey: string; labelParams?: Record<string, unknown> } | null {
     const labeledNode = node as EngineNode & {
       choiceLabelKey?: string
-      choiceLabelParams?: Record<string, string | number>
+      choiceLabelParams?: Record<string, unknown>
     }
     if (labeledNode.choiceLabelKey) {
       return {
@@ -223,7 +223,7 @@ export class Engine {
   private getReplaceAwareChoiceLabel(
     actionNode: ActionNode,
     executionContext: ActionExecutionContext,
-    defaultLabel: { labelKey: string; labelParams?: Record<string, string | number> },
+    defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
   ) {
     if (actionNode.choiceLabelKey) return defaultLabel
     const replaceResult = this.hooks.applyComputeReplace({
@@ -490,7 +490,7 @@ export class Engine {
         .filter((option) => option !== null) as {
         value: string
         labelKey: string
-        labelParams?: Record<string, string | number>
+        labelParams?: Record<string, unknown>
       }[]
       if (
         node instanceof OrNode &&

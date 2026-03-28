@@ -131,7 +131,7 @@ describe('pending choice types + undo regression', () => {
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('house-redevelopment')
       player.resources.clay = player.rooms
-      player.resources.reed = player.rooms
+      player.resources.reed = 1
       player.minorHand = []
       state.availableMajorImprovements = []
 

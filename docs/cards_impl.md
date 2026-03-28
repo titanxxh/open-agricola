@@ -459,6 +459,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 - **资源图标**：`ResourceLine.tsx` 使用 BGA meeple sprite 图标（`res-icon-*`）替代文字标签，`ActionBoard` 累积资源通过堆叠 `res-icon` sprite 显示在 `.resource-holder` 中，卡牌体内通过 `.gain-display` 显示数字 + 内联资源图标。
 - **日志卡牌 hover**：`LogPanel.tsx` 检测日志中的卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
 - **改良日志明细**：`playImprovement` / `playMinorImprovement` 日志现会附带支付资源与返还卡牌；若卡牌在 `onBuy` / 其他 effect 中立即得资源，则继续走独立的 `log.cardEffectGain`。像 `C60_SmallPottersOven` 现为“支付 2 Clay、归还 Clay Oven/Stone Oven”一条改良日志，再单独追加“获得 5 Food”卡牌日志。
+- **翻修成本**：`renovation.ts` 已按 BGA 对齐为“每房间 1 Clay/Stone + 一次性 1 Reed”，`House Redevelopment` / `Farm Redevelopment` 的 mandatory renovate 判定同步使用这套成本预览。
 - **卡牌关键字图标**：`PlayerCard.tsx` 的 `.card-category` 图标增加中英文 tooltip（8 个类别）。Passing 小牌增加 `.card-passing-badge` 可视标识。
 - **对局状态指示**：`GameHeader.tsx` 增加"轮到你了"/"等待对方"状态徽章（pulse 动画），显示玩家身份，回合进度（N/14）。My-turn 时 header 绿色高亮，not-my-turn 时 action 区域变暗并禁用交互。
 

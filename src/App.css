@@ -117,6 +117,33 @@
   opacity: 0.85;
 }
 
+.interaction-resource-exchange {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interaction-resource-exchange .resource-inline {
+  flex-wrap: nowrap;
+}
+
+.interaction-resource-exchange-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(104, 74, 26, 0.18);
+}
+
+.interaction-resource-exchange-arrow .res-icon-arrow {
+  font-size: 22px;
+  filter: drop-shadow(0 1px 0 rgba(255, 240, 200, 0.55));
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -1707,6 +1734,12 @@
   color: #5a3d1c;
 }
 
+.resource-inline-item.resource-bonusVp {
+  background: #fff1b8;
+  border-color: #e0bd56;
+  color: #6f5a08;
+}
+
 .resource-inline-item.resource-begging {
   background: #f1f1f1;
   border-color: #cfcfcf;
@@ -1731,6 +1764,7 @@
 .res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
+.res-icon-bonusVp { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 
 /* Action-specific icons from meeples.png */
 .res-icon-arrow   { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }

@@ -271,6 +271,15 @@ export const LogPanel = ({ locale, log }: Props) => (
             />
           )
         }
+        if (params && entry.key === 'log.cardEffectBonusVp') {
+          richParams.bonusVp = (
+            <ResourceLine
+              locale={locale}
+              resources={{}}
+              bonusVp={1}
+            />
+          )
+        }
         if (
           params &&
           entry.key === 'log.cardEffectOtherPlayersGain' &&

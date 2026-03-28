@@ -16,7 +16,7 @@ type PayGainNodeOptions = {
   gain?: CardGain
   promptKey?: string
   choiceLabelKey?: string
-  choiceLabelParams?: Record<string, string | number>
+  choiceLabelParams?: Record<string, unknown>
 }
 
 type PayThenActionFlowOptions = {
@@ -25,7 +25,7 @@ type PayThenActionFlowOptions = {
   promptKey?: string
   action: ActionFlow
   choiceLabelKey?: string
-  choiceLabelParams?: Record<string, string | number>
+  choiceLabelParams?: Record<string, unknown>
 }
 
 type ReturnToSpaceThenGainFlowOptions = {
@@ -51,7 +51,7 @@ export const gainLeaf = (
   cardId: string,
   gain: CardGain,
   choiceLabelKey?: string,
-  choiceLabelParams?: Record<string, string | number>,
+  choiceLabelParams?: Record<string, unknown>,
 ): ActionFlow => {
   const { resources } = splitCardGain(gain)
   return {

@@ -161,10 +161,14 @@ const PlayedCardStats = ({
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
-  const hasCounters = Object.keys(displayCounters).length > 0
+  const bonusVp = displayCounters.bonusVp ?? 0
+  const visibleCounters = Object.fromEntries(
+    Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
+  )
+  const hasCounters = Object.keys(visibleCounters).length > 0
   const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
   const hasGained = hasAnyResource(resourceStats?.gained ?? {})
-  const hasResourceStats = hasPaid || hasGained
+  const hasResourceStats = hasPaid || hasGained || bonusVp > 0
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -220,7 +224,7 @@ const PlayedCardStats = ({
       />
       {futureEntries.length > 0 || hasCounters ? (
         <div className="card-future">
-          {Object.entries(displayCounters).map(([resKey, count]) => {
+          {Object.entries(visibleCounters).map(([resKey, count]) => {
             if (count <= 0) return null
             const isKnownResource = resKey in emptyResources
             return (
@@ -299,12 +303,13 @@ const PlayedCardStats = ({
               />
             </div>
           ) : null}
-          {hasGained ? (
+          {hasGained || bonusVp > 0 ? (
             <div className="played-card-stats-section">
               <div className="played-card-stats-label">{t(locale, 'ui.cardStatsGained')}</div>
               <ResourceLine
                 locale={locale}
                 resources={{ ...emptyResources, ...(resourceStats?.gained ?? {}) }}
+                bonusVp={bonusVp}
                 className="played-card-stats-line"
               />
             </div>

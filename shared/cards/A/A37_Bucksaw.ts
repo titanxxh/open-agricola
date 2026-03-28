@@ -18,6 +18,12 @@ const afterRenovateListener: CardListenerRegistration = {
       cost: { wood: 1 },
       gain: { grain: 1, score: 1 },
       promptKey: 'ui.interactionBucksawPrompt',
+      choiceLabelKey: 'ui.interactionResourceExchange',
+      choiceLabelParams: {
+        resourcesPaid: { wood: 1 },
+        resourcesGained: { grain: 1 },
+        bonusVp: 1,
+      },
     })
   },
 }

@@ -229,7 +229,7 @@ export type ActionCostPreview = {
 export type ActionChoiceOption = {
   value: string
   labelKey: string
-  labelParams?: Record<string, string | number>
+  labelParams?: Record<string, unknown>
 }
 
 export type ActionExecutionResult =
@@ -248,7 +248,7 @@ export type ActionFlow =
       sourceCard?: string
       actionContext?: Record<string, unknown>
       choiceLabelKey?: string
-      choiceLabelParams?: Record<string, string | number>
+      choiceLabelParams?: Record<string, unknown>
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
@@ -256,7 +256,7 @@ export type ActionFlow =
       children: ActionFlow[]
       optional?: boolean
       choiceLabelKey?: string
-      choiceLabelParams?: Record<string, string | number>
+      choiceLabelParams?: Record<string, unknown>
     }
 
 export type ActionDefinition = {
@@ -314,7 +314,7 @@ export type InteractionCommand =
 export type AnytimeAction = {
   id: string
   labelKey: string
-  labelParams?: Record<string, string | number>
+  labelParams?: Record<string, unknown>
   actionId?: string
   sourceCard?: string
 }

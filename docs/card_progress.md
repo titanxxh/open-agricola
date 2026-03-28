@@ -119,6 +119,8 @@
 | A88_HedgeKeeper | Fencing | 围栏成本折扣 | ✅ |
 | A28_ForestSchool | Occupation | 职业食物成本可用木材替代，并可无视 Lessons 占用 | ✅ |
 
+注：基础 `renovation` 成本已按 BGA 对齐为“一次性 1 Reed + 每房间 1 Clay/Stone”，相关可行性判定与 `house-redevelopment` 开放条件已同步修正。
+
 ### ComputeArgs Hook
 | 卡牌 | 行动 | 说明 | 状态 |
 |------|------|------|------|

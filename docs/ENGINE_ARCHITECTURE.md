@@ -627,6 +627,8 @@ type ServerEvent =
 }
 ```
 
+补充说明：`renovation` 成本语义与 BGA 对齐，基础翻修费用按“一次性 `Reed` fee + 按房间数重复的 `Clay/Stone` trade”建模，而不是把 `Reed` 也按房间数倍增。
+
 ### 7.7 广播与单播的边界
 
 建议明确区分两类消息：

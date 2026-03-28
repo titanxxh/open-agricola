@@ -62,7 +62,18 @@ describe('A37_Bucksaw', () => {
     if (result?.flow?.type === 'seq') {
       expect(result.flow.optional).toBe(true)
       expect(result.flow.children).toEqual([
-        { type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: 'A37_Bucksaw' },
+        {
+          type: 'leaf',
+          actionId: 'pay-resources',
+          params: { wood: 1 },
+          sourceCard: 'A37_Bucksaw',
+          choiceLabelKey: 'ui.interactionResourceExchange',
+          choiceLabelParams: {
+            resourcesPaid: { wood: 1 },
+            resourcesGained: { grain: 1 },
+            bonusVp: 1,
+          },
+        },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: 'A37_Bucksaw' },
         { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: 'A37_Bucksaw' },
       ])

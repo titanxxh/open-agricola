@@ -11,7 +11,7 @@ abstract class BaseNode implements EngineNode {
   public id: string
   public type: EngineNodeType
   public choiceLabelKey?: string
-  public choiceLabelParams?: Record<string, string | number>
+  public choiceLabelParams?: Record<string, unknown>
   protected state: NodeState
 
   protected constructor(id: string, type: EngineNodeType) {
@@ -51,7 +51,7 @@ export class ActionNode extends BaseNode {
   public params?: Partial<Resource>
   public actionContext?: Record<string, unknown>
   public choiceLabelKey?: string
-  public choiceLabelParams?: Record<string, string | number>
+  public choiceLabelParams?: Record<string, unknown>
   public beforePhaseResolved = false
 
   constructor(
@@ -60,7 +60,7 @@ export class ActionNode extends BaseNode {
     sourceCard?: string,
     params?: Partial<Resource>,
     choiceLabelKey?: string,
-    choiceLabelParams?: Record<string, string | number>,
+    choiceLabelParams?: Record<string, unknown>,
     actionContext?: Record<string, unknown>,
   ) {
     super(id, 'action')

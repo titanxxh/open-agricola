@@ -13,7 +13,17 @@ registerCardEffect({
       optional: true,
       promptKey: 'ui.interactionAleBenches',
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+        {
+          type: 'leaf',
+          actionId: 'pay-resources',
+          params: { grain: 1 },
+          sourceCard: CARD_ID,
+          choiceLabelKey: 'ui.interactionResourceExchange',
+          choiceLabelParams: {
+            resourcesPaid: { grain: 1 },
+            bonusVp: 1,
+          },
+        },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
       ],
