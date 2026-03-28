@@ -3529,3 +3529,20 @@
   padding: 2px 7px;
   border-radius: 10px;
 }
+
+.header-lobby-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: inherit;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.header-lobby-btn:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.1);
+}

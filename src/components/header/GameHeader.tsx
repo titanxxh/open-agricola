@@ -2,6 +2,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
 import { harvestRounds } from '../../../shared/logic/state'
+import { setPage } from '../../app/PageRouter'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -57,6 +58,14 @@ export const GameHeader = ({
         )}
       </div>
       <div className="status">
+        <button
+          type="button"
+          className="header-lobby-btn"
+          onClick={() => setPage('lobby')}
+          title={locale === 'zh' ? '返回大厅' : 'Back to Lobby'}
+        >
+          {locale === 'zh' ? '← 大厅' : '← Lobby'}
+        </button>
         {state.gameOver ? (
           <span className="status-badge game-over">{t(locale, 'ui.statusGameOver')}</span>
         ) : isMyTurn ? (
