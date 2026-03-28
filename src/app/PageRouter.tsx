@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
+import { WorkshopPage } from './WorkshopPage'
 import { GameContainerApi } from './GameContainerApi'
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game'
@@ -61,7 +62,7 @@ export function PageRouter() {
     case 'game':
       return <GameContainerApi />
     case 'workshop':
-      return <div className="workshop-placeholder">工坊模式 — 即将推出</div>
+      return <WorkshopPage />
     case 'lobby':
     default:
       return <LobbyPage />

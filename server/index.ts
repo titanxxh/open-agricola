@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleGameRoute } from './game-router.ts'
+import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer, getRooms } from './room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { register, login, logout, validateSession, extractToken } from './auth.ts'
@@ -135,6 +136,12 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/rooms') {
     sendJson(res, 200, { ok: true, rooms: getRooms() })
     return
+  }
+
+  // ── Workshop routes ────────────────────────────────────
+  if (req.url?.startsWith('/api/workshop/')) {
+    const handled = await handleWorkshopRoute(req, res)
+    if (handled) return
   }
 
   // ── Game routes (existing) ─────────────────────────────

@@ -502,7 +502,16 @@ export const implementedOccupationCards = occupationCards.filter(isImplemented)
 
 export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
 export const occupationIds = implementedOccupationCards.map((card) => card.id)
-export const getMinorImprovementCard = (id: string) =>
-  allMinorImprovementCards.find((card) => card.id === id) ?? null
-export const getOccupationCard = (id: string) =>
-  allOccupationCards.find((card) => card.id === id) ?? null
+export const getMinorImprovementCard = (id: string) => {
+  const official = allMinorImprovementCards.find((card) => card.id === id)
+  if (official) return official
+  return null
+}
+export const getOccupationCard = (id: string) => {
+  const official = allOccupationCards.find((card) => card.id === id)
+  if (official) return official
+  return null
+}
+
+// Custom card lookups are in custom-registry.ts.
+// game-session.ts imports both catalog and custom-registry to resolve cards.
