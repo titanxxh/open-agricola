@@ -43,6 +43,13 @@ import {
 } from '../shared/logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../shared/logic/work-phase-resources.ts'
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
+import {
+  registerCustomCard,
+  clearCustomCards,
+  getCustomMinorImprovementIds,
+  getCustomOccupationIds,
+  type CustomCardData,
+} from '../shared/cards/custom-registry.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
 import {
   runRoundEndHooks,
@@ -196,7 +203,7 @@ export class GameSession {
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
 
-  constructor(stateOrSeed?: GameState | number) {
+  constructor(stateOrSeed?: GameState | number, customCards?: CustomCardData[]) {
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
@@ -204,11 +211,33 @@ export class GameSession {
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
+    // Register custom workshop cards (sandbox mode)
+    clearCustomCards()
+    if (customCards && customCards.length > 0) {
+      for (const cardData of customCards) {
+        try {
+          registerCustomCard(cardData)
+        } catch (err) {
+          console.warn(`[game-session] failed to register custom card ${cardData.cardJson.id}:`, err)
+        }
+      }
+    }
+
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       this.state = normalizeState(stateOrSeed)
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
-      this.state = createInitialState(seed)
+      const extraMinorIds = getCustomMinorImprovementIds()
+      const extraOccupationIds = getCustomOccupationIds()
+      this.state = createInitialState(seed, extraMinorIds, extraOccupationIds)
+    }
+  }
+
+  /** Update a player's display name in the game state (called after WS join). */
+  updatePlayerName(playerIndex: number, name: string): void {
+    const player = this.state.players[playerIndex]
+    if (player && name.trim()) {
+      player.name = name.trim()
     }
   }
 

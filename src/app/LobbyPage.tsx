@@ -11,9 +11,18 @@ type RoomSummary = {
   maxPlayers: number
 }
 
+type MyRoom = {
+  id: string
+  status: string
+  max_players: number
+  updated_at: number
+  player_index: number
+}
+
 export function LobbyPage() {
-  const { user, logout } = useAuth()
+  const { user, token, logout } = useAuth()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
+  const [myRooms, setMyRooms] = useState<MyRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
 
@@ -22,41 +31,38 @@ export function LobbyPage() {
       const resp = await fetch(`${API_BASE}/api/rooms`)
       const data = await resp.json()
       if (data.ok) setRooms(data.rooms)
-    } catch {
-      // silently fail
-    }
+    } catch { /* silently fail */ }
   }, [])
+
+  const fetchMyRooms = useCallback(async () => {
+    if (!token) return
+    try {
+      const resp = await fetch(`${API_BASE}/api/lobby/my-rooms`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await resp.json()
+      if (data.ok) setMyRooms(data.rooms)
+    } catch { /* silently fail */ }
+  }, [token])
 
   useEffect(() => {
     fetchRooms()
-    const interval = setInterval(fetchRooms, 5000)
+    fetchMyRooms()
+    const interval = setInterval(() => { fetchRooms(); fetchMyRooms() }, 5000)
     return () => clearInterval(interval)
-  }, [fetchRooms])
+  }, [fetchRooms, fetchMyRooms])
 
-  const handleCreateGame = () => {
-    setPage('game', { transport: 'ws' })
-  }
+  const handleCreateGame = () => setPage('game', { transport: 'ws' })
 
   const handleJoinRoom = () => {
     const id = joinRoomId.trim()
-    if (!id) {
-      setError('请输入房间 ID')
-      return
-    }
+    if (!id) { setError('请输入房间 ID'); return }
     setPage('game', { transport: 'ws', room: id })
   }
 
-  const handleJoinExisting = (roomId: string) => {
-    setPage('game', { transport: 'ws', room: roomId })
-  }
-
-  const handleSinglePlayer = () => {
-    setPage('game')
-  }
-
-  const handleWorkshop = () => {
-    setPage('workshop')
-  }
+  const handleJoinExisting = (roomId: string) => setPage('game', { transport: 'ws', room: roomId })
+  const handleResumeRoom = (roomId: string, playerIndex: number) =>
+    setPage('game', { transport: 'ws', room: roomId, player: `p${playerIndex + 1}` })
 
   return (
     <div className="lobby-page">
@@ -75,7 +81,7 @@ export function LobbyPage() {
             <button type="button" className="btn-primary" onClick={handleCreateGame}>
               创建多人游戏
             </button>
-            <button type="button" className="btn-secondary" onClick={handleSinglePlayer}>
+            <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
               单人模式
             </button>
           </div>
@@ -90,23 +96,45 @@ export function LobbyPage() {
                 placeholder="输入房间 ID"
                 onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
               />
-              <button type="button" className="btn-primary" onClick={handleJoinRoom}>
-                加入
-              </button>
+              <button type="button" className="btn-primary" onClick={handleJoinRoom}>加入</button>
             </div>
             {error && <div className="form-error">{error}</div>}
           </div>
 
           <div className="lobby-section">
             <h2>工坊</h2>
-            <button type="button" className="btn-secondary" onClick={handleWorkshop}>
+            <button type="button" className="btn-secondary" onClick={() => setPage('workshop')}>
               进入卡牌工坊
             </button>
           </div>
         </div>
 
+        {/* User's active rooms (SQLite mode) */}
+        {myRooms.length > 0 && (
+          <div className="lobby-rooms">
+            <h2>我的进行中游戏</h2>
+            <ul className="room-list">
+              {myRooms.map(r => (
+                <li key={r.id} className="room-item">
+                  <span className="room-id">房间 {r.id}</span>
+                  <span className="room-players">席位 {r.player_index + 1}</span>
+                  <span className="room-status">{r.status}</span>
+                  <button
+                    type="button"
+                    className="btn-small"
+                    onClick={() => handleResumeRoom(r.id, r.player_index)}
+                  >
+                    继续
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Live rooms in memory */}
         <div className="lobby-rooms">
-          <h2>当前房间</h2>
+          <h2>当前活跃房间</h2>
           {rooms.length === 0 ? (
             <p className="rooms-empty">暂无活跃房间</p>
           ) : (
@@ -116,11 +144,7 @@ export function LobbyPage() {
                   <span className="room-id">房间 {room.id}</span>
                   <span className="room-players">{room.playerCount}/{room.maxPlayers} 玩家</span>
                   {room.playerCount < room.maxPlayers && (
-                    <button
-                      type="button"
-                      className="btn-small"
-                      onClick={() => handleJoinExisting(room.id)}
-                    >
+                    <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
                       加入
                     </button>
                   )}

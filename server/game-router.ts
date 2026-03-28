@@ -3,6 +3,9 @@ import { GameSession } from './game-session.ts'
 import { serializeState } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from './fence-validation.ts'
 import { applyFarmChoice } from './farm-choice.ts'
+import { getDb } from './db.ts'
+import { validateSession, extractToken } from './auth.ts'
+import type { CustomCardData } from '../shared/cards/custom-registry.ts'
 
 let session: GameSession | null = null
 
@@ -232,6 +235,62 @@ export const handleGameRoute = async (
     session = new GameSession(seed)
     const resp = getSingletonSession().getState()
     sendJson(res, 200, respondWith(resp))
+    return true
+  }
+
+  // Sandbox game: start a new single-player game with custom workshop cards loaded
+  if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
+    let seed: number | undefined
+    let customCardDbIds: string[] = []
+    try {
+      const body = JSON.parse(await readBody(req)) as { seed?: number; customCardIds?: string[] }
+      if (typeof body.seed === 'number') seed = body.seed
+      if (Array.isArray(body.customCardIds)) {
+        customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
+      }
+    } catch { /* ignore */ }
+
+    // Identify the requesting user (optional — allows loading own draft cards)
+    const requestUser = validateSession(extractToken(req.headers.authorization))
+
+    // Load custom card data from the database.
+    // Allow: published cards (anyone) OR draft cards owned by the requesting user.
+    const customCards: CustomCardData[] = []
+    if (customCardDbIds.length > 0) {
+      const db = getDb()
+      for (const dbId of customCardDbIds) {
+        const row = db.prepare(
+          `SELECT card_type, card_json, effect_dsl, status, author_id
+           FROM workshop_cards WHERE id = ?`,
+        ).get(dbId) as {
+          card_type: string; card_json: string; effect_dsl: string | null
+          status: string; author_id: string
+        } | undefined
+        if (!row) continue
+        // Allow published cards, or draft cards if requester is the author
+        const allowed =
+          row.status === 'published' ||
+          (row.status === 'draft' && requestUser?.id === row.author_id)
+        if (!allowed) continue
+        try {
+          customCards.push({
+            cardType: row.card_type as 'minor' | 'occupation',
+            cardJson: JSON.parse(row.card_json),
+            effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+          })
+        } catch (err) {
+          console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
+        }
+      }
+    }
+
+    session = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
+    // Set player name from authenticated user
+    if (requestUser) {
+      session.updatePlayerName(0, requestUser.displayName)
+    }
+    const resp = getSingletonSession().getState()
+    sendJson(res, 200, { ...respondWith(resp), customCardsLoaded: customCards.length })
     return true
   }
 

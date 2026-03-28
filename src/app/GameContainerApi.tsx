@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
@@ -28,8 +29,6 @@ import { ResourceLine } from '../components/common/ResourceLine'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
-const urlParams = new URLSearchParams(window.location.search)
-const useWsMode = urlParams.get('transport') === 'ws'
 const httpTransportSingleton = new HttpGameTransport()
 const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
 
@@ -73,7 +72,7 @@ type WsStatus =
   | { phase: 'ready'; roomId: string; playerIndex: number }
   | { phase: 'error'; message: string }
 
-const useTransportSetup = (playerParam: string | null) => {
+const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const wsRef = useRef<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
@@ -81,7 +80,7 @@ const useTransportSetup = (playerParam: string | null) => {
   const initRef = useRef(false)
 
   useEffect(() => {
-    if (!useWsMode || initRef.current) return
+    if (!isWsMode || initRef.current) return
     initRef.current = true
 
     const init = async () => {
@@ -102,7 +101,7 @@ const useTransportSetup = (playerParam: string | null) => {
         return
       }
 
-      const roomParam = urlParams.get('room')
+      const roomParam = new URLSearchParams(window.location.search).get('room')
       const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
 
       if (isCreator) {
@@ -121,7 +120,9 @@ const useTransportSetup = (playerParam: string | null) => {
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: playerParam ?? 'Player 1' })
+          const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
+          const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
+          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
         })
 
         if ('error' in resp) {
@@ -170,7 +171,7 @@ const useTransportSetup = (playerParam: string | null) => {
           rawWs.addEventListener('message', handler)
           ws.sendRoomCommand('joinRoom', {
             roomId: roomId!,
-            name: playerParam ?? 'Player 2',
+            name: displayName ?? playerParam ?? 'Player 2',
             requestedPlayerIndex,
           })
         })
@@ -188,27 +189,33 @@ const useTransportSetup = (playerParam: string | null) => {
     init()
   }, [playerParam])
 
-  const transport: GameTransport = useWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
-  const isReady = !useWsMode || wsReady
-  return { transport, wsStatus, isWs: useWsMode, isReady }
+  const transport: GameTransport = isWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
+  const isReady = !isWsMode || wsReady
+  return { transport, wsStatus, isWs: isWsMode, isReady }
 }
 
 export const GameContainerApi = () => {
-  const requestedPlayerId = useMemo(() => {
-    const raw = urlParams.get('player') ?? urlParams.get('playerId')
+  // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
+  const currentUrlParams = new URLSearchParams(window.location.search)
+  const isWsMode = currentUrlParams.get('transport') === 'ws'
+
+  const lockedViewPlayerId = useMemo(() => {
+    const p = new URLSearchParams(window.location.search)
+    const raw = p.get('player') ?? p.get('playerId')
     if (!raw) return null
     if (/^p[1-4]$/.test(raw)) return raw
     const index = Number(raw)
     if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
     return null
   }, [])
-  const { transport, wsStatus, isWs, isReady } = useTransportSetup(requestedPlayerId)
+  const { user } = useAuth()
+  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>(detectInitialLocale)
-  const [viewPlayerId, setViewPlayerId] = useState<string | null>(requestedPlayerId)
+  const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
-  const [devMode, setDevMode] = useState(true)
+  const [devMode, setDevMode] = useState(() => currentUrlParams.get('devMode') === '1')
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
@@ -286,8 +293,8 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
-  const selfPlayer = requestedPlayerId
-    ? state?.players.find((p) => p.id === requestedPlayerId) ?? currentPlayer
+  const selfPlayer = lockedViewPlayerId
+    ? state?.players.find((p) => p.id === lockedViewPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   const displayPlayer = (viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null

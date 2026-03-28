@@ -34,7 +34,7 @@ export type ClientCommand =
   | { type: 'loadGame'; state: unknown }
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
-  | { type: 'createRoom'; maxPlayers?: number; name?: string }
+  | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }
   | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
 
 export type ServerEvent =
