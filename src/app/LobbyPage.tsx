@@ -69,7 +69,9 @@ export function LobbyPage() {
       <div className="lobby-header">
         <h1>Open Agricola</h1>
         <div className="lobby-user-info">
-          <span>{user?.displayName || user?.username}</span>
+          <button type="button" className="btn-link" onClick={() => setPage('settings')}>
+            {user?.displayName || user?.username}
+          </button>
           <button type="button" className="btn-link" onClick={logout}>登出</button>
         </div>
       </div>

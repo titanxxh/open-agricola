@@ -49,7 +49,11 @@ const LEGACY_PERSISTED_ROOM_FILE = process.env.PERSISTED_ROOM_FILE ?? join(proce
  *
  * Set via env: PERSIST_ROOMS=sqlite
  */
-const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'json') as 'json' | 'sqlite'
+/**
+ * Default to 'sqlite' so the "my-rooms" feature works out of the box.
+ * Set PERSIST_ROOMS=json to keep the legacy JSON-file behaviour (e.g. quick local dev).
+ */
+const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
 
 /**
  * When true, WebSocket connections are NOT required to send an auth token.

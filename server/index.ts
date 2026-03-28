@@ -7,7 +7,7 @@ import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer, getRooms } from './room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
-import { register, login, logout, validateSession, extractToken } from './auth.ts'
+import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword } from './auth.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 
@@ -122,6 +122,31 @@ const server = createServer(async (req, res) => {
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = extractToken(req.headers.authorization)
     if (token) logout(token)
+    sendJson(res, 200, { ok: true })
+    return
+  }
+
+  if (req.url === '/api/auth/profile' && req.method === 'PATCH') {
+    const token = extractToken(req.headers.authorization)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const body = await parseBody<{ displayName?: string }>(req)
+    const err = updateDisplayName(user.id, body?.displayName ?? '')
+    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
+    sendJson(res, 200, { ok: true })
+    return
+  }
+
+  if (req.url === '/api/auth/change-password' && req.method === 'POST') {
+    const token = extractToken(req.headers.authorization)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const body = await parseBody<{ oldPassword?: string; newPassword?: string }>(req)
+    if (!body?.oldPassword || !body.newPassword) {
+      sendJson(res, 400, { ok: false, error: 'Missing oldPassword or newPassword' }); return
+    }
+    const err = await changePassword(user.id, body.oldPassword, body.newPassword)
+    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
     sendJson(res, 200, { ok: true })
     return
   }
