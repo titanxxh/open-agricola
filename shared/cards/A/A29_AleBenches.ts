@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A29_AleBenches'
 
@@ -8,26 +9,15 @@ registerCardEffect({
   onReturnHome: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
-    return {
-      type: 'seq',
-      optional: true,
+    return payGainFlow({
+      cardId: CARD_ID,
+      cost: { grain: 1 },
+      gain: { score: 1 },
       promptKey: 'ui.interactionAleBenches',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'pay-resources',
-          params: { grain: 1 },
-          sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: {
-            resourcesPaid: { grain: 1 },
-            bonusVp: 1,
-          },
-        },
-        { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
+      followUp: [
         { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
       ],
-    }
+    })
   },
 })
 
