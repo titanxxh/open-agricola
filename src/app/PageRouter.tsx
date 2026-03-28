@@ -3,14 +3,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
 import { WorkshopPage } from './WorkshopPage'
+import { SettingsPage } from './SettingsPage'
 import { GameContainerApi } from './GameContainerApi'
 
-type Page = 'login' | 'lobby' | 'workshop' | 'game'
+type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
 function getPage(): Page {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'game' || page === 'workshop' || page === 'lobby') return page
+  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings') return page
   // Legacy: if ?room= or ?transport=ws is set, go straight to game
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   return 'lobby'
@@ -63,6 +64,8 @@ export function PageRouter() {
       return <GameContainerApi />
     case 'workshop':
       return <WorkshopPage />
+    case 'settings':
+      return <SettingsPage />
     case 'lobby':
     default:
       return <LobbyPage />

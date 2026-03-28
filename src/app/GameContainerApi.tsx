@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
 import type { Locale } from '../../shared/i18n'
@@ -1129,20 +1130,54 @@ export const GameContainerApi = () => {
       : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
       : 'Loading...'
 
+    const inviteUrl = wsStatus.phase === 'waiting'
+      ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
+      : null
+
     return (
-      <div className="app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>Open Agricola — WebSocket Mode</div>
-        <div style={{ fontSize: '16px' }}>{statusText}</div>
-        {wsStatus.phase === 'waiting' && (
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            Other player: open <code>?player=p2&transport=ws</code>
-          </div>
-        )}
-        {wsStatus.phase === 'error' && (
-          <button type="button" onClick={() => window.location.reload()} style={{ padding: '8px 16px', cursor: 'pointer' }}>
-            Retry
+      <div className="ws-status-screen">
+        <div className="ws-status-card">
+          <h2 className="ws-status-title">Open Agricola</h2>
+          <div className="ws-status-text">{statusText}</div>
+
+          {wsStatus.phase === 'waiting' && inviteUrl && (
+            <div className="ws-invite-panel">
+              <div className="ws-invite-label">分享此链接邀请对手加入：</div>
+              <div className="ws-invite-url-row">
+                <code className="ws-invite-url">{inviteUrl}</code>
+                <button
+                  type="button"
+                  className="btn-primary ws-btn-sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteUrl).catch(() => {})
+                  }}
+                >
+                  复制
+                </button>
+              </div>
+              <div className="ws-invite-roomid">房间 ID：<strong>{wsStatus.roomId}</strong></div>
+            </div>
+          )}
+
+          {wsStatus.phase === 'error' && (
+            <div className="ws-error-actions">
+              <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+                重试
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
+                返回大厅
+              </button>
+            </div>
+          )}
+
+          {(wsStatus.phase === 'connecting' || wsStatus.phase === 'creating' || wsStatus.phase === 'joining') && (
+            <div className="ws-spinner" />
+          )}
+
+          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
+            ← 返回大厅
           </button>
-        )}
+        </div>
       </div>
     )
   }

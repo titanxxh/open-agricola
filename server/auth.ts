@@ -122,3 +122,31 @@ export function extractToken(authHeader: string | undefined): string {
   const match = /^Bearer\s+(.+)$/i.exec(authHeader)
   return match ? match[1] : ''
 }
+
+/** Update a user's display name. Returns error string or null on success. */
+export function updateDisplayName(userId: string, displayName: string): string | null {
+  const name = displayName.trim()
+  if (!name || name.length > 60) return 'Display name must be 1-60 characters'
+  const db = getDb()
+  db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, userId)
+  return null
+}
+
+/** Change password. Returns error string or null on success. */
+export async function changePassword(
+  userId: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<string | null> {
+  if (!newPassword || newPassword.length < 4) return 'Password must be at least 4 characters'
+  const db = getDb()
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as
+    | { password_hash: string } | undefined
+  if (!row) return 'User not found'
+  const valid = await verifyPassword(oldPassword, row.password_hash)
+  if (!valid) return 'Current password is incorrect'
+  const newHash = await hashPassword(newPassword)
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId)
+  return null
+}
+
