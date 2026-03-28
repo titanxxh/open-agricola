@@ -2,6 +2,7 @@ import type { Resource } from '../game/types'
 import type { StateUpdateEnvelope } from './game'
 
 export type ClientCommand =
+  | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
   | { type: 'choice'; value: string }
   | { type: 'anytime'; actionId: string }
@@ -39,6 +40,7 @@ export type ClientCommand =
 export type ServerEvent =
   | StateUpdateEnvelope
   | { type: 'error'; error: string }
+  | { type: 'authOk'; userId: string; username: string }
   | { type: 'roomCreated'; roomId: string; playerIndex: number }
   | { type: 'roomJoined'; roomId: string; playerIndex: number }
   | { type: 'gameStarted' }

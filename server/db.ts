@@ -49,6 +49,7 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX idx_sessions_user ON sessions(user_id);
         CREATE INDEX idx_sessions_expires ON sessions(expires_at);
 
+        -- rooms.custom_card_ids: JSON array of workshop_cards.id included in this game
         CREATE TABLE rooms (
           id TEXT PRIMARY KEY,
           created_by TEXT REFERENCES users(id),
@@ -56,6 +57,7 @@ function runMigrations(db: Database.Database): void {
           max_players INTEGER NOT NULL DEFAULT 2,
           status TEXT NOT NULL DEFAULT 'waiting',
           version INTEGER NOT NULL DEFAULT 0,
+          custom_card_ids TEXT NOT NULL DEFAULT '[]',
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
@@ -91,6 +93,9 @@ function runMigrations(db: Database.Database): void {
         );
         CREATE INDEX idx_workshop_author ON workshop_cards(author_id);
         CREATE INDEX idx_workshop_status ON workshop_cards(status);
+        -- 同一个 card_id 只能有一张 published 卡牌（全局唯一）
+        CREATE UNIQUE INDEX idx_workshop_card_id_published
+          ON workshop_cards(card_id) WHERE status = 'published';
 
         CREATE TABLE card_likes (
           user_id TEXT NOT NULL REFERENCES users(id),

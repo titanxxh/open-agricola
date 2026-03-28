@@ -156,6 +156,8 @@ export class HttpGameTransport implements GameTransport {
 
 const WS_BASE = `ws://${backendHost}:${BACKEND_PORT}/ws`
 
+const TOKEN_KEY = 'open-agricola-token'
+
 export class WsGameTransport implements GameTransport {
   private ws: WebSocket | null = null
   private listeners = new Set<SnapshotListener>()
@@ -165,6 +167,7 @@ export class WsGameTransport implements GameTransport {
   }>()
   private reqCounter = 0
   private readonly wsUrl: string
+  private readonly authToken: string | null
   readonly roomId: string
   readonly playerIndex: number
   private _connected = false
@@ -173,10 +176,15 @@ export class WsGameTransport implements GameTransport {
     wsUrl: string = WS_BASE,
     roomId?: string,
     playerIndex?: number,
+    authToken?: string | null,
   ) {
     this.wsUrl = wsUrl
     this.roomId = roomId ?? ''
     this.playerIndex = playerIndex ?? 0
+    // If not explicitly provided, read from localStorage
+    this.authToken = authToken !== undefined
+      ? authToken
+      : (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null)
   }
 
   get connected() { return this._connected }
@@ -184,19 +192,41 @@ export class WsGameTransport implements GameTransport {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.wsUrl)
-      this.ws.onopen = () => {
-        this._connected = true
-        resolve()
-      }
+
       this.ws.onerror = () => {
         reject(new Error('WebSocket connection failed'))
       }
       this.ws.onclose = () => {
         this._connected = false
       }
+
+      this.ws.onopen = () => {
+        // Send auth token immediately after opening.
+        // If no token, rely on server's ALLOW_ANONYMOUS_WS setting.
+        if (this.authToken) {
+          this.ws!.send(JSON.stringify({ type: 'auth', token: this.authToken }))
+        } else {
+          this._connected = true
+          resolve()
+        }
+      }
+
       this.ws.onmessage = (event) => {
         let msg: ServerEvent
         try { msg = JSON.parse(event.data as string) as ServerEvent } catch { return }
+
+        // Handle authOk: marks connection as fully ready
+        if (msg.type === 'authOk') {
+          this._connected = true
+          resolve()
+          return
+        }
+
+        // If auth failed before connection was established, reject
+        if (msg.type === 'error' && !this._connected) {
+          reject(new Error(msg.error))
+          return
+        }
 
         if (msg.type === 'stateUpdate') {
           const envelope = msg as StateUpdateEnvelope
