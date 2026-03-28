@@ -85,6 +85,8 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 ### 3.3 UI 组件
 
 - `ActionBoard` — 完全还原 BGA 行动区。不论几人局始终显示全部 4 人局行动位（含左侧 6 个特殊行动）。卡牌采用 BGA 3 段式框架（header/desc/footer 分别切片 `action_frame.png`/`action_frame_s.png`）。使用 BGA 字体 Dominican + CalibriB。累积类行动卡体内显示每回合获取量（数字 + 资源图标 `.gain-display`），非累积行动显示文字描述。箭头通过 `action_frame_arrow.png` 伪元素显示方向（left/right/bottom），累积资源以 `.resource-holder` 显示在卡片外部，带橙色数量徽章。Round 行动 hover 显示 `actions.jpg` 大图 tooltip。侧边栏使用 `add_2p.png` 背景。14 个收获标记。ResizeObserver 响应式缩放。
+- `FarmBoard` — 田地播种改为图标化交互：田内作物用堆叠 seed icon 显示，`sow` 选择器改为 grain / vegetable 图标按钮；收获喂养阶段若存在可转换资源，会自动弹出 exchange center 浮层并提交实际转换结果。
+- Harvest log — 服务端在 `GameSession` 中权威记录 `reap / feed / breed` 三阶段日志，包括玩家收获、喂养转换、begging 与繁殖明细；顺序按起始玩家开始推进。
 - `FarmBoard` — 农场格网、围栏、播种、马厩交互；可选格/边由服务端 `interaction.farm` 下发。
 - `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
 - `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。

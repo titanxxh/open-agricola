@@ -109,7 +109,10 @@ export const InteractionBar = ({
       ) : harvestFeedPlayerName ? (
         <>
           <div className="interaction-title">
-            {t(locale, 'ui.harvestFeedConfirm')}
+            {t(locale, 'ui.harvestFeedTitle')}
+          </div>
+          <div className="interaction-subtitle">
+            {harvestFeedPlayerName}
           </div>
           <div className="interaction-actions">
             <button onClick={confirmHarvestFeed} disabled={!isInteractive}>

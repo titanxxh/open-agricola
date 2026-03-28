@@ -991,7 +991,7 @@ type PendingAction =
   | { type: 'none' }
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
+  | { type: 'harvestFeed'; playerIndex: number; remaining: number; foodUsed: number; feedQueue?: { index: number; remaining: number; foodUsed: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
 ```
 
@@ -1104,6 +1104,8 @@ type ActionHookResult = {
   → onStartHarvestFieldPhase → onHarvestFieldPhase → reap → onAfterReap → onEndHarvestFieldPhase
   → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase → feed → onEndHarvestFeedingPhase → onAfterFeed
   → breed → onEndHarvest → onAfterHarvest
+
+当前服务端收获结算按起始玩家开始、沿座位顺序推进 `reap / feed / breed` 三个子阶段；`harvestFeed` pending 会额外携带 `foodUsed`，前端据此展示喂养交换中心与进度摘要，并在玩家确认时把实际转换资源提交回权威 `GameSession`。
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。

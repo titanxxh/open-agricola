@@ -13,6 +13,7 @@ import { HttpGameTransport, WsGameTransport, type GameTransport } from '../servi
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateState } from '../../shared/game/serialization'
 import { useFarmSelection } from '../hooks/useFarmSelection'
+import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { FarmBoard } from '../components/board/FarmBoard'
@@ -210,6 +211,7 @@ export const GameContainerApi = () => {
   const [devMode, setDevMode] = useState(true)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
+  const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
   const [devPlayerId, setDevPlayerId] = useState('')
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -414,11 +416,6 @@ export const GameContainerApi = () => {
     if (!isInteractive) return
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
   }, [transport, isInteractive])
-  const confirmHarvestFeed = useCallback(() => {
-    if (!isInteractive) return
-    if (pending.type !== 'harvestFeed') return
-    void transport.confirmFeed(pending.playerIndex, []).catch((e) => console.error(e))
-  }, [pending, transport, isInteractive])
   const confirmAnimalReorg = useCallback(() => {
     if (!isInteractive) return
     if (pending.type !== 'animalReorg' || !animalReorg) return
@@ -462,7 +459,7 @@ export const GameContainerApi = () => {
           playerIndex: interaction.playerIndex,
           playerName: state.players[interaction.playerIndex]?.name ?? '',
           remaining: interaction.remaining,
-          foodUsed: 0,
+          foodUsed: interaction.foodUsed,
         }
       : null
   const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
@@ -609,6 +606,120 @@ export const GameContainerApi = () => {
   }
   const hasBakeSummary =
     summaryResources.food > 0 || summaryResources.grain > 0
+
+  const isHarvestFeedExchange = interaction.stateId === 'harvestFeed'
+  const harvestFeedPlayer =
+    isHarvestFeedExchange && state
+      ? state.players[interaction.playerIndex] ?? null
+      : null
+  const harvestFeedOptions = useMemo(
+    () =>
+      harvestFeedPlayer
+        ? buildHarvestFeedOptions(harvestFeedPlayer, locale, cardLabel)
+        : [],
+    [harvestFeedPlayer, locale],
+  )
+  const harvestFeedOptionIds = useMemo(
+    () => harvestFeedOptions.map((option) => option.id),
+    [harvestFeedOptions],
+  )
+  const harvestFeedKey = useMemo(
+    () => harvestFeedOptionIds.join('|'),
+    [harvestFeedOptionIds],
+  )
+  const harvestFeedKeyRef = useRef('')
+
+  useEffect(() => {
+    if (!isHarvestFeedExchange || harvestFeedOptionIds.length === 0) {
+      if (Object.keys(harvestFeedCounts).length > 0) {
+        setHarvestFeedCounts({})
+      }
+      harvestFeedKeyRef.current = ''
+      return
+    }
+    if (harvestFeedKeyRef.current === harvestFeedKey) return
+    const nextCounts: Record<string, number> = {}
+    harvestFeedOptionIds.forEach((id) => {
+      nextCounts[id] = 0
+    })
+    harvestFeedKeyRef.current = harvestFeedKey
+    setHarvestFeedCounts(nextCounts)
+  }, [
+    harvestFeedCounts,
+    harvestFeedKey,
+    harvestFeedOptionIds,
+    isHarvestFeedExchange,
+  ])
+
+  const getHarvestFeedUsageByResource = useCallback((counts: Record<string, number>) => {
+    const usage: Partial<Record<keyof Resource, number>> = {}
+    harvestFeedOptions.forEach((option) => {
+      const count = counts[option.id] ?? 0
+      if (count <= 0) return
+      usage[option.resourceKey] = (usage[option.resourceKey] ?? 0) + count
+    })
+    return usage
+  }, [harvestFeedOptions])
+
+  const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
+    setHarvestFeedCounts((prev) => {
+      const current = prev[id] ?? 0
+      const option = harvestFeedOptions.find((entry) => entry.id === id)
+      if (!option || !harvestFeedPlayer) return prev
+      const usage = getHarvestFeedUsageByResource(prev)
+      const available = harvestFeedPlayer.resources[option.resourceKey]
+      const usedByResource = usage[option.resourceKey] ?? 0
+      const max = current + Math.max(0, available - usedByResource)
+      const nextValue = Math.max(0, Math.min(current + delta, max))
+      if (nextValue === current) return prev
+      return { ...prev, [id]: nextValue }
+    })
+  }, [getHarvestFeedUsageByResource, harvestFeedOptions, harvestFeedPlayer])
+
+  const resetHarvestFeedCounts = useCallback(() => {
+    const nextCounts: Record<string, number> = {}
+    harvestFeedOptionIds.forEach((id) => {
+      nextCounts[id] = 0
+    })
+    setHarvestFeedCounts(nextCounts)
+  }, [harvestFeedOptionIds])
+
+  const harvestFeedSelections = useMemo(
+    () =>
+      harvestFeedOptions
+        .map((option) => ({
+          resourceKey: option.resourceKey,
+          count: harvestFeedCounts[option.id] ?? 0,
+          food: option.food,
+          sourceName: option.sourceName,
+        }))
+        .filter((entry) => entry.count > 0),
+    [harvestFeedCounts, harvestFeedOptions],
+  )
+  const harvestFeedConvertedFood = useMemo(
+    () =>
+      harvestFeedSelections.reduce((sum, entry) => sum + entry.count * entry.food, 0),
+    [harvestFeedSelections],
+  )
+  const harvestFeedBegging = Math.max(
+    0,
+    (harvestPending?.remaining ?? 0) - harvestFeedConvertedFood,
+  )
+  const harvestFeedSummary = useMemo(() => {
+    const resources = { ...emptyResources }
+    resources.food = (harvestPending?.foodUsed ?? 0) + harvestFeedConvertedFood
+    harvestFeedSelections.forEach((entry) => {
+      resources[entry.resourceKey] = (resources[entry.resourceKey] ?? 0) + entry.count
+    })
+    resources.begging = harvestFeedBegging
+    return resources
+  }, [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed])
+  const hasHarvestFeedSummary = Object.values(harvestFeedSummary).some((value) => value > 0)
+  const confirmHarvestFeed = useCallback(() => {
+    if (!isInteractive) return
+    if (pending.type !== 'harvestFeed') return
+    void transport.confirmFeed(pending.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
+  }, [pending, transport, isInteractive, harvestFeedSelections])
 
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
@@ -1044,6 +1155,119 @@ export const GameContainerApi = () => {
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
         isInteractive={isInteractive}
       />
+      {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
+        <div className="exchange-overlay">
+          <div className="exchange-modal">
+            <div className="exchange-header">
+              <div className="exchange-title">
+                {t(locale, 'ui.exchangeCenterTitle')}
+              </div>
+              <div className="exchange-subtitle">
+                {t(locale, 'ui.harvestFeedSubtitle', {
+                  player: harvestPending.playerName,
+                  count: harvestPending.remaining,
+                })}
+              </div>
+            </div>
+            <div className="exchange-content">
+              <div className="exchange-options">
+                {harvestFeedOptions.map((option) => {
+                  const current = harvestFeedCounts[option.id] ?? 0
+                  const usage = getHarvestFeedUsageByResource(harvestFeedCounts)
+                  const available = harvestFeedPlayer?.resources[option.resourceKey] ?? 0
+                  const usedByResource = usage[option.resourceKey] ?? 0
+                  const limit = current + Math.max(0, available - usedByResource)
+                  const canAdd = current < limit
+                  const canSubtract = current > 0
+                  return (
+                    <div key={option.id} className="exchange-row">
+                      <div className="exchange-name">{option.sourceName}</div>
+                      <div className="exchange-rate">
+                        <span className="interaction-resource-exchange">
+                          <ResourceLine
+                            locale={locale}
+                            resources={{
+                              ...emptyResources,
+                              [option.resourceKey]: 1,
+                            }}
+                            hideZero
+                          />
+                          <span className="interaction-resource-exchange-arrow" aria-hidden="true">
+                            <span className="res-icon res-icon-arrow" />
+                          </span>
+                          <ResourceLine
+                            locale={locale}
+                            resources={{
+                              ...emptyResources,
+                              food: option.food,
+                            }}
+                            hideZero
+                          />
+                        </span>
+                      </div>
+                      <div className="exchange-steps">
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateHarvestFeedCount(option.id, -1)}
+                          disabled={!canSubtract}
+                        >
+                          -
+                        </button>
+                        <div className="exchange-count">{current}</div>
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateHarvestFeedCount(option.id, 1)}
+                          disabled={!canAdd}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="exchange-footer">
+                <div className="exchange-summary">
+                  <div className="interaction-subtitle">
+                    {t(locale, 'ui.harvestFeedProgress', {
+                      fed: (harvestPending.foodUsed ?? 0) + harvestFeedConvertedFood,
+                      required: (harvestPending.foodUsed ?? 0) + harvestPending.remaining,
+                      begging: harvestFeedBegging,
+                    })}
+                  </div>
+                  {hasHarvestFeedSummary ? (
+                    <ResourceLine
+                      locale={locale}
+                      resources={harvestFeedSummary}
+                      emptyLabel={t(locale, 'ui.noResources')}
+                    />
+                  ) : (
+                    t(locale, 'ui.noResources')
+                  )}
+                </div>
+                <div className="exchange-actions">
+                  <button
+                    type="button"
+                    className="exchange-cancel"
+                    onClick={resetHarvestFeedCounts}
+                  >
+                    {t(locale, 'ui.exchangeReset')}
+                  </button>
+                  <button
+                    type="button"
+                    className="exchange-confirm"
+                    onClick={confirmHarvestFeed}
+                  >
+                    {t(locale, 'ui.interactionConfirmButton')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {isBakeExchange && pendingChoice ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">

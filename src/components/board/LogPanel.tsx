@@ -282,6 +282,41 @@ export const LogPanel = ({ locale, log }: Props) => (
         }
         if (
           params &&
+          (
+            entry.key === 'log.harvestReapDetail' ||
+            entry.key === 'log.harvestFeedDetail' ||
+            entry.key === 'log.harvestBreedDetail'
+          ) &&
+          typeof params.resources === 'object'
+        ) {
+          richParams.resources = (
+            <ResourceLine
+              locale={locale}
+              resources={params.resources as Partial<Resource>}
+            />
+          )
+        }
+        if (
+          params &&
+          entry.key === 'log.harvestFeedConvert' &&
+          typeof params.cost === 'object' &&
+          typeof params.food === 'object'
+        ) {
+          richParams.cost = (
+            <ResourceLine
+              locale={locale}
+              resources={params.cost as Partial<Resource>}
+            />
+          )
+          richParams.food = (
+            <ResourceLine
+              locale={locale}
+              resources={params.food as Partial<Resource>}
+            />
+          )
+        }
+        if (
+          params &&
           entry.key === 'log.cardEffectOtherPlayersGain' &&
           typeof params.gain === 'object'
         ) {

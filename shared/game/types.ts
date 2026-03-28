@@ -294,7 +294,13 @@ export type PendingAction =
       actionContext?: Record<string, unknown>
     }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
+  | {
+      type: 'harvestFeed'
+      playerIndex: number
+      remaining: number
+      foodUsed: number
+      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+    }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
   | { type: 'none' }
@@ -390,7 +396,8 @@ export type InteractionState =
       stateId: 'harvestFeed'
       playerIndex: number
       remaining: number
-      feedQueue?: { index: number; remaining: number }[]
+      foodUsed: number
+      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
     })
   | (InteractionBase & {
       stateId: 'confirmNextPlayer'

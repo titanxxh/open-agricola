@@ -367,6 +367,51 @@ export class GameSession {
     return current
   }
 
+  private getStartPlayerIdx() {
+    const startIdx = this.state.players.findIndex((player) => player.startPlayer)
+    return startIdx === -1 ? 0 : startIdx
+  }
+
+  private getHarvestPlayerIndices() {
+    const players = this.state.players
+    const startIdx = this.getStartPlayerIdx()
+    return players.map((_, offset) => (startIdx + offset) % players.length)
+  }
+
+  private hasPositiveResources(resources: Partial<Resource>) {
+    return resourceKeyList.some((key) => (resources[key] ?? 0) > 0)
+  }
+
+  private logHarvestResourceEntry(key: string, player: PlayerState, resources: Partial<Resource>) {
+    if (!this.hasPositiveResources(resources)) return
+    this.state.log.unshift({
+      key,
+      params: {
+        player: player.name,
+        resources,
+      },
+    })
+  }
+
+  private hasHarvestCooking(player: PlayerState) {
+    return player.improvements.some((id) =>
+      id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
+  }
+
+  private findNextHarvestReorgPlayer(afterPlayerIndex: number) {
+    const order = this.getHarvestPlayerIndices()
+    const currentOrderIndex = order.indexOf(afterPlayerIndex)
+    if (currentOrderIndex === -1) return -1
+    for (let offset = 1; offset < order.length; offset += 1) {
+      const nextIndex = order[(currentOrderIndex + offset) % order.length]
+      const player = nextIndex === undefined ? null : this.state.players[nextIndex]
+      if (player && this.hasPendingAnimals(player)) {
+        return nextIndex
+      }
+    }
+    return -1
+  }
+
   private createSyntheticSpace(id: string): ActionSpace {
     return {
       id,
@@ -549,6 +594,7 @@ export class GameSession {
         stateId: 'harvestFeed',
         playerIndex: this.pending.playerIndex,
         remaining: this.pending.remaining,
+        foodUsed: this.pending.foodUsed,
         feedQueue: this.pending.feedQueue,
         allowedCommands: ['confirmFeed', 'undoStep', 'undoAction'],
         anytimeActions: [],
@@ -931,15 +977,29 @@ export class GameSession {
     if (this.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((player) => runStartHarvestHooks(this.state, player))
+    const harvestOrder = this.getHarvestPlayerIndices()
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runStartHarvestHooks(this.state, player)
+    })
 
     this.state.phase = 'field'
-    this.state.players.forEach((player) => runStartHarvestFieldPhaseHooks(this.state, player))
-    this.state.players.forEach((player) => runHarvestFieldPhaseHooks(this.state, player))
+    this.state.log.unshift({ key: 'log.harvestPhaseReap' })
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runStartHarvestFieldPhaseHooks(this.state, player)
+    })
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runHarvestFieldPhaseHooks(this.state, player)
+    })
     this.state.harvestReapSummary = {}
-    this.state.players.forEach((player) => {
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (!player) return
       const result = reap(player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
+      this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
     })
     return this.continueAfterReapEffects()
   }
@@ -948,7 +1008,10 @@ export class GameSession {
     if (this.continueStageHook('onAfterReap', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((player) => runEndHarvestFieldPhaseHooks(this.state, player))
+    this.getHarvestPlayerIndices().forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runEndHarvestFieldPhaseHooks(this.state, player)
+    })
     delete this.state.harvestReapSummary
     this.state.phase = 'harvest'
     return this.continueHarvestEffects()
@@ -960,15 +1023,23 @@ export class GameSession {
     }
 
     this.state.phase = 'feeding'
+    const harvestOrder = this.getHarvestPlayerIndices()
     if (this.continueStageHook('onStartHarvestFeedingPhase')) {
       return this.respond()
     }
-    this.state.players.forEach((player) => runBeforeFeedHooks(this.state, player))
-    this.state.players.forEach((player) => runHarvestFeedingPhaseHooks(this.state, player))
+    this.state.log.unshift({ key: 'log.harvestPhaseFeed' })
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runBeforeFeedHooks(this.state, player)
+    })
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runHarvestFeedingPhaseHooks(this.state, player)
+    })
 
-    const feedQueue: { index: number; remaining: number }[] = []
+    const feedQueue: { index: number; remaining: number; foodUsed: number }[] = []
 
-    for (let i = 0; i < this.state.players.length; i += 1) {
+    for (const i of harvestOrder) {
       const player = this.state.players[i]!
       const newborn = Math.min(player.newbornCount, player.familySize)
       const required = Math.max(0, player.familySize * 2 - newborn)
@@ -976,17 +1047,25 @@ export class GameSession {
       player.resources.food -= useFood
       const remaining = required - useFood
 
-      if (remaining <= 0) continue
+      if (remaining <= 0) {
+        if (useFood > 0) {
+          this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
+        }
+        continue
+      }
 
-      const hasCooking = player.improvements.some((id) =>
-        id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
+      const hasCooking = this.hasHarvestCooking(player)
       const canConvert = player.resources.grain > 0 || player.resources.vegetable > 0 ||
         (hasCooking && (player.resources.sheep > 0 || player.resources.boar > 0 || player.resources.cattle > 0))
 
       if (canConvert) {
-        feedQueue.push({ index: i, remaining })
+        feedQueue.push({ index: i, remaining, foodUsed: useFood })
       } else {
         player.resources.begging += remaining
+        this.logHarvestResourceEntry('log.harvestFeedDetail', player, {
+          food: useFood,
+          begging: remaining,
+        })
       }
     }
 
@@ -996,6 +1075,7 @@ export class GameSession {
         type: 'harvestFeed',
         playerIndex: first.index,
         remaining: first.remaining,
+        foodUsed: first.foodUsed,
         feedQueue: feedQueue.slice(1),
       }
       return this.respond()
@@ -1574,7 +1654,7 @@ export class GameSession {
       return this.finalizeRound()
     }
     if (source === 'harvest-breed') {
-      const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+      const nextPending = this.findNextHarvestReorgPlayer(this.pending.playerIndex)
       if (nextPending !== -1) {
         this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'harvest-breed' }
         return this.respond()
@@ -1594,7 +1674,7 @@ export class GameSession {
     return this.respond()
   }
 
-  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number }[]): SessionResponse {
+  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string }[]): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
     }
@@ -1603,18 +1683,31 @@ export class GameSession {
     if (!player) return this.respond(false, 'invalid player')
 
     let totalFood = 0
+    const usedResources: Partial<Resource> = { food: this.pending.foodUsed }
     for (const sel of selections) {
       if (sel.count <= 0) continue
       const available = player.resources[sel.resourceKey]
       const used = Math.min(sel.count, available)
       player.resources[sel.resourceKey] -= used
       totalFood += used * sel.food
+      usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
+      this.state.log.unshift({
+        key: 'log.harvestFeedConvert',
+        params: {
+          player: player.name,
+          source: sel.sourceName ?? 'Harvest conversion',
+          cost: { [sel.resourceKey]: used },
+          food: { food: used * sel.food },
+        },
+      })
     }
     const required = this.pending.remaining
     const deficit = Math.max(0, required - totalFood)
     if (deficit > 0) {
       player.resources.begging += deficit
+      usedResources.begging = (usedResources.begging ?? 0) + deficit
     }
+    this.logHarvestResourceEntry('log.harvestFeedDetail', player, usedResources)
 
     const feedQueue = this.pending.feedQueue ?? []
     if (feedQueue.length > 0) {
@@ -1623,6 +1716,7 @@ export class GameSession {
         type: 'harvestFeed', 
         playerIndex: next.index, 
         remaining: next.remaining,
+        foodUsed: next.foodUsed,
         feedQueue: feedQueue.slice(1)
       }
       return this.respond()
@@ -1708,11 +1802,22 @@ export class GameSession {
 
   private startBreedPhase(): SessionResponse {
     this.state.phase = 'breeding'
-    this.state.players.forEach((p) => runEndHarvestFeedingPhaseHooks(this.state, p))
-    this.state.players.forEach((p) => runAfterFeedHooks(this.state, p))
+    const harvestOrder = this.getHarvestPlayerIndices()
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runEndHarvestFeedingPhaseHooks(this.state, player)
+    })
+    harvestOrder.forEach((index) => {
+      const player = this.state.players[index]
+      if (player) runAfterFeedHooks(this.state, player)
+    })
+    this.state.log.unshift({ key: 'log.harvestPhaseBreed' })
     this.applyBreedPhase()
     
-    const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+    const pendingAnimal = harvestOrder.find((index) => {
+      const player = this.state.players[index]
+      return !!player && this.hasPendingAnimals(player)
+    }) ?? -1
     if (pendingAnimal !== -1) {
       this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
       return this.respond()
@@ -1723,9 +1828,12 @@ export class GameSession {
 
   private applyBreedPhase() {
     this.state.harvestBreedSummary = {}
-    this.state.players.forEach((p) => {
+    this.getHarvestPlayerIndices().forEach((index) => {
+      const p = this.state.players[index]
+      if (!p) return
       const result = breedAnimals(p)
       this.state.harvestBreedSummary![p.id] = result.breedSummary
+      this.logHarvestResourceEntry('log.harvestBreedDetail', p, result.breedSummary.resources)
     })
   }
 
