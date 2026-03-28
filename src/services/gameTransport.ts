@@ -35,9 +35,7 @@ export interface GameTransport {
   destroy(): void
 }
 
-const BACKEND_PORT = 5175
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = `http://${backendHost}:${BACKEND_PORT}`
+import { API_BASE, WS_BASE } from '../config'
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
@@ -154,7 +152,7 @@ export class HttpGameTransport implements GameTransport {
   }
 }
 
-const WS_BASE = `ws://${backendHost}:${BACKEND_PORT}/ws`
+// WS_BASE imported from config
 
 const TOKEN_KEY = 'open-agricola-token'
 

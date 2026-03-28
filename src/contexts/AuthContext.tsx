@@ -1,7 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
-
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+import { API_BASE } from '../config'
 
 const TOKEN_KEY = 'open-agricola-token'
 
