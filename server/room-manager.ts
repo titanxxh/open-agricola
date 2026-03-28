@@ -189,7 +189,53 @@ function savePersistedStateSqlite(roomId: string, serialized: SerializedGameStat
   }
 }
 
+/** Write a room row to SQLite when it is first created (before any state). */
+function ensureRoomRowSqlite(room: Room): void {
+  if (PERSIST_ROOMS !== 'sqlite') return
+  try {
+    const db = getDb()
+    const now = Date.now()
+    const exists = db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(room.id)
+    if (!exists) {
+      db.prepare(
+        'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, 0, ?, ?, ?)',
+      ).run(room.id, room.createdBy ?? null, room.maxPlayers, 'waiting', '[]', now, now)
+    }
+  } catch (err) {
+    console.warn('[room-manager] ensureRoomRow failed:', err)
+  }
+}
+
+/** Upsert a player row in room_players. */
+function upsertRoomPlayer(roomId: string, userId: string, playerIndex: number): void {
+  if (PERSIST_ROOMS !== 'sqlite' || !userId) return
+  try {
+    const db = getDb()
+    const now = Date.now()
+    const exists = db.prepare(
+      'SELECT 1 FROM room_players WHERE room_id = ? AND user_id = ?',
+    ).get(roomId, userId)
+    if (!exists) {
+      db.prepare(
+        'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
+      ).run(roomId, userId, playerIndex, now)
+    }
+  } catch (err) {
+    console.warn('[room-manager] upsertRoomPlayer failed:', err)
+  }
+}
+
 // ── Room lifecycle ───────────────────────────────────────────────────────────
+
+function loadRoomFromState(roomId: string, serialized: SerializedGameState, maxPlayers = 2, createdBy?: string): Room {
+  const session = new GameSession()
+  try {
+    session.loadState(rehydrateState(serialized))
+  } catch (err) {
+    console.warn(`[room-manager] failed to rehydrate room ${roomId}, starting fresh:`, err)
+  }
+  return { id: roomId, session, players: [], maxPlayers, version: 0, createdBy }
+}
 
 function ensurePersistentRoom(): void {
   if (rooms.has(FIXED_DEV_ROOM_ID)) return
@@ -210,6 +256,39 @@ function ensurePersistentRoom(): void {
     version: 0,
   }
   rooms.set(FIXED_DEV_ROOM_ID, room)
+}
+
+/**
+ * In SQLite mode: restore all 'playing' rooms from the database into memory.
+ * Called once at startup. Players will reconnect via joinRoom.
+ */
+function restoreRoomsFromSqlite(): void {
+  if (PERSIST_ROOMS !== 'sqlite') return
+  try {
+    const db = getDb()
+    const rows = db.prepare(
+      "SELECT id, created_by, state_json, max_players FROM rooms WHERE status = 'playing' AND id != ?",
+    ).all(FIXED_DEV_ROOM_ID) as Array<{
+      id: string
+      created_by: string | null
+      state_json: string | null
+      max_players: number
+    }>
+    for (const row of rows) {
+      if (rooms.has(row.id)) continue
+      if (!row.state_json) continue
+      try {
+        const serialized = JSON.parse(row.state_json) as SerializedGameState
+        const room = loadRoomFromState(row.id, serialized, row.max_players, row.created_by ?? undefined)
+        rooms.set(row.id, room)
+        console.log(`[room-manager] restored room ${row.id} from SQLite`)
+      } catch (err) {
+        console.warn(`[room-manager] failed to restore room ${row.id}:`, err)
+      }
+    }
+  } catch (err) {
+    console.warn('[room-manager] restoreRoomsFromSqlite failed:', err)
+  }
 }
 
 const generateRoomId = () => Math.random().toString(36).slice(2, 8)
@@ -274,6 +353,7 @@ const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
 
 export const createWsServer = (server: import('node:http').Server) => {
   ensurePersistentRoom()
+  restoreRoomsFromSqlite()
   const wss = new WebSocketServer({ server, path: '/ws' })
 
   wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
@@ -333,6 +413,9 @@ export const createWsServer = (server: import('node:http').Server) => {
           ? (msg as Record<string, unknown>).name as string
           : 'Player 1'
         room.players.push({ ws, playerIndex: 0, name, userId: currentUserId })
+        // Persist room creation in SQLite
+        ensureRoomRowSqlite(room)
+        if (currentUserId) upsertRoomPlayer(roomId, currentUserId, 0)
         sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0 })
         return
       }
@@ -365,6 +448,9 @@ export const createWsServer = (server: import('node:http').Server) => {
         )
         room.players.push({ ws, playerIndex: currentPlayerIndex, name, userId: currentUserId })
         room.players.sort((a, b) => a.playerIndex - b.playerIndex)
+        // Persist player join in SQLite
+        ensureRoomRowSqlite(room)
+        if (currentUserId) upsertRoomPlayer(roomId, currentUserId, currentPlayerIndex)
         sendTo(ws, { type: 'roomJoined', roomId, playerIndex: currentPlayerIndex })
         if (room.players.length === room.maxPlayers) {
           const resp = room.session.getState()

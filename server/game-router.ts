@@ -4,6 +4,7 @@ import { serializeState } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from './fence-validation.ts'
 import { applyFarmChoice } from './farm-choice.ts'
 import { getDb } from './db.ts'
+import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/custom-registry.ts'
 
 let session: GameSession | null = null
@@ -249,15 +250,28 @@ export const handleGameRoute = async (
       }
     } catch { /* ignore */ }
 
-    // Load custom card data from the database
+    // Identify the requesting user (optional — allows loading own draft cards)
+    const requestUser = validateSession(extractToken(req.headers.authorization))
+
+    // Load custom card data from the database.
+    // Allow: published cards (anyone) OR draft cards owned by the requesting user.
     const customCards: CustomCardData[] = []
     if (customCardDbIds.length > 0) {
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          "SELECT card_type, card_json, effect_dsl FROM workshop_cards WHERE id = ? AND status = 'published'",
-        ).get(dbId) as { card_type: string; card_json: string; effect_dsl: string | null } | undefined
+          `SELECT card_type, card_json, effect_dsl, status, author_id
+           FROM workshop_cards WHERE id = ?`,
+        ).get(dbId) as {
+          card_type: string; card_json: string; effect_dsl: string | null
+          status: string; author_id: string
+        } | undefined
         if (!row) continue
+        // Allow published cards, or draft cards if requester is the author
+        const allowed =
+          row.status === 'published' ||
+          (row.status === 'draft' && requestUser?.id === row.author_id)
+        if (!allowed) continue
         try {
           customCards.push({
             cardType: row.card_type as 'minor' | 'occupation',
