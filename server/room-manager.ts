@@ -6,6 +6,8 @@ import { GameSession, type SessionResponse } from './game-session.ts'
 import { serializeState, rehydrateState, type SerializedGameState } from '../shared/game/serialization.ts'
 import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../shared/protocol/game.ts'
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws.ts'
+import { validateSession } from './auth.ts'
+import { getDb } from './db.ts'
 
 /** Fixed room ID for dev: one persistent room, survives backend restart. */
 export const FIXED_DEV_ROOM_ID = process.env.PERSISTENT_ROOM_ID ?? 'dev'
@@ -13,10 +15,35 @@ export const FIXED_DEV_ROOM_ID = process.env.PERSISTENT_ROOM_ID ?? 'dev'
 const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
 const LEGACY_PERSISTED_ROOM_FILE = process.env.PERSISTED_ROOM_FILE ?? join(process.cwd(), '.persisted-room.json')
 
+/**
+ * Persistence backend for rooms:
+ *   - 'json' (default): JSON files in output/ — no auth required, existing behaviour
+ *   - 'sqlite': SQLite rooms table — recommended for production
+ *
+ * Set via env: PERSIST_ROOMS=sqlite
+ */
+const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'json') as 'json' | 'sqlite'
+
+/**
+ * When true, WebSocket connections are NOT required to send an auth token.
+ * Default true in development (NODE_ENV != production), false otherwise.
+ * Override with env: ALLOW_ANONYMOUS_WS=true|false
+ */
+const ALLOW_ANONYMOUS_WS: boolean = (() => {
+  if (process.env.ALLOW_ANONYMOUS_WS !== undefined) {
+    return process.env.ALLOW_ANONYMOUS_WS === 'true'
+  }
+  return process.env.NODE_ENV !== 'production'
+})()
+
+/** Seconds to wait for auth message before closing unauthenticated connection. */
+const WS_AUTH_TIMEOUT_MS = 5000
+
 type RoomPlayer = {
   ws: WebSocket
   playerIndex: number
   name: string
+  userId?: string
 }
 
 type Room = {
@@ -25,6 +52,7 @@ type Room = {
   players: RoomPlayer[]
   maxPlayers: number
   version: number
+  createdBy?: string
 }
 
 const rooms = new Map<string, Room>()
@@ -80,12 +108,28 @@ export const resolveJoinPlayerIndex = (
   return { ok: false, error: 'room full' }
 }
 
+// ── Persistence helpers ──────────────────────────────────────────────────────
+
 function loadPersistedState(roomId: string): SerializedGameState | null {
+  if (PERSIST_ROOMS === 'sqlite') {
+    return loadPersistedStateSqlite(roomId)
+  }
+  return loadPersistedStateJson(roomId)
+}
+
+function savePersistedState(roomId: string, serialized: SerializedGameState, room?: Room): void {
+  if (PERSIST_ROOMS === 'sqlite') {
+    savePersistedStateSqlite(roomId, serialized, room)
+  } else {
+    savePersistedStateJson(roomId, serialized)
+  }
+}
+
+function loadPersistedStateJson(roomId: string): SerializedGameState | null {
   const candidates = [getPersistedRoomFile(roomId)]
   if (roomId === FIXED_DEV_ROOM_ID) {
     candidates.push(LEGACY_PERSISTED_ROOM_FILE)
   }
-
   for (const filePath of candidates) {
     if (!existsSync(filePath)) continue
     try {
@@ -98,7 +142,7 @@ function loadPersistedState(roomId: string): SerializedGameState | null {
   return null
 }
 
-function savePersistedState(roomId: string, serialized: SerializedGameState): void {
+function savePersistedStateJson(roomId: string, serialized: SerializedGameState): void {
   try {
     mkdirSync(PERSISTED_ROOMS_DIR, { recursive: true })
     writeFileSync(
@@ -107,9 +151,45 @@ function savePersistedState(roomId: string, serialized: SerializedGameState): vo
       'utf-8',
     )
   } catch (err) {
-    console.warn('[room-manager] persist failed:', err)
+    console.warn('[room-manager] persist (json) failed:', err)
   }
 }
+
+function loadPersistedStateSqlite(roomId: string): SerializedGameState | null {
+  try {
+    const db = getDb()
+    const row = db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(roomId) as
+      | { state_json: string | null }
+      | undefined
+    if (!row?.state_json) return null
+    return JSON.parse(row.state_json) as SerializedGameState
+  } catch (err) {
+    console.warn('[room-manager] persist (sqlite) load failed:', err)
+    return null
+  }
+}
+
+function savePersistedStateSqlite(roomId: string, serialized: SerializedGameState, room?: Room): void {
+  try {
+    const db = getDb()
+    const now = Date.now()
+    const stateJson = JSON.stringify(serialized)
+    const existing = db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId)
+    if (existing) {
+      db.prepare(
+        'UPDATE rooms SET state_json = ?, status = ?, version = version + 1, updated_at = ? WHERE id = ?',
+      ).run(stateJson, 'playing', now, roomId)
+    } else {
+      db.prepare(
+        'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+      ).run(roomId, room?.createdBy ?? null, stateJson, room?.maxPlayers ?? 2, 'playing', '[]', now, now)
+    }
+  } catch (err) {
+    console.warn('[room-manager] persist (sqlite) save failed:', err)
+  }
+}
+
+// ── Room lifecycle ───────────────────────────────────────────────────────────
 
 function ensurePersistentRoom(): void {
   if (rooms.has(FIXED_DEV_ROOM_ID)) return
@@ -171,8 +251,9 @@ const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCau
     emittedAt: Date.now(),
   }
   broadcast(room, envelope)
-  if (room.id === FIXED_DEV_ROOM_ID) {
-    savePersistedState(room.id, serializeState(resp.state))
+  // Persist on every state change for sqlite, only dev room for json
+  if (PERSIST_ROOMS === 'sqlite' || room.id === FIXED_DEV_ROOM_ID) {
+    savePersistedState(room.id, serializeState(resp.state), room)
   }
 }
 
@@ -189,6 +270,8 @@ const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
   sendTo(ws, envelope)
 }
 
+// ── WebSocket server ─────────────────────────────────────────────────────────
+
 export const createWsServer = (server: import('node:http').Server) => {
   ensurePersistentRoom()
   const wss = new WebSocketServer({ server, path: '/ws' })
@@ -196,25 +279,60 @@ export const createWsServer = (server: import('node:http').Server) => {
   wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
     let currentRoom: Room | null = null
     let currentPlayerIndex = -1
+    let currentUserId: string | undefined
+    let authenticated = ALLOW_ANONYMOUS_WS // anonymous allowed in dev
+
+    // In production: close connection if auth not received within timeout
+    let authTimer: ReturnType<typeof setTimeout> | undefined
+    if (!ALLOW_ANONYMOUS_WS) {
+      authTimer = setTimeout(() => {
+        if (!authenticated) {
+          sendTo(ws, { type: 'error', error: 'authentication timeout' })
+          ws.close()
+        }
+      }, WS_AUTH_TIMEOUT_MS)
+    }
 
     ws.on('message', (raw: Buffer) => {
       let msg: ClientCommand
       try { msg = JSON.parse(raw.toString()) as ClientCommand } catch { return }
 
+      // ── Auth handshake ───────────────────────────────────────────────────
+      if (msg.type === 'auth') {
+        const user = validateSession(msg.token)
+        if (!user) {
+          sendTo(ws, { type: 'error', error: 'invalid or expired token' })
+          if (!ALLOW_ANONYMOUS_WS) ws.close()
+          return
+        }
+        authenticated = true
+        currentUserId = user.id
+        clearTimeout(authTimer)
+        sendTo(ws, { type: 'authOk', userId: user.id, username: user.username })
+        return
+      }
+
+      // Gate all non-auth commands behind authentication
+      if (!authenticated) {
+        sendTo(ws, { type: 'error', error: 'not authenticated' })
+        return
+      }
+
+      // ── Room commands ────────────────────────────────────────────────────
       if (msg.type === 'createRoom') {
         const roomId = generateRoomId()
         const maxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
           ? (msg as Record<string, unknown>).maxPlayers as number
           : 2
         const session = new GameSession()
-        const room: Room = { id: roomId, session, players: [], maxPlayers, version: 0 }
+        const room: Room = { id: roomId, session, players: [], maxPlayers, version: 0, createdBy: currentUserId }
         rooms.set(roomId, room)
         currentRoom = room
         currentPlayerIndex = 0
         const name = typeof (msg as Record<string, unknown>).name === 'string'
           ? (msg as Record<string, unknown>).name as string
           : 'Player 1'
-        room.players.push({ ws, playerIndex: 0, name })
+        room.players.push({ ws, playerIndex: 0, name, userId: currentUserId })
         sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0 })
         return
       }
@@ -239,17 +357,13 @@ export const createWsServer = (server: import('node:http').Server) => {
             (player) => player.playerIndex === currentPlayerIndex,
           )
           if (existingPlayer) {
-            try {
-              existingPlayer.ws.close()
-            } catch {
-              // Ignore close errors during reconnect replacement.
-            }
+            try { existingPlayer.ws.close() } catch { /* ignore */ }
           }
         }
         room.players = room.players.filter(
           (player) => player.ws !== ws && player.playerIndex !== currentPlayerIndex,
         )
-        room.players.push({ ws, playerIndex: currentPlayerIndex, name })
+        room.players.push({ ws, playerIndex: currentPlayerIndex, name, userId: currentUserId })
         room.players.sort((a, b) => a.playerIndex - b.playerIndex)
         sendTo(ws, { type: 'roomJoined', roomId, playerIndex: currentPlayerIndex })
         if (room.players.length === room.maxPlayers) {
@@ -318,7 +432,6 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'commitFarm') {
-        // Use server-side currentPlayerIndex for security - don't trust client
         const resp = room.session.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload)
         broadcastState(room, resp, 'choice')
         return
@@ -350,7 +463,6 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'devCreatePasture') {
-        // Use server-side currentPlayerIndex for consistency
         const resp = room.session.startDevFenceSelect(currentPlayerIndex)
         broadcastState(room, resp, 'action')
         return
@@ -358,13 +470,12 @@ export const createWsServer = (server: import('node:http').Server) => {
     })
 
     ws.on('close', () => {
+      clearTimeout(authTimer)
       if (currentRoom) {
         const beforeCount = currentRoom.players.length
         currentRoom.players = currentRoom.players.filter((p) => p.ws !== ws)
         const wasPresent = currentRoom.players.length !== beforeCount
-        if (!wasPresent) {
-          return
-        }
+        if (!wasPresent) return
         if (currentRoom.players.length === 0 && currentRoom.id !== FIXED_DEV_ROOM_ID) {
           rooms.delete(currentRoom.id)
         } else if (currentRoom.players.length > 0) {
