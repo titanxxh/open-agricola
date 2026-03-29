@@ -17,9 +17,9 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   const result: CustomCardData[] = []
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, effect_dsl, status, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, effect_dsl, compiled_code, status, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
-      card_type: string; card_json: string; effect_dsl: string | null
+      card_type: string; card_json: string; effect_dsl: string | null; compiled_code: string | null
       status: string; author_id: string
     } | undefined
     if (!row) continue
@@ -30,6 +30,7 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
         cardType: row.card_type as 'minor' | 'occupation',
         cardJson: JSON.parse(row.card_json),
         effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+        compiledCode: row.compiled_code ?? null,
       })
     } catch { /* skip malformed */ }
   }
@@ -441,7 +442,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }, WS_AUTH_TIMEOUT_MS)
     }
 
-    ws.on('message', (raw: Buffer) => {
+    ws.on('message', async (raw: Buffer) => {
       let msg: ClientCommand
       try { msg = JSON.parse(raw.toString()) as ClientCommand } catch { return }
 
@@ -477,6 +478,9 @@ export const createWsServer = (server: import('node:http').Server) => {
           ? (msg as Record<string, unknown>).customCardIds as string[]
           : []
         const customCards = loadCustomCardsFromDb(customCardDbIds, currentUserId)
+        if (customCards.length > 0) {
+          await GameSession.preloadCardFiles(customCards)
+        }
         const session = new GameSession(undefined, customCards.length > 0 ? customCards : undefined)
         const room: Room = { id: roomId, session, players: [], maxPlayers, version: 0, createdBy: currentUserId }
         rooms.set(roomId, room)

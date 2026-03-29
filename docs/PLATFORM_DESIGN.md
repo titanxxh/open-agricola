@@ -559,14 +559,14 @@ WorkshopPage
 
 ## J. 实现状态（platform 分支）
 
-> 更新于 2026-03-28
+> 更新于 2026-03-29
 
 ### 已完成
 
 | 功能 | 文件 |
 |------|------|
 | 注册/登录/登出/会话验证 | `server/auth.ts`, `src/app/LoginPage.tsx`, `src/contexts/AuthContext.tsx` |
-| SQLite 数据库 + migration | `server/db.ts` |
+| SQLite 数据库 + migration (v1-v3) | `server/db.ts` |
 | WebSocket 认证握手 | `server/room-manager.ts`, `shared/protocol/ws.ts` |
 | WS 房间 → SQLite 写入 | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer) |
 | 服务器重启恢复房间 | `server/room-manager.ts` (restoreRoomsFromSqlite) |
@@ -584,7 +584,9 @@ WorkshopPage
 | 工坊社交（点赞/评论） | `server/workshop.ts` |
 | 工坊沙盒 | `server/workshop.ts`, WorkshopPage SandboxView |
 | 自定义 DSL 效果系统 | `shared/cards/custom-dsl-runner.ts` |
-| 自定义卡牌注册表 | `shared/cards/custom-registry.ts` |
+| 自定义卡牌注册表 + catalog fallback | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts` |
+| 自定义卡牌 try-catch 容错 | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过) |
+| DSL 系统单元测试 | `shared/cards/__tests__/custom-dsl-runner.test.ts`, `custom-registry.test.ts` |
 | 单人沙盒游戏（含自定义卡牌） | `/api/game/new-sandbox`, `server/game-router.ts` |
 | WS 多人游戏含自定义卡牌 | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts` |
 | LLM 卡牌设计师 | `src/app/workshop/AiCardDesigner.tsx`, `src/services/llmService.ts` |
@@ -593,13 +595,14 @@ WorkshopPage
 | 卡牌美术生成 + 上传 | DALL-E 3 + `POST /api/workshop/art` + `/card-art/` 静态服务 |
 | 资源图标解析 | `src/components/common/ResourceText.tsx` |
 | auth/workshop 单元测试 | `server/__tests__/auth.test.ts`, `workshop-api.test.ts` |
+| TypeScript AST 验证 + VM 沙盒 | `server/ast-validator.ts`, `server/card-compiler.ts`, WorkshopPage 代码模式 |
+| 卡牌版本历史 | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板 |
+| 工坊精选页面 | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页 |
+| 生产部署 (Docker + GitHub Pages) | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `src/config.ts` |
+| 管理员角色 | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量 |
 
-### 未完成（Phase 5 可选）
+### 未完成（可选）
 
 | 功能 | 说明 |
 |------|------|
-| TypeScript AST 验证 | 允许完整 TS 卡牌代码，AST 白名单验证后 vm.runInContext() 执行 |
-| 卡牌版本历史 | 更新卡牌时保留旧版本快照 |
-| 工坊 Featured 页面 | 编辑推荐/精选卡牌展示 |
-| 邮箱验证 | 注册后验证邮件（当前无邮件系统）|
-| Nginx 生产配置 | WebSocket 代理 + 静态文件 |
+| 邮箱验证 | 注册后验证邮件（需要外部邮件服务）|

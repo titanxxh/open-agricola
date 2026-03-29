@@ -50,6 +50,8 @@ import {
   getCustomOccupationIds,
   type CustomCardData,
 } from '../shared/cards/custom-registry.ts'
+import { executeCardCode } from './card-compiler.ts'
+import { loadCardFile, cardFileExists } from './card-file-manager.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
 import {
   runRoundEndHooks,
@@ -212,10 +214,25 @@ export class GameSession {
     this.engineLog = new LogStore()
 
     // Register custom workshop cards (sandbox mode)
+    // .ts files are loaded async via loadCustomCardFiles() before constructor
+    // Here we handle DSL/VM fallback for cards without .ts files
     clearCustomCards()
     if (customCards && customCards.length > 0) {
       for (const cardData of customCards) {
         try {
+          // Skip .ts-file-loaded cards (effects already registered by import side effects)
+          if (cardData.loadedFromFile) {
+            registerCustomCard(cardData)
+            continue
+          }
+          // Fallback: execute compiled code in VM sandbox
+          if (cardData.compiledCode) {
+            try {
+              executeCardCode(cardData.compiledCode, cardData.cardJson.id)
+            } catch (err) {
+              console.warn(`[game-session] compiled code execution failed for ${cardData.cardJson.id}:`, err)
+            }
+          }
           registerCustomCard(cardData)
         } catch (err) {
           console.warn(`[game-session] failed to register custom card ${cardData.cardJson.id}:`, err)
@@ -230,6 +247,23 @@ export class GameSession {
       const extraMinorIds = getCustomMinorImprovementIds()
       const extraOccupationIds = getCustomOccupationIds()
       this.state = createInitialState(seed, extraMinorIds, extraOccupationIds)
+    }
+  }
+
+  /**
+   * Pre-load custom card .ts files (async). Call before constructor.
+   * Mutates cardData entries to mark loadedFromFile=true if the .ts import succeeded.
+   */
+  static async preloadCardFiles(customCards: CustomCardData[]): Promise<void> {
+    for (const cardData of customCards) {
+      const cardId = cardData.cardJson.id
+      if (!cardFileExists(cardId)) continue
+      try {
+        await loadCardFile(cardId) // side effects: registerCardEffect/registerCardListener
+        cardData.loadedFromFile = true
+      } catch (err) {
+        console.warn(`[game-session] .ts file load failed for ${cardId}, falling back:`, err)
+      }
     }
   }
 

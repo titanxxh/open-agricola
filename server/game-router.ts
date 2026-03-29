@@ -278,10 +278,10 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, status, author_id
+          `SELECT card_type, card_json, effect_dsl, compiled_code, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
-          card_type: string; card_json: string; effect_dsl: string | null
+          card_type: string; card_json: string; effect_dsl: string | null; compiled_code: string | null
           status: string; author_id: string
         } | undefined
         if (!row) continue
@@ -295,6 +295,7 @@ export const handleGameRoute = async (
             cardType: row.card_type as 'minor' | 'occupation',
             cardJson: JSON.parse(row.card_json),
             effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+            compiledCode: row.compiled_code ?? null,
           })
         } catch (err) {
           console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
@@ -302,6 +303,9 @@ export const handleGameRoute = async (
       }
     }
 
+    if (customCards.length > 0) {
+      await GameSession.preloadCardFiles(customCards)
+    }
     const sandboxSession = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
     // Set player name from authenticated user
     if (requestUser) {

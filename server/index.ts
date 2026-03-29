@@ -7,7 +7,7 @@ import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer, getRooms } from './room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
-import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword } from './auth.ts'
+import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 
@@ -159,7 +159,7 @@ const server = createServer(async (req, res) => {
       sendJson(res, 401, { ok: false, error: 'Not authenticated' })
       return
     }
-    sendJson(res, 200, { ok: true, user })
+    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username) } })
     return
   }
 

@@ -7,6 +7,7 @@ export type AuthUser = {
   id: string
   username: string
   displayName: string
+  isAdmin?: boolean
 }
 
 type AuthState = {
