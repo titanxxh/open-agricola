@@ -10,6 +10,8 @@ import { getDb, cleanExpiredSessions } from './db.ts'
 import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
+const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
+const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
 const CORS_HEADERS: Record<string, string> = {
@@ -187,6 +189,35 @@ const server = createServer(async (req, res) => {
     } catch {
       sendJson(res, 200, { ok: true, rooms: [] })
     }
+    return
+  }
+
+  // ── BGA images proxy ───────────────────────────────────
+  if (req.method === 'GET' && req.url?.startsWith('/bga-img/')) {
+    const imgPath = req.url.slice('/bga-img'.length)
+    // Local first (if BGA_IMAGE_DIR is set)
+    if (BGA_LOCAL_DIR) {
+      const filePath = join(BGA_LOCAL_DIR, imgPath)
+      if (existsSync(filePath)) {
+        const ext = extname(filePath).toLowerCase()
+        const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : ext === '.woff2' ? 'font/woff2' : ext === '.woff' ? 'font/woff' : ext === '.ttf' ? 'font/ttf' : 'application/octet-stream'
+        res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.end(readFileSync(filePath))
+        return
+      }
+    }
+    // CDN fallback
+    try {
+      const cdnRes = await fetch(`${BGA_CDN_BASE}${imgPath}`)
+      if (cdnRes.ok) {
+        const contentType = cdnRes.headers.get('content-type') || 'application/octet-stream'
+        const buf = await cdnRes.arrayBuffer()
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.end(Buffer.from(buf))
+        return
+      }
+    } catch { /* CDN unreachable */ }
+    sendJson(res, 404, { error: 'Not found' })
     return
   }
 

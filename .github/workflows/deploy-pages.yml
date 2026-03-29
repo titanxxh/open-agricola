@@ -2,10 +2,11 @@ name: Deploy Frontend to GitHub Pages
 
 on:
   push:
-    branches: [platform]
+    branches: [main]
     paths:
       - 'src/**'
       - 'shared/**'
+      - 'public/**'
       - 'index.html'
       - 'vite.config.ts'
       - 'package.json'
@@ -39,6 +40,8 @@ jobs:
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
+          VITE_BASE_PATH: /open-agricola/
+          BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
