@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
@@ -38,7 +38,7 @@ const getMinorImprovementBaseCost = (
 }
 
 const getMinorImprovementEffectiveCost = (
-  player: PlayerState,
+  _player: PlayerState,
   improvement: ResolvedMinorImprovement,
 ) => {
   if (improvement.altCosts && improvement.altCosts.length > 0) {

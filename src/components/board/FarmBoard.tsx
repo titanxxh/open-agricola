@@ -637,14 +637,6 @@ export const FarmBoard = ({
             : 0
           const pastureAnimalType = pastureDisplay?.animalType ?? null
           const pastureAnimalCount = pastureDisplay?.animalCount ?? 0
-          const pastureLabel = pastureInfo?.isCorner
-            ? pastureAnimalType
-              ? `${pastureAnimalCount}${t(
-                  locale,
-                  `resources.${pastureAnimalType}`,
-                )}/${pastureCapacity}`
-              : `0/${pastureCapacity}`
-            : null
           const houseLabel =
             tileKey === houseLabelKey
               ? houseDisplay.animalCount > 0

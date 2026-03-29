@@ -53,7 +53,7 @@ const renderRichTemplate = (
   const markerEntries = entries.map(([paramKey], index) => [paramKey, `__rich_${index}__`] as const)
   const markerParams = Object.fromEntries(markerEntries)
   const template = t(locale, key, { ...textParams, ...markerParams })
-  const markerToNode = new Map(
+  const markerToNode = new Map<string, ReactNode>(
     markerEntries.map(([paramKey, marker]) => [marker, richParams[paramKey]]),
   )
   const pattern = markerEntries.map(([, marker]) => escapeRegExp(marker)).join('|')

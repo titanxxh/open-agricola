@@ -41,7 +41,7 @@ export const buildCardCostListenerContext = (
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,
     execute: () => ({ type: 'ok' as const }),
-    resources: {},
+    resources: {} as Resource,
     takenBy: null,
   }
 
