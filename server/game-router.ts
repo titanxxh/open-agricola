@@ -7,14 +7,32 @@ import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/custom-registry.ts'
 
-let session: GameSession | null = null
+/**
+ * Per-user HTTP game sessions, keyed by user ID.
+ * 'anonymous' is the fallback for unauthenticated requests (dev mode).
+ * This prevents multiple logged-in users from sharing a single game state.
+ */
+const userSessions = new Map<string, GameSession>()
 
-const getSingletonSession = (): GameSession => {
-  if (!session) session = new GameSession()
-  return session
+const getSessionKey = (req: IncomingMessage): string => {
+  const user = validateSession(extractToken(req.headers.authorization))
+  return user?.id ?? 'anonymous'
 }
 
-export const setSession = (s: GameSession) => { session = s }
+const getSessionForRequest = (req: IncomingMessage): GameSession => {
+  const key = getSessionKey(req)
+  if (!userSessions.has(key)) {
+    userSessions.set(key, new GameSession())
+  }
+  return userSessions.get(key)!
+}
+
+const setSessionForRequest = (req: IncomingMessage, s: GameSession): void => {
+  userSessions.set(getSessionKey(req), s)
+}
+
+/** @deprecated Use getSessionForRequest instead. Kept for test compatibility. */
+export const setSession = (s: GameSession) => { userSessions.set('anonymous', s) }
 
 const readBody = (req: IncomingMessage): Promise<string> =>
   new Promise((resolve) => {
@@ -48,7 +66,7 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'GET' && req.url === '/api/game/state') {
-    const resp = getSingletonSession().getState()
+    const resp = getSessionForRequest(req).getState()
     sendJson(res, 200, respondWith(resp))
     return true
   }
@@ -59,7 +77,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().takeAction(body.playerIndex, body.spaceId)
+    const resp = getSessionForRequest(req).takeAction(body.playerIndex, body.spaceId)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -70,7 +88,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().resolveChoice(body.playerIndex, body.value)
+    const resp = getSessionForRequest(req).resolveChoice(body.playerIndex, body.value)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -81,7 +99,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().takeAnytimeAction(body.playerIndex, body.actionId)
+    const resp = getSessionForRequest(req).takeAnytimeAction(body.playerIndex, body.actionId)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -92,7 +110,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().confirmAnimalReorg(body.playerIndex, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1])
+    const resp = getSessionForRequest(req).confirmAnimalReorg(body.playerIndex, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1])
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -103,37 +121,37 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().confirmHarvestFeed(body.playerIndex, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1])
+    const resp = getSessionForRequest(req).confirmHarvestFeed(body.playerIndex, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1])
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
-    const resp = getSingletonSession().confirmNextPlayer()
+    const resp = getSessionForRequest(req).confirmNextPlayer()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
-    const resp = getSingletonSession().confirmPlayerSwitch()
+    const resp = getSessionForRequest(req).confirmPlayerSwitch()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
-    const resp = getSingletonSession().performRoundEnd()
+    const resp = getSessionForRequest(req).performRoundEnd()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo') {
-    const resp = getSingletonSession().undoStep()
+    const resp = getSessionForRequest(req).undoStep()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo-action') {
-    const resp = getSingletonSession().undoAction()
+    const resp = getSessionForRequest(req).undoAction()
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -141,7 +159,7 @@ export const handleGameRoute = async (
   if (req.method === 'GET' && req.url?.startsWith('/api/game/actions')) {
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')
-    const actions = getSingletonSession().getAvailableActions(playerIndex)
+    const actions = getSessionForRequest(req).getAvailableActions(playerIndex)
     sendJson(res, 200, { ok: true, actions })
     return true
   }
@@ -152,7 +170,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    const resp = getSingletonSession().loadState(body.state)
+    const resp = getSessionForRequest(req).loadState(body.state)
     sendJson(res, 200, respondWith(resp))
     return true
   }
@@ -163,7 +181,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().startDevFenceSelect(body.playerIndex)
+    const resp = getSessionForRequest(req).startDevFenceSelect(body.playerIndex)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -178,7 +196,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().commitFarmChoice(body.playerIndex, body.farmType, body.payload)
+    const resp = getSessionForRequest(req).commitFarmChoice(body.playerIndex, body.farmType, body.payload)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -189,7 +207,7 @@ export const handleGameRoute = async (
       playerId: string
       payload: Record<string, unknown>
     }
-    const state = getSingletonSession().getStateForRead()
+    const state = getSessionForRequest(req).getStateForRead()
     const playerIndex = state.players.findIndex((p) => p.id === body.playerId)
     if (playerIndex === -1) {
       sendJson(res, 400, { valid: false, error: 'Player not found' })
@@ -232,8 +250,8 @@ export const handleGameRoute = async (
       const body = JSON.parse(await readBody(req)) as { seed?: number }
       if (typeof body.seed === 'number') seed = body.seed
     } catch { /* no body or invalid JSON — use random seed */ }
-    session = new GameSession(seed)
-    const resp = getSingletonSession().getState()
+    setSessionForRequest(req, new GameSession(seed))
+    const resp = getSessionForRequest(req).getState()
     sendJson(res, 200, respondWith(resp))
     return true
   }
@@ -260,10 +278,10 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, status, author_id
+          `SELECT card_type, card_json, effect_dsl, compiled_code, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
-          card_type: string; card_json: string; effect_dsl: string | null
+          card_type: string; card_json: string; effect_dsl: string | null; compiled_code: string | null
           status: string; author_id: string
         } | undefined
         if (!row) continue
@@ -277,6 +295,7 @@ export const handleGameRoute = async (
             cardType: row.card_type as 'minor' | 'occupation',
             cardJson: JSON.parse(row.card_json),
             effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+            compiledCode: row.compiled_code ?? null,
           })
         } catch (err) {
           console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
@@ -284,12 +303,16 @@ export const handleGameRoute = async (
       }
     }
 
-    session = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
+    if (customCards.length > 0) {
+      await GameSession.preloadCardFiles(customCards)
+    }
+    const sandboxSession = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
     // Set player name from authenticated user
     if (requestUser) {
-      session.updatePlayerName(0, requestUser.displayName)
+      sandboxSession.updatePlayerName(0, requestUser.displayName)
     }
-    const resp = getSingletonSession().getState()
+    setSessionForRequest(req, sandboxSession)
+    const resp = getSessionForRequest(req).getState()
     sendJson(res, 200, { ...respondWith(resp), customCardsLoaded: customCards.length })
     return true
   }
@@ -300,7 +323,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().devPlayCard(body.playerIndex, body.cardId)
+    const resp = getSessionForRequest(req).devPlayCard(body.playerIndex, body.cardId)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -311,7 +334,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().devSetSpaceTaken(body.spaceId, body.playerId ?? null)
+    const resp = getSessionForRequest(req).devSetSpaceTaken(body.spaceId, body.playerId ?? null)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -322,7 +345,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().devSetCurrentPlayer(body.playerIndex)
+    const resp = getSessionForRequest(req).devSetCurrentPlayer(body.playerIndex)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -333,7 +356,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().devSetResources(body.playerIndex, body.resources)
+    const resp = getSessionForRequest(req).devSetResources(body.playerIndex, body.resources)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -344,7 +367,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = getSingletonSession().devAddRooms(body.playerIndex, body.rooms)
+    const resp = getSessionForRequest(req).devAddRooms(body.playerIndex, body.rooms)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }
@@ -355,7 +378,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid round' })
       return true
     }
-    const resp = getSingletonSession().devSetRound(body.round)
+    const resp = getSessionForRequest(req).devSetRound(body.round)
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }

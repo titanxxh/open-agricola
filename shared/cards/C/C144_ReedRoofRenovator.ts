@@ -11,7 +11,7 @@ const listener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['renovate-house'],
   scope: 'opponent',
-  handler: (context: CardListenerContext): ActionHookResult | void => {
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',

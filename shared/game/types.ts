@@ -203,7 +203,7 @@ export type ActionAvailabilityContext = {
   state: GameState
   player: PlayerState
   space?: ActionSpace
-  params?: Partial<Resource>
+  params?: Record<string, unknown>
   sourceCard?: string
 }
 
@@ -212,7 +212,7 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
-  params?: Partial<Resource>
+  params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>
 }
@@ -244,7 +244,7 @@ export type ActionFlow =
       actionId: string
       optional?: boolean
       promptKey?: string
-      params?: Partial<Resource>
+      params?: Record<string, unknown>
       sourceCard?: string
       actionContext?: Record<string, unknown>
       choiceLabelKey?: string

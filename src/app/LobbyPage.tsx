@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
-
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+import { API_BASE } from '../config'
 
 type RoomSummary = {
   id: string
@@ -69,7 +67,9 @@ export function LobbyPage() {
       <div className="lobby-header">
         <h1>Open Agricola</h1>
         <div className="lobby-user-info">
-          <span>{user?.displayName || user?.username}</span>
+          <button type="button" className="btn-link" onClick={() => setPage('settings')}>
+            {user?.displayName || user?.username}
+          </button>
           <button type="button" className="btn-link" onClick={logout}>登出</button>
         </div>
       </div>

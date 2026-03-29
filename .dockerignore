@@ -1,0 +1,12 @@
+node_modules
+dist
+output
+data
+.git
+*.log
+e2e-tests
+tests
+docs
+.github
+.env
+.env.*

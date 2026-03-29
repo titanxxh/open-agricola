@@ -3550,3 +3550,148 @@
 .ws-sandbox-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .res-inline-score { color: #c0a030; font-size: 0.9em; }
+
+/* ── WS status screen ───────────────────────────── */
+.ws-status-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 100%);
+  padding: 20px;
+}
+
+.ws-status-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 24px rgba(90,58,32,0.12);
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ws-status-title {
+  font-size: 24px;
+  color: #3a5a2c;
+  margin: 0;
+  text-align: center;
+}
+
+.ws-status-text {
+  text-align: center;
+  font-size: 16px;
+  color: #5a3a20;
+}
+
+.ws-invite-panel {
+  background: #fdf6e3;
+  border: 1px solid #e8d5b7;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ws-invite-label {
+  font-size: 13px;
+  color: #5a3a20;
+  font-weight: 600;
+}
+
+.ws-invite-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ws-invite-url {
+  flex: 1;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #cdb996;
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+  color: #3a2a10;
+}
+
+.ws-invite-roomid {
+  font-size: 13px;
+  color: #8a7a60;
+  text-align: center;
+}
+
+.ws-error-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.ws-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e8d5b7;
+  border-top-color: #3a5a2c;
+  border-radius: 50%;
+  animation: ws-spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes ws-spin { to { transform: rotate(360deg); } }
+
+.ws-status-back {
+  text-align: center;
+  font-size: 13px;
+}
+
+/* ── Settings page ──────────────────────────────── */
+.settings-page {
+  min-height: 100vh;
+  background: #fdf6e3;
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.settings-header h1 { font-size: 22px; color: #3a5a2c; margin: 0; }
+
+.settings-content { display: flex; flex-direction: column; gap: 24px; }
+
+.settings-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(90,58,32,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-section h2 { font-size: 16px; color: #5a3a20; margin: 0; }
+
+.settings-username { font-size: 14px; color: #8a7a60; margin: 0; }
+
+.settings-form { display: flex; flex-direction: column; gap: 12px; }
+
+.settings-success {
+  color: #2d7a1f;
+  background: #e8f5e0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.settings-danger { border: 1px solid #f5c6cb; }
+
+.settings-note { font-size: 12px; color: #8a7a60; margin: 0; }

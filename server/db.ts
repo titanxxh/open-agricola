@@ -121,6 +121,26 @@ function runMigrations(db: Database.Database): void {
         );
       `,
     },
+    {
+      version: 3,
+      sql: `
+        CREATE TABLE workshop_card_versions (
+          id TEXT PRIMARY KEY,
+          card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+          card_json TEXT NOT NULL,
+          effect_dsl TEXT,
+          effect_code TEXT,
+          compiled_code TEXT,
+          art_url TEXT,
+          version_number INTEGER NOT NULL,
+          created_by TEXT NOT NULL REFERENCES users(id),
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_versions_card ON workshop_card_versions(card_id);
+
+        ALTER TABLE workshop_cards ADD COLUMN featured INTEGER NOT NULL DEFAULT 0;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

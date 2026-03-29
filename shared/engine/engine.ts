@@ -950,7 +950,7 @@ choice: { promptKey: result.promptKey, options: result.options },
             this.buildReplaceChoiceFlow(child, replaceResult.alternativeFlow, actionId),
           )
           this.tree.insertAfter(node.id, [flowNode])
-          targetNode.resolve(choice)
+          targetNode!.resolve(choice)
           node.resolve(choice)
           this.pendingChoiceNodeId = null
           this.pendingChoiceActionId = null
@@ -989,12 +989,12 @@ choice: { promptKey: result.promptKey, options: result.options },
         )
         if (beforeActivateNodes.length > 0 && !child.beforePhaseResolved) {
           child.beforePhaseResolved = true
-          const deferredTarget = this.cloneNode(targetNode)
+          const deferredTarget = this.cloneNode(targetNode!)
           const deferredAction = this.findActionNode(deferredTarget)
           if (deferredAction) {
             deferredAction.beforePhaseResolved = true
           }
-          this.resolveSubtree(targetNode)
+          this.resolveSubtree(targetNode!)
           if (node instanceof XorNode) {
             node.resolve(choice)
           }

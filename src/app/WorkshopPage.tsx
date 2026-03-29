@@ -3,9 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 import { ResourceText } from '../components/common/ResourceText'
-
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
+import { API_BASE } from '../config'
 
 type WorkshopCard = {
   id: string
@@ -17,11 +15,22 @@ type WorkshopCard = {
   effect_dsl: Record<string, unknown> | null
   art_url: string | null
   status: 'draft' | 'published'
+  author_id?: string
   author_name: string
   like_count: number
   liked_by_me: boolean
+  featured?: number
   created_at: number
   updated_at: number
+}
+
+type CardVersion = {
+  id: string
+  version_number: number
+  card_json: Record<string, unknown>
+  effect_dsl: Record<string, unknown> | null
+  art_url: string | null
+  created_at: number
 }
 
 type Comment = {
@@ -31,7 +40,7 @@ type Comment = {
   created_at: number
 }
 
-type View = 'browse' | 'mine' | 'sandbox' | 'editor' | 'detail'
+type View = 'browse' | 'mine' | 'featured' | 'sandbox' | 'editor' | 'detail'
 
 function authHeaders(token: string | null): Record<string, string> {
   if (!token) return {}
@@ -55,6 +64,7 @@ function CardTile({ card, onSelect, onLike, mine }: {
         <div className="ws-card-tile-name">{card.name}</div>
         <div className="ws-card-tile-meta">
           <span className="ws-badge">{card.card_type === 'minor' ? '小改进' : '职业'}</span>
+          {!!card.featured && <span className="ws-badge ws-badge-featured">★ 精选</span>}
           {mine && <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? '已发布' : '草稿'}</span>}
           <span className="ws-author">by {card.author_name}</span>
         </div>
@@ -76,20 +86,83 @@ function CardTile({ card, onSelect, onLike, mine }: {
   )
 }
 
+// ── Card Source Viewer (generated .ts code) ─────────────────────────────────
+
+function CardSourceViewer({ card, token }: { card: WorkshopCard; token: string | null }) {
+  const [code, setCode] = useState<string | null>(null)
+  const [showCode, setShowCode] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const loadCode = async () => {
+    if (code) { setShowCode(!showCode); return }
+    setLoading(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/workshop/cards/preview-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        body: JSON.stringify({
+          card_id: card.card_id,
+          card_type: card.card_type,
+          name: card.name,
+          description: card.description,
+          card_json: card.card_json,
+          effect_dsl: card.effect_dsl,
+        }),
+      })
+      const d = await r.json()
+      if (d.ok) { setCode(d.code); setShowCode(true) }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }
+
+  // If the card has user-written code, show that directly
+  const effectCode = (card as Record<string, unknown>).effect_code as string | null
+  if (effectCode) {
+    return (
+      <div className="ws-detail-section">
+        <h3>卡牌代码 (.ts)</h3>
+        <pre className="ws-code">{effectCode}</pre>
+        <p className="ws-code-note">此代码通过 AST 验证后在服务器 VM 沙盒中执行。</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="ws-detail-section">
+      <h3>效果</h3>
+      <pre className="ws-code">{JSON.stringify(card.effect_dsl, null, 2)}</pre>
+      <div className="ws-code-toolbar">
+        <button type="button" className="btn-secondary ws-btn-sm" onClick={loadCode} disabled={loading}>
+          {loading ? '生成中…' : showCode ? '隐藏 .ts 代码' : '查看生成的 .ts 代码'}
+        </button>
+      </div>
+      {showCode && code && (
+        <pre className="ws-code" style={{ marginTop: '8px' }}>{code}</pre>
+      )}
+    </div>
+  )
+}
+
 // ── Card Detail Panel ────────────────────────────────────────────────────────
 
-function CardDetail({ card, token, onBack, onEdit, onAddSandbox }: {
+function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh }: {
   card: WorkshopCard
   token: string | null
   onBack: () => void
   onEdit?: () => void
   onAddSandbox: (id: string) => void
+  isOwner?: boolean
+  isUserAdmin?: boolean
+  onRefresh?: () => void
 }) {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [liked, setLiked] = useState(card.liked_by_me)
   const [likeCount, setLikeCount] = useState(card.like_count)
   const [submitting, setSubmitting] = useState(false)
+  const [versions, setVersions] = useState<CardVersion[]>([])
+  const [showVersions, setShowVersions] = useState(false)
+  const [isFeatured, setIsFeatured] = useState(!!card.featured)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/workshop/cards/${card.id}/comments`)
@@ -123,6 +196,31 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox }: {
       setNewComment('')
     }
     setSubmitting(false)
+  }
+
+  const fetchVersions = async () => {
+    if (showVersions) { setShowVersions(false); return }
+    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/versions`, { headers: authHeaders(token) })
+    const d = await r.json()
+    if (d.ok) { setVersions(d.versions); setShowVersions(true) }
+  }
+
+  const handleRevert = async (versionId: string) => {
+    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/revert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify({ version_id: versionId }),
+    })
+    const d = await r.json()
+    if (d.ok) { onRefresh?.() }
+  }
+
+  const handleFeatureToggle = async () => {
+    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/feature`, {
+      method: 'POST', headers: authHeaders(token),
+    })
+    const d = await r.json()
+    if (d.ok) setIsFeatured(d.featured)
   }
 
   const cardJson = card.card_json
@@ -163,15 +261,41 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox }: {
             {onEdit && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>编辑</button>
             )}
+            {isOwner && (
+              <button type="button" className="btn-secondary ws-btn-sm" onClick={fetchVersions}>
+                {showVersions ? '隐藏版本' : '版本历史'}
+              </button>
+            )}
+            {isUserAdmin && card.status === 'published' && (
+              <button type="button" className={`btn-secondary ws-btn-sm${isFeatured ? ' liked' : ''}`} onClick={handleFeatureToggle}>
+                {isFeatured ? '★ 取消精选' : '☆ 设为精选'}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {card.effect_dsl && (
+      {(card.effect_dsl || 'effect_code' in card) && (
+        <CardSourceViewer card={card} token={token} />
+      )}
+
+      {showVersions && (
         <div className="ws-detail-section">
-          <h3>效果 DSL</h3>
-          <pre className="ws-code">{JSON.stringify(card.effect_dsl, null, 2)}</pre>
-          <p className="ws-code-note">此代码在浏览器中可见，在服务器端通过白名单验证后执行。</p>
+          <h3>版本历史 ({versions.length})</h3>
+          {versions.length === 0 ? (
+            <p className="ws-empty">暂无历史版本</p>
+          ) : (
+            <ul className="ws-versions">
+              {versions.map(v => (
+                <li key={v.id} className="ws-version-item">
+                  <span className="ws-version-num">v{v.version_number}</span>
+                  <span className="ws-version-date">{new Date(v.created_at).toLocaleString()}</span>
+                  <span className="ws-version-name">{(v.card_json as Record<string, unknown>).name as string || '—'}</span>
+                  <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>恢复</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -222,6 +346,10 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
     ((initial?.card_json as Record<string, unknown>)?.cost as Record<string, number>) ?? {}
   )
   const [dslText, setDslText] = useState(initial?.effect_dsl ? JSON.stringify(initial.effect_dsl, null, 2) : '')
+  const [effectMode, setEffectMode] = useState<'dsl' | 'code'>('dsl')
+  const [codeText, setCodeText] = useState('')
+  const [codeErrors, setCodeErrors] = useState<string[]>([])
+  const [validating, setValidating] = useState(false)
   const [artUrl, setArtUrl] = useState<string | null>(initial?.art_url ?? null)
   const [showAi, setShowAi] = useState(false)
   const [error, setError] = useState('')
@@ -252,13 +380,37 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
     }
   }
 
+  const handleValidateCode = async () => {
+    if (!codeText.trim()) { setCodeErrors(['请输入代码']); return }
+    setValidating(true)
+    setCodeErrors([])
+    try {
+      const r = await fetch(`${API_BASE}/api/workshop/cards/validate-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        body: JSON.stringify({ source: codeText }),
+      })
+      const d = await r.json()
+      if (d.ok && d.valid) {
+        setCodeErrors([])
+        setError('')
+      } else {
+        setCodeErrors(d.errors ?? ['验证失败'])
+      }
+    } catch {
+      setCodeErrors(['网络错误'])
+    } finally {
+      setValidating(false)
+    }
+  }
+
   const handleSave = async (publishStatus: 'draft' | 'published') => {
     setError('')
     if (!name.trim()) { setError('请填写卡牌名称'); return }
     if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError('ID 必须以 CUSTOM_ 开头且不能为空'); return }
 
     let effectDsl = null
-    if (dslText.trim()) {
+    if (effectMode === 'dsl' && dslText.trim()) {
       try { effectDsl = JSON.parse(dslText) } catch { setError('效果 DSL JSON 格式错误'); return }
     }
 
@@ -285,7 +437,8 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
           name,
           description: desc,
           card_json: cardJson,
-          effect_dsl: effectDsl,
+          effect_dsl: effectMode === 'dsl' ? effectDsl : null,
+          effect_code: effectMode === 'code' ? codeText : undefined,
           art_url: artUrl,
           status: publishStatus,
         }),
@@ -378,15 +531,83 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
         </div>
 
         <div className="form-field">
-          <label>效果 DSL（JSON，可选）</label>
-          <textarea
-            value={dslText}
-            onChange={e => setDslText(e.target.value)}
-            rows={8}
-            placeholder={'{\n  "onReturnHome": {\n    "optional": true,\n    "flow": [{ "action": "gain", "params": { "food": 2 } }]\n  }\n}'}
-            className="ws-code-input"
-          />
-          <p className="ws-code-note">只允许白名单内的 action：gain / pay-resources / bonus-vp / exchange</p>
+          <div className="ws-effect-mode-toggle">
+            <button type="button" className={`ws-tab-sm${effectMode === 'dsl' ? ' active' : ''}`} onClick={() => setEffectMode('dsl')}>
+              DSL 模式
+            </button>
+            <button type="button" className={`ws-tab-sm${effectMode === 'code' ? ' active' : ''}`} onClick={() => setEffectMode('code')}>
+              代码模式
+            </button>
+          </div>
+
+          {effectMode === 'dsl' ? (
+            <>
+              <label>效果 DSL（JSON，可选）</label>
+              <textarea
+                value={dslText}
+                onChange={e => setDslText(e.target.value)}
+                rows={8}
+                placeholder={'{\n  "onReturnHome": {\n    "optional": true,\n    "flow": [{ "action": "gain", "params": { "food": 2 } }]\n  }\n}'}
+                className="ws-code-input"
+              />
+              <p className="ws-code-note">只允许白名单内的 action：gain / pay-resources / bonus-vp / exchange</p>
+            </>
+          ) : (
+            <>
+              <label>TypeScript 卡牌代码</label>
+              <textarea
+                value={codeText}
+                onChange={e => { setCodeText(e.target.value); setCodeErrors([]) }}
+                rows={12}
+                placeholder={'registerCardEffect({\n  id: "CUSTOM_MyCard",\n  onReturnHome: (state, player) => {\n    return { type: "leaf", actionId: "gain", params: { food: 2 }, sourceCard: "CUSTOM_MyCard" }\n  },\n})'}
+                className="ws-code-input"
+              />
+              <div className="ws-code-toolbar">
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={handleValidateCode} disabled={validating}>
+                  {validating ? '验证中…' : '验证代码'}
+                </button>
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
+                  const r = await fetch(`${API_BASE}/api/workshop/cards/generate-template`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+                    body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] } }),
+                  })
+                  const d = await r.json()
+                  if (d.ok && d.code) setCodeText(d.code)
+                }}>
+                  生成模板
+                </button>
+                {dslText.trim() && (
+                  <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
+                    try {
+                      const dsl = JSON.parse(dslText)
+                      const r = await fetch(`${API_BASE}/api/workshop/cards/preview-code`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+                        body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] }, effect_dsl: dsl }),
+                      })
+                      const d = await r.json()
+                      if (d.ok && d.code) setCodeText(d.code)
+                    } catch { setError('DSL JSON 格式错误') }
+                  }}>
+                    从 DSL 生成代码
+                  </button>
+                )}
+                {codeErrors.length === 0 && codeText.trim() && !validating && (
+                  <span className="ws-code-ok">✓ 验证通过</span>
+                )}
+              </div>
+              {codeErrors.length > 0 && (
+                <ul className="ws-code-errors">
+                  {codeErrors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+              <p className="ws-code-note">
+                可用 API：registerCardEffect(), registerCardListener(), console.log/warn, Math.*。
+                禁止：import, require, eval, fetch, process 等。代码在服务器 VM 沙盒中执行（100ms 超时）。
+              </p>
+            </>
+          )}
         </div>
 
         {error && <div className="form-error">{error}</div>}
@@ -485,7 +706,7 @@ export function WorkshopPage() {
   const prevView = useRef<View>('browse')
 
   const loadCards = useCallback(async (
-    target: 'browse' | 'mine',
+    target: 'browse' | 'mine' | 'featured',
     sortVal: string,
     searchVal: string,
     pageVal: number,
@@ -498,6 +719,7 @@ export function WorkshopPage() {
         page: String(pageVal),
         status: target === 'mine' ? 'draft' : 'published',
       })
+      if (target === 'featured') params.set('featured', '1')
       const r = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
         headers: authHeaders(token),
       })
@@ -512,7 +734,7 @@ export function WorkshopPage() {
   }, [token])
 
   useEffect(() => {
-    if (view === 'browse' || view === 'mine') {
+    if (view === 'browse' || view === 'mine' || view === 'featured') {
       loadCards(view, sort, search, page)
     }
   }, [view, sort, search, page, loadCards])
@@ -592,10 +814,18 @@ export function WorkshopPage() {
           card={selectedCard}
           token={token}
           onBack={goBack}
-          onEdit={selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
+          onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
             ? () => { setEditCard(selectedCard); setView('editor') }
             : undefined}
           onAddSandbox={handleAddSandbox}
+          isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
+          isUserAdmin={!!user?.isAdmin}
+          onRefresh={() => {
+            fetch(`${API_BASE}/api/workshop/cards/${selectedCard.id}`, { headers: authHeaders(token) })
+              .then(r => r.json())
+              .then(d => { if (d.ok) setSelectedCard(d.card) })
+              .catch(() => {})
+          }}
         />
       </div>
     )
@@ -640,7 +870,7 @@ export function WorkshopPage() {
           />
           <button type="submit" className="btn-primary ws-btn-sm">搜索</button>
         </form>
-        {view === 'browse' && (
+        {(view === 'browse' || view === 'featured') && (
           <div className="ws-sort">
             <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>最新</button>
             <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>最热</button>
@@ -655,7 +885,7 @@ export function WorkshopPage() {
 
       {cards.length === 0 && !loading ? (
         <p className="rooms-empty">
-          {view === 'mine' ? '你还没有创建卡牌' : '暂无已发布的卡牌'}
+          {view === 'mine' ? '你还没有创建卡牌' : view === 'featured' ? '暂无精选卡牌' : '暂无已发布的卡牌'}
         </p>
       ) : (
         <div className="ws-card-grid">
@@ -689,6 +919,9 @@ function WorkshopNav({ view, setView, user }: {
       <div className="ws-nav-tabs">
         <button type="button" className={`ws-tab${view === 'browse' ? ' active' : ''}`} onClick={() => setView('browse')}>
           浏览
+        </button>
+        <button type="button" className={`ws-tab${view === 'featured' ? ' active' : ''}`} onClick={() => setView('featured')}>
+          ★ 精选
         </button>
         {user && (
           <button type="button" className={`ws-tab${view === 'mine' ? ' active' : ''}`} onClick={() => setView('mine')}>

@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${BACKEND_PORT:-5175}:5175"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_PORT=5175
+      - BACKEND_HOST=0.0.0.0
+      - PERSIST_ROOMS=sqlite
+      - ALLOW_ANONYMOUS_WS=false
+      - DB_PATH=./data/open-agricola.db
+      - CARD_ART_DIR=./data/card-art
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    volumes:
+      - app-data:/app/data
+      - app-output:/app/output
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  app-output:

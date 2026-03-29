@@ -1,0 +1,7 @@
+# 将 your-game.example.com 替换为你的域名
+# 可以是免费域名（如 DuckDNS: your-game.duckdns.org）
+# Caddy 会自动申请和续期 Let's Encrypt 证书
+
+your-game.example.com {
+    reverse_proxy app:5175
+}
