@@ -470,9 +470,10 @@ export const createWsServer = (server: import('node:http').Server) => {
       // ── Room commands ────────────────────────────────────────────────────
       if (msg.type === 'createRoom') {
         const roomId = generateRoomId()
-        const maxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
+        const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
           ? (msg as Record<string, unknown>).maxPlayers as number
           : 2
+        const maxPlayers = Math.min(Math.max(2, rawMaxPlayers), 4)
         // Load custom cards if provided
         const customCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
           ? (msg as Record<string, unknown>).customCardIds as string[]
