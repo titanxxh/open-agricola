@@ -40,6 +40,7 @@ jobs:
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
+          VITE_BASE_PATH: /open-agricola/
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
