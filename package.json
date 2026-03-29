@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && cp -r ${BGA_IMAGE_DIR:-../bga-agricola/img}/* dist/bga-img/ 2>/dev/null || true",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
     "test:e2e": "npx playwright test",

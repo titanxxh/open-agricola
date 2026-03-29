@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'shared/**'
+      - 'public/**'
       - 'index.html'
       - 'vite.config.ts'
       - 'package.json'
