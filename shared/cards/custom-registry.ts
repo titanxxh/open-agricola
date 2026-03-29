@@ -20,6 +20,9 @@ export type CustomCardData = {
   cardType: 'minor' | 'occupation'
   cardJson: CardDefinition
   effectDsl?: CardDslEffects | null
+  compiledCode?: string | null
+  /** Set to true when card was loaded from a .ts file (effects already registered by import). */
+  loadedFromFile?: boolean
 }
 
 /**

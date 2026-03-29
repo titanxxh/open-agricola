@@ -61,6 +61,8 @@ export const clearCardEffects = () => {
 export const getCardEffect = (id: string): CardEffect | null =>
   cardEffectOverrides.get(id) ?? getMajorCardEffect(id) ?? null
 
+const isCustomCard = (id: string) => id.startsWith('CUSTOM_')
+
 export const runCardEffectHook = (
   state: GameState,
   player: PlayerState,
@@ -71,10 +73,18 @@ export const runCardEffectHook = (
   const effect = getCardEffect(cardId)
   const handler = effect?.[hook]
   if (!handler) return null
-  if (hook === 'onBuy') {
-    return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo) ?? null
+  try {
+    if (hook === 'onBuy') {
+      return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo) ?? null
+    }
+    return (handler as FlowEffectHandler)(state, player) ?? null
+  } catch (err) {
+    if (isCustomCard(cardId)) {
+      console.warn(`[card-effects] custom card ${cardId} hook "${hook}" threw, skipping:`, err)
+      return null
+    }
+    throw err
   }
-  return (handler as FlowEffectHandler)(state, player) ?? null
 }
 
 /**
@@ -90,7 +100,15 @@ export const runReturnHomeHooks = (state: GameState, player: PlayerState): void 
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onReturnHome) {
-      effect.onReturnHome(state, player)
+      try {
+        effect.onReturnHome(state, player)
+      } catch (err) {
+        if (isCustomCard(cardId)) {
+          console.warn(`[card-effects] custom card ${cardId} onReturnHome threw, skipping:`, err)
+          continue
+        }
+        throw err
+      }
     }
   }
 }
@@ -104,7 +122,15 @@ export const runRoundEndHooks = (state: GameState, player: PlayerState): void =>
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onRoundEnd) {
-      effect.onRoundEnd(state, player)
+      try {
+        effect.onRoundEnd(state, player)
+      } catch (err) {
+        if (isCustomCard(cardId)) {
+          console.warn(`[card-effects] custom card ${cardId} onRoundEnd threw, skipping:`, err)
+          continue
+        }
+        throw err
+      }
     }
   }
 }
@@ -122,7 +148,17 @@ const runHookForAllCards = (
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     const handler = effect?.[hookName] as ((s: GameState, p: PlayerState) => void) | undefined
-    if (handler) handler(state, player)
+    if (handler) {
+      try {
+        handler(state, player)
+      } catch (err) {
+        if (isCustomCard(cardId)) {
+          console.warn(`[card-effects] custom card ${cardId} hook "${hookName}" threw, skipping:`, err)
+          continue
+        }
+        throw err
+      }
+    }
   }
 }
 

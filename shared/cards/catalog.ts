@@ -1,3 +1,4 @@
+import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
 import { A105_BarrowPusher } from './A/A105_BarrowPusher'
 import { A106_SlurrySpreader } from './A/A106_SlurrySpreader'
@@ -503,15 +504,10 @@ export const implementedOccupationCards = occupationCards.filter(isImplemented)
 export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
 export const occupationIds = implementedOccupationCards.map((card) => card.id)
 export const getMinorImprovementCard = (id: string) => {
-  const official = allMinorImprovementCards.find((card) => card.id === id)
-  if (official) return official
-  return null
+  return allMinorImprovementCards.find((card) => card.id === id)
+    ?? getCustomMinorImprovement(id)
 }
 export const getOccupationCard = (id: string) => {
-  const official = allOccupationCards.find((card) => card.id === id)
-  if (official) return official
-  return null
+  return allOccupationCards.find((card) => card.id === id)
+    ?? getCustomOccupation(id)
 }
-
-// Custom card lookups are in custom-registry.ts.
-// game-session.ts imports both catalog and custom-registry to resolve cards.

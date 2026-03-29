@@ -132,6 +132,14 @@ export function updateDisplayName(userId: string, displayName: string): string |
   return null
 }
 
+/** Check if a username is an admin (configured via ADMIN_USERS env var). */
+const ADMIN_USERNAMES = new Set(
+  (process.env.ADMIN_USERS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+)
+export function isAdmin(username: string): boolean {
+  return ADMIN_USERNAMES.has(username)
+}
+
 /** Change password. Returns error string or null on success. */
 export async function changePassword(
   userId: string,
