@@ -198,9 +198,12 @@ type Props = {
 }
 
 type TooltipInfo = {
-  actionId: string
-  nameKey: string
-  descKey: string
+  kind: 'action' | 'resource'
+  actionId?: string
+  nameKey?: string
+  descKey?: string
+  title?: string
+  description?: string
   spritePos?: string
   x: number
   y: number
@@ -298,7 +301,26 @@ export const ActionBoard = ({
       <div className="resource-holder" data-n={totalCount} style={offset}>
         {items.flatMap((item) =>
           Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
-            <span key={`${item.resource}-${i}`} className={`res-icon res-icon-${item.resource}`} />
+            <span
+              key={`${item.player?.id ?? 'none'}-${item.resource}-${i}`}
+              className={`res-icon res-icon-${item.resource}`}
+              title={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
+              aria-label={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
+              data-owner-player={item.player?.id}
+              data-owner-label={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
+              onMouseEnter={(e) => {
+                if (!item.player) return
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setTooltip({
+                  kind: 'resource',
+                  title: item.player.name,
+                  description: t(locale, `resources.${item.resource}`),
+                  x: rect.right + 8,
+                  y: rect.top - 8,
+                })
+              }}
+              onMouseLeave={hideTooltip}
+            />
           ))
         )}
       </div>
@@ -343,6 +365,7 @@ export const ActionBoard = ({
     const rightSpace = window.innerWidth - rect.right
     const x = rightSpace > tooltipW + 16 ? rect.right + 8 : rect.left - tooltipW - 8
     setTooltip({
+      kind: 'action',
       actionId: action.id,
       nameKey: action.nameKey,
       descKey: action.descriptionKey,
@@ -494,12 +517,14 @@ export const ActionBoard = ({
           className="round-action-tooltip"
           style={{ top: tooltip.y, left: tooltip.x }}
         >
-          {tooltip.spritePos && (
+          {tooltip.kind === 'action' && tooltip.spritePos && (
             <div className="tooltip-card-img" style={{ backgroundPosition: tooltip.spritePos }} />
           )}
           <div className="tooltip-text">
-            <strong>{t(locale, tooltip.nameKey)}</strong>
-            <p>{t(locale, tooltip.descKey)}</p>
+            <strong>{tooltip.kind === 'action' ? t(locale, tooltip.nameKey!) : tooltip.title}</strong>
+            {(tooltip.kind === 'action' || tooltip.description) && (
+              <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
+            )}
           </div>
         </div>
       )}

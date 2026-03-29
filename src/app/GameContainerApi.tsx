@@ -194,7 +194,7 @@ const useTransportSetup = (playerParam: string | null) => {
 }
 
 export const GameContainerApi = () => {
-  const lockedViewPlayerId = useMemo(() => {
+  const requestedPlayerId = useMemo(() => {
     const raw = urlParams.get('player') ?? urlParams.get('playerId')
     if (!raw) return null
     if (/^p[1-4]$/.test(raw)) return raw
@@ -202,11 +202,11 @@ export const GameContainerApi = () => {
     if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
     return null
   }, [])
-  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId)
+  const { transport, wsStatus, isWs, isReady } = useTransportSetup(requestedPlayerId)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const [locale, setLocale] = useState<Locale>(detectInitialLocale)
-  const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
+  const [viewPlayerId, setViewPlayerId] = useState<string | null>(requestedPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(true)
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
@@ -286,14 +286,24 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
-  const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? currentPlayer
-  const displayPlayer = (viewPlayerId ? viewedPlayer : currentPlayer) ?? state?.players[0] ?? null
+  const selfPlayer = requestedPlayerId
+    ? state?.players.find((p) => p.id === requestedPlayerId) ?? currentPlayer
+    : currentPlayer
+  const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
+  const displayPlayer = (viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null
   const activePlayer = interaction.stateId === 'confirmPlayerSwitch'
     ? state?.players[interaction.fromPlayerIndex] ?? currentPlayer
     : ('playerIndex' in interaction && typeof interaction.playerIndex === 'number')
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
-  const isInteractive = !!(activePlayer && displayPlayer && activePlayer.id === displayPlayer.id)
+  const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
+  const isInteractive = !!(
+    activePlayer &&
+    selfPlayer &&
+    displayPlayer &&
+    activePlayer.id === selfPlayer.id &&
+    displayPlayer.id === selfPlayer.id
+  )
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -894,9 +904,8 @@ export const GameContainerApi = () => {
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey)
   const setViewPlayerIdSafe = useCallback((value: string) => {
-    if (lockedViewPlayerId) return
     setViewPlayerId(value)
-  }, [lockedViewPlayerId])
+  }, [])
 
   const adjustReorgAnimal = (zoneId: string, animalType: 'sheep' | 'boar' | 'cattle', delta: number) => {
     setAnimalReorg((prev) => {
@@ -1383,7 +1392,7 @@ export const GameContainerApi = () => {
         isInteractive={isInteractive}
         takeAnytimeAction={takeAnytimeAction}
       />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={displayPlayer?.name ?? null} isMyTurn={isInteractive} />
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn} />
       <GameControls
         locale={locale}
         onUndo={undoStep}
