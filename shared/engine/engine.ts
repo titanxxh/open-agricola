@@ -950,7 +950,7 @@ choice: { promptKey: result.promptKey, options: result.options },
             this.buildReplaceChoiceFlow(child, replaceResult.alternativeFlow, actionId),
           )
           this.tree.insertAfter(node.id, [flowNode])
-          targetNode.resolve(choice)
+          targetNode!.resolve(choice)
           node.resolve(choice)
           this.pendingChoiceNodeId = null
           this.pendingChoiceActionId = null

@@ -24,7 +24,7 @@ export const gainAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, params, sourceCard }) => {
-    const gain = params ?? gainConfigByActionId.get(space.id)
+    const gain = (params ?? gainConfigByActionId.get(space.id)) as Partial<Resource> | undefined
     const gained: Record<string, number> = {}
     if (gain) {
       Object.keys(gain).forEach((key) => {

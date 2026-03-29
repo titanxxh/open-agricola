@@ -2,16 +2,16 @@ import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, Player
 import { canExecuteWithCostPreview } from './cost-preview'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 
-export const getRenovation = (player: PlayerState) => {
+export const getRenovation = (player: PlayerState): { nextType: 'wood' | 'clay' | 'stone'; cost: Partial<Resource> } | null => {
   if (player.houseType === 'wood') {
     return {
-      nextType: 'clay' as const,
+      nextType: 'clay',
       cost: { clay: player.rooms, reed: 1 },
     }
   }
   if (player.houseType === 'clay') {
     return {
-      nextType: 'stone' as const,
+      nextType: 'stone',
       cost: { stone: player.rooms, reed: 1 },
     }
   }

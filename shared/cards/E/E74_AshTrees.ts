@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { initCardState, incCounter } from '../__stubs__/helpers'
+import { initCardState } from '../__stubs__/helpers'
 import {
   clearPendingFenceBonus,
 } from '../helpers/pending-fence-bonus'

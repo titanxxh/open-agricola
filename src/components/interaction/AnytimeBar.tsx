@@ -25,7 +25,7 @@ export const AnytimeBar = ({
             onClick={() => takeAnytimeAction(action.id)}
             disabled={!isInteractive}
           >
-            {t(locale, action.labelKey, action.labelParams)}
+            {t(locale, action.labelKey, action.labelParams as Record<string, string | number> | undefined)}
           </button>
         ))}
       </div>

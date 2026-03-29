@@ -1,5 +1,5 @@
 import type { Locale } from '../../../shared/i18n'
-import { t, type TranslationKey } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
 import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import type { Resource } from '../../../shared/game/types'
@@ -123,7 +123,7 @@ export const InteractionBar = ({
       ) : pendingChoice && isInteractive ? (
         <>
           <div className="interaction-title">
-            {t(locale, pendingChoice.promptKey as TranslationKey ?? 'ui.interactionChooseOne')}
+            {t(locale, pendingChoice.promptKey as string ?? 'ui.interactionChooseOne')}
           </div>
           {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
             <div className="interaction-subtitle">
@@ -192,10 +192,10 @@ export const InteractionBar = ({
                       ) : (
                         <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
                       )}
-                      {option.labelParams.cardUsed && (
+                      {!!option.labelParams.cardUsed && (
                         <span className="payment-option-card">
                           {' '}
-                          ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
+                          ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as string) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as string)})
                         </span>
                       )}
                     </span>
@@ -234,7 +234,7 @@ export const InteractionBar = ({
                       card: t(locale, option.labelParams.cardNameKey),
                     })
                   ) : (
-                    t(locale, option.labelKey, option.labelParams)
+                    t(locale, option.labelKey, option.labelParams as Record<string, string | number> | undefined)
                   )}
                 </button>
               ))}
