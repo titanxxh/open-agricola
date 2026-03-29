@@ -210,6 +210,8 @@ const server = createServer(async (req, res) => {
     const token = extractToken(req.headers.authorization)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const contentLength = parseInt(req.headers['content-length'] ?? '0', 10)
+    if (contentLength > 5 * 1024 * 1024) { sendJson(res, 413, { ok: false, error: 'Image too large (max 5MB)' }); return }
     const body = await parseBody<{ dataUrl?: string }>(req)
     const dataUrl = body?.dataUrl ?? ''
     const match = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(dataUrl)

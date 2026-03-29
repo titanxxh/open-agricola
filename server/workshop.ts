@@ -7,10 +7,12 @@ import { compileCardCode } from './card-compiler.ts'
 import { generateCardFile, wrapUserCode, generateCodeTemplate, type CardMeta } from './card-codegen.ts'
 import { writeCardFile, deleteCardFile } from './card-file-manager.ts'
 
+const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
+
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   })
@@ -158,8 +160,8 @@ export async function handleWorkshopRoute(
       liked_by_me: likedIds.has(r.id),
     }))
 
-    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards WHERE status = ?${whereExtra.includes('author_id') ? whereExtra : ''}`)
-      .get(effectiveStatus) as { n: number }).n
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE w.status = ?${whereExtra}`)
+      .get(...params) as { n: number }).n
 
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
     return true
@@ -406,6 +408,10 @@ export async function handleWorkshopRoute(
   if (req.method === 'POST' && likeMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = likeMatch[1]!
+    const cardRow = db.prepare('SELECT status, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { status: string; author_id: string } | undefined
+    if (!cardRow || (cardRow.status !== 'published' && cardRow.author_id !== user.id)) {
+      sendJson(res, 404, { ok: false, error: 'Card not found' }); return true
+    }
     const existing = db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, cardDbId)
     if (existing) {
       db.prepare('DELETE FROM card_likes WHERE user_id = ? AND card_id = ?').run(user.id, cardDbId)
@@ -497,7 +503,12 @@ export async function handleWorkshopRoute(
   // ── GET /api/workshop/cards/:id/versions ──────────────────────────────────
   const versionsGetMatch = /^\/api\/workshop\/cards\/([^/]+)\/versions$/.exec(url)
   if (req.method === 'GET' && versionsGetMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = versionsGetMatch[1]!
+    // Only owner can see version history (drafts or published)
+    const cardRow = db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { author_id: string } | undefined
+    if (!cardRow) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
+    if (cardRow.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
     const rows = db.prepare(`
       SELECT id, version_number, card_json, effect_dsl, art_url, created_at
       FROM workshop_card_versions

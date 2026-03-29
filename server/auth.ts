@@ -28,7 +28,7 @@ function verifyPassword(password: string, stored: string): Promise<boolean> {
       if (err) reject(err)
       else {
         const hashBuf = Buffer.from(hash, 'hex')
-        resolve(timingSafeEqual(hashBuf, derived))
+        resolve(hashBuf.length === derived.length && timingSafeEqual(hashBuf, derived))
       }
     })
   })
