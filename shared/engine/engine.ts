@@ -146,6 +146,107 @@ export class Engine {
     })
   }
 
+  private cloneNode(node: EngineNode): EngineNode {
+    if (node instanceof ActionNode) {
+      const clone = new ActionNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.actionId,
+        node.sourceCard,
+        node.params,
+        node.choiceLabelKey,
+        node.choiceLabelParams,
+        node.actionContext,
+      )
+      clone.beforePhaseResolved = node.beforePhaseResolved
+      return clone
+    }
+    if (node instanceof ChoiceNode) {
+      const clone = new ChoiceNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        [...node.choices],
+      )
+      if (node.promptKey) {
+        clone.setChoice(node.promptKey, [...node.choices])
+      }
+      return clone
+    }
+    if (node instanceof SequenceNode) {
+      return new SequenceNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.children.map((child) => this.cloneNode(child)),
+      )
+    }
+    if (node instanceof ParallelNode) {
+      return new ParallelNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.children.map((child) => this.cloneNode(child)),
+      )
+    }
+    if (node instanceof OrNode) {
+      return new OrNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.children.map((child) => this.cloneNode(child)),
+        node.promptKey,
+      )
+    }
+    if (node instanceof XorNode) {
+      return new XorNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.children.map((child) => this.cloneNode(child)),
+        node.promptKey,
+      )
+    }
+    if (node instanceof OptionalNode) {
+      const clone = new OptionalNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        this.cloneNode(node.child),
+        node.promptKey,
+      )
+      clone.active = node.active
+      return clone
+    }
+    if (node instanceof ActivateCardNode) {
+      return new ActivateCardNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.listenerId,
+        node.cardId,
+        node.phase,
+        node.actionId,
+        node.event,
+      )
+    }
+    if (node instanceof PlayerSwitchNode) {
+      return new PlayerSwitchNode(
+        `${node.id}-clone-${this.flowNodeCounter++}`,
+        node.targetPlayerId,
+      )
+    }
+    return node
+  }
+
+  private resolveSubtree(node: EngineNode): void {
+    if (node instanceof OptionalNode) {
+      this.resolveSubtree(node.child)
+      node.resolve()
+      return
+    }
+    if (
+      node instanceof SequenceNode ||
+      node instanceof ParallelNode ||
+      node instanceof OrNode ||
+      node instanceof XorNode
+    ) {
+      node.children.forEach((child) => this.resolveSubtree(child))
+      node.resolve()
+      return
+    }
+    if (node instanceof ActionNode || node instanceof ChoiceNode) {
+      node.setState('resolved')
+      return
+    }
+    node.resolve()
+  }
+
   private attachChoiceLabel(
     node: EngineNode,
     choiceLabelKey?: string,
@@ -882,7 +983,28 @@ choice: { promptKey: result.promptKey, options: result.options },
         )
         executionContext.costs =
           Object.keys(costOverride).length > 0 ? costOverride : undefined
-        this.hooks.before({ ...executionContext, actionId })
+        const beforePhase = this.hooks.before({ ...executionContext, actionId })
+        const beforeActivateNodes = this.buildActivateCardNodes(
+          beforePhase.matchedListeners, 'before', actionId,
+        )
+        if (beforeActivateNodes.length > 0 && !child.beforePhaseResolved) {
+          child.beforePhaseResolved = true
+          const deferredTarget = this.cloneNode(targetNode)
+          const deferredAction = this.findActionNode(deferredTarget)
+          if (deferredAction) {
+            deferredAction.beforePhaseResolved = true
+          }
+          this.resolveSubtree(targetNode)
+          if (node instanceof XorNode) {
+            node.resolve(choice)
+          }
+          this.tree.insertBefore(node.id, [...beforeActivateNodes, deferredTarget])
+          this.pendingChoiceNodeId = null
+          this.pendingChoiceActionId = null
+          this.pendingChoiceOwnerNodeId = null
+          this.pendingChoiceContext = null
+          return { type: 'ok' }
+        }
         const result = action.execute(executionContext)
         this.hooks.during({ ...executionContext, actionId }, result)
         if (result.type === 'choice') {
