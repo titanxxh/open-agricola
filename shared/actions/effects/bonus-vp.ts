@@ -13,6 +13,10 @@ export const bonusVpAction: ActionDefinition = {
       return { type: 'fail', logKey: 'log.exchangeFail' }
     }
     incCounter(player, sourceCard, 'bonusVp')
-    return { type: 'ok' }
+    return {
+      type: 'ok',
+      logKey: 'log.cardEffectBonusVp',
+      logParams: { cardId: sourceCard },
+    }
   },
 }

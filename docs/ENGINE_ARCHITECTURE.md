@@ -627,6 +627,8 @@ type ServerEvent =
 }
 ```
 
+补充说明：`renovation` 成本语义与 BGA 对齐，基础翻修费用按“一次性 `Reed` fee + 按房间数重复的 `Clay/Stone` trade”建模，而不是把 `Reed` 也按房间数倍增。
+
 ### 7.7 广播与单播的边界
 
 建议明确区分两类消息：
@@ -882,6 +884,8 @@ HTTP 不再承担多人对局主链路，但仍然重要：
 - 延迟获得家庭成员：`futureMeeples`、`pendingFutureMeeples`
 - 工作阶段统计：`workPhaseObtainedResources`
 
+`workPhaseObtainedResources` 用于记录某玩家在当前工作阶段通过 `gain` / `collect` / `take-from-card` / `anytime-exchange` 等动作获得的建材总量；该统计在回家阶段结算完毕后清空，供 `A53_Claypipe` 这类“preceding work phase”卡牌复用。
+
 其中 `ActionSpaceState` 表示行动格的可变运行时部分，至少包含：
 
 ```ts
@@ -987,7 +991,7 @@ type PendingAction =
   | { type: 'none' }
   | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number; feedQueue?: { index: number; remaining: number }[] }
+  | { type: 'harvestFeed'; playerIndex: number; remaining: number; foodUsed: number; feedQueue?: { index: number; remaining: number; foodUsed: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
 ```
 
@@ -1100,6 +1104,8 @@ type ActionHookResult = {
   → onStartHarvestFieldPhase → onHarvestFieldPhase → reap → onAfterReap → onEndHarvestFieldPhase
   → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase → feed → onEndHarvestFeedingPhase → onAfterFeed
   → breed → onEndHarvest → onAfterHarvest
+
+当前服务端收获结算按起始玩家开始、沿座位顺序推进 `reap / feed / breed` 三个子阶段；`harvestFeed` pending 会额外携带 `foodUsed`，前端据此展示喂养交换中心与进度摘要，并在玩家确认时把实际转换资源提交回权威 `GameSession`。
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。

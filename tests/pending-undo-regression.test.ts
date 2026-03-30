@@ -131,7 +131,7 @@ describe('pending choice types + undo regression', () => {
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('house-redevelopment')
       player.resources.clay = player.rooms
-      player.resources.reed = player.rooms
+      player.resources.reed = 1
       player.minorHand = []
       state.availableMajorImprovements = []
 
@@ -158,6 +158,62 @@ describe('pending choice types + undo regression', () => {
       session.devPlayCard(0, 'A94_LazySowman')
 
       expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
+
+    it('before-sow resource provider can make grain-utilization available', () => {
+      const state = createInitialState(42)
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      state.players[0]!.fields.push({
+        id: 'field-a65',
+        row: 0,
+        col: 0,
+        crop: null,
+        remaining: 0,
+      })
+      state.players[0]!.resources.grain = 0
+      state.players[0]!.resources.vegetable = 0
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'A65_SeedPellets')
+
+      expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
+    })
+
+    it('Seed Pellets grants grain before grain-utilization sow resolves', () => {
+      const state = createInitialState(42)
+      state.roundActionOrder = openRoundAction('grain-utilization')
+      state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+      state.players[0]!.resources.grain = 0
+      state.players[0]!.resources.vegetable = 0
+      const session = new GameSession(state)
+      session.devPlayCard(0, 'A65_SeedPellets')
+
+      let resp = session.takeAction(0, 'grain-utilization')
+      expect(resp.ok).toBe(true)
+      expect(resp.pending.type).toBe('choice')
+      expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+        .toBe('ui.interactionSowSelect')
+      expect(resp.state.players[0]!.resources.grain).toBe(1)
+      expect(resp.interaction.stateId).toBe('farmSelect')
+      expect(
+        resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow'
+          ? resp.interaction.farm.selectableFields
+          : [],
+      ).toContainEqual({
+        tile: { row: 0, col: 0 },
+        allowedCrops: ['grain'],
+      })
+
+      resp = session.commitFarmChoice(0, 'sow', {
+        crops: [{ row: 0, col: 0, crop: 'grain' }],
+      })
+      expect(resp.ok).toBe(true)
+      expect(resp.state.players[0]!.resources.grain).toBe(0)
+      expect(resp.state.players[0]!.fields).toContainEqual({
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        remaining: 3,
+      })
     })
   })
 

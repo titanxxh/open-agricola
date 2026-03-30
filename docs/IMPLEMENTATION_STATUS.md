@@ -85,6 +85,8 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 ### 3.3 UI 组件
 
 - `ActionBoard` — 完全还原 BGA 行动区。不论几人局始终显示全部 4 人局行动位（含左侧 6 个特殊行动）。卡牌采用 BGA 3 段式框架（header/desc/footer 分别切片 `action_frame.png`/`action_frame_s.png`）。使用 BGA 字体 Dominican + CalibriB。累积类行动卡体内显示每回合获取量（数字 + 资源图标 `.gain-display`），非累积行动显示文字描述。箭头通过 `action_frame_arrow.png` 伪元素显示方向（left/right/bottom），累积资源以 `.resource-holder` 显示在卡片外部，带橙色数量徽章。Round 行动 hover 显示 `actions.jpg` 大图 tooltip。侧边栏使用 `add_2p.png` 背景。14 个收获标记。ResizeObserver 响应式缩放。
+- `FarmBoard` — 田地播种改为图标化交互：田内作物用堆叠 seed icon 显示，`sow` 选择器改为 grain / vegetable 图标按钮；收获喂养阶段若存在可转换资源，会自动弹出 exchange center 浮层并提交实际转换结果。
+- Harvest log — 服务端在 `GameSession` 中权威记录 `reap / feed / breed` 三阶段日志，包括玩家收获、喂养转换、begging 与繁殖明细；顺序按起始玩家开始推进。
 - `FarmBoard` — 农场格网、围栏、播种、马厩交互；可选格/边由服务端 `interaction.farm` 下发。
 - `ResourceLine` — BGA meeple sprite 资源图标（`res-icon-*`）+ 数量。
 - `LogPanel` — 结构化日志，卡牌引用显示 hover tooltip（名称 + 描述）。
@@ -145,6 +147,8 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `prompt.selectPayment`：统一支付选项协议；涉及返还/使用卡牌的方案会优先展示可读卡名，而不是直接暴露内部 card id。
 - 小改良/行动卡出牌前提：`minor-improvement` / `improvement-any` 已接入统一 prerequisite 校验；当前覆盖结构化的 `occupationPrerequisites` / `improvementPrerequisites`，以及常见文本前提如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`。
 - 改良日志：`log.playImprovement` / `log.playMinorImprovement` 现统一携带支付资源与返还卡牌；像 `C60_SmallPottersOven` 这类 `onBuy` 立即得资源效果，会额外产出独立的 `log.cardEffectGain`。当前实现卡牌中已无遗留 `reward:` 字段用法。
+- 翻修成本已对齐 BGA：木屋/泥屋翻修分别为“每房间 1 Clay/Stone + 一次性 1 Reed”，`house-redevelopment` 可用性也按该规则判定。
+- 工作阶段建材统计已下沉到通用资源获得动作；`A53_Claypipe` 现可回溯“本回合先获得建材、后打出卡牌”的 BGA 语义，并在回家阶段统一结算。
 - `CostModifier` 系统：`TradeModifier` / `BonusModifier`，30+ 卡牌注册了支付修改器。
 
 ## 5. 测试

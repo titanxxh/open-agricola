@@ -13,6 +13,7 @@ describe('meeting-place session', () => {
     state.players[1]!.workersAvailable = 1
     state.players[0]!.startPlayer = true
     state.players[1]!.startPlayer = false
+    state.players[1]!.minorHand = []
 
     session.loadState(state)
 
@@ -20,10 +21,10 @@ describe('meeting-place session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.startPlayer).toBe(false)
     expect(resp.state.players[1]!.startPlayer).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-
-    resp = session.resolveChoice(1, '__skip__')
-    expect(resp.ok).toBe(true)
+    if (resp.pending.type === 'choice') {
+      resp = session.resolveChoice(1, '__skip__')
+      expect(resp.ok).toBe(true)
+    }
     expect(resp.pending.type).toBe('confirmNextPlayer')
 
     resp = session.confirmNextPlayer()

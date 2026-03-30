@@ -16,7 +16,8 @@ type PayGainNodeOptions = {
   gain?: CardGain
   promptKey?: string
   choiceLabelKey?: string
-  choiceLabelParams?: Record<string, string | number>
+  choiceLabelParams?: Record<string, unknown>
+  followUp?: ActionFlow[]
 }
 
 type PayThenActionFlowOptions = {
@@ -25,7 +26,7 @@ type PayThenActionFlowOptions = {
   promptKey?: string
   action: ActionFlow
   choiceLabelKey?: string
-  choiceLabelParams?: Record<string, string | number>
+  choiceLabelParams?: Record<string, unknown>
 }
 
 type ReturnToSpaceThenGainFlowOptions = {
@@ -47,11 +48,39 @@ const buildSequenceNode = (
   children,
 })
 
+const resolveChoiceLabelParams = (
+  cost: Partial<Resource>,
+  gain: CardGain | undefined,
+  choiceLabelKey?: string,
+  choiceLabelParams?: Record<string, unknown>,
+) => {
+  if (choiceLabelParams) return choiceLabelParams
+  if (choiceLabelKey !== 'ui.interactionResourceExchange') return undefined
+  const { resources, score } = splitCardGain(gain)
+  return {
+    resourcesPaid: cost,
+    resourcesGained: resources,
+    bonusVp: score > 0 ? score : undefined,
+  }
+}
+
+const resolveChoiceLabelKey = (
+  gain: CardGain | undefined,
+  choiceLabelKey?: string,
+) => {
+  if (choiceLabelKey) return choiceLabelKey
+  const { resources, score } = splitCardGain(gain)
+  if (Object.keys(resources).length > 0 || score > 0) {
+    return 'ui.interactionResourceExchange'
+  }
+  return undefined
+}
+
 export const gainLeaf = (
   cardId: string,
   gain: CardGain,
   choiceLabelKey?: string,
-  choiceLabelParams?: Record<string, string | number>,
+  choiceLabelParams?: Record<string, unknown>,
 ): ActionFlow => {
   const { resources } = splitCardGain(gain)
   return {
@@ -93,12 +122,22 @@ export const payGainActionFlow = ({
   gain,
   choiceLabelKey,
   choiceLabelParams,
-}: PayGainNodeOptions): SequenceFlow =>
-  buildSequenceNode(undefined, [
-    payLeaf({ cardId, cost, choiceLabelKey, choiceLabelParams }),
+  followUp,
+}: PayGainNodeOptions): SequenceFlow => {
+  const { resources } = splitCardGain(gain)
+  const resolvedChoiceLabelKey = resolveChoiceLabelKey(gain, choiceLabelKey)
+  return buildSequenceNode(undefined, [
+    payLeaf({
+      cardId,
+      cost,
+      choiceLabelKey: resolvedChoiceLabelKey,
+      choiceLabelParams: resolveChoiceLabelParams(cost, gain, resolvedChoiceLabelKey, choiceLabelParams),
+    }),
     ...bonusVpLeaves(cardId, gain),
-    ...(gain ? [gainLeaf(cardId, gain)] : []),
+    ...(Object.keys(resources).length > 0 && gain ? [gainLeaf(cardId, gain)] : []),
+    ...(followUp ?? []),
   ])
+}
 
 export const payGainFlow = ({
   cardId,
@@ -107,6 +146,7 @@ export const payGainFlow = ({
   promptKey,
   choiceLabelKey,
   choiceLabelParams,
+  followUp,
 }: PayGainNodeOptions): ActionFlow =>
   buildSequenceNode(promptKey, payGainActionFlow({
     cardId,
@@ -114,6 +154,7 @@ export const payGainFlow = ({
     gain,
     choiceLabelKey,
     choiceLabelParams,
+    followUp,
   }).children, true)
 
 export const payGainNode = (options: PayGainNodeOptions): ActionHookResult =>
@@ -125,11 +166,22 @@ export const payThenGainActionFlow = ({
   gain,
   choiceLabelKey,
   choiceLabelParams,
-}: PayGainNodeOptions): SequenceFlow =>
-  buildSequenceNode(undefined, [
-    payLeaf({ cardId, cost, choiceLabelKey, choiceLabelParams }),
-    gainLeaf(cardId, gain ?? {}),
+  followUp,
+}: PayGainNodeOptions): SequenceFlow => {
+  const resolvedGain = gain ?? {}
+  const { resources } = splitCardGain(resolvedGain)
+  const resolvedChoiceLabelKey = resolveChoiceLabelKey(gain, choiceLabelKey)
+  return buildSequenceNode(undefined, [
+    payLeaf({
+      cardId,
+      cost,
+      choiceLabelKey: resolvedChoiceLabelKey,
+      choiceLabelParams: resolveChoiceLabelParams(cost, gain, resolvedChoiceLabelKey, choiceLabelParams),
+    }),
+    ...(Object.keys(resources).length > 0 ? [gainLeaf(cardId, resolvedGain)] : []),
+    ...(followUp ?? []),
   ])
+}
 
 export const payThenGainFlow = ({
   cardId,
@@ -138,6 +190,7 @@ export const payThenGainFlow = ({
   promptKey,
   choiceLabelKey,
   choiceLabelParams,
+  followUp,
 }: PayGainNodeOptions): ActionHookResult =>
   ({
     flow: buildSequenceNode(promptKey, payThenGainActionFlow({
@@ -146,6 +199,7 @@ export const payThenGainFlow = ({
       gain,
       choiceLabelKey,
       choiceLabelParams,
+      followUp,
     }).children, true),
   })
 

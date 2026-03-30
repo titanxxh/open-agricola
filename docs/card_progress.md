@@ -91,7 +91,7 @@
 |------|------|------|------|
 | C75_Firewood | Improvement | 打改良后以直接 xor flow 取卡上木材，并记录 cardEffectGain 日志 | ✅ |
 | A17_ReclamationPlow | Collect | 收取前快照动物板面，收取后以 xor flow 决定是否触发犁地 | ✅ |
-| A53_Claypipe | Gain/Receive | 获得/接收后交换 | ✅ |
+| A53_Claypipe | onBuy / onReturnHome | 支持回溯本工作阶段打牌前已获得的建材，并在回家阶段按 BGA 结算 2 食物 | ✅ |
 | A110_Roughcaster | Construct/Renovation | 建造/翻新后 | ✅ |
 | A105_BarrowPusher | Plow | 犁地后 | ✅ |
 | A109_SmallTrader | Improvement | 打改良后 | ✅ |
@@ -118,6 +118,8 @@
 | A123_FrameBuilder | Renovation/Construct | 建房/翻修时的资源替换成本，含 construct/renovation 可行性放宽 | ✅ |
 | A88_HedgeKeeper | Fencing | 围栏成本折扣 | ✅ |
 | A28_ForestSchool | Occupation | 职业食物成本可用木材替代，并可无视 Lessons 占用 | ✅ |
+
+注：基础 `renovation` 成本已按 BGA 对齐为“一次性 1 Reed + 每房间 1 Clay/Stone”，相关可行性判定与 `house-redevelopment` 开放条件已同步修正。
 
 ### ComputeArgs Hook
 | 卡牌 | 行动 | 说明 | 状态 |
@@ -168,7 +170,7 @@
 | A39_Chapel | - | 🔧 |
 | A40_PottersYard | - | 🔧 |
 | A41_VegetableSlicer | - | 🔧 |
-| A53_Claypipe | After(Gain, Receive), ImmediatelyAfter(Obtain) | ✅ |
+| A53_Claypipe | onBuy, onReturnHome + workPhaseObtainedResources | ✅ |
 | A55_JunkRoom | During(Improvement) | ✅ |
 | A64_BarleyMill | After(Reap) | ✅ |
 | A65_SeedPellets | Before(Sow) | ✅ |

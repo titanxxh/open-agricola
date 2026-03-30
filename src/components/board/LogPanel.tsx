@@ -1,10 +1,9 @@
-import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
-import { formatResources } from '../../../shared/logic/format'
-import { emptyResources } from '../../../shared/logic/state'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
+import { ResourceLine } from '../common/ResourceLine'
 
 type Props = {
   locale: Locale
@@ -40,6 +39,34 @@ const escapeRegExp = (value: string): string =>
 type TooltipPosition = {
   top: number
   left: number
+}
+
+const renderRichTemplate = (
+  locale: Locale,
+  key: string,
+  textParams: Record<string, string | number>,
+  richParams: Record<string, ReactNode>,
+): ReactNode[] => {
+  const entries = Object.entries(richParams)
+  if (entries.length === 0) return [t(locale, key, textParams)]
+
+  const markerEntries = entries.map(([paramKey], index) => [paramKey, `__rich_${index}__`] as const)
+  const markerParams = Object.fromEntries(markerEntries)
+  const template = t(locale, key, { ...textParams, ...markerParams })
+  const markerToNode = new Map(
+    markerEntries.map(([paramKey, marker]) => [marker, richParams[paramKey]]),
+  )
+  const pattern = markerEntries.map(([, marker]) => escapeRegExp(marker)).join('|')
+  return template
+    .split(new RegExp(`(${pattern})`, 'g'))
+    .filter(Boolean)
+    .map((part, index) => {
+      const richNode = markerToNode.get(part)
+      if (richNode !== undefined) {
+        return <Fragment key={`rich-${key}-${index}`}>{richNode}</Fragment>
+      }
+      return part
+    })
 }
 
 const LogCardLink = ({ locale, cardRef, children }: { locale: Locale; cardRef: CardRef; children: string }) => {
@@ -122,9 +149,7 @@ const LogCardLink = ({ locale, cardRef, children }: { locale: Locale; cardRef: C
   )
 }
 
-const LogEntry = ({ text, cardRefs, locale }: { text: string; cardRefs: CardRef[]; locale: Locale }) => {
-  if (cardRefs.length === 0) return <li>{text}</li>
-
+const LogEntry = ({ parts, cardRefs, locale }: { parts: ReactNode[]; cardRefs: CardRef[]; locale: Locale }) => {
   const refsByName = new Map<string, CardRef>()
   cardRefs.forEach((ref) => {
     if (!refsByName.has(ref.name)) refsByName.set(ref.name, ref)
@@ -135,20 +160,28 @@ const LogEntry = ({ text, cardRefs, locale }: { text: string; cardRefs: CardRef[
     .map((name) => escapeRegExp(name))
     .join('|')
 
-  if (!pattern) return <li>{text}</li>
-
-  const parts = text.split(new RegExp(`(${pattern})`, 'g')).filter(Boolean)
-
   return (
     <li className="log-entry-with-cards">
       {parts.map((part, index) => {
-        const ref = refsByName.get(part)
-        if (!ref) return <Fragment key={`text-${index}`}>{part}</Fragment>
-
+        if (typeof part !== 'string') {
+          return <Fragment key={`node-${index}`}>{part}</Fragment>
+        }
+        if (!pattern) {
+          return <Fragment key={`text-${index}`}>{part}</Fragment>
+        }
+        const textParts = part.split(new RegExp(`(${pattern})`, 'g')).filter(Boolean)
         return (
-          <LogCardLink key={`${ref.id}-${index}`} locale={locale} cardRef={ref}>
-            {part}
-          </LogCardLink>
+          <Fragment key={`text-${index}`}>
+            {textParts.map((textPart, textIndex) => {
+              const ref = refsByName.get(textPart)
+              if (!ref) return <Fragment key={`plain-${index}-${textIndex}`}>{textPart}</Fragment>
+              return (
+                <LogCardLink key={`${ref.id}-${index}-${textIndex}`} locale={locale} cardRef={ref}>
+                  {textPart}
+                </LogCardLink>
+              )
+            })}
+          </Fragment>
         )
       })}
     </li>
@@ -161,6 +194,7 @@ export const LogPanel = ({ locale, log }: Props) => (
     <ul>
       {log.map((entry, index) => {
         const params = entry.params ? { ...entry.params } : undefined
+        const richParams: Record<string, ReactNode> = {}
         if (params && typeof params.action === 'string') {
           params.action = t(locale, params.action)
         }
@@ -177,18 +211,24 @@ export const LogPanel = ({ locale, log }: Props) => (
             )
             .filter((name) => name)
           params.improvements = joinCardNames(locale, names)
-          params.cost = ''
           params.returned = ''
           const costResources = params.costResources as Partial<Resource> | undefined
           if (costResources && typeof costResources === 'object') {
-            const costText = formatResources(
-              locale,
-              { ...emptyResources, ...costResources },
-              true,
+            richParams.cost = (
+              <>
+                {' '}
+                {renderRichTemplate(
+                  locale,
+                  'log.costs',
+                  {},
+                  {
+                    resources: <ResourceLine locale={locale} resources={costResources} />,
+                  },
+                )}
+              </>
             )
-            params.cost = costText
-              ? ` ${t(locale, 'log.costs', { resources: costText })}`
-              : ''
+          } else {
+            params.cost = ''
           }
           const returnedCardsRaw = params.returnedCards
           const returnedCardIds = Array.isArray(returnedCardsRaw)
@@ -205,17 +245,87 @@ export const LogPanel = ({ locale, log }: Props) => (
             })}`
           }
         }
-        if (params && params.cardId && entry.key === 'log.cardEffectGain') {
+        if (
+          params &&
+          params.cardId &&
+          (entry.key === 'log.cardEffectGain' ||
+            entry.key === 'log.cardEffectPay' ||
+            entry.key === 'log.cardEffectBonusVp' ||
+            entry.key === 'log.cardEffectOtherPlayersGain')
+        ) {
           params.cardId = resolveCardDisplayName(locale, String(params.cardId))
         }
         if (params && entry.key === 'log.cardEffectGain' && typeof params.gain === 'object') {
-          const gainResources = params.gain as Partial<Resource>
-          const gainText = formatResources(
-            locale,
-            { ...emptyResources, ...gainResources },
-            true,
+          richParams.gain = (
+            <ResourceLine
+              locale={locale}
+              resources={params.gain as Partial<Resource>}
+            />
           )
-          params.gain = gainText
+        }
+        if (params && entry.key === 'log.cardEffectPay' && typeof params.cost === 'object') {
+          richParams.cost = (
+            <ResourceLine
+              locale={locale}
+              resources={params.cost as Partial<Resource>}
+            />
+          )
+        }
+        if (params && entry.key === 'log.cardEffectBonusVp') {
+          richParams.bonusVp = (
+            <ResourceLine
+              locale={locale}
+              resources={{}}
+              bonusVp={1}
+            />
+          )
+        }
+        if (
+          params &&
+          (
+            entry.key === 'log.harvestReapDetail' ||
+            entry.key === 'log.harvestFeedDetail' ||
+            entry.key === 'log.harvestBreedDetail'
+          ) &&
+          typeof params.resources === 'object'
+        ) {
+          richParams.resources = (
+            <ResourceLine
+              locale={locale}
+              resources={params.resources as Partial<Resource>}
+            />
+          )
+        }
+        if (
+          params &&
+          entry.key === 'log.harvestFeedConvert' &&
+          typeof params.cost === 'object' &&
+          typeof params.food === 'object'
+        ) {
+          richParams.cost = (
+            <ResourceLine
+              locale={locale}
+              resources={params.cost as Partial<Resource>}
+            />
+          )
+          richParams.food = (
+            <ResourceLine
+              locale={locale}
+              resources={params.food as Partial<Resource>}
+            />
+          )
+        }
+        if (
+          params &&
+          entry.key === 'log.cardEffectOtherPlayersGain' &&
+          typeof params.gain === 'object'
+        ) {
+          richParams.gain = (
+            <ResourceLine
+              locale={locale}
+              resources={params.gain as Partial<Resource>}
+            />
+          )
         }
         if (params && params.detailParts && entry.key === 'log.actionDetail') {
           const detailParts = params.detailParts as {
@@ -236,16 +346,6 @@ export const LogPanel = ({ locale, log }: Props) => (
               bakeBread?: { count: number; food: number }
             }
           }
-          const gainsText = formatResources(
-            locale,
-            detailParts.gains ?? emptyResources,
-            true,
-          )
-          const costText = formatResources(
-            locale,
-            detailParts.costs ?? emptyResources,
-            true,
-          )
           const effects: string[] = []
           const effectData = detailParts.effects ?? {}
           if (effectData.buildRoom) {
@@ -331,17 +431,47 @@ export const LogPanel = ({ locale, log }: Props) => (
               }),
             )
           }
-          const segments: string[] = []
-          if (gainsText) {
-            segments.push(t(locale, 'log.gains', { resources: gainsText }))
+          const segments: ReactNode[] = []
+          if (detailParts.gains && Object.values(detailParts.gains).some((value) => (value ?? 0) > 0)) {
+            segments.push(
+              ...renderRichTemplate(
+                locale,
+                'log.gains',
+                {},
+                {
+                  resources: <ResourceLine locale={locale} resources={detailParts.gains} />,
+                },
+              ),
+            )
           }
-          if (costText) {
-            segments.push(t(locale, 'log.costs', { resources: costText }))
+          if (detailParts.costs && Object.values(detailParts.costs).some((value) => (value ?? 0) > 0)) {
+            segments.push(
+              ...renderRichTemplate(
+                locale,
+                'log.costs',
+                {},
+                {
+                  resources: <ResourceLine locale={locale} resources={detailParts.costs} />,
+                },
+              ),
+            )
           }
           if (effects.length > 0) {
             segments.push(t(locale, 'log.effects', { effects: effects.join(' · ') }))
           }
-          params.detail = segments.length > 0 ? ` · ${segments.join(' · ')}` : ''
+          richParams.detail = segments.length > 0
+            ? (
+                <>
+                  {' · '}
+                  {segments.map((segment, segmentIndex) => (
+                    <Fragment key={`detail-${segmentIndex}`}>
+                      {segmentIndex > 0 ? ' · ' : null}
+                      {segment}
+                    </Fragment>
+                  ))}
+                </>
+              )
+            : ''
         }
         const cardIds: string[] = []
         if (entry.params) {
@@ -376,7 +506,7 @@ export const LogPanel = ({ locale, log }: Props) => (
         return (
           <LogEntry
             key={`${entry.key}-${index}`}
-            text={t(locale, entry.key, textParams)}
+            parts={renderRichTemplate(locale, entry.key, textParams ?? {}, richParams)}
             cardRefs={cardRefs}
             locale={locale}
           />

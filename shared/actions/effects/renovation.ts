@@ -6,13 +6,13 @@ export const getRenovation = (player: PlayerState) => {
   if (player.houseType === 'wood') {
     return {
       nextType: 'clay' as const,
-      cost: { clay: player.rooms, reed: player.rooms },
+      cost: { clay: player.rooms, reed: 1 },
     }
   }
   if (player.houseType === 'clay') {
     return {
       nextType: 'stone' as const,
-      cost: { stone: player.rooms, reed: player.rooms },
+      cost: { stone: player.rooms, reed: 1 },
     }
   }
   return null

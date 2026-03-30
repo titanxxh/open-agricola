@@ -4,6 +4,17 @@ import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import type { Resource } from '../../../shared/game/types'
 
+type ResourceExchangeLabelParams = {
+  resourcesPaid?: Partial<Resource>
+  resourcesGained?: Partial<Resource>
+  bonusVp?: number
+}
+
+const isResourceExchangeLabelParams = (
+  value: unknown,
+): value is ResourceExchangeLabelParams =>
+  !!value && typeof value === 'object'
+
 type Props = {
   pendingAnimalReorg: PendingAnimalReorg | null
   pendingChoice: PendingChoice | null
@@ -98,7 +109,10 @@ export const InteractionBar = ({
       ) : harvestFeedPlayerName ? (
         <>
           <div className="interaction-title">
-            {t(locale, 'ui.harvestFeedConfirm')}
+            {t(locale, 'ui.harvestFeedTitle')}
+          </div>
+          <div className="interaction-subtitle">
+            {harvestFeedPlayerName}
           </div>
           <div className="interaction-actions">
             <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
@@ -184,6 +198,28 @@ export const InteractionBar = ({
                           ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as TranslationKey) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as TranslationKey)})
                         </span>
                       )}
+                    </span>
+                  ) : option.labelKey === 'ui.interactionResourceExchange' &&
+                    isResourceExchangeLabelParams(option.labelParams) ? (
+                    <span className="interaction-resource-exchange">
+                      {(option.labelParams.resourcesPaid && Object.values(option.labelParams.resourcesPaid).some((value) => (value ?? 0) > 0)) ? (
+                        <ResourceLine
+                          locale={locale}
+                          resources={option.labelParams.resourcesPaid}
+                          hideZero
+                        />
+                      ) : (
+                        <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+                      )}
+                      <span className="interaction-resource-exchange-arrow" aria-hidden="true">
+                        <span className="res-icon res-icon-arrow" />
+                      </span>
+                      <ResourceLine
+                        locale={locale}
+                        resources={option.labelParams.resourcesGained ?? {}}
+                        bonusVp={option.labelParams.bonusVp ?? 0}
+                        hideZero
+                      />
                     </span>
                   ) : option.labelKey === 'ui.interactionActionOrReplace' &&
                     option.labelParams &&

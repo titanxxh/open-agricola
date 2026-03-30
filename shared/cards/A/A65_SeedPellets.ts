@@ -2,16 +2,24 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { canSow } from '../../actions/effects/sow'
 
 const CARD_ID = 'A65_SeedPellets'
 
-const listener: CardListenerRegistration = {
+const isUnconditionalSow = (context: CardListenerContext) => {
+  const actionContext = context.actionContext ?? {}
+  if (actionContext.checkedReplaceAction === true) return false
+  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
+}
+
+const beforeSowListener: CardListenerRegistration = {
   id: 'A65-seed-pellets-before-sow',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!isUnconditionalSow(context)) return
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
@@ -21,7 +29,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
+const isDoableListener: CardListenerRegistration = {
+  id: 'A65-seed-pellets-isdoable-sow',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!isUnconditionalSow(context)) return
+    if (canSow(context.player)) return
+    if (!context.player.fields.some((field) => field.crop === null)) return
+    return { doable: true }
+  },
+}
+
+registerCardListener(beforeSowListener)
+registerCardListener(isDoableListener)
 
 export const A65_SeedPellets = new MinorImprovement({
   id: CARD_ID,

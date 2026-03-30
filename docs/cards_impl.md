@@ -72,7 +72,7 @@
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
 | onBeforeReturnHome | — | 已接入 | 回家阶段最先触发（BGA: D51_Archway） |
 | onStartReturnHome | — | 已接入 | 回家阶段工人返回前（BGA: A151_Minstrel 等 11 张卡） |
-| onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts) | 已接入 | 每回合回家阶段触发 |
+| onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | 已接入 | 每回合回家阶段触发 |
 | onAfterRoundEnd | — | 已接入 | 回合结束后触发（BGA: D167_PureBreeder） |
 | onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发，支持返回可暂停/恢复的 `ActionFlow` |
 | onStartHarvest | — | 已接入 | 收获开始时触发（BGA: D97_BeggingStudent 等 16 张卡） |
@@ -459,6 +459,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 - **资源图标**：`ResourceLine.tsx` 使用 BGA meeple sprite 图标（`res-icon-*`）替代文字标签，`ActionBoard` 累积资源通过堆叠 `res-icon` sprite 显示在 `.resource-holder` 中，卡牌体内通过 `.gain-display` 显示数字 + 内联资源图标。
 - **日志卡牌 hover**：`LogPanel.tsx` 检测日志中的卡牌引用，hover 显示卡牌徽章与 tooltip（名称、描述）。
 - **改良日志明细**：`playImprovement` / `playMinorImprovement` 日志现会附带支付资源与返还卡牌；若卡牌在 `onBuy` / 其他 effect 中立即得资源，则继续走独立的 `log.cardEffectGain`。像 `C60_SmallPottersOven` 现为“支付 2 Clay、归还 Clay Oven/Stone Oven”一条改良日志，再单独追加“获得 5 Food”卡牌日志。
+- **翻修成本**：`renovation.ts` 已按 BGA 对齐为“每房间 1 Clay/Stone + 一次性 1 Reed”，`House Redevelopment` / `Farm Redevelopment` 的 mandatory renovate 判定同步使用这套成本预览。
 - **卡牌关键字图标**：`PlayerCard.tsx` 的 `.card-category` 图标增加中英文 tooltip（8 个类别）。Passing 小牌增加 `.card-passing-badge` 可视标识。
 - **对局状态指示**：`GameHeader.tsx` 增加"轮到你了"/"等待对方"状态徽章（pulse 动画），显示玩家身份，回合进度（N/14）。My-turn 时 header 绿色高亮，not-my-turn 时 action 区域变暗并禁用交互。
 
@@ -534,7 +535,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 | StartOfTurn | 30+ | onRoundStart（已接入） | 已有 `A81_InterimStorage` 样板，其他多数仍待落卡 | A81_InterimStorage, E126_TaxCollector, D53_TeaHouse |
 | BeforeReturnHome | 1 | onBeforeReturnHome（已接入） | 暂无卡牌注册 | D51_Archway |
 | StartReturnHome | 11 | onStartReturnHome（已接入） | 暂无卡牌注册 | A151_Minstrel, E20_IronHoe, C97_SeedResearcher, A100_Curator |
-| ReturnHome | 12 | onReturnHome（已接入） | C75_Firewood, A84_Silage, A29_AleBenches | A53_Claypipe, A29_AleBenches, B139_ForestScientist |
+| ReturnHome | 12 | onReturnHome（已接入） | C75_Firewood, A84_Silage, A53_Claypipe, A29_AleBenches | A29_AleBenches, B139_ForestScientist |
 | EndOfRound | 7 | onRoundEnd（已接入） | 暂无卡牌注册 | A70_LiftingMachine, A54_Credit, A165_PigBreeder |
 | AfterEndOfRound | 1 | onAfterRoundEnd（已接入） | 暂无卡牌注册 | D167_PureBreeder |
 | BeforeHarvest | 3 | onBeforeHarvest（已接入） | A166_Haydryer | D98_Transactor, D32_WoodRake, C92_AutumnMother |

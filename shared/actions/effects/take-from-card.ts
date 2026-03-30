@@ -2,6 +2,7 @@ import type { ActionDefinition, Resource } from '../../game/types'
 import { initCardState } from '../../cards/__stubs__/helpers'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainResources } from './gain'
+import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 const canTakeFromCard = (
   counters: Record<string, number> | undefined,
@@ -19,7 +20,7 @@ export const takeFromCardAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, sourceCard }) => {
+  execute: ({ state, player, params, sourceCard }) => {
     if (!sourceCard) {
       return { type: 'fail', logKey: 'log.exchangeFail' }
     }
@@ -35,6 +36,7 @@ export const takeFromCardAction: ActionDefinition = {
       cardCounters[key] = Math.max(0, (cardCounters[key] ?? 0) - value)
     })
     gainResources(player, gain)
+    trackWorkPhaseBuildingResources(state, player.id, gain)
     addCardResourceGained(player, sourceCard, gain)
 
     return {

@@ -15,6 +15,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+type CropType = 'grain' | 'vegetable'
 
 const AnimalCount = ({
   count,
@@ -38,6 +39,94 @@ const AnimalCount = ({
       <span className={`res-icon res-icon-${animalType}`} style={{ marginLeft: '2px', marginRight: '2px' }} />
       /{capacity}
     </span>
+  )
+}
+
+const CropStack = ({
+  locale,
+  crop,
+  remaining,
+}: {
+  locale: Locale
+  crop: CropType
+  remaining: number
+}) => {
+  if (remaining <= 0) return null
+  return (
+    <div
+      className={`field-crop field-crop-${crop}`}
+      title={`${t(locale, `resources.${crop}`)} ${remaining}`}
+      aria-label={`${t(locale, `resources.${crop}`)} ${remaining}`}
+    >
+      {Array.from({ length: remaining }, (_, index) => (
+        <span
+          key={`${crop}-${index}`}
+          className={`res-icon res-icon-${crop} field-crop-icon`}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  )
+}
+
+const SowChoiceButtons = ({
+  locale,
+  tileKey,
+  currentValue,
+  allowedCrops,
+  availableGrain,
+  availableVegetable,
+  isInteractive,
+  updateSowSelection,
+  tile,
+}: {
+  locale: Locale
+  tileKey: string
+  currentValue: string
+  allowedCrops: CropType[]
+  availableGrain: number
+  availableVegetable: number
+  isInteractive: boolean
+  updateSowSelection: (tile: FarmTilePosition, value: string) => void
+  tile: FarmTilePosition
+}) => {
+  const options = ([
+    {
+      crop: 'grain',
+      enabled: allowedCrops.includes('grain') && availableGrain > 0,
+    },
+    {
+      crop: 'vegetable',
+      enabled: allowedCrops.includes('vegetable') && availableVegetable > 0,
+    },
+  ] as const).filter((option) => option.enabled || currentValue === option.crop)
+
+  return (
+    <div className="sow-choice-group" role="radiogroup" aria-label={`${tileKey}-sow-choice`}>
+      <button
+        type="button"
+        className={`sow-choice-button sow-choice-clear${currentValue === '' ? ' active' : ''}`}
+        onClick={() => updateSowSelection(tile, '')}
+        disabled={!isInteractive}
+        aria-pressed={currentValue === ''}
+        title={t(locale, 'ui.sowSelectNone')}
+      >
+        {t(locale, 'ui.sowSelectNone')}
+      </button>
+      {options.map(({ crop }) => (
+        <button
+          key={crop}
+          type="button"
+          className={`sow-choice-button${currentValue === crop ? ' active' : ''}`}
+          onClick={() => updateSowSelection(tile, crop)}
+          disabled={!isInteractive}
+          aria-pressed={currentValue === crop}
+          title={t(locale, `resources.${crop}`)}
+        >
+          <span className={`res-icon res-icon-${crop}`} aria-hidden="true" />
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -161,10 +250,14 @@ const PlayedCardStats = ({
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
-  const hasCounters = Object.keys(displayCounters).length > 0
+  const bonusVp = displayCounters.bonusVp ?? 0
+  const visibleCounters = Object.fromEntries(
+    Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
+  )
+  const hasCounters = Object.keys(visibleCounters).length > 0
   const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
   const hasGained = hasAnyResource(resourceStats?.gained ?? {})
-  const hasResourceStats = hasPaid || hasGained
+  const hasResourceStats = hasPaid || hasGained || bonusVp > 0
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -220,7 +313,7 @@ const PlayedCardStats = ({
       />
       {futureEntries.length > 0 || hasCounters ? (
         <div className="card-future">
-          {Object.entries(displayCounters).map(([resKey, count]) => {
+          {Object.entries(visibleCounters).map(([resKey, count]) => {
             if (count <= 0) return null
             const isKnownResource = resKey in emptyResources
             return (
@@ -299,12 +392,13 @@ const PlayedCardStats = ({
               />
             </div>
           ) : null}
-          {hasGained ? (
+          {hasGained || bonusVp > 0 ? (
             <div className="played-card-stats-section">
               <div className="played-card-stats-label">{t(locale, 'ui.cardStatsGained')}</div>
               <ResourceLine
                 locale={locale}
                 resources={{ ...emptyResources, ...(resourceStats?.gained ?? {}) }}
+                bonusVp={bonusVp}
                 className="played-card-stats-line"
               />
             </div>
@@ -516,10 +610,16 @@ export const FarmBoard = ({
             isRoomSelected || isPlowSelected || isStableSelected
           const fieldInfo = fieldMap.get(tileKey)
           const isEmptyField = !!fieldInfo && fieldInfo.crop === null
-          const cropLabel =
+          const cropStack =
             fieldInfo?.crop && fieldInfo.remaining > 0
-              ? `${t(locale, `resources.${fieldInfo.crop}`)} ${fieldInfo.remaining}`
-              : ''
+              ? (
+                  <CropStack
+                    locale={locale}
+                    crop={fieldInfo.crop}
+                    remaining={fieldInfo.remaining}
+                  />
+                )
+              : null
           const allowedSowCrops = sowSelectableMap.get(tileKey) ?? []
           const isSowSelectable =
             isInteractive && isEmptyField && allowedSowCrops.length > 0
@@ -605,23 +705,19 @@ export const FarmBoard = ({
                       : t(locale, 'ui.tileEmpty')}
               </span>
               {isSowSelectable ? (
-                <select
-                  value={currentSowChoice}
-                  onChange={(event) =>
-                    updateSowSelection({ row: tileRow, col: tileCol }, event.target.value)
-                  }
-                  disabled={!isInteractive}
-                >
-                  <option value="">{t(locale, 'ui.sowSelectNone')}</option>
-                  {allowedSowCrops.includes('grain') && availableGrain > 0 ? (
-                    <option value="grain">{t(locale, 'resources.grain')}</option>
-                  ) : null}
-                  {allowedSowCrops.includes('vegetable') && availableVegetable > 0 ? (
-                    <option value="vegetable">{t(locale, 'resources.vegetable')}</option>
-                  ) : null}
-                </select>
+                <SowChoiceButtons
+                  locale={locale}
+                  tileKey={tileKey}
+                  currentValue={currentSowChoice}
+                  allowedCrops={allowedSowCrops}
+                  availableGrain={availableGrain}
+                  availableVegetable={availableVegetable}
+                  isInteractive={isInteractive}
+                  updateSowSelection={updateSowSelection}
+                  tile={{ row: tileRow, col: tileCol }}
+                />
               ) : null}
-              {cropLabel ? <div className="field-crop">{cropLabel}</div> : null}
+              {cropStack}
               {pastureInfo?.isCorner ? (
                 <div className="pasture-info">
                   <div className="pasture-count"><AnimalCount count={pastureAnimalCount} animalType={pastureAnimalType} capacity={pastureCapacity} /></div>

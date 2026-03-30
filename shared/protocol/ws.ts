@@ -16,7 +16,7 @@ export type ClientCommand =
     }
   | {
       type: 'feed'
-      selections: { resourceKey: keyof Resource; count: number; food: number }[]
+      selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string }[]
     }
   | {
       type: 'commitFarm'

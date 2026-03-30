@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../game/types'
+import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 export const collectAccumulatedResources = (
   player: PlayerState,
@@ -21,7 +22,7 @@ export const collectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, space }) => {
+  execute: ({ state, player, space }) => {
     const gained: Record<string, number> = {}
     const resources = space.resources
     ;(['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const).forEach((key) => {
@@ -30,6 +31,7 @@ export const collectAction: ActionDefinition = {
       }
     })
     collectAccumulatedResources(player, space)
+    trackWorkPhaseBuildingResources(state, player.id, gained)
     return { type: 'ok' as const, resourcesGained: gained }
   },
 }

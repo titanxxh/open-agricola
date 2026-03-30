@@ -117,6 +117,33 @@
   opacity: 0.85;
 }
 
+.interaction-resource-exchange {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interaction-resource-exchange .resource-inline {
+  flex-wrap: nowrap;
+}
+
+.interaction-resource-exchange-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(104, 74, 26, 0.18);
+}
+
+.interaction-resource-exchange-arrow .res-icon-arrow {
+  font-size: 22px;
+  filter: drop-shadow(0 1px 0 rgba(255, 240, 200, 0.55));
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -280,7 +307,7 @@
 
 .app:has(.header.not-my-turn) .board .actions {
   opacity: 0.7;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .actions,
@@ -1190,17 +1217,73 @@
   line-height: 1.1;
 }
 
+.sow-choice-group {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  z-index: 1;
+}
+
+.sow-choice-button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(47, 79, 31, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.sow-choice-button .res-icon {
+  font-size: 20px;
+}
+
+.sow-choice-button.active {
+  background: #fff6d8;
+  box-shadow: inset 0 0 0 2px rgba(212, 160, 23, 0.75);
+}
+
+.sow-choice-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sow-choice-clear {
+  width: auto;
+  min-width: 46px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2f4f1f;
+}
+
 .field-crop {
   position: absolute;
   top: 4px;
   right: 4px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #1f2937;
+  display: flex;
+  flex-flow: column-reverse;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.field-crop-icon {
+  font-size: 21px;
+  margin: 0 auto -5px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.28));
+}
+
+.field-crop-icon:first-child {
+  margin-bottom: 0;
 }
 
 .pasture-info {
@@ -1707,6 +1790,12 @@
   color: #5a3d1c;
 }
 
+.resource-inline-item.resource-bonusVp {
+  background: #fff1b8;
+  border-color: #e0bd56;
+  color: #6f5a08;
+}
+
 .resource-inline-item.resource-begging {
   background: #f1f1f1;
   border-color: #cfcfcf;
@@ -1728,9 +1817,11 @@
 .res-icon-grain { width: 0.75em; height: 0.79em; background-position: 54.5869% 21.7877%; background-size: 2730.67%; }
 .res-icon-vegetable { width: 0.82em; height: 0.8em; background-position: 77.0791% 21.7325%; background-size: 2694.74%; }
 .res-icon-food { width: 0.8em; height: 0.8em; background-position: 41.0061% 21.7988%; background-size: 2560%; }
+.res-icon-begging { width: 1.1em; height: 1.1em; background-position: 50.1524% 21.7988%; background-size: 2560%; }
 .res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
+.res-icon-bonusVp { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 
 /* Action-specific icons from meeples.png */
 .res-icon-arrow   { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
@@ -2314,6 +2405,12 @@
 .exchange-rate {
   font-size: 13px;
   color: #7a5a3a;
+  display: flex;
+  align-items: center;
+}
+
+.exchange-rate .resource-inline {
+  flex-wrap: nowrap;
 }
 
 .exchange-steps {

@@ -37,8 +37,32 @@ describe('LogPanel', () => {
     const text = stripHtml(html)
 
     expect(text).toContain("Player B plays minor improvement: Small Potter's Oven")
-    expect(text).toContain('Pays Clay 2')
     expect(text).toContain('Returns Clay Oven')
-    expect(text).toContain("Player B gains Food 5 from Small Potter's Oven")
+    expect(text).toContain("Player B gains")
+    expect(text).toContain("from Small Potter's Oven")
+    expect(html).toContain('data-resource="clay"')
+    expect(html).toContain('data-amount="2"')
+    expect(html).toContain('data-resource="food"')
+    expect(html).toContain('data-amount="5"')
+  })
+
+  it('renders bonus VP card logs with icon chips', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.cardEffectBonusVp',
+        params: {
+          player: 'Player A',
+          cardId: 'A37_Bucksaw',
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="en" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('Player A gains')
+    expect(text).toContain('from Bucksaw')
+    expect(html).toContain('data-resource="bonusVp"')
+    expect(html).toContain('data-amount="1"')
   })
 })

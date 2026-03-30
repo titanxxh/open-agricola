@@ -5,6 +5,7 @@ import { resourceKeyList } from '../../../shared/logic/state'
 type Props = {
   locale: Locale
   resources: Partial<Resource>
+  bonusVp?: number
   hideZero?: boolean
   emptyLabel?: string
   className?: string
@@ -13,14 +14,18 @@ type Props = {
 export const ResourceLine = ({
   locale: _locale,
   resources,
+  bonusVp = 0,
   hideZero = true,
   emptyLabel,
   className,
 }: Props) => {
-  const items = resourceKeyList
+  const items: Array<{ key: string; amount: number }> = resourceKeyList
     .map((key) => ({ key, amount: resources[key] ?? 0 }))
     .filter(({ amount }) => !hideZero || amount > 0)
     .filter(({ amount }) => amount > 0)
+  if (bonusVp > 0) {
+    items.push({ key: 'bonusVp', amount: bonusVp })
+  }
   if (items.length === 0) {
     return emptyLabel ? <span className="resource-inline-empty">{emptyLabel}</span> : null
   }

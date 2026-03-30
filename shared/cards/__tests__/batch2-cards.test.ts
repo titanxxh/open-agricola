@@ -145,6 +145,21 @@ describe('A65_SeedPellets', () => {
     } as any)
     expect(result).toBeUndefined()
   })
+
+  it('marks unconditional sow doable when card provides the first grain', () => {
+    const listener = findListener('A65-seed-pellets-isdoable-sow')
+    expect(listener).toBeDefined()
+    const player = createPlayer()
+    player.minorPlayed = ['A65_SeedPellets']
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    player.fields = [{ id: 'f1', row: 0, col: 0, crop: null, remaining: 0 }]
+    const result = executeCardListener(listener!, {
+      state: createState(player), player, space: createSpace('sow'),
+      actionId: 'sow', phase: 'isDoable',
+    } as any)
+    expect(result).toEqual({ doable: true })
+  })
 })
 
 describe('C88_CarpentersApprentice', () => {

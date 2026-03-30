@@ -58,8 +58,14 @@ describe('shared protocol types', () => {
       { type: 'none' },
       { type: 'choice', playerIndex: 0, spaceId: 'test', options: [] },
       { type: 'animalReorg', playerIndex: 0, spaceId: 'test' },
-      { type: 'harvestFeed', playerIndex: 0, remaining: 5 },
-      { type: 'harvestFeed', playerIndex: 0, remaining: 3, feedQueue: [{ index: 1, remaining: 2 }] },
+      { type: 'harvestFeed', playerIndex: 0, remaining: 5, foodUsed: 0 },
+      {
+        type: 'harvestFeed',
+        playerIndex: 0,
+        remaining: 3,
+        foodUsed: 1,
+        feedQueue: [{ index: 1, remaining: 2, foodUsed: 0 }],
+      },
       { type: 'confirmNextPlayer', nextPlayerIndex: 1 },
     ]
     expect(variants.length).toBe(6)

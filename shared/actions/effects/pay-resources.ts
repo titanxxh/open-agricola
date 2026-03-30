@@ -21,6 +21,13 @@ export const payResourcesAction: ActionDefinition = {
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, cost as Partial<Resource>)
     }
+    if (sourceCard) {
+      return {
+        type: 'ok',
+        logKey: 'log.cardEffectPay',
+        logParams: { cost: cost as Partial<Resource>, cardId: sourceCard },
+      }
+    }
     return { type: 'ok' }
   },
 }
