@@ -69,7 +69,7 @@ type WsStatus =
   | { phase: 'connecting' }
   | { phase: 'creating' }
   | { phase: 'joining'; roomId: string }
-  | { phase: 'waiting'; roomId: string }
+  | { phase: 'waiting'; roomId: string; players: Array<{ playerIndex: number; name: string }>; maxPlayers: number }
   | { phase: 'ready'; roomId: string; playerIndex: number }
   | { phase: 'error'; message: string }
 
@@ -131,7 +131,13 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           return
         }
         setRoomInUrl(resp.roomId)
-        setWsStatus({ phase: 'waiting', roomId: resp.roomId })
+        const creatorName = displayName ?? playerParam ?? 'Player 1'
+        setWsStatus({
+          phase: 'waiting',
+          roomId: resp.roomId,
+          players: [{ playerIndex: resp.playerIndex, name: creatorName }],
+          maxPlayers: 2,
+        })
 
         const handler = (event: MessageEvent) => {
           try {
@@ -140,6 +146,16 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
               rawWs.removeEventListener('message', handler)
               setWsReady(true)
               setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+            } else if (msg.type === 'playerJoined') {
+              setWsStatus(prev => {
+                if (prev.phase !== 'waiting') return prev
+                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
+                return {
+                  ...prev,
+                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
+                  maxPlayers: msg.maxPlayers,
+                }
+              })
             }
           } catch { /* skip */ }
         }
@@ -1126,7 +1142,7 @@ export const GameContainerApi = () => {
       : wsStatus.phase === 'connecting' ? 'Connecting to server...'
       : wsStatus.phase === 'creating' ? 'Creating room...'
       : wsStatus.phase === 'joining' ? `Joining room ${wsStatus.roomId}...`
-      : wsStatus.phase === 'waiting' ? `Room ${wsStatus.roomId} — waiting for other player...`
+      : wsStatus.phase === 'waiting' ? `房间 ${wsStatus.roomId} — 等待玩家加入 (${wsStatus.players.length}/${wsStatus.maxPlayers})`
       : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
       : 'Loading...'
 
@@ -1156,6 +1172,13 @@ export const GameContainerApi = () => {
                 </button>
               </div>
               <div className="ws-invite-roomid">房间 ID：<strong>{wsStatus.roomId}</strong></div>
+              <div className="ws-invite-players">
+                {wsStatus.players.map(p => (
+                  <div key={p.playerIndex} className="ws-invite-player">
+                    玩家 {p.playerIndex + 1}：{p.name}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

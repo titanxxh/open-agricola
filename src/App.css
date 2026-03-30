@@ -3632,6 +3632,19 @@
   text-align: center;
 }
 
+.ws-invite-players {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f5f0e8;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #5a3a20;
+}
+
+.ws-invite-player {
+  padding: 4px 0;
+}
+
 .ws-error-actions {
   display: flex;
   gap: 10px;
