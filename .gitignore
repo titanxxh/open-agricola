@@ -34,3 +34,4 @@ artifacts/
 test-results/
 *.traineddata
 .gstack/
+deploy/Caddyfile
