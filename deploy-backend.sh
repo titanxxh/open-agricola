@@ -30,7 +30,8 @@ ssh "$HOST" bash -s "$REMOTE_DIR" << 'REMOTE_SCRIPT'
   cd "$REMOTE_DIR"
 
   echo ">>> git pull..."
-  git pull origin main
+  git fetch origin main
+  git reset --hard origin/main
 
   echo ">>> docker compose build..."
   docker compose -f docker-compose.prod.yml up -d --build
