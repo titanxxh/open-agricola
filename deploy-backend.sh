@@ -6,7 +6,13 @@
 
 set -e
 
-HOST="${1:-}"
+# 如果没有 @ 则默认用 root 用户
+_HOST="${1:-}"
+if [[ "$_HOST" != *@* ]]; then
+  HOST="root@$_HOST"
+else
+  HOST="$_HOST"
+fi
 REMOTE_DIR="${2:-/root/open-agricola}"
 
 if [ -z "$HOST" ]; then
