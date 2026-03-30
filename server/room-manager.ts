@@ -420,7 +420,9 @@ function startRoomCleanup(): void {
 }
 
 export const createWsServer = (server: import('node:http').Server) => {
-  ensurePersistentRoom()
+  if (process.env.NODE_ENV !== 'production') {
+    ensurePersistentRoom()
+  }
   restoreRoomsFromSqlite()
   startRoomCleanup()
   const wss = new WebSocketServer({ server, path: '/ws' })

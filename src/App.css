@@ -2700,6 +2700,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .lobby-section h2 {
@@ -2711,10 +2712,16 @@
 .join-form {
   display: flex;
   gap: 8px;
+  min-width: 0;
+}
+
+.join-form .btn-primary {
+  flex-shrink: 0;
 }
 
 .join-form input {
   flex: 1;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid #cdb996;
   border-radius: 8px;
