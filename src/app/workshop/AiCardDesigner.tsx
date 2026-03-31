@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
   streamChat, extractCardJson, generateCardArt,
+  PROVIDER_LABELS, PROVIDER_KEY_HINTS,
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
@@ -80,7 +81,7 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
             它<strong>绝不会</strong>通过 WebSocket 或 HTTP 发送到游戏服务器。
             所有 AI 请求由你的浏览器直接发出，游戏服务器无法获取你的 Key。
             <br/>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="ai-source-link">
+            <a href="https://github.com/titanxxh/open-agricola/blob/main/src/services/llmService.ts" target="_blank" rel="noopener noreferrer" className="ai-source-link">
               查看源码验证
             </a>
           </p>
@@ -91,14 +92,14 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
         <div className="form-field">
           <label>AI 提供商</label>
           <div className="ai-provider-btns">
-            {(['openai', 'anthropic', 'custom'] as LlmProvider[]).map(p => (
+            {(['gemini', 'groq', 'openai', 'anthropic', 'openrouter', 'custom'] as LlmProvider[]).map(p => (
               <button
                 key={p}
                 type="button"
                 className={`ai-provider-btn${provider === p ? ' active' : ''}`}
                 onClick={() => handleProviderChange(p)}
               >
-                {p === 'openai' ? 'OpenAI' : p === 'anthropic' ? 'Anthropic' : '自定义'}
+                {PROVIDER_LABELS[p]}
               </button>
             ))}
           </div>
@@ -140,6 +141,11 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
               {showKey ? '隐藏' : '显示'}
             </button>
           </div>
+          {PROVIDER_KEY_HINTS[provider] && (
+            <div className="form-hint">
+              获取 Key：<a href={`https://${PROVIDER_KEY_HINTS[provider]}`} target="_blank" rel="noopener noreferrer">{PROVIDER_KEY_HINTS[provider]}</a>
+            </div>
+          )}
         </div>
 
         <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim()}>

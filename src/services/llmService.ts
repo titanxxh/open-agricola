@@ -11,7 +11,7 @@
 // ── Storage keys ─────────────────────────────────────────────────────────────
 const KEY_LLM_CONFIG = 'open-agricola-llm-config'
 
-export type LlmProvider = 'openai' | 'anthropic' | 'custom'
+export type LlmProvider = 'openai' | 'anthropic' | 'gemini' | 'groq' | 'openrouter' | 'custom'
 
 export type LlmConfig = {
   provider: LlmProvider
@@ -23,7 +23,38 @@ export type LlmConfig = {
 const DEFAULT_MODELS: Record<LlmProvider, string> = {
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-5',
+  gemini: 'gemini-2.5-flash',
+  groq: 'llama-3.3-70b-versatile',
+  openrouter: 'google/gemini-2.5-flash-preview',
   custom: 'gpt-4o',
+}
+
+/** Pre-configured base URLs for named providers (OpenAI-compatible). */
+const PROVIDER_BASE_URLS: Partial<Record<LlmProvider, string>> = {
+  openai: 'https://api.openai.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
+  groq: 'https://api.groq.com/openai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+}
+
+/** Human-readable labels. */
+export const PROVIDER_LABELS: Record<LlmProvider, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  gemini: 'Gemini (免费)',
+  groq: 'Groq (免费)',
+  openrouter: 'OpenRouter',
+  custom: '自定义',
+}
+
+/** Hint text for API key acquisition. */
+export const PROVIDER_KEY_HINTS: Record<LlmProvider, string> = {
+  openai: 'platform.openai.com/api-keys',
+  anthropic: 'console.anthropic.com/settings/keys',
+  gemini: 'aistudio.google.com/apikey',
+  groq: 'console.groq.com/keys',
+  openrouter: 'openrouter.ai/settings/keys',
+  custom: '',
 }
 
 export function getLlmConfig(): LlmConfig | null {
@@ -84,8 +115,10 @@ async function* streamOpenAI(
   systemPrompt: string,
   config: LlmConfig,
 ): AsyncGenerator<string> {
-  const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com'
-  const url = `${baseUrl}/v1/chat/completions`
+  const baseUrl = (config.baseUrl?.replace(/\/$/, '') || PROVIDER_BASE_URLS[config.provider] || 'https://api.openai.com/v1').replace(/\/$/, '')
+  const url = baseUrl.endsWith('/v1') || baseUrl.endsWith('/openai')
+    ? `${baseUrl}/chat/completions`
+    : `${baseUrl}/v1/chat/completions`
 
   const body = {
     model: config.model,

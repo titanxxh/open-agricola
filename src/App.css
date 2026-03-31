@@ -3257,11 +3257,12 @@
 
 .ai-provider-btns {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .ai-provider-btn {
-  padding: 7px 18px;
+  padding: 7px 14px;
   border: 1px solid #cdb996;
   border-radius: 8px;
   background: transparent;
@@ -3296,6 +3297,16 @@
 .ai-toggle-key {
   font-size: 13px;
   flex-shrink: 0;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #8a7a60;
+  margin-top: 4px;
+}
+
+.form-hint a {
+  color: #3a5a2c;
 }
 
 /* Chat layout */
