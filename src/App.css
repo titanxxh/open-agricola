@@ -2750,6 +2750,8 @@
   color: #8a7a60;
   font-size: 14px;
   margin: 0;
+  padding: 20px;
+  text-align: center;
 }
 
 .room-list {
