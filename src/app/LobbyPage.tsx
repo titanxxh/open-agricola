@@ -118,7 +118,7 @@ export function LobbyPage() {
                 <li key={r.id} className="room-item">
                   <span className="room-id">房间 {r.id}</span>
                   <span className="room-players">席位 {r.player_index + 1}</span>
-                  <span className="room-status">{r.status}</span>
+                  <span className="room-status">{r.status === 'playing' ? '进行中' : r.status === 'waiting' ? '等待中' : r.status}</span>
                   <button
                     type="button"
                     className="btn-small"
