@@ -145,6 +145,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `computeAllBuyableCombinations`：穷举可用支付方案 + Pareto 过滤。
 - LRU 缓存加速重复查询（复杂场景 100x+ 提升）。
 - `prompt.selectPayment`：统一支付选项协议；涉及返还/使用卡牌的方案会优先展示可读卡名，而不是直接暴露内部 card id。
+- `typed flat` 直付路径会先尝试同类型 `TradeModifier` 的等价抵扣，再回退原始 `baseCost`；因此 `payTypedFlatCost` 与 `computeAllBuyableCombinations` 在 A88 这类空 `from` trade 上保持一致。
 - 小改良/行动卡出牌前提：`minor-improvement` / `improvement-any` 已接入统一 prerequisite 校验；当前覆盖结构化的 `occupationPrerequisites` / `improvementPrerequisites`，以及常见文本前提如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`。
 - 改良日志：`log.playImprovement` / `log.playMinorImprovement` 现统一携带支付资源与返还卡牌；像 `C60_SmallPottersOven` 这类 `onBuy` 立即得资源效果，会额外产出独立的 `log.cardEffectGain`。当前实现卡牌中已无遗留 `reward:` 字段用法。
 - 翻修成本已对齐 BGA：木屋/泥屋翻修分别为“每房间 1 Clay/Stone + 一次性 1 Reed”，`house-redevelopment` 可用性也按该规则判定。
@@ -204,7 +205,7 @@ npm run test:e2e  # E2E 测试
 ## 7. 已知边界
 
 - 251 个 A/B/C/D/E 牌文件中，当前有 45+ 张已接入 hook；仍有部分卡牌仅完成数据接入，复杂行为待补全。
-- Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。
+- Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。`A88_HedgeKeeper` 使用与 BGA 一致的「空 `from` + `to: { wood: 1 }` + `max: 3`」`TradeModifier` 模拟围栏免木段数，而非单笔 `bonus` −3 Wood。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。
 - 断线重连未实现（WS 断开后需刷新页面重连）。

@@ -102,6 +102,7 @@ const getPersistedRoomFile = (roomId: string) =>
 export const resolveJoinPlayerIndex = (
   room: Pick<Room, 'id' | 'maxPlayers' | 'players'>,
   requestedPlayerIndex?: number,
+  userId?: string,
 ): JoinSeatResolution => {
   if (requestedPlayerIndex !== undefined) {
     if (
@@ -115,7 +116,8 @@ export const resolveJoinPlayerIndex = (
       (player) => player.playerIndex === requestedPlayerIndex,
     )
     if (occupied) {
-      if (room.id !== FIXED_DEV_ROOM_ID) {
+      // Allow reconnection if same userId, or in dev room
+      if (room.id !== FIXED_DEV_ROOM_ID && !(userId && occupied.userId === userId)) {
         return { ok: false, error: 'player slot occupied' }
       }
       return {
@@ -420,7 +422,9 @@ function startRoomCleanup(): void {
 }
 
 export const createWsServer = (server: import('node:http').Server) => {
-  ensurePersistentRoom()
+  if (process.env.NODE_ENV !== 'production') {
+    ensurePersistentRoom()
+  }
   restoreRoomsFromSqlite()
   startRoomCleanup()
   const wss = new WebSocketServer({ server, path: '/ws' })
@@ -502,11 +506,18 @@ export const createWsServer = (server: import('node:http').Server) => {
         const roomId = msg.roomId
         const room = rooms.get(roomId)
         if (!room) { sendTo(ws, { type: 'error', error: 'room not found' }); return }
-        const requestedPlayerIndex =
+        // If this userId already has a seat, reconnect to that seat
+        let requestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
             ? msg.requestedPlayerIndex
             : undefined
-        const seat = resolveJoinPlayerIndex(room, requestedPlayerIndex)
+        if (requestedPlayerIndex === undefined && currentUserId) {
+          const existingSeat = room.players.find(p => p.userId === currentUserId)
+          if (existingSeat) {
+            requestedPlayerIndex = existingSeat.playerIndex
+          }
+        }
+        const seat = resolveJoinPlayerIndex(room, requestedPlayerIndex, currentUserId)
         if (!seat.ok) { sendTo(ws, { type: 'error', error: seat.error }); return }
         currentRoom = room
         currentPlayerIndex = seat.playerIndex
@@ -530,6 +541,14 @@ export const createWsServer = (server: import('node:http').Server) => {
         ensureRoomRowSqlite(room)
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, currentPlayerIndex)
         sendTo(ws, { type: 'roomJoined', roomId, playerIndex: currentPlayerIndex })
+        // Notify all players in the room about the join
+        broadcast(room, {
+          type: 'playerJoined',
+          playerIndex: currentPlayerIndex,
+          name,
+          playerCount: room.players.length,
+          maxPlayers: room.maxPlayers,
+        })
         if (room.players.length === room.maxPlayers) {
           // Sync player names from join commands into the game state
           for (const p of room.players) {

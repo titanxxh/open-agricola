@@ -11,12 +11,22 @@ import {
   returnCardToBoard,
   clearPaymentCache,
 } from '../pay'
-import { buildPaymentChoiceResult } from '../pay-helpers'
+import { buildPaymentChoiceResult, payTypedFlatCost } from '../pay-helpers'
 
 beforeEach(() => {
   clearPaymentCache()
 })
-import type { PlayerState, Resource, ComplexCost, PaymentSolution, Trade } from '../../../game/types'
+import type {
+  PlayerState,
+  Resource,
+  ComplexCost,
+  PaymentSolution,
+  Trade,
+  TradeModifier,
+} from '../../../game/types'
+import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+
+const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -226,6 +236,37 @@ describe('computeAllBuyableCombinations', () => {
     const solutions = computeAllBuyableCombinations(player, cost)
     expect(solutions.length).toBeGreaterThan(0)
     expect(solutions[0].resourcesPaid.wood).toBe(3)
+  })
+
+  it('A88 HedgeKeeper: BGA-style empty-from trade covers up to 3 wood of fencing fee', () => {
+    const player = createMockPlayer({ wood: 1 })
+    player.activeModifiers = [{ ...hedgeKeeperModifier }]
+    const cost: ComplexCost = { fee: { wood: 4 } }
+    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'fencing')
+    expect(solutions.length).toBeGreaterThan(0)
+    const best = solutions[0]!
+    expect(best.resourcesPaid.wood).toBe(1)
+    const hk = best.tradesUsed.find(
+      (u) => u.trade.sourceId === 'A88_HedgeKeeper' && u.times === 3,
+    )
+    expect(hk).toBeDefined()
+  })
+
+  it('keeps typed flat direct payment aligned with trade combinations for A88 HedgeKeeper', () => {
+    const player = createMockPlayer({ wood: 10 })
+    player.activeModifiers = [{ ...hedgeKeeperModifier }]
+
+    const solutions = computeAllBuyableCombinations(
+      player,
+      { fee: { wood: 6 } },
+      undefined,
+      'fencing',
+    )
+    expect(solutions.length).toBeGreaterThan(0)
+    expect(solutions[0]?.resourcesPaid.wood).toBe(3)
+
+    expect(payTypedFlatCost(player, { wood: 6 }, 'fencing')).toBe(true)
+    expect(player.resources.wood).toBe(7)
   })
 
   it('handles multiple trades', () => {

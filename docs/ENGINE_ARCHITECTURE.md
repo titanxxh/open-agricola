@@ -1178,7 +1178,7 @@ PlayerSwitchNode(→ p1)
 在 `commitFarmChoice` 中：
 - `room` 路径：先用 `shared/actions/effects/room-payment.ts` 展开“每间房”的费用变体，再按已选房间数合成为总成本；若存在多个可行支付解，会先转成统一的 `prompt.selectPayment` pending，待玩家选定后再真正落房与扣费
 - `stable` / `plow` 路径：改为复用 typed flat payment 解析；即使当前多数情况下仍只有单一支付法，也不再各自手写 `canPayResources/payResources`，后续若接入 trade / bonus modifier 可直接复用同一套 payment choice 协议
-- `fence` 路径：先校验选边/连通/封闭区域，并在得到 `newEdges` 后计算最终 payable wood（考虑 `freeFences`、`extraWood`，以及从 `override.wood` 提取出来的额外折扣）；若存在多个围栏支付解，同样先进入统一的 `prompt.selectPayment` 再落围栏
+- `fence` 路径：先校验选边/连通/封闭区域，并在得到 `newEdges` 后计算最终 payable wood（考虑 `freeFences`、`extraWood`，以及从 `override.wood` 提取出来的额外折扣）；`fencing` 类型的 `TradeModifier` 可走 `computeAllBuyableCombinations`（与 BGA 一致，例如 `A88_HedgeKeeper` 使用空 `from`、`to: { wood: 1 }`、`max: 3` 表示至多三段围栏免木）；`pay-helpers` 对同类 modifier 在 typed flat 的 direct 路径上会先尝试等价的「虚拟抵扣」，仅在 trade 仍无收益时才回退原始 `baseCost`，以保证 `canAffordTypedFlatCost` / `payTypedFlatCost` 与组合支付结果一致。若存在多个围栏支付解，同样先进入统一的 `prompt.selectPayment` 再落围栏
 - payment option 文案：`prompt.selectPayment` 中若方案带 `cardUsed`（如 `returnCards`），文案层会优先把 card id 映射为可读卡名，避免直接显示 `Major_*` 这类内部标识
 
 #### 11.6.2e gain params（参数化资源获取）

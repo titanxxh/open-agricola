@@ -395,12 +395,29 @@ modifier: {
 #### BonusModifier（资源折扣）
 
 ```typescript
-// 示例：A88_HedgeKeeper - 围栏时 -3 Wood
+// 典型：某行动统一减若干资源（与 BGA `bonuses` 对应）
 modifier: {
   type: 'bonus',
+  cardId: 'ExampleCard',
+  appliesTo: ['occupation'],
+  discount: { food: 1 },
+}
+```
+
+#### BGA 式「免费用具」Trade（空 `from`）
+
+与 BGA `Pay::addCost` 中 `max` + `nb`、且无资源键的条目一致：用 **空 `from` + 正 `to` + `max`** 表示「最多若干次、每次抵消一笔应付资源」（如篱笆守护者对围栏木费）。
+typed flat 直付路径会先尝试这类“虚拟抵扣”再回退到原始费用，因此 `payTypedFlatCost` 与 `computeAllBuyableCombinations` 在可直接支付与需组合求解两条路径上保持一致。
+
+```typescript
+// A88_HedgeKeeper — 对齐 bga-agricola A88_HedgeKeeper.php 的 trade 注入
+modifier: {
+  type: 'trade',
   cardId: 'A88_HedgeKeeper',
   appliesTo: ['fencing'],
-  discount: { wood: 3 },
+  from: {},
+  to: { wood: 1 },
+  max: 3,
 }
 ```
 
@@ -432,13 +449,13 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 | 卡牌 | 成本类型 | 转换规则 |
 |------|----------|----------|
+| [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | BGA 式空 `from` trade：`to: { wood: 1 }`，`max: 3`（等同 3 段围栏免木） |
 | [A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) | 房间建造/翻新 | 建房时支持 Wood/Clay/Stone 互替，翻新时支持 2 Clay/Stone → 1 Wood（每房/每行动 1 次） |
 
 #### 资源折扣卡 (BonusModifier)
 
 | 卡牌 | 成本类型 | 折扣 |
 |------|----------|------|
-| [A88_HedgeKeeper](../shared/cards/A/A88_HedgeKeeper.ts) | 围栏 | -3 Wood |
 | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts) | 房间建造 | 芦苇河岸赠送建房时，泥屋 -1 Clay / 石屋 -2 Stone |
 | [B15_CarpentersBench](../shared/cards/B/B15_CarpentersBench.ts) | 围栏 | -1 Wood |
 | [C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | 房间建造 | -2 Wood（木屋时） |

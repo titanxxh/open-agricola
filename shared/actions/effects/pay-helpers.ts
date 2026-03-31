@@ -128,12 +128,31 @@ const resolveSimpleTradeAdjustedCost = (
   baseCost: Partial<Resource>,
   modifiers: CostModifier[],
 ): Partial<Resource> | null => {
-  if (canPayResources(player, baseCost)) {
-    return baseCost
-  }
+  const fallbackBaseCost: Partial<Resource> | null =
+    canPayResources(player, baseCost) ? baseCost : null
 
   for (const mod of modifiers) {
     if (mod.type !== 'trade') continue
+    const fromKeys = Object.keys(mod.from) as (keyof Resource)[]
+    const toPositiveKeys = (Object.keys(mod.to) as (keyof Resource)[]).filter(
+      (k) => (mod.to[k] ?? 0) > 0,
+    )
+
+    // BGA-style "free unit" trades: empty `from`, positive `to` (e.g. A88_HedgeKeeper).
+    if (fromKeys.length === 0 && toPositiveKeys.length === 1) {
+      const toKey = toPositiveKeys[0]!
+      const perUse = mod.to[toKey] ?? 0
+      if (perUse <= 0 || (baseCost[toKey] ?? 0) <= 0) continue
+      const maxCredit = (mod.max ?? Infinity) * perUse
+      const virtualPaid = Math.min(baseCost[toKey] ?? 0, maxCredit)
+      const altCost = { ...baseCost }
+      altCost[toKey] = Math.max(0, (altCost[toKey] ?? 0) - virtualPaid)
+      if (canPayResources(player, altCost)) {
+        return altCost
+      }
+      continue
+    }
+
     const toKey = Object.keys(mod.to)[0] as keyof typeof baseCost
     const fromKey = Object.keys(mod.from)[0] as keyof typeof baseCost
     const toAmount = mod.to[toKey as keyof typeof mod.to] ?? 0
@@ -154,7 +173,7 @@ const resolveSimpleTradeAdjustedCost = (
     }
   }
 
-  return null
+  return fallbackBaseCost
 }
 
 const resolveTypedFlatDirectPaymentCost = (

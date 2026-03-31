@@ -116,7 +116,7 @@
 | C37_DwellingMound | Plow | 犁地成本增加(+1食物) | ✅ |
 | C88_CarpentersApprentice | Construct | 木屋/畜栏减费已接入，13-15 段围栏免费改走 pending fence bonus | ✅ |
 | A123_FrameBuilder | Renovation/Construct | 建房/翻修时的资源替换成本，含 construct/renovation 可行性放宽 | ✅ |
-| A88_HedgeKeeper | Fencing | 围栏成本折扣 | ✅ |
+| A88_HedgeKeeper | Fencing | 围栏：BGA 式 trade（空 from，to wood×3） | ✅ |
 | A28_ForestSchool | Occupation | 职业食物成本可用木材替代，并可无视 Lessons 占用 | ✅ |
 
 注：基础 `renovation` 成本已按 BGA 对齐为“一次性 1 Reed + 每房间 1 Clay/Stone”，相关可行性判定与 `house-redevelopment` 开放条件已同步修正。
@@ -185,7 +185,7 @@
 | A84_Silage | onReturnHome | ✅ |
 | A85_Homekeeper | - | 🔧 |
 | A87_Conservator | - | 🔧 |
-| A88_HedgeKeeper | ComputeCosts(Fencing) | ✅ |
+| A88_HedgeKeeper | TradeModifier(Fencing)，BGA 式空 from trade | ✅ |
 | A89_StablePlanner | - | 🔧 |
 | A92_AdoptiveParents | After(PlaceFarmer) | 🔧 |
 | A94_LazySowman | ComputeReplace(Sow), IsDoable(Sow), ComputeArgs(PlaceFarmer) | ✅ |

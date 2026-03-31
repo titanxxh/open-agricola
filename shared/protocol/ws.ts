@@ -44,6 +44,7 @@ export type ServerEvent =
   | { type: 'roomCreated'; roomId: string; playerIndex: number }
   | { type: 'roomJoined'; roomId: string; playerIndex: number }
   | { type: 'gameStarted' }
+  | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }
 
 export type RoomSummary = {
