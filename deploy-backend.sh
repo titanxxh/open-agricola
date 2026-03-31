@@ -1,8 +1,9 @@
 #!/bin/bash
 # 一键更新并重新部署后端 Docker
-# 用法: ./deploy-backend.sh [ssh-host]
-# 示例: ./deploy-backend.sh root@your-vps-ip
-#       ./deploy-backend.sh my-vps          (使用 ~/.ssh/config 里的别名)
+# 用法: ./deploy-backend.sh <ssh-host> [branch] [remote-dir]
+# 示例: ./deploy-backend.sh 1.2.3.4
+#       ./deploy-backend.sh 1.2.3.4 ui
+#       ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola
 
 set -e
 
@@ -13,25 +14,28 @@ if [[ "$_HOST" != *@* ]]; then
 else
   HOST="$_HOST"
 fi
-REMOTE_DIR="${2:-/root/open-agricola}"
+BRANCH="${2:-main}"
+REMOTE_DIR="${3:-/root/open-agricola}"
 
 if [ -z "$HOST" ]; then
-  echo "用法: ./deploy-backend.sh <ssh-host> [remote-dir]"
-  echo "示例: ./deploy-backend.sh root@1.2.3.4"
-  echo "      ./deploy-backend.sh root@1.2.3.4 /home/user/open-agricola"
+  echo "用法: ./deploy-backend.sh <ssh-host> [branch] [remote-dir]"
+  echo "示例: ./deploy-backend.sh 1.2.3.4              # 部署 main"
+  echo "      ./deploy-backend.sh 1.2.3.4 ui           # 部署 ui 分支"
+  echo "      ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola"
   exit 1
 fi
 
-echo ">>> 部署后端到 $HOST:$REMOTE_DIR"
+echo ">>> 部署后端到 $HOST:$REMOTE_DIR (分支: $BRANCH)"
 
-ssh "$HOST" bash -s "$REMOTE_DIR" << 'REMOTE_SCRIPT'
+ssh "$HOST" bash -s "$REMOTE_DIR" "$BRANCH" << 'REMOTE_SCRIPT'
   set -e
   REMOTE_DIR="$1"
+  BRANCH="$2"
   cd "$REMOTE_DIR"
 
-  echo ">>> git pull..."
-  git fetch origin main
-  git reset --hard origin/main
+  echo ">>> git fetch + checkout $BRANCH..."
+  git fetch origin "$BRANCH"
+  git reset --hard "origin/$BRANCH"
 
   echo ">>> docker compose build..."
   docker compose -f docker-compose.prod.yml up -d --build
