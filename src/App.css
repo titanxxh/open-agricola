@@ -2522,16 +2522,16 @@
 .login-card {
   background: #fff;
   border-radius: 16px;
-  padding: 40px;
+  padding: 48px 56px;
   box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
 }
 
 .login-title {
-  font-size: 28px;
+  font-size: 32px;
   color: #3a5a2c;
-  margin: 0 0 4px 0;
+  margin: 0 0 6px 0;
   text-align: center;
 }
 
