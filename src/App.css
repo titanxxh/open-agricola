@@ -2685,8 +2685,8 @@
 }
 
 .lobby-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
 
@@ -2695,12 +2695,15 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
-  flex: 1;
-  min-width: 220px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+.lobby-section > .btn-primary:last-child,
+.lobby-section > .btn-secondary:last-child {
+  margin-top: auto;
 }
 
 .lobby-section h2 {
@@ -3569,6 +3572,12 @@
 }
 
 .ws-sandbox-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .lobby-actions {
+    grid-template-columns: 1fr;
+  }
+}
 
 .res-inline-score { color: #c0a030; font-size: 0.9em; }
 
