@@ -2522,16 +2522,16 @@
 .login-card {
   background: #fff;
   border-radius: 16px;
-  padding: 40px;
+  padding: 48px 56px;
   box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
 }
 
 .login-title {
-  font-size: 28px;
+  font-size: 32px;
   color: #3a5a2c;
-  margin: 0 0 4px 0;
+  margin: 0 0 6px 0;
   text-align: center;
 }
 
@@ -2652,8 +2652,8 @@
 .lobby-page {
   min-height: 100vh;
   background: #fdf6e3;
-  padding: 20px;
-  max-width: 800px;
+  padding: 20px clamp(20px, 4vw, 48px);
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -2685,8 +2685,8 @@
 }
 
 .lobby-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
 
@@ -2695,12 +2695,15 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
-  flex: 1;
-  min-width: 220px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+.lobby-section > .btn-primary:last-child,
+.lobby-section > .btn-secondary:last-child {
+  margin-top: auto;
 }
 
 .lobby-section h2 {
@@ -2750,6 +2753,8 @@
   color: #8a7a60;
   font-size: 14px;
   margin: 0;
+  padding: 20px;
+  text-align: center;
 }
 
 .room-list {
@@ -2829,6 +2834,7 @@
 .ws-nav-tabs {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .ws-tab {
@@ -3257,11 +3263,12 @@
 
 .ai-provider-btns {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .ai-provider-btn {
-  padding: 7px 18px;
+  padding: 7px 14px;
   border: 1px solid #cdb996;
   border-radius: 8px;
   background: transparent;
@@ -3296,6 +3303,16 @@
 .ai-toggle-key {
   font-size: 13px;
   flex-shrink: 0;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #8a7a60;
+  margin-top: 4px;
+}
+
+.form-hint a {
+  color: #3a5a2c;
 }
 
 /* Chat layout */
@@ -3555,6 +3572,12 @@
 }
 
 .ws-sandbox-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .lobby-actions {
+    grid-template-columns: 1fr;
+  }
+}
 
 .res-inline-score { color: #c0a030; font-size: 0.9em; }
 
