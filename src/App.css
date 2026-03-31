@@ -2652,8 +2652,8 @@
 .lobby-page {
   min-height: 100vh;
   background: #fdf6e3;
-  padding: 20px;
-  max-width: 800px;
+  padding: 20px clamp(20px, 4vw, 48px);
+  max-width: 1200px;
   margin: 0 auto;
 }
 
