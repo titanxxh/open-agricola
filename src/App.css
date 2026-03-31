@@ -2829,6 +2829,7 @@
 .ws-nav-tabs {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .ws-tab {
