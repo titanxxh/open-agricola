@@ -128,7 +128,7 @@ const resolveSimpleTradeAdjustedCost = (
   baseCost: Partial<Resource>,
   modifiers: CostModifier[],
 ): Partial<Resource> | null => {
-  let fallbackBaseCost: Partial<Resource> | null =
+  const fallbackBaseCost: Partial<Resource> | null =
     canPayResources(player, baseCost) ? baseCost : null
 
   for (const mod of modifiers) {

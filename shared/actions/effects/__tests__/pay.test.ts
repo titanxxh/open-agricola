@@ -16,8 +16,17 @@ import { buildPaymentChoiceResult, payTypedFlatCost } from '../pay-helpers'
 beforeEach(() => {
   clearPaymentCache()
 })
-import type { PlayerState, Resource, ComplexCost, PaymentSolution, Trade } from '../../../game/types'
+import type {
+  PlayerState,
+  Resource,
+  ComplexCost,
+  PaymentSolution,
+  Trade,
+  TradeModifier,
+} from '../../../game/types'
 import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+
+const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -231,7 +240,7 @@ describe('computeAllBuyableCombinations', () => {
 
   it('A88 HedgeKeeper: BGA-style empty-from trade covers up to 3 wood of fencing fee', () => {
     const player = createMockPlayer({ wood: 1 })
-    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+    player.activeModifiers = [{ ...hedgeKeeperModifier }]
     const cost: ComplexCost = { fee: { wood: 4 } }
     const solutions = computeAllBuyableCombinations(player, cost, undefined, 'fencing')
     expect(solutions.length).toBeGreaterThan(0)
@@ -245,7 +254,7 @@ describe('computeAllBuyableCombinations', () => {
 
   it('keeps typed flat direct payment aligned with trade combinations for A88 HedgeKeeper', () => {
     const player = createMockPlayer({ wood: 10 })
-    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+    player.activeModifiers = [{ ...hedgeKeeperModifier }]
 
     const solutions = computeAllBuyableCombinations(
       player,

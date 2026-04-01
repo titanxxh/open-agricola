@@ -4,7 +4,7 @@ import {
   buildPasture,
   canStartFencing,
 } from '../effects/fencing'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState, TradeModifier } from '../../game/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -47,6 +47,8 @@ const createPlayer = (): PlayerState => ({
   startPlayer: false, activeModifiers: [], cardStates: {},
 })
 
+const hedgeKeeperModifier = { ...A88_HedgeKeeper.modifier } as TradeModifier
+
 describe('fencing pasture', () => {
   it('builds a pasture and consumes wood', () => {
     const player = createPlayer()
@@ -60,7 +62,7 @@ describe('fencing pasture', () => {
   it('allows starting fencing with Hedge Keeper discount', () => {
     const player = createPlayer()
     player.resources.wood = 1
-    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+    player.activeModifiers = [hedgeKeeperModifier]
 
     expect(canStartFencing(player)).toBe(true)
   })
@@ -68,7 +70,7 @@ describe('fencing pasture', () => {
   it('applies fencing discount when building a minimum pasture', () => {
     const player = createPlayer()
     player.resources.wood = 1
-    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+    player.activeModifiers = [hedgeKeeperModifier]
 
     const result = buildPasture(player, { size: 1, stables: 0, fenceCost: 4 })
 
