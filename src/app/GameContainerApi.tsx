@@ -22,7 +22,6 @@ import { FarmBoard } from '../components/board/FarmBoard'
 import { LogPanel } from '../components/board/LogPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
-import { GameControls } from '../components/controls/GameControls'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
@@ -242,6 +241,7 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
+  const [activeTab, setActiveTab] = useState<'board' | 'farm' | 'cards' | 'log'>('board')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1211,24 +1211,6 @@ export const GameContainerApi = () => {
 
   return (
     <div className="app">
-      <InteractionBar
-        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
-        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
-        pendingPlayerSwitch={pendingPlayerSwitch}
-        confirmPlayerSwitch={confirmPlayerSwitch}
-        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
-        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
-        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
-        pendingSowSelectionsLength={sowSelectedCount}
-        hasPendingPlowSelection={pendingPlowTile !== null}
-        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
-        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
-        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
-        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
-        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
-        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
-        isInteractive={isInteractive}
-      />
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -1451,50 +1433,91 @@ export const GameContainerApi = () => {
           seedValue={resetSeedInput} onSeedChange={setResetSeedInput} onResetGame={resetGame}
         />
       ) : null}
+
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+      />
+
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}
         locale={locale}
         isInteractive={isInteractive}
         takeAnytimeAction={takeAnytimeAction}
       />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn} />
-      <GameControls
-        locale={locale}
-        onUndo={undoStep}
-        onUndoAction={undoAction}
-        onShowScoring={() => setShowScoringPad(true)}
-        historyLength={historyLength}
-        hasActionStartSnapshot={hasActionStartSnapshot}
+
+      <nav className="game-tabs">
+        <button className={`game-tab ${activeTab === 'board' ? 'active' : ''}`} onClick={() => setActiveTab('board')}>
+          {locale === 'zh' ? '棋盘' : 'Board'}
+        </button>
+        <button className={`game-tab ${activeTab === 'farm' ? 'active' : ''}`} onClick={() => setActiveTab('farm')}>
+          {locale === 'zh' ? '农场' : 'Farm'}
+        </button>
+        <button className={`game-tab ${activeTab === 'cards' ? 'active' : ''}`} onClick={() => setActiveTab('cards')}>
+          {locale === 'zh' ? '卡牌' : 'Cards'}
+        </button>
+        <button className={`game-tab ${activeTab === 'log' ? 'active' : ''}`} onClick={() => setActiveTab('log')}>
+          {locale === 'zh' ? '日志' : 'Log'}
+        </button>
+      </nav>
+
+      <div className={activeTab === 'cards' ? '' : 'mobile-hidden'}>
+        <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+      </div>
+
+      <main className="board">
+        <section className={`board-panel board-action ${activeTab === 'board' ? '' : 'mobile-hidden'}`}>
+          <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+        </section>
+        <section className={`board-panel board-farm ${activeTab === 'farm' ? '' : 'mobile-hidden'}`}>
+          <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
+            currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+            nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+            playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+            fieldMap={fieldMap} stablePositions={stablePositions}
+            pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
+            pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+            roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
+            maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
+            pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
+            pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
+            stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+            hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+            existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+            toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+            togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
+            toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+            confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+            setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+            isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
+            selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+            isInteractive={isInteractive}
+          />
+        </section>
+      </main>
+
+      <div className={`board-panel ${activeTab === 'log' ? '' : 'mobile-hidden'}`}>
+        <LogPanel locale={locale} log={state.log} />
+      </div>
+
+      <InteractionBar
+        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
+        pendingPlayerSwitch={pendingPlayerSwitch}
+        confirmPlayerSwitch={confirmPlayerSwitch}
+        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
+        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
+        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
+        pendingSowSelectionsLength={sowSelectedCount}
+        hasPendingPlowSelection={pendingPlowTile !== null}
+        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
+        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
+        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
+        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
+        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
+        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
         isInteractive={isInteractive}
       />
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
-      <main className="board">
-        <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
-        <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
-          currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-          nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-          playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
-          fieldMap={fieldMap} stablePositions={stablePositions}
-          pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-          pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-          roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-          maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-          pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
-          pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-          stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-          hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
-          existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-          toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-          togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-          toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-          confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-          setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-          isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-          selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-          isInteractive={isInteractive}
-        />
-      </main>
-      <LogPanel locale={locale} log={state.log} />
+      <div className="interaction-bar-spacer" />
     </div>
   )
 }

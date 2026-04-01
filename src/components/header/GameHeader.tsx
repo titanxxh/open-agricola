@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
@@ -27,6 +28,12 @@ type Props = {
   setDevMode: (value: boolean) => void
   myPlayerName: string | null
   isMyTurn: boolean
+  onUndo: () => void
+  onUndoAction: () => void
+  onShowScoring: () => void
+  historyLength: number
+  hasActionStartSnapshot: boolean
+  isInteractive: boolean
 }
 
 export const GameHeader = ({
@@ -39,84 +46,64 @@ export const GameHeader = ({
   setDevMode,
   myPlayerName,
   isMyTurn,
+  onUndo,
+  onUndoAction,
+  onShowScoring,
+  historyLength,
+  hasActionStartSnapshot,
+  isInteractive,
 }: Props) => {
+  void allWorkersUsed
+  const [menuOpen, setMenuOpen] = useState(false)
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
 
   return (
-    <header className={`header ${isMyTurn ? 'my-turn' : 'not-my-turn'}`}>
-      <div>
-        <h1>{t(locale, 'ui.gameTitle')}</h1>
-        <div className="subtitle">
-          {t(locale, 'ui.round')} {state.round} / 14 · {t(locale, 'ui.currentPlayer')}{' '}
-          {currentPlayer.name}
-        </div>
-        {myPlayerName && (
-          <div className="my-identity">
-            {locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}
-          </div>
-        )}
-      </div>
-      <div className="status">
-        <button
-          type="button"
-          className="header-lobby-btn"
-          onClick={() => setPage('lobby')}
-          title={locale === 'zh' ? '返回大厅' : 'Back to Lobby'}
-        >
-          {locale === 'zh' ? '← 大厅' : '← Lobby'}
+    <header className={`header-compact ${isMyTurn ? 'my-turn' : 'not-my-turn'}`}>
+      <div className="header-left">
+        <button type="button" className="header-lobby-btn" onClick={() => setPage('lobby')} title={locale === 'zh' ? '返回大厅' : 'Back to Lobby'}>
+          ←
         </button>
+        <span className="header-round">R{state.round}/14</span>
+        <span className="header-phase-pills">
+          {phases.map((phase) => (
+            <span key={phase} className={`header-phase-pill${phase === state.phase ? ' active' : ''}`}>
+              {PHASE_LABELS[phase][locale]}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="header-right">
         {state.gameOver ? (
           <span className="status-badge game-over">{t(locale, 'ui.statusGameOver')}</span>
         ) : isMyTurn ? (
-          <span className="status-badge your-turn">
-            {locale === 'zh' ? '轮到你了' : 'Your Turn'}
-          </span>
+          <span className="status-badge your-turn">{locale === 'zh' ? '你的回合' : 'Your Turn'}</span>
         ) : (
-          <span className="status-badge waiting-turn">
-            {locale === 'zh' ? `等待 ${currentPlayer.name}` : `Waiting for ${currentPlayer.name}`}
-          </span>
+          <span className="status-badge waiting-turn">{currentPlayer.name}</span>
         )}
-        <span className="status-text">
-          {allWorkersUsed ? t(locale, 'ui.statusRoundReady') : t(locale, 'ui.statusWaiting')}
-        </span>
-        <div className="locale-switch">
-          <button
-            className={locale === 'zh' ? 'active' : ''}
-            onClick={() => setLocale('zh')}
-          >
-            {t(locale, 'ui.languageZh')}
-          </button>
-          <button
-            className={locale === 'en' ? 'active' : ''}
-            onClick={() => setLocale('en')}
-          >
-            {t(locale, 'ui.languageEn')}
-          </button>
+        <div className="header-actions">
+          <button className="header-icon-btn" onClick={onUndo} disabled={!isInteractive || historyLength === 0} title={t(locale, 'ui.undoStep')}>↩</button>
+          <button className="header-icon-btn" onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot} title={t(locale, 'ui.undoAction')}>⟲</button>
+          <button className="header-icon-btn" onClick={onShowScoring} disabled={!isInteractive} title={t(locale, 'ui.scoringPadButton')}>📊</button>
+          <button className="header-icon-btn" onClick={() => setMenuOpen(!menuOpen)} title="Menu">⋯</button>
         </div>
-        <div className="dev-toggle">
-          <label>
-            <input
-              type="checkbox"
-              checked={devMode}
-              onChange={(event) => setDevMode(event.target.checked)}
-            />
-            {t(locale, 'ui.devMode')}
-          </label>
-        </div>
-      </div>
-      <div className="phase-bar">
-        <span className="phase-round">
-          {t(locale, 'ui.round')} <strong>{state.round}</strong> / 14
-        </span>
-        {phases.map((phase, i) => (
-          <span key={phase}>
-            {i > 0 && <span className="phase-separator">&#x25B8;</span>}
-            <span className={`phase-label${phase === state.phase ? ' phase-active' : ''}`}>
-              {PHASE_LABELS[phase][locale]}
-            </span>
-          </span>
-        ))}
+        {menuOpen && (
+          <div className="header-menu">
+            <div className="header-menu-item">
+              <div className="locale-switch">
+                <button className={locale === 'zh' ? 'active' : ''} onClick={() => setLocale('zh')}>中</button>
+                <button className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>En</button>
+              </div>
+            </div>
+            <label className="header-menu-item">
+              <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
+              {t(locale, 'ui.devMode')}
+            </label>
+            {myPlayerName && (
+              <div className="header-menu-item header-menu-identity">{locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}</div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )
