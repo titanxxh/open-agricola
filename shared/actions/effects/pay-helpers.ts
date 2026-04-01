@@ -128,9 +128,8 @@ const resolveSimpleTradeAdjustedCost = (
   baseCost: Partial<Resource>,
   modifiers: CostModifier[],
 ): Partial<Resource> | null => {
-  if (canPayResources(player, baseCost)) {
-    return baseCost
-  }
+  let fallbackBaseCost: Partial<Resource> | null =
+    canPayResources(player, baseCost) ? baseCost : null
 
   for (const mod of modifiers) {
     if (mod.type !== 'trade') continue
@@ -174,7 +173,7 @@ const resolveSimpleTradeAdjustedCost = (
     }
   }
 
-  return null
+  return fallbackBaseCost
 }
 
 const resolveTypedFlatDirectPaymentCost = (
