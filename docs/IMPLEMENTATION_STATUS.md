@@ -204,7 +204,7 @@ npm run test:e2e  # E2E 测试
 ## 7. 已知边界
 
 - 251 个 A/B/C/D/E 牌文件中，当前有 45+ 张已接入 hook；仍有部分卡牌仅完成数据接入，复杂行为待补全。
-- Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。
+- Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。`A88_HedgeKeeper` 使用与 BGA 一致的「空 `from` + `to: { wood: 1 }` + `max: 3`」`TradeModifier` 模拟围栏免木段数，而非单笔 `bonus` −3 Wood。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。
 - 断线重连未实现（WS 断开后需刷新页面重连）。

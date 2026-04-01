@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
-import type { BonusModifier } from '../../game/types'
+import type { TradeModifier } from '../../game/types'
 
+/** BGA-style: up to 3× "pay 0 to cover 1 wood" fence units (see `addCost` in bga-agricola A88_HedgeKeeper.php). */
 export const A88_HedgeKeeper = new Occupation({
   id: "A88_HedgeKeeper",
   name: "Hedge Keeper",
@@ -11,9 +12,11 @@ export const A88_HedgeKeeper = new Occupation({
   cost: {},
   players: "1+",
   modifier: {
-    type: 'bonus',
+    type: 'trade',
     cardId: 'A88_HedgeKeeper',
     appliesTo: ['fencing'],
-    discount: { wood: 3 },
-  } as BonusModifier,
+    from: {},
+    to: { wood: 1 },
+    max: 3,
+  } as TradeModifier,
 })
