@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
-import { WorkshopPage } from './WorkshopPage'
 import { SettingsPage } from './SettingsPage'
 import { GameContainerApi } from './GameContainerApi'
+
+const WorkshopPage = lazy(() => import('./WorkshopPage').then(m => ({ default: m.WorkshopPage })))
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
@@ -63,7 +64,11 @@ export function PageRouter() {
     case 'game':
       return <GameContainerApi />
     case 'workshop':
-      return <WorkshopPage />
+      return (
+        <Suspense fallback={<div className="loading-screen">Loading...</div>}>
+          <WorkshopPage />
+        </Suspense>
+      )
     case 'settings':
       return <SettingsPage />
     case 'lobby':

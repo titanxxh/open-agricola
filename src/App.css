@@ -16,6 +16,7 @@
   font-display: swap;
 }
 
+/* ══════════ DESIGN TOKENS ══════════ */
 :root {
   --agricola-font: 'Dominican', 'CalibriB', serif;
   --color-primary: #3a5a2c;
@@ -47,6 +48,7 @@
   overflow-x: hidden;
 }
 
+/* ══════════ INTERACTION BAR ══════════ */
 .interaction-bar {
   position: fixed;
   bottom: 0;
@@ -174,6 +176,7 @@
   filter: drop-shadow(0 1px 0 rgba(255, 240, 200, 0.55));
 }
 
+/* ══════════ HEADER ══════════ */
 .header {
   display: flex;
   justify-content: space-between;
@@ -328,6 +331,7 @@
   accent-color: #3a5a2c;
 }
 
+/* ══════════ BOARD & ACTIONS ══════════ */
 .board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1172,6 +1176,7 @@
   color: #fff;
 }
 
+/* ══════════ FARM GRID ══════════ */
 .farm-grid {
   display: grid;
   --tile: clamp(56px, 8vw, 96px);
@@ -1485,6 +1490,7 @@
 }
 
 
+/* ══════════ CARDS (PLAYED / HAND / MAJOR) ══════════ */
 .played-cards {
   background: #f6f2df;
   border-radius: 12px;
@@ -1832,6 +1838,7 @@
   color: #4f4f4f;
 }
 
+/* ══════════ RESOURCE ICONS ══════════ */
 .res-icon {
   display: inline-block;
   font-size: 24px; /* Base size, acts as scale factor */
@@ -2018,6 +2025,7 @@
   color: #6b6b6b;
 }
 
+/* ══════════ DEV PANEL ══════════ */
 .dev-panel {
   background: #f3f7ea;
   border-radius: 12px;
@@ -2264,6 +2272,7 @@
   cursor: not-allowed;
 }
 
+/* ══════════ SCORING & EXCHANGE OVERLAYS ══════════ */
 .scoring-overlay {
   position: fixed;
   inset: 0;
@@ -2513,12 +2522,14 @@
   cursor: not-allowed;
 }
 
+/* ══════════ MOBILE & RESPONSIVE ══════════ */
 @media (max-width: 1100px) {
   .board {
     grid-template-columns: 1fr;
   }
 }
 
+/* ══════════ COMPACT HEADER ══════════ */
 /* ── Compact Header ─────────────────────── */
 .header-compact {
   display: flex;
@@ -2747,10 +2758,41 @@
 }
 
 @media (max-width: 480px) {
+  .header-compact {
+    padding: 4px 8px;
+  }
+
+  .header-phase-pills {
+    display: none;
+  }
+
+  .header-icon-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .game-tab {
+    font-size: 11px;
+    padding: 6px 2px;
+  }
+
   .played-row > *,
   .hand-row > *,
   .major-row > * {
     flex: 0 1 100%;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1600px) {
+  .board {
+    gap: 24px;
+  }
+
+  .app {
+    max-width: 1800px;
+    margin: 0 auto;
   }
 }
 
@@ -2765,13 +2807,13 @@
   background: #fdf6e3;
 }
 
-/* ── Login page ─────────────────────────────────── */
+/* ══════════ LOGIN PAGE ══════════ */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 100%);
+  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 50%, #d4c4a8 100%);
   padding: 20px;
 }
 
@@ -2779,9 +2821,10 @@
   background: #fff;
   border-radius: 16px;
   padding: 48px 56px;
-  box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
+  box-shadow: 0 8px 32px rgba(90, 58, 32, 0.15);
   width: 100%;
   max-width: 480px;
+  border-top: 4px solid #3a5a2c;
 }
 
 .login-title {
@@ -2789,12 +2832,15 @@
   color: #3a5a2c;
   margin: 0 0 6px 0;
   text-align: center;
+  font-family: var(--agricola-font);
+  letter-spacing: 1px;
 }
 
 .login-subtitle {
   text-align: center;
   color: #8a7a60;
   margin: 0 0 24px 0;
+  font-size: 14px;
 }
 
 .login-form {
@@ -2904,7 +2950,7 @@
   font-size: 14px;
 }
 
-/* ── Lobby page ─────────────────────────────────── */
+/* ══════════ LOBBY PAGE ══════════ */
 .lobby-page {
   min-height: 100vh;
   background: #fdf6e3;
@@ -2924,6 +2970,7 @@
   font-size: 24px;
   color: #3a5a2c;
   margin: 0;
+  font-family: var(--agricola-font);
 }
 
 .lobby-user-info {
@@ -2955,6 +3002,12 @@
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.lobby-section:hover {
+  box-shadow: 0 6px 20px rgba(90, 58, 32, 0.14);
+  transform: translateY(-2px);
 }
 
 .lobby-section > .btn-primary:last-child,
@@ -3042,6 +3095,7 @@
   font-size: 13px;
 }
 
+/* ══════════ WORKSHOP ══════════ */
 /* ── Workshop placeholder ───────────────────────── */
 .workshop-placeholder {
   display: flex;
@@ -3994,3 +4048,47 @@
 .settings-danger { border: 1px solid #f5c6cb; }
 
 .settings-note { font-size: 12px; color: #8a7a60; margin: 0; }
+
+/* ── Page transitions ─────────────────── */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-card {
+  animation: fadeSlideIn 0.4s ease-out;
+}
+
+.lobby-page {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+/* Action card hover animation enhancement */
+.action-card-holder:not(.taken):hover {
+  z-index: 20;
+}
+
+/* Smooth scoring overlay */
+.scoring-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.exchange-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Tab switching animation */
+.board-panel {
+  animation: fadeSlideIn 0.2s ease-out;
+}
