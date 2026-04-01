@@ -95,6 +95,17 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
     pendingStableTilesLength === 0
 
+  const hasContent = !!(
+    pendingAnimalReorg ||
+    harvestFeedPlayerName ||
+    (pendingChoice && isInteractive) ||
+    (pendingPlayerSwitch && isInteractive) ||
+    (pendingNextPlayerIndex !== null && isInteractive) ||
+    !isInteractive
+  )
+
+  if (!hasContent) return null
+
   return (
     <div className="interaction-bar">
       {pendingAnimalReorg ? (
@@ -267,7 +278,7 @@ export const InteractionBar = ({
         </>
       ) : (
         <div className="interaction-title">
-          {isInteractive ? t(locale, 'ui.interactionChooseOne') : t(locale, 'ui.statusWaiting')}
+          {t(locale, 'ui.statusWaiting')}
         </div>
       )}
     </div>
