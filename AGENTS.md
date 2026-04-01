@@ -2,7 +2,7 @@
 
 ## 架构基线
 
-- 遇到不确定的实现，优先参考 `../bga-agricola`，除非 `docs/ENGINE_ARCHITECTURE.md` 已明确给出不同设计。
+- 遇到不确定的实现，优先参考 `output/bga-agricola`，除非 `docs/ENGINE_ARCHITECTURE.md` 已明确给出不同设计。
 - 当前项目主设计以 `docs/ENGINE_ARCHITECTURE.md` 为准：
   - WebSocket 房间对局是主链路。
   - 后端 `GameSession` 持有唯一权威 `GameState`。
@@ -146,4 +146,48 @@
   - `http://<host>:5173/?player=p2`
  - 同机本地调试可将 `<host>` 视为 `localhost`
  - 局域网 / intranet 调试优先使用 `./restart-intranet.sh` 输出的地址
- 
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+
+The `canvas` npm package requires native libraries. These are pre-installed in the VM:
+`libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`.
+If `npm install` fails with canvas build errors, re-install these via apt.
+
+### Starting services in Cloud Agent VMs
+
+- Do NOT use `./restart-intranet.sh` — it uses `pkill -f` and relies on LAN IP detection via `eth0`, which may not exist in the VM.
+- Instead, start services separately:
+  - Backend: `npm run server` (port 5175, binds to localhost)
+  - Frontend: `npx vite --host 0.0.0.0` (port 5173)
+- SQLite database auto-creates at `./data/open-agricola.db` on first backend start; no external DB needed.
+- The backend serves both HTTP API and WebSocket (`/ws`) from port 5175.
+
+### Testing
+
+- Unit/session tests (`npm test`): ~644 cases, no running services needed. These test pure domain logic and `GameSession` directly.
+- E2E tests (`npm run test:e2e`): require both frontend and backend running, plus Playwright browsers (`npx playwright install`).
+- Lint: `npm run lint` — pre-existing lint errors (~340, mostly `@typescript-eslint/no-explicit-any`) are expected and not blocking.
+- Build: `npm run build` — warnings about unresolved `/bga-img/*` are cosmetic (BGA card art proxy).
+
+### HTTP single-player debug mode
+
+Access `http://localhost:5173/?player=p1` for single-player HTTP mode. The HTTP transport creates a per-user `GameSession` automatically. Useful API endpoints for testing:
+- `GET /api/game/state` — current game state
+- `POST /api/game/action` — `{ playerIndex, spaceId }`
+- `POST /api/game/next-player` — confirm turn transition
+- `POST /api/game/choice` — resolve pending choice
+
+### WebSocket multiplayer mode
+
+Access `http://localhost:5173/?player=p1&transport=ws&room=dev` for WS mode. The `dev` room is a persistent room that survives backend restarts (state saved to `output/`).
+
+### BGA reference repository access
+
+The `GH_TOKEN` secret (set via Cursor Cloud Secrets) provides access to the private repo `bga-devs/bga-agricola`, which is the upstream BGA Agricola reference.
+`gh` CLI automatically picks up `GH_TOKEN` from the environment. The reference repo is cloned into `output/bga-agricola` (already gitignored via `output/`):
+```bash
+gh repo view bga-devs/bga-agricola
+gh repo clone bga-devs/bga-agricola output/bga-agricola
+```
