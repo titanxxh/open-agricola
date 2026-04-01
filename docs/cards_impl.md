@@ -407,6 +407,7 @@ modifier: {
 #### BGA 式「免费用具」Trade（空 `from`）
 
 与 BGA `Pay::addCost` 中 `max` + `nb`、且无资源键的条目一致：用 **空 `from` + 正 `to` + `max`** 表示「最多若干次、每次抵消一笔应付资源」（如篱笆守护者对围栏木费）。
+typed flat 直付路径会先尝试这类“虚拟抵扣”再回退到原始费用，因此 `payTypedFlatCost` 与 `computeAllBuyableCombinations` 在可直接支付与需组合求解两条路径上保持一致。
 
 ```typescript
 // A88_HedgeKeeper — 对齐 bga-agricola A88_HedgeKeeper.php 的 trade 注入

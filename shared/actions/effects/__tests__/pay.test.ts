@@ -11,7 +11,7 @@ import {
   returnCardToBoard,
   clearPaymentCache,
 } from '../pay'
-import { buildPaymentChoiceResult } from '../pay-helpers'
+import { buildPaymentChoiceResult, payTypedFlatCost } from '../pay-helpers'
 
 beforeEach(() => {
   clearPaymentCache()
@@ -241,6 +241,23 @@ describe('computeAllBuyableCombinations', () => {
       (u) => u.trade.sourceId === 'A88_HedgeKeeper' && u.times === 3,
     )
     expect(hk).toBeDefined()
+  })
+
+  it('keeps typed flat direct payment aligned with trade combinations for A88 HedgeKeeper', () => {
+    const player = createMockPlayer({ wood: 10 })
+    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+
+    const solutions = computeAllBuyableCombinations(
+      player,
+      { fee: { wood: 6 } },
+      undefined,
+      'fencing',
+    )
+    expect(solutions.length).toBeGreaterThan(0)
+    expect(solutions[0]?.resourcesPaid.wood).toBe(3)
+
+    expect(payTypedFlatCost(player, { wood: 6 }, 'fencing')).toBe(true)
+    expect(player.resources.wood).toBe(7)
   })
 
   it('handles multiple trades', () => {
