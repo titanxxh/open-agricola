@@ -17,6 +17,7 @@ beforeEach(() => {
   clearPaymentCache()
 })
 import type { PlayerState, Resource, ComplexCost, PaymentSolution, Trade } from '../../../game/types'
+import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -226,6 +227,20 @@ describe('computeAllBuyableCombinations', () => {
     const solutions = computeAllBuyableCombinations(player, cost)
     expect(solutions.length).toBeGreaterThan(0)
     expect(solutions[0].resourcesPaid.wood).toBe(3)
+  })
+
+  it('A88 HedgeKeeper: BGA-style empty-from trade covers up to 3 wood of fencing fee', () => {
+    const player = createMockPlayer({ wood: 1 })
+    player.activeModifiers = [{ ...(A88_HedgeKeeper as any).modifier }]
+    const cost: ComplexCost = { fee: { wood: 4 } }
+    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'fencing')
+    expect(solutions.length).toBeGreaterThan(0)
+    const best = solutions[0]!
+    expect(best.resourcesPaid.wood).toBe(1)
+    const hk = best.tradesUsed.find(
+      (u) => u.trade.sourceId === 'A88_HedgeKeeper' && u.times === 3,
+    )
+    expect(hk).toBeDefined()
   })
 
   it('handles multiple trades', () => {
