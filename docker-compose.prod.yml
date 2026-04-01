@@ -8,7 +8,9 @@
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: production
     expose:
       - "5175"
     environment:
