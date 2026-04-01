@@ -65,6 +65,16 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5175',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:5175',
+        ws: true,
+      },
+    },
   },
   define: {
     'import.meta.env.VITE_BGA_IMAGE_DIR': JSON.stringify('/bga-img'),
