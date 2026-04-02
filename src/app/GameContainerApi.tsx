@@ -241,7 +241,6 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'board' | 'farm' | 'cards' | 'log'>('board')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1445,30 +1444,13 @@ export const GameContainerApi = () => {
         takeAnytimeAction={takeAnytimeAction}
       />
 
-      <nav className="game-tabs">
-        <button className={`game-tab ${activeTab === 'board' ? 'active' : ''}`} onClick={() => setActiveTab('board')}>
-          {locale === 'zh' ? '棋盘' : 'Board'}
-        </button>
-        <button className={`game-tab ${activeTab === 'farm' ? 'active' : ''}`} onClick={() => setActiveTab('farm')}>
-          {locale === 'zh' ? '农场' : 'Farm'}
-        </button>
-        <button className={`game-tab ${activeTab === 'cards' ? 'active' : ''}`} onClick={() => setActiveTab('cards')}>
-          {locale === 'zh' ? '卡牌' : 'Cards'}
-        </button>
-        <button className={`game-tab ${activeTab === 'log' ? 'active' : ''}`} onClick={() => setActiveTab('log')}>
-          {locale === 'zh' ? '日志' : 'Log'}
-        </button>
-      </nav>
-
-      <div className={activeTab === 'cards' ? '' : 'mobile-hidden'}>
-        <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
-      </div>
+      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
 
       <main className="board">
-        <section className={`board-panel board-action ${activeTab === 'board' ? '' : 'mobile-hidden'}`}>
+        <section className="board-panel board-action">
           <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
         </section>
-        <section className={`board-panel board-farm ${activeTab === 'farm' ? '' : 'mobile-hidden'}`}>
+        <section className="board-panel board-farm">
           <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
             currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
             nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
@@ -1495,9 +1477,7 @@ export const GameContainerApi = () => {
         </section>
       </main>
 
-      <div className={`board-panel ${activeTab === 'log' ? '' : 'mobile-hidden'}`}>
-        <LogPanel locale={locale} log={state.log} />
-      </div>
+      <LogPanel locale={locale} log={state.log} />
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
@@ -1517,7 +1497,6 @@ export const GameContainerApi = () => {
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
         isInteractive={isInteractive}
       />
-      <div className="interaction-bar-spacer" />
     </div>
   )
 }

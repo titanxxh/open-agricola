@@ -68,9 +68,7 @@
   overflow-y: auto;
 }
 
-.interaction-bar-spacer {
-  height: 80px;
-}
+/* Padding when interaction bar is visible (fixed bottom) */
 
 .anytime-bar {
   background: rgba(255, 255, 255, 0.9);
@@ -2527,6 +2525,60 @@
   .board {
     grid-template-columns: 1fr;
   }
+
+  .actions > h2 {
+    display: none;
+  }
+
+  .actions {
+    padding: clamp(4px, 1vw, 8px);
+  }
+
+  .center {
+    padding: clamp(8px, 1.5vw, 12px);
+  }
+
+  .center > .farm-header > div > h2 {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .farm-stats {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .farm-stats .farm-item {
+    padding: 6px 8px;
+  }
+
+  .played-cards,
+  .hand-cards {
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+
+  .played-cards h3,
+  .hand-cards h3 {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .log-bottom {
+    padding: 8px;
+    margin-top: 8px;
+  }
+
+  .log h3 {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .log ul {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 12px;
+  }
 }
 
 /* ══════════ COMPACT HEADER ══════════ */
@@ -2658,33 +2710,7 @@
 }
 
 /* ── Mobile Tab Navigation ─────────────── */
-.game-tabs {
-  display: none;
-  gap: 2px;
-  padding: 0 4px;
-  margin-bottom: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.game-tab {
-  flex: 1;
-  padding: 8px 4px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  color: #5a3a20;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.15s;
-}
-
-.game-tab.active {
-  background: #3a5a2c;
-  color: #fff;
-}
+/* Tabs removed — using vertical stacking layout instead */
 
 /* ── MajorImprovements collapsed ──────── */
 .major-improvements.collapsed {
@@ -2702,87 +2728,6 @@
   font-size: 12px;
   color: #8a7a60;
   margin-left: 6px;
-}
-
-@media (max-width: 768px) {
-  .game-tabs {
-    display: flex;
-  }
-
-  .mobile-hidden {
-    display: none !important;
-  }
-
-  .board {
-    grid-template-columns: 1fr !important;
-  }
-
-  .header-compact {
-    font-size: 12px;
-  }
-
-  .header-phase-pills {
-    display: none;
-  }
-
-  .action-board-wrapper {
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    max-height: calc(100vh - 120px);
-  }
-
-  .action-board {
-    min-width: 600px;
-  }
-
-  .farm-grid {
-    --tile: 64px;
-    --fence: 10px;
-    overflow-x: auto;
-  }
-
-  .played-row > *,
-  .hand-row > *,
-  .major-row > * {
-    flex: 0 1 calc(50% - 8px);
-  }
-}
-
-@media (max-width: 720px) {
-  .header h1 {
-    font-size: 22px;
-  }
-  .action-title {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-compact {
-    padding: 4px 8px;
-  }
-
-  .header-phase-pills {
-    display: none;
-  }
-
-  .header-icon-btn {
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
-  }
-
-  .game-tab {
-    font-size: 11px;
-    padding: 6px 2px;
-  }
-
-  .played-row > *,
-  .hand-row > *,
-  .major-row > * {
-    flex: 0 1 100%;
-    max-width: 100%;
-  }
 }
 
 @media (min-width: 1600px) {
