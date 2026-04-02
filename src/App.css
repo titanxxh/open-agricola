@@ -1091,6 +1091,57 @@
   margin-top: 4px;
 }
 
+/* ── Compact icon-based resource bar (BGA style) ── */
+.player-resources-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2a1a00;
+}
+
+.res-compact-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.res-compact-group .res-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.res-compact-num {
+  min-width: 14px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2a1a00;
+  margin-right: 3px;
+}
+
+.res-compact-num:last-child {
+  margin-right: 0;
+}
+
+.res-compact-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a3a20;
+  margin-right: 1px;
+}
+
+.res-compact-divider {
+  width: 1px;
+  height: 16px;
+  background: #d0c4a8;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .player-tabs-container {
   display: flex;
   flex-direction: column;
@@ -1749,84 +1800,40 @@
 .resource-inline {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 3px;
 }
 
 .resource-inline-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  border: 1px solid #d7e3c6;
-  background: #f6fbef;
-  font-size: 11px;
+  gap: 1px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
   color: #2e4b1e;
 }
 
-.resource-inline-item.resource-wood {
-  background: #f2e2c4;
-  border-color: #d6b58a;
-  color: #5a3d1c;
-}
-
-.resource-inline-item.resource-clay {
-  background: #f0d2c9;
-  border-color: #d3a59a;
-  color: #6b2b1a;
-}
-
-.resource-inline-item.resource-reed {
-  background: #e6f3dd;
-  border-color: #c0dcb1;
-  color: #2f5a2f;
-}
-
-.resource-inline-item.resource-stone {
-  background: #e1e7ef;
-  border-color: #c1ccd9;
-  color: #2e3b4e;
-}
-
-.resource-inline-item.resource-food {
-  background: #ffe7c6;
-  border-color: #e4c293;
-  color: #6a3b1c;
-}
-
-.resource-inline-item.resource-grain {
-  background: #fff1b8;
-  border-color: #e3c97d;
-  color: #5a4a1b;
-}
-
-.resource-inline-item.resource-vegetable {
-  background: #d6f5cc;
-  border-color: #b1dba4;
-  color: #2f5a2f;
-}
-
-.resource-inline-item.resource-sheep {
-  background: #f9f5f0;
-  border-color: #ddd6cc;
-  color: #5a4a1b;
-}
-
-.resource-inline-item.resource-boar {
-  background: #f6d9c3;
-  border-color: #d9b191;
-  color: #5a2b1a;
-}
-
+/* resource-inline-item colors removed for compact BGA-style icon display */
+.resource-inline-item.resource-wood,
+.resource-inline-item.resource-clay,
+.resource-inline-item.resource-reed,
+.resource-inline-item.resource-stone,
+.resource-inline-item.resource-food,
+.resource-inline-item.resource-grain,
+.resource-inline-item.resource-vegetable,
+.resource-inline-item.resource-sheep,
+.resource-inline-item.resource-boar,
 .resource-inline-item.resource-cattle {
-  background: #f5e7d0;
-  border-color: #d7c1a0;
-  color: #5a3d1c;
+  background: transparent;
+  border-color: transparent;
+  color: #2a1a00;
 }
 
 .resource-inline-item.resource-bonusVp {
-  background: #fff1b8;
-  border-color: #e0bd56;
+  background: transparent;
+  border-color: transparent;
   color: #6f5a08;
 }
 
@@ -1934,6 +1941,9 @@
 
 .resource-inline-amount {
   font-weight: 700;
+  font-size: 12px;
+  min-width: 10px;
+  text-align: center;
 }
 
 .card-future {
