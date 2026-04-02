@@ -337,6 +337,14 @@
   transition: opacity 0.3s;
 }
 
+.board > * {
+  min-width: 0;
+}
+
+.board > .board-action {
+  overflow: hidden;
+}
+
 .app:has(.header.not-my-turn) .board .actions {
   opacity: 0.7;
   pointer-events: auto;
@@ -2532,16 +2540,40 @@
 
 /* ══════════ MOBILE & RESPONSIVE ══════════ */
 @media (max-width: 1100px) {
+  /* Reduce app padding to give board more width */
+  .app {
+    padding: 6px;
+  }
+
   .board {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Action board: remove wrapper chrome so board fills full width */
+  .actions {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: hidden;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .board-panel.board-action {
+    overflow: hidden;
+    min-width: 0;
   }
 
   .actions > h2 {
     display: none;
   }
 
-  .actions {
-    padding: clamp(4px, 1vw, 8px);
+  /* Ensure action board wrapper uses all available width, no horizontal scroll */
+  .action-board-wrapper {
+    width: 100%;
+    overflow: hidden;
   }
 
   .center {
