@@ -116,6 +116,7 @@ Phase 2 前端联调已完成：
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
 - **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时从 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）恢复该房间状态；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
+- 普通 SQLite 房间同样遵循“空房先保留、TTL 后回收”的策略：连接全部断开时不会立刻从内存删掉，而是保留分享链接可重连的窗口期。服务端启动恢复范围也覆盖 `waiting` 与 `playing` 房间，因此等待中的房间不会再因为后端重启直接丢失。恢复与重开都会继续带上房间记录里的 `custom_card_ids`。
 
 #### 4.3.2 如果后续要支持 patch，同步协议应如何设计
 

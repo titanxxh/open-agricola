@@ -85,6 +85,7 @@ type Room = {
   maxPlayers: number
   version: number
   createdBy?: string
+  customCardDbIds?: string[]
 }
 
 const rooms = new Map<string, Room>()
@@ -98,6 +99,45 @@ const toPersistedRoomFileName = (roomId: string) =>
 
 const getPersistedRoomFile = (roomId: string) =>
   join(PERSISTED_ROOMS_DIR, toPersistedRoomFileName(roomId))
+
+type PersistedRoomRow = {
+  id: string
+  created_by: string | null
+  state_json: string | null
+  max_players: number
+  custom_card_ids: string | null
+}
+
+const serializeCustomCardDbIds = (room?: Pick<Room, 'customCardDbIds'>) =>
+  JSON.stringify(room?.customCardDbIds ?? [])
+
+const parseCustomCardDbIds = (raw: string | null | undefined): string[] => {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+const createSessionForRoom = (
+  stateOrSeed?: SerializedGameState | number,
+  customCardDbIds: string[] = [],
+  requestUserId?: string,
+): GameSession => {
+  const customCards = loadCustomCardsFromDb(customCardDbIds, requestUserId)
+  return new GameSession(
+    typeof stateOrSeed === 'number'
+      ? stateOrSeed
+      : stateOrSeed
+        ? rehydrateState(stateOrSeed)
+        : undefined,
+    customCards.length > 0 ? customCards : undefined,
+  )
+}
 
 export const resolveJoinPlayerIndex = (
   room: Pick<Room, 'id' | 'maxPlayers' | 'players'>,
@@ -208,15 +248,16 @@ function savePersistedStateSqlite(roomId: string, serialized: SerializedGameStat
     const db = getDb()
     const now = Date.now()
     const stateJson = JSON.stringify(serialized)
+    const customCardIdsJson = serializeCustomCardDbIds(room)
     const existing = db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId)
     if (existing) {
       db.prepare(
-        'UPDATE rooms SET state_json = ?, status = ?, version = version + 1, updated_at = ? WHERE id = ?',
-      ).run(stateJson, 'playing', now, roomId)
+        'UPDATE rooms SET state_json = ?, status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
+      ).run(stateJson, 'playing', customCardIdsJson, now, roomId)
     } else {
       db.prepare(
         'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
-      ).run(roomId, room?.createdBy ?? null, stateJson, room?.maxPlayers ?? 2, 'playing', '[]', now, now)
+      ).run(roomId, room?.createdBy ?? null, stateJson, room?.maxPlayers ?? 2, 'playing', customCardIdsJson, now, now)
     }
   } catch (err) {
     console.warn('[room-manager] persist (sqlite) save failed:', err)
@@ -233,7 +274,7 @@ function ensureRoomRowSqlite(room: Room): void {
     if (!exists) {
       db.prepare(
         'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, 0, ?, ?, ?)',
-      ).run(room.id, room.createdBy ?? null, room.maxPlayers, 'waiting', '[]', now, now)
+      ).run(room.id, room.createdBy ?? null, room.maxPlayers, 'waiting', serializeCustomCardDbIds(room), now, now)
     }
   } catch (err) {
     console.warn('[room-manager] ensureRoomRow failed:', err)
@@ -261,14 +302,65 @@ function upsertRoomPlayer(roomId: string, userId: string, playerIndex: number): 
 
 // ── Room lifecycle ───────────────────────────────────────────────────────────
 
-function loadRoomFromState(roomId: string, serialized: SerializedGameState, maxPlayers = 2, createdBy?: string): Room {
-  const session = new GameSession()
+function loadRoomFromState(
+  roomId: string,
+  serialized: SerializedGameState,
+  maxPlayers = 2,
+  createdBy?: string,
+  customCardDbIds: string[] = [],
+): Room {
+  let session = createSessionForRoom(undefined, customCardDbIds, createdBy)
   try {
-    session.loadState(rehydrateState(serialized))
+    session = createSessionForRoom(serialized, customCardDbIds, createdBy)
   } catch (err) {
     console.warn(`[room-manager] failed to rehydrate room ${roomId}, starting fresh:`, err)
   }
-  return { id: roomId, session, players: [], maxPlayers, version: 0, createdBy }
+  return { id: roomId, session, players: [], maxPlayers, version: 0, createdBy, customCardDbIds }
+}
+
+export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
+  const customCardDbIds = parseCustomCardDbIds(row.custom_card_ids)
+  if (!row.state_json) {
+    return {
+      id: row.id,
+      session: createSessionForRoom(undefined, customCardDbIds, row.created_by ?? undefined),
+      players: [],
+      maxPlayers: row.max_players,
+      version: 0,
+      createdBy: row.created_by ?? undefined,
+      customCardDbIds,
+    }
+  }
+  try {
+    const serialized = JSON.parse(row.state_json) as SerializedGameState
+    return loadRoomFromState(
+      row.id,
+      serialized,
+      row.max_players,
+      row.created_by ?? undefined,
+      customCardDbIds,
+    )
+  } catch (err) {
+    console.warn(`[room-manager] failed to restore room ${row.id}:`, err)
+    return null
+  }
+}
+
+export const removePlayerFromRoom = (
+  room: Pick<Room, 'id' | 'players'>,
+  ws: WebSocket,
+  now = Date.now(),
+): 'not-present' | 'empty' | 'remaining' => {
+  const beforeCount = room.players.length
+  room.players = room.players.filter((player) => player.ws !== ws)
+  if (room.players.length === beforeCount) return 'not-present'
+  if (room.players.length === 0) {
+    if (room.id !== FIXED_DEV_ROOM_ID) {
+      roomLastActivity.set(room.id, now)
+    }
+    return 'empty'
+  }
+  return 'remaining'
 }
 
 function ensurePersistentRoom(): void {
@@ -301,19 +393,13 @@ function restoreRoomsFromSqlite(): void {
   try {
     const db = getDb()
     const rows = db.prepare(
-      "SELECT id, created_by, state_json, max_players FROM rooms WHERE status = 'playing' AND id != ?",
-    ).all(FIXED_DEV_ROOM_ID) as Array<{
-      id: string
-      created_by: string | null
-      state_json: string | null
-      max_players: number
-    }>
+      "SELECT id, created_by, state_json, max_players, custom_card_ids FROM rooms WHERE status != 'finished' AND id != ?",
+    ).all(FIXED_DEV_ROOM_ID) as PersistedRoomRow[]
     for (const row of rows) {
       if (rooms.has(row.id)) continue
-      if (!row.state_json) continue
       try {
-        const serialized = JSON.parse(row.state_json) as SerializedGameState
-        const room = loadRoomFromState(row.id, serialized, row.max_players, row.created_by ?? undefined)
+        const room = restoreRoomFromSqliteRow(row)
+        if (!room) continue
         rooms.set(row.id, room)
         console.log(`[room-manager] restored room ${row.id} from SQLite`)
       } catch (err) {
@@ -487,7 +573,15 @@ export const createWsServer = (server: import('node:http').Server) => {
           await GameSession.preloadCardFiles(customCards)
         }
         const session = new GameSession(undefined, customCards.length > 0 ? customCards : undefined)
-        const room: Room = { id: roomId, session, players: [], maxPlayers, version: 0, createdBy: currentUserId }
+        const room: Room = {
+          id: roomId,
+          session,
+          players: [],
+          maxPlayers,
+          version: 0,
+          createdBy: currentUserId,
+          customCardDbIds,
+        }
         rooms.set(roomId, room)
         currentRoom = room
         currentPlayerIndex = 0
@@ -637,7 +731,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'newGame') {
-        room.session = new GameSession(msg.seed)
+        room.session = createSessionForRoom(msg.seed, room.customCardDbIds ?? [], room.createdBy)
         const resp = room.session.getState()
         broadcastState(room, resp, 'reconnect')
         return
@@ -659,13 +753,8 @@ export const createWsServer = (server: import('node:http').Server) => {
     ws.on('close', () => {
       clearTimeout(authTimer)
       if (currentRoom) {
-        const beforeCount = currentRoom.players.length
-        currentRoom.players = currentRoom.players.filter((p) => p.ws !== ws)
-        const wasPresent = currentRoom.players.length !== beforeCount
-        if (!wasPresent) return
-        if (currentRoom.players.length === 0 && currentRoom.id !== FIXED_DEV_ROOM_ID) {
-          rooms.delete(currentRoom.id)
-        } else if (currentRoom.players.length > 0) {
+        const removal = removePlayerFromRoom(currentRoom, ws)
+        if (removal === 'remaining') {
           broadcast(currentRoom, {
             type: 'playerDisconnected',
             playerIndex: currentPlayerIndex,
