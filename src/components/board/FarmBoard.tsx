@@ -486,12 +486,30 @@ export const FarmBoard = ({
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
         <div className="player-summary">{displayPlayer.name}</div>
-        <div className="player-resources">
-          <ResourceLine
-            locale={locale}
-            resources={displayPlayer.resources}
-            emptyLabel={t(locale, 'ui.noResources')}
-          />
+        <div className="player-resources-compact">
+          <span className="res-compact-group">
+            <span className="res-icon res-icon-wood" /><span className="res-compact-num">{displayPlayer.resources.wood}</span>
+            <span className="res-icon res-icon-clay" /><span className="res-compact-num">{displayPlayer.resources.clay}</span>
+            <span className="res-icon res-icon-reed" /><span className="res-compact-num">{displayPlayer.resources.reed}</span>
+            <span className="res-icon res-icon-stone" /><span className="res-compact-num">{displayPlayer.resources.stone}</span>
+            <span className="res-icon res-icon-grain" /><span className="res-compact-num">{displayPlayer.resources.grain}</span>
+            <span className="res-icon res-icon-vegetable" /><span className="res-compact-num">{displayPlayer.resources.vegetable}</span>
+          </span>
+          <span className="res-compact-divider" />
+          <span className="res-compact-group">
+            <span className="res-icon res-icon-food" /><span className="res-compact-num">{displayPlayer.resources.food}</span>
+            <span className="res-icon res-icon-sheep" /><span className="res-compact-num">{displayPlayer.resources.sheep}</span>
+            <span className="res-icon res-icon-boar" /><span className="res-compact-num">{displayPlayer.resources.boar}</span>
+            <span className="res-icon res-icon-cattle" /><span className="res-compact-num">{displayPlayer.resources.cattle}</span>
+          </span>
+          <span className="res-compact-divider" />
+          <span className="res-compact-group">
+            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{displayPlayer.familySize}</span>
+            <span className="res-compact-label">{locale === 'zh' ? '屋' : 'R'}</span><span className="res-compact-num">{displayPlayer.rooms}</span>
+            <span className="res-icon res-icon-field" /><span className="res-compact-num">{displayPlayer.fields.length}</span>
+            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{displayPlayer.fences}</span>
+            <span className="res-icon res-icon-barn" /><span className="res-compact-num">{displayPlayer.stableTiles?.length ?? 0}</span>
+          </span>
         </div>
       </div>
       <div className="player-tabs-container">
@@ -546,38 +564,6 @@ export const FarmBoard = ({
             <span className="legend-text">{t(locale, 'ui.legendNextStart')}</span>
           </div>
         </div>
-      </div>
-    </div>
-    <div className="farm-stats">
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.rooms')}</div>
-        <div className="farm-value">{displayPlayer.rooms}</div>
-      </div>
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.houseType')}</div>
-        <div className="farm-value">
-          {displayPlayer.houseType === 'clay'
-            ? t(locale, 'ui.houseClay')
-            : displayPlayer.houseType === 'stone'
-              ? t(locale, 'ui.houseStone')
-              : t(locale, 'ui.houseWood')}
-        </div>
-      </div>
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.fields')}</div>
-        <div className="farm-value">{displayPlayer.fields.length}</div>
-      </div>
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.fences')}</div>
-        <div className="farm-value">{displayPlayer.fences}</div>
-      </div>
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.family')}</div>
-        <div className="farm-value">{displayPlayer.familySize}</div>
-      </div>
-      <div className="farm-item">
-        <div className="farm-label">{t(locale, 'ui.workers')}</div>
-        <div className="farm-value">{displayPlayer.workersAvailable}</div>
       </div>
     </div>
     <div className="farm-grid">
