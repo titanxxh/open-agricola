@@ -29,6 +29,12 @@ services:
       - CUSTOM_CODE_EXECUTOR_PORT=5181
       - CUSTOM_CODE_EXECUTOR_HOST=0.0.0.0
     command: ["node", "--import", "tsx", "server/custom-code-executor/index.ts"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5181/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     read_only: true
     tmpfs:
       - /tmp
