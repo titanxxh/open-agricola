@@ -601,16 +601,6 @@ export const createWsServer = (server: import('node:http').Server) => {
         const roomId = msg.roomId
         const room = rooms.get(roomId)
         if (!room) { sendTo(ws, { type: 'error', error: 'room not found' }); return }
-        // Prevent creator from joining their own room as a second player
-        if (currentUserId && room.createdBy === currentUserId) {
-          const existingSeat = room.players.find(p => p.userId === currentUserId)
-          if (existingSeat) {
-            // Allow reconnect to existing seat
-          } else {
-            sendTo(ws, { type: 'error', error: 'cannot join your own room' })
-            return
-          }
-        }
         // If this userId already has a seat, reconnect to that seat
         let requestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
@@ -620,6 +610,15 @@ export const createWsServer = (server: import('node:http').Server) => {
           const existingSeat = room.players.find(p => p.userId === currentUserId)
           if (existingSeat) {
             requestedPlayerIndex = existingSeat.playerIndex
+          }
+        }
+        // Prevent same user from taking a NEW seat (self-join) or
+        // replacing an active connection to the same seat
+        if (currentUserId) {
+          const existingSeat = room.players.find(p => p.userId === currentUserId)
+          if (existingSeat && existingSeat.ws.readyState === existingSeat.ws.OPEN) {
+            sendTo(ws, { type: 'error', error: 'you are already in this room' })
+            return
           }
         }
         const seat = resolveJoinPlayerIndex(room, requestedPlayerIndex, currentUserId)
