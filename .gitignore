@@ -37,3 +37,4 @@ test-results/
 *.traineddata
 .gstack/
 deploy/Caddyfile
+__pycache__/

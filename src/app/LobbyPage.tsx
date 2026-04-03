@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { BrandMark } from '../components/common/BrandMark'
 import { API_BASE } from '../config'
 
 type RoomSummary = {
@@ -84,7 +85,12 @@ export function LobbyPage() {
   return (
     <div className="lobby-page">
       <div className="lobby-header">
-        <h1>{t('platform.lobbyTitle')}</h1>
+        <BrandMark
+          title={t('platform.lobbyTitle')}
+          titleAs="h1"
+          className="lobby-brand"
+          titleClassName="lobby-title"
+        />
         <div className="lobby-user-info">
           <LocaleSwitcher />
           <button type="button" className="btn-link" onClick={() => setPage('settings')}>

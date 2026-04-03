@@ -25,6 +25,7 @@ import { ScoringPad } from '../components/board/ScoringPad'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
+import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 
 type RoundSlot = { round: number; action?: ActionSpace }
@@ -1143,7 +1144,12 @@ export const GameContainerApi = () => {
     return (
       <div className="ws-status-screen">
         <div className="ws-status-card">
-          <h2 className="ws-status-title">Open Agricola</h2>
+          <BrandMark
+            title="Open Agricola"
+            titleAs="h2"
+            className="brand-mark-centered ws-status-brand"
+            titleClassName="ws-status-title"
+          />
           <div className="ws-status-text">{statusText}</div>
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
