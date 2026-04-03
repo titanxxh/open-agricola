@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
-import type { Locale } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
@@ -30,18 +30,6 @@ import { ResourceLine } from '../components/common/ResourceLine'
 type RoundSlot = { round: number; action?: ActionSpace }
 
 const httpTransportSingleton = new HttpGameTransport()
-const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
-
-const detectInitialLocale = (): Locale => {
-  if (typeof window === 'undefined') return 'zh'
-  try {
-    const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-    if (saved === 'zh' || saved === 'en') return saved
-  } catch {
-    // Ignore storage access failures and fall back to default locale.
-  }
-  return 'zh'
-}
 
 /** Update browser URL to include room= so the link can be shared; same room id = same game. */
 const setRoomInUrl = (roomId: string) => {
@@ -228,7 +216,7 @@ export const GameContainerApi = () => {
   const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
-  const [locale, setLocale] = useState<Locale>(detectInitialLocale)
+  const { locale, setLocale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => currentUrlParams.get('devMode') === '1')
@@ -241,15 +229,6 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale)
-    } catch {
-      // Ignore storage access failures.
-    }
-  }, [locale])
 
   useEffect(() => {
     if (state && viewPlayerId) {
