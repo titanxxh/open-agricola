@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 import { ResourceText } from '../components/common/ResourceText'
@@ -49,11 +50,12 @@ function authHeaders(token: string | null): Record<string, string> {
 
 // ── Card Preview Tile ────────────────────────────────────────────────────────
 
-function CardTile({ card, onSelect, onLike, mine }: {
+function CardTile({ card, onSelect, onLike, mine, t }: {
   card: WorkshopCard
   onSelect: (c: WorkshopCard) => void
   onLike: (id: string) => void
   mine?: boolean
+  t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
     <div className="ws-card-tile" onClick={() => onSelect(card)}>
@@ -63,10 +65,10 @@ function CardTile({ card, onSelect, onLike, mine }: {
       <div className="ws-card-tile-body">
         <div className="ws-card-tile-name">{card.name}</div>
         <div className="ws-card-tile-meta">
-          <span className="ws-badge">{card.card_type === 'minor' ? '小改进' : '职业'}</span>
-          {!!card.featured && <span className="ws-badge ws-badge-featured">★ 精选</span>}
-          {mine && <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? '已发布' : '草稿'}</span>}
-          <span className="ws-author">by {card.author_name}</span>
+          <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+          {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
+          {mine && <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>}
+          <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
         </div>
         <div className="ws-card-desc">
           <ResourceText text={card.description.slice(0, 80) + (card.description.length > 80 ? '…' : '')} />
@@ -77,7 +79,7 @@ function CardTile({ card, onSelect, onLike, mine }: {
           type="button"
           className={`ws-like-btn${card.liked_by_me ? ' liked' : ''}`}
           onClick={e => { e.stopPropagation(); onLike(card.id) }}
-          title="点赞"
+          title={t('platform.likeBtn')}
         >
           ♥ {card.like_count}
         </button>
@@ -88,7 +90,7 @@ function CardTile({ card, onSelect, onLike, mine }: {
 
 // ── Card Source Viewer (generated .ts code) ─────────────────────────────────
 
-function CardSourceViewer({ card, token }: { card: WorkshopCard; token: string | null }) {
+function CardSourceViewer({ card, token, t }: { card: WorkshopCard; token: string | null; t: (key: string, params?: Record<string, string | number>) => string }) {
   const [code, setCode] = useState<string | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -115,25 +117,24 @@ function CardSourceViewer({ card, token }: { card: WorkshopCard; token: string |
     setLoading(false)
   }
 
-  // If the card has user-written code, show that directly
   const effectCode = (card as Record<string, unknown>).effect_code as string | null
   if (effectCode) {
     return (
       <div className="ws-detail-section">
-        <h3>卡牌代码 (.ts)</h3>
+        <h3>{t('platform.cardCode')}</h3>
         <pre className="ws-code">{effectCode}</pre>
-        <p className="ws-code-note">此代码通过 AST 验证后在服务器 VM 沙盒中执行。</p>
+        <p className="ws-code-note">{t('platform.codeNote')}</p>
       </div>
     )
   }
 
   return (
     <div className="ws-detail-section">
-      <h3>效果</h3>
+      <h3>{t('platform.effect')}</h3>
       <pre className="ws-code">{JSON.stringify(card.effect_dsl, null, 2)}</pre>
       <div className="ws-code-toolbar">
         <button type="button" className="btn-secondary ws-btn-sm" onClick={loadCode} disabled={loading}>
-          {loading ? '生成中…' : showCode ? '隐藏 .ts 代码' : '查看生成的 .ts 代码'}
+          {loading ? t('platform.generating') : showCode ? t('platform.hideCode') : t('platform.showCode')}
         </button>
       </div>
       {showCode && code && (
@@ -145,7 +146,7 @@ function CardSourceViewer({ card, token }: { card: WorkshopCard; token: string |
 
 // ── Card Detail Panel ────────────────────────────────────────────────────────
 
-function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh }: {
+function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh, t }: {
   card: WorkshopCard
   token: string | null
   onBack: () => void
@@ -154,6 +155,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   isOwner?: boolean
   isUserAdmin?: boolean
   onRefresh?: () => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
@@ -192,7 +194,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
     })
     const d = await r.json()
     if (d.ok) {
-      setComments(prev => [...prev, { id: d.id, body: newComment, author_name: '我', created_at: Date.now() }])
+      setComments(prev => [...prev, { id: d.id, body: newComment, author_name: t('platform.me'), created_at: Date.now() }])
       setNewComment('')
     }
     setSubmitting(false)
@@ -229,23 +231,23 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
   return (
     <div className="ws-detail">
-      <button type="button" className="ws-back-btn" onClick={onBack}>← 返回</button>
+      <button type="button" className="ws-back-btn" onClick={onBack}>{t('platform.back')}</button>
 
       <div className="ws-detail-header">
         {card.art_url && <img className="ws-detail-art" src={card.art_url} alt={card.name} />}
         <div className="ws-detail-meta">
           <h2>{card.name}</h2>
           <div className="ws-badges-row">
-            <span className="ws-badge">{card.card_type === 'minor' ? '小改进' : '职业'}</span>
-            <span className="ws-author">by {card.author_name}</span>
+            <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+            <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
           </div>
           {cost && Object.keys(cost).length > 0 && (
             <div className="ws-detail-cost">
-              费用：{Object.entries(cost).map(([r, n]) => `${r} ×${n}`).join('、')}
+              {t('platform.cost')}：{Object.entries(cost).map(([r, n]) => t('platform.costEntry', { resource: r, count: n })).join(t('platform.costSeparator'))}
             </div>
           )}
           {vp !== undefined && vp > 0 && (
-            <div className="ws-detail-vp">{vp} 分</div>
+            <div className="ws-detail-vp">{t('platform.vpLabel', { vp })}</div>
           )}
           <p className="ws-detail-desc"><ResourceText text={card.description} /></p>
 
@@ -256,19 +258,19 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
               onClick={handleLike}
             >♥ {likeCount}</button>
             <button type="button" className="btn-secondary ws-btn-sm" onClick={() => onAddSandbox(card.id)}>
-              加入沙盒
+              {t('platform.addToSandbox')}
             </button>
             {onEdit && (
-              <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>编辑</button>
+              <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>{t('platform.edit')}</button>
             )}
             {isOwner && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={fetchVersions}>
-                {showVersions ? '隐藏版本' : '版本历史'}
+                {showVersions ? t('platform.hideVersions') : t('platform.versionHistory')}
               </button>
             )}
             {isUserAdmin && card.status === 'published' && (
               <button type="button" className={`btn-secondary ws-btn-sm${isFeatured ? ' liked' : ''}`} onClick={handleFeatureToggle}>
-                {isFeatured ? '★ 取消精选' : '☆ 设为精选'}
+                {isFeatured ? t('platform.unfeature') : t('platform.setFeatured')}
               </button>
             )}
           </div>
@@ -276,14 +278,14 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
       </div>
 
       {(card.effect_dsl || 'effect_code' in card) && (
-        <CardSourceViewer card={card} token={token} />
+        <CardSourceViewer card={card} token={token} t={t} />
       )}
 
       {showVersions && (
         <div className="ws-detail-section">
-          <h3>版本历史 ({versions.length})</h3>
+          <h3>{t('platform.versionHistoryCount', { count: versions.length })}</h3>
           {versions.length === 0 ? (
-            <p className="ws-empty">暂无历史版本</p>
+            <p className="ws-empty">{t('platform.noVersions')}</p>
           ) : (
             <ul className="ws-versions">
               {versions.map(v => (
@@ -291,7 +293,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
                   <span className="ws-version-num">v{v.version_number}</span>
                   <span className="ws-version-date">{new Date(v.created_at).toLocaleString()}</span>
                   <span className="ws-version-name">{(v.card_json as Record<string, unknown>).name as string || '—'}</span>
-                  <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>恢复</button>
+                  <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>{t('platform.revert')}</button>
                 </li>
               ))}
             </ul>
@@ -300,7 +302,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
       )}
 
       <div className="ws-detail-section">
-        <h3>评论 ({comments.length})</h3>
+        <h3>{t('platform.commentsCount', { count: comments.length })}</h3>
         <ul className="ws-comments">
           {comments.map(c => (
             <li key={c.id} className="ws-comment">
@@ -314,11 +316,11 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
             <textarea
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
-              placeholder="写评论…"
+              placeholder={t('platform.commentPlaceholder')}
               rows={2}
             />
             <button type="button" className="btn-primary ws-btn-sm" onClick={handleComment} disabled={submitting}>
-              发送
+              {t('platform.send')}
             </button>
           </div>
         )}
@@ -331,11 +333,12 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle']
 
-function CardEditor({ initial, token, onSaved, onCancel }: {
+function CardEditor({ initial, token, onSaved, onCancel, t }: {
   initial?: WorkshopCard
   token: string | null
   onSaved: () => void
   onCancel: () => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [cardId, setCardId] = useState(initial?.card_id ?? 'CUSTOM_')
@@ -381,7 +384,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
   }
 
   const handleValidateCode = async () => {
-    if (!codeText.trim()) { setCodeErrors(['请输入代码']); return }
+    if (!codeText.trim()) { setCodeErrors([t('platform.enterCode')]); return }
     setValidating(true)
     setCodeErrors([])
     try {
@@ -395,10 +398,10 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
         setCodeErrors([])
         setError('')
       } else {
-        setCodeErrors(d.errors ?? ['验证失败'])
+        setCodeErrors(d.errors ?? [t('platform.validationFailed')])
       }
     } catch {
-      setCodeErrors(['网络错误'])
+      setCodeErrors([t('platform.networkError')])
     } finally {
       setValidating(false)
     }
@@ -406,12 +409,12 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
 
   const handleSave = async (publishStatus: 'draft' | 'published') => {
     setError('')
-    if (!name.trim()) { setError('请填写卡牌名称'); return }
-    if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError('ID 必须以 CUSTOM_ 开头且不能为空'); return }
+    if (!name.trim()) { setError(t('platform.cardNameRequired')); return }
+    if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError(t('platform.cardIdInvalid')); return }
 
     let effectDsl = null
     if (effectMode === 'dsl' && dslText.trim()) {
-      try { effectDsl = JSON.parse(dslText) } catch { setError('效果 DSL JSON 格式错误'); return }
+      try { effectDsl = JSON.parse(dslText) } catch { setError(t('platform.dslJsonError')); return }
     }
 
     const cardJson = {
@@ -447,10 +450,10 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
       if (d.ok) {
         onSaved()
       } else {
-        setError(d.error ?? '保存失败')
+        setError(d.error ?? t('platform.saveFailed'))
       }
     } catch {
-      setError('网络错误')
+      setError(t('platform.networkError'))
     } finally {
       setSaving(false)
     }
@@ -470,12 +473,12 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
   return (
     <div className="ws-editor">
       <div className="ws-editor-header">
-        <h2>{initial ? '编辑卡牌' : '创建卡牌'}</h2>
+        <h2>{initial ? t('platform.editCard') : t('platform.createCardTitle')}</h2>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button type="button" className="btn-secondary ws-btn-sm ai-open-btn" onClick={() => setShowAi(true)}>
-            ✦ AI 设计师
+            {t('platform.aiDesigner')}
           </button>
-          <button type="button" className="btn-link" onClick={onCancel}>取消</button>
+          <button type="button" className="btn-link" onClick={onCancel}>{t('platform.cancel')}</button>
         </div>
       </div>
       {artUrl && <img src={artUrl} alt="card art" className="ws-editor-art-preview" />}
@@ -483,37 +486,37 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
       <div className="ws-editor-form">
         <div className="ws-form-row">
           <div className="form-field">
-            <label>卡牌名称</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="木质厨房" />
+            <label>{t('platform.cardName')}</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder={t('platform.cardNamePlaceholder')} />
           </div>
           <div className="form-field">
-            <label>卡牌类型</label>
+            <label>{t('platform.cardType')}</label>
             <select value={cardType} onChange={e => setCardType(e.target.value as 'minor' | 'occupation')}>
-              <option value="minor">小改进</option>
-              <option value="occupation">职业</option>
+              <option value="minor">{t('platform.minor')}</option>
+              <option value="occupation">{t('platform.occupation')}</option>
             </select>
           </div>
         </div>
 
         <div className="form-field">
-          <label>卡牌 ID（唯一标识，格式：CUSTOM_名称）</label>
-          <input value={cardId} onChange={e => setCardId(e.target.value)} placeholder="CUSTOM_WoodKitchen" />
+          <label>{t('platform.cardId')}</label>
+          <input value={cardId} onChange={e => setCardId(e.target.value)} placeholder={t('platform.cardIdPlaceholder')} />
         </div>
 
         <div className="form-field">
-          <label>描述</label>
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="每次回家时，可以支付 1 粮食获得 3 食物" />
+          <label>{t('platform.description')}</label>
+          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder={t('platform.descPlaceholder')} />
         </div>
 
         <div className="ws-form-row">
           <div className="form-field ws-field-sm">
-            <label>分数 (VP)</label>
+            <label>{t('platform.vpField')}</label>
             <input type="number" value={vp} onChange={e => setVp(e.target.value)} min={0} max={20} />
           </div>
         </div>
 
         <div className="ws-cost-editor">
-          <label>费用</label>
+          <label>{t('platform.costLabel')}</label>
           <div className="ws-cost-grid">
             {RESOURCE_KEYS.map(res => (
               <div key={res} className="ws-cost-cell">
@@ -533,16 +536,16 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
         <div className="form-field">
           <div className="ws-effect-mode-toggle">
             <button type="button" className={`ws-tab-sm${effectMode === 'dsl' ? ' active' : ''}`} onClick={() => setEffectMode('dsl')}>
-              DSL 模式
+              {t('platform.dslMode')}
             </button>
             <button type="button" className={`ws-tab-sm${effectMode === 'code' ? ' active' : ''}`} onClick={() => setEffectMode('code')}>
-              代码模式
+              {t('platform.codeMode')}
             </button>
           </div>
 
           {effectMode === 'dsl' ? (
             <>
-              <label>效果 DSL（JSON，可选）</label>
+              <label>{t('platform.dslLabel')}</label>
               <textarea
                 value={dslText}
                 onChange={e => setDslText(e.target.value)}
@@ -550,11 +553,11 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
                 placeholder={'{\n  "onReturnHome": {\n    "optional": true,\n    "flow": [{ "action": "gain", "params": { "food": 2 } }]\n  }\n}'}
                 className="ws-code-input"
               />
-              <p className="ws-code-note">只允许白名单内的 action：gain / pay-resources / bonus-vp / exchange</p>
+              <p className="ws-code-note">{t('platform.dslNote')}</p>
             </>
           ) : (
             <>
-              <label>TypeScript 卡牌代码</label>
+              <label>{t('platform.tsLabel')}</label>
               <textarea
                 value={codeText}
                 onChange={e => { setCodeText(e.target.value); setCodeErrors([]) }}
@@ -564,7 +567,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
               />
               <div className="ws-code-toolbar">
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={handleValidateCode} disabled={validating}>
-                  {validating ? '验证中…' : '验证代码'}
+                  {validating ? t('platform.validating') : t('platform.validateCode')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
                   const r = await fetch(`${API_BASE}/api/workshop/cards/generate-template`, {
@@ -575,7 +578,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
                   const d = await r.json()
                   if (d.ok && d.code) setCodeText(d.code)
                 }}>
-                  生成模板
+                  {t('platform.generateTemplate')}
                 </button>
                 {dslText.trim() && (
                   <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
@@ -588,13 +591,13 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
                       })
                       const d = await r.json()
                       if (d.ok && d.code) setCodeText(d.code)
-                    } catch { setError('DSL JSON 格式错误') }
+                    } catch { setError(t('platform.dslJsonError')) }
                   }}>
-                    从 DSL 生成代码
+                    {t('platform.generateFromDsl')}
                   </button>
                 )}
                 {codeErrors.length === 0 && codeText.trim() && !validating && (
-                  <span className="ws-code-ok">✓ 验证通过</span>
+                  <span className="ws-code-ok">{t('platform.validationPassed')}</span>
                 )}
               </div>
               {codeErrors.length > 0 && (
@@ -603,8 +606,7 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
                 </ul>
               )}
               <p className="ws-code-note">
-                可用 API：registerCardEffect(), registerCardListener(), console.log/warn, Math.*。
-                禁止：import, require, eval, fetch, process 等。代码在服务器 VM 沙盒中执行（100ms 超时）。
+                {t('platform.codeApiNote')}
               </p>
             </>
           )}
@@ -614,10 +616,10 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
 
         <div className="ws-editor-actions">
           <button type="button" className="btn-secondary" onClick={() => handleSave('draft')} disabled={saving}>
-            保存草稿
+            {t('platform.saveDraft')}
           </button>
           <button type="button" className="btn-primary" onClick={() => handleSave('published')} disabled={saving}>
-            发布卡牌
+            {t('platform.publishCard')}
           </button>
         </div>
       </div>
@@ -627,10 +629,11 @@ function CardEditor({ initial, token, onSaved, onCancel }: {
 
 // ── Sandbox View ─────────────────────────────────────────────────────────────
 
-function SandboxView({ token, onSelect, onStartGame }: {
+function SandboxView({ token, onSelect, onStartGame, t }: {
   token: string | null
   onSelect: (c: WorkshopCard) => void
   onStartGame: (cardIds: string[], mode: 'single' | 'multi') => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const [cards, setCards] = useState<WorkshopCard[]>([])
 
@@ -653,17 +656,17 @@ function SandboxView({ token, onSelect, onStartGame }: {
 
   return (
     <div className="ws-sandbox">
-      <h2>我的沙盒</h2>
+      <h2>{t('platform.mySandbox')}</h2>
       {cards.length === 0 ? (
-        <p className="rooms-empty">沙盒为空 — 在卡牌列表中点击"加入沙盒"添加卡牌</p>
+        <p className="rooms-empty">{t('platform.sandboxEmpty')}</p>
       ) : (
         <>
           <ul className="ws-sandbox-list">
             {cards.map(c => (
               <li key={c.id} className="ws-sandbox-item">
                 <span className="ws-card-tile-name" style={{ cursor: 'pointer' }} onClick={() => onSelect(c)}>{c.name}</span>
-                <span className="ws-author">by {c.author_name}</span>
-                <button type="button" className="btn-small ws-remove-btn" onClick={() => handleRemove(c.id)}>移除</button>
+                <span className="ws-author">{t('platform.by', { name: c.author_name })}</span>
+                <button type="button" className="btn-small ws-remove-btn" onClick={() => handleRemove(c.id)}>{t('platform.remove')}</button>
               </li>
             ))}
           </ul>
@@ -673,14 +676,14 @@ function SandboxView({ token, onSelect, onStartGame }: {
               className="btn-primary"
               onClick={() => onStartGame(cards.map(c => c.id), 'single')}
             >
-              单人测试
+              {t('platform.singleTest')}
             </button>
             <button
               type="button"
               className="btn-secondary"
               onClick={() => onStartGame(cards.map(c => c.id), 'multi')}
             >
-              多人测试（创建房间）
+              {t('platform.multiTest')}
             </button>
           </div>
         </>
@@ -693,6 +696,7 @@ function SandboxView({ token, onSelect, onStartGame }: {
 
 export function WorkshopPage() {
   const { user, token } = useAuth()
+  const { t } = useLocale()
   const [view, setView] = useState<View>('browse')
   const [cards, setCards] = useState<WorkshopCard[]>([])
   const [selectedCard, setSelectedCard] = useState<WorkshopCard | null>(null)
@@ -739,7 +743,6 @@ export function WorkshopPage() {
     }
   }, [view, sort, search, page, loadCards])
 
-  // Reset page on sort/search change
   useEffect(() => {
     setPageNum(1)
     setCards([])
@@ -752,7 +755,7 @@ export function WorkshopPage() {
       headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify({ workshop_card_id: cardDbId }),
     })
-    alert('已加入沙盒')
+    alert(t('platform.addedToSandbox'))
   }
 
   const handleLike = async (cardDbId: string) => {
@@ -772,11 +775,9 @@ export function WorkshopPage() {
 
   const handleStartSandboxGame = async (cardIds: string[], mode: 'single' | 'multi') => {
     if (mode === 'multi') {
-      // WS multiplayer: pass card IDs via URL param; createRoom will load them from DB
       setPage('game', { transport: 'ws', customCards: cardIds.join(',') })
       return
     }
-    // Single-player HTTP: load custom cards server-side before starting
     try {
       const r = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
@@ -787,10 +788,10 @@ export function WorkshopPage() {
       if (d.ok) {
         setPage('game')
       } else {
-        alert('启动沙盒游戏失败：' + (d.error ?? '未知错误'))
+        alert(t('platform.sandboxFailed', { error: d.error ?? t('platform.sandboxUnknownError') }))
       }
     } catch {
-      alert('网络错误，请重试')
+      alert(t('platform.sandboxNetworkError'))
     }
   }
 
@@ -805,11 +806,10 @@ export function WorkshopPage() {
     setView('detail')
   }
 
-  // ── Detail view ──────────────────────────────────────────────────────────
   if (view === 'detail' && selectedCard) {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={v => { setSelectedCard(null); setView(v) }} user={user} />
+        <WorkshopNav view={view} setView={v => { setSelectedCard(null); setView(v) }} user={user} t={t} />
         <CardDetail
           card={selectedCard}
           token={token}
@@ -826,111 +826,111 @@ export function WorkshopPage() {
               .then(d => { if (d.ok) setSelectedCard(d.card) })
               .catch(() => {})
           }}
+          t={t}
         />
       </div>
     )
   }
 
-  // ── Editor view ──────────────────────────────────────────────────────────
   if (view === 'editor') {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={v => { setEditCard(undefined); setView(v) }} user={user} />
+        <WorkshopNav view={view} setView={v => { setEditCard(undefined); setView(v) }} user={user} t={t} />
         <CardEditor
           initial={editCard}
           token={token}
           onSaved={() => { setEditCard(undefined); setView('mine'); setPageNum(1); setCards([]) }}
           onCancel={() => { setEditCard(undefined); setView(prevView.current) }}
+          t={t}
         />
       </div>
     )
   }
 
-  // ── Sandbox view ─────────────────────────────────────────────────────────
   if (view === 'sandbox') {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={setView} user={user} />
-        <SandboxView token={token} onSelect={selectCard} onStartGame={handleStartSandboxGame} />
+        <WorkshopNav view={view} setView={setView} user={user} t={t} />
+        <SandboxView token={token} onSelect={selectCard} onStartGame={handleStartSandboxGame} t={t} />
       </div>
     )
   }
 
-  // ── Browse / Mine view ───────────────────────────────────────────────────
   return (
     <div className="ws-page">
-      <WorkshopNav view={view} setView={setView} user={user} />
+      <WorkshopNav view={view} setView={setView} user={user} t={t} />
 
       <div className="ws-toolbar">
         <form onSubmit={e => { e.preventDefault(); setSearch(searchInput) }} className="ws-search">
           <input
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
-            placeholder="搜索卡牌…"
+            placeholder={t('platform.searchPlaceholder')}
           />
-          <button type="submit" className="btn-primary ws-btn-sm">搜索</button>
+          <button type="submit" className="btn-primary ws-btn-sm">{t('platform.searchBtn')}</button>
         </form>
         {(view === 'browse' || view === 'featured') && (
           <div className="ws-sort">
-            <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>最新</button>
-            <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>最热</button>
+            <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>{t('platform.sortRecent')}</button>
+            <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>{t('platform.sortPopular')}</button>
           </div>
         )}
         {view === 'mine' && (
           <button type="button" className="btn-primary ws-btn-sm" onClick={() => { setEditCard(undefined); prevView.current = view; setView('editor') }}>
-            + 创建卡牌
+            {t('platform.createCard')}
           </button>
         )}
       </div>
 
       {cards.length === 0 && !loading ? (
         <p className="rooms-empty">
-          {view === 'mine' ? '你还没有创建卡牌' : view === 'featured' ? '暂无精选卡牌' : '暂无已发布的卡牌'}
+          {view === 'mine' ? t('platform.noMyCards') : view === 'featured' ? t('platform.noFeatured') : t('platform.noPublished')}
         </p>
       ) : (
         <div className="ws-card-grid">
           {cards.map(c => (
-            <CardTile key={c.id} card={c} onSelect={selectCard} onLike={handleLike} mine={view === 'mine'} />
+            <CardTile key={c.id} card={c} onSelect={selectCard} onLike={handleLike} mine={view === 'mine'} t={t} />
           ))}
         </div>
       )}
 
-      {loading && <div className="ws-loading">加载中…</div>}
+      {loading && <div className="ws-loading">{t('platform.loadingMore')}</div>}
       {hasMore && !loading && (
         <button type="button" className="btn-secondary ws-load-more" onClick={() => setPageNum(p => p + 1)}>
-          加载更多
+          {t('platform.loadMore')}
         </button>
       )}
     </div>
   )
 }
 
-function WorkshopNav({ view, setView, user }: {
+function WorkshopNav({ view, setView, user, t }: {
   view: View
   setView: (v: View) => void
   user: { username: string; displayName: string } | null
+  t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="btn-link ws-back-home" onClick={() => setPage('lobby')}>← 大厅</button>
-        <h1>卡牌工坊</h1>
+        <button type="button" className="btn-link ws-back-home" onClick={() => setPage('lobby')}>{t('platform.backToLobbyShort')}</button>
+        <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-tabs">
         <button type="button" className={`ws-tab${view === 'browse' ? ' active' : ''}`} onClick={() => setView('browse')}>
-          浏览
+          {t('platform.browse')}
         </button>
         <button type="button" className={`ws-tab${view === 'featured' ? ' active' : ''}`} onClick={() => setView('featured')}>
-          ★ 精选
+          {t('platform.featured')}
         </button>
         {user && (
           <button type="button" className={`ws-tab${view === 'mine' ? ' active' : ''}`} onClick={() => setView('mine')}>
-            我的卡牌
+            {t('platform.myCards')}
           </button>
         )}
         {user && (
           <button type="button" className={`ws-tab${view === 'sandbox' ? ' active' : ''}`} onClick={() => setView('sandbox')}>
-            沙盒
+            {t('platform.sandbox')}
           </button>
         )}
       </div>

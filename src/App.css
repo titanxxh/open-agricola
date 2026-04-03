@@ -2814,6 +2814,12 @@
   border-top: 4px solid #3a5a2c;
 }
 
+.login-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 0 8px 0;
+}
+
 .login-title {
   font-size: 32px;
   color: #3a5a2c;
