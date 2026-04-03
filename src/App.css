@@ -3991,6 +3991,17 @@
   background: #b93a2c;
 }
 
+.btn-danger-small {
+  background: #d74a3a;
+  color: #fff !important;
+  border-color: #d74a3a !important;
+}
+
+.btn-danger-small:hover {
+  background: #b93a2c;
+  border-color: #b93a2c !important;
+}
+
 .player-select-panel {
   display: flex;
   flex-direction: column;

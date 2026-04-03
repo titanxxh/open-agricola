@@ -589,6 +589,7 @@ export const createWsServer = (server: import('node:http').Server) => {
           ? (msg as Record<string, unknown>).name as string
           : 'Player 1'
         room.players.push({ ws, playerIndex: 0, name, userId: currentUserId })
+        room.session.updatePlayerName(0, name)
         // Persist room creation in SQLite
         ensureRoomRowSqlite(room)
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, 0)
@@ -600,6 +601,16 @@ export const createWsServer = (server: import('node:http').Server) => {
         const roomId = msg.roomId
         const room = rooms.get(roomId)
         if (!room) { sendTo(ws, { type: 'error', error: 'room not found' }); return }
+        // Prevent creator from joining their own room as a second player
+        if (currentUserId && room.createdBy === currentUserId) {
+          const existingSeat = room.players.find(p => p.userId === currentUserId)
+          if (existingSeat) {
+            // Allow reconnect to existing seat
+          } else {
+            sendTo(ws, { type: 'error', error: 'cannot join your own room' })
+            return
+          }
+        }
         // If this userId already has a seat, reconnect to that seat
         let requestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
@@ -631,6 +642,7 @@ export const createWsServer = (server: import('node:http').Server) => {
         )
         room.players.push({ ws, playerIndex: currentPlayerIndex, name, userId: currentUserId })
         room.players.sort((a, b) => a.playerIndex - b.playerIndex)
+        room.session.updatePlayerName(currentPlayerIndex, name)
         // Persist player join in SQLite
         ensureRoomRowSqlite(room)
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, currentPlayerIndex)
@@ -794,4 +806,25 @@ export const getRooms = (): RoomSummary[] =>
     id: r.id,
     playerCount: r.players.length,
     maxPlayers: r.maxPlayers,
+    createdBy: r.createdBy,
+    status: r.players.length < r.maxPlayers ? 'waiting' as const : 'playing' as const,
   }))
+
+export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean; error?: string } => {
+  const room = rooms.get(roomId)
+  if (!room) return { ok: false, error: 'room not found' }
+  if (room.id === FIXED_DEV_ROOM_ID) return { ok: false, error: 'cannot dissolve dev room' }
+  if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
+  broadcast(room, { type: 'roomDissolved', roomId: room.id })
+  for (const p of room.players) {
+    try { p.ws.close() } catch { /* ignore */ }
+  }
+  rooms.delete(room.id)
+  roomLastActivity.delete(room.id)
+  if (PERSIST_ROOMS === 'sqlite') {
+    try {
+      getDb().prepare("DELETE FROM rooms WHERE id = ?").run(room.id)
+    } catch { /* non-critical */ }
+  }
+  return { ok: true }
+}

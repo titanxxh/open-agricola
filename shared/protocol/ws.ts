@@ -53,4 +53,6 @@ export type RoomSummary = {
   id: string
   playerCount: number
   maxPlayers: number
+  createdBy?: string
+  status?: 'waiting' | 'playing'
 }
