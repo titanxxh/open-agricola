@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { BrandMark } from '../components/common/BrandMark'
 
 type Mode = 'login' | 'register'
 
@@ -39,7 +40,12 @@ export function LoginPage() {
         <div className="login-top-bar">
           <LocaleSwitcher />
         </div>
-        <h1 className="login-title">{t('platform.loginTitle')}</h1>
+        <BrandMark
+          title={t('platform.loginTitle')}
+          titleAs="h1"
+          className="brand-mark-centered login-brand"
+          titleClassName="login-title"
+        />
         <p className="login-subtitle">
           {mode === 'login' ? t('platform.loginSubtitle') : t('platform.registerSubtitle')}
         </p>
