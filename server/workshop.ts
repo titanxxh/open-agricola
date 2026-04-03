@@ -101,15 +101,34 @@ export async function handleWorkshopRoute(
     const page = Math.max(1, Number(q.get('page') ?? '1'))
     const limit = 20
     const offset = (page - 1) * limit
-    const statusFilter = q.get('status') ?? 'published'
-
-    // Only admins/authors can see non-published cards; enforce published for public
-    const effectiveStatus = user ? (statusFilter === 'draft' ? 'draft' : 'published') : 'published'
-
+    const statusFilter = q.get('status')
+    const mineOnly = q.get('scope') === 'mine'
     const featured = q.get('featured') === '1'
 
     let whereExtra = ''
-    const params: unknown[] = [effectiveStatus]
+    const params: unknown[] = []
+
+    if (mineOnly) {
+      if (!user) {
+        sendJson(res, 401, { ok: false, error: 'Not authenticated' })
+        return true
+      }
+      whereExtra += ' AND w.author_id = ?'
+      params.push(user.id)
+      if (statusFilter === 'draft' || statusFilter === 'published') {
+        whereExtra += ' AND w.status = ?'
+        params.push(statusFilter)
+      }
+    } else {
+      // Only admins/authors can see non-published cards; enforce published for public
+      const effectiveStatus = user ? (statusFilter === 'draft' ? 'draft' : 'published') : 'published'
+      whereExtra += ' AND w.status = ?'
+      params.push(effectiveStatus)
+      if (effectiveStatus === 'draft' && user) {
+        whereExtra += ' AND w.author_id = ?'
+        params.push(user.id)
+      }
+    }
 
     if (featured) {
       whereExtra += ' AND w.featured = 1'
@@ -118,12 +137,6 @@ export async function handleWorkshopRoute(
     if (search) {
       whereExtra += ' AND (w.name LIKE ? OR w.description LIKE ?)'
       params.push(`%${search}%`, `%${search}%`)
-    }
-
-    // Filter own drafts by author
-    if (effectiveStatus === 'draft' && user) {
-      whereExtra += ' AND w.author_id = ?'
-      params.push(user.id)
     }
 
     const orderBy = sort === 'popular'
@@ -137,7 +150,7 @@ export async function handleWorkshopRoute(
       FROM workshop_cards w
       LEFT JOIN users u ON w.author_id = u.id
       LEFT JOIN card_likes l ON l.card_id = w.id
-      WHERE w.status = ?${whereExtra}
+      WHERE 1 = 1${whereExtra}
       GROUP BY w.id
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
@@ -160,7 +173,7 @@ export async function handleWorkshopRoute(
       liked_by_me: likedIds.has(r.id),
     }))
 
-    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE w.status = ?${whereExtra}`)
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE 1 = 1${whereExtra}`)
       .get(...params) as { n: number }).n
 
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
