@@ -49,8 +49,16 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 - Dev 端点：`/api/game/dev/create-pasture`、`/api/game/dev/play-card`、`/api/game/dev/set-space-taken`、`/api/game/dev/set-current-player`、`/api/game/dev/set-round`、`/api/game/dev/set-resources`。
 - `/api/rooms` — 列出当前活跃房间。
 - HTTP 使用单例 `GameSession`，仅用于单机调试。多人对局走 WS。
+- `/api/game/new-sandbox` 现在会创建单浏览器 hot-seat 沙盒局，支持 `playerCount`、`deckIds`、`customCardIds`，并使用固定 `playerA/playerB/...` 命名，而不是沿用登录名或 WS 房间座位语义。
 
-### 2.4 共享协议
+### 2.4 Workshop / Sandbox / 自定义代码
+
+- `server/workshop.ts` 的 `/api/workshop/sandbox` 现在返回两部分数据：`cards` + `settings`。其中 `settings` 持久化保存沙盒玩家人数与默认牌组（A/B/C/D/E）。
+- Workshop 前端已改成“进入我的沙盒后统一开始”的 hot-seat 入口；`Reset Sandbox` 会一次性提交卡牌列表与配置，而不是逐张增删同步。
+- 代码模式仍保留，但保存时会先通过隔离执行器校验/编译/抽取 `code_manifest`，主后端不再依赖把玩家代码写成 `.ts` 后动态 `import()` 执行。
+- 运行时的自定义 `effect_code` 会注册为代理 hook / listener；真正的代码执行发生在 sidecar `custom-code-executor` 中，主后端只接收可序列化的 `ActionFlow` / `ActionHookResult` 结果。
+
+### 2.5 共享协议
 
 | 文件 | 内容 |
 |---|---|
@@ -59,7 +67,7 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 | `shared/game/serialization.ts` | `serializeState` / `rehydrateState` — 去函数序列化 |
 | `shared/game/types.ts` | `GameState`、`PlayerState`、`ActionSpace`、`PendingAction`、`InteractionState`、`Resource` |
 
-### 2.5 校验
+### 2.6 校验
 
 独立校验模块：`server/validators.ts`、`server/fence-validation.ts`、`server/plow-validation.ts`、`server/sow-validation.ts`。打断了 index↔game-router 循环依赖。
 

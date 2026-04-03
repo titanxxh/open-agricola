@@ -18,6 +18,31 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onEndHarvest' | 'onAfterHarvest'
   | 'onBeforeStartOfTurn'
 
+export const cardEffectHooks: CardEffectHook[] = [
+  'onBuy',
+  'onRoundStart',
+  'onHarvest',
+  'onRoundEnd',
+  'onReturnHome',
+  'onBeforeReturnHome',
+  'onStartReturnHome',
+  'onAfterRoundEnd',
+  'onBeforeHarvest',
+  'onStartHarvest',
+  'onStartHarvestFieldPhase',
+  'onHarvestFieldPhase',
+  'onEndHarvestFieldPhase',
+  'onAfterReap',
+  'onStartHarvestFeedingPhase',
+  'onHarvestFeedingPhase',
+  'onEndHarvestFeedingPhase',
+  'onBeforeFeed',
+  'onAfterFeed',
+  'onEndHarvest',
+  'onAfterHarvest',
+  'onBeforeStartOfTurn',
+]
+
 type EffectHandler = (state: GameState, player: PlayerState) => void
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
@@ -56,6 +81,14 @@ export const registerCardEffect = (effect: CardEffect) => {
 
 export const clearCardEffects = () => {
   cardEffectOverrides.clear()
+}
+
+export const clearCustomCardEffects = () => {
+  for (const id of [...cardEffectOverrides.keys()]) {
+    if (id.startsWith('CUSTOM_')) {
+      cardEffectOverrides.delete(id)
+    }
+  }
 }
 
 export const getCardEffect = (id: string): CardEffect | null =>

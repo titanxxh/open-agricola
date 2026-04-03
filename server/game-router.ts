@@ -6,6 +6,8 @@ import { applyFarmChoice } from './farm-choice.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/custom-registry.ts'
+import type { CustomCodeManifest } from '../shared/cards/custom-code-types.ts'
+import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/logic/state.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -260,11 +262,30 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
     let seed: number | undefined
     let customCardDbIds: string[] = []
+    let playerCount = 2
+    let deckIds = [...defaultSandboxDeckIds]
     try {
-      const body = JSON.parse(await readBody(req)) as { seed?: number; customCardIds?: string[] }
+      const body = JSON.parse(await readBody(req)) as {
+        seed?: number
+        customCardIds?: string[]
+        playerCount?: number
+        deckIds?: string[]
+      }
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
         customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
+      }
+      if (typeof body.playerCount === 'number') {
+        playerCount = Math.max(2, Math.min(4, Math.floor(body.playerCount)))
+      }
+      if (Array.isArray(body.deckIds)) {
+        const nextDecks = body.deckIds
+          .filter((deck): deck is string => typeof deck === 'string')
+          .map((deck) => deck.trim().toUpperCase())
+          .filter((deck) => (defaultSandboxDeckIds as readonly string[]).includes(deck))
+        if (nextDecks.length > 0) {
+          deckIds = Array.from(new Set(nextDecks)) as typeof deckIds
+        }
       }
     } catch { /* ignore */ }
 
@@ -278,10 +299,15 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, compiled_code, status, author_id
+          `SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
-          card_type: string; card_json: string; effect_dsl: string | null; compiled_code: string | null
+          card_type: string
+          card_json: string
+          effect_dsl: string | null
+          effect_code: string | null
+          compiled_code: string | null
+          code_manifest: string | null
           status: string; author_id: string
         } | undefined
         if (!row) continue
@@ -295,7 +321,9 @@ export const handleGameRoute = async (
             cardType: row.card_type as 'minor' | 'occupation',
             cardJson: JSON.parse(row.card_json),
             effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+            effectCode: row.effect_code ?? null,
             compiledCode: row.compiled_code ?? null,
+            codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
           })
         } catch (err) {
           console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
@@ -303,14 +331,15 @@ export const handleGameRoute = async (
       }
     }
 
-    if (customCards.length > 0) {
-      await GameSession.preloadCardFiles(customCards)
-    }
-    const sandboxSession = new GameSession(seed, customCards.length > 0 ? customCards : undefined)
-    // Set player name from authenticated user
-    if (requestUser) {
-      sandboxSession.updatePlayerName(0, requestUser.displayName)
-    }
+    const sandboxSession = new GameSession(
+      seed,
+      customCards.length > 0 ? customCards : undefined,
+      {
+        playerCount,
+        deckIds,
+        playerNames: [...defaultSandboxPlayerNames].slice(0, playerCount),
+      },
+    )
     setSessionForRequest(req, sandboxSession)
     const resp = getSessionForRequest(req).getState()
     sendJson(res, 200, { ...respondWith(resp), customCardsLoaded: customCards.length })

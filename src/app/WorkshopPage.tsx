@@ -41,11 +41,38 @@ type Comment = {
   created_at: number
 }
 
+type SandboxSettings = {
+  player_count: number
+  deck_ids: string[]
+}
+
+const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
+  player_count: 2,
+  deck_ids: ['A', 'B', 'C', 'D', 'E'],
+}
+
 type View = 'home' | 'sandbox' | 'editor' | 'detail'
 
 function authHeaders(token: string | null): Record<string, string> {
   if (!token) return {}
   return { Authorization: `Bearer ${token}` }
+}
+
+function normalizeSandboxSettings(raw: unknown): SandboxSettings {
+  const source = (raw ?? {}) as Partial<SandboxSettings>
+  const playerCount = typeof source.player_count === 'number'
+    ? Math.min(4, Math.max(2, Math.floor(source.player_count)))
+    : DEFAULT_SANDBOX_SETTINGS.player_count
+  const deckIds = Array.isArray(source.deck_ids)
+    ? source.deck_ids
+      .filter((deck): deck is string => typeof deck === 'string')
+      .map((deck) => deck.trim().toUpperCase())
+      .filter((deck) => DEFAULT_SANDBOX_SETTINGS.deck_ids.includes(deck))
+    : []
+  return {
+    player_count: playerCount,
+    deck_ids: deckIds.length > 0 ? Array.from(new Set(deckIds)) : [...DEFAULT_SANDBOX_SETTINGS.deck_ids],
+  }
 }
 
 // ── Card Preview Tile ────────────────────────────────────────────────────────
@@ -658,12 +685,12 @@ function WorkshopSection({
 function SandboxSummaryPanel({
   cards,
   onOpenSandbox,
-  onStartGame,
+  settings,
   t,
 }: {
   cards: WorkshopCard[]
   onOpenSandbox: () => void
-  onStartGame: (cardIds: string[], mode: 'single' | 'multi') => void
+  settings: SandboxSettings
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
@@ -678,26 +705,16 @@ function SandboxSummaryPanel({
             })
             : t('platform.sandboxSummaryEmpty')}
         </div>
+        <div className="ws-sandbox-summary-text">
+          {t('platform.sandboxSettingsSummary', {
+            players: settings.player_count,
+            decks: settings.deck_ids.join(', '),
+          })}
+        </div>
       </div>
       <div className="ws-sandbox-summary-actions">
         <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenSandbox}>
           {t('platform.openSandbox')}
-        </button>
-        <button
-          type="button"
-          className="btn-primary ws-btn-sm"
-          onClick={() => onStartGame(cards.map(card => card.id), 'single')}
-          disabled={cards.length === 0}
-        >
-          {t('platform.singleTest')}
-        </button>
-        <button
-          type="button"
-          className="btn-secondary ws-btn-sm"
-          onClick={() => onStartGame(cards.map(card => card.id), 'multi')}
-          disabled={cards.length === 0}
-        >
-          {t('platform.multiTest')}
         </button>
       </div>
     </div>
@@ -738,19 +755,23 @@ function SelectableSandboxCard({
 function SandboxResetModal({
   token,
   currentCards,
+  currentSettings,
   onClose,
   onSave,
   t,
 }: {
   token: string | null
   currentCards: WorkshopCard[]
+  currentSettings: SandboxSettings
   onClose: () => void
-  onSave: (cardIds: string[]) => Promise<void>
+  onSave: (cardIds: string[], settings: SandboxSettings) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const [myCards, setMyCards] = useState<WorkshopCard[]>([])
   const [publishedCards, setPublishedCards] = useState<WorkshopCard[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>(currentCards.map(card => card.id))
+  const [playerCount, setPlayerCount] = useState(currentSettings.player_count)
+  const [deckIds, setDeckIds] = useState<string[]>(currentSettings.deck_ids)
   const [publishedSearchInput, setPublishedSearchInput] = useState('')
   const [publishedSearch, setPublishedSearch] = useState('')
   const [loadingMine, setLoadingMine] = useState(false)
@@ -760,6 +781,11 @@ function SandboxResetModal({
   useEffect(() => {
     setSelectedIds(currentCards.map(card => card.id))
   }, [currentCards])
+
+  useEffect(() => {
+    setPlayerCount(currentSettings.player_count)
+    setDeckIds(currentSettings.deck_ids)
+  }, [currentSettings])
 
   const loadMyCards = useCallback(async () => {
     if (!token) return
@@ -815,13 +841,25 @@ function SandboxResetModal({
     )
   }
 
+  const toggleDeck = (deckId: string) => {
+    setDeckIds((prev) => {
+      const next = prev.includes(deckId)
+        ? prev.filter((entry) => entry !== deckId)
+        : [...prev, deckId]
+      return next.length > 0 ? next : [...DEFAULT_SANDBOX_SETTINGS.deck_ids]
+    })
+  }
+
   const myCardIds = new Set(myCards.map(card => card.id))
   const selectablePublishedCards = publishedCards.filter(card => !myCardIds.has(card.id))
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave(selectedIds)
+      await onSave(selectedIds, {
+        player_count: playerCount,
+        deck_ids: deckIds,
+      })
       onClose()
     } finally {
       setSaving(false)
@@ -840,6 +878,38 @@ function SandboxResetModal({
         </div>
 
         <div className="ws-modal-toolbar">
+          <div className="ws-sandbox-config-panel">
+            <div className="ws-sandbox-config-group">
+              <span className="ws-sandbox-config-label">{t('platform.sandboxPlayerCount')}</span>
+              <div className="ws-sandbox-chip-row">
+                {[2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`ws-sandbox-chip${playerCount === count ? ' active' : ''}`}
+                    onClick={() => setPlayerCount(count)}
+                  >
+                    {t('platform.sandboxPlayerCountOption', { count })}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ws-sandbox-config-group">
+              <span className="ws-sandbox-config-label">{t('platform.sandboxDecks')}</span>
+              <div className="ws-sandbox-chip-row">
+                {DEFAULT_SANDBOX_SETTINGS.deck_ids.map((deckId) => (
+                  <button
+                    key={deckId}
+                    type="button"
+                    className={`ws-sandbox-chip${deckIds.includes(deckId) ? ' active' : ''}`}
+                    onClick={() => toggleDeck(deckId)}
+                  >
+                    {deckId}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           <form
             className="ws-search"
             onSubmit={event => {
@@ -909,6 +979,16 @@ function SandboxResetModal({
           <button type="button" className="btn-secondary" onClick={() => setSelectedIds([])}>
             {t('platform.clearSelection')}
           </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setPlayerCount(DEFAULT_SANDBOX_SETTINGS.player_count)
+              setDeckIds([...DEFAULT_SANDBOX_SETTINGS.deck_ids])
+            }}
+          >
+            {t('platform.resetSandboxSettings')}
+          </button>
           <button type="button" className="btn-secondary" onClick={onClose}>
             {t('platform.cancel')}
           </button>
@@ -925,6 +1005,7 @@ function SandboxResetModal({
 
 function SandboxView({
   cards,
+  settings,
   onSelect,
   onStartGame,
   onRemove,
@@ -932,8 +1013,9 @@ function SandboxView({
   t,
 }: {
   cards: WorkshopCard[]
+  settings: SandboxSettings
   onSelect: (c: WorkshopCard) => void
-  onStartGame: (cardIds: string[], mode: 'single' | 'multi') => void
+  onStartGame: () => void
   onRemove: (workshopCardId: string) => Promise<void>
   onOpenReset: () => void
   t: (key: string, params?: Record<string, string | number>) => string
@@ -944,6 +1026,12 @@ function SandboxView({
         <div>
           <h2>{t('platform.mySandbox')}</h2>
           <p className="ws-section-subtitle">{t('platform.sandboxManageSubtitle')}</p>
+          <p className="ws-section-subtitle">
+            {t('platform.sandboxSettingsSummary', {
+              players: settings.player_count,
+              decks: settings.deck_ids.join(', '),
+            })}
+          </p>
         </div>
         <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenReset}>
           {t('platform.resetSandbox')}
@@ -969,24 +1057,17 @@ function SandboxView({
               </li>
             ))}
           </ul>
-          <div className="ws-sandbox-btns">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => onStartGame(cards.map(card => card.id), 'single')}
-            >
-              {t('platform.singleTest')}
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => onStartGame(cards.map(card => card.id), 'multi')}
-            >
-              {t('platform.multiTest')}
-            </button>
-          </div>
         </>
       )}
+      <div className="ws-sandbox-btns">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={onStartGame}
+        >
+          {t('platform.startSandbox')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -1001,6 +1082,7 @@ export function WorkshopPage() {
   const [featuredCards, setFeaturedCards] = useState<WorkshopCard[]>([])
   const [myCards, setMyCards] = useState<WorkshopCard[]>([])
   const [sandboxCards, setSandboxCards] = useState<WorkshopCard[]>([])
+  const [sandboxSettings, setSandboxSettings] = useState<SandboxSettings>(DEFAULT_SANDBOX_SETTINGS)
   const [selectedCard, setSelectedCard] = useState<WorkshopCard | null>(null)
   const [editCard, setEditCard] = useState<WorkshopCard | undefined>(undefined)
   const [sort, setSort] = useState<'recent' | 'popular'>('recent')
@@ -1080,16 +1162,20 @@ export function WorkshopPage() {
     }
   }, [fetchCardList, token])
 
-  const loadSandboxCards = useCallback(async () => {
+  const loadSandboxData = useCallback(async () => {
     if (!token) {
       setSandboxCards([])
+      setSandboxSettings(DEFAULT_SANDBOX_SETTINGS)
       return
     }
     const response = await fetch(`${API_BASE}/api/workshop/sandbox`, {
       headers: authHeaders(token),
     })
     const data = await response.json()
-    if (data.ok) setSandboxCards(data.cards)
+    if (data.ok) {
+      setSandboxCards(data.cards)
+      setSandboxSettings(normalizeSandboxSettings(data.settings))
+    }
   }, [token])
 
   useEffect(() => {
@@ -1119,8 +1205,8 @@ export function WorkshopPage() {
   }, [loadMyCards])
 
   useEffect(() => {
-    void loadSandboxCards()
-  }, [loadSandboxCards])
+    void loadSandboxData()
+  }, [loadSandboxData])
 
   const refreshAllSections = useCallback(() => {
     if (browsePage === 1) {
@@ -1130,8 +1216,8 @@ export function WorkshopPage() {
     }
     void loadFeaturedCards()
     void loadMyCards()
-    void loadSandboxCards()
-  }, [browsePage, loadBrowseCards, loadFeaturedCards, loadMyCards, loadSandboxCards, search, sort])
+    void loadSandboxData()
+  }, [browsePage, loadBrowseCards, loadFeaturedCards, loadMyCards, loadSandboxData, search, sort])
 
   const updateCardCollections = useCallback((cardId: string, updater: (card: WorkshopCard) => WorkshopCard) => {
     const patchList = (cards: WorkshopCard[]) =>
@@ -1150,7 +1236,7 @@ export function WorkshopPage() {
       headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify({ workshop_card_id: cardDbId }),
     })
-    await loadSandboxCards()
+    await loadSandboxData()
   }
 
   const handleRemoveSandboxCard = async (cardDbId: string) => {
@@ -1159,30 +1245,20 @@ export function WorkshopPage() {
       method: 'DELETE',
       headers: authHeaders(token),
     })
-    await loadSandboxCards()
+    await loadSandboxData()
   }
 
-  const handleResetSandbox = async (nextCardIds: string[]) => {
+  const handleResetSandbox = async (nextCardIds: string[], nextSettings: SandboxSettings) => {
     if (!token) return
-    const currentIds = new Set(sandboxCards.map(card => card.id))
-    const targetIds = new Set(nextCardIds)
-    const removals = [...currentIds].filter(id => !targetIds.has(id))
-    const additions = [...targetIds].filter(id => !currentIds.has(id))
-
-    await Promise.all(removals.map(cardId =>
-      fetch(`${API_BASE}/api/workshop/sandbox/${cardId}`, {
-        method: 'DELETE',
-        headers: authHeaders(token),
+    await fetch(`${API_BASE}/api/workshop/sandbox`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify({
+        workshop_card_ids: nextCardIds,
+        settings: nextSettings,
       }),
-    ))
-    await Promise.all(additions.map(cardId =>
-      fetch(`${API_BASE}/api/workshop/sandbox`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({ workshop_card_id: cardId }),
-      }),
-    ))
-    await loadSandboxCards()
+    })
+    await loadSandboxData()
   }
 
   const handleLike = async (cardDbId: string) => {
@@ -1201,16 +1277,16 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = async (cardIds: string[], mode: 'single' | 'multi') => {
-    if (mode === 'multi') {
-      setPage('game', { transport: 'ws', customCards: cardIds.join(',') })
-      return
-    }
+  const handleStartSandboxGame = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({ customCardIds: cardIds }),
+        body: JSON.stringify({
+          customCardIds: sandboxCards.map(card => card.id),
+          playerCount: sandboxSettings.player_count,
+          deckIds: sandboxSettings.deck_ids,
+        }),
       })
       const data = await response.json()
       if (data.ok) {
@@ -1328,6 +1404,7 @@ export function WorkshopPage() {
         />
         <SandboxView
           cards={sandboxCards}
+          settings={sandboxSettings}
           onSelect={selectCard}
           onStartGame={handleStartSandboxGame}
           onRemove={handleRemoveSandboxCard}
@@ -1338,6 +1415,7 @@ export function WorkshopPage() {
           <SandboxResetModal
             token={token}
             currentCards={sandboxCards}
+            currentSettings={sandboxSettings}
             onClose={() => setResetSandboxOpen(false)}
             onSave={handleResetSandbox}
             t={t}
@@ -1368,7 +1446,7 @@ export function WorkshopPage() {
           <SandboxSummaryPanel
             cards={sandboxCards}
             onOpenSandbox={() => setView('sandbox')}
-            onStartGame={handleStartSandboxGame}
+            settings={sandboxSettings}
             t={t}
           />
         </div>
@@ -1464,6 +1542,7 @@ export function WorkshopPage() {
         <SandboxResetModal
           token={token}
           currentCards={sandboxCards}
+          currentSettings={sandboxSettings}
           onClose={() => setResetSandboxOpen(false)}
           onSave={handleResetSandbox}
           t={t}
