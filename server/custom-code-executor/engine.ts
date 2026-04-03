@@ -1,7 +1,11 @@
 import vm from 'node:vm'
+import type { ActionHookPhase } from '../../shared/actions/hooks.ts'
 import { validateCardCode } from '../ast-validator.ts'
 import { compileCardCode } from '../card-compiler.ts'
 import { cardEffectHooks, type CardEffectHook } from '../../shared/cards/card-effects.ts'
+import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
+import type { ActionFlow } from '../../shared/game/types.ts'
+import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import type {
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
@@ -22,6 +26,23 @@ type ExecutionCapture = {
   effect: Record<string, unknown> | null
   listeners: CapturedListener[]
 }
+
+const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
+  typeof value === 'string' && [
+    'before',
+    'during',
+    'immediatelyAfter',
+    'after',
+    'computeCosts',
+    'computeArgs',
+    'computeReplace',
+    'isDoable',
+    'canUseOccupied',
+    'computeCardCosts',
+  ].includes(value)
+
+const isCardListenerScope = (value: unknown): value is CardListenerScope =>
+  value === 'player' || value === 'opponent' || value === 'any'
 
 const createBaseSandbox = (cardId: string) => ({
   console: {
@@ -85,10 +106,10 @@ const executeWithCapture = (
           ? listener.actions.filter((item): item is string => typeof item === 'string')
           : undefined,
         phases: Array.isArray(listener.phases)
-          ? listener.phases.filter((item): item is string => typeof item === 'string')
+          ? listener.phases.filter(isActionHookPhase)
           : undefined,
         order: typeof listener.order === 'number' ? listener.order : undefined,
-        scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+        scope: isCardListenerScope(listener.scope) ? listener.scope : undefined,
         handler: typeof listener.handler === 'function'
           ? listener.handler as (context: unknown) => unknown
           : () => undefined,
@@ -168,7 +189,7 @@ __result = typeof __handler === 'function'
         __input_paymentInfo: request.paymentInfo ?? null,
       },
     )
-    return { ok: true, result: (result ?? null) as CustomCodeEffectResult['result'] }
+    return { ok: true, result: (result ?? null) as ActionFlow | null }
   } catch (error) {
     return {
       ok: false,
@@ -194,7 +215,7 @@ __result = __listener && typeof __listener.handler === 'function'
         __input_context: request.context,
       },
     )
-    return { ok: true, result: (result ?? null) as CustomCodeListenerResult['result'] }
+    return { ok: true, result: (result ?? null) as ActionHookResult | null }
   } catch (error) {
     return {
       ok: false,
