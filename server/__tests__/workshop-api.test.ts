@@ -27,6 +27,7 @@ db.exec(`
     description TEXT NOT NULL DEFAULT '', card_json TEXT NOT NULL,
     effect_dsl TEXT, effect_code TEXT, compiled_code TEXT,
     art_url TEXT, art_prompt TEXT, status TEXT NOT NULL DEFAULT 'draft',
+    featured INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
   CREATE UNIQUE INDEX idx_workshop_card_id_published
@@ -193,6 +194,43 @@ describe('workshop API', () => {
       const d = JSON.parse(res.body)
       expect(d.ok).toBe(true)
       expect(Array.isArray(d.cards)).toBe(true)
+    })
+
+    it('returns both draft and published cards for scope=mine', async () => {
+      const createDraft = mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_MyDraftCard',
+        card_type: 'minor',
+        name: 'My Draft Card',
+        card_json: { id: 'CUSTOM_MyDraftCard', name: 'My Draft Card', deck: 'CUSTOM', number: 0, desc: [] },
+      }, 'tok-alice')
+      const createPublished = mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_MyPublishedCard',
+        card_type: 'minor',
+        name: 'My Published Card',
+        card_json: { id: 'CUSTOM_MyPublishedCard', name: 'My Published Card', deck: 'CUSTOM', number: 0, desc: [] },
+        status: 'published',
+      }, 'tok-alice')
+      const createOther = mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_OtherPublishedCard',
+        card_type: 'minor',
+        name: 'Other Published Card',
+        card_json: { id: 'CUSTOM_OtherPublishedCard', name: 'Other Published Card', deck: 'CUSTOM', number: 0, desc: [] },
+        status: 'published',
+      }, 'tok-bob')
+
+      await handleWorkshopRoute(createDraft, mockRes())
+      await handleWorkshopRoute(createPublished, mockRes())
+      await handleWorkshopRoute(createOther, mockRes())
+
+      const req = mockReq('GET', '/api/workshop/cards?scope=mine', null, 'tok-alice')
+      const res = mockRes()
+      await handleWorkshopRoute(req, res)
+      const d = JSON.parse(res.body)
+
+      expect(d.ok).toBe(true)
+      expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Draft Card' && card.status === 'draft')).toBe(true)
+      expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Published Card' && card.status === 'published')).toBe(true)
+      expect(d.cards.some((card: { name: string }) => card.name === 'Other Published Card')).toBe(false)
     })
   })
 
