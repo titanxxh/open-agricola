@@ -99,6 +99,7 @@ export const shuffleWithRng = (values: string[], rng: () => number) => {
 }
 
 export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
+type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
 export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD'] as const
 
 export type InitialStateOptions = {
@@ -109,11 +110,11 @@ export type InitialStateOptions = {
   playerNames?: string[]
 }
 
-const normalizeDeckIds = (deckIds?: string[]) => {
+const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
   const next = deckIds
     ?.filter((deck): deck is string => typeof deck === 'string')
     .map((deck) => deck.trim().toUpperCase())
-    .filter((deck): deck is typeof defaultSandboxDeckIds[number] =>
+    .filter((deck): deck is DefaultSandboxDeckId =>
       (defaultSandboxDeckIds as readonly string[]).includes(deck),
     ) ?? []
   return next.length > 0 ? Array.from(new Set(next)) : [...defaultSandboxDeckIds]
@@ -127,7 +128,7 @@ export const dealHands = (
   deckIds?: string[],
 ) => {
   const rng = createRng(seed)
-  const allowedDecks = new Set(normalizeDeckIds(deckIds))
+  const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
   const minorPool = Array.from(new Set([
     ...implementedMinorImprovementCards
       .filter((card) => allowedDecks.has(card.deck))
