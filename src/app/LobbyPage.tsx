@@ -26,6 +26,8 @@ export function LobbyPage() {
   const [myRooms, setMyRooms] = useState<MyRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
+  const [showPlayerSelect, setShowPlayerSelect] = useState(false)
+  const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -53,7 +55,7 @@ export function LobbyPage() {
     return () => clearInterval(interval)
   }, [fetchRooms, fetchMyRooms])
 
-  const handleCreateGame = () => setPage('game', { transport: 'ws' })
+  const handleCreateGame = () => setPage('game', { transport: 'ws', maxPlayers: String(selectedMaxPlayers) })
 
   const handleJoinRoom = () => {
     const id = joinRoomId.trim()
@@ -82,12 +84,40 @@ export function LobbyPage() {
         <div className="lobby-actions">
           <div className="lobby-section">
             <h2>{t('platform.startGame')}</h2>
-            <button type="button" className="btn-primary" onClick={handleCreateGame}>
-              {t('platform.createMultiplayer')}
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
-              {t('platform.singlePlayer')}
-            </button>
+            {!showPlayerSelect ? (
+              <>
+                <button type="button" className="btn-primary" onClick={() => setShowPlayerSelect(true)}>
+                  {t('platform.createMultiplayer')}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
+                  {t('platform.singlePlayer')}
+                </button>
+              </>
+            ) : (
+              <div className="player-select-panel">
+                <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
+                <div className="player-select-options">
+                  {([2, 3, 4] as const).map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
+                      onClick={() => setSelectedMaxPlayers(n)}
+                    >
+                      {t(`platform.players${n}`)}
+                    </button>
+                  ))}
+                </div>
+                <div className="player-select-actions">
+                  <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                    {t('platform.createGame')}
+                  </button>
+                  <button type="button" className="btn-link" onClick={() => setShowPlayerSelect(false)}>
+                    {t('platform.cancel')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="lobby-section">

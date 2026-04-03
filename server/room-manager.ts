@@ -592,7 +592,7 @@ export const createWsServer = (server: import('node:http').Server) => {
         // Persist room creation in SQLite
         ensureRoomRowSqlite(room)
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, 0)
-        sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0 })
+        sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0, maxPlayers })
         return
       }
 
@@ -652,6 +652,28 @@ export const createWsServer = (server: import('node:http').Server) => {
           broadcastState(room, resp, 'reconnect')
           broadcast(room, { type: 'gameStarted' })
         }
+        return
+      }
+
+      if (msg.type === 'dissolveRoom') {
+        if (!currentRoom) { sendTo(ws, { type: 'error', error: 'not in a room' }); return }
+        const room = currentRoom
+        if (room.id === FIXED_DEV_ROOM_ID) { sendTo(ws, { type: 'error', error: 'cannot dissolve dev room' }); return }
+        if (room.createdBy !== currentUserId) { sendTo(ws, { type: 'error', error: 'only the room creator can dissolve' }); return }
+        broadcast(room, { type: 'roomDissolved', roomId: room.id })
+        for (const p of room.players) {
+          if (p.ws !== ws) {
+            try { p.ws.close() } catch { /* ignore */ }
+          }
+        }
+        rooms.delete(room.id)
+        roomLastActivity.delete(room.id)
+        if (PERSIST_ROOMS === 'sqlite') {
+          try {
+            getDb().prepare("DELETE FROM rooms WHERE id = ?").run(room.id)
+          } catch { /* non-critical */ }
+        }
+        currentRoom = null
         return
       }
 

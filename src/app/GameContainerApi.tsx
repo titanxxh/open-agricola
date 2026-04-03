@@ -94,13 +94,13 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
 
       if (isCreator) {
         setWsStatus({ phase: 'creating' })
-        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+        const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number } | { error: string }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
               if (msg.type === 'roomCreated') {
                 rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
                 resolve({ error: msg.error })
@@ -110,7 +110,9 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           rawWs.addEventListener('message', handler)
           const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
+          const maxPlayersParam = new URLSearchParams(window.location.search).get('maxPlayers')
+          const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
+          ws.sendRoomCommand('createRoom', { maxPlayers, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
         })
 
         if ('error' in resp) {
@@ -123,7 +125,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           phase: 'waiting',
           roomId: resp.roomId,
           players: [{ playerIndex: resp.playerIndex, name: creatorName }],
-          maxPlayers: 2,
+          maxPlayers: resp.maxPlayers,
         })
 
         const handler = (event: MessageEvent) => {
@@ -143,6 +145,9 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
                   maxPlayers: msg.maxPlayers,
                 }
               })
+            } else if (msg.type === 'roomDissolved') {
+              rawWs.removeEventListener('message', handler)
+              setWsStatus({ phase: 'error', message: 'roomDissolved' })
             }
           } catch { /* skip */ }
         }
@@ -195,7 +200,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
 
   const transport: GameTransport = isWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
   const isReady = !isWsMode || wsReady
-  return { transport, wsStatus, isWs: isWsMode, isReady }
+  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport: wsRef.current }
 }
 
 export const GameContainerApi = () => {
@@ -213,7 +218,7 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
+  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const { locale, setLocale } = useLocale()
@@ -1116,17 +1121,24 @@ export const GameContainerApi = () => {
   }, [transport])
 
   if (isWs && wsStatus.phase !== 'ready' && !state) {
-    const statusText = wsStatus.phase === 'idle' ? 'Initializing...'
-      : wsStatus.phase === 'connecting' ? 'Connecting to server...'
-      : wsStatus.phase === 'creating' ? 'Creating room...'
-      : wsStatus.phase === 'joining' ? `Joining room ${wsStatus.roomId}...`
-      : wsStatus.phase === 'waiting' ? `房间 ${wsStatus.roomId} — 等待玩家加入 (${wsStatus.players.length}/${wsStatus.maxPlayers})`
-      : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
-      : 'Loading...'
+    const statusText = wsStatus.phase === 'idle' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'connecting' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'creating' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'joining' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'waiting' ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
+      : wsStatus.phase === 'error' ? (wsStatus.message === 'roomDissolved' ? t(locale, 'platform.roomDissolved') : `Error: ${wsStatus.message}`)
+      : t(locale, 'platform.loading')
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
       : null
+
+    const handleDissolve = () => {
+      if (!wsTransport) return
+      if (!window.confirm(t(locale, 'platform.dissolveConfirm'))) return
+      wsTransport.sendRoomCommand('dissolveRoom')
+      setPage('lobby')
+    }
 
     return (
       <div className="ws-status-screen">
@@ -1136,7 +1148,7 @@ export const GameContainerApi = () => {
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
-              <div className="ws-invite-label">分享此链接邀请对手加入：</div>
+              <div className="ws-invite-label">{t(locale, 'platform.inviteLabel')}</div>
               <div className="ws-invite-url-row">
                 <code className="ws-invite-url">{inviteUrl}</code>
                 <button
@@ -1146,27 +1158,30 @@ export const GameContainerApi = () => {
                     navigator.clipboard.writeText(inviteUrl).catch(() => {})
                   }}
                 >
-                  复制
+                  {t(locale, 'platform.copy')}
                 </button>
               </div>
-              <div className="ws-invite-roomid">房间 ID：<strong>{wsStatus.roomId}</strong></div>
+              <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
               <div className="ws-invite-players">
                 {wsStatus.players.map(p => (
                   <div key={p.playerIndex} className="ws-invite-player">
-                    玩家 {p.playerIndex + 1}：{p.name}
+                    {t(locale, 'platform.playerLabel', { index: String(p.playerIndex + 1), name: p.name })}
                   </div>
                 ))}
               </div>
+              <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
+                {t(locale, 'platform.dissolveRoom')}
+              </button>
             </div>
           )}
 
           {wsStatus.phase === 'error' && (
             <div className="ws-error-actions">
               <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-                重试
+                {t(locale, 'platform.retry')}
               </button>
               <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
-                返回大厅
+                {t(locale, 'platform.backToLobby')}
               </button>
             </div>
           )}
@@ -1176,7 +1191,7 @@ export const GameContainerApi = () => {
           )}
 
           <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            ← 返回大厅
+            {t(locale, 'platform.backToLobby')}
           </button>
         </div>
       </div>
