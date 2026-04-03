@@ -37,19 +37,16 @@ const serveBgaImages = (imageDir: string) => ({
   },
 })
 
-// Build-time plugin: replace /bga-img with CDN URL in all output CSS/JS
+// Build-time plugin: replace /bga-img with CDN URL early in the transform
+// phase so that content hashes reflect the actual URLs and Vite won't
+// emit "didn't resolve at build time" warnings for /bga-img/* paths.
 const replaceBgaBase = (cdnBase: string) => ({
   name: 'replace-bga-base',
   apply: 'build' as const,
-  renderChunk(code: string) {
+  enforce: 'pre' as const,
+  transform(code: string) {
+    if (!code.includes('/bga-img')) return null
     return { code: code.replaceAll('/bga-img', cdnBase), map: null }
-  },
-  generateBundle(_: unknown, bundle: Record<string, any>) {
-    for (const file of Object.values(bundle)) {
-      if (file.type === 'asset' && typeof file.source === 'string') {
-        file.source = file.source.replaceAll('/bga-img', cdnBase)
-      }
-    }
   },
 })
 
@@ -77,6 +74,8 @@ export default defineConfig({
     },
   },
   define: {
-    'import.meta.env.VITE_BGA_IMAGE_DIR': JSON.stringify('/bga-img'),
+    'import.meta.env.VITE_BGA_IMAGE_DIR': JSON.stringify(
+      process.env.BGA_CDN_BASE_URL || '/bga-img'
+    ),
   },
 })
