@@ -60,7 +60,7 @@ if (process.env.BGA_CDN_BASE_URL) {
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
-  plugins: [react(), serveBgaImages(bgaImagePath)],
+  plugins,
   server: {
     fs: {
       allow: ['..'],
