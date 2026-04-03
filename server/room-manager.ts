@@ -9,6 +9,7 @@ import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol
 import { validateSession } from './auth.ts'
 import { getDb } from './db.ts'
 import type { CustomCardData } from '../shared/cards/custom-registry.ts'
+import type { CustomCodeManifest } from '../shared/cards/custom-code-types.ts'
 
 /** Load custom card data from DB by workshop_cards.id list. Allows published + author's drafts. */
 function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
@@ -17,9 +18,14 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   const result: CustomCardData[] = []
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, effect_dsl, compiled_code, status, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, status, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
-      card_type: string; card_json: string; effect_dsl: string | null; compiled_code: string | null
+      card_type: string
+      card_json: string
+      effect_dsl: string | null
+      effect_code: string | null
+      compiled_code: string | null
+      code_manifest: string | null
       status: string; author_id: string
     } | undefined
     if (!row) continue
@@ -30,7 +36,9 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
         cardType: row.card_type as 'minor' | 'occupation',
         cardJson: JSON.parse(row.card_json),
         effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
+        effectCode: row.effect_code ?? null,
         compiledCode: row.compiled_code ?? null,
+        codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
       })
     } catch { /* skip malformed */ }
   }
@@ -569,9 +577,6 @@ export const createWsServer = (server: import('node:http').Server) => {
           ? (msg as Record<string, unknown>).customCardIds as string[]
           : []
         const customCards = loadCustomCardsFromDb(customCardDbIds, currentUserId)
-        if (customCards.length > 0) {
-          await GameSession.preloadCardFiles(customCards)
-        }
         const session = new GameSession(undefined, customCards.length > 0 ? customCards : undefined)
         const room: Room = {
           id: roomId,

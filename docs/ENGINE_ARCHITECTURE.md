@@ -42,11 +42,17 @@ shared/
   ├─ cards/    卡牌与扩展
   └─ game/     核心类型
 
+custom-code-executor sidecar
+  ├─ 玩家代码校验 / 编译
+  ├─ effect/listener manifest 提取
+  └─ 自定义代码隔离执行
+
 HTTP /api/*
   ├─ 健康检查
   ├─ 房间列表 / 运维接口
   ├─ 新局 / 加载 / 调试
-  └─ 补拉快照 / 测试辅助
+  ├─ 补拉快照 / 测试辅助
+  └─ Sandbox hot-seat 启动
 ```
 
 ## 3. 分层结构
@@ -65,6 +71,7 @@ server/ (后端运行时)
   ├─ room-manager.ts  房间管理、连接绑定、消息路由、广播
   ├─ game-session.ts  权威状态容器，命令执行中心
   ├─ game-router.ts   HTTP 兼容接口、调试接口、快照接口
+  ├─ custom-code-executor/  自定义代码隔离执行器
   └─ *-validation.ts  纯规则校验模块
 
 src/ (前端)
@@ -76,6 +83,13 @@ src/ (前端)
 ```
 
 注：卡牌的“职业 / 小改良”类型归属以 `shared/cards/catalog.ts` 中对应注册表为准；例如 `A92_AdoptiveParents` 当前应属于职业卡注册表，而不是小改良注册表。
+
+### 3.1 Sandbox Hot-seat 与自定义代码隔离
+
+- Workshop 的 sandbox 已固定为单浏览器 hot-seat 模式：由 HTTP `/api/game/new-sandbox` 创建独立 `GameSession`，不创建 WS 房间，也不复用房间 `maxPlayers` 语义。
+- Sandbox 配置（玩家人数、A/B/C/D/E 默认牌组、自定义卡列表）由 `server/workshop.ts` + SQLite `sandbox_settings` / `sandbox_cards` 持久化；再次进入“我的沙盒”时沿用上次配置。
+- Sandbox 开局会把 `playerCount`、`deckIds`、`customCardIds` 下沉到 `createInitialState()`，因此人数、默认命名、基础牌组过滤都由领域层统一生成。
+- 自定义 `effect_code` 不再被主后端动态 `import()` 或直接执行。主后端只保存 `compiled_code + code_manifest`，运行时注册代理 hook / listener，并通过内部 RPC 调用同机 `custom-code-executor` sidecar 返回纯数据结果。
 
 ## 4. 核心设计原则
 

@@ -39,6 +39,14 @@ export const clearCardListeners = () => {
   cardListeners.length = 0
 }
 
+export const clearCustomCardListeners = () => {
+  for (let index = cardListeners.length - 1; index >= 0; index -= 1) {
+    if (cardListeners[index]?.id.startsWith('CUSTOM_')) {
+      cardListeners.splice(index, 1)
+    }
+  }
+}
+
 export const getRegisteredCardListeners = () => [...cardListeners]
 
 const getPlayerCardIds = (player: PlayerState) => [

@@ -7,8 +7,7 @@ import {
 } from '../game/farm'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
-import { minorImprovementIds } from '../game/minor-improvements'
-import { occupationIds } from '../game/occupations'
+import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../game/types'
 
 export const emptyResources: Resource = {
@@ -99,15 +98,48 @@ export const shuffleWithRng = (values: string[], rng: () => number) => {
   return result
 }
 
+export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
+export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD'] as const
+
+export type InitialStateOptions = {
+  playerCount?: number
+  extraMinorIds?: string[]
+  extraOccupationIds?: string[]
+  deckIds?: string[]
+  playerNames?: string[]
+}
+
+const normalizeDeckIds = (deckIds?: string[]) => {
+  const next = deckIds
+    ?.filter((deck): deck is string => typeof deck === 'string')
+    .map((deck) => deck.trim().toUpperCase())
+    .filter((deck): deck is typeof defaultSandboxDeckIds[number] =>
+      (defaultSandboxDeckIds as readonly string[]).includes(deck),
+    ) ?? []
+  return next.length > 0 ? Array.from(new Set(next)) : [...defaultSandboxDeckIds]
+}
+
 export const dealHands = (
   playerCount: number,
   seed: number,
   extraMinorIds: string[] = [],
   extraOccupationIds: string[] = [],
+  deckIds?: string[],
 ) => {
   const rng = createRng(seed)
-  const minorPool = [...minorImprovementIds, ...extraMinorIds]
-  const occupationPool = [...occupationIds, ...extraOccupationIds]
+  const allowedDecks = new Set(normalizeDeckIds(deckIds))
+  const minorPool = Array.from(new Set([
+    ...implementedMinorImprovementCards
+      .filter((card) => allowedDecks.has(card.deck))
+      .map((card) => card.id),
+    ...extraMinorIds,
+  ]))
+  const occupationPool = Array.from(new Set([
+    ...implementedOccupationCards
+      .filter((card) => allowedDecks.has(card.deck))
+      .map((card) => card.id),
+    ...extraOccupationIds,
+  ]))
   const shuffledMinor = shuffleWithRng(minorPool, rng)
   const shuffledOccupation = shuffleWithRng(occupationPool, rng)
   const minorHands: string[][] = []
@@ -355,12 +387,17 @@ export const cloneState = (state: GameState): GameState => {
 
 export const createInitialPlayers = (
   seed: number,
-  playerCount = 2,
-  extraMinorIds: string[] = [],
-  extraOccupationIds: string[] = [],
+  options: InitialStateOptions = {},
 ): PlayerState[] => {
+  const {
+    playerCount = 2,
+    extraMinorIds = [],
+    extraOccupationIds = [],
+    deckIds,
+    playerNames = [],
+  } = options
   const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
-  const dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds)
+  const dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds)
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -374,7 +411,7 @@ export const createInitialPlayers = (
   ]
   return base.slice(0, count).map((info, index) => ({
     id: info.id,
-    name: info.name,
+    name: playerNames[index] ?? info.name,
     color: info.color,
     resources: { ...emptyResources, food: 2 },
     familySize: 2,
@@ -445,9 +482,12 @@ export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 export const createInitialState = (
   seed?: number,
-  extraMinorIds: string[] = [],
+  extraMinorIdsOrOptions: string[] | InitialStateOptions = [],
   extraOccupationIds: string[] = [],
 ): GameState => {
+  const options: InitialStateOptions = Array.isArray(extraMinorIdsOrOptions)
+    ? { extraMinorIds: extraMinorIdsOrOptions, extraOccupationIds }
+    : extraMinorIdsOrOptions
   const gameSeed =
     typeof seed === 'number' && Number.isFinite(seed)
       ? Math.floor(seed)
@@ -457,7 +497,7 @@ export const createInitialState = (
     round: 1,
     phase: 'work',
     currentPlayerIndex: 0,
-    players: createInitialPlayers(gameSeed, 2, extraMinorIds, extraOccupationIds),
+    players: createInitialPlayers(gameSeed, options),
     actionSpaces: createActionSpaces(),
     log: [{ key: 'log.startGame' }],
     roundStartSnapshot: null,

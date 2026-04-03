@@ -25,7 +25,7 @@ db.exec(`
     id TEXT PRIMARY KEY, author_id TEXT NOT NULL REFERENCES users(id),
     card_id TEXT NOT NULL, card_type TEXT NOT NULL, name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '', card_json TEXT NOT NULL,
-    effect_dsl TEXT, effect_code TEXT, compiled_code TEXT,
+    effect_dsl TEXT, effect_code TEXT, compiled_code TEXT, code_manifest TEXT,
     art_url TEXT, art_prompt TEXT, status TEXT NOT NULL DEFAULT 'draft',
     featured INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -47,6 +47,12 @@ db.exec(`
     user_id TEXT NOT NULL REFERENCES users(id),
     workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
     added_at INTEGER NOT NULL, PRIMARY KEY (user_id, workshop_card_id)
+  );
+  CREATE TABLE sandbox_settings (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    player_count INTEGER NOT NULL DEFAULT 2,
+    deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+    updated_at INTEGER NOT NULL
   );
 `)
 
@@ -312,6 +318,55 @@ describe('workshop API', () => {
       const res = mockRes()
       await handleWorkshopRoute(req, res)
       expect(res.statusCode).toBe(400)
+    })
+  })
+
+  describe('sandbox settings', () => {
+    let cardDbId = ''
+
+    beforeAll(async () => {
+      const req = mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_SandboxCard',
+        card_type: 'minor',
+        name: 'Sandbox Card',
+        card_json: { id: 'CUSTOM_SandboxCard', name: 'Sandbox Card', deck: 'CUSTOM', number: 0, desc: [] },
+        status: 'published',
+      }, 'tok-alice')
+      const res = mockRes()
+      await handleWorkshopRoute(req, res)
+      cardDbId = JSON.parse(res.body).id
+    })
+
+    it('returns default sandbox settings when none saved', async () => {
+      const req = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const res = mockRes()
+      await handleWorkshopRoute(req, res)
+      const data = JSON.parse(res.body)
+      expect(data.ok).toBe(true)
+      expect(data.settings.player_count).toBe(2)
+      expect(data.settings.deck_ids).toEqual(['A', 'B', 'C', 'D', 'E'])
+    })
+
+    it('replaces sandbox cards and persists settings together', async () => {
+      const req = mockReq('POST', '/api/workshop/sandbox', {
+        workshop_card_ids: [cardDbId],
+        settings: {
+          player_count: 4,
+          deck_ids: ['B', 'D'],
+        },
+      }, 'tok-bob')
+      const res = mockRes()
+      await handleWorkshopRoute(req, res)
+      expect(JSON.parse(res.body).ok).toBe(true)
+
+      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const getRes = mockRes()
+      await handleWorkshopRoute(getReq, getRes)
+      const data = JSON.parse(getRes.body)
+      expect(data.cards).toHaveLength(1)
+      expect(data.cards[0].id).toBe(cardDbId)
+      expect(data.settings.player_count).toBe(4)
+      expect(data.settings.deck_ids).toEqual(['B', 'D'])
     })
   })
 })
