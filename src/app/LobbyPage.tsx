@@ -9,6 +9,8 @@ type RoomSummary = {
   id: string
   playerCount: number
   maxPlayers: number
+  createdBy?: string
+  status?: 'waiting' | 'playing'
 }
 
 type MyRoom = {
@@ -66,6 +68,18 @@ export function LobbyPage() {
   const handleJoinExisting = (roomId: string) => setPage('game', { transport: 'ws', room: roomId })
   const handleResumeRoom = (roomId: string, playerIndex: number) =>
     setPage('game', { transport: 'ws', room: roomId, player: `p${playerIndex + 1}` })
+  const handleDissolveRoom = async (roomId: string) => {
+    if (!token) return
+    if (!window.confirm(t('platform.dissolveConfirm'))) return
+    try {
+      await fetch(`${API_BASE}/api/rooms/${roomId}/dissolve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      fetchRooms()
+      fetchMyRooms()
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className="lobby-page">
@@ -177,9 +191,14 @@ export function LobbyPage() {
                 <li key={room.id} className="room-item">
                   <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
                   <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
-                  {room.playerCount < room.maxPlayers && (
+                  {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
                     <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
                       {t('platform.joinBtn')}
+                    </button>
+                  )}
+                  {room.createdBy === user?.id && room.status === 'waiting' && (
+                    <button type="button" className="btn-small btn-danger-small" onClick={() => handleDissolveRoom(room.id)}>
+                      {t('platform.dissolveRoom')}
                     </button>
                   )}
                 </li>

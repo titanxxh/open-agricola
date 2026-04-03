@@ -5,7 +5,7 @@ import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
-import { createWsServer, getRooms } from './room-manager.ts'
+import { createWsServer, getRooms, dissolveRoomById } from './room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 
@@ -168,6 +168,17 @@ const server = createServer(async (req, res) => {
   // ── Lobby routes ───────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/rooms') {
     sendJson(res, 200, { ok: true, rooms: getRooms() })
+    return
+  }
+
+  // Dissolve a room (HTTP, for lobby use)
+  if (req.method === 'POST' && req.url?.startsWith('/api/rooms/') && req.url.endsWith('/dissolve')) {
+    const token = extractToken(req.headers.authorization)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
+    const result = dissolveRoomById(roomId, user.id)
+    sendJson(res, result.ok ? 200 : 400, result)
     return
   }
 
