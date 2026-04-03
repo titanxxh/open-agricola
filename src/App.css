@@ -3971,6 +3971,72 @@
   padding: 4px 0;
 }
 
+.ws-dissolve-btn {
+  margin-top: 8px;
+  align-self: center;
+}
+
+.btn-danger {
+  background: #d74a3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover {
+  background: #b93a2c;
+}
+
+.player-select-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.player-select-label {
+  font-size: 14px;
+  color: #5a3a20;
+  font-weight: 600;
+}
+
+.player-select-options {
+  display: flex;
+  gap: 8px;
+}
+
+.player-select-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid #cdb996;
+  border-radius: 8px;
+  background: #fff;
+  color: #5a3a20;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.player-select-btn:hover {
+  border-color: #3a5a2c;
+}
+
+.player-select-btn.active {
+  background: #3a5a2c;
+  color: #fff;
+  border-color: #3a5a2c;
+}
+
+.player-select-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .ws-error-actions {
   display: flex;
   gap: 10px;
