@@ -36,19 +36,23 @@ export type ClientCommand =
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }
   | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
+  | { type: 'dissolveRoom' }
 
 export type ServerEvent =
   | StateUpdateEnvelope
   | { type: 'error'; error: string }
   | { type: 'authOk'; userId: string; username: string }
-  | { type: 'roomCreated'; roomId: string; playerIndex: number }
+  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number }
   | { type: 'roomJoined'; roomId: string; playerIndex: number }
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }
+  | { type: 'roomDissolved'; roomId: string }
 
 export type RoomSummary = {
   id: string
   playerCount: number
   maxPlayers: number
+  createdBy?: string
+  status?: 'waiting' | 'playing'
 }

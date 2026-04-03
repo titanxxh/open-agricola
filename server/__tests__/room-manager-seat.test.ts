@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { FIXED_DEV_ROOM_ID, resolveJoinPlayerIndex } from '../room-manager.ts'
+import {
+  FIXED_DEV_ROOM_ID,
+  removePlayerFromRoom,
+  resolveJoinPlayerIndex,
+  restoreRoomFromSqliteRow,
+} from '../room-manager.ts'
 
 const createRoom = (
   id: string,
@@ -70,5 +75,38 @@ describe('room-manager seat assignment', () => {
       ok: false,
       error: 'invalid player slot',
     })
+  })
+
+  it('restores waiting rooms without serialized state', () => {
+    const room = restoreRoomFromSqliteRow({
+      id: 'waiting1',
+      created_by: null,
+      state_json: null,
+      max_players: 3,
+      custom_card_ids: '[]',
+    })
+
+    expect(room).toMatchObject({
+      id: 'waiting1',
+      maxPlayers: 3,
+      players: [],
+      createdBy: undefined,
+      customCardDbIds: [],
+    })
+  })
+
+  it('keeps empty non-dev rooms joinable after disconnect', () => {
+    const ws = {} as never
+    const room = createRoom('abc123', [0]) as {
+      id: string
+      maxPlayers: number
+      players: Array<{ playerIndex: number; ws: never; name: string }>
+    }
+    room.players[0]!.ws = ws
+
+    const result = removePlayerFromRoom(room, ws, 1234)
+
+    expect(result).toBe('empty')
+    expect(room.players).toEqual([])
   })
 })

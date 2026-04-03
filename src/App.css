@@ -16,8 +16,27 @@
   font-display: swap;
 }
 
+/* ══════════ DESIGN TOKENS ══════════ */
 :root {
   --agricola-font: 'Dominican', 'CalibriB', serif;
+  --color-primary: #3a5a2c;
+  --color-primary-hover: #2d4a21;
+  --color-accent: #d4a017;
+  --color-bg-warm: #fdf6e3;
+  --color-bg-card: #fff;
+  --color-text: #1e1e1e;
+  --color-text-secondary: #5a3a20;
+  --color-text-muted: #8a7a60;
+  --color-border: #cdb996;
+  --color-border-light: #e8d5b7;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
 }
 
 .app {
@@ -29,16 +48,27 @@
   overflow-x: hidden;
 }
 
+/* ══════════ INTERACTION BAR ══════════ */
 .interaction-bar {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  padding: clamp(10px, 2vw, 16px);
-  margin-bottom: clamp(10px, 2vw, 16px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px 16px 0 0;
+  padding: 10px 16px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
 }
+
+/* Padding when interaction bar is visible (fixed bottom) */
 
 .anytime-bar {
   background: rgba(255, 255, 255, 0.9);
@@ -144,6 +174,7 @@
   filter: drop-shadow(0 1px 0 rgba(255, 240, 200, 0.55));
 }
 
+/* ══════════ HEADER ══════════ */
 .header {
   display: flex;
   justify-content: space-between;
@@ -298,11 +329,20 @@
   accent-color: #3a5a2c;
 }
 
+/* ══════════ BOARD & ACTIONS ══════════ */
 .board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(12px, 2vw, 20px);
   transition: opacity 0.3s;
+}
+
+.board > * {
+  min-width: 0;
+}
+
+.board > .board-action {
+  overflow: hidden;
 }
 
 .app:has(.header.not-my-turn) .board .actions {
@@ -1059,6 +1099,57 @@
   margin-top: 4px;
 }
 
+/* ── Compact icon-based resource bar (BGA style) ── */
+.player-resources-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2a1a00;
+}
+
+.res-compact-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.res-compact-group .res-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.res-compact-num {
+  min-width: 14px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2a1a00;
+  margin-right: 3px;
+}
+
+.res-compact-num:last-child {
+  margin-right: 0;
+}
+
+.res-compact-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a3a20;
+  margin-right: 1px;
+}
+
+.res-compact-divider {
+  width: 1px;
+  height: 16px;
+  background: #d0c4a8;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .player-tabs-container {
   display: flex;
   flex-direction: column;
@@ -1142,6 +1233,7 @@
   color: #fff;
 }
 
+/* ══════════ FARM GRID ══════════ */
 .farm-grid {
   display: grid;
   --tile: clamp(56px, 8vw, 96px);
@@ -1455,6 +1547,7 @@
 }
 
 
+/* ══════════ CARDS (PLAYED / HAND / MAJOR) ══════════ */
 .played-cards {
   background: #f6f2df;
   border-radius: 12px;
@@ -1715,84 +1808,40 @@
 .resource-inline {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 3px;
 }
 
 .resource-inline-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  border: 1px solid #d7e3c6;
-  background: #f6fbef;
-  font-size: 11px;
+  gap: 1px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
   color: #2e4b1e;
 }
 
-.resource-inline-item.resource-wood {
-  background: #f2e2c4;
-  border-color: #d6b58a;
-  color: #5a3d1c;
-}
-
-.resource-inline-item.resource-clay {
-  background: #f0d2c9;
-  border-color: #d3a59a;
-  color: #6b2b1a;
-}
-
-.resource-inline-item.resource-reed {
-  background: #e6f3dd;
-  border-color: #c0dcb1;
-  color: #2f5a2f;
-}
-
-.resource-inline-item.resource-stone {
-  background: #e1e7ef;
-  border-color: #c1ccd9;
-  color: #2e3b4e;
-}
-
-.resource-inline-item.resource-food {
-  background: #ffe7c6;
-  border-color: #e4c293;
-  color: #6a3b1c;
-}
-
-.resource-inline-item.resource-grain {
-  background: #fff1b8;
-  border-color: #e3c97d;
-  color: #5a4a1b;
-}
-
-.resource-inline-item.resource-vegetable {
-  background: #d6f5cc;
-  border-color: #b1dba4;
-  color: #2f5a2f;
-}
-
-.resource-inline-item.resource-sheep {
-  background: #f9f5f0;
-  border-color: #ddd6cc;
-  color: #5a4a1b;
-}
-
-.resource-inline-item.resource-boar {
-  background: #f6d9c3;
-  border-color: #d9b191;
-  color: #5a2b1a;
-}
-
+/* resource-inline-item colors removed for compact BGA-style icon display */
+.resource-inline-item.resource-wood,
+.resource-inline-item.resource-clay,
+.resource-inline-item.resource-reed,
+.resource-inline-item.resource-stone,
+.resource-inline-item.resource-food,
+.resource-inline-item.resource-grain,
+.resource-inline-item.resource-vegetable,
+.resource-inline-item.resource-sheep,
+.resource-inline-item.resource-boar,
 .resource-inline-item.resource-cattle {
-  background: #f5e7d0;
-  border-color: #d7c1a0;
-  color: #5a3d1c;
+  background: transparent;
+  border-color: transparent;
+  color: #2a1a00;
 }
 
 .resource-inline-item.resource-bonusVp {
-  background: #fff1b8;
-  border-color: #e0bd56;
+  background: transparent;
+  border-color: transparent;
   color: #6f5a08;
 }
 
@@ -1802,6 +1851,7 @@
   color: #4f4f4f;
 }
 
+/* ══════════ RESOURCE ICONS ══════════ */
 .res-icon {
   display: inline-block;
   font-size: 24px; /* Base size, acts as scale factor */
@@ -1899,6 +1949,9 @@
 
 .resource-inline-amount {
   font-weight: 700;
+  font-size: 12px;
+  min-width: 10px;
+  text-align: center;
 }
 
 .card-future {
@@ -1988,6 +2041,7 @@
   color: #6b6b6b;
 }
 
+/* ══════════ DEV PANEL ══════════ */
 .dev-panel {
   background: #f3f7ea;
   border-radius: 12px;
@@ -2234,6 +2288,7 @@
   cursor: not-allowed;
 }
 
+/* ══════════ SCORING & EXCHANGE OVERLAYS ══════════ */
 .scoring-overlay {
   position: fixed;
   inset: 0;
@@ -2483,18 +2538,248 @@
   cursor: not-allowed;
 }
 
+/* ══════════ MOBILE & RESPONSIVE ══════════ */
 @media (max-width: 1100px) {
+  /* Reduce app padding to give board more width */
+  .app {
+    padding: 6px;
+  }
+
   .board {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Action board: remove wrapper chrome so board fills full width */
+  .actions {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: hidden;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .board-panel.board-action {
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .actions > h2 {
+    display: none;
+  }
+
+  /* Ensure action board wrapper uses all available width, no horizontal scroll */
+  .action-board-wrapper {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .center {
+    padding: clamp(8px, 1.5vw, 12px);
+  }
+
+  .center > .farm-header > div > h2 {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .farm-stats {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .farm-stats .farm-item {
+    padding: 6px 8px;
+  }
+
+  .played-cards,
+  .hand-cards {
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+
+  .played-cards h3,
+  .hand-cards h3 {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .log-bottom {
+    padding: 8px;
+    margin-top: 8px;
+  }
+
+  .log h3 {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .log ul {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 12px;
   }
 }
 
-@media (max-width: 720px) {
-  .header h1 {
-    font-size: 22px;
+/* ══════════ COMPACT HEADER ══════════ */
+/* ── Compact Header ─────────────────────── */
+.header-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex-wrap: wrap;
+}
+
+.header-compact.my-turn {
+  border-left: 4px solid #2f855a;
+  background: rgba(240, 255, 240, 0.95);
+}
+
+.header-compact.not-my-turn {
+  border-left: 4px solid #b0b0b0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-round {
+  font-weight: 700;
+  font-size: 14px;
+  color: #3a5a2c;
+  white-space: nowrap;
+}
+
+.header-phase-pills {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.header-phase-pill {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.header-phase-pill.active {
+  background: #d4a017;
+  color: #fff;
+  font-weight: 700;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.header-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #e4f0d7;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3a5a2c;
+  transition: background 0.15s;
+}
+
+.header-icon-btn:hover:not(:disabled) {
+  background: #c8e0b0;
+}
+
+.header-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.header-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  z-index: 40;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #3a5a2c;
+}
+
+.header-menu-identity {
+  color: #8a7a60;
+  font-size: 12px;
+}
+
+/* ── Mobile Tab Navigation ─────────────── */
+/* Tabs removed — using vertical stacking layout instead */
+
+/* ── MajorImprovements collapsed ──────── */
+.major-improvements.collapsed {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.major-improvements.collapsed h2 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.collapse-toggle {
+  font-weight: 400;
+  font-size: 12px;
+  color: #8a7a60;
+  margin-left: 6px;
+}
+
+@media (min-width: 1600px) {
+  .board {
+    gap: 24px;
   }
-  .action-title {
-    font-size: 14px;
+
+  .app {
+    max-width: 1800px;
+    margin: 0 auto;
   }
 }
 
@@ -2509,13 +2794,13 @@
   background: #fdf6e3;
 }
 
-/* ── Login page ─────────────────────────────────── */
+/* ══════════ LOGIN PAGE ══════════ */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 100%);
+  background: linear-gradient(135deg, #fdf6e3 0%, #e8d5b7 50%, #d4c4a8 100%);
   padding: 20px;
 }
 
@@ -2523,9 +2808,16 @@
   background: #fff;
   border-radius: 16px;
   padding: 48px 56px;
-  box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
+  box-shadow: 0 8px 32px rgba(90, 58, 32, 0.15);
   width: 100%;
   max-width: 480px;
+  border-top: 4px solid #3a5a2c;
+}
+
+.login-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 0 8px 0;
 }
 
 .login-title {
@@ -2533,12 +2825,15 @@
   color: #3a5a2c;
   margin: 0 0 6px 0;
   text-align: center;
+  font-family: var(--agricola-font);
+  letter-spacing: 1px;
 }
 
 .login-subtitle {
   text-align: center;
   color: #8a7a60;
   margin: 0 0 24px 0;
+  font-size: 14px;
 }
 
 .login-form {
@@ -2648,7 +2943,7 @@
   font-size: 14px;
 }
 
-/* ── Lobby page ─────────────────────────────────── */
+/* ══════════ LOBBY PAGE ══════════ */
 .lobby-page {
   min-height: 100vh;
   background: #fdf6e3;
@@ -2668,6 +2963,7 @@
   font-size: 24px;
   color: #3a5a2c;
   margin: 0;
+  font-family: var(--agricola-font);
 }
 
 .lobby-user-info {
@@ -2699,6 +2995,12 @@
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.lobby-section:hover {
+  box-shadow: 0 6px 20px rgba(90, 58, 32, 0.14);
+  transform: translateY(-2px);
 }
 
 .lobby-section > .btn-primary:last-child,
@@ -2786,6 +3088,7 @@
   font-size: 13px;
 }
 
+/* ══════════ WORKSHOP ══════════ */
 /* ── Workshop placeholder ───────────────────────── */
 .workshop-placeholder {
   display: flex;
@@ -3668,6 +3971,83 @@
   padding: 4px 0;
 }
 
+.ws-dissolve-btn {
+  margin-top: 8px;
+  align-self: center;
+}
+
+.btn-danger {
+  background: #d74a3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover {
+  background: #b93a2c;
+}
+
+.btn-danger-small {
+  background: #d74a3a;
+  color: #fff !important;
+  border-color: #d74a3a !important;
+}
+
+.btn-danger-small:hover {
+  background: #b93a2c;
+  border-color: #b93a2c !important;
+}
+
+.player-select-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.player-select-label {
+  font-size: 14px;
+  color: #5a3a20;
+  font-weight: 600;
+}
+
+.player-select-options {
+  display: flex;
+  gap: 8px;
+}
+
+.player-select-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid #cdb996;
+  border-radius: 8px;
+  background: #fff;
+  color: #5a3a20;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.player-select-btn:hover {
+  border-color: #3a5a2c;
+}
+
+.player-select-btn.active {
+  background: #3a5a2c;
+  color: #fff;
+  border-color: #3a5a2c;
+}
+
+.player-select-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .ws-error-actions {
   display: flex;
   gap: 10px;
@@ -3738,3 +4118,47 @@
 .settings-danger { border: 1px solid #f5c6cb; }
 
 .settings-note { font-size: 12px; color: #8a7a60; margin: 0; }
+
+/* ── Page transitions ─────────────────── */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-card {
+  animation: fadeSlideIn 0.4s ease-out;
+}
+
+.lobby-page {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+/* Action card hover animation enhancement */
+.action-card-holder:not(.taken):hover {
+  z-index: 20;
+}
+
+/* Smooth scoring overlay */
+.scoring-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.exchange-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Tab switching animation */
+.board-panel {
+  animation: fadeSlideIn 0.2s ease-out;
+}

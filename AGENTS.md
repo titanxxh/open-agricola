@@ -166,10 +166,14 @@ If `npm install` fails with canvas build errors, re-install these via apt.
 
 ### Testing
 
-- Unit/session tests (`npm test`): ~644 cases, no running services needed. These test pure domain logic and `GameSession` directly.
+- Unit/session tests (`npm test`): ~631 passing cases (15 skipped), no running services needed. These test pure domain logic and `GameSession` directly.
 - E2E tests (`npm run test:e2e`): require both frontend and backend running, plus Playwright browsers (`npx playwright install`).
 - Lint: `npm run lint` — pre-existing lint errors (~340, mostly `@typescript-eslint/no-explicit-any`) are expected and not blocking.
 - Build: `npm run build` — warnings about unresolved `/bga-img/*` are cosmetic (BGA card art proxy).
+
+### Authentication (platform branch)
+
+The platform branch requires user registration/login before accessing the game UI in a browser. When performing GUI-based testing, register an account first (POST `/api/auth/register` with `{username, password}`, or use the registration form in the UI). Anonymous WebSocket access is allowed by default in dev (`ALLOW_ANONYMOUS_WS=true`), but the frontend will still show a login page.
 
 ### HTTP single-player debug mode
 

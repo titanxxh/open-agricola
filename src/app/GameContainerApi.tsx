@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
-import type { Locale } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
 import { majorImprovementIds } from '../../shared/game/major-improvements'
@@ -22,7 +22,6 @@ import { FarmBoard } from '../components/board/FarmBoard'
 import { LogPanel } from '../components/board/LogPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
-import { GameControls } from '../components/controls/GameControls'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { AnytimeBar } from '../components/interaction/AnytimeBar'
@@ -31,18 +30,6 @@ import { ResourceLine } from '../components/common/ResourceLine'
 type RoundSlot = { round: number; action?: ActionSpace }
 
 const httpTransportSingleton = new HttpGameTransport()
-const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
-
-const detectInitialLocale = (): Locale => {
-  if (typeof window === 'undefined') return 'zh'
-  try {
-    const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-    if (saved === 'zh' || saved === 'en') return saved
-  } catch {
-    // Ignore storage access failures and fall back to default locale.
-  }
-  return 'zh'
-}
 
 /** Update browser URL to include room= so the link can be shared; same room id = same game. */
 const setRoomInUrl = (roomId: string) => {
@@ -107,13 +94,13 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
 
       if (isCreator) {
         setWsStatus({ phase: 'creating' })
-        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+        const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number } | { error: string }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
               if (msg.type === 'roomCreated') {
                 rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
                 resolve({ error: msg.error })
@@ -123,7 +110,9 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           rawWs.addEventListener('message', handler)
           const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          ws.sendRoomCommand('createRoom', { maxPlayers: 2, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
+          const maxPlayersParam = new URLSearchParams(window.location.search).get('maxPlayers')
+          const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
+          ws.sendRoomCommand('createRoom', { maxPlayers, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
         })
 
         if ('error' in resp) {
@@ -136,7 +125,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           phase: 'waiting',
           roomId: resp.roomId,
           players: [{ playerIndex: resp.playerIndex, name: creatorName }],
-          maxPlayers: 2,
+          maxPlayers: resp.maxPlayers,
         })
 
         const handler = (event: MessageEvent) => {
@@ -156,6 +145,9 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
                   maxPlayers: msg.maxPlayers,
                 }
               })
+            } else if (msg.type === 'roomDissolved') {
+              rawWs.removeEventListener('message', handler)
+              setWsStatus({ phase: 'error', message: 'roomDissolved' })
             }
           } catch { /* skip */ }
         }
@@ -208,7 +200,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
 
   const transport: GameTransport = isWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
   const isReady = !isWsMode || wsReady
-  return { transport, wsStatus, isWs: isWsMode, isReady }
+  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport: wsRef.current }
 }
 
 export const GameContainerApi = () => {
@@ -226,10 +218,10 @@ export const GameContainerApi = () => {
     return null
   }, [])
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
+  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
-  const [locale, setLocale] = useState<Locale>(detectInitialLocale)
+  const { locale, setLocale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => currentUrlParams.get('devMode') === '1')
@@ -242,15 +234,6 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale)
-    } catch {
-      // Ignore storage access failures.
-    }
-  }, [locale])
 
   useEffect(() => {
     if (state && viewPlayerId) {
@@ -1138,17 +1121,24 @@ export const GameContainerApi = () => {
   }, [transport])
 
   if (isWs && wsStatus.phase !== 'ready' && !state) {
-    const statusText = wsStatus.phase === 'idle' ? 'Initializing...'
-      : wsStatus.phase === 'connecting' ? 'Connecting to server...'
-      : wsStatus.phase === 'creating' ? 'Creating room...'
-      : wsStatus.phase === 'joining' ? `Joining room ${wsStatus.roomId}...`
-      : wsStatus.phase === 'waiting' ? `房间 ${wsStatus.roomId} — 等待玩家加入 (${wsStatus.players.length}/${wsStatus.maxPlayers})`
-      : wsStatus.phase === 'error' ? `Error: ${wsStatus.message}`
-      : 'Loading...'
+    const statusText = wsStatus.phase === 'idle' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'connecting' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'creating' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'joining' ? t(locale, 'platform.loading')
+      : wsStatus.phase === 'waiting' ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
+      : wsStatus.phase === 'error' ? (wsStatus.message === 'roomDissolved' ? t(locale, 'platform.roomDissolved') : `Error: ${wsStatus.message}`)
+      : t(locale, 'platform.loading')
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
       : null
+
+    const handleDissolve = () => {
+      if (!wsTransport) return
+      if (!window.confirm(t(locale, 'platform.dissolveConfirm'))) return
+      wsTransport.sendRoomCommand('dissolveRoom')
+      setPage('lobby')
+    }
 
     return (
       <div className="ws-status-screen">
@@ -1158,7 +1148,7 @@ export const GameContainerApi = () => {
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
-              <div className="ws-invite-label">分享此链接邀请对手加入：</div>
+              <div className="ws-invite-label">{t(locale, 'platform.inviteLabel')}</div>
               <div className="ws-invite-url-row">
                 <code className="ws-invite-url">{inviteUrl}</code>
                 <button
@@ -1168,27 +1158,30 @@ export const GameContainerApi = () => {
                     navigator.clipboard.writeText(inviteUrl).catch(() => {})
                   }}
                 >
-                  复制
+                  {t(locale, 'platform.copy')}
                 </button>
               </div>
-              <div className="ws-invite-roomid">房间 ID：<strong>{wsStatus.roomId}</strong></div>
+              <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
               <div className="ws-invite-players">
                 {wsStatus.players.map(p => (
                   <div key={p.playerIndex} className="ws-invite-player">
-                    玩家 {p.playerIndex + 1}：{p.name}
+                    {t(locale, 'platform.playerLabel', { index: String(p.playerIndex + 1), name: p.name })}
                   </div>
                 ))}
               </div>
+              <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
+                {t(locale, 'platform.dissolveRoom')}
+              </button>
             </div>
           )}
 
           {wsStatus.phase === 'error' && (
             <div className="ws-error-actions">
               <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-                重试
+                {t(locale, 'platform.retry')}
               </button>
               <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
-                返回大厅
+                {t(locale, 'platform.backToLobby')}
               </button>
             </div>
           )}
@@ -1198,7 +1191,7 @@ export const GameContainerApi = () => {
           )}
 
           <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            ← 返回大厅
+            {t(locale, 'platform.backToLobby')}
           </button>
         </div>
       </div>
@@ -1211,24 +1204,6 @@ export const GameContainerApi = () => {
 
   return (
     <div className="app">
-      <InteractionBar
-        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
-        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
-        pendingPlayerSwitch={pendingPlayerSwitch}
-        confirmPlayerSwitch={confirmPlayerSwitch}
-        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
-        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
-        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
-        pendingSowSelectionsLength={sowSelectedCount}
-        hasPendingPlowSelection={pendingPlowTile !== null}
-        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
-        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
-        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
-        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
-        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
-        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
-        isInteractive={isInteractive}
-      />
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -1451,50 +1426,71 @@ export const GameContainerApi = () => {
           seedValue={resetSeedInput} onSeedChange={setResetSeedInput} onResetGame={resetGame}
         />
       ) : null}
+
+      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+      />
+
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}
         locale={locale}
         isInteractive={isInteractive}
         takeAnytimeAction={takeAnytimeAction}
       />
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn} />
-      <GameControls
-        locale={locale}
-        onUndo={undoStep}
-        onUndoAction={undoAction}
-        onShowScoring={() => setShowScoringPad(true)}
-        historyLength={historyLength}
-        hasActionStartSnapshot={hasActionStartSnapshot}
+
+      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+
+      <main className="board">
+        <section className="board-panel board-action">
+          <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+        </section>
+        <section className="board-panel board-farm">
+          <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
+            currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+            nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+            playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+            fieldMap={fieldMap} stablePositions={stablePositions}
+            pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
+            pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+            roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
+            maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
+            pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
+            pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
+            stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+            hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+            existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+            toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+            togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
+            toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+            confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+            setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+            isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
+            selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+            isInteractive={isInteractive}
+          />
+        </section>
+      </main>
+
+      <LogPanel locale={locale} log={state.log} />
+
+      <InteractionBar
+        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
+        pendingPlayerSwitch={pendingPlayerSwitch}
+        confirmPlayerSwitch={confirmPlayerSwitch}
+        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
+        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
+        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
+        pendingSowSelectionsLength={sowSelectedCount}
+        hasPendingPlowSelection={pendingPlowTile !== null}
+        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
+        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
+        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
+        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
+        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
+        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
         isInteractive={isInteractive}
       />
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
-      <main className="board">
-        <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
-        <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
-          currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-          nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-          playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
-          fieldMap={fieldMap} stablePositions={stablePositions}
-          pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-          pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-          roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-          maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-          pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
-          pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-          stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-          hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
-          existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-          toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-          togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-          toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-          confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-          setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-          isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-          selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-          isInteractive={isInteractive}
-        />
-      </main>
-      <LogPanel locale={locale} log={state.log} />
     </div>
   )
 }

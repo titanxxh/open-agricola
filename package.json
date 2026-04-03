@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
+    "test:bench": "RUN_BENCHMARKS=1 vitest run tests/pay-dp.test.ts tests/pay-optimizations.test.ts --testTimeout=20000",
     "test:e2e": "npx playwright test",
     "docs:check": "node scripts/check-docs.js",
     "preview": "vite preview",
@@ -42,6 +43,6 @@
     "puppeteer": "^24.37.5",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.2"
   }
 }

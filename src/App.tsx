@@ -1,12 +1,15 @@
 import { AuthProvider } from './contexts/AuthContext'
+import { LocaleProvider } from './contexts/LocaleContext'
 import { PageRouter } from './app/PageRouter'
 import './App.css'
 
 function App() {
   return (
-    <AuthProvider>
-      <PageRouter />
-    </AuthProvider>
+    <LocaleProvider>
+      <AuthProvider>
+        <PageRouter />
+      </AuthProvider>
+    </LocaleProvider>
   )
 }
 

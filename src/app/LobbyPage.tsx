@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 
 type RoomSummary = {
   id: string
   playerCount: number
   maxPlayers: number
+  createdBy?: string
+  status?: 'waiting' | 'playing'
 }
 
 type MyRoom = {
@@ -19,10 +23,13 @@ type MyRoom = {
 
 export function LobbyPage() {
   const { user, token, logout } = useAuth()
+  const { t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
+  const [showPlayerSelect, setShowPlayerSelect] = useState(false)
+  const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -50,81 +57,123 @@ export function LobbyPage() {
     return () => clearInterval(interval)
   }, [fetchRooms, fetchMyRooms])
 
-  const handleCreateGame = () => setPage('game', { transport: 'ws' })
+  const handleCreateGame = () => setPage('game', { transport: 'ws', maxPlayers: String(selectedMaxPlayers) })
 
   const handleJoinRoom = () => {
     const id = joinRoomId.trim()
-    if (!id) { setError('请输入房间 ID'); return }
+    if (!id) { setError(t('platform.pleaseEnterRoomId')); return }
     setPage('game', { transport: 'ws', room: id })
   }
 
   const handleJoinExisting = (roomId: string) => setPage('game', { transport: 'ws', room: roomId })
   const handleResumeRoom = (roomId: string, playerIndex: number) =>
     setPage('game', { transport: 'ws', room: roomId, player: `p${playerIndex + 1}` })
+  const handleDissolveRoom = async (roomId: string) => {
+    if (!token) return
+    if (!window.confirm(t('platform.dissolveConfirm'))) return
+    try {
+      await fetch(`${API_BASE}/api/rooms/${roomId}/dissolve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      fetchRooms()
+      fetchMyRooms()
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className="lobby-page">
       <div className="lobby-header">
-        <h1>Open Agricola</h1>
+        <h1>{t('platform.lobbyTitle')}</h1>
         <div className="lobby-user-info">
+          <LocaleSwitcher />
           <button type="button" className="btn-link" onClick={() => setPage('settings')}>
             {user?.displayName || user?.username}
           </button>
-          <button type="button" className="btn-link" onClick={logout}>登出</button>
+          <button type="button" className="btn-link" onClick={logout}>{t('platform.logout')}</button>
         </div>
       </div>
 
       <div className="lobby-content">
         <div className="lobby-actions">
           <div className="lobby-section">
-            <h2>开始游戏</h2>
-            <button type="button" className="btn-primary" onClick={handleCreateGame}>
-              创建多人游戏
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
-              单人模式
-            </button>
+            <h2>{t('platform.startGame')}</h2>
+            {!showPlayerSelect ? (
+              <>
+                <button type="button" className="btn-primary" onClick={() => setShowPlayerSelect(true)}>
+                  {t('platform.createMultiplayer')}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
+                  {t('platform.singlePlayer')}
+                </button>
+              </>
+            ) : (
+              <div className="player-select-panel">
+                <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
+                <div className="player-select-options">
+                  {([2, 3, 4] as const).map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
+                      onClick={() => setSelectedMaxPlayers(n)}
+                    >
+                      {t(`platform.players${n}`)}
+                    </button>
+                  ))}
+                </div>
+                <div className="player-select-actions">
+                  <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                    {t('platform.createGame')}
+                  </button>
+                  <button type="button" className="btn-link" onClick={() => setShowPlayerSelect(false)}>
+                    {t('platform.cancel')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="lobby-section">
-            <h2>加入游戏</h2>
+            <h2>{t('platform.joinGame')}</h2>
             <div className="join-form">
               <input
                 type="text"
                 value={joinRoomId}
                 onChange={e => { setJoinRoomId(e.target.value); setError('') }}
-                placeholder="输入房间 ID"
+                placeholder={t('platform.joinRoomPlaceholder')}
                 onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
               />
-              <button type="button" className="btn-primary" onClick={handleJoinRoom}>加入</button>
+              <button type="button" className="btn-primary" onClick={handleJoinRoom}>{t('platform.joinBtn')}</button>
             </div>
             {error && <div className="form-error">{error}</div>}
           </div>
 
           <div className="lobby-section">
-            <h2>工坊</h2>
+            <h2>{t('platform.workshop')}</h2>
             <button type="button" className="btn-secondary" onClick={() => setPage('workshop')}>
-              进入卡牌工坊
+              {t('platform.enterWorkshop')}
             </button>
           </div>
         </div>
 
-        {/* User's active rooms (SQLite mode) */}
         {myRooms.length > 0 && (
           <div className="lobby-rooms">
-            <h2>我的进行中游戏</h2>
+            <h2>{t('platform.myActiveGames')}</h2>
             <ul className="room-list">
               {myRooms.map(r => (
                 <li key={r.id} className="room-item">
-                  <span className="room-id">房间 {r.id}</span>
-                  <span className="room-players">席位 {r.player_index + 1}</span>
-                  <span className="room-status">{r.status === 'playing' ? '进行中' : r.status === 'waiting' ? '等待中' : r.status}</span>
+                  <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
+                  <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
+                  <span className="room-status">
+                    {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
+                  </span>
                   <button
                     type="button"
                     className="btn-small"
                     onClick={() => handleResumeRoom(r.id, r.player_index)}
                   >
-                    继续
+                    {t('platform.resume')}
                   </button>
                 </li>
               ))}
@@ -132,20 +181,24 @@ export function LobbyPage() {
           </div>
         )}
 
-        {/* Live rooms in memory */}
         <div className="lobby-rooms">
-          <h2>当前活跃房间</h2>
+          <h2>{t('platform.activeRooms')}</h2>
           {rooms.length === 0 ? (
-            <p className="rooms-empty">暂无活跃房间</p>
+            <p className="rooms-empty">{t('platform.noActiveRooms')}</p>
           ) : (
             <ul className="room-list">
               {rooms.map(room => (
                 <li key={room.id} className="room-item">
-                  <span className="room-id">房间 {room.id}</span>
-                  <span className="room-players">{room.playerCount}/{room.maxPlayers} 玩家</span>
-                  {room.playerCount < room.maxPlayers && (
+                  <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
+                  <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                  {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
                     <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
-                      加入
+                      {t('platform.joinBtn')}
+                    </button>
+                  )}
+                  {room.createdBy === user?.id && room.status === 'waiting' && (
+                    <button type="button" className="btn-small btn-danger-small" onClick={() => handleDissolveRoom(room.id)}>
+                      {t('platform.dissolveRoom')}
                     </button>
                   )}
                 </li>

@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 
 type Mode = 'login' | 'register'
 
 export function LoginPage() {
   const { login, register } = useAuth()
+  const { t } = useLocale()
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -21,10 +24,10 @@ export function LoginPage() {
         ? await login(username, password)
         : await register(username, password, displayName || undefined)
       if (!result.ok) {
-        setError(result.error || 'Unknown error')
+        setError(result.error || t('platform.unknownError'))
       }
     } catch {
-      setError('Network error')
+      setError(t('platform.networkError'))
     } finally {
       setLoading(false)
     }
@@ -33,20 +36,23 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">Open Agricola</h1>
+        <div className="login-top-bar">
+          <LocaleSwitcher />
+        </div>
+        <h1 className="login-title">{t('platform.loginTitle')}</h1>
         <p className="login-subtitle">
-          {mode === 'login' ? '登录以继续' : '创建新账户'}
+          {mode === 'login' ? t('platform.loginSubtitle') : t('platform.registerSubtitle')}
         </p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-field">
-            <label htmlFor="username">用户名</label>
+            <label htmlFor="username">{t('platform.username')}</label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="2-30 字符"
+              placeholder={t('platform.usernamePlaceholder')}
               autoComplete="username"
               required
             />
@@ -54,25 +60,25 @@ export function LoginPage() {
 
           {mode === 'register' && (
             <div className="form-field">
-              <label htmlFor="displayName">显示名称（可选）</label>
+              <label htmlFor="displayName">{t('platform.displayName')}</label>
               <input
                 id="displayName"
                 type="text"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
-                placeholder="留空则使用用户名"
+                placeholder={t('platform.displayNamePlaceholder')}
               />
             </div>
           )}
 
           <div className="form-field">
-            <label htmlFor="password">密码</label>
+            <label htmlFor="password">{t('platform.password')}</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="至少 4 个字符"
+              placeholder={t('platform.passwordPlaceholder')}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
             />
@@ -81,23 +87,23 @@ export function LoginPage() {
           {error && <div className="form-error">{error}</div>}
 
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? '...' : mode === 'login' ? '登录' : '注册'}
+            {loading ? '...' : mode === 'login' ? t('platform.loginBtn') : t('platform.registerBtn')}
           </button>
         </form>
 
         <div className="login-switch">
           {mode === 'login' ? (
             <span>
-              没有账户？
+              {t('platform.noAccount')}
               <button type="button" className="btn-link" onClick={() => { setMode('register'); setError('') }}>
-                注册
+                {t('platform.registerBtn')}
               </button>
             </span>
           ) : (
             <span>
-              已有账户？
+              {t('platform.hasAccount')}
               <button type="button" className="btn-link" onClick={() => { setMode('login'); setError('') }}>
-                登录
+                {t('platform.loginBtn')}
               </button>
             </span>
           )}

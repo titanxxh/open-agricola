@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
+const benchmarkIt = process.env.RUN_BENCHMARKS === '1' ? it : it.skip
+
 const createMockPlayer = (resources: Record<string, number>) => ({
   resources,
   getExchangeResources: () => resources,
@@ -368,7 +370,7 @@ describe('Pay Combination Optimizations', () => {
       expect(equal(base, optimized(player, tc.costs, tc.target ?? null))).toBe(true)
     })
 
-    it(`benchmark: ${tc.name}`, () => {
+    benchmarkIt(`benchmark: ${tc.name}`, () => {
       const player = createMockPlayer(tc.resources)
       
       baseline(player, tc.costs, tc.target ?? null)

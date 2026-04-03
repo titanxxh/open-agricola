@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
-import { WorkshopPage } from './WorkshopPage'
 import { SettingsPage } from './SettingsPage'
 import { GameContainerApi } from './GameContainerApi'
+
+const WorkshopPage = lazy(() => import('./WorkshopPage').then(m => ({ default: m.WorkshopPage })))
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
@@ -12,7 +14,6 @@ function getPage(): Page {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
   if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings') return page
-  // Legacy: if ?room= or ?transport=ws is set, go straight to game
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   return 'lobby'
 }
@@ -20,7 +21,6 @@ function getPage(): Page {
 export function setPage(page: Page, extraParams?: Record<string, string>) {
   const params = new URLSearchParams(window.location.search)
   if (page === 'lobby') {
-    // Remove page param and game-specific params
     params.delete('page')
     params.delete('room')
     params.delete('player')
@@ -41,6 +41,7 @@ export function setPage(page: Page, extraParams?: Record<string, string>) {
 
 export function PageRouter() {
   const { user, loading } = useAuth()
+  const { t } = useLocale()
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function PageRouter() {
   }, [])
 
   if (loading) {
-    return <div className="loading-screen">加载中...</div>
+    return <div className="loading-screen">{t('platform.loading')}</div>
   }
 
   if (!user) {
@@ -63,7 +64,11 @@ export function PageRouter() {
     case 'game':
       return <GameContainerApi />
     case 'workshop':
-      return <WorkshopPage />
+      return (
+        <Suspense fallback={<div className="loading-screen">{t('platform.loading')}</div>}>
+          <WorkshopPage />
+        </Suspense>
+      )
     case 'settings':
       return <SettingsPage />
     case 'lobby':
