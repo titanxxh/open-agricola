@@ -297,6 +297,42 @@
   50% { opacity: 0.75; }
 }
 
+.locale-select {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #e4f0d7;
+  font-weight: 600;
+  font-size: 13px;
+  color: #2e4b1e;
+  cursor: pointer;
+  min-width: 7.5rem;
+}
+
+.locale-select:hover {
+  background: #c8e0b0;
+}
+
+.locale-select:focus {
+  outline: 2px solid #3a5a2c;
+  outline-offset: 1px;
+}
+
+.header-locale-select {
+  height: 34px;
+  padding: 0 10px;
+  align-self: center;
+  border: 2px solid #355d2e;
+  background: #fff;
+  color: #2d5228;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.header-locale-select:hover {
+  background: #f4faf0;
+}
+
 .locale-switch {
   display: flex;
   gap: 6px;
@@ -2693,31 +2729,64 @@
 
 .header-actions {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
-.header-icon-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 8px;
-  background: #e4f0d7;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
+.header-action-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #3a5a2c;
-  transition: background 0.15s;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #4a7c3f 0%, #355d2e 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition:
+    filter 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+  white-space: nowrap;
 }
 
-.header-icon-btn:hover:not(:disabled) {
-  background: #c8e0b0;
+.header-action-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.header-icon-btn:disabled {
-  opacity: 0.4;
+.header-action-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.header-action-btn:disabled {
+  opacity: 0.42;
   cursor: not-allowed;
+  filter: grayscale(0.25);
+  box-shadow: none;
+}
+
+.header-action-btn__icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.header-action-btn__label {
+  line-height: 1.2;
 }
 
 .header-menu {
