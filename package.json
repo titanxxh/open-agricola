@@ -12,6 +12,7 @@
     "test:e2e": "npx playwright test",
     "docs:check": "node scripts/check-docs.js",
     "sync-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts",
+    "probe-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts --probe-only",
     "preview": "vite preview",
     "server": "tsx server/index.ts"
   },

@@ -1,14 +1,15 @@
 /**
- * 推导 BGA_CDN_BASE_URL，并用 gh 对齐 GitHub Repository variable。
+ * 从 BGA gametables 扫多桌，推导 BGA_CDN_BASE_URL。
  *
- * 默认：**匿名 HTTP HEAD** 探测固定 CDN URL（与 vite 默认 build 同步），**不需要 BGA 登录**。
- * 可选 `--scan-tables`：用 Playwright 扫 gametables?game=agricola 列表（多数情况无需登录；若遇登录墙可配合 --storage-state）。
+ * - `-p` / `--probe-only`：只打印探测结果，不写 GitHub。
+ * - 不带 `-p`：抓取后与仓库变量 `BGA_CDN_BASE_URL` 比较，不一致则 `gh variable set`（需 gh + token）。
  *
- * 读写 GitHub 变量：gh 或 .env 的 GH_TOKEN（--probe-only 不需要）。
+ * 可选：`--dry-run`（仅在不带 -p 时生效）、`--repo owner/name`。
+ * 环境变量 `BGA_STORAGE_STATE`：Playwright 登录态 JSON（遇 BGA 登录页时）。
  *
- *   npx tsx scripts/sync-bga-cdn-github-var.ts --probe-only
- *   npx tsx scripts/sync-bga-cdn-github-var.ts --probe-only --scan-tables
- *   npx tsx scripts/sync-bga-cdn-github-var.ts --dry-run
+ *   npx tsx scripts/sync-bga-cdn-github-var.ts -p
+ *   npx tsx scripts/sync-bga-cdn-github-var.ts
+ *   npx tsx scripts/sync-bga-cdn-github-var.ts --dry-run --repo owner/repo
  */
 
 import { execFileSync } from 'node:child_process'
@@ -21,35 +22,17 @@ const VAR_NAME = 'BGA_CDN_BASE_URL'
 
 const DEFAULT_TABLE_WAIT_MS = 10_000
 const TABLE_GOTO_TIMEOUT_MS = 90_000
-/** 多桌扫描时每桌等待素材的上限（秒太长会拖慢整次运行） */
 const CDN_ASSET_WAIT_PER_TABLE_MS = 75_000
 const GAME_AREA_WAIT_MS = 90_000
 const DEFAULT_MAX_TABLES = 15
 
-/** 列表与桌链接用英文区，避免根域 302 / 区域不一致 */
 const BGA_ORIGIN = 'https://en.boardgamearena.com'
-/** 公开桌列表（链格式为 /…/agricola?table=，与旧版 /table?table= 不同） */
 const BGA_AGRICOLA_TABLES_URL = `${BGA_ORIGIN}/gametables?game=agricola`
 
-/**
- * 匿名可访问的 meeples 探测 URL（与 vite.config.ts / server 默认 BGA_CDN_BASE 同步）。
- * BGA 更换 theme build 后需改此处或设 env BGA_CDN_FALLBACK_MEEPLES_URL。
- */
-const FALLBACK_CDN_MEEPLES_URL =
-  process.env.BGA_CDN_FALLBACK_MEEPLES_URL ??
-  'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img/meeples.png'
-
-async function probeCdnViaHttpHead(): Promise<string> {
-  const r = await fetch(FALLBACK_CDN_MEEPLES_URL, { method: 'HEAD', redirect: 'follow' })
-  if (!r.ok) {
-    throw new Error(`HEAD ${FALLBACK_CDN_MEEPLES_URL} -> HTTP ${r.status}`)
-  }
-  return r.url
-}
-
-/** 任意一局内从 CDN 拉取的、位于 agricola …/img/ 下的静态图（meeples 常不请求，用其它图推导同一基址） */
 const AGRICOLA_CDN_IMG_FILE_RE =
   /\/games\/agricola\/[^/]+\/img\/[^/?#]+\.(png|webp|jpe?g|gif|svg|ico)(\?|#|$)/i
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function looksLikeMeeplesAssetUrl(url: string): boolean {
   const u = url.toLowerCase()
@@ -59,8 +42,6 @@ function looksLikeMeeplesAssetUrl(url: string): boolean {
 function looksLikeAgricolaCdnImgFileUrl(url: string): boolean {
   return AGRICOLA_CDN_IMG_FILE_RE.test(url)
 }
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function repoRoot(): string {
   return path.resolve(__dirname, '..')
@@ -111,7 +92,6 @@ function normalizeTableHref(href: string): string {
   return href
 }
 
-/** 列表顺序 = BGA 展示顺序，视为新→旧；按此顺序对 base 去重即「从新到旧」的唯一基址列表 */
 function dedupeBasesPreserveOrder(basesInListOrder: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
@@ -131,7 +111,6 @@ type TableCdnCapture = {
   base: string
 }
 
-/** 从 …/games/agricola/<build>/img/<file> 去掉文件名得到 BGA_CDN_BASE_URL */
 function baseUrlFromImgAsset(fullUrl: string): string {
   const u = new URL(fullUrl.trim())
   const pathname = u.pathname
@@ -219,19 +198,17 @@ async function captureSampleUrlOnTablePage(
   }
 }
 
-/**
- * 按 gametables 列表顺序（视为新→旧）取前 maxTables 个不同 table=，逐桌抓 CDN 样本。
- */
-async function fetchCdnCapturesFromPlaywright(
-  headless: boolean,
-  listWaitMs: number,
-  maxTables: number,
-  storageStatePath?: string,
-): Promise<TableCdnCapture[]> {
+function storageStatePathFromEnv(): string | undefined {
+  const p = process.env.BGA_STORAGE_STATE?.trim()
+  return p || undefined
+}
+
+async function fetchCdnCapturesFromPlaywright(): Promise<TableCdnCapture[]> {
+  const storageStatePath = storageStatePathFromEnv()
   if (storageStatePath && !fs.existsSync(storageStatePath)) {
-    throw new Error(`--storage-state 文件不存在: ${storageStatePath}`)
+    throw new Error(`BGA_STORAGE_STATE 指向的文件不存在: ${storageStatePath}`)
   }
-  const browser = await chromium.launch({ headless })
+  const browser = await chromium.launch({ headless: true })
   try {
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
@@ -244,7 +221,7 @@ async function fetchCdnCapturesFromPlaywright(
     const listPage = await context.newPage()
     await listPage.goto(BGA_AGRICOLA_TABLES_URL, {
       waitUntil: 'load',
-      timeout: Math.max(listWaitMs, 60_000),
+      timeout: Math.max(DEFAULT_TABLE_WAIT_MS, 60_000),
     })
     await listPage.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
     await listPage
@@ -254,12 +231,15 @@ async function fetchCdnCapturesFromPlaywright(
     const title = await listPage.title()
     if (/login to board game arena/i.test(title)) {
       throw new Error(
-        '当前被重定向到 BGA 登录页。请使用已登录浏览器导出的 --storage-state=auth.json，' +
-          '或改用默认匿名 HTTP（不要加 --scan-tables）。',
+        '当前被重定向到 BGA 登录页。请设置环境变量 BGA_STORAGE_STATE 指向已登录导出的 storage state JSON 后重试。',
       )
     }
 
-    const tableTargets = await collectOrderedTableTargets(listPage, listWaitMs, maxTables)
+    const tableTargets = await collectOrderedTableTargets(
+      listPage,
+      DEFAULT_TABLE_WAIT_MS,
+      DEFAULT_MAX_TABLES,
+    )
     await listPage.close()
 
     if (tableTargets.length === 0) {
@@ -334,93 +314,64 @@ function ghVariableSet(name: string, value: string, repo: string | undefined): v
 function parseArgs(argv: string[]): {
   probeOnly: boolean
   dryRun: boolean
-  headed: boolean
-  /** 为 true 时用 Playwright 扫多桌（常需 BGA 登录）；默认 false = 匿名 HTTP */
-  scanLiveTables: boolean
-  maxTables: number
   repo: string | undefined
-  storageState: string | undefined
 } {
   const out = {
     probeOnly: false,
     dryRun: false,
-    headed: false,
-    scanLiveTables: false,
-    maxTables: DEFAULT_MAX_TABLES,
     repo: undefined as string | undefined,
-    storageState: undefined as string | undefined,
   }
-  let explicitHttpOnly = false
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--probe-only' || a === '-p') out.probeOnly = true
     else if (a === '--dry-run') out.dryRun = true
-    else if (a === '--headed') out.headed = true
-    else if (a === '--scan-tables') out.scanLiveTables = true
-    else if (a === '--http-only') explicitHttpOnly = true
-    else if (a === '--max-tables') {
-      const next = argv[++i]
-      if (!next) throw new Error('--max-tables 需要正整数')
-      const n = Number.parseInt(next, 10)
-      if (!Number.isFinite(n) || n < 1) throw new Error('--max-tables 需要正整数')
-      out.maxTables = n
-    } else if (a === '--repo') {
+    else if (a === '--repo') {
       const next = argv[++i]
       if (!next) throw new Error('--repo 需要参数 owner/name')
       out.repo = next
-    } else if (a === '--storage-state') {
-      const next = argv[++i]
-      if (!next) throw new Error('--storage-state 需要 auth.json 路径')
-      out.storageState = next
     } else if (a.startsWith('-')) {
+      throw new Error(`未知参数: ${a}`)
+    } else {
       throw new Error(`未知参数: ${a}`)
     }
   }
-  if (explicitHttpOnly && out.scanLiveTables) {
-    throw new Error('--http-only 与 --scan-tables 互斥（默认已是匿名 HTTP，无需再写 --http-only）')
-  }
-  if (explicitHttpOnly) out.scanLiveTables = false
   return out
 }
 
-async function main(): Promise<number> {
-  const args = parseArgs(process.argv)
+function printProbeDetails(captures: TableCdnCapture[], basesNewestFirst: string[]): void {
+  console.log('')
+  console.log(`成功 ${captures.length} 桌；去重后 ${basesNewestFirst.length} 个 CDN 基址。`)
+  console.log('')
+  console.log('去重后的 BGA_CDN_BASE_URL（新→旧，按列表中首次出现顺序）:')
+  for (const b of basesNewestFirst) console.log(b)
+  console.log('')
+  console.log('各桌样本（含同源多桌）:')
+  for (const c of captures) {
+    const via = looksLikeMeeplesAssetUrl(c.sampleUrl) ? 'meeples' : '其它 img'
+    console.log(`  table=${c.tableId} (${via})`)
+    console.log(`    ${c.sampleUrl}`)
+  }
+  console.log('')
+}
 
-  if (args.storageState && !args.scanLiveTables) {
-    console.warn(
-      '提示: 已忽略 --storage-state（仅在 --scan-tables 时生效；默认使用匿名 HTTP，无需 BGA 登录）。',
-    )
+async function main(): Promise<number> {
+  let args: ReturnType<typeof parseArgs>
+  try {
+    args = parseArgs(process.argv)
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e)
+    return 2
   }
 
   let captures: TableCdnCapture[]
   let basesNewestFirst: string[]
 
   try {
-    if (args.scanLiveTables) {
-      console.log(
-        `按列表顺序（新→旧）最多扫描 ${args.maxTables} 桌，捕获 …/games/agricola/…/img/ 资源（优先 meeples）…`,
-      )
-      captures = await fetchCdnCapturesFromPlaywright(
-        !args.headed,
-        DEFAULT_TABLE_WAIT_MS,
-        args.maxTables,
-        args.storageState,
-      )
-      basesNewestFirst = dedupeBasesPreserveOrder(captures.map((c) => c.base))
-    } else {
-      console.log('使用匿名 HTTP HEAD 探测 CDN（无需 BGA 登录；URL 与仓库 vite 默认 build 同步）…')
-      const sampleUrl = await probeCdnViaHttpHead()
-      const base = normalizeBase(baseUrlFromImgAsset(sampleUrl))
-      captures = [
-        {
-          tableId: 'http-fallback',
-          tableUrl: FALLBACK_CDN_MEEPLES_URL,
-          sampleUrl,
-          base,
-        },
-      ]
-      basesNewestFirst = [base]
-    }
+    console.log(
+      `按 gametables 列表顺序（新→旧）最多扫描 ${DEFAULT_MAX_TABLES} 桌，捕获 …/games/agricola/…/img/ 资源（优先 meeples）…`,
+    )
+    captures = await fetchCdnCapturesFromPlaywright()
+    basesNewestFirst = dedupeBasesPreserveOrder(captures.map((c) => c.base))
   } catch (e) {
     console.error('抓取失败:', e)
     return 1
@@ -433,38 +384,11 @@ async function main(): Promise<number> {
   }
 
   if (args.probeOnly) {
-    console.log('')
-    if (args.scanLiveTables) {
-      console.log(`成功 ${captures.length} 桌；去重后 ${basesNewestFirst.length} 个 CDN 基址。`)
-      console.log('')
-      console.log('去重后的 BGA_CDN_BASE_URL（新→旧，按列表中首次出现顺序）:')
-      for (const b of basesNewestFirst) console.log(b)
-      console.log('')
-      console.log('各桌样本（含同源多桌）:')
-      for (const c of captures) {
-        const via = looksLikeMeeplesAssetUrl(c.sampleUrl) ? 'meeples' : '其它 img'
-        console.log(`  table=${c.tableId} (${via})`)
-        console.log(`    ${c.sampleUrl}`)
-      }
-    } else {
-      const first = captures[0]
-      if (!first) {
-        console.error('内部错误: 匿名 HTTP 无样本')
-        return 1
-      }
-      const via = looksLikeMeeplesAssetUrl(first.sampleUrl) ? 'meeples' : '其它 img'
-      console.log(`HTTP 样本（${via}）:`)
-      console.log(first.sampleUrl)
-      console.log('')
-      console.log('去重后的 BGA_CDN_BASE_URL（新→旧）:')
-      console.log(newBase)
-    }
-    console.log('')
+    printProbeDetails(captures, basesNewestFirst)
     return 0
   }
 
   loadGhTokenFromDotenv()
-
   const repo = resolveRepo(args.repo)
   if (!repo) {
     console.error(
@@ -473,13 +397,10 @@ async function main(): Promise<number> {
     return 2
   }
 
-  if (args.scanLiveTables) {
-    console.log(`采用实时桌列表去重后的最新 CDN 基址: ${newBase}`)
-    if (basesNewestFirst.length > 1) {
-      console.log('其它去重基址（新→旧）:', basesNewestFirst.slice(1).join(' | '))
-    }
-  } else {
-    console.log(`采用匿名 HTTP 探测的 CDN 基址: ${newBase}`)
+  console.log('')
+  console.log(`探测到最新 CDN 基址: ${newBase}`)
+  if (basesNewestFirst.length > 1) {
+    console.log('其它去重基址（新→旧）:', basesNewestFirst.slice(1).join(' | '))
   }
 
   const currentRaw = ghVariableGet(VAR_NAME, repo)
