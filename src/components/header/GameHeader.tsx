@@ -4,6 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
 import { harvestRounds } from '../../../shared/logic/state'
 import { setPage } from '../../app/PageRouter'
+import { LocaleSelect } from '../common/LocaleSwitcher'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -82,19 +83,59 @@ export const GameHeader = ({
           <span className="status-badge waiting-turn">{currentPlayer.name}</span>
         )}
         <div className="header-actions">
-          <button className="header-icon-btn" onClick={onUndo} disabled={!isInteractive || historyLength === 0} title={t(locale, 'ui.undoStep')}>↩</button>
-          <button className="header-icon-btn" onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot} title={t(locale, 'ui.undoAction')}>⟲</button>
-          <button className="header-icon-btn" onClick={onShowScoring} disabled={!isInteractive} title={t(locale, 'ui.scoringPadButton')}>📊</button>
-          <button className="header-icon-btn" onClick={() => setMenuOpen(!menuOpen)} title="Menu">⋯</button>
+          <LocaleSelect locale={locale} setLocale={setLocale} className="header-locale-select" />
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={onUndo}
+            disabled={!isInteractive || historyLength === 0}
+            title={t(locale, 'ui.undoStep')}
+          >
+            <span className="header-action-btn__icon" aria-hidden>
+              ↩
+            </span>
+            <span className="header-action-btn__label">{t(locale, 'ui.undoStep')}</span>
+          </button>
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={onUndoAction}
+            disabled={!isInteractive || !hasActionStartSnapshot}
+            title={t(locale, 'ui.undoAction')}
+          >
+            <span className="header-action-btn__icon" aria-hidden>
+              ⟲
+            </span>
+            <span className="header-action-btn__label">{t(locale, 'ui.undoAction')}</span>
+          </button>
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={onShowScoring}
+            disabled={!isInteractive}
+            title={t(locale, 'ui.scoringPadButton')}
+          >
+            <span className="header-action-btn__icon" aria-hidden>
+              📊
+            </span>
+            <span className="header-action-btn__label">{t(locale, 'ui.scoringPadButton')}</span>
+          </button>
+          <button
+            type="button"
+            className="header-action-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            title={t(locale, 'ui.headerMenu')}
+          >
+            <span className="header-action-btn__icon" aria-hidden>
+              ⋯
+            </span>
+            <span className="header-action-btn__label">{t(locale, 'ui.headerMenu')}</span>
+          </button>
         </div>
         {menuOpen && (
           <div className="header-menu">
-            <div className="header-menu-item">
-              <div className="locale-switch">
-                <button className={locale === 'zh' ? 'active' : ''} onClick={() => setLocale('zh')}>中</button>
-                <button className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>En</button>
-              </div>
-            </div>
             <label className="header-menu-item">
               <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
               {t(locale, 'ui.devMode')}

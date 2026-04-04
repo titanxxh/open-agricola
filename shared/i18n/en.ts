@@ -61,6 +61,8 @@ export const en = {
     noResources: 'No resources',
     languageZh: '中文',
     languageEn: 'English',
+    languageSelectLabel: 'Display language',
+    headerMenu: 'Menu',
     interactionConfirmNext: 'Action completed. Confirm switch to next player.',
     interactionChooseOne: 'Please choose an option',
     interactionNextPlayer: 'Next player: {player}',

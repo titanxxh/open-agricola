@@ -61,6 +61,8 @@ export const zh = {
     noResources: '无资源',
     languageZh: '中文',
     languageEn: 'English',
+    languageSelectLabel: '界面语言',
+    headerMenu: '菜单',
     interactionConfirmNext: '玩家已完成行动，请确认切换到下一位玩家',
     interactionChooseOne: '请选择一项执行',
     interactionNextPlayer: '下一位玩家：{player}',

@@ -11,6 +11,7 @@
     "test:bench": "RUN_BENCHMARKS=1 vitest run tests/pay-dp.test.ts tests/pay-optimizations.test.ts --testTimeout=20000",
     "test:e2e": "npx playwright test",
     "docs:check": "node scripts/check-docs.js",
+    "sync-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts",
     "preview": "vite preview",
     "server": "tsx server/index.ts"
   },
