@@ -10,8 +10,10 @@
  */
 import { MinorImprovement, Occupation, type CardBase } from './types.ts'
 import type { CardDefinition } from './types.ts'
-import { registerCardEffect } from './card-effects.ts'
+import { registerCardEffect, clearCustomCardEffects } from './card-effects.ts'
+import { clearCustomCardListeners } from './card-listeners.ts'
 import { dslToCardEffect, type CardDslEffects } from './custom-dsl-runner.ts'
+import type { CustomCodeManifest } from './custom-code-types.ts'
 
 const customMinorImprovements = new Map<string, CardBase>()
 const customOccupations = new Map<string, CardBase>()
@@ -20,9 +22,9 @@ export type CustomCardData = {
   cardType: 'minor' | 'occupation'
   cardJson: CardDefinition
   effectDsl?: CardDslEffects | null
+  effectCode?: string | null
   compiledCode?: string | null
-  /** Set to true when card was loaded from a .ts file (effects already registered by import). */
-  loadedFromFile?: boolean
+  codeManifest?: CustomCodeManifest | null
 }
 
 /**
@@ -64,6 +66,8 @@ export function getCustomOccupation(id: string): CardBase | null {
 export function clearCustomCards(): void {
   customMinorImprovements.clear()
   customOccupations.clear()
+  clearCustomCardEffects()
+  clearCustomCardListeners()
 }
 
 export function getCustomMinorImprovementIds(): string[] {

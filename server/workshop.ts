@@ -2,10 +2,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
-import { validateCardCode } from './ast-validator.ts'
-import { compileCardCode } from './card-compiler.ts'
-import { generateCardFile, wrapUserCode, generateCodeTemplate, type CardMeta } from './card-codegen.ts'
-import { writeCardFile, deleteCardFile } from './card-file-manager.ts'
+import { generateCardFile, generateCodeTemplate, type CardMeta } from './card-codegen.ts'
+import { validateAndCompileCustomCodeRemote } from './custom-code-executor/client.ts'
+import type { CustomCodeValidateResult } from '../shared/cards/custom-code-types.ts'
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 
@@ -40,6 +39,9 @@ type WorkshopCard = {
   description: string
   card_json: string
   effect_dsl: string | null
+  effect_code?: string | null
+  compiled_code?: string | null
+  code_manifest?: string | null
   art_url: string | null
   status: string
   like_count?: number
@@ -48,37 +50,73 @@ type WorkshopCard = {
   updated_at: number
 }
 
-/** Generate and write .ts card file from save data. */
-function generateAndWriteCardFile(
-  cardId: string, cardType: 'minor' | 'occupation', name: string,
-  description: string, cardJson: unknown, effectDsl: unknown, effectCode: string | null,
-): void {
-  try {
-    const cj = cardJson as Record<string, unknown>
-    const meta: CardMeta = {
-      id: cardId,
-      name,
-      cardType,
-      desc: description ? [description] : (cj.desc as string[] ?? []),
-      cost: (cj.cost as Record<string, number>) ?? {},
-      vp: (cj.vp as number) ?? 0,
-      modifiers: cj.modifiers as unknown[] | undefined,
-    }
+type SandboxSettings = {
+  player_count: number
+  deck_ids: string[]
+  updated_at?: number
+}
 
-    let tsSource: string
-    if (effectCode) {
-      // User-written code mode — wrap with imports + card definition
-      tsSource = wrapUserCode(meta, effectCode)
-    } else {
-      // DSL mode — generate from DSL JSON
-      const dsl = effectDsl ? (typeof effectDsl === 'string' ? JSON.parse(effectDsl) : effectDsl) : null
-      tsSource = generateCardFile(meta, dsl)
-    }
+const SANDBOX_DECK_IDS = ['A', 'B', 'C', 'D', 'E'] as const
 
-    writeCardFile(cardId, tsSource)
-  } catch (err) {
-    console.warn(`[workshop] failed to generate .ts file for ${cardId}:`, err)
+const sanitizeSandboxPlayerCount = (value: unknown): number => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 2
+  return Math.min(4, Math.max(2, Math.floor(parsed)))
+}
+
+const sanitizeSandboxDeckIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [...SANDBOX_DECK_IDS]
+  const next = value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim().toUpperCase())
+    .filter((item): item is typeof SANDBOX_DECK_IDS[number] =>
+      (SANDBOX_DECK_IDS as readonly string[]).includes(item),
+    )
+  return next.length > 0 ? Array.from(new Set(next)) : [...SANDBOX_DECK_IDS]
+}
+
+const getSandboxSettings = (userId: string): SandboxSettings => {
+  const db = getDb()
+  const row = db.prepare(`
+    SELECT player_count, deck_ids_json, updated_at
+    FROM sandbox_settings
+    WHERE user_id = ?
+  `).get(userId) as { player_count: number; deck_ids_json: string; updated_at: number } | undefined
+  if (!row) {
+    return {
+      player_count: 2,
+      deck_ids: [...SANDBOX_DECK_IDS],
+    }
   }
+  let rawDeckIds: unknown = []
+  try {
+    rawDeckIds = JSON.parse(row.deck_ids_json)
+  } catch {
+    rawDeckIds = []
+  }
+  return {
+    player_count: sanitizeSandboxPlayerCount(row.player_count),
+    deck_ids: sanitizeSandboxDeckIds(rawDeckIds),
+    updated_at: row.updated_at,
+  }
+}
+
+const saveSandboxSettings = (userId: string, settings?: { player_count?: unknown; deck_ids?: unknown }): SandboxSettings => {
+  const next: SandboxSettings = {
+    player_count: sanitizeSandboxPlayerCount(settings?.player_count),
+    deck_ids: sanitizeSandboxDeckIds(settings?.deck_ids),
+    updated_at: Date.now(),
+  }
+  const db = getDb()
+  db.prepare(`
+    INSERT INTO sandbox_settings (user_id, player_count, deck_ids_json, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      player_count = excluded.player_count,
+      deck_ids_json = excluded.deck_ids_json,
+      updated_at = excluded.updated_at
+  `).run(userId, next.player_count, JSON.stringify(next.deck_ids), next.updated_at)
+  return next
 }
 
 /** Route handler — returns true if handled. */
@@ -101,15 +139,34 @@ export async function handleWorkshopRoute(
     const page = Math.max(1, Number(q.get('page') ?? '1'))
     const limit = 20
     const offset = (page - 1) * limit
-    const statusFilter = q.get('status') ?? 'published'
-
-    // Only admins/authors can see non-published cards; enforce published for public
-    const effectiveStatus = user ? (statusFilter === 'draft' ? 'draft' : 'published') : 'published'
-
+    const statusFilter = q.get('status')
+    const mineOnly = q.get('scope') === 'mine'
     const featured = q.get('featured') === '1'
 
     let whereExtra = ''
-    const params: unknown[] = [effectiveStatus]
+    const params: unknown[] = []
+
+    if (mineOnly) {
+      if (!user) {
+        sendJson(res, 401, { ok: false, error: 'Not authenticated' })
+        return true
+      }
+      whereExtra += ' AND w.author_id = ?'
+      params.push(user.id)
+      if (statusFilter === 'draft' || statusFilter === 'published') {
+        whereExtra += ' AND w.status = ?'
+        params.push(statusFilter)
+      }
+    } else {
+      // Only admins/authors can see non-published cards; enforce published for public
+      const effectiveStatus = user ? (statusFilter === 'draft' ? 'draft' : 'published') : 'published'
+      whereExtra += ' AND w.status = ?'
+      params.push(effectiveStatus)
+      if (effectiveStatus === 'draft' && user) {
+        whereExtra += ' AND w.author_id = ?'
+        params.push(user.id)
+      }
+    }
 
     if (featured) {
       whereExtra += ' AND w.featured = 1'
@@ -118,12 +175,6 @@ export async function handleWorkshopRoute(
     if (search) {
       whereExtra += ' AND (w.name LIKE ? OR w.description LIKE ?)'
       params.push(`%${search}%`, `%${search}%`)
-    }
-
-    // Filter own drafts by author
-    if (effectiveStatus === 'draft' && user) {
-      whereExtra += ' AND w.author_id = ?'
-      params.push(user.id)
     }
 
     const orderBy = sort === 'popular'
@@ -137,7 +188,7 @@ export async function handleWorkshopRoute(
       FROM workshop_cards w
       LEFT JOIN users u ON w.author_id = u.id
       LEFT JOIN card_likes l ON l.card_id = w.id
-      WHERE w.status = ?${whereExtra}
+      WHERE 1 = 1${whereExtra}
       GROUP BY w.id
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
@@ -160,7 +211,7 @@ export async function handleWorkshopRoute(
       liked_by_me: likedIds.has(r.id),
     }))
 
-    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE w.status = ?${whereExtra}`)
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE 1 = 1${whereExtra}`)
       .get(...params) as { n: number }).n
 
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
@@ -209,14 +260,15 @@ export async function handleWorkshopRoute(
     if (!body?.source || typeof body.source !== 'string') {
       sendJson(res, 400, { ok: false, error: 'Missing source' }); return true
     }
-    const result = validateCardCode(body.source)
+    let result: CustomCodeValidateResult
+    try {
+      result = await validateAndCompileCustomCodeRemote(body.source, 'CUSTOM_ValidateOnly')
+    } catch (error) {
+      sendJson(res, 502, { ok: false, error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}` })
+      return true
+    }
     if (result.valid) {
-      try {
-        const compiled = compileCardCode(body.source)
-        sendJson(res, 200, { ok: true, valid: true, compiled })
-      } catch (err) {
-        sendJson(res, 200, { ok: true, valid: false, errors: [`Compilation failed: ${err}`] })
-      }
+      sendJson(res, 200, { ok: true, valid: true, compiled: result.compiledCode, manifest: result.manifest })
     } else {
       sendJson(res, 200, { ok: true, valid: false, errors: result.errors })
     }
@@ -302,14 +354,22 @@ export async function handleWorkshopRoute(
     // Validate + compile effect_code if provided
     let effectCode: string | null = null
     let compiledCode: string | null = null
+    let codeManifest: string | null = null
     if (body.effect_code && typeof body.effect_code === 'string' && body.effect_code.trim()) {
-      const validation = validateCardCode(body.effect_code)
+      let validation: CustomCodeValidateResult
+      try {
+        validation = await validateAndCompileCustomCodeRemote(body.effect_code, body.card_id)
+      } catch (error) {
+        sendJson(res, 502, { ok: false, error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}` })
+        return true
+      }
       if (!validation.valid) {
         sendJson(res, 400, { ok: false, error: 'Code validation failed', errors: validation.errors })
         return true
       }
       effectCode = body.effect_code
-      compiledCode = compileCardCode(body.effect_code)
+      compiledCode = validation.compiledCode
+      codeManifest = JSON.stringify(validation.manifest)
     }
 
     const newStatus = body.status === 'published' ? 'published' : 'draft'
@@ -338,29 +398,27 @@ export async function handleWorkshopRoute(
         'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
       ).get(body.id) as { n: number })?.n ?? 0) + 1
       db.prepare(`
-        INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, art_url, version_number, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         nanoid(), body.id, existing.card_json, existing.effect_dsl ?? null,
-        null, null, existing.art_url ?? null, versionNum, user.id, now,
+        existing.effect_code ?? null, existing.compiled_code ?? null, existing.code_manifest ?? null,
+        existing.art_url ?? null, versionNum, user.id, now,
       )
 
       db.prepare(`
         UPDATE workshop_cards SET
           card_id = ?, card_type = ?, name = ?, description = ?,
-          card_json = ?, effect_dsl = ?, effect_code = ?, compiled_code = ?,
+          card_json = ?, effect_dsl = ?, effect_code = ?, compiled_code = ?, code_manifest = ?,
           art_url = ?, status = ?, updated_at = ?
         WHERE id = ?
       `).run(
         body.card_id, body.card_type, body.name, body.description ?? '',
         JSON.stringify(body.card_json),
         body.effect_dsl ? JSON.stringify(body.effect_dsl) : null,
-        effectCode, compiledCode,
+        effectCode, compiledCode, codeManifest,
         body.art_url ?? null, newStatus, now, body.id,
       )
-
-      // Generate .ts card file
-      generateAndWriteCardFile(body.card_id, body.card_type as 'minor' | 'occupation', body.name, body.description ?? '', body.card_json, body.effect_dsl, effectCode)
 
       sendJson(res, 200, { ok: true, id: body.id })
     } else {
@@ -368,18 +426,15 @@ export async function handleWorkshopRoute(
       const id = nanoid()
       db.prepare(`
         INSERT INTO workshop_cards
-          (id, author_id, card_id, card_type, name, description, card_json, effect_dsl, effect_code, compiled_code, art_url, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, author_id, card_id, card_type, name, description, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, user.id, body.card_id, body.card_type, body.name, body.description ?? '',
         JSON.stringify(body.card_json),
         body.effect_dsl ? JSON.stringify(body.effect_dsl) : null,
-        effectCode, compiledCode,
+        effectCode, compiledCode, codeManifest,
         body.art_url ?? null, newStatus, now, now,
       )
-
-      // Generate .ts card file
-      generateAndWriteCardFile(body.card_id, body.card_type as 'minor' | 'occupation', body.name, body.description ?? '', body.card_json, body.effect_dsl, effectCode)
 
       sendJson(res, 200, { ok: true, id })
     }
@@ -395,10 +450,7 @@ export async function handleWorkshopRoute(
       | { author_id: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     if (row.author_id !== user.id) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
-    // Get card_id before deleting to remove the .ts file
-    const delCard = db.prepare('SELECT card_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { card_id: string } | undefined
     db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
-    if (delCard) deleteCardFile(delCard.card_id)
     sendJson(res, 200, { ok: true })
     return true
   }
@@ -471,22 +523,44 @@ export async function handleWorkshopRoute(
       card_json: JSON.parse(r.card_json as string),
       effect_dsl: r.effect_dsl ? JSON.parse(r.effect_dsl as string) : null,
     }))
-    sendJson(res, 200, { ok: true, cards })
+    sendJson(res, 200, { ok: true, cards, settings: getSandboxSettings(user.id) })
     return true
   }
 
   // ── POST /api/workshop/sandbox ────────────────────────────────────────────
   if (req.method === 'POST' && url === '/api/workshop/sandbox') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const body = await parseBody<{ workshop_card_id?: string }>(req)
-    if (!body?.workshop_card_id) { sendJson(res, 400, { ok: false, error: 'Missing workshop_card_id' }); return true }
-    const existing = db.prepare('SELECT 1 FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?')
-      .get(user.id, body.workshop_card_id)
-    if (!existing) {
-      db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
-        .run(user.id, body.workshop_card_id, Date.now())
+    const body = await parseBody<{
+      workshop_card_id?: string
+      workshop_card_ids?: string[]
+      settings?: { player_count?: unknown; deck_ids?: unknown }
+    }>(req)
+    if (body?.workshop_card_id) {
+      const existing = db.prepare('SELECT 1 FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?')
+        .get(user.id, body.workshop_card_id)
+      if (!existing) {
+        db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
+          .run(user.id, body.workshop_card_id, Date.now())
+      }
+      sendJson(res, 200, { ok: true, settings: getSandboxSettings(user.id) })
+      return true
     }
-    sendJson(res, 200, { ok: true })
+    if (!Array.isArray(body?.workshop_card_ids)) {
+      sendJson(res, 400, { ok: false, error: 'Missing workshop_card_ids' })
+      return true
+    }
+
+    const nextIds = Array.from(new Set(body.workshop_card_ids.filter((id): id is string => typeof id === 'string')))
+    const now = Date.now()
+    const insertSandboxCard = db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
+    db.transaction(() => {
+      db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(user.id)
+      for (const cardId of nextIds) {
+        insertSandboxCard.run(user.id, cardId, now)
+      }
+    })()
+    const settings = saveSandboxSettings(user.id, body.settings)
+    sendJson(res, 200, { ok: true, settings })
     return true
   }
 
@@ -539,27 +613,56 @@ export async function handleWorkshopRoute(
     if (card.author_id !== user.id) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
 
     const version = db.prepare('SELECT * FROM workshop_card_versions WHERE id = ? AND card_id = ?')
-      .get(body.version_id, cardDbId) as { card_json: string; effect_dsl: string | null; art_url: string | null } | undefined
+      .get(body.version_id, cardDbId) as {
+        card_json: string
+        effect_dsl: string | null
+        effect_code: string | null
+        compiled_code: string | null
+        code_manifest: string | null
+        art_url: string | null
+      } | undefined
     if (!version) { sendJson(res, 404, { ok: false, error: 'Version not found' }); return true }
 
     // Save current state as a version before reverting
-    const current = db.prepare('SELECT card_json, effect_dsl, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
+    const current = db.prepare('SELECT card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
     const versionNum = ((db.prepare(
       'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
     ).get(cardDbId) as { n: number })?.n ?? 0) + 1
     const now = Date.now()
     db.prepare(`
-      INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, art_url, version_number, created_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nanoid(), cardDbId, current.card_json, current.effect_dsl ?? null, null, null, current.art_url ?? null, versionNum, user.id, now)
+      INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      nanoid(),
+      cardDbId,
+      current.card_json,
+      current.effect_dsl ?? null,
+      current.effect_code ?? null,
+      current.compiled_code ?? null,
+      current.code_manifest ?? null,
+      current.art_url ?? null,
+      versionNum,
+      user.id,
+      now,
+    )
 
     // Restore from version
     const restored = JSON.parse(version.card_json)
     db.prepare(`
       UPDATE workshop_cards SET
-        card_json = ?, effect_dsl = ?, art_url = ?, name = ?, updated_at = ?
+        card_json = ?, effect_dsl = ?, effect_code = ?, compiled_code = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
       WHERE id = ?
-    `).run(version.card_json, version.effect_dsl, version.art_url, restored.name ?? '', now, cardDbId)
+    `).run(
+      version.card_json,
+      version.effect_dsl,
+      version.effect_code,
+      version.compiled_code,
+      version.code_manifest,
+      version.art_url,
+      restored.name ?? '',
+      now,
+      cardDbId,
+    )
 
     sendJson(res, 200, { ok: true })
     return true

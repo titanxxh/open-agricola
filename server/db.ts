@@ -141,6 +141,20 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE workshop_cards ADD COLUMN featured INTEGER NOT NULL DEFAULT 0;
       `,
     },
+    {
+      version: 4,
+      sql: `
+        ALTER TABLE workshop_cards ADD COLUMN code_manifest TEXT;
+        ALTER TABLE workshop_card_versions ADD COLUMN code_manifest TEXT;
+
+        CREATE TABLE sandbox_settings (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          player_count INTEGER NOT NULL DEFAULT 2,
+          deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+          updated_at INTEGER NOT NULL
+        );
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

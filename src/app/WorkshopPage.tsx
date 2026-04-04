@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
@@ -41,11 +41,38 @@ type Comment = {
   created_at: number
 }
 
-type View = 'browse' | 'mine' | 'featured' | 'sandbox' | 'editor' | 'detail'
+type SandboxSettings = {
+  player_count: number
+  deck_ids: string[]
+}
+
+const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
+  player_count: 2,
+  deck_ids: ['A', 'B', 'C', 'D', 'E'],
+}
+
+type View = 'home' | 'sandbox' | 'editor' | 'detail'
 
 function authHeaders(token: string | null): Record<string, string> {
   if (!token) return {}
   return { Authorization: `Bearer ${token}` }
+}
+
+function normalizeSandboxSettings(raw: unknown): SandboxSettings {
+  const source = (raw ?? {}) as Partial<SandboxSettings>
+  const playerCount = typeof source.player_count === 'number'
+    ? Math.min(4, Math.max(2, Math.floor(source.player_count)))
+    : DEFAULT_SANDBOX_SETTINGS.player_count
+  const deckIds = Array.isArray(source.deck_ids)
+    ? source.deck_ids
+      .filter((deck): deck is string => typeof deck === 'string')
+      .map((deck) => deck.trim().toUpperCase())
+      .filter((deck) => DEFAULT_SANDBOX_SETTINGS.deck_ids.includes(deck))
+    : []
+  return {
+    player_count: playerCount,
+    deck_ids: deckIds.length > 0 ? Array.from(new Set(deckIds)) : [...DEFAULT_SANDBOX_SETTINGS.deck_ids],
+  }
 }
 
 // ── Card Preview Tile ────────────────────────────────────────────────────────
@@ -239,6 +266,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
           <h2>{card.name}</h2>
           <div className="ws-badges-row">
             <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+            {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
             <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
           </div>
           {cost && Object.keys(cost).length > 0 && (
@@ -627,67 +655,419 @@ function CardEditor({ initial, token, onSaved, onCancel, t }: {
   )
 }
 
-// ── Sandbox View ─────────────────────────────────────────────────────────────
+// ── Workshop Dashboard ───────────────────────────────────────────────────────
 
-function SandboxView({ token, onSelect, onStartGame, t }: {
-  token: string | null
-  onSelect: (c: WorkshopCard) => void
-  onStartGame: (cardIds: string[], mode: 'single' | 'multi') => void
+function WorkshopSection({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="ws-section">
+      <div className="ws-section-header">
+        <div>
+          <h2>{title}</h2>
+          {subtitle && <p className="ws-section-subtitle">{subtitle}</p>}
+        </div>
+        {actions && <div className="ws-section-actions">{actions}</div>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function SandboxSummaryPanel({
+  cards,
+  onOpenSandbox,
+  settings,
+  t,
+}: {
+  cards: WorkshopCard[]
+  onOpenSandbox: () => void
+  settings: SandboxSettings
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
-  const [cards, setCards] = useState<WorkshopCard[]>([])
+  return (
+    <div className="ws-sandbox-summary">
+      <div>
+        <div className="ws-sandbox-summary-title">{t('platform.sandbox')}</div>
+        <div className="ws-sandbox-summary-text">
+          {cards.length > 0
+            ? t('platform.sandboxSummaryFilled', {
+              count: cards.length,
+              cards: `${cards.slice(0, 3).map(card => card.name).join(', ')}${cards.length > 3 ? '…' : ''}`,
+            })
+            : t('platform.sandboxSummaryEmpty')}
+        </div>
+        <div className="ws-sandbox-summary-text">
+          {t('platform.sandboxSettingsSummary', {
+            players: settings.player_count,
+            decks: settings.deck_ids.join(', '),
+          })}
+        </div>
+      </div>
+      <div className="ws-sandbox-summary-actions">
+        <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenSandbox}>
+          {t('platform.openSandbox')}
+        </button>
+      </div>
+    </div>
+  )
+}
 
-  const reload = useCallback(() => {
+function SelectableSandboxCard({
+  card,
+  selected,
+  onToggle,
+  t,
+}: {
+  card: WorkshopCard
+  selected: boolean
+  onToggle: (id: string) => void
+  t: (key: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <label className={`ws-select-card${selected ? ' selected' : ''}`}>
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggle(card.id)}
+      />
+      <div className="ws-select-card-body">
+        <div className="ws-select-card-name">{card.name}</div>
+        <div className="ws-select-card-meta">
+          <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+          {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
+          <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
+          <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
+        </div>
+      </div>
+    </label>
+  )
+}
+
+function SandboxResetModal({
+  token,
+  currentCards,
+  currentSettings,
+  onClose,
+  onSave,
+  t,
+}: {
+  token: string | null
+  currentCards: WorkshopCard[]
+  currentSettings: SandboxSettings
+  onClose: () => void
+  onSave: (cardIds: string[], settings: SandboxSettings) => Promise<void>
+  t: (key: string, params?: Record<string, string | number>) => string
+}) {
+  const [myCards, setMyCards] = useState<WorkshopCard[]>([])
+  const [publishedCards, setPublishedCards] = useState<WorkshopCard[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>(currentCards.map(card => card.id))
+  const [playerCount, setPlayerCount] = useState(currentSettings.player_count)
+  const [deckIds, setDeckIds] = useState<string[]>(currentSettings.deck_ids)
+  const [publishedSearchInput, setPublishedSearchInput] = useState('')
+  const [publishedSearch, setPublishedSearch] = useState('')
+  const [loadingMine, setLoadingMine] = useState(false)
+  const [loadingPublished, setLoadingPublished] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setSelectedIds(currentCards.map(card => card.id))
+  }, [currentCards])
+
+  useEffect(() => {
+    setPlayerCount(currentSettings.player_count)
+    setDeckIds(currentSettings.deck_ids)
+  }, [currentSettings])
+
+  const loadMyCards = useCallback(async () => {
     if (!token) return
-    fetch(`${API_BASE}/api/workshop/sandbox`, { headers: authHeaders(token) })
-      .then(r => r.json())
-      .then(d => { if (d.ok) setCards(d.cards) })
-      .catch(() => {})
+    setLoadingMine(true)
+    try {
+      const params = new URLSearchParams({
+        scope: 'mine',
+        sort: 'recent',
+        page: '1',
+      })
+      const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
+        headers: authHeaders(token),
+      })
+      const data = await response.json()
+      if (data.ok) setMyCards(data.cards)
+    } finally {
+      setLoadingMine(false)
+    }
   }, [token])
 
-  useEffect(() => { reload() }, [reload])
+  const loadPublishedCards = useCallback(async () => {
+    setLoadingPublished(true)
+    try {
+      const params = new URLSearchParams({
+        status: 'published',
+        sort: 'popular',
+        page: '1',
+        search: publishedSearch,
+      })
+      const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
+        headers: authHeaders(token),
+      })
+      const data = await response.json()
+      if (data.ok) setPublishedCards(data.cards)
+    } finally {
+      setLoadingPublished(false)
+    }
+  }, [publishedSearch, token])
 
-  const handleRemove = async (workshopCardId: string) => {
-    await fetch(`${API_BASE}/api/workshop/sandbox/${workshopCardId}`, {
-      method: 'DELETE', headers: authHeaders(token),
+  useEffect(() => {
+    void loadMyCards()
+  }, [loadMyCards])
+
+  useEffect(() => {
+    void loadPublishedCards()
+  }, [loadPublishedCards])
+
+  const toggleSelected = (cardId: string) => {
+    setSelectedIds(prev =>
+      prev.includes(cardId)
+        ? prev.filter(id => id !== cardId)
+        : [...prev, cardId],
+    )
+  }
+
+  const toggleDeck = (deckId: string) => {
+    setDeckIds((prev) => {
+      const next = prev.includes(deckId)
+        ? prev.filter((entry) => entry !== deckId)
+        : [...prev, deckId]
+      return next.length > 0 ? next : [...DEFAULT_SANDBOX_SETTINGS.deck_ids]
     })
-    reload()
+  }
+
+  const myCardIds = new Set(myCards.map(card => card.id))
+  const selectablePublishedCards = publishedCards.filter(card => !myCardIds.has(card.id))
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(selectedIds, {
+        player_count: playerCount,
+        deck_ids: deckIds,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
+    <div className="ws-modal-overlay" onClick={onClose}>
+      <div className="ws-modal ws-reset-modal" onClick={event => event.stopPropagation()}>
+        <div className="ws-modal-header">
+          <div>
+            <h2>{t('platform.resetSandboxTitle')}</h2>
+            <p>{t('platform.resetSandboxSubtitle')}</p>
+          </div>
+          <button type="button" className="btn-link" onClick={onClose}>{t('platform.cancel')}</button>
+        </div>
+
+        <div className="ws-modal-toolbar">
+          <div className="ws-sandbox-config-panel">
+            <div className="ws-sandbox-config-group">
+              <span className="ws-sandbox-config-label">{t('platform.sandboxPlayerCount')}</span>
+              <div className="ws-sandbox-chip-row">
+                {[2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`ws-sandbox-chip${playerCount === count ? ' active' : ''}`}
+                    onClick={() => setPlayerCount(count)}
+                  >
+                    {t('platform.sandboxPlayerCountOption', { count })}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ws-sandbox-config-group">
+              <span className="ws-sandbox-config-label">{t('platform.sandboxDecks')}</span>
+              <div className="ws-sandbox-chip-row">
+                {DEFAULT_SANDBOX_SETTINGS.deck_ids.map((deckId) => (
+                  <button
+                    key={deckId}
+                    type="button"
+                    className={`ws-sandbox-chip${deckIds.includes(deckId) ? ' active' : ''}`}
+                    onClick={() => toggleDeck(deckId)}
+                  >
+                    {deckId}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <form
+            className="ws-search"
+            onSubmit={event => {
+              event.preventDefault()
+              setPublishedSearch(publishedSearchInput.trim())
+            }}
+          >
+            <input
+              value={publishedSearchInput}
+              onChange={event => setPublishedSearchInput(event.target.value)}
+              placeholder={t('platform.resetSandboxSearchPlaceholder')}
+            />
+            <button type="submit" className="btn-secondary ws-btn-sm">{t('platform.searchBtn')}</button>
+          </form>
+          <div className="ws-reset-selection-count">{t('platform.sandboxSelectionCount', { count: selectedIds.length })}</div>
+        </div>
+
+        <div className="ws-reset-modal-body">
+          <WorkshopSection
+            title={t('platform.myCards')}
+            subtitle={t('platform.resetSandboxMineSubtitle')}
+          >
+            {loadingMine ? (
+              <div className="ws-loading">{t('platform.loadingMore')}</div>
+            ) : myCards.length === 0 ? (
+              <p className="rooms-empty">{t('platform.resetSandboxNoMine')}</p>
+            ) : (
+              <div className="ws-select-card-grid">
+                {myCards.map(card => (
+                  <SelectableSandboxCard
+                    key={card.id}
+                    card={card}
+                    selected={selectedIds.includes(card.id)}
+                    onToggle={toggleSelected}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
+          </WorkshopSection>
+
+          <WorkshopSection
+            title={t('platform.publishedCards')}
+            subtitle={t('platform.resetSandboxPublishedSubtitle')}
+          >
+            {loadingPublished ? (
+              <div className="ws-loading">{t('platform.loadingMore')}</div>
+            ) : selectablePublishedCards.length === 0 ? (
+              <p className="rooms-empty">{t('platform.resetSandboxNoPublished')}</p>
+            ) : (
+              <div className="ws-select-card-grid">
+                {selectablePublishedCards.map(card => (
+                  <SelectableSandboxCard
+                    key={card.id}
+                    card={card}
+                    selected={selectedIds.includes(card.id)}
+                    onToggle={toggleSelected}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
+          </WorkshopSection>
+        </div>
+
+        <div className="ws-modal-actions">
+          <button type="button" className="btn-secondary" onClick={() => setSelectedIds([])}>
+            {t('platform.clearSelection')}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setPlayerCount(DEFAULT_SANDBOX_SETTINGS.player_count)
+              setDeckIds([...DEFAULT_SANDBOX_SETTINGS.deck_ids])
+            }}
+          >
+            {t('platform.resetSandboxSettings')}
+          </button>
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            {t('platform.cancel')}
+          </button>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? t('platform.saving') : t('platform.applySandbox')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Sandbox View ─────────────────────────────────────────────────────────────
+
+function SandboxView({
+  cards,
+  settings,
+  onSelect,
+  onStartGame,
+  onRemove,
+  onOpenReset,
+  t,
+}: {
+  cards: WorkshopCard[]
+  settings: SandboxSettings
+  onSelect: (c: WorkshopCard) => void
+  onStartGame: () => void
+  onRemove: (workshopCardId: string) => Promise<void>
+  onOpenReset: () => void
+  t: (key: string, params?: Record<string, string | number>) => string
+}) {
+  return (
     <div className="ws-sandbox">
-      <h2>{t('platform.mySandbox')}</h2>
+      <div className="ws-sandbox-header">
+        <div>
+          <h2>{t('platform.mySandbox')}</h2>
+          <p className="ws-section-subtitle">{t('platform.sandboxManageSubtitle')}</p>
+          <p className="ws-section-subtitle">
+            {t('platform.sandboxSettingsSummary', {
+              players: settings.player_count,
+              decks: settings.deck_ids.join(', '),
+            })}
+          </p>
+        </div>
+        <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenReset}>
+          {t('platform.resetSandbox')}
+        </button>
+      </div>
       {cards.length === 0 ? (
-        <p className="rooms-empty">{t('platform.sandboxEmpty')}</p>
+        <p className="rooms-empty">{t('platform.resetSandboxEmpty')}</p>
       ) : (
         <>
           <ul className="ws-sandbox-list">
-            {cards.map(c => (
-              <li key={c.id} className="ws-sandbox-item">
-                <span className="ws-card-tile-name" style={{ cursor: 'pointer' }} onClick={() => onSelect(c)}>{c.name}</span>
-                <span className="ws-author">{t('platform.by', { name: c.author_name })}</span>
-                <button type="button" className="btn-small ws-remove-btn" onClick={() => handleRemove(c.id)}>{t('platform.remove')}</button>
+            {cards.map(card => (
+              <li key={card.id} className="ws-sandbox-item">
+                <div className="ws-sandbox-item-main" onClick={() => onSelect(card)}>
+                  <span className="ws-card-tile-name">{card.name}</span>
+                  <div className="ws-card-tile-meta">
+                    <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+                    {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
+                    <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
+                    <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
+                  </div>
+                </div>
+                <button type="button" className="btn-small ws-remove-btn" onClick={() => void onRemove(card.id)}>{t('platform.remove')}</button>
               </li>
             ))}
           </ul>
-          <div className="ws-sandbox-btns">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => onStartGame(cards.map(c => c.id), 'single')}
-            >
-              {t('platform.singleTest')}
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => onStartGame(cards.map(c => c.id), 'multi')}
-            >
-              {t('platform.multiTest')}
-            </button>
-          </div>
         </>
       )}
+      <div className="ws-sandbox-btns">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={onStartGame}
+        >
+          {t('platform.startSandbox')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -697,56 +1077,157 @@ function SandboxView({ token, onSelect, onStartGame, t }: {
 export function WorkshopPage() {
   const { user, token } = useAuth()
   const { t } = useLocale()
-  const [view, setView] = useState<View>('browse')
-  const [cards, setCards] = useState<WorkshopCard[]>([])
+  const [view, setView] = useState<View>('home')
+  const [browseCards, setBrowseCards] = useState<WorkshopCard[]>([])
+  const [featuredCards, setFeaturedCards] = useState<WorkshopCard[]>([])
+  const [myCards, setMyCards] = useState<WorkshopCard[]>([])
+  const [sandboxCards, setSandboxCards] = useState<WorkshopCard[]>([])
+  const [sandboxSettings, setSandboxSettings] = useState<SandboxSettings>(DEFAULT_SANDBOX_SETTINGS)
   const [selectedCard, setSelectedCard] = useState<WorkshopCard | null>(null)
   const [editCard, setEditCard] = useState<WorkshopCard | undefined>(undefined)
   const [sort, setSort] = useState<'recent' | 'popular'>('recent')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [page, setPageNum] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const prevView = useRef<View>('browse')
+  const [browsePage, setBrowsePage] = useState(1)
+  const [browseHasMore, setBrowseHasMore] = useState(false)
+  const [browseLoading, setBrowseLoading] = useState(false)
+  const [featuredLoading, setFeaturedLoading] = useState(false)
+  const [myLoading, setMyLoading] = useState(false)
+  const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
+  const prevView = useRef<View>('home')
+  const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
-  const loadCards = useCallback(async (
-    target: 'browse' | 'mine' | 'featured',
-    sortVal: string,
-    searchVal: string,
-    pageVal: number,
+  const fetchCardList = useCallback(async (params: URLSearchParams) => {
+    const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
+      headers: authHeaders(token),
+    })
+    return response.json()
+  }, [token])
+
+  const loadBrowseCards = useCallback(async (
+    pageToLoad: number,
+    searchValue: string,
+    sortValue: 'recent' | 'popular',
   ) => {
-    setLoading(true)
+    setBrowseLoading(true)
     try {
       const params = new URLSearchParams({
-        sort: sortVal,
-        search: searchVal,
-        page: String(pageVal),
-        status: target === 'mine' ? 'draft' : 'published',
+        sort: sortValue,
+        search: searchValue,
+        page: String(pageToLoad),
+        status: 'published',
       })
-      if (target === 'featured') params.set('featured', '1')
-      const r = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
-        headers: authHeaders(token),
-      })
-      const d = await r.json()
-      if (d.ok) {
-        setCards(prev => pageVal === 1 ? d.cards : [...prev, ...d.cards])
-        setHasMore(d.hasMore)
+      const data = await fetchCardList(params)
+      if (data.ok) {
+        setBrowseCards(prev => pageToLoad === 1 ? data.cards : [...prev, ...data.cards])
+        setBrowseHasMore(data.hasMore)
       }
     } finally {
-      setLoading(false)
+      setBrowseLoading(false)
+    }
+  }, [fetchCardList])
+
+  const loadFeaturedCards = useCallback(async () => {
+    setFeaturedLoading(true)
+    try {
+      const params = new URLSearchParams({
+        featured: '1',
+        status: 'published',
+        sort: 'popular',
+        page: '1',
+      })
+      const data = await fetchCardList(params)
+      if (data.ok) setFeaturedCards(data.cards)
+    } finally {
+      setFeaturedLoading(false)
+    }
+  }, [fetchCardList])
+
+  const loadMyCards = useCallback(async () => {
+    if (!token) {
+      setMyCards([])
+      return
+    }
+    setMyLoading(true)
+    try {
+      const params = new URLSearchParams({
+        scope: 'mine',
+        sort: 'recent',
+        page: '1',
+      })
+      const data = await fetchCardList(params)
+      if (data.ok) setMyCards(data.cards)
+    } finally {
+      setMyLoading(false)
+    }
+  }, [fetchCardList, token])
+
+  const loadSandboxData = useCallback(async () => {
+    if (!token) {
+      setSandboxCards([])
+      setSandboxSettings(DEFAULT_SANDBOX_SETTINGS)
+      return
+    }
+    const response = await fetch(`${API_BASE}/api/workshop/sandbox`, {
+      headers: authHeaders(token),
+    })
+    const data = await response.json()
+    if (data.ok) {
+      setSandboxCards(data.cards)
+      setSandboxSettings(normalizeSandboxSettings(data.settings))
     }
   }, [token])
 
   useEffect(() => {
-    if (view === 'browse' || view === 'mine' || view === 'featured') {
-      loadCards(view, sort, search, page)
+    const queryChanged =
+      prevBrowseQuery.current.search !== search ||
+      prevBrowseQuery.current.sort !== sort
+
+    if (queryChanged) {
+      prevBrowseQuery.current = { search, sort }
+      setBrowseCards([])
+      setBrowseHasMore(false)
+      if (browsePage !== 1) {
+        setBrowsePage(1)
+        return
+      }
     }
-  }, [view, sort, search, page, loadCards])
+
+    void loadBrowseCards(browsePage, search, sort)
+  }, [browsePage, search, sort, loadBrowseCards])
 
   useEffect(() => {
-    setPageNum(1)
-    setCards([])
-  }, [sort, search, view])
+    void loadFeaturedCards()
+  }, [loadFeaturedCards])
+
+  useEffect(() => {
+    void loadMyCards()
+  }, [loadMyCards])
+
+  useEffect(() => {
+    void loadSandboxData()
+  }, [loadSandboxData])
+
+  const refreshAllSections = useCallback(() => {
+    if (browsePage === 1) {
+      void loadBrowseCards(1, search, sort)
+    } else {
+      setBrowsePage(1)
+    }
+    void loadFeaturedCards()
+    void loadMyCards()
+    void loadSandboxData()
+  }, [browsePage, loadBrowseCards, loadFeaturedCards, loadMyCards, loadSandboxData, search, sort])
+
+  const updateCardCollections = useCallback((cardId: string, updater: (card: WorkshopCard) => WorkshopCard) => {
+    const patchList = (cards: WorkshopCard[]) =>
+      cards.map(card => card.id === cardId ? updater(card) : card)
+    setBrowseCards(prev => patchList(prev))
+    setFeaturedCards(prev => patchList(prev))
+    setMyCards(prev => patchList(prev))
+    setSandboxCards(prev => patchList(prev))
+    setSelectedCard(prev => prev && prev.id === cardId ? updater(prev) : prev)
+  }, [])
 
   const handleAddSandbox = async (cardDbId: string) => {
     if (!token) return
@@ -755,40 +1236,63 @@ export function WorkshopPage() {
       headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify({ workshop_card_id: cardDbId }),
     })
-    alert(t('platform.addedToSandbox'))
+    await loadSandboxData()
+  }
+
+  const handleRemoveSandboxCard = async (cardDbId: string) => {
+    if (!token) return
+    await fetch(`${API_BASE}/api/workshop/sandbox/${cardDbId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+    await loadSandboxData()
+  }
+
+  const handleResetSandbox = async (nextCardIds: string[], nextSettings: SandboxSettings) => {
+    if (!token) return
+    await fetch(`${API_BASE}/api/workshop/sandbox`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify({
+        workshop_card_ids: nextCardIds,
+        settings: nextSettings,
+      }),
+    })
+    await loadSandboxData()
   }
 
   const handleLike = async (cardDbId: string) => {
     if (!token) return
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}/like`, {
-      method: 'POST', headers: authHeaders(token),
+    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}/like`, {
+      method: 'POST',
+      headers: authHeaders(token),
     })
-    const d = await r.json()
-    if (d.ok) {
-      setCards(prev => prev.map(c =>
-        c.id === cardDbId
-          ? { ...c, liked_by_me: d.liked, like_count: c.like_count + (d.liked ? 1 : -1) }
-          : c
-      ))
+    const data = await response.json()
+    if (data.ok) {
+      updateCardCollections(cardDbId, card => ({
+        ...card,
+        liked_by_me: data.liked,
+        like_count: card.like_count + (data.liked ? 1 : -1),
+      }))
     }
   }
 
-  const handleStartSandboxGame = async (cardIds: string[], mode: 'single' | 'multi') => {
-    if (mode === 'multi') {
-      setPage('game', { transport: 'ws', customCards: cardIds.join(',') })
-      return
-    }
+  const handleStartSandboxGame = async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/game/new-sandbox`, {
+      const response = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({ customCardIds: cardIds }),
+        body: JSON.stringify({
+          customCardIds: sandboxCards.map(card => card.id),
+          playerCount: sandboxSettings.player_count,
+          deckIds: sandboxSettings.deck_ids,
+        }),
       })
-      const d = await r.json()
-      if (d.ok) {
+      const data = await response.json()
+      if (data.ok) {
         setPage('game')
       } else {
-        alert(t('platform.sandboxFailed', { error: d.error ?? t('platform.sandboxUnknownError') }))
+        alert(t('platform.sandboxFailed', { error: data.error ?? t('platform.sandboxUnknownError') }))
       }
     } catch {
       alert(t('platform.sandboxNetworkError'))
@@ -797,19 +1301,31 @@ export function WorkshopPage() {
 
   const goBack = () => {
     setSelectedCard(null)
-    setView(prevView.current === 'detail' ? 'browse' : prevView.current)
+    setView(prevView.current)
   }
 
-  const selectCard = (c: WorkshopCard) => {
+  const selectCard = (card: WorkshopCard) => {
     prevView.current = view
-    setSelectedCard(c)
+    setSelectedCard(card)
     setView('detail')
   }
 
   if (view === 'detail' && selectedCard) {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={v => { setSelectedCard(null); setView(v) }} user={user} t={t} />
+        <WorkshopNav
+          view={view}
+          user={user}
+          sandboxCount={sandboxCards.length}
+          onOpenHome={() => { setSelectedCard(null); setView('home') }}
+          onOpenSandbox={() => setView('sandbox')}
+          onCreateCard={() => {
+            prevView.current = view
+            setEditCard(undefined)
+            setView('editor')
+          }}
+          t={t}
+        />
         <CardDetail
           card={selectedCard}
           token={token}
@@ -822,8 +1338,13 @@ export function WorkshopPage() {
           isUserAdmin={!!user?.isAdmin}
           onRefresh={() => {
             fetch(`${API_BASE}/api/workshop/cards/${selectedCard.id}`, { headers: authHeaders(token) })
-              .then(r => r.json())
-              .then(d => { if (d.ok) setSelectedCard(d.card) })
+              .then(response => response.json())
+              .then(data => {
+                if (data.ok) {
+                  setSelectedCard(data.card)
+                  refreshAllSections()
+                }
+              })
               .catch(() => {})
           }}
           t={t}
@@ -835,12 +1356,30 @@ export function WorkshopPage() {
   if (view === 'editor') {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={v => { setEditCard(undefined); setView(v) }} user={user} t={t} />
+        <WorkshopNav
+          view={view}
+          user={user}
+          sandboxCount={sandboxCards.length}
+          onOpenHome={() => { setEditCard(undefined); setView('home') }}
+          onOpenSandbox={() => setView('sandbox')}
+          onCreateCard={() => {
+            setEditCard(undefined)
+            setView('editor')
+          }}
+          t={t}
+        />
         <CardEditor
           initial={editCard}
           token={token}
-          onSaved={() => { setEditCard(undefined); setView('mine'); setPageNum(1); setCards([]) }}
-          onCancel={() => { setEditCard(undefined); setView(prevView.current) }}
+          onSaved={() => {
+            setEditCard(undefined)
+            setView('home')
+            refreshAllSections()
+          }}
+          onCancel={() => {
+            setEditCard(undefined)
+            setView(prevView.current)
+          }}
           t={t}
         />
       </div>
@@ -850,64 +1389,184 @@ export function WorkshopPage() {
   if (view === 'sandbox') {
     return (
       <div className="ws-page">
-        <WorkshopNav view={view} setView={setView} user={user} t={t} />
-        <SandboxView token={token} onSelect={selectCard} onStartGame={handleStartSandboxGame} t={t} />
+        <WorkshopNav
+          view={view}
+          user={user}
+          sandboxCount={sandboxCards.length}
+          onOpenHome={() => setView('home')}
+          onOpenSandbox={() => setView('sandbox')}
+          onCreateCard={() => {
+            prevView.current = view
+            setEditCard(undefined)
+            setView('editor')
+          }}
+          t={t}
+        />
+        <SandboxView
+          cards={sandboxCards}
+          settings={sandboxSettings}
+          onSelect={selectCard}
+          onStartGame={handleStartSandboxGame}
+          onRemove={handleRemoveSandboxCard}
+          onOpenReset={() => setResetSandboxOpen(true)}
+          t={t}
+        />
+        {resetSandboxOpen && (
+          <SandboxResetModal
+            token={token}
+            currentCards={sandboxCards}
+            currentSettings={sandboxSettings}
+            onClose={() => setResetSandboxOpen(false)}
+            onSave={handleResetSandbox}
+            t={t}
+          />
+        )}
       </div>
     )
   }
 
   return (
     <div className="ws-page">
-      <WorkshopNav view={view} setView={setView} user={user} t={t} />
+      <WorkshopNav
+        view={view}
+        user={user}
+        sandboxCount={sandboxCards.length}
+        onOpenHome={() => setView('home')}
+        onOpenSandbox={() => setView('sandbox')}
+        onCreateCard={() => {
+          prevView.current = view
+          setEditCard(undefined)
+          setView('editor')
+        }}
+        t={t}
+      />
 
-      <div className="ws-toolbar">
-        <form onSubmit={e => { e.preventDefault(); setSearch(searchInput) }} className="ws-search">
-          <input
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            placeholder={t('platform.searchPlaceholder')}
+      {user && (
+        <div className="ws-home-header">
+          <SandboxSummaryPanel
+            cards={sandboxCards}
+            onOpenSandbox={() => setView('sandbox')}
+            settings={sandboxSettings}
+            t={t}
           />
-          <button type="submit" className="btn-primary ws-btn-sm">{t('platform.searchBtn')}</button>
-        </form>
-        {(view === 'browse' || view === 'featured') && (
-          <div className="ws-sort">
-            <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>{t('platform.sortRecent')}</button>
-            <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>{t('platform.sortPopular')}</button>
-          </div>
-        )}
-        {view === 'mine' && (
-          <button type="button" className="btn-primary ws-btn-sm" onClick={() => { setEditCard(undefined); prevView.current = view; setView('editor') }}>
-            {t('platform.createCard')}
-          </button>
-        )}
-      </div>
-
-      {cards.length === 0 && !loading ? (
-        <p className="rooms-empty">
-          {view === 'mine' ? t('platform.noMyCards') : view === 'featured' ? t('platform.noFeatured') : t('platform.noPublished')}
-        </p>
-      ) : (
-        <div className="ws-card-grid">
-          {cards.map(c => (
-            <CardTile key={c.id} card={c} onSelect={selectCard} onLike={handleLike} mine={view === 'mine'} t={t} />
-          ))}
         </div>
       )}
 
-      {loading && <div className="ws-loading">{t('platform.loadingMore')}</div>}
-      {hasMore && !loading && (
-        <button type="button" className="btn-secondary ws-load-more" onClick={() => setPageNum(p => p + 1)}>
-          {t('platform.loadMore')}
-        </button>
+      {user && (
+        <WorkshopSection
+          title={t('platform.myCards')}
+          subtitle={t('platform.myCardsSubtitle')}
+          actions={(
+            <button
+              type="button"
+              className="btn-primary ws-btn-sm"
+              onClick={() => {
+                prevView.current = view
+                setEditCard(undefined)
+                setView('editor')
+              }}
+            >
+              {t('platform.createCard')}
+            </button>
+          )}
+        >
+          {myLoading ? (
+            <div className="ws-loading">{t('platform.loadingMore')}</div>
+          ) : myCards.length === 0 ? (
+            <p className="rooms-empty">{t('platform.noMyCards')}</p>
+          ) : (
+            <div className="ws-card-grid">
+              {myCards.map(card => (
+                <CardTile key={card.id} card={card} onSelect={selectCard} onLike={handleLike} mine t={t} />
+              ))}
+            </div>
+          )}
+        </WorkshopSection>
+      )}
+
+      <WorkshopSection
+        title={t('platform.featured')}
+        subtitle={t('platform.featuredSubtitle')}
+      >
+        {featuredLoading ? (
+          <div className="ws-loading">{t('platform.loadingMore')}</div>
+        ) : featuredCards.length === 0 ? (
+          <p className="rooms-empty">{t('platform.noFeatured')}</p>
+        ) : (
+          <div className="ws-card-grid">
+            {featuredCards.map(card => (
+              <CardTile key={card.id} card={card} onSelect={selectCard} onLike={handleLike} t={t} />
+            ))}
+          </div>
+        )}
+      </WorkshopSection>
+
+      <WorkshopSection
+        title={t('platform.browse')}
+        subtitle={t('platform.browseSubtitle')}
+        actions={(
+          <div className="ws-toolbar">
+            <form onSubmit={event => { event.preventDefault(); setSearch(searchInput.trim()) }} className="ws-search">
+              <input
+                value={searchInput}
+                onChange={event => setSearchInput(event.target.value)}
+                placeholder={t('platform.searchPlaceholder')}
+              />
+              <button type="submit" className="btn-primary ws-btn-sm">{t('platform.searchBtn')}</button>
+            </form>
+            <div className="ws-sort">
+              <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>{t('platform.sortRecent')}</button>
+              <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>{t('platform.sortPopular')}</button>
+            </div>
+          </div>
+        )}
+      >
+        {browseCards.length === 0 && !browseLoading ? (
+          <p className="rooms-empty">{t('platform.noPublished')}</p>
+        ) : (
+          <div className="ws-card-grid">
+            {browseCards.map(card => (
+              <CardTile key={card.id} card={card} onSelect={selectCard} onLike={handleLike} t={t} />
+            ))}
+          </div>
+        )}
+        {browseLoading && <div className="ws-loading">{t('platform.loadingMore')}</div>}
+        {browseHasMore && !browseLoading && (
+          <button type="button" className="btn-secondary ws-load-more" onClick={() => setBrowsePage(prev => prev + 1)}>
+            {t('platform.loadMore')}
+          </button>
+        )}
+      </WorkshopSection>
+
+      {resetSandboxOpen && (
+        <SandboxResetModal
+          token={token}
+          currentCards={sandboxCards}
+          currentSettings={sandboxSettings}
+          onClose={() => setResetSandboxOpen(false)}
+          onSave={handleResetSandbox}
+          t={t}
+        />
       )}
     </div>
   )
 }
 
-function WorkshopNav({ view, setView, user, t }: {
+function WorkshopNav({
+  view,
+  user,
+  sandboxCount,
+  onOpenHome,
+  onOpenSandbox,
+  onCreateCard,
+  t,
+}: {
   view: View
-  setView: (v: View) => void
   user: { username: string; displayName: string } | null
+  sandboxCount: number
+  onOpenHome: () => void
+  onOpenSandbox: () => void
+  onCreateCard: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
@@ -916,22 +1575,25 @@ function WorkshopNav({ view, setView, user, t }: {
         <button type="button" className="btn-link ws-back-home" onClick={() => setPage('lobby')}>{t('platform.backToLobbyShort')}</button>
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
-      <div className="ws-nav-tabs">
-        <button type="button" className={`ws-tab${view === 'browse' ? ' active' : ''}`} onClick={() => setView('browse')}>
-          {t('platform.browse')}
-        </button>
-        <button type="button" className={`ws-tab${view === 'featured' ? ' active' : ''}`} onClick={() => setView('featured')}>
-          {t('platform.featured')}
-        </button>
-        {user && (
-          <button type="button" className={`ws-tab${view === 'mine' ? ' active' : ''}`} onClick={() => setView('mine')}>
-            {t('platform.myCards')}
+      <div className="ws-nav-actions">
+        {view !== 'home' && (
+          <button type="button" className="btn-link ws-nav-link" onClick={onOpenHome}>
+            {t('platform.backToWorkshopHome')}
           </button>
         )}
         {user && (
-          <button type="button" className={`ws-tab${view === 'sandbox' ? ' active' : ''}`} onClick={() => setView('sandbox')}>
-            {t('platform.sandbox')}
-          </button>
+          <>
+            <button
+              type="button"
+              className={`btn-secondary ws-btn-sm ws-nav-action${view === 'sandbox' ? ' active' : ''}`}
+              onClick={onOpenSandbox}
+            >
+              {t('platform.sandbox')}{sandboxCount > 0 ? ` (${sandboxCount})` : ''}
+            </button>
+            <button type="button" className="btn-primary ws-btn-sm" onClick={onCreateCard}>
+              {t('platform.createCard')}
+            </button>
+          </>
         )}
       </div>
     </div>
