@@ -172,7 +172,7 @@ async function* streamOpenAI(
       ...messages,
     ],
     temperature: 0.7,
-    max_tokens: 2048,
+    max_tokens: 8192,
   }
 
   const resp = await fetch(url, {
@@ -230,7 +230,7 @@ async function* streamAnthropic(
     stream: true,
     system: systemPrompt,
     messages,
-    max_tokens: 2048,
+    max_tokens: 8192,
   }
 
   const resp = await fetch(url, {
