@@ -460,34 +460,41 @@ export function supportsImageGeneration(config: LlmConfig): boolean {
 }
 
 /**
- * Generate card art via DALL-E (OpenAI/custom) or Imagen 3 (Gemini).
+ * Generate card art via DALL-E (OpenAI/custom) or Gemini native image generation.
  * Returns a data URL or null on failure.
  */
 export async function generateCardArt(
   prompt: string,
   config: LlmConfig,
 ): Promise<string | null> {
-  // Gemini: use Imagen 3 via generativelanguage API
+  // Gemini: native image generation via generateContent
   if (config.provider === 'gemini') {
     try {
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${config.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${config.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            instances: [{ prompt }],
-            parameters: { sampleCount: 1 },
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
           }),
         },
       )
-      if (!resp.ok) return null
-      const data = await resp.json() as { predictions?: { bytesBase64Encoded?: string }[] }
-      const b64 = data.predictions?.[0]?.bytesBase64Encoded
-      if (!b64) return null
-      return `data:image/png;base64,${b64}`
-    } catch {
-      return null
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({})) as { error?: { message?: string } }
+        throw new Error(err.error?.message ?? `HTTP ${resp.status}`)
+      }
+      const data = await resp.json() as {
+        candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[]
+      }
+      const parts = data.candidates?.[0]?.content?.parts ?? []
+      const imgPart = parts.find(p => p.inlineData?.data)
+      if (!imgPart?.inlineData?.data) return null
+      const mime = imgPart.inlineData.mimeType ?? 'image/png'
+      return `data:${mime};base64,${imgPart.inlineData.data}`
+    } catch (e) {
+      throw e
     }
   }
 
