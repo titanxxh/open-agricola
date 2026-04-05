@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
-  supportsImageGeneration,
+  supportsImageGeneration, KEY_LLM_CONFIG_ART,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
@@ -140,10 +140,11 @@ function MessageContent({ text }: { text: string }) {
 
 // ── Inline Config Bar ─────────────────────────────────────────────────────────
 
-function ConfigBar({ config, onConfigured, onClear }: {
+function ConfigBar({ config, onConfigured, onClear, storageKey }: {
   config: LlmConfig | null
   onConfigured: () => void
   onClear: () => void
+  storageKey?: string
 }) {
   const [expanded, setExpanded] = useState(!config)
   const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
@@ -160,13 +161,13 @@ function ConfigBar({ config, onConfigured, onClear }: {
 
   const handleSave = () => {
     if (!apiKey.trim()) return
-    saveLlmConfig({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined })
+    saveLlmConfig({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined }, storageKey)
     setExpanded(false)
     onConfigured()
   }
 
   const handleClear = () => {
-    clearLlmConfig()
+    clearLlmConfig(storageKey)
     setApiKey('')
     setExpanded(true)
     onClear()
@@ -338,20 +339,20 @@ function RefImagePicker({ cardType, selected, onToggle }: {
 
 // ── Art Panel ─────────────────────────────────────────────────────────────────
 
-function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, refCache }: {
+function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
   cardType: 'minor' | 'occupation'
   cardName: string
   artUrl: string | null
   setArtUrl: (url: string | null) => void
-  config: LlmConfig
-  setError: (msg: string) => void
   refCache?: Map<string, ReferenceImage>
 }) {
   const { locale } = useLocale()
+  const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
   const [artSubject, setArtSubject] = useState('')
   const [generating, setGenerating] = useState(false)
   const [artPrompt, setArtPrompt] = useState('')
   const [selectedRefs, setSelectedRefs] = useState<string[]>([])
+  const [artError, setArtError] = useState('')
 
   const handleToggleRef = (url: string) => {
     setSelectedRefs(prev =>
@@ -368,20 +369,20 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, ref
     setArtPrompt(buildCardArtPrompt(artSubject.trim(), cardType, locale as 'zh' | 'en'))
   }, [artSubject, cardType, locale])
 
-  const canGenerateArt = supportsImageGeneration(config)
+  const canGenerateArt = config ? supportsImageGeneration(config) : false
 
   const handleGenerate = async () => {
-    if (!artPrompt.trim() || generating || !canGenerateArt) return
+    if (!artPrompt.trim() || generating || !canGenerateArt || !config) return
     setGenerating(true)
-    setError('')
+    setArtError('')
     try {
       // Use pre-fetched cache when available, fall back to live fetch
       const refImages = selectedRefs.length > 0
-        ? (await Promise.all(selectedRefs.map(url => refCache?.get(url) ? Promise.resolve(refCache.get(url)!) : fetchRefImage(url)))).filter((r): r is NonNullable<typeof r> => r !== null)
+        ? (await Promise.all(selectedRefs.map(url => refCache?.get(url) ? Promise.resolve(refCache.get(url)!) : fetchRefImage(url)))).filter((r): r is ReferenceImage => r !== null)
         : undefined
       const dataUrl = await generateCardArt(artPrompt, config, refImages)
       if (!dataUrl) {
-        setError(locale === 'zh'
+        setArtError(locale === 'zh'
           ? '图片生成失败，请检查 API Key 权限'
           : 'Image generation failed, please check your API key permissions')
         return
@@ -389,7 +390,7 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, ref
       const uploaded = await uploadArt(dataUrl)
       setArtUrl(uploaded ?? dataUrl)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Art generation error')
+      setArtError(err instanceof Error ? err.message : 'Art generation error')
     } finally {
       setGenerating(false)
     }
@@ -402,9 +403,16 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, ref
   return (
     <div className="ai-art-panel">
       <div className="ai-art-panel-header">
-        <h3>{locale === 'zh' ? '卡牌美术' : 'Card Art'}</h3>
+        <h3>{locale === 'zh' ? '🖼 卡牌图片' : '🖼 Card Art'}</h3>
         <span className="ai-art-border-tag">{borderLabel}</span>
       </div>
+
+      <ConfigBar
+        storageKey={KEY_LLM_CONFIG_ART}
+        config={config}
+        onConfigured={() => setConfig(getLlmConfig(KEY_LLM_CONFIG_ART))}
+        onClear={() => setConfig(null)}
+      />
 
       {artUrl && (
         <div className="ai-art-preview-area">
@@ -412,65 +420,71 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, ref
         </div>
       )}
 
-      <div className="form-field">
-        <label>
-          {cardType === 'occupation'
-            ? (locale === 'zh' ? '描述人物形象（如：一个正在锻造铁器的快乐铁匠）' : 'Describe the character (e.g., a cheerful blacksmith forging iron)')
-            : (locale === 'zh' ? '描述物品（如：一个由木头和藤条编织的中世纪摇篮）' : 'Describe the object (e.g., a medieval cradle made of wood and wicker)')
-          }
-        </label>
-        <input
-          type="text"
-          value={artSubject}
-          onChange={e => setArtSubject(e.target.value)}
-          placeholder={cardType === 'occupation'
-            ? (locale === 'zh' ? '一个正在采摘水果的快乐农夫' : 'a cheerful farmer picking fruit')
-            : (locale === 'zh' ? '一把质朴的中世纪木锤' : 'a rustic medieval wooden mallet')
-          }
-        />
-      </div>
+      {config && (
+        <>
+          <div className="form-field">
+            <label>
+              {cardType === 'occupation'
+                ? (locale === 'zh' ? '描述人物形象（如：一个正在锻造铁器的快乐铁匠）' : 'Describe the character (e.g., a cheerful blacksmith forging iron)')
+                : (locale === 'zh' ? '描述物品（如：一个由木头和藤条编织的中世纪摇篮）' : 'Describe the object (e.g., a medieval cradle made of wood and wicker)')
+              }
+            </label>
+            <input
+              type="text"
+              value={artSubject}
+              onChange={e => setArtSubject(e.target.value)}
+              placeholder={cardType === 'occupation'
+                ? (locale === 'zh' ? '一个正在采摘水果的快乐农夫' : 'a cheerful farmer picking fruit')
+                : (locale === 'zh' ? '一把质朴的中世纪木锤' : 'a rustic medieval wooden mallet')
+              }
+            />
+          </div>
 
-      {artPrompt && (
-        <div className="ai-art-prompt-preview">
-          <div className="ai-art-prompt-label">{locale === 'zh' ? '生成提示词' : 'Generation Prompt'}</div>
-          <textarea
-            className="ai-art-prompt-text"
-            value={artPrompt}
-            onChange={e => setArtPrompt(e.target.value)}
-            rows={4}
-          />
-        </div>
-      )}
+          {artPrompt && (
+            <div className="ai-art-prompt-preview">
+              <div className="ai-art-prompt-label">{locale === 'zh' ? '生成提示词' : 'Generation Prompt'}</div>
+              <textarea
+                className="ai-art-prompt-text"
+                value={artPrompt}
+                onChange={e => setArtPrompt(e.target.value)}
+                rows={4}
+              />
+            </div>
+          )}
 
-      {canGenerateArt && (
-        <RefImagePicker
-          cardType={cardType}
-          selected={selectedRefs}
-          onToggle={handleToggleRef}
-        />
-      )}
+          {canGenerateArt && (
+            <RefImagePicker
+              cardType={cardType}
+              selected={selectedRefs}
+              onToggle={handleToggleRef}
+            />
+          )}
 
-      {canGenerateArt ? (
-        <button
-          type="button"
-          className="btn-primary ai-art-gen-btn"
-          onClick={handleGenerate}
-          disabled={generating || !artPrompt.trim()}
-        >
-          {generating
-            ? (locale === 'zh' ? '生成中…' : 'Generating…')
-            : selectedRefs.length > 0
-              ? (locale === 'zh' ? `生成图片（${selectedRefs.length}张参考）` : `Generate (${selectedRefs.length} refs)`)
-              : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
-          }
-        </button>
-      ) : (
-        <div className="ai-art-no-gen">
-          {locale === 'zh'
-            ? '图片生成需要 OpenAI（DALL-E 3）或 Gemini（Imagen 3）API Key'
-            : 'Image generation requires OpenAI (DALL-E 3) or Gemini (Imagen 3) API Key'
-          }
-        </div>
+          {canGenerateArt ? (
+            <button
+              type="button"
+              className="btn-primary ai-art-gen-btn"
+              onClick={handleGenerate}
+              disabled={generating || !artPrompt.trim()}
+            >
+              {generating
+                ? (locale === 'zh' ? '生成中…' : 'Generating…')
+                : selectedRefs.length > 0
+                  ? (locale === 'zh' ? `生成图片（${selectedRefs.length}张参考）` : `Generate (${selectedRefs.length} refs)`)
+                  : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
+              }
+            </button>
+          ) : (
+            <div className="ai-art-no-gen">
+              {locale === 'zh'
+                ? '图片生成需要 Gemini（gemini-3.1-flash-image-preview）或 OpenAI（DALL-E 3）'
+                : 'Image gen requires Gemini (gemini-3.1-flash-image-preview) or OpenAI (DALL-E 3)'
+              }
+            </div>
+          )}
+
+          {artError && <div className="form-error" style={{ marginTop: 8 }}>{artError}</div>}
+        </>
       )}
     </div>
   )
@@ -479,10 +493,9 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, ref
 // ── Ability Chat Panel ────────────────────────────────────────────────────────
 
 function AbilityPanel({
-  config, cardType, cardName, prerequisite, costHint, extracted, setExtracted, artUrl, onImport,
-  sandboxErrors, onSandboxErrorsConsumed, setError,
+  cardType, cardName, prerequisite, costHint, extracted, setExtracted, artUrl, onImport,
+  sandboxErrors, onSandboxErrorsConsumed,
 }: {
-  config: LlmConfig
   cardType: 'minor' | 'occupation'
   cardName: string
   prerequisite?: string
@@ -493,9 +506,10 @@ function AbilityPanel({
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
-  setError: (msg: string) => void
 }) {
   const { locale } = useLocale()
+  const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
+  const [chatError, setChatError] = useState('')
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -508,7 +522,7 @@ function AbilityPanel({
   const sendMessages = useCallback(async (chatHistory: ChatMessage[]) => {
     if (!config) return
     setStreaming(true)
-    setError('')
+    setChatError('')
 
     const assistantMsg: DisplayMessage = { role: 'assistant', content: '', streaming: true }
     setMessages(prev => [...prev, assistantMsg])
@@ -540,12 +554,12 @@ function AbilityPanel({
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(msg)
+      setChatError(msg)
       setMessages(prev => prev.filter(m => !m.streaming))
     } finally {
       setStreaming(false)
     }
-  }, [config, setError, setExtracted])
+  }, [config, setChatError, setExtracted])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !config || streaming) return
@@ -608,7 +622,7 @@ function AbilityPanel({
   return (
     <div className="ai-ability-panel">
       <div className="ai-ability-panel-header">
-        <h3>{locale === 'zh' ? '卡牌能力' : 'Card Ability'}</h3>
+        <h3>{locale === 'zh' ? '💬 卡牌能力' : '💬 Card Ability'}</h3>
         {extracted && (
           <button
             type="button"
@@ -619,6 +633,14 @@ function AbilityPanel({
           </button>
         )}
       </div>
+
+      <ConfigBar
+        config={config}
+        onConfigured={() => setConfig(getLlmConfig())}
+        onClear={() => setConfig(null)}
+      />
+
+      {chatError && <div className="form-error" style={{ marginTop: 4, marginBottom: 4 }}>{chatError}</div>}
 
       <div className="ai-chat-area">
         {messages.length === 0 && (
@@ -661,24 +683,26 @@ function AbilityPanel({
         </div>
       )}
 
-      <div className="ai-input-area">
-        <textarea
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={locale === 'zh' ? '描述你想要的卡牌效果… (Enter 发送)' : 'Describe the card effect… (Enter to send)'}
-          rows={2}
-          disabled={streaming}
-        />
-        <button
-          type="button"
-          className="btn-primary ai-send-btn"
-          onClick={handleSend}
-          disabled={streaming || !input.trim()}
-        >
-          {streaming ? '…' : '→'}
-        </button>
-      </div>
+      {config && (
+        <div className="ai-input-area">
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={locale === 'zh' ? '描述你想要的卡牌效果… (Enter 发送)' : 'Describe the card effect… (Enter to send)'}
+            rows={2}
+            disabled={streaming}
+          />
+          <button
+            type="button"
+            className="btn-primary ai-send-btn"
+            onClick={handleSend}
+            disabled={streaming || !input.trim()}
+          >
+            {streaming ? '…' : '→'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -699,7 +723,6 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   onSandboxErrorsConsumed?: () => void
 }) {
   const { locale } = useLocale()
-  const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
   const [cardName, setCardName] = useState('')
   const [prerequisite, setPrerequisite] = useState('')
@@ -898,12 +921,6 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
         <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
       </div>
 
-      <ConfigBar
-        config={config}
-        onConfigured={() => setConfig(getLlmConfig())}
-        onClear={() => setConfig(null)}
-      />
-
       {/* Load previous designs */}
       {myCards.length > 0 && (
         <div className="ai-my-cards-bar">
@@ -935,10 +952,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
         </div>
       )}
 
-      {/* Card design area — only shown when config is ready */}
-      {config && (
-        <>
-          <div className="ai-card-info-bar">
+      <div className="ai-card-info-bar">
             <div className="ai-card-type-toggle">
               <button
                 type="button"
@@ -1034,12 +1048,9 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               cardName={cardName}
               artUrl={artUrl}
               setArtUrl={setArtUrl}
-              config={config}
-              setError={setError}
               refCache={refCache}
             />
             <AbilityPanel
-              config={config}
               cardType={cardType}
               cardName={cardName}
               prerequisite={prerequisite}
@@ -1050,11 +1061,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               onImport={onImport}
               sandboxErrors={sandboxErrors}
               onSandboxErrorsConsumed={onSandboxErrorsConsumed}
-              setError={setError}
             />
           </div>
-        </>
-      )}
 
       {error && <div className="form-error ai-error">{error}</div>}
     </div>

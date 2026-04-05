@@ -460,7 +460,7 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
 
   if (showAi) {
     return (
-      <div className="ws-editor">
+      <div className="ws-editor ws-editor-ai">
         <AiCardDesigner
           onImport={handleAiImport}
           onClose={() => setShowAi(false)}

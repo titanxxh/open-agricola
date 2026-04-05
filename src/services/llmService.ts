@@ -99,9 +99,11 @@ export const PROVIDER_KEY_HINTS: Record<LlmProvider, string> = {
   custom: '',
 }
 
-export function getLlmConfig(): LlmConfig | null {
+export const KEY_LLM_CONFIG_ART = 'open-agricola-llm-config-art'
+
+export function getLlmConfig(storageKey?: string): LlmConfig | null {
   try {
-    const raw = localStorage.getItem(KEY_LLM_CONFIG)
+    const raw = localStorage.getItem(storageKey ?? KEY_LLM_CONFIG)
     if (!raw) return null
     return JSON.parse(raw) as LlmConfig
   } catch {
@@ -109,12 +111,12 @@ export function getLlmConfig(): LlmConfig | null {
   }
 }
 
-export function saveLlmConfig(config: LlmConfig): void {
-  localStorage.setItem(KEY_LLM_CONFIG, JSON.stringify(config))
+export function saveLlmConfig(config: LlmConfig, storageKey?: string): void {
+  localStorage.setItem(storageKey ?? KEY_LLM_CONFIG, JSON.stringify(config))
 }
 
-export function clearLlmConfig(): void {
-  localStorage.removeItem(KEY_LLM_CONFIG)
+export function clearLlmConfig(storageKey?: string): void {
+  localStorage.removeItem(storageKey ?? KEY_LLM_CONFIG)
 }
 
 export function defaultModel(provider: LlmProvider): string {
@@ -463,20 +465,27 @@ export function supportsImageGeneration(config: LlmConfig): boolean {
  * Generate card art via DALL-E (OpenAI/custom) or Gemini native image generation.
  * Returns a data URL or null on failure.
  */
+export type ReferenceImage = { data: string; mimeType: string }
+
 export async function generateCardArt(
   prompt: string,
   config: LlmConfig,
+  referenceImages?: ReferenceImage[],
 ): Promise<string | null> {
-  // Gemini: native image generation via generateContent
+  // Gemini: native image generation via generateContent (with optional reference images)
   if (config.provider === 'gemini') {
     try {
+      const textPart = { text: prompt }
+      const imgParts = (referenceImages ?? []).map(img => ({
+        inlineData: { mimeType: img.mimeType, data: img.data },
+      }))
       const resp = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${config.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: [{ parts: [textPart, ...imgParts] }],
             generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
           }),
         },
