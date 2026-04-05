@@ -4,7 +4,7 @@ import {
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
   supportsImageGeneration,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
-  type LlmConfig, type LlmProvider, type ChatMessage,
+  type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
 import { useLocale } from '../../contexts/LocaleContext'
@@ -246,20 +246,104 @@ function ConfigBar({ config, onConfigured, onClear }: {
   )
 }
 
+// ── BGA Reference Image Picker ────────────────────────────────────────────────
+
+/** BGA card image URL given deck letter and card number */
+function bgaImgUrl(deck: string, num: number) {
+  return `/bga-img/deck${deck}/${deck}${String(num).padStart(3, '0')}.png`
+}
+
+const MINOR_REF_IMAGES = [
+  bgaImgUrl('A', 1), bgaImgUrl('A', 2), bgaImgUrl('A', 3),
+  bgaImgUrl('A', 4), bgaImgUrl('A', 5), bgaImgUrl('A', 6),
+  bgaImgUrl('B', 1), bgaImgUrl('B', 2), bgaImgUrl('B', 3),
+  bgaImgUrl('C', 1), bgaImgUrl('C', 2), bgaImgUrl('C', 3),
+]
+
+const OCC_REF_IMAGES = [
+  bgaImgUrl('A', 85), bgaImgUrl('A', 87), bgaImgUrl('A', 88),
+  bgaImgUrl('A', 92), bgaImgUrl('B', 70), bgaImgUrl('B', 86),
+  bgaImgUrl('C', 85), bgaImgUrl('C', 86), bgaImgUrl('D', 49),
+  bgaImgUrl('D', 85), bgaImgUrl('E', 85), bgaImgUrl('E', 86),
+]
+
+async function fetchRefImage(url: string): Promise<ReferenceImage | null> {
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        const data = dataUrl.split(',')[1] ?? ''
+        resolve({ data, mimeType: blob.type || 'image/png' })
+      }
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+function RefImagePicker({ cardType, selected, onToggle }: {
+  cardType: 'minor' | 'occupation'
+  selected: string[]
+  onToggle: (url: string) => void
+}) {
+  const { locale } = useLocale()
+  const images = cardType === 'minor' ? MINOR_REF_IMAGES : OCC_REF_IMAGES
+
+  return (
+    <div className="ai-ref-picker">
+      <div className="ai-ref-picker-label">
+        {locale === 'zh' ? `参考图片（最多选3张）` : 'Reference images (up to 3)'}
+      </div>
+      <div className="ai-ref-picker-grid">
+        {images.map(url => {
+          const isSelected = selected.includes(url)
+          const maxed = selected.length >= 3 && !isSelected
+          return (
+            <button
+              key={url}
+              type="button"
+              className={`ai-ref-thumb${isSelected ? ' selected' : ''}${maxed ? ' maxed' : ''}`}
+              onClick={() => !maxed && onToggle(url)}
+              title={isSelected ? (locale === 'zh' ? '取消选择' : 'Deselect') : (locale === 'zh' ? '选为参考' : 'Use as reference')}
+            >
+              <img src={url} alt="" />
+              {isSelected && <span className="ai-ref-check">✓</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Art Panel ─────────────────────────────────────────────────────────────────
 
-function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
+function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError, refCache }: {
   cardType: 'minor' | 'occupation'
   cardName: string
   artUrl: string | null
   setArtUrl: (url: string | null) => void
   config: LlmConfig
   setError: (msg: string) => void
+  refCache?: Map<string, ReferenceImage>
 }) {
   const { locale } = useLocale()
   const [artSubject, setArtSubject] = useState('')
   const [generating, setGenerating] = useState(false)
   const [artPrompt, setArtPrompt] = useState('')
+  const [selectedRefs, setSelectedRefs] = useState<string[]>([])
+
+  const handleToggleRef = (url: string) => {
+    setSelectedRefs(prev =>
+      prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]
+    )
+  }
 
   // Auto-generate prompt when subject or card type changes
   useEffect(() => {
@@ -277,7 +361,11 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
     setGenerating(true)
     setError('')
     try {
-      const dataUrl = await generateCardArt(artPrompt, config)
+      // Use pre-fetched cache when available, fall back to live fetch
+      const refImages = selectedRefs.length > 0
+        ? (await Promise.all(selectedRefs.map(url => refCache?.get(url) ? Promise.resolve(refCache.get(url)!) : fetchRefImage(url)))).filter((r): r is NonNullable<typeof r> => r !== null)
+        : undefined
+      const dataUrl = await generateCardArt(artPrompt, config, refImages)
       if (!dataUrl) {
         setError(locale === 'zh'
           ? '图片生成失败，请检查 API Key 权限'
@@ -340,6 +428,14 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
         </div>
       )}
 
+      {canGenerateArt && (
+        <RefImagePicker
+          cardType={cardType}
+          selected={selectedRefs}
+          onToggle={handleToggleRef}
+        />
+      )}
+
       {canGenerateArt ? (
         <button
           type="button"
@@ -349,7 +445,9 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
         >
           {generating
             ? (locale === 'zh' ? '生成中…' : 'Generating…')
-            : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
+            : selectedRefs.length > 0
+              ? (locale === 'zh' ? `生成图片（${selectedRefs.length}张参考）` : `Generate (${selectedRefs.length} refs)`)
+              : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
           }
         </button>
       ) : (
@@ -571,6 +669,12 @@ function AbilityPanel({
   )
 }
 
+// Pre-fetch images to download on mount: first 3 minors + first 3 occupations
+const PREFETCH_URLS = [
+  ...MINOR_REF_IMAGES.slice(0, 3),
+  ...OCC_REF_IMAGES.slice(0, 3),
+]
+
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
 export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
@@ -592,6 +696,26 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
+
+  // Pre-fetch 3 minor + 3 occupation reference images on mount
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const entries = await Promise.all(
+        PREFETCH_URLS.map(async url => ({ url, img: await fetchRefImage(url) }))
+      )
+      if (cancelled) return
+      setRefCache(prev => {
+        const next = new Map(prev)
+        for (const { url, img } of entries) {
+          if (img) next.set(url, img)
+        }
+        return next
+      })
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Sync card type/name from extracted card
   useEffect(() => {
@@ -776,6 +900,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               setArtUrl={setArtUrl}
               config={config}
               setError={setError}
+              refCache={refCache}
             />
             <AbilityPanel
               config={config}
