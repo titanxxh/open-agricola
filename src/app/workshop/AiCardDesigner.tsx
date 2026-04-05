@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
-  streamChat, extractCardJson, generateCardArt,
+  streamChat, extractCardJson, generateCardArt, buildCardArtPrompt,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
+import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
 
 const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
@@ -66,7 +67,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
       <div className="ai-code-header">
         {lang && <span className="ai-code-lang">{lang}</span>}
         <button type="button" className="ai-code-copy" onClick={handleCopy}>
-          {copied ? '已复制' : '复制'}
+          {copied ? '✓' : '复制'}
         </button>
       </div>
       <pre><code>{code}</code></pre>
@@ -75,7 +76,6 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
 }
 
 function MessageContent({ text }: { text: string }) {
-  // Split on fenced code blocks: ```lang\ncode```
   const parts = text.split(/(```[\s\S]*?```)/g)
 
   return (
@@ -207,92 +207,140 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
   )
 }
 
-// ── Card Preview ──────────────────────────────────────────────────────────────
+// ── Art Panel ─────────────────────────────────────────────────────────────────
 
-function CardPreview({ extracted, artUrl, onGenArt, generatingArt }: {
-  extracted: ExtractedCard
+function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
+  cardType: 'minor' | 'occupation'
+  cardName: string
   artUrl: string | null
-  onGenArt: () => void
-  generatingArt: boolean
+  setArtUrl: (url: string | null) => void
+  config: LlmConfig
+  setError: (msg: string) => void
 }) {
-  const { card } = extracted
-  const costEntries = Object.entries(card.cost ?? {}).filter(([, v]) => v > 0)
+  const { locale } = useLocale()
+  const [artSubject, setArtSubject] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [artPrompt, setArtPrompt] = useState('')
+
+  // Auto-generate prompt when subject or card type changes
+  useEffect(() => {
+    if (!artSubject.trim()) {
+      setArtPrompt('')
+      return
+    }
+    setArtPrompt(buildCardArtPrompt(artSubject.trim(), cardType, locale as 'zh' | 'en'))
+  }, [artSubject, cardType, locale])
+
+  const handleGenerate = async () => {
+    if (!artPrompt.trim() || generating) return
+    setGenerating(true)
+    setError('')
+    try {
+      const dataUrl = await generateCardArt(artPrompt, config)
+      if (!dataUrl) {
+        setError(locale === 'zh'
+          ? '图片生成失败（需要 OpenAI API Key 支持 DALL-E）'
+          : 'Image generation failed (requires OpenAI API Key for DALL-E)')
+        return
+      }
+      const uploaded = await uploadArt(dataUrl)
+      setArtUrl(uploaded ?? dataUrl)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Art generation error')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const borderLabel = cardType === 'occupation'
+    ? (locale === 'zh' ? '圆形金边' : 'circular gold-trimmed')
+    : (locale === 'zh' ? '六角形金边' : 'hexagonal gold-trimmed')
 
   return (
-    <div className="ai-card-preview">
-      <div className="ai-preview-art-area">
-        {artUrl
-          ? <img src={artUrl} alt={card.name} className="ai-preview-art" />
-          : <div className="ai-preview-art-placeholder">
-              <button type="button" className="btn-secondary ws-btn-sm" onClick={onGenArt} disabled={generatingArt}>
-                {generatingArt ? '生成中…' : '生成卡牌美术'}
-              </button>
-            </div>
-        }
-        {artUrl && (
-          <button type="button" className="btn-link ai-regen-art" onClick={onGenArt} disabled={generatingArt}>
-            {generatingArt ? '生成中…' : '重新生成'}
-          </button>
-        )}
+    <div className="ai-art-panel">
+      <div className="ai-art-panel-header">
+        <h3>{locale === 'zh' ? '卡牌美术' : 'Card Art'}</h3>
+        <span className="ai-art-border-tag">{borderLabel}</span>
       </div>
 
-      <div className="ai-preview-body">
-        <div className="ai-preview-name">{card.name}</div>
-        <div className="ai-preview-meta">
-          <span className="ws-badge">{card.card_type === 'minor' ? '小改进' : '职业'}</span>
-          {(card.vp ?? 0) > 0 && <span className="ws-badge ai-badge-vp">{card.vp} VP</span>}
+      {artUrl && (
+        <div className="ai-art-preview-area">
+          <img src={artUrl} alt={cardName || 'card art'} className="ai-art-preview-img" />
         </div>
-        {costEntries.length > 0 && (
-          <div className="ai-preview-cost">
-            费用：{costEntries.map(([r, n]) => `${r}×${n}`).join(' ')}
-          </div>
-        )}
-        {card.prerequisite && (
-          <div className="ai-preview-prereq">先决：{card.prerequisite}</div>
-        )}
-        <div className="ai-preview-desc">
-          <ResourceText text={(card.desc ?? []).join(' ')} />
-        </div>
-        {extracted.effects && Object.keys(extracted.effects).length > 0 && (
-          <div className="ai-preview-effects">
-            <span className="ai-effect-label">效果：</span>
-            {Object.keys(extracted.effects).join('、')}
-          </div>
-        )}
+      )}
+
+      <div className="form-field">
+        <label>
+          {cardType === 'occupation'
+            ? (locale === 'zh' ? '描述人物形象（如：一个正在锻造铁器的快乐铁匠）' : 'Describe the character (e.g., a cheerful blacksmith forging iron)')
+            : (locale === 'zh' ? '描述物品（如：一个由木头和藤条编织的中世纪摇篮）' : 'Describe the object (e.g., a medieval cradle made of wood and wicker)')
+          }
+        </label>
+        <input
+          type="text"
+          value={artSubject}
+          onChange={e => setArtSubject(e.target.value)}
+          placeholder={cardType === 'occupation'
+            ? (locale === 'zh' ? '一个正在采摘水果的快乐农夫' : 'a cheerful farmer picking fruit')
+            : (locale === 'zh' ? '一把质朴的中世纪木锤' : 'a rustic medieval wooden mallet')
+          }
+        />
       </div>
+
+      {artPrompt && (
+        <div className="ai-art-prompt-preview">
+          <div className="ai-art-prompt-label">{locale === 'zh' ? '生成提示词' : 'Generation Prompt'}</div>
+          <textarea
+            className="ai-art-prompt-text"
+            value={artPrompt}
+            onChange={e => setArtPrompt(e.target.value)}
+            rows={4}
+          />
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="btn-primary ai-art-gen-btn"
+        onClick={handleGenerate}
+        disabled={generating || !artPrompt.trim()}
+      >
+        {generating
+          ? (locale === 'zh' ? '生成中…' : 'Generating…')
+          : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
+        }
+      </button>
     </div>
   )
 }
 
-// ── Main AiCardDesigner ───────────────────────────────────────────────────────
+// ── Ability Chat Panel ────────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErrorsConsumed }: {
+function AbilityPanel({
+  config, cardType, cardName, extracted, setExtracted, artUrl, onImport,
+  sandboxErrors, onSandboxErrorsConsumed, setError,
+}: {
+  config: LlmConfig
+  cardType: 'minor' | 'occupation'
+  cardName: string
+  extracted: ExtractedCard | null
+  setExtracted: (e: ExtractedCard | null) => void
+  artUrl: string | null
   onImport: (card: ExtractedCard, artUrl: string | null) => void
-  onClose: () => void
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
+  setError: (msg: string) => void
 }) {
-  const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
+  const { locale } = useLocale()
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [error, setError] = useState('')
-  const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
-  const [artUrl, setArtUrl] = useState<string | null>(null)
-  const [generatingArt, setGeneratingArt] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleClearConfig = () => {
-    clearLlmConfig()
-    setConfig(null)
-  }
-
-  // Core streaming logic — shared by manual send and auto-trigger
   const sendMessages = useCallback(async (chatHistory: ChatMessage[]) => {
     if (!config) return
     setStreaming(true)
@@ -321,7 +369,6 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
       const parsed = extractCardJson(fullText)
       if (parsed?.card) {
         setExtracted(parsed as ExtractedCard)
-        setArtUrl(null)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -330,21 +377,34 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
     } finally {
       setStreaming(false)
     }
-  }, [config])
+  }, [config, setError, setExtracted])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !config || streaming) return
 
-    const userMsg: DisplayMessage = { role: 'user', content: input.trim() }
+    // Prepend card context to user message
+    const typeLabel = cardType === 'occupation' ? '职业卡 (Occupation)' : '小发展卡 (Minor Improvement)'
+    const context = cardName.trim()
+      ? `[卡牌类型: ${typeLabel}, 卡牌名称: ${cardName.trim()}]\n`
+      : `[卡牌类型: ${typeLabel}]\n`
+
+    const userContent = input.trim()
+    const enrichedContent = context + userContent
+
+    const userMsg: DisplayMessage = { role: 'user', content: userContent }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
 
-    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' : m.role, content: m.content }))
+    // Send enriched version to LLM but display original to user
+    const chatHistory: ChatMessage[] = newMessages.map((m, i) => ({
+      role: m.isError ? 'user' as const : m.role,
+      content: i === newMessages.length - 1 ? enrichedContent : m.content,
+    }))
     await sendMessages(chatHistory)
-  }, [input, config, messages, streaming, sendMessages])
+  }, [input, config, messages, streaming, sendMessages, cardType, cardName])
 
-  // Auto-inject sandbox errors into the conversation and trigger LLM
+  // Auto-inject sandbox errors
   useEffect(() => {
     if (!sandboxErrors?.length || streaming || !config) return
 
@@ -361,14 +421,11 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
     const errorMsg: DisplayMessage = { role: 'user', content: errorText, isError: true }
     const newMessages = [...messages, errorMsg]
     setMessages(newMessages)
-
-    // Consume errors so they don't re-trigger
     onSandboxErrorsConsumed?.()
 
-    // Auto-trigger LLM response with the full conversation including error
-    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' : m.role, content: m.content }))
+    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' as const : m.role, content: m.content }))
     void sendMessages(chatHistory)
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run only when sandboxErrors changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxErrors])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -378,29 +435,119 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
     }
   }
 
-  const handleGenArt = async () => {
-    if (!config || !extracted || generatingArt) return
-    setGeneratingArt(true)
-    try {
-      const desc = extracted.card.desc?.join(' ') ?? extracted.card.name
-      const dataUrl = await generateCardArt(extracted.card.name, desc, config)
-      if (!dataUrl) { setError('美术生成失败（仅 OpenAI DALL-E 支持）'); return }
-      const uploaded = await uploadArt(dataUrl)
-      setArtUrl(uploaded ?? dataUrl)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '美术生成出错')
-    } finally {
-      setGeneratingArt(false)
-    }
+  return (
+    <div className="ai-ability-panel">
+      <div className="ai-ability-panel-header">
+        <h3>{locale === 'zh' ? '卡牌能力' : 'Card Ability'}</h3>
+        {extracted && (
+          <button
+            type="button"
+            className="btn-primary ws-btn-sm"
+            onClick={() => onImport(extracted, artUrl)}
+          >
+            {locale === 'zh' ? '导入编辑器 →' : 'Import →'}
+          </button>
+        )}
+      </div>
+
+      <div className="ai-chat-area">
+        {messages.length === 0 && (
+          <div className="ai-chat-hint">
+            <p>{locale === 'zh' ? '描述你想设计的卡牌效果，AI 会生成符合 Agricola 规范的卡牌定义。' : 'Describe the card effect you want. AI will generate an Agricola-compatible card definition.'}</p>
+            <p>{locale === 'zh' ? '示例：' : 'Examples:'}</p>
+            <ul>
+              <li>{locale === 'zh' ? '"工人回家时可以花 1 粮食换 3 食物，费用 1 木头"' : '"Spend 1 grain for 3 food when workers return home, costs 1 wood"'}</li>
+              <li>{locale === 'zh' ? '"建造房间时节省 1 黏土"' : '"Save 1 clay when building rooms"'}</li>
+            </ul>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} className={`ai-message ai-message-${msg.role}${msg.isError ? ' ai-message-error' : ''}`}>
+            <div className="ai-message-role">
+              {msg.isError ? (locale === 'zh' ? '沙盒报错' : 'Sandbox Error')
+                : msg.role === 'user' ? (locale === 'zh' ? '你' : 'You')
+                : 'AI'}
+            </div>
+            <div className={`ai-message-content${msg.streaming ? ' ai-streaming' : ''}`}>
+              {msg.role === 'assistant'
+                ? <MessageContent text={msg.content || (msg.streaming ? '▋' : '')} />
+                : (msg.content || (msg.streaming ? '▋' : ''))
+              }
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {extracted && (
+        <div className="ai-extracted-summary">
+          <span className="ws-badge">{extracted.card.card_type === 'minor' ? (locale === 'zh' ? '小改进' : 'Minor') : (locale === 'zh' ? '职业' : 'Occupation')}</span>
+          <span className="ai-extracted-name">{extracted.card.name}</span>
+          {extracted.effects && Object.keys(extracted.effects).length > 0 && (
+            <span className="ai-extracted-hooks">{Object.keys(extracted.effects).join(', ')}</span>
+          )}
+          <ResourceText text={(extracted.card.desc ?? []).join(' ')} />
+        </div>
+      )}
+
+      <div className="ai-input-area">
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={locale === 'zh' ? '描述你想要的卡牌效果… (Enter 发送)' : 'Describe the card effect… (Enter to send)'}
+          rows={2}
+          disabled={streaming}
+        />
+        <button
+          type="button"
+          className="btn-primary ai-send-btn"
+          onClick={handleSend}
+          disabled={streaming || !input.trim()}
+        >
+          {streaming ? '…' : '→'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Main AiCardDesigner ───────────────────────────────────────────────────────
+
+export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErrorsConsumed }: {
+  onImport: (card: ExtractedCard, artUrl: string | null) => void
+  onClose: () => void
+  sandboxErrors?: string[] | null
+  onSandboxErrorsConsumed?: () => void
+}) {
+  const { locale } = useLocale()
+  const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
+  const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
+  const [cardName, setCardName] = useState('')
+  const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
+  const [artUrl, setArtUrl] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const handleClearConfig = () => {
+    clearLlmConfig()
+    setConfig(null)
   }
 
-  // Show config panel if not configured
+  // Sync card type/name from extracted card
+  useEffect(() => {
+    if (extracted?.card) {
+      if (extracted.card.card_type) setCardType(extracted.card.card_type)
+      if (extracted.card.name) setCardName(extracted.card.name)
+    }
+  }, [extracted])
+
   if (!config) {
     return (
       <div className="ai-designer">
         <div className="ai-designer-header">
-          <h2>AI 卡牌设计师</h2>
-          <button type="button" className="btn-link" onClick={onClose}>关闭</button>
+          <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
+          <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
         </div>
         <ApiKeyPanel onConfigured={() => setConfig(getLlmConfig())} />
       </div>
@@ -410,89 +557,66 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
   return (
     <div className="ai-designer">
       <div className="ai-designer-header">
-        <h2>AI 卡牌设计师</h2>
+        <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
         <div className="ai-header-actions">
           <span className="ai-provider-tag">{config.provider} / {config.model}</span>
-          <button type="button" className="btn-link" onClick={handleClearConfig}>切换 API Key</button>
-          <button type="button" className="btn-link" onClick={onClose}>关闭</button>
+          <button type="button" className="btn-link" onClick={handleClearConfig}>{locale === 'zh' ? '切换 API Key' : 'Switch Key'}</button>
+          <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
         </div>
       </div>
 
-      <div className="ai-designer-body">
-        {/* Chat area */}
-        <div className="ai-chat-area">
-          {messages.length === 0 && (
-            <div className="ai-chat-hint">
-              <p>描述你想设计的卡牌，AI 会帮你生成符合 Agricola 规范的卡牌定义。</p>
-              <p>示例：</p>
-              <ul>
-                <li>"设计一个工人回家时可以花 1 粮食换 3 食物的小改进，费用 1 木头"</li>
-                <li>"做一个建造房间时节省 1 黏土的职业卡"</li>
-                <li>"参考麦酒长凳，但改成用蔬菜换食物的版本"</li>
-              </ul>
-            </div>
-          )}
-
-          {messages.map((msg, i) => (
-            <div key={i} className={`ai-message ai-message-${msg.role}${msg.isError ? ' ai-message-error' : ''}`}>
-              <div className="ai-message-role">
-                {msg.isError ? '沙盒报错' : msg.role === 'user' ? '你' : 'AI'}
-              </div>
-              <div className={`ai-message-content${msg.streaming ? ' ai-streaming' : ''}`}>
-                {msg.role === 'assistant'
-                  ? <MessageContent text={msg.content || (msg.streaming ? '▋' : '')} />
-                  : (msg.content || (msg.streaming ? '▋' : ''))
-                }
-              </div>
-            </div>
-          ))}
-          <div ref={bottomRef} />
+      {/* Card info bar */}
+      <div className="ai-card-info-bar">
+        <div className="ai-card-type-toggle">
+          <button
+            type="button"
+            className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
+            onClick={() => setCardType('minor')}
+          >
+            {locale === 'zh' ? '小发展' : 'Minor'}
+          </button>
+          <button
+            type="button"
+            className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
+            onClick={() => setCardType('occupation')}
+          >
+            {locale === 'zh' ? '职业' : 'Occupation'}
+          </button>
         </div>
+        <input
+          type="text"
+          className="ai-card-name-input"
+          value={cardName}
+          onChange={e => setCardName(e.target.value)}
+          placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
+        />
+      </div>
 
-        {/* Card preview sidebar */}
-        {extracted && (
-          <div className="ai-preview-sidebar">
-            <div className="ai-preview-header">
-              <span>卡牌预览</span>
-              <button
-                type="button"
-                className="btn-primary ws-btn-sm"
-                onClick={() => onImport(extracted, artUrl)}
-              >
-                导入编辑器 →
-              </button>
-            </div>
-            <CardPreview
-              extracted={extracted}
-              artUrl={artUrl}
-              onGenArt={handleGenArt}
-              generatingArt={generatingArt}
-            />
-          </div>
-        )}
+      {/* Two-panel layout */}
+      <div className="ai-designer-panels">
+        <ArtPanel
+          cardType={cardType}
+          cardName={cardName}
+          artUrl={artUrl}
+          setArtUrl={setArtUrl}
+          config={config}
+          setError={setError}
+        />
+        <AbilityPanel
+          config={config}
+          cardType={cardType}
+          cardName={cardName}
+          extracted={extracted}
+          setExtracted={setExtracted}
+          artUrl={artUrl}
+          onImport={onImport}
+          sandboxErrors={sandboxErrors}
+          onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+          setError={setError}
+        />
       </div>
 
       {error && <div className="form-error ai-error">{error}</div>}
-
-      <div className="ai-input-area">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="描述你想要的卡牌效果… (Enter 发送，Shift+Enter 换行)"
-          rows={3}
-          disabled={streaming}
-        />
-        <button
-          type="button"
-          className="btn-primary ai-send-btn"
-          onClick={handleSend}
-          disabled={streaming || !input.trim()}
-        >
-          {streaming ? '生成中…' : '发送'}
-        </button>
-      </div>
     </div>
   )
 }

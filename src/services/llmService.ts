@@ -64,6 +64,7 @@ export const PROVIDER_MODELS: Record<LlmProvider, { id: string; label: string }[
     { id: 'deepseek/deepseek-chat-v3', label: 'DeepSeek V3' },
     { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
     { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
+    { id: 'qwen/qwen-plus', label: 'Qwen Plus (通义千问)' },
   ],
   custom: [],
 }
@@ -300,18 +301,37 @@ export function extractCardJson(text: string): Record<string, unknown> | null {
 // ── Image generation ──────────────────────────────────────────────────────────
 
 /**
+ * Build art generation prompt based on card type and locale.
+ * Occupation cards: person in circular gold-trimmed border (Klemens Franz style)
+ * Minor improvement cards: object in hexagonal gold-trimmed border
+ */
+export function buildCardArtPrompt(
+  subject: string,
+  cardType: 'minor' | 'occupation',
+  locale: 'zh' | 'en',
+): string {
+  if (cardType === 'occupation') {
+    return locale === 'zh'
+      ? `一幅《农场主》(Agricola)桌游"职业卡"风格的2D插画，完全致敬画师 Klemens Franz。画面主体是${subject}（半身像构图）。角色造型略显粗犷讨喜，具有粗黑墨水勾边和平涂水彩质感，背景是简单的乡村农田风光。画面被完美地框在一个带金边的圆形画框内，框外为纯白背景。画面中绝对不允许出现任何文字、字母、单词或标签。`
+      : `A 2D illustration for an Agricola board game "Occupation" card, closely matching the art style of Klemens Franz. It features ${subject}. The character has a quirky, slightly chunky, and charming design, drawn with thick dark ink outlines and flat watercolor texturing. The background is a simple rustic agricultural landscape. The illustration is perfectly enclosed within a gold-trimmed circular border, with a solid white background outside the circle. STRICTLY NO TEXT, NO WORDS, NO LETTERS, AND NO LABELS ANYWHERE IN THE IMAGE.`
+  }
+  // Minor improvement
+  return locale === 'zh'
+    ? `一幅《农场主》(Agricola)桌游"次要发展卡"风格的2D插画，完全致敬画师 Klemens Franz。画面特写${subject}。具有粗黑墨水勾边和平涂水彩质感，重点突出物品的质朴感、手工制作痕迹与中世纪实用性。柔和的大地色系，以温暖的棕色和绿色为主。画面被完美地框在一个带金边的【六角形】画框内，框外为纯白背景。画面中绝对不允许出现任何文字、字母、单词或标签。完全的2D平面插画，不要3D，不要写实元素。`
+    : `A 2D illustration for an Agricola board game "Minor Improvement" card, in the exact art style of Klemens Franz. It features a close-up of ${subject}. Drawn with thick dark ink outlines and flat watercolor texturing. Focus on the object's rustic, handmade texture and medieval utility. Earthy muted colors with warm browns and greens. The illustration is perfectly enclosed within a gold-trimmed hexagon border, with a solid white background outside the hexagon. STRICTLY NO TEXT, NO WORDS, NO LETTERS, AND NO LABELS ANYWHERE IN THE IMAGE. purely 2D flat illustration, no 3d, no realistic elements.`
+}
+
+/**
  * Generate card art via DALL-E (OpenAI only).
  * Returns a data URL or null on failure.
  */
 export async function generateCardArt(
-  cardName: string,
-  cardDesc: string,
+  prompt: string,
   config: LlmConfig,
 ): Promise<string | null> {
   if (config.provider !== 'openai' && !config.baseUrl) return null
 
   const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com'
-  const prompt = `Medieval farming board game card illustration. Watercolor style, warm earth tones, medieval European pastoral setting. Card: "${cardName}". Scene: ${cardDesc}. Single centered illustration, no text, no borders, square composition.`
 
   try {
     const resp = await fetch(`${baseUrl}/v1/images/generations`, {
