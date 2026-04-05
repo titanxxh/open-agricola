@@ -940,42 +940,46 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   /** Save card and return the DB ID, or null on failure.
    *  Pass `silent=true` for auto-save (no UI state changes). */
   const saveCardToWorkshop = async (silent?: boolean): Promise<string | null> => {
-    if (!extracted?.card) return null
-    const card = extracted.card
-    if (!card.name?.trim()) { if (!silent) setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
-    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { if (!silent) setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return null }
+    const name = extracted?.card?.name?.trim() || cardName.trim()
+    if (!name) { if (!silent) setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
+
+    // Build card id from extracted or generate one
+    const cardId = extracted?.card?.id?.startsWith('CUSTOM_') && extracted.card.id.length >= 8
+      ? extracted.card.id
+      : `CUSTOM_${name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 30)}_${Date.now().toString(36)}`
 
     if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
     try {
       const token = localStorage.getItem(TOKEN_KEY)
+      const card = extracted?.card
       const cardJson = {
-        id: card.id,
-        name: card.name,
-        card_type: card.card_type,
+        id: cardId,
+        name,
+        card_type: card?.card_type ?? cardType,
         deck: 'CUSTOM',
         number: 0,
-        desc: card.desc ?? [],
-        cost: card.cost ?? {},
-        vp: card.vp ?? 0,
-        prerequisite: card.prerequisite,
-        modifiers: card.modifiers ?? [],
+        desc: card?.desc ?? [],
+        cost: card?.cost ?? {},
+        vp: card?.vp ?? 0,
+        prerequisite: card?.prerequisite ?? (prerequisite || undefined),
+        modifiers: card?.modifiers ?? [],
         implemented: true,
       }
 
       const body: Record<string, unknown> = {
-        card_id: card.id,
-        card_type: card.card_type,
-        name: card.name,
-        description: (card.desc ?? []).join(' '),
+        card_id: cardId,
+        card_type: card?.card_type ?? cardType,
+        name,
+        description: (card?.desc ?? []).join(' '),
         card_json: cardJson,
         art_url: artUrl,
         status: 'draft',
       }
 
       // If we have source code from TS extraction, save as effect_code
-      if (extracted.sourceCode) {
+      if (extracted?.sourceCode) {
         body.effect_code = extracted.sourceCode
-      } else if (extracted.effects && Object.keys(extracted.effects).length > 0 && !('_hasCode' in extracted.effects)) {
+      } else if (extracted?.effects && Object.keys(extracted.effects).length > 0 && !('_hasCode' in extracted.effects)) {
         body.effect_dsl = extracted.effects
       }
 
@@ -992,7 +996,14 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
         if (!silent) { setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000) }
         return d.id as string
       } else {
-        if (!silent) setError(d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'))
+        if (!silent) {
+          let errMsg = d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed')
+          // Show detailed validation errors
+          if (Array.isArray(d.errors) && d.errors.length > 0) {
+            errMsg += ':\n' + (d.errors as string[]).join('\n')
+          }
+          setError(errMsg)
+        }
       }
     } catch {
       if (!silent) setError(locale === 'zh' ? '网络错误' : 'Network error')
@@ -1108,52 +1119,47 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               onChange={e => setCardName(e.target.value)}
               placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
             />
-            {extracted && (
-              <>
-                <button
-                  type="button"
-                  className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
-                  onClick={handleSaveCard}
-                  disabled={saving}
-                >
-                  {saving
-                    ? (locale === 'zh' ? '保存中…' : 'Saving…')
-                    : saveSuccess
-                      ? (locale === 'zh' ? '已保存' : 'Saved')
-                      : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
-                  }
-                </button>
-                {onAddToSandboxAndRestart && (
-                  <button
-                    type="button"
-                    className="btn-primary ai-save-card-btn ai-sandbox-btn"
-                    onClick={handleSaveAndAddToSandbox}
-                    disabled={saving}
-                  >
-                    {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
-                  </button>
-                )}
-              </>
+            <button
+              type="button"
+              className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
+              onClick={handleSaveCard}
+              disabled={saving || !cardName.trim()}
+            >
+              {saving
+                ? (locale === 'zh' ? '保存中…' : 'Saving…')
+                : saveSuccess
+                  ? (locale === 'zh' ? '已保存' : 'Saved')
+                  : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
+              }
+            </button>
+            {onAddToSandboxAndRestart && (
+              <button
+                type="button"
+                className="btn-primary ai-save-card-btn ai-sandbox-btn"
+                onClick={handleSaveAndAddToSandbox}
+                disabled={saving || !extracted?.sourceCode}
+                title={!extracted?.sourceCode ? (locale === 'zh' ? '需要先生成卡牌代码' : 'Generate card code first') : ''}
+              >
+                {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+              </button>
             )}
           </div>
 
           {/* Completeness + auto-save status */}
-          {extracted && (
-            <div className="ai-completeness-bar">
-              <span className={artUrl ? 'ai-complete-tag' : 'ai-missing-tag'}>
-                {artUrl ? '✓' : '✗'} {locale === 'zh' ? '图片' : 'Art'}
-              </span>
-              <span className={extracted.effects || extracted.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
-                {extracted.effects || extracted.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
-              </span>
-              {autoSaving && (
-                <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
-              )}
-              {autoSaveFlash && !autoSaving && (
-                <span className="ai-autosave-ok">✓ {locale === 'zh' ? '已自动保存' : 'Auto-saved'}</span>
-              )}
-            </div>
-          )}
+          <div className="ai-completeness-bar">
+            <span className={artUrl ? 'ai-complete-tag' : 'ai-missing-tag'}>
+              {artUrl ? '✓' : '✗'} {locale === 'zh' ? '图片' : 'Art'}
+            </span>
+            <span className={extracted?.effects || extracted?.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
+              {extracted?.effects || extracted?.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
+            </span>
+            {autoSaving && (
+              <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
+            )}
+            {autoSaveFlash && !autoSaving && (
+              <span className="ai-autosave-ok">✓ {locale === 'zh' ? '已自动保存' : 'Auto-saved'}</span>
+            )}
+          </div>
 
           {cardType === 'minor' && (
             <div className="ai-minor-fields">
@@ -1196,7 +1202,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
             />
           </div>
 
-      {error && <div className="form-error ai-error">{error}</div>}
+      {error && <div className="form-error ai-error" style={{ whiteSpace: 'pre-wrap' }}>{error}</div>}
     </div>
   )
 }
