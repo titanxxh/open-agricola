@@ -1297,27 +1297,33 @@ export function WorkshopPage() {
           sandboxErrors={pendingSandboxErrors}
           onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
         />
-        {sandboxActive && (
-          <div className="sandbox-embed">
-            <div className="sandbox-embed-toolbar">
+        <div className="sandbox-embed">
+          <div className="sandbox-embed-toolbar">
+            {sandboxActive ? (
+              <>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                  {t('platform.restartSandbox')}
+                </button>
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                  {t('platform.closeSandbox')}
+                </button>
+              </>
+            ) : (
               <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
-                {t('platform.restartSandbox')}
+                {t('platform.startSandbox')}
               </button>
-              <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
-                {t('platform.closeSandbox')}
-              </button>
-              <span className="sandbox-embed-tips">
-                {t('platform.sandboxDevTips')}
-              </span>
-            </div>
+            )}
+            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+          </div>
+          {sandboxActive && (
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
               src={`?page=game&player=p1&embedded=1&devMode=1`}
               title="Sandbox"
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
@@ -1357,27 +1363,33 @@ export function WorkshopPage() {
             t={t}
           />
         )}
-        {sandboxActive && (
-          <div className="sandbox-embed">
-            <div className="sandbox-embed-toolbar">
+        <div className="sandbox-embed">
+          <div className="sandbox-embed-toolbar">
+            {sandboxActive ? (
+              <>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                  {t('platform.restartSandbox')}
+                </button>
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                  {t('platform.closeSandbox')}
+                </button>
+              </>
+            ) : (
               <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
-                {t('platform.restartSandbox')}
+                {t('platform.startSandbox')}
               </button>
-              <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
-                {t('platform.closeSandbox')}
-              </button>
-              <span className="sandbox-embed-tips">
-                {t('platform.sandboxDevTips')}
-              </span>
-            </div>
+            )}
+            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+          </div>
+          {sandboxActive && (
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
               src={`?page=game&player=p1&embedded=1&devMode=1`}
               title="Sandbox"
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
