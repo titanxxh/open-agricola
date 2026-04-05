@@ -318,12 +318,14 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
 // ── Ability Chat Panel ────────────────────────────────────────────────────────
 
 function AbilityPanel({
-  config, cardType, cardName, extracted, setExtracted, artUrl, onImport,
+  config, cardType, cardName, prerequisite, costHint, extracted, setExtracted, artUrl, onImport,
   sandboxErrors, onSandboxErrorsConsumed, setError,
 }: {
   config: LlmConfig
   cardType: 'minor' | 'occupation'
   cardName: string
+  prerequisite?: string
+  costHint?: string
   extracted: ExtractedCard | null
   setExtracted: (e: ExtractedCard | null) => void
   artUrl: string | null
@@ -389,9 +391,11 @@ function AbilityPanel({
 
     // Prepend card context to user message
     const typeLabel = cardType === 'occupation' ? '职业卡 (Occupation)' : '小发展卡 (Minor Improvement)'
-    const context = cardName.trim()
-      ? `[卡牌类型: ${typeLabel}, 卡牌名称: ${cardName.trim()}]\n`
-      : `[卡牌类型: ${typeLabel}]\n`
+    const parts = [`卡牌类型: ${typeLabel}`]
+    if (cardName.trim()) parts.push(`卡牌名称: ${cardName.trim()}`)
+    if (prerequisite?.trim()) parts.push(`前置条件: ${prerequisite.trim()}`)
+    if (costHint?.trim()) parts.push(`消耗资源: ${costHint.trim()}`)
+    const context = `[${parts.join(', ')}]\n`
 
     const userContent = input.trim()
     const enrichedContent = context + userContent
@@ -531,6 +535,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
   const [cardName, setCardName] = useState('')
+  const [prerequisite, setPrerequisite] = useState('')
+  const [costInput, setCostInput] = useState('')
   const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
   const [artUrl, setArtUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -678,6 +684,26 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
         )}
       </div>
 
+      {/* Minor improvement extra fields */}
+      {cardType === 'minor' && (
+        <div className="ai-minor-fields">
+          <input
+            type="text"
+            className="ai-minor-input"
+            value={prerequisite}
+            onChange={e => setPrerequisite(e.target.value)}
+            placeholder={locale === 'zh' ? '前置条件（可选，如：2 个职业、仍住木屋）' : 'Prerequisite (optional, e.g., 2 occupations)'}
+          />
+          <input
+            type="text"
+            className="ai-minor-input"
+            value={costInput}
+            onChange={e => setCostInput(e.target.value)}
+            placeholder={locale === 'zh' ? '消耗资源（可选，如：1 木 2 黏土）' : 'Cost (optional, e.g., 1 wood 2 clay)'}
+          />
+        </div>
+      )}
+
       {/* Two-panel layout */}
       <div className="ai-designer-panels">
         <ArtPanel
@@ -692,6 +718,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
           config={config}
           cardType={cardType}
           cardName={cardName}
+          prerequisite={prerequisite}
+          costHint={costInput}
           extracted={extracted}
           setExtracted={setExtracted}
           artUrl={artUrl}
