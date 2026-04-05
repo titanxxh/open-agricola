@@ -337,6 +337,64 @@ function RefImagePicker({ cardType, selected, onToggle }: {
   )
 }
 
+// ── Canvas Art Processing ──────────────────────────────────────────────────────
+
+async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation'): Promise<string> {
+  const SIZE = 300
+  const BORDER = 6
+  const GOLD = '#c9a227'
+  const R = SIZE / 2 - BORDER / 2 - 2
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE
+      canvas.height = SIZE
+      const ctx = canvas.getContext('2d')!
+      const cx = SIZE / 2
+      const cy = SIZE / 2
+
+      const buildPath = () => {
+        ctx.beginPath()
+        if (cardType === 'occupation') {
+          ctx.arc(cx, cy, R, 0, Math.PI * 2)
+        } else {
+          // Pointy-top hexagon
+          for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 6
+            const x = cx + R * Math.cos(angle)
+            const y = cy + R * Math.sin(angle)
+            if (i === 0) ctx.moveTo(x, y)
+            else ctx.lineTo(x, y)
+          }
+          ctx.closePath()
+        }
+      }
+
+      // Clip and draw image cover-fit
+      ctx.save()
+      buildPath()
+      ctx.clip()
+      const scale = Math.max(SIZE / img.width, SIZE / img.height)
+      const iw = img.width * scale
+      const ih = img.height * scale
+      ctx.drawImage(img, (SIZE - iw) / 2, (SIZE - ih) / 2, iw, ih)
+      ctx.restore()
+
+      // Gold border on top
+      buildPath()
+      ctx.strokeStyle = GOLD
+      ctx.lineWidth = BORDER
+      ctx.stroke()
+
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = dataUrl
+  })
+}
+
 // ── Art Panel ─────────────────────────────────────────────────────────────────
 
 function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
@@ -353,6 +411,31 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
   const [artPrompt, setArtPrompt] = useState('')
   const [selectedRefs, setSelectedRefs] = useState<string[]>([])
   const [artError, setArtError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setArtError('')
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(file)
+      })
+      const processed = await processCardArt(dataUrl, cardType)
+      const uploaded = await uploadArt(processed)
+      setArtUrl(uploaded ?? processed)
+    } catch (err) {
+      setArtError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleToggleRef = (url: string) => {
     setSelectedRefs(prev =>
@@ -486,6 +569,36 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
           {artError && <div className="form-error" style={{ marginTop: 8 }}>{artError}</div>}
         </>
       )}
+
+      <div className="ai-art-upload-section">
+        <div className="ai-art-upload-divider">
+          <span>{locale === 'zh' ? '或者上传自己的图片' : 'Or upload your own image'}</span>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          className="btn-secondary ai-art-upload-btn"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading
+            ? (locale === 'zh' ? '处理中…' : 'Processing…')
+            : (locale === 'zh' ? '上传图片' : 'Upload Image')
+          }
+        </button>
+        <div className="ai-art-upload-hint">
+          {cardType === 'occupation'
+            ? (locale === 'zh' ? '上传后自动裁剪为圆形 + 金边' : 'Auto-cropped to circle + gold border')
+            : (locale === 'zh' ? '上传后自动裁剪为六角形 + 金边' : 'Auto-cropped to hexagon + gold border')
+          }
+        </div>
+      </div>
     </div>
   )
 }
