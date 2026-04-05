@@ -52,6 +52,20 @@ export type ExtractedCard = {
 
 type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean }
 
+type ApiCard = {
+  id: string          // DB row id
+  card_id: string     // CUSTOM_xxx
+  card_type: string
+  name: string
+  description: string
+  art_url: string | null
+  effect_dsl: Record<string, unknown> | null
+  effect_code: string | null
+  card_json: Record<string, unknown>  // already parsed by server
+  status: string
+  updated_at: number
+}
+
 // ── Markdown with code copy ─────────────────────────────────────────────────
 
 function CodeBlock({ lang, code }: { lang: string; code: string }) {
@@ -696,6 +710,11 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
+  const [myCards, setMyCards] = useState<ApiCard[]>([])
+  const [autoSaving, setAutoSaving] = useState(false)
+  const [autoSaveFlash, setAutoSaveFlash] = useState(false)
+  const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Pre-fetch 3 random minor + 3 random occupation reference images on mount
   useEffect(() => {
@@ -720,6 +739,41 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     return () => { cancelled = true }
   }, [])
 
+  const refreshMyCards = useCallback(() => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+    fetch(`${API_BASE}/api/workshop/cards?scope=mine`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setMyCards(d.cards as ApiCard[]) })
+      .catch(() => {})
+  }, [])
+
+  // Load user's own cards on mount
+  useEffect(() => { refreshMyCards() }, [refreshMyCards])
+
+  // Auto-save when extracted card or art changes
+  useEffect(() => {
+    const card = extracted?.card
+    if (!card?.id?.startsWith('CUSTOM_') || card.id.length < 8 || !card.name?.trim()) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      setAutoSaving(true)
+      void saveCardToWorkshop(true).then(dbId => {
+        setAutoSaving(false)
+        if (!dbId) return
+        setCurrentCardDbId(dbId)
+        setAutoSaveFlash(true)
+        setTimeout(() => setAutoSaveFlash(false), 2000)
+        refreshMyCards()
+      })
+    }, 1000)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  // saveCardToWorkshop reads from closure; refreshMyCards is stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extracted, artUrl])
+
   // Sync card type/name from extracted card
   useEffect(() => {
     if (extracted?.card) {
@@ -728,26 +782,27 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     }
   }, [extracted])
 
-  /** Save card and return the DB ID, or null on failure. */
-  const saveCardToWorkshop = async (): Promise<string | null> => {
+  /** Save card and return the DB ID, or null on failure.
+   *  Pass `silent=true` for auto-save (no UI state changes). */
+  const saveCardToWorkshop = async (silent?: boolean): Promise<string | null> => {
     if (!extracted?.card) return null
     const card = extracted.card
-    if (!card.name?.trim()) { setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
-    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return null }
+    if (!card.name?.trim()) { if (!silent) setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
+    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { if (!silent) setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return null }
 
-    setSaving(true)
-    setError('')
-    setSaveSuccess(false)
+    if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
     try {
       const token = localStorage.getItem(TOKEN_KEY)
       const cardJson = {
         id: card.id,
         name: card.name,
+        card_type: card.card_type,
         deck: 'CUSTOM',
         number: 0,
         desc: card.desc ?? [],
         cost: card.cost ?? {},
         vp: card.vp ?? 0,
+        prerequisite: card.prerequisite,
         modifiers: card.modifiers ?? [],
         implemented: true,
       }
@@ -779,32 +834,61 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
       })
       const d = await r.json()
       if (d.ok) {
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 3000)
+        if (!silent) { setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000) }
         return d.id as string
       } else {
-        setError(d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'))
+        if (!silent) setError(d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'))
       }
     } catch {
-      setError(locale === 'zh' ? '网络错误' : 'Network error')
+      if (!silent) setError(locale === 'zh' ? '网络错误' : 'Network error')
     } finally {
-      setSaving(false)
+      if (!silent) setSaving(false)
     }
     return null
   }
 
   const handleSaveCard = async () => {
     const dbId = await saveCardToWorkshop()
-    if (dbId) onSaved?.()
+    if (dbId) { setCurrentCardDbId(dbId); refreshMyCards(); onSaved?.() }
   }
 
   const handleSaveAndAddToSandbox = async () => {
     if (!onAddToSandboxAndRestart) return
     const dbId = await saveCardToWorkshop()
     if (dbId) {
+      setCurrentCardDbId(dbId)
+      refreshMyCards()
       onSaved?.()
       await onAddToSandboxAndRestart(dbId)
     }
+  }
+
+  const handleLoadCard = (apiCard: ApiCard) => {
+    const cj = apiCard.card_json
+    const ct = ((cj.card_type ?? apiCard.card_type) as string) as 'minor' | 'occupation'
+    const cardData: ExtractedCard['card'] = {
+      id: (cj.id ?? apiCard.card_id) as string,
+      name: apiCard.name,
+      card_type: ct,
+      cost: (cj.cost ?? {}) as Record<string, number>,
+      vp: (cj.vp ?? 0) as number,
+      desc: (cj.desc ?? []) as string[],
+      prerequisite: cj.prerequisite as string | undefined,
+      modifiers: (cj.modifiers ?? []) as unknown[],
+    }
+    setCardType(ct)
+    setCardName(apiCard.name)
+    setArtUrl(apiCard.art_url ?? null)
+    setCurrentCardDbId(apiCard.id)
+    if (cj.prerequisite) setPrerequisite(cj.prerequisite as string)
+    const costParts = Object.entries((cj.cost ?? {}) as Record<string, number>)
+      .map(([k, v]) => `${v} ${k}`)
+    setCostInput(costParts.join(' '))
+    setExtracted({
+      card: cardData,
+      effects: apiCard.effect_dsl ?? undefined,
+      sourceCode: apiCard.effect_code ?? undefined,
+    })
   }
 
   return (
@@ -819,6 +903,37 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
         onConfigured={() => setConfig(getLlmConfig())}
         onClear={() => setConfig(null)}
       />
+
+      {/* Load previous designs */}
+      {myCards.length > 0 && (
+        <div className="ai-my-cards-bar">
+          <span className="ai-my-cards-label">{locale === 'zh' ? '加载设计：' : 'Load design:'}</span>
+          <select
+            className="ai-my-cards-select"
+            value={currentCardDbId ?? ''}
+            onChange={e => {
+              const card = myCards.find(c => c.id === e.target.value)
+              if (card) handleLoadCard(card)
+            }}
+          >
+            <option value="">{locale === 'zh' ? '-- 选择已有卡牌 --' : '-- Select a card --'}</option>
+            {myCards.map(c => {
+              const hasArt = !!c.art_url
+              const hasCode = !!(c.effect_code ?? c.effect_dsl)
+              const missing = [
+                !hasArt && (locale === 'zh' ? '缺图片' : 'no art'),
+                !hasCode && (locale === 'zh' ? '缺代码' : 'no code'),
+              ].filter(Boolean).join(' · ')
+              return (
+                <option key={c.id} value={c.id}>
+                  {c.name} [{c.card_type === 'minor' ? (locale === 'zh' ? '小发展' : 'Minor') : (locale === 'zh' ? '职业' : 'Occ')}]
+                  {missing ? `  ⚠ ${missing}` : '  ✓'}
+                </option>
+              )
+            })}
+          </select>
+        </div>
+      )}
 
       {/* Card design area — only shown when config is ready */}
       {config && (
@@ -875,6 +990,24 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               </>
             )}
           </div>
+
+          {/* Completeness + auto-save status */}
+          {extracted && (
+            <div className="ai-completeness-bar">
+              <span className={artUrl ? 'ai-complete-tag' : 'ai-missing-tag'}>
+                {artUrl ? '✓' : '✗'} {locale === 'zh' ? '图片' : 'Art'}
+              </span>
+              <span className={extracted.effects || extracted.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
+                {extracted.effects || extracted.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
+              </span>
+              {autoSaving && (
+                <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
+              )}
+              {autoSaveFlash && !autoSaving && (
+                <span className="ai-autosave-ok">✓ {locale === 'zh' ? '已自动保存' : 'Auto-saved'}</span>
+              )}
+            </div>
+          )}
 
           {cardType === 'minor' && (
             <div className="ai-minor-fields">

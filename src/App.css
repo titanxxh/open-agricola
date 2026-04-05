@@ -4797,9 +4797,98 @@
   background: #1e5a2e;
 }
 
+/* Reference image picker */
+.ai-ref-picker { margin: 8px 0; }
+
+.ai-ref-picker-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.ai-ref-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.ai-ref-thumb {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 0;
+  background: #f0ebe0;
+  cursor: pointer;
+  overflow: hidden;
+  aspect-ratio: 1;
+  transition: border-color 0.15s;
+}
+
+.ai-ref-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ai-ref-thumb.selected { border-color: #3a5a2c; }
+
+.ai-ref-thumb.maxed { opacity: 0.4; cursor: not-allowed; }
+
+.ai-ref-check {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 11px;
+  color: #fff;
+  background: #3a5a2c;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
 .ai-art-no-gen {
   font-size: 12px;
   color: #888;
   padding: 8px 0;
   font-style: italic;
 }
+
+/* Load previous designs bar */
+.ai-my-cards-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f0ebe0;
+  border-bottom: 1px solid #d8cfc0;
+  font-size: 13px;
+}
+.ai-my-cards-label { color: #555; white-space: nowrap; }
+.ai-my-cards-select {
+  flex: 1;
+  font-size: 13px;
+  padding: 3px 6px;
+  border: 1px solid #c8b89a;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  max-width: 480px;
+}
+
+/* Completeness bar */
+.ai-completeness-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.ai-complete-tag { color: #3a7a2c; font-weight: 500; }
+.ai-missing-tag  { color: #b04a20; font-weight: 500; }
+.ai-autosave-status { color: #888; margin-left: auto; font-style: italic; }
+.ai-autosave-ok     { color: #3a7a2c; margin-left: auto; }
