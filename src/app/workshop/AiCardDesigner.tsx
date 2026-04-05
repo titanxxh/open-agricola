@@ -50,7 +50,7 @@ export type ExtractedCard = {
   sourceCode?: string
 }
 
-type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean }
+type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean; promptSnapshot?: string }
 
 type ApiCard = {
   id: string          // DB row id
@@ -519,12 +519,12 @@ function AbilityPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessages = useCallback(async (chatHistory: ChatMessage[]) => {
+  const sendMessages = useCallback(async (chatHistory: ChatMessage[], promptSnapshot?: string) => {
     if (!config) return
     setStreaming(true)
     setChatError('')
 
-    const assistantMsg: DisplayMessage = { role: 'assistant', content: '', streaming: true }
+    const assistantMsg: DisplayMessage = { role: 'assistant', content: '', streaming: true, promptSnapshot }
     setMessages(prev => [...prev, assistantMsg])
 
     try {
@@ -533,14 +533,14 @@ function AbilityPanel({
         fullText += chunk
         setMessages(prev => {
           const updated = [...prev]
-          updated[updated.length - 1] = { role: 'assistant', content: fullText, streaming: true }
+          updated[updated.length - 1] = { role: 'assistant', content: fullText, streaming: true, promptSnapshot }
           return updated
         })
       }
 
       setMessages(prev => {
         const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: fullText }
+        updated[updated.length - 1] = { role: 'assistant', content: fullText, promptSnapshot }
         return updated
       })
 
@@ -585,7 +585,12 @@ function AbilityPanel({
       role: m.isError ? 'user' as const : m.role,
       content: i === newMessages.length - 1 ? enrichedContent : m.content,
     }))
-    await sendMessages(chatHistory)
+    // Build prompt snapshot for inspection
+    const promptSnapshot = [
+      `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
+      ...chatHistory.map(m => `[${m.role.toUpperCase()}]\n${m.content}`),
+    ].join('\n\n---\n\n')
+    await sendMessages(chatHistory, promptSnapshot)
   }, [input, config, messages, streaming, sendMessages, cardType, cardName])
 
   // Auto-inject sandbox errors
@@ -661,6 +666,14 @@ function AbilityPanel({
                 : msg.role === 'user' ? (locale === 'zh' ? '你' : 'You')
                 : 'AI'}
             </div>
+            {msg.role === 'assistant' && msg.promptSnapshot && (
+              <details className="ai-prompt-details">
+                <summary className="ai-prompt-summary">
+                  {locale === 'zh' ? '查看完整 Prompt' : 'View full prompt'}
+                </summary>
+                <pre className="ai-prompt-text">{msg.promptSnapshot}</pre>
+              </details>
+            )}
             <div className={`ai-message-content${msg.streaming ? ' ai-streaming' : ''}`}>
               {msg.role === 'assistant'
                 ? <MessageContent text={msg.content || (msg.streaming ? '▋' : '')} />

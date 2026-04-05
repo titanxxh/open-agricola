@@ -4118,8 +4118,10 @@
 }
 
 .ai-art-preview-img {
+  max-width: 200px;
   width: 100%;
   display: block;
+  border-radius: 4px;
 }
 
 .ai-art-prompt-preview {
@@ -4901,3 +4903,32 @@
 .ai-missing-tag  { color: #b04a20; font-weight: 500; }
 .ai-autosave-status { color: #888; margin-left: auto; font-style: italic; }
 .ai-autosave-ok     { color: #3a7a2c; margin-left: auto; }
+
+/* Collapsible prompt details */
+.ai-prompt-details { margin: 4px 0 6px; }
+.ai-prompt-summary {
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ai-prompt-summary::-webkit-details-marker { display: none; }
+.ai-prompt-summary::before { content: '▶'; font-size: 9px; transition: transform 0.15s; }
+details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
+.ai-prompt-text {
+  margin: 6px 0 0;
+  padding: 10px;
+  background: #f5f5f0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
+  color: #444;
+}
