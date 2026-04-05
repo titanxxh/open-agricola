@@ -9,9 +9,8 @@ import {
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
 import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
+import { API_BASE } from '../../config'
 
-const backendHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const API_BASE = import.meta.env.VITE_API_BASE || `http://${backendHost}:5175`
 const TOKEN_KEY = 'open-agricola-token'
 
 async function uploadArt(dataUrl: string): Promise<string | null> {
@@ -747,7 +746,7 @@ function AbilityPanel({
             className="btn-primary ws-btn-sm"
             onClick={() => onImport(extracted, artUrl)}
           >
-            {locale === 'zh' ? '导入编辑器 →' : 'Import →'}
+            {locale === 'zh' ? '导入手动编辑器（可微调字段）→' : 'Import to manual editor →'}
           </button>
         )}
       </div>

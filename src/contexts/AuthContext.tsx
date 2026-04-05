@@ -26,11 +26,18 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function authFetch(path: string, body: Record<string, unknown>, token?: string | null) {
+async function authFetch(path: string, body: Record<string, unknown>, token?: string | null, retries = 2) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const resp = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
-  return resp.json()
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const resp = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+      return await resp.json()
+    } catch (err) {
+      if (attempt >= retries) throw err
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+    }
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
