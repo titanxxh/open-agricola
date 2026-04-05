@@ -29,6 +29,45 @@ const DEFAULT_MODELS: Record<LlmProvider, string> = {
   custom: 'gpt-4o',
 }
 
+/** Available models per provider, ordered by recommendation. */
+export const PROVIDER_MODELS: Record<LlmProvider, { id: string; label: string }[]> = {
+  openai: [
+    { id: 'gpt-4o', label: 'GPT-4o' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { id: 'gpt-4.1', label: 'GPT-4.1' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+    { id: 'gpt-4.1-nano', label: 'GPT-4.1 Nano' },
+    { id: 'o3-mini', label: 'o3-mini' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  ],
+  gemini: [
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+  ],
+  groq: [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
+    { id: 'gemma2-9b-it', label: 'Gemma 2 9B' },
+    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+    { id: 'qwen-qwq-32b', label: 'Qwen QwQ 32B' },
+  ],
+  openrouter: [
+    { id: 'google/gemini-2.5-flash-preview', label: 'Gemini 2.5 Flash' },
+    { id: 'google/gemini-2.5-pro-preview', label: 'Gemini 2.5 Pro' },
+    { id: 'anthropic/claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'openai/gpt-4o', label: 'GPT-4o' },
+    { id: 'deepseek/deepseek-chat-v3', label: 'DeepSeek V3' },
+    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
+    { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
+  ],
+  custom: [],
+}
+
 /** Pre-configured base URLs for named providers (OpenAI-compatible). */
 const PROVIDER_BASE_URLS: Partial<Record<LlmProvider, string>> = {
   openai: 'https://api.openai.com/v1',

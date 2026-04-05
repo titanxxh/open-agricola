@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
   streamChat, extractCardJson, generateCardArt,
-  PROVIDER_LABELS, PROVIDER_KEY_HINTS,
+  PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
@@ -162,12 +162,20 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
 
         <div className="form-field">
           <label>模型</label>
-          <input
-            type="text"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            placeholder={defaultModel(provider)}
-          />
+          {PROVIDER_MODELS[provider].length > 0 ? (
+            <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
+              {PROVIDER_MODELS[provider].map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              placeholder={defaultModel(provider)}
+            />
+          )}
         </div>
 
         <div className="form-field">
