@@ -44,10 +44,11 @@ export const PROVIDER_MODELS: Record<LlmProvider, { id: string; label: string }[
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   ],
   gemini: [
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
     { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
   ],
   groq: [
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
@@ -81,8 +82,8 @@ const PROVIDER_BASE_URLS: Partial<Record<LlmProvider, string>> = {
 export const PROVIDER_LABELS: Record<LlmProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
-  gemini: 'Gemini (免费)',
-  groq: 'Groq (免费)',
+  gemini: 'Gemini',
+  groq: 'Groq',
   openrouter: 'OpenRouter',
   custom: '自定义',
 }
