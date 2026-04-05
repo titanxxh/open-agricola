@@ -451,13 +451,45 @@ export function buildCardArtPrompt(
 }
 
 /**
- * Generate card art via DALL-E (OpenAI only).
+ * Returns true if this provider/config supports image generation.
+ */
+export function supportsImageGeneration(config: LlmConfig): boolean {
+  return config.provider === 'openai' || config.provider === 'gemini' || !!config.baseUrl
+}
+
+/**
+ * Generate card art via DALL-E (OpenAI/custom) or Imagen 3 (Gemini).
  * Returns a data URL or null on failure.
  */
 export async function generateCardArt(
   prompt: string,
   config: LlmConfig,
 ): Promise<string | null> {
+  // Gemini: use Imagen 3 via generativelanguage API
+  if (config.provider === 'gemini') {
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${config.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instances: [{ prompt }],
+            parameters: { sampleCount: 1 },
+          }),
+        },
+      )
+      if (!resp.ok) return null
+      const data = await resp.json() as { predictions?: { bytesBase64Encoded?: string }[] }
+      const b64 = data.predictions?.[0]?.bytesBase64Encoded
+      if (!b64) return null
+      return `data:image/png;base64,${b64}`
+    } catch {
+      return null
+    }
+  }
+
+  // OpenAI or custom baseUrl: use DALL-E 3
   if (config.provider !== 'openai' && !config.baseUrl) return null
 
   const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com'

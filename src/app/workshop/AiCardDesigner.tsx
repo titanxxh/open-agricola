@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
+  supportsImageGeneration,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
@@ -232,16 +233,18 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
     setArtPrompt(buildCardArtPrompt(artSubject.trim(), cardType, locale as 'zh' | 'en'))
   }, [artSubject, cardType, locale])
 
+  const canGenerateArt = supportsImageGeneration(config)
+
   const handleGenerate = async () => {
-    if (!artPrompt.trim() || generating) return
+    if (!artPrompt.trim() || generating || !canGenerateArt) return
     setGenerating(true)
     setError('')
     try {
       const dataUrl = await generateCardArt(artPrompt, config)
       if (!dataUrl) {
         setError(locale === 'zh'
-          ? '图片生成失败（需要 OpenAI API Key 支持 DALL-E）'
-          : 'Image generation failed (requires OpenAI API Key for DALL-E)')
+          ? '图片生成失败，请检查 API Key 权限'
+          : 'Image generation failed, please check your API key permissions')
         return
       }
       const uploaded = await uploadArt(dataUrl)
@@ -300,17 +303,26 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, config, setError }: {
         </div>
       )}
 
-      <button
-        type="button"
-        className="btn-primary ai-art-gen-btn"
-        onClick={handleGenerate}
-        disabled={generating || !artPrompt.trim()}
-      >
-        {generating
-          ? (locale === 'zh' ? '生成中…' : 'Generating…')
-          : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
-        }
-      </button>
+      {canGenerateArt ? (
+        <button
+          type="button"
+          className="btn-primary ai-art-gen-btn"
+          onClick={handleGenerate}
+          disabled={generating || !artPrompt.trim()}
+        >
+          {generating
+            ? (locale === 'zh' ? '生成中…' : 'Generating…')
+            : (locale === 'zh' ? '生成卡牌图片' : 'Generate Card Art')
+          }
+        </button>
+      ) : (
+        <div className="ai-art-no-gen">
+          {locale === 'zh'
+            ? '图片生成需要 OpenAI（DALL-E 3）或 Gemini（Imagen 3）API Key'
+            : 'Image generation requires OpenAI (DALL-E 3) or Gemini (Imagen 3) API Key'
+          }
+        </div>
+      )}
     </div>
   )
 }
