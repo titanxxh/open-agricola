@@ -4160,6 +4160,38 @@
   flex-shrink: 0;
 }
 
+.ai-art-upload-section {
+  margin-top: 16px;
+  padding-top: 0;
+}
+
+.ai-art-upload-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #8a7a5a;
+  font-size: 0.85em;
+}
+
+.ai-art-upload-divider::before,
+.ai-art-upload-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid #d5c9a8;
+}
+
+.ai-art-upload-btn {
+  width: 100%;
+}
+
+.ai-art-upload-hint {
+  margin-top: 6px;
+  font-size: 0.8em;
+  color: #8a7a5a;
+  text-align: center;
+}
+
 /* Ability panel (right) */
 .ai-ability-panel {
   display: flex;
