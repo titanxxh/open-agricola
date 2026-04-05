@@ -3591,6 +3591,11 @@
   margin: 0 auto;
   width: 100%;
 }
+/* AI designer uses full viewport width */
+.ws-editor.ws-editor-ai {
+  max-width: 100%;
+  padding: 0;
+}
 
 .ws-editor-header {
   display: flex;
@@ -3826,17 +3831,16 @@
 .ai-designer {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 500px;
+  min-height: 100vh;
 }
 
 .ai-designer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 16px 0;
+  padding: 12px 20px;
   border-bottom: 1px solid #e8d5b7;
-  margin-bottom: 16px;
+  background: #fff;
   flex-shrink: 0;
 }
 
@@ -3989,10 +3993,11 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 10px 0;
+  padding: 10px 20px;
   border-bottom: 1px solid #e8d5b7;
-  margin-bottom: 12px;
+  background: #fafaf8;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .ai-card-type-toggle {
@@ -4046,7 +4051,9 @@
 .ai-minor-fields {
   display: flex;
   gap: 10px;
-  padding: 0 16px 4px;
+  padding: 8px 20px;
+  border-bottom: 1px solid #e8d5b7;
+  background: #fafaf8;
 }
 
 .ai-minor-input {
@@ -4064,8 +4071,9 @@
 
 /* Two-panel layout */
 .ai-designer-panels {
-  display: flex;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -4073,20 +4081,19 @@
 
 /* Art panel (left) */
 .ai-art-panel {
-  width: 300px;
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   overflow-y: auto;
-  border-right: 1px solid #e8d5b7;
-  padding-right: 16px;
+  border-right: 2px solid #e8d5b7;
+  padding: 16px;
 }
 
 .ai-art-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .ai-art-panel-header h3 {
@@ -4153,10 +4160,10 @@
 
 /* Ability panel (right) */
 .ai-ability-panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 16px;
 }
 
 .ai-ability-panel-header {
@@ -4863,7 +4870,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 8px 20px;
   background: #f0ebe0;
   border-bottom: 1px solid #d8cfc0;
   font-size: 13px;
@@ -4885,8 +4892,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 6px 20px;
   font-size: 12px;
+  background: #fafaf8;
+  border-bottom: 1px solid #e8d5b7;
 }
 .ai-complete-tag { color: #3a7a2c; font-weight: 500; }
 .ai-missing-tag  { color: #b04a20; font-weight: 500; }
