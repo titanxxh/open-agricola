@@ -669,11 +669,10 @@ function AbilityPanel({
   )
 }
 
-// Pre-fetch images to download on mount: first 3 minors + first 3 occupations
-const PREFETCH_URLS = [
-  ...MINOR_REF_IMAGES.slice(0, 3),
-  ...OCC_REF_IMAGES.slice(0, 3),
-]
+function sampleN<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, n)
+}
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
@@ -698,12 +697,16 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
 
-  // Pre-fetch 3 minor + 3 occupation reference images on mount
+  // Pre-fetch 3 random minor + 3 random occupation reference images on mount
   useEffect(() => {
     let cancelled = false
+    const prefetchUrls = [
+      ...sampleN(MINOR_REF_IMAGES, 3),
+      ...sampleN(OCC_REF_IMAGES, 3),
+    ]
     void (async () => {
       const entries = await Promise.all(
-        PREFETCH_URLS.map(async url => ({ url, img: await fetchRefImage(url) }))
+        prefetchUrls.map(async url => ({ url, img: await fetchRefImage(url) }))
       )
       if (cancelled) return
       setRefCache(prev => {
