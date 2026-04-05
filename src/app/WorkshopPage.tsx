@@ -581,12 +581,10 @@ function WorkshopSection({
 
 function SandboxSummaryPanel({
   cards,
-  onOpenSandbox,
   settings,
   t,
 }: {
   cards: WorkshopCard[]
-  onOpenSandbox: () => void
   settings: SandboxSettings
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
@@ -608,11 +606,6 @@ function SandboxSummaryPanel({
             decks: settings.deck_ids.join(', '),
           })}
         </div>
-      </div>
-      <div className="ws-sandbox-summary-actions">
-        <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenSandbox}>
-          {t('platform.openSandbox')}
-        </button>
       </div>
     </div>
   )
@@ -1224,15 +1217,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => { setSelectedCard(null); setView('home') }}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            prevView.current = view
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <CardDetail
@@ -1267,14 +1252,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => { setEditCard(undefined); setView('home') }}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <CardEditor
@@ -1333,15 +1311,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => setView('home')}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            prevView.current = view
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <SandboxView
@@ -1398,15 +1368,7 @@ export function WorkshopPage() {
     <div className="ws-page">
       <WorkshopNav
         view={view}
-        user={user}
-        sandboxCount={sandboxCards.length}
         onOpenHome={() => setView('home')}
-        onOpenSandbox={() => setView('sandbox')}
-        onCreateCard={() => {
-          prevView.current = view
-          setEditCard(undefined)
-          setView('editor')
-        }}
         t={t}
       />
 
@@ -1414,7 +1376,6 @@ export function WorkshopPage() {
         <div className="ws-home-header">
           <SandboxSummaryPanel
             cards={sandboxCards}
-            onOpenSandbox={() => setView('sandbox')}
             settings={sandboxSettings}
             t={t}
           />
@@ -1523,19 +1484,11 @@ export function WorkshopPage() {
 
 function WorkshopNav({
   view,
-  user,
-  sandboxCount,
   onOpenHome,
-  onOpenSandbox,
-  onCreateCard,
   t,
 }: {
   view: View
-  user: { username: string; displayName: string } | null
-  sandboxCount: number
   onOpenHome: () => void
-  onOpenSandbox: () => void
-  onCreateCard: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
@@ -1549,20 +1502,6 @@ function WorkshopNav({
           <button type="button" className="btn-link ws-nav-link" onClick={onOpenHome}>
             {t('platform.backToWorkshopHome')}
           </button>
-        )}
-        {user && (
-          <>
-            <button
-              type="button"
-              className={`btn-secondary ws-btn-sm ws-nav-action${view === 'sandbox' ? ' active' : ''}`}
-              onClick={onOpenSandbox}
-            >
-              {t('platform.sandbox')}{sandboxCount > 0 ? ` (${sandboxCount})` : ''}
-            </button>
-            <button type="button" className="btn-primary ws-btn-sm" onClick={onCreateCard}>
-              {t('platform.createCard')}
-            </button>
-          </>
         )}
       </div>
     </div>
