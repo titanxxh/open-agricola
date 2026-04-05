@@ -44,6 +44,7 @@ export const PROVIDER_MODELS: Record<LlmProvider, { id: string; label: string }[
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   ],
   gemini: [
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
     { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },

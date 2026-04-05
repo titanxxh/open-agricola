@@ -94,13 +94,18 @@ function MessageContent({ text }: { text: string }) {
   )
 }
 
-// ── Config Panel ──────────────────────────────────────────────────────────────
+// ── Inline Config Bar ─────────────────────────────────────────────────────────
 
-function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
-  const [provider, setProvider] = useState<LlmProvider>('openai')
+function ConfigBar({ config, onConfigured, onClear }: {
+  config: LlmConfig | null
+  onConfigured: () => void
+  onClear: () => void
+}) {
+  const [expanded, setExpanded] = useState(!config)
+  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
   const [apiKey, setApiKey] = useState('')
-  const [model, setModel] = useState(defaultModel('openai'))
-  const [baseUrl, setBaseUrl] = useState('')
+  const [model, setModel] = useState(config?.model ?? defaultModel('openai'))
+  const [baseUrl, setBaseUrl] = useState(config?.baseUrl ?? '')
   const [showKey, setShowKey] = useState(false)
 
   const handleProviderChange = (p: LlmProvider) => {
@@ -112,97 +117,99 @@ function ApiKeyPanel({ onConfigured }: { onConfigured: () => void }) {
   const handleSave = () => {
     if (!apiKey.trim()) return
     saveLlmConfig({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined })
+    setExpanded(false)
     onConfigured()
   }
 
+  const handleClear = () => {
+    clearLlmConfig()
+    setApiKey('')
+    setExpanded(true)
+    onClear()
+  }
+
+  if (!expanded && config) {
+    return (
+      <div className="ai-config-bar">
+        <span className="ai-provider-tag">{config.provider} / {config.model}</span>
+        <button type="button" className="btn-link" onClick={() => setExpanded(true)}>切换</button>
+        <button type="button" className="btn-link ai-config-bar-clear" onClick={handleClear}>清除</button>
+      </div>
+    )
+  }
+
   return (
-    <div className="ai-config-panel">
-      <div className="ai-config-notice">
-        <span className="ai-notice-icon">🔒</span>
-        <div>
-          <strong>API Key 安全声明</strong>
-          <p>
-            你的 API Key 仅保存在浏览器本地（localStorage）。
-            它<strong>绝不会</strong>通过 WebSocket 或 HTTP 发送到游戏服务器。
-            所有 AI 请求由你的浏览器直接发出，游戏服务器无法获取你的 Key。
-            <br/>
-            <a href="https://github.com/titanxxh/open-agricola/blob/main/src/services/llmService.ts" target="_blank" rel="noopener noreferrer" className="ai-source-link">
-              查看源码验证
-            </a>
-          </p>
-        </div>
+    <div className="ai-config-bar ai-config-bar-expanded">
+      <div className="ai-config-bar-row">
+        <strong>AI 提供商配置</strong>
+        <span className="ai-config-bar-hint">API Key 仅保存在本地，不会上传到服务器</span>
+        {config && (
+          <button type="button" className="btn-link" onClick={() => setExpanded(false)}>折叠</button>
+        )}
       </div>
 
-      <div className="ai-config-form">
-        <div className="form-field">
-          <label>AI 提供商</label>
-          <div className="ai-provider-btns">
-            {(['gemini', 'groq', 'openai', 'anthropic', 'openrouter', 'custom'] as LlmProvider[]).map(p => (
-              <button
-                key={p}
-                type="button"
-                className={`ai-provider-btn${provider === p ? ' active' : ''}`}
-                onClick={() => handleProviderChange(p)}
-              >
-                {PROVIDER_LABELS[p]}
-              </button>
-            ))}
-          </div>
+      <div className="ai-config-bar-fields">
+        <div className="ai-provider-btns">
+          {(['gemini', 'groq', 'openai', 'anthropic', 'openrouter', 'custom'] as LlmProvider[]).map(p => (
+            <button
+              key={p}
+              type="button"
+              className={`ai-provider-btn${provider === p ? ' active' : ''}`}
+              onClick={() => handleProviderChange(p)}
+            >
+              {PROVIDER_LABELS[p]}
+            </button>
+          ))}
         </div>
 
         {provider === 'custom' && (
-          <div className="form-field">
-            <label>API 端点（兼容 OpenAI 格式）</label>
-            <input
-              type="url"
-              value={baseUrl}
-              onChange={e => setBaseUrl(e.target.value)}
-              placeholder="https://your-proxy.example.com"
-            />
+          <input
+            type="url"
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            placeholder="API 端点 (兼容 OpenAI 格式)"
+            className="ai-config-bar-input"
+          />
+        )}
+
+        {PROVIDER_MODELS[provider].length > 0 ? (
+          <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
+            {PROVIDER_MODELS[provider].map(m => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            placeholder={defaultModel(provider)}
+            className="ai-config-bar-input"
+          />
+        )}
+
+        <div className="ai-key-input-row">
+          <input
+            type={showKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder={provider === 'openai' ? 'sk-...' : provider === 'anthropic' ? 'sk-ant-...' : 'API Key'}
+            autoComplete="off"
+            className="ai-config-bar-input"
+          />
+          <button type="button" className="btn-link ai-toggle-key" onClick={() => setShowKey(s => !s)}>
+            {showKey ? '隐藏' : '显示'}
+          </button>
+        </div>
+
+        {PROVIDER_KEY_HINTS[provider] && (
+          <div className="form-hint">
+            获取 Key：<a href={`https://${PROVIDER_KEY_HINTS[provider]}`} target="_blank" rel="noopener noreferrer">{PROVIDER_KEY_HINTS[provider]}</a>
           </div>
         )}
 
-        <div className="form-field">
-          <label>模型</label>
-          {PROVIDER_MODELS[provider].length > 0 ? (
-            <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
-              {PROVIDER_MODELS[provider].map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              value={model}
-              onChange={e => setModel(e.target.value)}
-              placeholder={defaultModel(provider)}
-            />
-          )}
-        </div>
-
-        <div className="form-field">
-          <label>API Key</label>
-          <div className="ai-key-input-row">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder={provider === 'openai' ? 'sk-...' : provider === 'anthropic' ? 'sk-ant-...' : 'your-api-key'}
-              autoComplete="off"
-            />
-            <button type="button" className="btn-link ai-toggle-key" onClick={() => setShowKey(s => !s)}>
-              {showKey ? '隐藏' : '显示'}
-            </button>
-          </div>
-          {PROVIDER_KEY_HINTS[provider] && (
-            <div className="form-hint">
-              获取 Key：<a href={`https://${PROVIDER_KEY_HINTS[provider]}`} target="_blank" rel="noopener noreferrer">{PROVIDER_KEY_HINTS[provider]}</a>
-            </div>
-          )}
-        </div>
-
         <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim()}>
-          保存并开始设计
+          保存配置
         </button>
       </div>
     </div>
@@ -556,11 +563,6 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  const handleClearConfig = () => {
-    clearLlmConfig()
-    setConfig(null)
-  }
-
   // Sync card type/name from extracted card
   useEffect(() => {
     if (extracted?.card) {
@@ -648,128 +650,120 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     }
   }
 
-  if (!config) {
-    return (
-      <div className="ai-designer">
-        <div className="ai-designer-header">
-          <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
-          <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
-        </div>
-        <ApiKeyPanel onConfigured={() => setConfig(getLlmConfig())} />
-      </div>
-    )
-  }
-
   return (
     <div className="ai-designer">
       <div className="ai-designer-header">
         <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
-        <div className="ai-header-actions">
-          <span className="ai-provider-tag">{config.provider} / {config.model}</span>
-          <button type="button" className="btn-link" onClick={handleClearConfig}>{locale === 'zh' ? '切换 API Key' : 'Switch Key'}</button>
-          <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
-        </div>
+        <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
       </div>
 
-      {/* Card info bar */}
-      <div className="ai-card-info-bar">
-        <div className="ai-card-type-toggle">
-          <button
-            type="button"
-            className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
-            onClick={() => setCardType('minor')}
-          >
-            {locale === 'zh' ? '小发展' : 'Minor'}
-          </button>
-          <button
-            type="button"
-            className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
-            onClick={() => setCardType('occupation')}
-          >
-            {locale === 'zh' ? '职业' : 'Occupation'}
-          </button>
-        </div>
-        <input
-          type="text"
-          className="ai-card-name-input"
-          value={cardName}
-          onChange={e => setCardName(e.target.value)}
-          placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
-        />
-        {extracted && (
-          <>
-            <button
-              type="button"
-              className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
-              onClick={handleSaveCard}
-              disabled={saving}
-            >
-              {saving
-                ? (locale === 'zh' ? '保存中…' : 'Saving…')
-                : saveSuccess
-                  ? (locale === 'zh' ? '已保存' : 'Saved')
-                  : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
-              }
-            </button>
-            {onAddToSandboxAndRestart && (
+      <ConfigBar
+        config={config}
+        onConfigured={() => setConfig(getLlmConfig())}
+        onClear={() => setConfig(null)}
+      />
+
+      {/* Card design area — only shown when config is ready */}
+      {config && (
+        <>
+          <div className="ai-card-info-bar">
+            <div className="ai-card-type-toggle">
               <button
                 type="button"
-                className="btn-primary ai-save-card-btn ai-sandbox-btn"
-                onClick={handleSaveAndAddToSandbox}
-                disabled={saving}
+                className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
+                onClick={() => setCardType('minor')}
               >
-                {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+                {locale === 'zh' ? '小发展' : 'Minor'}
               </button>
+              <button
+                type="button"
+                className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
+                onClick={() => setCardType('occupation')}
+              >
+                {locale === 'zh' ? '职业' : 'Occupation'}
+              </button>
+            </div>
+            <input
+              type="text"
+              className="ai-card-name-input"
+              value={cardName}
+              onChange={e => setCardName(e.target.value)}
+              placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
+            />
+            {extracted && (
+              <>
+                <button
+                  type="button"
+                  className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
+                  onClick={handleSaveCard}
+                  disabled={saving}
+                >
+                  {saving
+                    ? (locale === 'zh' ? '保存中…' : 'Saving…')
+                    : saveSuccess
+                      ? (locale === 'zh' ? '已保存' : 'Saved')
+                      : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
+                  }
+                </button>
+                {onAddToSandboxAndRestart && (
+                  <button
+                    type="button"
+                    className="btn-primary ai-save-card-btn ai-sandbox-btn"
+                    onClick={handleSaveAndAddToSandbox}
+                    disabled={saving}
+                  >
+                    {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+                  </button>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
 
-      {/* Minor improvement extra fields */}
-      {cardType === 'minor' && (
-        <div className="ai-minor-fields">
-          <input
-            type="text"
-            className="ai-minor-input"
-            value={prerequisite}
-            onChange={e => setPrerequisite(e.target.value)}
-            placeholder={locale === 'zh' ? '前置条件（可选，如：2 个职业、仍住木屋）' : 'Prerequisite (optional, e.g., 2 occupations)'}
-          />
-          <input
-            type="text"
-            className="ai-minor-input"
-            value={costInput}
-            onChange={e => setCostInput(e.target.value)}
-            placeholder={locale === 'zh' ? '消耗资源（可选，如：1 木 2 黏土）' : 'Cost (optional, e.g., 1 wood 2 clay)'}
-          />
-        </div>
+          {cardType === 'minor' && (
+            <div className="ai-minor-fields">
+              <input
+                type="text"
+                className="ai-minor-input"
+                value={prerequisite}
+                onChange={e => setPrerequisite(e.target.value)}
+                placeholder={locale === 'zh' ? '前置条件（可选，如：2 个职业、仍住木屋）' : 'Prerequisite (optional, e.g., 2 occupations)'}
+              />
+              <input
+                type="text"
+                className="ai-minor-input"
+                value={costInput}
+                onChange={e => setCostInput(e.target.value)}
+                placeholder={locale === 'zh' ? '消耗资源（可选，如：1 木 2 黏土）' : 'Cost (optional, e.g., 1 wood 2 clay)'}
+              />
+            </div>
+          )}
+
+          <div className="ai-designer-panels">
+            <ArtPanel
+              cardType={cardType}
+              cardName={cardName}
+              artUrl={artUrl}
+              setArtUrl={setArtUrl}
+              config={config}
+              setError={setError}
+            />
+            <AbilityPanel
+              config={config}
+              cardType={cardType}
+              cardName={cardName}
+              prerequisite={prerequisite}
+              costHint={costInput}
+              extracted={extracted}
+              setExtracted={setExtracted}
+              artUrl={artUrl}
+              onImport={onImport}
+              sandboxErrors={sandboxErrors}
+              onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+              setError={setError}
+            />
+          </div>
+        </>
       )}
-
-      {/* Two-panel layout */}
-      <div className="ai-designer-panels">
-        <ArtPanel
-          cardType={cardType}
-          cardName={cardName}
-          artUrl={artUrl}
-          setArtUrl={setArtUrl}
-          config={config}
-          setError={setError}
-        />
-        <AbilityPanel
-          config={config}
-          cardType={cardType}
-          cardName={cardName}
-          prerequisite={prerequisite}
-          costHint={costInput}
-          extracted={extracted}
-          setExtracted={setExtracted}
-          artUrl={artUrl}
-          onImport={onImport}
-          sandboxErrors={sandboxErrors}
-          onSandboxErrorsConsumed={onSandboxErrorsConsumed}
-          setError={setError}
-        />
-      </div>
 
       {error && <div className="form-error ai-error">{error}</div>}
     </div>
