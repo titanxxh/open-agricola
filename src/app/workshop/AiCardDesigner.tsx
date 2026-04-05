@@ -307,7 +307,9 @@ function RefImagePicker({ cardType, selected, onToggle }: {
   onToggle: (url: string) => void
 }) {
   const { locale } = useLocale()
-  const images = cardType === 'minor' ? MINOR_REF_IMAGES : OCC_REF_IMAGES
+  const allImages = cardType === 'minor' ? MINOR_REF_IMAGES : OCC_REF_IMAGES
+  // Show 6 random images, stable per mount
+  const [images] = useState(() => sampleN(allImages, 6))
 
   return (
     <div className="ai-ref-picker">
@@ -465,11 +467,16 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
       const dataUrl = await generateCardArt(artPrompt, config, refImages)
       if (!dataUrl) {
         setArtError(locale === 'zh'
-          ? '图片生成失败，请检查 API Key 权限'
-          : 'Image generation failed, please check your API key permissions')
+          ? '⚠️ 图片生成失败：API 未返回图片数据，请检查 API Key 权限和模型是否支持图片生成'
+          : '⚠️ Image generation failed: API returned no image data. Check API key permissions and model support.')
         return
       }
       const uploaded = await uploadArt(dataUrl)
+      if (!uploaded) {
+        setArtError(locale === 'zh'
+          ? '⚠️ 图片上传到服务器失败，图片仅在本地显示'
+          : '⚠️ Failed to upload art to server, showing local preview only')
+      }
       setArtUrl(uploaded ?? dataUrl)
     } catch (err) {
       setArtError(err instanceof Error ? err.message : 'Art generation error')
@@ -895,7 +902,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     })
       .then(r => r.json())
       .then(d => { if (d.ok) setMyCards(d.cards as ApiCard[]) })
-      .catch(() => {})
+      .catch(err => { console.warn('[AiCardDesigner] Failed to load saved designs:', err) })
   }, [])
 
   // Load user's own cards on mount

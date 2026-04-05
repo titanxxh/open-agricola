@@ -531,7 +531,10 @@ export async function generateCardArt(
       }),
     })
 
-    if (!resp.ok) return null
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '')
+      throw new Error(`OpenAI image API error ${resp.status}: ${err}`)
+    }
     const data = await resp.json() as { data?: { b64_json?: string }[] }
     const b64 = data.data?.[0]?.b64_json
     if (!b64) return null
