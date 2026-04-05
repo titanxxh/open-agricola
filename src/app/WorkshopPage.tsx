@@ -502,6 +502,7 @@ function CardEditor({ initial, token, onSaved, onCancel, t, sandboxErrors, onSan
         <AiCardDesigner
           onImport={handleAiImport}
           onClose={() => setShowAi(false)}
+          onSaved={onSaved}
           sandboxErrors={sandboxErrors}
           onSandboxErrorsConsumed={onSandboxErrorsConsumed}
         />

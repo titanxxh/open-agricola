@@ -4019,6 +4019,17 @@
   border-color: #3a5a2c;
 }
 
+.ai-save-card-btn {
+  white-space: nowrap;
+  padding: 7px 16px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.ai-save-card-btn.ai-save-success {
+  background: #3a5a2c;
+}
+
 /* Two-panel layout */
 .ai-designer-panels {
   display: flex;

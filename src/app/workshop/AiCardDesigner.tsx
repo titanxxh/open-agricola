@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
-  streamChat, extractCardJson, generateCardArt, buildCardArtPrompt,
+  streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
   type LlmConfig, type LlmProvider, type ChatMessage,
 } from '../../services/llmService'
@@ -46,6 +46,7 @@ export type ExtractedCard = {
     modifiers?: unknown[]
   }
   effects?: Record<string, unknown>
+  sourceCode?: string
 }
 
 type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean }
@@ -366,9 +367,13 @@ function AbilityPanel({
         return updated
       })
 
-      const parsed = extractCardJson(fullText)
+      const parsed = extractCardFromResponse(fullText)
       if (parsed?.card) {
-        setExtracted(parsed as ExtractedCard)
+        setExtracted({
+          card: parsed.card as ExtractedCard['card'],
+          effects: parsed.effects ?? undefined,
+          sourceCode: parsed.sourceCode || undefined,
+        })
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -515,9 +520,10 @@ function AbilityPanel({
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSandboxErrorsConsumed }: {
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
+  onSaved?: () => void
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
 }) {
@@ -528,6 +534,8 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
   const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
   const [artUrl, setArtUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const handleClearConfig = () => {
     clearLlmConfig()
@@ -541,6 +549,69 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
       if (extracted.card.name) setCardName(extracted.card.name)
     }
   }, [extracted])
+
+  const handleSaveCard = async () => {
+    if (!extracted?.card) return
+    const card = extracted.card
+    if (!card.name?.trim()) { setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return }
+    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return }
+
+    setSaving(true)
+    setError('')
+    setSaveSuccess(false)
+    try {
+      const token = localStorage.getItem(TOKEN_KEY)
+      const cardJson = {
+        id: card.id,
+        name: card.name,
+        deck: 'CUSTOM',
+        number: 0,
+        desc: card.desc ?? [],
+        cost: card.cost ?? {},
+        vp: card.vp ?? 0,
+        modifiers: card.modifiers ?? [],
+        implemented: true,
+      }
+
+      const body: Record<string, unknown> = {
+        card_id: card.id,
+        card_type: card.card_type,
+        name: card.name,
+        description: (card.desc ?? []).join(' '),
+        card_json: cardJson,
+        art_url: artUrl,
+        status: 'draft',
+      }
+
+      // If we have source code from TS extraction, save as effect_code
+      if (extracted.sourceCode) {
+        body.effect_code = extracted.sourceCode
+      } else if (extracted.effects && Object.keys(extracted.effects).length > 0 && !('_hasCode' in extracted.effects)) {
+        body.effect_dsl = extracted.effects
+      }
+
+      const r = await fetch(`${API_BASE}/api/workshop/cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 3000)
+        onSaved?.()
+      } else {
+        setError(d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'))
+      }
+    } catch {
+      setError(locale === 'zh' ? '网络错误' : 'Network error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (!config) {
     return (
@@ -590,6 +661,21 @@ export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErro
           onChange={e => setCardName(e.target.value)}
           placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
         />
+        {extracted && (
+          <button
+            type="button"
+            className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
+            onClick={handleSaveCard}
+            disabled={saving}
+          >
+            {saving
+              ? (locale === 'zh' ? '保存中…' : 'Saving…')
+              : saveSuccess
+                ? (locale === 'zh' ? '已保存' : 'Saved')
+                : (locale === 'zh' ? '保存到我的卡牌' : 'Save to My Cards')
+            }
+          </button>
+        )}
       </div>
 
       {/* Two-panel layout */}
