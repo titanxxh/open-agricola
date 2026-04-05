@@ -208,6 +208,7 @@ export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const isWsMode = currentUrlParams.get('transport') === 'ws'
+  const isEmbedded = currentUrlParams.get('embedded') === '1'
 
   const lockedViewPlayerId = useMemo(() => {
     const p = new URLSearchParams(window.location.search)
@@ -1205,11 +1206,11 @@ export const GameContainerApi = () => {
   }
 
   if (!state || !currentPlayer || !displayPlayer) {
-    return <div className="app">Loading...</div>
+    return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
   return (
-    <div className="app">
+    <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -1433,9 +1434,11 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
-        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
-      />
+      {!isEmbedded && (
+        <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+          onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+        />
+      )}
 
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}

@@ -870,6 +870,8 @@ export const zh = {
     sandboxFailed: '启动沙盒游戏失败：{error}',
     sandboxUnknownError: '未知错误',
     sandboxNetworkError: '网络错误，请重试',
+    restartSandbox: '重启沙盒',
+    closeSandbox: '关闭沙盒',
     me: '我',
     by: 'by {name}',
     selectPlayerCount: '选择游戏人数',
