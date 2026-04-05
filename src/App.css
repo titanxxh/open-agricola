@@ -4030,6 +4030,25 @@
   background: #3a5a2c;
 }
 
+.ai-minor-fields {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px 4px;
+}
+
+.ai-minor-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #cdb996;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.ai-minor-input:focus {
+  border-color: #3a5a2c;
+}
+
 /* Two-panel layout */
 .ai-designer-panels {
   display: flex;
