@@ -890,6 +890,8 @@ export const en = {
     sandboxFailed: 'Failed to start sandbox game: {error}',
     sandboxUnknownError: 'Unknown error',
     sandboxNetworkError: 'Network error, please retry',
+    restartSandbox: 'Restart Sandbox',
+    closeSandbox: 'Close Sandbox',
     me: 'Me',
     by: 'by {name}',
     selectPlayerCount: 'Select number of players',

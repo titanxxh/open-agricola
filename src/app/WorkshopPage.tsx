@@ -1107,6 +1107,8 @@ export function WorkshopPage() {
   const [myLoading, setMyLoading] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
+  const [sandboxActive, setSandboxActive] = useState(false)
+  const [sandboxKey, setSandboxKey] = useState(0)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1304,12 +1306,12 @@ export function WorkshopPage() {
       const data = await response.json()
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
+        setSandboxActive(true)
+        setSandboxKey(k => k + 1)
         if (warnings.length > 0) {
           // Cards had registration errors — feed back to AI designer
           setPendingSandboxErrors(warnings)
           setView('editor')
-        } else {
-          setPage('game')
         }
       } else {
         const errors = [data.error ?? t('platform.sandboxUnknownError')]
@@ -1406,6 +1408,24 @@ export function WorkshopPage() {
           sandboxErrors={pendingSandboxErrors}
           onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
         />
+        {sandboxActive && (
+          <div className="sandbox-embed">
+            <div className="sandbox-embed-toolbar">
+              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                {t('platform.restartSandbox')}
+              </button>
+              <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                {t('platform.closeSandbox')}
+              </button>
+            </div>
+            <iframe
+              key={sandboxKey}
+              className="sandbox-embed-frame"
+              src={`?page=game&player=p1&embedded=1`}
+              title="Sandbox"
+            />
+          </div>
+        )}
       </div>
     )
   }
@@ -1444,6 +1464,24 @@ export function WorkshopPage() {
             onSave={handleResetSandbox}
             t={t}
           />
+        )}
+        {sandboxActive && (
+          <div className="sandbox-embed">
+            <div className="sandbox-embed-toolbar">
+              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                {t('platform.restartSandbox')}
+              </button>
+              <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                {t('platform.closeSandbox')}
+              </button>
+            </div>
+            <iframe
+              key={sandboxKey}
+              className="sandbox-embed-frame"
+              src={`?page=game&player=p1&embedded=1`}
+              title="Sandbox"
+            />
+          </div>
         )}
       </div>
     )

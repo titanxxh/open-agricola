@@ -4732,3 +4732,35 @@
     flex-direction: column-reverse;
   }
 }
+
+/* ── Sandbox Embed ─────────────────────────────────────────────────────────── */
+
+.sandbox-embed {
+  margin-top: 16px;
+  border-top: 2px solid #3a5a2c;
+}
+
+.sandbox-embed-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f5f0e8;
+  align-items: center;
+}
+
+.sandbox-embed-frame {
+  width: 100%;
+  height: 80vh;
+  border: none;
+  display: block;
+}
+
+/* ── Embedded game mode (inside iframe) ──────────────────────────────────── */
+
+.app--embedded {
+  padding-top: 0;
+}
+
+.app--embedded .header-compact {
+  display: none;
+}
