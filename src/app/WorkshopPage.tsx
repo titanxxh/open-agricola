@@ -379,13 +379,8 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
   const [cost, setCost] = useState<Record<string, number>>(
     ((initial?.card_json as Record<string, unknown>)?.cost as Record<string, number>) ?? {}
   )
-  const [dslText, setDslText] = useState(initial?.effect_dsl ? JSON.stringify(initial.effect_dsl, null, 2) : '')
-  const [effectMode, setEffectMode] = useState<'dsl' | 'code'>('dsl')
-  const [codeText, setCodeText] = useState('')
-  const [codeErrors, setCodeErrors] = useState<string[]>([])
-  const [validating, setValidating] = useState(false)
   const [artUrl, setArtUrl] = useState<string | null>(initial?.art_url ?? null)
-  const [showAi, setShowAi] = useState(false)
+  const [showAi, setShowAi] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -403,9 +398,6 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
     setDesc((extracted.card.desc ?? []).join(' '))
     setVp(String(extracted.card.vp ?? 0))
     setCost(extracted.card.cost ?? {})
-    if (extracted.effects && Object.keys(extracted.effects).length > 0) {
-      setDslText(JSON.stringify(extracted.effects, null, 2))
-    }
     if (importedArtUrl) setArtUrl(importedArtUrl)
     setShowAi(false)
   }
@@ -421,39 +413,10 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
     }
   }
 
-  const handleValidateCode = async () => {
-    if (!codeText.trim()) { setCodeErrors([t('platform.enterCode')]); return }
-    setValidating(true)
-    setCodeErrors([])
-    try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards/validate-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({ source: codeText }),
-      })
-      const d = await r.json()
-      if (d.ok && d.valid) {
-        setCodeErrors([])
-        setError('')
-      } else {
-        setCodeErrors(d.errors ?? [t('platform.validationFailed')])
-      }
-    } catch {
-      setCodeErrors([t('platform.networkError')])
-    } finally {
-      setValidating(false)
-    }
-  }
-
   const handleSave = async (publishStatus: 'draft' | 'published') => {
     setError('')
     if (!name.trim()) { setError(t('platform.cardNameRequired')); return }
     if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError(t('platform.cardIdInvalid')); return }
-
-    let effectDsl = null
-    if (effectMode === 'dsl' && dslText.trim()) {
-      try { effectDsl = JSON.parse(dslText) } catch { setError(t('platform.dslJsonError')); return }
-    }
 
     const cardJson = {
       id: cardId,
@@ -478,8 +441,6 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
           name,
           description: desc,
           card_json: cardJson,
-          effect_dsl: effectMode === 'dsl' ? effectDsl : null,
-          effect_code: effectMode === 'code' ? codeText : undefined,
           art_url: artUrl,
           status: publishStatus,
         }),
@@ -575,84 +536,6 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
           </div>
         </div>
 
-        <div className="form-field">
-          <div className="ws-effect-mode-toggle">
-            <button type="button" className={`ws-tab-sm${effectMode === 'dsl' ? ' active' : ''}`} onClick={() => setEffectMode('dsl')}>
-              {t('platform.dslMode')}
-            </button>
-            <button type="button" className={`ws-tab-sm${effectMode === 'code' ? ' active' : ''}`} onClick={() => setEffectMode('code')}>
-              {t('platform.codeMode')}
-            </button>
-          </div>
-
-          {effectMode === 'dsl' ? (
-            <>
-              <label>{t('platform.dslLabel')}</label>
-              <textarea
-                value={dslText}
-                onChange={e => setDslText(e.target.value)}
-                rows={8}
-                placeholder={'{\n  "onReturnHome": {\n    "optional": true,\n    "flow": [{ "action": "gain", "params": { "food": 2 } }]\n  }\n}'}
-                className="ws-code-input"
-              />
-              <p className="ws-code-note">{t('platform.dslNote')}</p>
-            </>
-          ) : (
-            <>
-              <label>{t('platform.tsLabel')}</label>
-              <textarea
-                value={codeText}
-                onChange={e => { setCodeText(e.target.value); setCodeErrors([]) }}
-                rows={12}
-                placeholder={'registerCardEffect({\n  id: "CUSTOM_MyCard",\n  onReturnHome: (state, player) => {\n    return { type: "leaf", actionId: "gain", params: { food: 2 }, sourceCard: "CUSTOM_MyCard" }\n  },\n})'}
-                className="ws-code-input"
-              />
-              <div className="ws-code-toolbar">
-                <button type="button" className="btn-secondary ws-btn-sm" onClick={handleValidateCode} disabled={validating}>
-                  {validating ? t('platform.validating') : t('platform.validateCode')}
-                </button>
-                <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
-                  const r = await fetch(`${API_BASE}/api/workshop/cards/generate-template`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-                    body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] } }),
-                  })
-                  const d = await r.json()
-                  if (d.ok && d.code) setCodeText(d.code)
-                }}>
-                  {t('platform.generateTemplate')}
-                </button>
-                {dslText.trim() && (
-                  <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
-                    try {
-                      const dsl = JSON.parse(dslText)
-                      const r = await fetch(`${API_BASE}/api/workshop/cards/preview-code`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-                        body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] }, effect_dsl: dsl }),
-                      })
-                      const d = await r.json()
-                      if (d.ok && d.code) setCodeText(d.code)
-                    } catch { setError(t('platform.dslJsonError')) }
-                  }}>
-                    {t('platform.generateFromDsl')}
-                  </button>
-                )}
-                {codeErrors.length === 0 && codeText.trim() && !validating && (
-                  <span className="ws-code-ok">{t('platform.validationPassed')}</span>
-                )}
-              </div>
-              {codeErrors.length > 0 && (
-                <ul className="ws-code-errors">
-                  {codeErrors.map((e, i) => <li key={i}>{e}</li>)}
-                </ul>
-              )}
-              <p className="ws-code-note">
-                {t('platform.codeApiNote')}
-              </p>
-            </>
-          )}
-        </div>
 
         {error && <div className="form-error">{error}</div>}
 
