@@ -19,6 +19,7 @@
   "dependencies": {
     "better-sqlite3": "^12.8.0",
     "canvas": "^3.2.1",
+    "isolated-vm": "^6.1.2",
     "nanoid": "^5.1.7",
     "pngjs": "^7.0.0",
     "react": "^19.2.0",

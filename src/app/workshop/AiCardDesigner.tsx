@@ -47,7 +47,50 @@ export type ExtractedCard = {
   effects?: Record<string, unknown>
 }
 
-type DisplayMessage = ChatMessage & { streaming?: boolean }
+type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean }
+
+// ── Markdown with code copy ─────────────────────────────────────────────────
+
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code.trim()).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <div className="ai-code-block">
+      <div className="ai-code-header">
+        {lang && <span className="ai-code-lang">{lang}</span>}
+        <button type="button" className="ai-code-copy" onClick={handleCopy}>
+          {copied ? '已复制' : '复制'}
+        </button>
+      </div>
+      <pre><code>{code}</code></pre>
+    </div>
+  )
+}
+
+function MessageContent({ text }: { text: string }) {
+  // Split on fenced code blocks: ```lang\ncode```
+  const parts = text.split(/(```[\s\S]*?```)/g)
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        const codeMatch = part.match(/^```(\w*)\n?([\s\S]*?)```$/)
+        if (codeMatch) {
+          const [, lang, code] = codeMatch
+          return <CodeBlock key={i} lang={lang ?? ''} code={code ?? ''} />
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </>
+  )
+}
 
 // ── Config Panel ──────────────────────────────────────────────────────────────
 
@@ -215,9 +258,11 @@ function CardPreview({ extracted, artUrl, onGenArt, generatingArt }: {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose }: {
+export function AiCardDesigner({ onImport, onClose, sandboxErrors, onSandboxErrorsConsumed }: {
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
+  sandboxErrors?: string[] | null
+  onSandboxErrorsConsumed?: () => void
 }) {
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [messages, setMessages] = useState<DisplayMessage[]>([])
@@ -239,24 +284,17 @@ export function AiCardDesigner({ onImport, onClose }: {
     setConfig(null)
   }
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || !config || streaming) return
+  // Core streaming logic — shared by manual send and auto-trigger
+  const sendMessages = useCallback(async (chatHistory: ChatMessage[]) => {
+    if (!config) return
+    setStreaming(true)
     setError('')
 
-    const userMsg: DisplayMessage = { role: 'user', content: input.trim() }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
-    setInput('')
-    setStreaming(true)
-
-    // Add empty assistant message for streaming
     const assistantMsg: DisplayMessage = { role: 'assistant', content: '', streaming: true }
     setMessages(prev => [...prev, assistantMsg])
 
     try {
       let fullText = ''
-      const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.role, content: m.content }))
-
       for await (const chunk of streamChat(chatHistory, CARD_DESIGNER_SYSTEM_PROMPT, config)) {
         fullText += chunk
         setMessages(prev => {
@@ -266,14 +304,12 @@ export function AiCardDesigner({ onImport, onClose }: {
         })
       }
 
-      // Mark streaming done
       setMessages(prev => {
         const updated = [...prev]
         updated[updated.length - 1] = { role: 'assistant', content: fullText }
         return updated
       })
 
-      // Try to extract card JSON
       const parsed = extractCardJson(fullText)
       if (parsed?.card) {
         setExtracted(parsed as ExtractedCard)
@@ -286,7 +322,46 @@ export function AiCardDesigner({ onImport, onClose }: {
     } finally {
       setStreaming(false)
     }
-  }, [input, config, messages, streaming])
+  }, [config])
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || !config || streaming) return
+
+    const userMsg: DisplayMessage = { role: 'user', content: input.trim() }
+    const newMessages = [...messages, userMsg]
+    setMessages(newMessages)
+    setInput('')
+
+    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' : m.role, content: m.content }))
+    await sendMessages(chatHistory)
+  }, [input, config, messages, streaming, sendMessages])
+
+  // Auto-inject sandbox errors into the conversation and trigger LLM
+  useEffect(() => {
+    if (!sandboxErrors?.length || streaming || !config) return
+
+    const errorText = [
+      '⚠️ 沙盒运行报错',
+      '',
+      '我导入的卡牌在沙盒中运行时出现了以下错误：',
+      '',
+      ...sandboxErrors.map((e, i) => `${i + 1}. ${e}`),
+      '',
+      '请根据这些错误修改卡牌定义，并给出完整的修复后 JSON。',
+    ].join('\n')
+
+    const errorMsg: DisplayMessage = { role: 'user', content: errorText, isError: true }
+    const newMessages = [...messages, errorMsg]
+    setMessages(newMessages)
+
+    // Consume errors so they don't re-trigger
+    onSandboxErrorsConsumed?.()
+
+    // Auto-trigger LLM response with the full conversation including error
+    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' : m.role, content: m.content }))
+    void sendMessages(chatHistory)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run only when sandboxErrors changes
+  }, [sandboxErrors])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -302,7 +377,6 @@ export function AiCardDesigner({ onImport, onClose }: {
       const desc = extracted.card.desc?.join(' ') ?? extracted.card.name
       const dataUrl = await generateCardArt(extracted.card.name, desc, config)
       if (!dataUrl) { setError('美术生成失败（仅 OpenAI DALL-E 支持）'); return }
-      // Upload to server so the final URL is a persistent path, not a large base64 blob
       const uploaded = await uploadArt(dataUrl)
       setArtUrl(uploaded ?? dataUrl)
     } catch (err) {
@@ -352,10 +426,15 @@ export function AiCardDesigner({ onImport, onClose }: {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className={`ai-message ai-message-${msg.role}`}>
-              <div className="ai-message-role">{msg.role === 'user' ? '你' : 'AI'}</div>
+            <div key={i} className={`ai-message ai-message-${msg.role}${msg.isError ? ' ai-message-error' : ''}`}>
+              <div className="ai-message-role">
+                {msg.isError ? '沙盒报错' : msg.role === 'user' ? '你' : 'AI'}
+              </div>
               <div className={`ai-message-content${msg.streaming ? ' ai-streaming' : ''}`}>
-                {msg.content || (msg.streaming ? '▋' : '')}
+                {msg.role === 'assistant'
+                  ? <MessageContent text={msg.content || (msg.streaming ? '▋' : '')} />
+                  : (msg.content || (msg.streaming ? '▋' : ''))
+                }
               </div>
             </div>
           ))}

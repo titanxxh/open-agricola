@@ -361,12 +361,14 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle']
 
-function CardEditor({ initial, token, onSaved, onCancel, t }: {
+function CardEditor({ initial, token, onSaved, onCancel, t, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
   onSaved: () => void
   onCancel: () => void
   t: (key: string, params?: Record<string, string | number>) => string
+  sandboxErrors?: string[] | null
+  onSandboxErrorsConsumed?: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [cardId, setCardId] = useState(initial?.card_id ?? 'CUSTOM_')
@@ -385,6 +387,13 @@ function CardEditor({ initial, token, onSaved, onCancel, t }: {
   const [showAi, setShowAi] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Auto-open AI designer when sandbox errors arrive
+  useEffect(() => {
+    if (sandboxErrors?.length) {
+      setShowAi(true)
+    }
+  }, [sandboxErrors])
 
   const handleAiImport = (extracted: ExtractedCard, importedArtUrl: string | null) => {
     setName(extracted.card.name)
@@ -493,6 +502,8 @@ function CardEditor({ initial, token, onSaved, onCancel, t }: {
         <AiCardDesigner
           onImport={handleAiImport}
           onClose={() => setShowAi(false)}
+          sandboxErrors={sandboxErrors}
+          onSandboxErrorsConsumed={onSandboxErrorsConsumed}
         />
       </div>
     )
@@ -1094,6 +1105,7 @@ export function WorkshopPage() {
   const [featuredLoading, setFeaturedLoading] = useState(false)
   const [myLoading, setMyLoading] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
+  const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1290,9 +1302,18 @@ export function WorkshopPage() {
       })
       const data = await response.json()
       if (data.ok) {
-        setPage('game')
+        const warnings: string[] = data.cardWarnings ?? []
+        if (warnings.length > 0) {
+          // Cards had registration errors — feed back to AI designer
+          setPendingSandboxErrors(warnings)
+          setView('editor')
+        } else {
+          setPage('game')
+        }
       } else {
-        alert(t('platform.sandboxFailed', { error: data.error ?? t('platform.sandboxUnknownError') }))
+        const errors = [data.error ?? t('platform.sandboxUnknownError')]
+        setPendingSandboxErrors(errors)
+        setView('editor')
       }
     } catch {
       alert(t('platform.sandboxNetworkError'))
@@ -1381,6 +1402,8 @@ export function WorkshopPage() {
             setView(prevView.current)
           }}
           t={t}
+          sandboxErrors={pendingSandboxErrors}
+          onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
         />
       </div>
     )

@@ -8,7 +8,7 @@ import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws.ts'
 import { validateSession } from './auth.ts'
 import { getDb } from './db.ts'
-import type { CustomCardData } from '../shared/cards/custom-registry.ts'
+import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/cards/custom-code-types.ts'
 
 /** Load custom card data from DB by workshop_cards.id list. Allows published + author's drafts. */
@@ -664,7 +664,7 @@ export const createWsServer = (server: import('node:http').Server) => {
           for (const p of room.players) {
             room.session.updatePlayerName(p.playerIndex, p.name)
           }
-          const resp = room.session.getState()
+          const resp = room.session.withCtx(() => room.session.getState())
           broadcastState(room, resp, 'reconnect')
           broadcast(room, { type: 'gameStarted' })
         }
@@ -696,93 +696,97 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (!currentRoom) { sendTo(ws, { type: 'error', error: 'not in a room' }); return }
       const room = currentRoom
 
+      // Activate session card context for all game operations
+      const callRoom = <T>(fn: (session: GameSession) => T): T =>
+        room.session.withCtx(() => fn(room.session))
+
       if (msg.type === 'getState') {
-        const resp = room.session.getState()
+        const resp = callRoom(s => s.getState())
         sendStateTo(ws, room, resp)
         return
       }
 
       if (msg.type === 'action') {
-        const resp = room.session.takeAction(currentPlayerIndex, msg.spaceId)
+        const resp = callRoom(s => s.takeAction(currentPlayerIndex, msg.spaceId))
         broadcastState(room, resp, 'action')
         return
       }
 
       if (msg.type === 'choice') {
-        const resp = room.session.resolveChoice(currentPlayerIndex, msg.value)
+        const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value))
         broadcastState(room, resp, 'choice')
         return
       }
 
       if (msg.type === 'anytime') {
-        const resp = room.session.takeAnytimeAction(currentPlayerIndex, msg.actionId)
+        const resp = callRoom(s => s.takeAnytimeAction(currentPlayerIndex, msg.actionId))
         broadcastState(room, resp, 'anytime')
         return
       }
 
       if (msg.type === 'reorg') {
-        const resp = room.session.confirmAnimalReorg(currentPlayerIndex, msg.zones)
+        const resp = callRoom(s => s.confirmAnimalReorg(currentPlayerIndex, msg.zones))
         broadcastState(room, resp, 'reorg')
         return
       }
 
       if (msg.type === 'feed') {
-        const resp = room.session.confirmHarvestFeed(currentPlayerIndex, msg.selections)
+        const resp = callRoom(s => s.confirmHarvestFeed(currentPlayerIndex, msg.selections))
         broadcastState(room, resp, 'feed')
         return
       }
 
       if (msg.type === 'nextPlayer') {
-        const resp = room.session.confirmNextPlayer()
+        const resp = callRoom(s => s.confirmNextPlayer())
         broadcastState(room, resp, 'action')
         return
       }
 
       if (msg.type === 'confirmPlayerSwitch') {
-        const resp = room.session.confirmPlayerSwitch()
+        const resp = callRoom(s => s.confirmPlayerSwitch())
         broadcastState(room, resp, 'action')
         return
       }
 
       if (msg.type === 'roundEnd') {
-        const resp = room.session.performRoundEnd()
+        const resp = callRoom(s => s.performRoundEnd())
         broadcastState(room, resp, 'action')
         return
       }
 
       if (msg.type === 'commitFarm') {
-        const resp = room.session.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload)
+        const resp = callRoom(s => s.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload))
         broadcastState(room, resp, 'choice')
         return
       }
 
       if (msg.type === 'undoStep') {
-        const resp = room.session.undoStep()
+        const resp = callRoom(s => s.undoStep())
         broadcastState(room, resp, 'undo')
         return
       }
 
       if (msg.type === 'undoAction') {
-        const resp = room.session.undoAction()
+        const resp = callRoom(s => s.undoAction())
         broadcastState(room, resp, 'undo')
         return
       }
 
       if (msg.type === 'newGame') {
         room.session = createSessionForRoom(msg.seed, room.customCardDbIds ?? [], room.createdBy)
-        const resp = room.session.getState()
+        const resp = room.session.withCtx(() => room.session.getState())
         broadcastState(room, resp, 'reconnect')
         return
       }
 
       if (msg.type === 'loadGame') {
-        const resp = room.session.loadState(msg.state)
+        const resp = callRoom(s => s.loadState(msg.state))
         broadcastState(room, resp, 'reconnect')
         return
       }
 
       if (msg.type === 'devCreatePasture') {
-        const resp = room.session.startDevFenceSelect(currentPlayerIndex)
+        const resp = callRoom(s => s.startDevFenceSelect(currentPlayerIndex))
         broadcastState(room, resp, 'action')
         return
       }

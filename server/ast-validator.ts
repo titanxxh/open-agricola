@@ -3,7 +3,10 @@
  *
  * Parses user-submitted TypeScript, walks the AST, and rejects any
  * construct that could escape the sandbox (imports, eval, process, etc.).
- * Only whitelisted patterns are allowed.
+ *
+ * NOTE: This validator is defense-in-depth — it provides helpful error
+ * messages for users. The actual security boundary is isolated-vm
+ * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
 
@@ -11,11 +14,27 @@ export type ValidationResult = { valid: true } | { valid: false; errors: string[
 
 /** Identifiers that are completely forbidden as references. */
 const DENIED_IDENTIFIERS = new Set([
+  // Sandbox escapes
   'eval', 'Function', 'process', 'require', 'globalThis', 'global',
   'window', 'document', '__dirname', '__filename',
+  // Network / IO
   'fetch', 'XMLHttpRequest', 'WebSocket',
+  // Timers (not available in sandbox)
   'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval',
+  // Alternative runtimes
   'Deno', 'Bun',
+  // Prototype chain manipulation (primary VM escape vector)
+  'Proxy', 'Reflect',
+])
+
+/** Property names that are forbidden even in property access (obj.constructor). */
+const DENIED_PROPERTY_ACCESS = new Set([
+  'constructor',
+  '__proto__',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
 ])
 
 export function validateCardCode(source: string): ValidationResult {
@@ -59,8 +78,11 @@ export function validateCardCode(source: string): ValidationResult {
     if (ts.isIdentifier(node)) {
       const parent = node.parent
       // Skip property access names (obj.process is fine, bare process is not)
+      // BUT check DENIED_PROPERTY_ACCESS for dangerous property names
       if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) {
-        // This is the right side of a dot — OK
+        if (DENIED_PROPERTY_ACCESS.has(node.text)) {
+          errors.push(`line ${getLine(node)}: accessing '.${node.text}' is not allowed`)
+        }
       } else if (parent && (ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) && parent.name === node) {
         // Object literal key — OK
       } else if (parent && ts.isLabeledStatement(parent) && parent.label === node) {
@@ -69,6 +91,14 @@ export function validateCardCode(source: string): ValidationResult {
         // break/continue label — OK
       } else if (DENIED_IDENTIFIERS.has(node.text)) {
         errors.push(`line ${getLine(node)}: '${node.text}' is not allowed`)
+      }
+    }
+
+    // Deny computed property access with string literals containing denied names
+    // e.g., obj['constructor'], obj['__proto__']
+    if (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression)) {
+      if (DENIED_PROPERTY_ACCESS.has(node.argumentExpression.text)) {
+        errors.push(`line ${getLine(node)}: accessing ['${node.argumentExpression.text}'] is not allowed`)
       }
     }
 

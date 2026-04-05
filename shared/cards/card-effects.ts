@@ -1,5 +1,6 @@
 import type { ActionFlow, GameState, PlayerState, Resource } from '../game/types'
 import { getMajorCardEffect } from './major'
+import { getCurrentSessionContext } from './session-card-context'
 
 export type PaymentInfo = {
   resourcesPaid: Partial<Resource>
@@ -91,8 +92,12 @@ export const clearCustomCardEffects = () => {
   }
 }
 
-export const getCardEffect = (id: string): CardEffect | null =>
-  cardEffectOverrides.get(id) ?? getMajorCardEffect(id) ?? null
+export const getCardEffect = (id: string): CardEffect | null => {
+  const sessionCtx = getCurrentSessionContext()
+  const custom = sessionCtx?.customEffects.get(id)
+  if (custom) return custom
+  return cardEffectOverrides.get(id) ?? getMajorCardEffect(id) ?? null
+}
 
 const isCustomCard = (id: string) => id.startsWith('CUSTOM_')
 

@@ -1,5 +1,6 @@
 import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
+import { getCurrentSessionContext } from './session-card-context'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -91,8 +92,14 @@ const matchesListener = (
   return true
 }
 
+const getAllListeners = (): CardListenerRegistration[] => {
+  const sessionCtx = getCurrentSessionContext()
+  if (!sessionCtx || sessionCtx.customListeners.length === 0) return cardListeners
+  return [...cardListeners, ...sessionCtx.customListeners]
+}
+
 const getOrderedListeners = (context: CardListenerContext) =>
-  cardListeners
+  getAllListeners()
     .filter((registration) => matchesListener(registration, context))
     .sort((left, right) => {
       const leftOrder = left.order ?? 0
@@ -232,5 +239,10 @@ export const shouldSkipImmediateListenerLog = (
 }
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
+  const sessionCtx = getCurrentSessionContext()
+  if (sessionCtx) {
+    const custom = sessionCtx.customListeners.find((l) => l.id === listenerId)
+    if (custom) return custom
+  }
   return cardListeners.find((l) => l.id === listenerId)
 }
