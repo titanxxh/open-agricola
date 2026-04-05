@@ -361,11 +361,12 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle']
 
-function CardEditor({ initial, token, onSaved, onCancel, t, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestart, t, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
   onSaved: () => void
   onCancel: () => void
+  onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
@@ -503,6 +504,7 @@ function CardEditor({ initial, token, onSaved, onCancel, t, sandboxErrors, onSan
           onImport={handleAiImport}
           onClose={() => setShowAi(false)}
           onSaved={onSaved}
+          onAddToSandboxAndRestart={onAddToSandboxAndRestart}
           sandboxErrors={sandboxErrors}
           onSandboxErrorsConsumed={onSandboxErrorsConsumed}
         />
@@ -1404,6 +1406,10 @@ export function WorkshopPage() {
             setEditCard(undefined)
             setView(prevView.current)
           }}
+          onAddToSandboxAndRestart={async (cardDbId: string) => {
+            await handleAddSandbox(cardDbId)
+            await handleStartSandboxGame()
+          }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
           onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
@@ -1417,11 +1423,14 @@ export function WorkshopPage() {
               <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
                 {t('platform.closeSandbox')}
               </button>
+              <span className="sandbox-embed-tips">
+                {t('platform.sandboxDevTips')}
+              </span>
             </div>
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1`}
               title="Sandbox"
             />
           </div>
@@ -1474,11 +1483,14 @@ export function WorkshopPage() {
               <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
                 {t('platform.closeSandbox')}
               </button>
+              <span className="sandbox-embed-tips">
+                {t('platform.sandboxDevTips')}
+              </span>
             </div>
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1`}
               title="Sandbox"
             />
           </div>

@@ -872,6 +872,7 @@ export const zh = {
     sandboxNetworkError: '网络错误，请重试',
     restartSandbox: '重启沙盒',
     closeSandbox: '关闭沙盒',
+    sandboxDevTips: '已开启开发者模式 — 使用 Save/Load State 保存恢复进度，Draw Card 输入卡牌 ID 摸牌测试打出流程，Play Card 直接打出卡牌测试效果',
     me: '我',
     by: 'by {name}',
     selectPlayerCount: '选择游戏人数',
