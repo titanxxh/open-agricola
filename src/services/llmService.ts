@@ -272,30 +272,159 @@ async function* streamAnthropic(
   }
 }
 
-// ── Card JSON extraction ──────────────────────────────────────────────────────
+// ── Card extraction from LLM response ────────────────────────────────────────
 
 /**
- * Extract the last JSON code block from an LLM response.
- * Returns parsed object or null.
+ * Extract card metadata + effects from a TypeScript code block in LLM response.
+ * Falls back to JSON extraction for backwards compatibility.
  */
-export function extractCardJson(text: string): Record<string, unknown> | null {
-  // Match ```json ... ``` or ``` ... ``` blocks
-  const matches = [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)]
-  if (matches.length === 0) {
-    // Try to find a raw JSON object
-    const jsonMatch = /(\{[\s\S]*\})/.exec(text)
-    if (jsonMatch) {
-      try { return JSON.parse(jsonMatch[1]!) } catch { return null }
+export function extractCardFromResponse(text: string): {
+  card: Record<string, unknown>
+  effects: Record<string, unknown> | null
+  sourceCode: string
+} | null {
+  // Try TypeScript code blocks first
+  const tsMatches = [...text.matchAll(/```(?:typescript|ts)\s*([\s\S]*?)```/g)]
+  if (tsMatches.length > 0) {
+    const code = tsMatches[tsMatches.length - 1]![1]!.trim()
+    const parsed = parseCardFromTs(code)
+    if (parsed) return parsed
+  }
+
+  // Fall back to any code block (might be TS without language tag)
+  const anyMatches = [...text.matchAll(/```\s*([\s\S]*?)```/g)]
+  for (let i = anyMatches.length - 1; i >= 0; i--) {
+    const block = anyMatches[i]![1]!.trim()
+    // Check if it looks like TypeScript (has const CARD_ID or import)
+    if (block.includes('CARD_ID') || block.includes("from '../../shared/cards/")) {
+      const parsed = parseCardFromTs(block)
+      if (parsed) return parsed
     }
-    return null
+    // Try JSON
+    try {
+      const json = JSON.parse(block) as Record<string, unknown>
+      if (json.card) return { card: json.card as Record<string, unknown>, effects: (json.effects as Record<string, unknown>) ?? null, sourceCode: '' }
+      return null
+    } catch { /* not JSON */ }
   }
-  // Use the last match
-  const last = matches[matches.length - 1]!
-  try {
-    return JSON.parse(last[1]!.trim())
-  } catch {
-    return null
+
+  return null
+}
+
+/**
+ * Parse card metadata from TypeScript source code.
+ */
+function parseCardFromTs(code: string): {
+  card: Record<string, unknown>
+  effects: Record<string, unknown> | null
+  sourceCode: string
+} | null {
+  // Extract card_type from class constructor
+  const isOccupation = /new\s+Occupation\s*\(/.test(code)
+  const isMinor = /new\s+MinorImprovement\s*\(/.test(code)
+  if (!isOccupation && !isMinor) return null
+
+  const cardType = isOccupation ? 'occupation' : 'minor'
+
+  // Extract CARD_ID
+  const idMatch = code.match(/const\s+CARD_ID\s*=\s*['"]([^'"]+)['"]/)
+  const cardId = idMatch?.[1] ?? 'CUSTOM_Unknown'
+
+  // Extract the card definition object — find the constructor argument
+  const constructorPattern = /new\s+(?:MinorImprovement|Occupation)\s*\(\s*\{([\s\S]*)\}\s*\)\s*$/m
+  const ctorMatch = code.match(constructorPattern)
+  if (!ctorMatch) return null
+
+  const objStr = ctorMatch[1]!
+
+  // Parse fields from the object literal
+  const name = extractStringField(objStr, 'name') ?? cardId
+  const desc = extractArrayField(objStr, 'desc') ?? []
+  const vp = extractNumberField(objStr, 'vp') ?? 0
+  const cost = extractObjectField(objStr, 'cost') ?? {}
+  const modifiers = extractModifiers(objStr)
+
+  // Check if registerCardEffect exists → has effects
+  const hasEffects = /registerCardEffect\s*\(/.test(code)
+
+  const card: Record<string, unknown> = {
+    id: cardId,
+    name,
+    card_type: cardType,
+    cost,
+    vp,
+    desc,
   }
+  if (modifiers.length > 0) card.modifiers = modifiers
+
+  return {
+    card,
+    effects: hasEffects ? { _hasCode: true } : null,
+    sourceCode: code,
+  }
+}
+
+function extractStringField(objStr: string, field: string): string | null {
+  // Match: name: 'xxx' or name: "xxx"
+  const re = new RegExp(`${field}\\s*:\\s*(['"])((?:(?!\\1)[^\\\\]|\\\\.)*)\\1`)
+  const m = objStr.match(re)
+  return m?.[2] ?? null
+}
+
+function extractNumberField(objStr: string, field: string): number | null {
+  const re = new RegExp(`${field}\\s*:\\s*(\\d+)`)
+  const m = objStr.match(re)
+  return m ? Number(m[1]) : null
+}
+
+function extractArrayField(objStr: string, field: string): string[] | null {
+  // Match desc: ['...', '...']
+  const re = new RegExp(`${field}\\s*:\\s*\\[([^\\]]*?)\\]`)
+  const m = objStr.match(re)
+  if (!m) return null
+  const items = [...m[1]!.matchAll(/['"]([^'"]*)['"]/g)].map(x => x[1]!)
+  return items.length > 0 ? items : null
+}
+
+function extractObjectField(objStr: string, field: string): Record<string, number> | null {
+  const re = new RegExp(`${field}\\s*:\\s*\\{([^}]*)\\}`)
+  const m = objStr.match(re)
+  if (!m) return null
+  const result: Record<string, number> = {}
+  for (const [, k, v] of m[1]!.matchAll(/(\w+)\s*:\s*(\d+)/g)) {
+    result[k!] = Number(v!)
+  }
+  return result
+}
+
+function extractModifiers(objStr: string): unknown[] {
+  // Simple check: does it have modifiers: [...]?
+  if (!objStr.includes('modifiers')) return []
+  // Extract the modifiers array content
+  const re = /modifiers\s*:\s*\[([\s\S]*?)\]\s*,?\s*(?:implemented|$)/
+  const m = objStr.match(re)
+  if (!m) return []
+  // Try to parse each object in the array
+  const results: unknown[] = []
+  const objMatches = m[1]!.matchAll(/\{([^}]+)\}/g)
+  for (const om of objMatches) {
+    try {
+      // Convert JS object literal to JSON
+      const jsonStr = '{' + om[1]!
+        .replace(/(\w+)\s*:/g, '"$1":')
+        .replace(/'/g, '"')
+        + '}'
+      results.push(JSON.parse(jsonStr))
+    } catch { /* skip malformed */ }
+  }
+  return results
+}
+
+/** @deprecated Use extractCardFromResponse instead */
+export function extractCardJson(text: string): Record<string, unknown> | null {
+  const result = extractCardFromResponse(text)
+  if (!result) return null
+  return { card: result.card, effects: result.effects }
 }
 
 // ── Image generation ──────────────────────────────────────────────────────────
