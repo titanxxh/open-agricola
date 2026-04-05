@@ -892,6 +892,7 @@ export const en = {
     sandboxNetworkError: 'Network error, please retry',
     restartSandbox: 'Restart Sandbox',
     closeSandbox: 'Close Sandbox',
+    sandboxDevTips: 'Dev mode enabled — use Save/Load State to checkpoint progress, Draw Card to add a card by ID, Play Card to directly play and test effects',
     me: 'Me',
     by: 'by {name}',
     selectPlayerCount: 'Select number of players',

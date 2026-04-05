@@ -524,10 +524,11 @@ function AbilityPanel({
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onSaved?: () => void
+  onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
 }) {
@@ -556,11 +557,12 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
     }
   }, [extracted])
 
-  const handleSaveCard = async () => {
-    if (!extracted?.card) return
+  /** Save card and return the DB ID, or null on failure. */
+  const saveCardToWorkshop = async (): Promise<string | null> => {
+    if (!extracted?.card) return null
     const card = extracted.card
-    if (!card.name?.trim()) { setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return }
-    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return }
+    if (!card.name?.trim()) { setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
+    if (!card.id?.startsWith('CUSTOM_') || card.id.length < 8) { setError(locale === 'zh' ? '卡牌 ID 必须以 CUSTOM_ 开头且至少8个字符' : 'Card ID must start with CUSTOM_ and be at least 8 characters'); return null }
 
     setSaving(true)
     setError('')
@@ -608,7 +610,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
       if (d.ok) {
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 3000)
-        onSaved?.()
+        return d.id as string
       } else {
         setError(d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'))
       }
@@ -616,6 +618,21 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
       setError(locale === 'zh' ? '网络错误' : 'Network error')
     } finally {
       setSaving(false)
+    }
+    return null
+  }
+
+  const handleSaveCard = async () => {
+    const dbId = await saveCardToWorkshop()
+    if (dbId) onSaved?.()
+  }
+
+  const handleSaveAndAddToSandbox = async () => {
+    if (!onAddToSandboxAndRestart) return
+    const dbId = await saveCardToWorkshop()
+    if (dbId) {
+      onSaved?.()
+      await onAddToSandboxAndRestart(dbId)
     }
   }
 
@@ -668,19 +685,31 @@ export function AiCardDesigner({ onImport, onClose, onSaved, sandboxErrors, onSa
           placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
         />
         {extracted && (
-          <button
-            type="button"
-            className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
-            onClick={handleSaveCard}
-            disabled={saving}
-          >
-            {saving
-              ? (locale === 'zh' ? '保存中…' : 'Saving…')
-              : saveSuccess
-                ? (locale === 'zh' ? '已保存' : 'Saved')
-                : (locale === 'zh' ? '保存到我的卡牌' : 'Save to My Cards')
-            }
-          </button>
+          <>
+            <button
+              type="button"
+              className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
+              onClick={handleSaveCard}
+              disabled={saving}
+            >
+              {saving
+                ? (locale === 'zh' ? '保存中…' : 'Saving…')
+                : saveSuccess
+                  ? (locale === 'zh' ? '已保存' : 'Saved')
+                  : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
+              }
+            </button>
+            {onAddToSandboxAndRestart && (
+              <button
+                type="button"
+                className="btn-primary ai-save-card-btn ai-sandbox-btn"
+                onClick={handleSaveAndAddToSandbox}
+                disabled={saving}
+              >
+                {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+              </button>
+            )}
+          </>
         )}
       </div>
 

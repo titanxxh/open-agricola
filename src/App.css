@@ -4764,3 +4764,18 @@
 .app--embedded .header-compact {
   display: none;
 }
+
+.sandbox-embed-tips {
+  font-size: 12px;
+  color: #666;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.ai-sandbox-btn {
+  background: #2a6b3a;
+}
+
+.ai-sandbox-btn:hover {
+  background: #1e5a2e;
+}
