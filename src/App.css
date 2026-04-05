@@ -4119,7 +4119,9 @@
 
 .ai-art-preview-img {
   max-width: 200px;
-  width: 100%;
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
   display: block;
   border-radius: 4px;
 }
