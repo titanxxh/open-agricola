@@ -1,11 +1,24 @@
-import { execFileSync } from 'node:child_process'
+/**
+ * Executor client — runs custom card code in a Worker Thread for crash isolation.
+ *
+ * Two layers of protection:
+ * 1. isolated-vm: V8 isolate with separate heap (JS-level security)
+ * 2. Worker Thread: process-level crash boundary (native crash safety)
+ *
+ * If user code triggers a V8/native crash, only the worker dies.
+ * The main server process auto-spawns a new worker and continues serving.
+ *
+ * Architecture:
+ * - Validation/compilation runs in-process (needs project module tree)
+ * - Effect/listener invocation runs in Worker Thread (only needs isolated-vm)
+ *
+ * Sync calls use SharedArrayBuffer + Atomics.wait to block the main thread.
+ * This is safe because the game engine is fully synchronous and single-threaded.
+ */
+import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-import {
-  invokeCustomCodeEffect,
-  invokeCustomCodeListener,
-  validateAndCompileCustomCode,
-} from './engine.ts'
+import path from 'node:path'
+import { validateAndCompileCustomCode } from './engine.ts'
 import type {
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
@@ -14,70 +27,116 @@ import type {
   CustomCodeValidateResult,
 } from '../../shared/cards/custom-code-types.ts'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const bridgePath = join(__dirname, 'http-bridge.ts')
+const WORKER_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'executor-worker.ts',
+)
 
-const executorUrl = () => process.env.CUSTOM_CODE_EXECUTOR_URL ?? 'http://127.0.0.1:5181'
+// Max size for JSON-serialized results (1MB)
+const RESULT_BUFFER_SIZE = 1024 * 1024
+// Timeout for sync calls — longer than the isolate timeout (100ms) to account for startup + overhead
+const SYNC_TIMEOUT_MS = 5000
 
-const isLocalTestMode = () => process.env.NODE_ENV === 'test' && !process.env.CUSTOM_CODE_EXECUTOR_URL
+let worker: Worker | null = null
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  if (isLocalTestMode()) {
-    if (path === '/validate') {
-      const payload = body as { source: string; cardId: string }
-      return validateAndCompileCustomCode(payload.source, payload.cardId) as T
-    }
-    throw new Error(`Local async executor path not implemented: ${path}`)
-  }
+function ensureWorker(): Worker {
+  if (worker) return worker
 
-  const response = await fetch(new URL(path, executorUrl()), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  return response.json() as Promise<T>
-}
-
-function postJsonSync<T>(path: string, body: unknown): T {
-  if (isLocalTestMode()) {
-    if (path === '/invoke/effect') {
-      return invokeCustomCodeEffect(body as CustomCodeEffectInvocation) as T
-    }
-    if (path === '/invoke/listener') {
-      return invokeCustomCodeListener(body as CustomCodeListenerInvocation) as T
-    }
-    throw new Error(`Local sync executor path not implemented: ${path}`)
-  }
-
-  const stdout = execFileSync(
-    process.execPath,
-    ['--import', 'tsx', bridgePath],
-    {
-      input: JSON.stringify({
-        url: executorUrl(),
-        path,
-        body,
-      }),
-      encoding: 'utf-8',
-      maxBuffer: 1024 * 1024,
+  const w = new Worker(WORKER_SCRIPT, {
+    // tsx doesn't automatically register its loader in Worker Threads.
+    // Pass --import tsx/esm so the worker can load .ts files.
+    execArgv: ['--import', 'tsx/esm'],
+    // Worker-level resource limits as an extra safety net
+    resourceLimits: {
+      maxOldGenerationSizeMb: 64,
+      maxYoungGenerationSizeMb: 16,
+      codeRangeSizeMb: 16,
     },
-  )
-  return JSON.parse(stdout) as T
+  })
+
+  w.on('error', (err) => {
+    console.error('[executor-worker] Worker error:', err.message)
+  })
+
+  w.on('exit', (code) => {
+    if (code !== 0) {
+      console.warn(`[executor-worker] Worker exited with code ${code}, will respawn on next call`)
+    }
+    worker = null
+  })
+
+  worker = w
+  return w
 }
 
+/**
+ * Synchronous call to the worker using SharedArrayBuffer + Atomics.wait.
+ * Blocks the main thread until the worker completes (or times out).
+ */
+function callWorkerSync(type: string, data: unknown): unknown {
+  const w = ensureWorker()
+
+  const signal = new SharedArrayBuffer(4)
+  const signalArray = new Int32Array(signal)
+  const resultBuffer = new SharedArrayBuffer(RESULT_BUFFER_SIZE)
+
+  Atomics.store(signalArray, 0, 0)
+  // JSON-serialize data to strip functions (e.g., canBeExecutedByPlayer on GameState)
+  // which can't survive the structured clone algorithm used by postMessage.
+  const safeData = JSON.parse(JSON.stringify(data))
+  w.postMessage({ id: -1, type, data: safeData, signal, resultBuffer })
+
+  const waitResult = Atomics.wait(signalArray, 0, 0, SYNC_TIMEOUT_MS)
+  if (waitResult === 'timed-out') {
+    throw new Error('Worker execution timed out')
+  }
+
+  // Read result from shared buffer
+  const lengthView = new DataView(resultBuffer)
+  const length = lengthView.getUint32(0)
+  if (length === 0 || length > RESULT_BUFFER_SIZE - 4) {
+    throw new Error('Invalid result length from worker')
+  }
+  const encoded = new Uint8Array(resultBuffer, 4, length)
+  const json = new TextDecoder().decode(encoded)
+  const response = JSON.parse(json) as { ok: boolean; result?: unknown; error?: string }
+
+  if (!response.ok) {
+    throw new Error(response.error ?? 'Worker execution failed')
+  }
+  return response.result
+}
+
+// Validation runs in-process — it needs the AST validator, card compiler,
+// and manifest extraction which depend on the full project module tree.
 export const validateAndCompileCustomCodeRemote = async (
   source: string,
   cardId: string,
 ): Promise<CustomCodeValidateResult> =>
-  postJson<CustomCodeValidateResult>('/validate', { source, cardId })
+  validateAndCompileCustomCode(source, cardId)
 
 export const invokeCustomCodeEffectSync = (
   request: CustomCodeEffectInvocation,
-): CustomCodeEffectResult =>
-  postJsonSync<CustomCodeEffectResult>('/invoke/effect', request)
+): CustomCodeEffectResult => {
+  try {
+    return callWorkerSync('invokeEffect', request) as CustomCodeEffectResult
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Worker error: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
 
 export const invokeCustomCodeListenerSync = (
   request: CustomCodeListenerInvocation,
-): CustomCodeListenerResult =>
-  postJsonSync<CustomCodeListenerResult>('/invoke/listener', request)
+): CustomCodeListenerResult => {
+  try {
+    return callWorkerSync('invokeListener', request) as CustomCodeListenerResult
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Worker error: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}

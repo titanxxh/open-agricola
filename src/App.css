@@ -4171,6 +4171,69 @@
   flex-shrink: 0;
 }
 
+/* Error messages from sandbox */
+.ai-message-error .ai-message-content {
+  background: #fef3cd;
+  border-left: 3px solid #d4a017;
+  color: #856404;
+  border-bottom-right-radius: 12px;
+}
+
+.ai-message-error .ai-message-role {
+  color: #d4a017;
+}
+
+/* Code blocks with copy button */
+.ai-code-block {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ai-code-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #2d2d2d;
+}
+
+.ai-code-lang {
+  color: #aaa;
+  font-size: 11px;
+  margin-right: auto;
+}
+
+.ai-code-copy {
+  background: none;
+  border: 1px solid #666;
+  color: #ccc;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.ai-code-copy:hover {
+  background: #444;
+}
+
+.ai-code-block pre {
+  margin: 0;
+  padding: 12px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-code-block code {
+  font-family: 'Fira Code', 'Consolas', monospace;
+}
+
 .ai-open-btn {
   background: linear-gradient(135deg, #3a5a2c, #5a8a3c);
   color: #fff;
