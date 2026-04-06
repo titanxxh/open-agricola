@@ -367,9 +367,15 @@ export const handleGameRoute = async (
     )
     setSessionForRequest(req, sandboxSession)
     const resp = callSession(req, s => s.getState())
+    // Build a map of custom card IDs → types for the client dev panel
+    const customCardTypes: Record<string, string> = {}
+    for (const cc of customCards) {
+      customCardTypes[cc.cardJson.id as string] = cc.cardType
+    }
     sendJson(res, 200, {
       ...respondWith(resp),
       customCardsLoaded: customCards.length,
+      customCardTypes,
       cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
     })
     return true
@@ -382,6 +388,17 @@ export const handleGameRoute = async (
       return true
     }
     const resp = callSession(req, s => s.devPlayCard(body.playerIndex!, body.cardId!))
+    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/dev/draw-card') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; cardId?: string }
+    if (typeof body.playerIndex !== 'number' || typeof body.cardId !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const resp = callSession(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
     sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
     return true
   }

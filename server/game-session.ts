@@ -2304,10 +2304,37 @@ export class GameSession {
     return this.respond()
   }
 
+  private isOccupationCard(cardId: string): boolean {
+    // Built-in cards: [A-E]NNN_ pattern, check if it's NOT a minor improvement
+    if (cardId.match(/^[A-E]\d+_/)) return !getMinorImprovement(cardId)
+    // Custom cards: check session card context
+    if (this.sessionCardContext) {
+      if (this.sessionCardContext.getCustomOccupation(cardId)) return true
+      if (this.sessionCardContext.getCustomMinor(cardId)) return false
+    }
+    return false
+  }
+
+  devDrawCard(playerIndex: number, cardId: string): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'player not found')
+    // Remove from all players' hands first
+    for (const p of this.state.players) {
+      p.minorHand = p.minorHand.filter(id => id !== cardId)
+      p.occupationHand = p.occupationHand.filter(id => id !== cardId)
+    }
+    if (this.isOccupationCard(cardId)) {
+      player.occupationHand.push(cardId)
+    } else {
+      player.minorHand.push(cardId)
+    }
+    return this.respond()
+  }
+
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const isOccupation = cardId.match(/^[A-E]\d+_/) && !getMinorImprovement(cardId)
+    const isOccupation = this.isOccupationCard(cardId)
     if (isOccupation) {
       if (!player.occupationPlayed.includes(cardId)) {
         player.occupationPlayed.push(cardId)
