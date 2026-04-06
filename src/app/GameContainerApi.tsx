@@ -6,6 +6,7 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
+import { API_BASE } from '../config'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import { baseActionOrder } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
@@ -1040,7 +1041,7 @@ export const GameContainerApi = () => {
       const token = localStorage.getItem('open-agricola-token')
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const resp = await fetch(`/api/game/dev/play-card`, {
+      const resp = await fetch(`${API_BASE}/api/game/dev/play-card`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ playerIndex, cardId }),
@@ -1066,7 +1067,7 @@ export const GameContainerApi = () => {
       const token = localStorage.getItem('open-agricola-token')
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const resp = await fetch(`/api/game/dev/draw-card`, {
+      const resp = await fetch(`${API_BASE}/api/game/dev/draw-card`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ playerIndex, cardId }),
