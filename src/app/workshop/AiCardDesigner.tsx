@@ -1098,7 +1098,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     if (dbId) {
       setCurrentCardDbId(dbId)
       refreshMyCards()
-      onSaved?.()
+      // Don't call onSaved here — it navigates away from the editor
       await onAddToSandboxAndRestart(dbId)
     }
   }
