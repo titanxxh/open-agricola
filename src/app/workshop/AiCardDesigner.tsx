@@ -13,10 +13,19 @@ import { API_BASE } from '../../config'
 
 const TOKEN_KEY = 'open-agricola-token'
 
-/** Generate a card ID from a display name: "中世纪木槌" → "CUSTOM_中世纪木槌" */
+/** Generate a card ID from a display name — English only */
 function autoCardId(name: string): string {
-  const slug = name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 40)
+  // Keep only ASCII letters, digits, underscores
+  const slug = name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 40)
   return slug ? `CUSTOM_${slug}` : ''
+}
+
+/** Check if a card ID is valid (CUSTOM_ prefix, ASCII only, min length) */
+function isValidCardId(id: string): { valid: boolean; reason?: string } {
+  if (!id.startsWith('CUSTOM_')) return { valid: false, reason: 'ID 必须以 CUSTOM_ 开头' }
+  if (id.length < 8) return { valid: false, reason: 'ID 太短，至少 8 个字符' }
+  if (/[^a-zA-Z0-9_]/.test(id)) return { valid: false, reason: 'ID 只能包含英文字母、数字和下划线' }
+  return { valid: true }
 }
 
 async function uploadArt(dataUrl: string): Promise<string | null> {
@@ -993,11 +1002,15 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extracted, artUrl])
 
-  // Sync card type/name from extracted card
+  // Sync card type/name/id from extracted card
   useEffect(() => {
     if (extracted?.card) {
       if (extracted.card.card_type) setCardType(extracted.card.card_type)
       if (extracted.card.name) setCardName(extracted.card.name)
+      // If the AI generated a valid English CUSTOM_ ID, use it
+      if (extracted.card.id?.startsWith('CUSTOM_') && isValidCardId(extracted.card.id).valid) {
+        setCardIdInput(extracted.card.id)
+      }
     }
   }, [extracted])
 
@@ -1012,7 +1025,16 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
       ? cardIdInput.trim()
       : extracted?.card?.id?.startsWith('CUSTOM_') && extracted.card.id.length >= 8
         ? extracted.card.id
-        : `CUSTOM_${name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 30)}`
+        : autoCardId(name) || `CUSTOM_Card_${Date.now().toString(36)}`
+
+    // Validate card ID format (must be ASCII only)
+    const idCheck = isValidCardId(cardId)
+    if (!idCheck.valid) {
+      if (!silent) setError(locale === 'zh'
+        ? `卡牌 ID 格式错误：${idCheck.reason}。请修改 ID 字段（仅限英文字母、数字、下划线）`
+        : `Invalid card ID: ${idCheck.reason}`)
+      return null
+    }
 
     if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
     try {
@@ -1200,8 +1222,11 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               onChange={e => {
                 setCardName(e.target.value)
                 // Auto-generate card ID from name if user hasn't manually edited it
-                if (!cardIdInput || cardIdInput === autoCardId(cardName)) {
-                  setCardIdInput(autoCardId(e.target.value))
+                const prevAuto = autoCardId(cardName)
+                if (!cardIdInput || cardIdInput === prevAuto) {
+                  const newAuto = autoCardId(e.target.value)
+                  // Only auto-set if the name has ASCII chars; otherwise leave empty for AI to fill
+                  if (newAuto.length > 7) setCardIdInput(newAuto)
                 }
               }}
               placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
@@ -1211,8 +1236,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               className="ai-card-id-input"
               value={cardIdInput}
               onChange={e => setCardIdInput(e.target.value)}
-              placeholder="CUSTOM_..."
-              title={locale === 'zh' ? '卡牌唯一标识，CUSTOM_ 开头' : 'Unique card ID, starts with CUSTOM_'}
+              placeholder={locale === 'zh' ? 'CUSTOM_英文ID（AI生成后自动填入）' : 'CUSTOM_EnglishId (auto-filled by AI)'}
+              title={locale === 'zh' ? '卡牌唯一标识，仅限英文字母、数字、下划线' : 'Unique card ID, English letters/digits/underscore only'}
             />
             <button
               type="button"
