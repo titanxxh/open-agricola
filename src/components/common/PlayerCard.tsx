@@ -128,37 +128,37 @@ export const PlayerCard = ({
       }
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
-      return minor
-        ? {
-            name: minor.name,
-            description: minor.desc.join('\n'),
-            cost: { ...emptyResources, ...minor.cost },
-            altCosts: minor.altCosts,
-            deck: minor.deck,
-            category: minor.category,
-            vp: minor.vp,
-            prerequisite: minor.prerequisite,
-            players: minor.players,
-            isCookery: minor.isCookery,
-            isBaking: minor.isBaking,
-            passing: minor.passing,
-          }
-        : null
+      if (minor) return {
+        name: minor.name,
+        description: minor.desc.join('\n'),
+        cost: { ...emptyResources, ...minor.cost },
+        altCosts: minor.altCosts,
+        deck: minor.deck,
+        category: minor.category,
+        vp: minor.vp,
+        prerequisite: minor.prerequisite,
+        players: minor.players,
+        isCookery: minor.isCookery,
+        isBaking: minor.isBaking,
+        passing: minor.passing,
+      }
+      // Fallback for custom cards not in built-in registry
+      return { name: cardId.replace(/^CUSTOM_/, ''), description: '', cost: emptyResources, deck: 'CUSTOM' }
     } else {
       const occupation = getOccupation(cardId)
-      return occupation
-        ? {
-            name: occupation.name,
-            description: occupation.desc.join('\n'),
-            cost: { ...emptyResources, ...occupation.cost },
-            deck: occupation.deck,
-            category: occupation.category,
-            prerequisite: occupation.prerequisite,
-            players: occupation.players,
-            isCookery: occupation.isCookery,
-            isBaking: occupation.isBaking,
-          }
-        : null
+      if (occupation) return {
+        name: occupation.name,
+        description: occupation.desc.join('\n'),
+        cost: { ...emptyResources, ...occupation.cost },
+        deck: occupation.deck,
+        category: occupation.category,
+        prerequisite: occupation.prerequisite,
+        players: occupation.players,
+        isCookery: occupation.isCookery,
+        isBaking: occupation.isBaking,
+      }
+      // Fallback for custom cards
+      return { name: cardId.replace(/^CUSTOM_/, ''), description: '', cost: emptyResources, deck: 'CUSTOM' }
     }
   }, [cardId, cardType, locale])
 
