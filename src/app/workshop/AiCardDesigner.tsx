@@ -273,19 +273,10 @@ function bgaImgUrl(deck: string, num: number) {
   return `/bga-img/deck${deck}/${deck}${String(num).padStart(3, '0')}.png`
 }
 
-const MINOR_REF_IMAGES = [
-  bgaImgUrl('A', 1), bgaImgUrl('A', 2), bgaImgUrl('A', 3),
-  bgaImgUrl('A', 4), bgaImgUrl('A', 5), bgaImgUrl('A', 6),
-  bgaImgUrl('B', 1), bgaImgUrl('B', 2), bgaImgUrl('B', 3),
-  bgaImgUrl('C', 1), bgaImgUrl('C', 2), bgaImgUrl('C', 3),
-]
-
-const OCC_REF_IMAGES = [
-  bgaImgUrl('A', 85), bgaImgUrl('A', 87), bgaImgUrl('A', 88),
-  bgaImgUrl('A', 92), bgaImgUrl('B', 70), bgaImgUrl('B', 86),
-  bgaImgUrl('C', 85), bgaImgUrl('C', 86), bgaImgUrl('D', 49),
-  bgaImgUrl('D', 85), bgaImgUrl('E', 85), bgaImgUrl('E', 86),
-]
+// All BGA card images: decks A-E, minors 1-84, occupations 85-168
+const DECKS = ['A', 'B', 'C', 'D', 'E'] as const
+const MINOR_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => bgaImgUrl(d, i + 1)))
+const OCC_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => bgaImgUrl(d, i + 85)))
 
 async function fetchRefImage(url: string): Promise<ReferenceImage | null> {
   try {
