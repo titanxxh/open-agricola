@@ -1024,12 +1024,10 @@ export function WorkshopPage() {
         if (warnings.length > 0) {
           // Cards had registration errors — feed back to AI designer
           setPendingSandboxErrors(warnings)
-          setView('editor')
         }
       } else {
         const errors = [data.error ?? t('platform.sandboxUnknownError')]
         setPendingSandboxErrors(errors)
-        setView('editor')
       }
     } catch {
       alert(t('platform.sandboxNetworkError'))
