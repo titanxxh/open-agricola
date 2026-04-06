@@ -386,6 +386,16 @@ export async function handleWorkshopRoute(
       }
     }
 
+    // Auto-resolve: if no body.id but a draft with this card_id exists for this author, update it
+    if (!body.id && body.card_id) {
+      const existingDraft = db.prepare(
+        'SELECT id FROM workshop_cards WHERE card_id = ? AND author_id = ? LIMIT 1',
+      ).get(body.card_id, user.id) as { id: string } | undefined
+      if (existingDraft) {
+        body.id = existingDraft.id
+      }
+    }
+
     if (body.id) {
       // Update existing
       const existing = db.prepare('SELECT * FROM workshop_cards WHERE id = ?').get(body.id) as
