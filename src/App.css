@@ -3401,7 +3401,8 @@
 .ws-card-art-thumb {
   width: 100%;
   height: 140px;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f5eed8;
 }
 
 .ws-card-tile-body {
