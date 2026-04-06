@@ -39,6 +39,8 @@ function runInIsolate(
         log: (...args) => __log.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
         warn: (...args) => __warn.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
       };
+      function MinorImprovement(def) { return def; }
+      function Occupation(def) { return def; }
       const __capture = { effect: null, listeners: [] };
       function registerCardEffect(effect) {
         __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };

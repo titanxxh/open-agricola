@@ -767,7 +767,7 @@ export const zh = {
     searchBtn: '搜索',
     sortRecent: '最新',
     sortPopular: '最热',
-    createCard: '+ 创建卡牌',
+    createCard: '+ 创建/修改卡牌',
     backToWorkshopHome: '返回主界面',
     myCardsSubtitle: '这里同时展示你的草稿和已发布卡牌。',
     featuredSubtitle: '精选卡会带星标显示。',
