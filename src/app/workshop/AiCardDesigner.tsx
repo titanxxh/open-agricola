@@ -756,6 +756,22 @@ function AbilityPanel({
     void sendMessages(chatHistory)
   }, [validationErrors, streaming, config, messages, sendMessages, onValidationErrorsConsumed])
 
+  const handleResend = useCallback((msgIndex: number) => {
+    if (streaming || !config) return
+    // Truncate to messages up to and including this user message
+    const truncated = messages.slice(0, msgIndex + 1)
+    setMessages(truncated)
+    const chatHistory: ChatMessage[] = truncated.map(m => ({
+      role: m.isError ? 'user' as const : m.role,
+      content: m.content,
+    }))
+    const promptSnapshot = [
+      `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
+      ...chatHistory.map(m => `[${m.role.toUpperCase()}]\n${m.content}`),
+    ].join('\n\n---\n\n')
+    void sendMessages(chatHistory, promptSnapshot)
+  }, [streaming, config, messages, sendMessages])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -804,6 +820,16 @@ function AbilityPanel({
               {msg.isError ? (locale === 'zh' ? '沙盒报错' : 'Sandbox Error')
                 : msg.role === 'user' ? (locale === 'zh' ? '你' : 'You')
                 : 'AI'}
+              {msg.role === 'user' && !streaming && (
+                <button
+                  type="button"
+                  className="btn-link ai-resend-btn"
+                  onClick={() => handleResend(i)}
+                  title={locale === 'zh' ? '从这条消息重新发送' : 'Resend from this message'}
+                >
+                  ↻
+                </button>
+              )}
             </div>
             {msg.role === 'assistant' && msg.promptSnapshot && (
               <details className="ai-prompt-details">
