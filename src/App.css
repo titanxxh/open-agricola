@@ -4312,6 +4312,26 @@
 /* Legacy badge (kept for extracted summary) */
 .ai-badge-vp { background: #fff3cd; color: #856404; }
 
+/* Validation error bar */
+.ai-validation-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.ai-validation-error-text {
+  flex: 1;
+  font-size: 0.85em;
+  color: #856404;
+  white-space: pre-wrap;
+}
+
 /* Input area */
 .ai-input-area {
   display: flex;
