@@ -613,7 +613,7 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
 
 function AbilityPanel({
   cardType, cardName, prerequisite, costHint, extracted, setExtracted, artUrl, onImport,
-  sandboxErrors, onSandboxErrorsConsumed,
+  sandboxErrors, onSandboxErrorsConsumed, validationErrors, onValidationErrorsConsumed,
 }: {
   cardType: 'minor' | 'occupation'
   cardName: string
@@ -625,6 +625,8 @@ function AbilityPanel({
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
+  validationErrors?: string | null
+  onValidationErrorsConsumed?: () => void
 }) {
   const { locale } = useLocale()
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
@@ -736,6 +738,27 @@ function AbilityPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxErrors])
 
+  const handleInjectValidationError = useCallback(() => {
+    if (!validationErrors || streaming || !config) return
+    const errorText = [
+      '⚠️ 代码验证失败',
+      '',
+      '保存卡牌时服务端返回了以下验证错误：',
+      '',
+      validationErrors,
+      '',
+      '请修复这些错误，重新给出完整的卡牌代码。注意不要使用 import 语句，所有依赖通过参数注入。',
+    ].join('\n')
+
+    const errorMsg: DisplayMessage = { role: 'user', content: errorText, isError: true }
+    const newMessages = [...messages, errorMsg]
+    setMessages(newMessages)
+    onValidationErrorsConsumed?.()
+
+    const chatHistory: ChatMessage[] = newMessages.map(m => ({ role: m.isError ? 'user' as const : m.role, content: m.content }))
+    void sendMessages(chatHistory)
+  }, [validationErrors, streaming, config, messages, sendMessages, onValidationErrorsConsumed])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -815,6 +838,22 @@ function AbilityPanel({
         </div>
       )}
 
+      {validationErrors && (
+        <div className="ai-validation-error-bar">
+          <div className="ai-validation-error-text">
+            ⚠️ {locale === 'zh' ? '代码验证失败' : 'Code validation failed'}：{validationErrors}
+          </div>
+          <button
+            type="button"
+            className="btn-primary ws-btn-sm"
+            onClick={handleInjectValidationError}
+            disabled={streaming || !config}
+          >
+            {locale === 'zh' ? '发送给 AI 修复' : 'Send to AI to fix'}
+          </button>
+        </div>
+      )}
+
       {config && (
         <div className="ai-input-area">
           <textarea
@@ -862,6 +901,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
   const [artUrl, setArtUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
@@ -1000,7 +1040,9 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
           let errMsg = d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed')
           // Show detailed validation errors
           if (Array.isArray(d.errors) && d.errors.length > 0) {
-            errMsg += ':\n' + (d.errors as string[]).join('\n')
+            const detailStr = (d.errors as string[]).join('\n')
+            errMsg += ':\n' + detailStr
+            setValidationErrors(detailStr)
           }
           setError(errMsg)
         }
@@ -1199,6 +1241,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               onImport={onImport}
               sandboxErrors={sandboxErrors}
               onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+              validationErrors={validationErrors}
+              onValidationErrorsConsumed={() => setValidationErrors(null)}
             />
           </div>
 
