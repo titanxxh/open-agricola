@@ -4037,6 +4037,22 @@
   border-color: #3a5a2c;
 }
 
+.ai-card-id-input {
+  width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #cdb996;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #666;
+  outline: none;
+}
+
+.ai-card-id-input:focus {
+  border-color: #3a5a2c;
+  color: #333;
+}
+
 .ai-save-card-btn {
   white-space: nowrap;
   padding: 7px 16px;

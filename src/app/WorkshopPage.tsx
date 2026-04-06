@@ -359,9 +359,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle']
-
-function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestart, t, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ onSaved, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
   onSaved: () => void
@@ -371,183 +369,20 @@ function CardEditor({ initial, token, onSaved, onCancel, onAddToSandboxAndRestar
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
 }) {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [cardId, setCardId] = useState(initial?.card_id ?? 'CUSTOM_')
-  const [cardType, setCardType] = useState<'minor' | 'occupation'>(initial?.card_type ?? 'minor')
-  const [desc, setDesc] = useState(initial?.description ?? '')
-  const [vp, setVp] = useState(String((initial?.card_json as Record<string, unknown>)?.vp ?? 0))
-  const [cost, setCost] = useState<Record<string, number>>(
-    ((initial?.card_json as Record<string, unknown>)?.cost as Record<string, number>) ?? {}
-  )
-  const [artUrl, setArtUrl] = useState<string | null>(initial?.art_url ?? null)
-  const [showAi, setShowAi] = useState(true)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  // Auto-open AI designer when sandbox errors arrive
-  useEffect(() => {
-    if (sandboxErrors?.length) {
-      setShowAi(true)
-    }
-  }, [sandboxErrors])
-
-  const handleAiImport = (extracted: ExtractedCard, importedArtUrl: string | null) => {
-    setName(extracted.card.name)
-    setCardId(extracted.card.id)
-    setCardType(extracted.card.card_type)
-    setDesc((extracted.card.desc ?? []).join(' '))
-    setVp(String(extracted.card.vp ?? 0))
-    setCost(extracted.card.cost ?? {})
-    if (importedArtUrl) setArtUrl(importedArtUrl)
-    setShowAi(false)
-  }
-
-  const handleCostChange = (res: string, val: string) => {
-    const n = Number(val)
-    if (n <= 0) {
-      const next = { ...cost }
-      delete next[res]
-      setCost(next)
-    } else {
-      setCost(prev => ({ ...prev, [res]: n }))
-    }
-  }
-
-  const handleSave = async (publishStatus: 'draft' | 'published') => {
-    setError('')
-    if (!name.trim()) { setError(t('platform.cardNameRequired')); return }
-    if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError(t('platform.cardIdInvalid')); return }
-
-    const cardJson = {
-      id: cardId,
-      name,
-      deck: 'CUSTOM',
-      number: 0,
-      desc: desc ? [desc] : [],
-      cost,
-      vp: Number(vp) || 0,
-      implemented: true,
-    }
-
-    setSaving(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({
-          id: initial?.id,
-          card_id: cardId,
-          card_type: cardType,
-          name,
-          description: desc,
-          card_json: cardJson,
-          art_url: artUrl,
-          status: publishStatus,
-        }),
-      })
-      const d = await r.json()
-      if (d.ok) {
-        onSaved()
-      } else {
-        setError(d.error ?? t('platform.saveFailed'))
-      }
-    } catch {
-      setError(t('platform.networkError'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (showAi) {
-    return (
-      <div className="ws-editor ws-editor-ai">
-        <AiCardDesigner
-          onImport={handleAiImport}
-          onClose={() => setShowAi(false)}
-          onSaved={onSaved}
-          onAddToSandboxAndRestart={onAddToSandboxAndRestart}
-          sandboxErrors={sandboxErrors}
-          onSandboxErrorsConsumed={onSandboxErrorsConsumed}
-        />
-      </div>
-    )
+  const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
+    // AI designer handles everything now; this callback is kept for interface compatibility
   }
 
   return (
-    <div className="ws-editor">
-      <div className="ws-editor-header">
-        <h2>{initial ? t('platform.editCard') : t('platform.createCardTitle')}</h2>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button type="button" className="btn-secondary ws-btn-sm ai-open-btn" onClick={() => setShowAi(true)}>
-            {t('platform.aiDesigner')}
-          </button>
-          <button type="button" className="btn-link" onClick={onCancel}>{t('platform.cancel')}</button>
-        </div>
-      </div>
-      {artUrl && <img src={artUrl} alt="card art" className="ws-editor-art-preview" />}
-
-      <div className="ws-editor-form">
-        <div className="ws-form-row">
-          <div className="form-field">
-            <label>{t('platform.cardName')}</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder={t('platform.cardNamePlaceholder')} />
-          </div>
-          <div className="form-field">
-            <label>{t('platform.cardType')}</label>
-            <select value={cardType} onChange={e => setCardType(e.target.value as 'minor' | 'occupation')}>
-              <option value="minor">{t('platform.minor')}</option>
-              <option value="occupation">{t('platform.occupation')}</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="form-field">
-          <label>{t('platform.cardId')}</label>
-          <input value={cardId} onChange={e => setCardId(e.target.value)} placeholder={t('platform.cardIdPlaceholder')} />
-        </div>
-
-        <div className="form-field">
-          <label>{t('platform.description')}</label>
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder={t('platform.descPlaceholder')} />
-        </div>
-
-        <div className="ws-form-row">
-          <div className="form-field ws-field-sm">
-            <label>{t('platform.vpField')}</label>
-            <input type="number" value={vp} onChange={e => setVp(e.target.value)} min={0} max={20} />
-          </div>
-        </div>
-
-        <div className="ws-cost-editor">
-          <label>{t('platform.costLabel')}</label>
-          <div className="ws-cost-grid">
-            {RESOURCE_KEYS.map(res => (
-              <div key={res} className="ws-cost-cell">
-                <span>{res}</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  value={cost[res] ?? 0}
-                  onChange={e => handleCostChange(res, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-
-        {error && <div className="form-error">{error}</div>}
-
-        <div className="ws-editor-actions">
-          <button type="button" className="btn-secondary" onClick={() => handleSave('draft')} disabled={saving}>
-            {t('platform.saveDraft')}
-          </button>
-          <button type="button" className="btn-primary" onClick={() => handleSave('published')} disabled={saving}>
-            {t('platform.publishCard')}
-          </button>
-        </div>
-      </div>
+    <div className="ws-editor ws-editor-ai">
+      <AiCardDesigner
+        onImport={handleAiImport}
+        onClose={onCancel}
+        onSaved={onSaved}
+        onAddToSandboxAndRestart={onAddToSandboxAndRestart}
+        sandboxErrors={sandboxErrors}
+        onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+      />
     </div>
   )
 }

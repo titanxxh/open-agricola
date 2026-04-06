@@ -13,6 +13,12 @@ import { API_BASE } from '../../config'
 
 const TOKEN_KEY = 'open-agricola-token'
 
+/** Generate a card ID from a display name: "中世纪木槌" → "CUSTOM_中世纪木槌" */
+function autoCardId(name: string): string {
+  const slug = name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 40)
+  return slug ? `CUSTOM_${slug}` : ''
+}
+
 async function uploadArt(dataUrl: string): Promise<string | null> {
   try {
     const token = localStorage.getItem(TOKEN_KEY)
@@ -896,6 +902,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const { locale } = useLocale()
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
   const [cardName, setCardName] = useState('')
+  const [cardIdInput, setCardIdInput] = useState('')
   const [prerequisite, setPrerequisite] = useState('')
   const [costInput, setCostInput] = useState('')
   const [extracted, setExtracted] = useState<ExtractedCard | null>(null)
@@ -983,10 +990,12 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     const name = extracted?.card?.name?.trim() || cardName.trim()
     if (!name) { if (!silent) setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
 
-    // Build card id from extracted or generate one
-    const cardId = extracted?.card?.id?.startsWith('CUSTOM_') && extracted.card.id.length >= 8
-      ? extracted.card.id
-      : `CUSTOM_${name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 30)}_${Date.now().toString(36)}`
+    // Use manually-set card ID, or extracted card ID, or generate from name
+    const cardId = cardIdInput.trim().startsWith('CUSTOM_') && cardIdInput.trim().length >= 8
+      ? cardIdInput.trim()
+      : extracted?.card?.id?.startsWith('CUSTOM_') && extracted.card.id.length >= 8
+        ? extracted.card.id
+        : `CUSTOM_${name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '').slice(0, 30)}`
 
     if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
     try {
@@ -1007,6 +1016,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
       }
 
       const body: Record<string, unknown> = {
+        ...(currentCardDbId ? { id: currentCardDbId } : {}),
         card_id: cardId,
         card_type: card?.card_type ?? cardType,
         name,
@@ -1086,6 +1096,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     }
     setCardType(ct)
     setCardName(apiCard.name)
+    setCardIdInput(apiCard.card_id)
     setArtUrl(apiCard.art_url ?? null)
     setCurrentCardDbId(apiCard.id)
     if (cj.prerequisite) setPrerequisite(cj.prerequisite as string)
@@ -1158,8 +1169,22 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
               type="text"
               className="ai-card-name-input"
               value={cardName}
-              onChange={e => setCardName(e.target.value)}
+              onChange={e => {
+                setCardName(e.target.value)
+                // Auto-generate card ID from name if user hasn't manually edited it
+                if (!cardIdInput || cardIdInput === autoCardId(cardName)) {
+                  setCardIdInput(autoCardId(e.target.value))
+                }
+              }}
               placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
+            />
+            <input
+              type="text"
+              className="ai-card-id-input"
+              value={cardIdInput}
+              onChange={e => setCardIdInput(e.target.value)}
+              placeholder="CUSTOM_..."
+              title={locale === 'zh' ? '卡牌唯一标识，CUSTOM_ 开头' : 'Unique card ID, starts with CUSTOM_'}
             />
             <button
               type="button"
