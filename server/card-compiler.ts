@@ -52,6 +52,9 @@ export function executeCardCode(compiledJs: string, cardId: string): void {
       log: (...args: unknown[]) => console.log(`[card:${cardId}]`, ...args),
       warn: (...args: unknown[]) => console.warn(`[card:${cardId}]`, ...args),
     },
+    // Card class stubs (card definition is parsed by frontend, not executed here)
+    MinorImprovement: function (def: unknown) { return def },
+    Occupation: function (def: unknown) { return def },
     // Safe built-ins
     Math,
     Number,

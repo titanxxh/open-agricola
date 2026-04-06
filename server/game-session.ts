@@ -46,11 +46,10 @@ import { clearWorkPhaseBuildingResources } from '../shared/logic/work-phase-reso
 import { getMinorImprovement } from '../shared/game/minor-improvements.ts'
 import {
   registerCustomCard,
-  clearCustomCards,
   getCustomMinorImprovementIds,
   getCustomOccupationIds,
-  type CustomCardData,
 } from '../shared/cards/custom-registry.ts'
+import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
 import {
@@ -204,6 +203,8 @@ export class GameSession {
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
+  private sessionCardContext: SessionCardContext | null = null
+  readonly cardWarnings: string[] = []
 
   constructor(stateOrSeed?: GameState | number, customCards?: CustomCardData[], initialStateOptions?: InitialStateOptions) {
     this.registry = new ActionRegistry()
@@ -213,31 +214,46 @@ export class GameSession {
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
-    // Register custom workshop cards (sandbox mode)
-    clearCustomCards()
+    // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
-      for (const cardData of customCards) {
-        try {
-          registerCustomCard(cardData)
-          registerExecutorBackedCustomCard(cardData)
-        } catch (err) {
-          console.warn(`[game-session] failed to register custom card ${cardData.cardJson.id}:`, err)
+      this.sessionCardContext = new SessionCardContext()
+      withSessionContext(this.sessionCardContext, () => {
+        for (const cardData of customCards!) {
+          try {
+            registerCustomCard(cardData)
+            registerExecutorBackedCustomCard(cardData)
+          } catch (err) {
+            const msg = `Failed to register card ${cardData.cardJson.id}: ${err instanceof Error ? err.message : String(err)}`
+            console.warn(`[game-session] ${msg}`)
+            this.cardWarnings.push(msg)
+          }
         }
-      }
+      })
     }
 
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       this.state = normalizeState(stateOrSeed)
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
-      const extraMinorIds = getCustomMinorImprovementIds()
-      const extraOccupationIds = getCustomOccupationIds()
+      const extraMinorIds = withSessionContext(this.sessionCardContext, () => getCustomMinorImprovementIds())
+      const extraOccupationIds = withSessionContext(this.sessionCardContext, () => getCustomOccupationIds())
       this.state = createInitialState(seed, {
         ...initialStateOptions,
         extraMinorIds,
         extraOccupationIds,
       })
     }
+  }
+
+  /** Run a function with this session's card context active. */
+  withCtx<T>(fn: () => T): T {
+    return withSessionContext(this.sessionCardContext, fn)
+  }
+
+  /** Dispose of session resources. Call when replacing or removing a session. */
+  dispose(): void {
+    this.sessionCardContext?.dispose()
+    this.sessionCardContext = null
   }
 
   /** Update a player's display name in the game state (called after WS join). */
@@ -2288,10 +2304,37 @@ export class GameSession {
     return this.respond()
   }
 
+  private isOccupationCard(cardId: string): boolean {
+    // Built-in cards: [A-E]NNN_ pattern, check if it's NOT a minor improvement
+    if (cardId.match(/^[A-E]\d+_/)) return !getMinorImprovement(cardId)
+    // Custom cards: check session card context
+    if (this.sessionCardContext) {
+      if (this.sessionCardContext.getCustomOccupation(cardId)) return true
+      if (this.sessionCardContext.getCustomMinor(cardId)) return false
+    }
+    return false
+  }
+
+  devDrawCard(playerIndex: number, cardId: string): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'player not found')
+    // Remove from all players' hands first
+    for (const p of this.state.players) {
+      p.minorHand = p.minorHand.filter(id => id !== cardId)
+      p.occupationHand = p.occupationHand.filter(id => id !== cardId)
+    }
+    if (this.isOccupationCard(cardId)) {
+      player.occupationHand.push(cardId)
+    } else {
+      player.minorHand.push(cardId)
+    }
+    return this.respond()
+  }
+
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const isOccupation = cardId.match(/^[A-E]\d+_/) && !getMinorImprovement(cardId)
+    const isOccupation = this.isOccupationCard(cardId)
     if (isOccupation) {
       if (!player.occupationPlayed.includes(cardId)) {
         player.occupationPlayed.push(cardId)

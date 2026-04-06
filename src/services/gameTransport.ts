@@ -37,17 +37,24 @@ export interface GameTransport {
 
 import { API_BASE, WS_BASE } from '../config'
 
+const TOKEN_KEY = 'open-agricola-token'
+
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   })
   return resp.json() as Promise<GameSyncPayload>
 }
 
 const get = async (path: string): Promise<GameSyncPayload> => {
-  const resp = await fetch(`${API_BASE}${path}`)
+  const resp = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
   return resp.json() as Promise<GameSyncPayload>
 }
 
@@ -153,8 +160,6 @@ export class HttpGameTransport implements GameTransport {
 }
 
 // WS_BASE imported from config
-
-const TOKEN_KEY = 'open-agricola-token'
 
 export class WsGameTransport implements GameTransport {
   private ws: WebSocket | null = null

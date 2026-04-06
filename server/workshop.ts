@@ -386,6 +386,16 @@ export async function handleWorkshopRoute(
       }
     }
 
+    // Auto-resolve: if no body.id but a draft with this card_id exists for this author, update it
+    if (!body.id && body.card_id) {
+      const existingDraft = db.prepare(
+        'SELECT id FROM workshop_cards WHERE card_id = ? AND author_id = ? LIMIT 1',
+      ).get(body.card_id, user.id) as { id: string } | undefined
+      if (existingDraft) {
+        body.id = existingDraft.id
+      }
+    }
+
     if (body.id) {
       // Update existing
       const existing = db.prepare('SELECT * FROM workshop_cards WHERE id = ?').get(body.id) as
@@ -535,7 +545,14 @@ export async function handleWorkshopRoute(
       workshop_card_ids?: string[]
       settings?: { player_count?: unknown; deck_ids?: unknown }
     }>(req)
+    const MAX_SANDBOX_CARDS = 20
     if (body?.workshop_card_id) {
+      const count = (db.prepare('SELECT COUNT(*) as c FROM sandbox_cards WHERE user_id = ?')
+        .get(user.id) as { c: number }).c
+      if (count >= MAX_SANDBOX_CARDS) {
+        sendJson(res, 400, { ok: false, error: `Maximum ${MAX_SANDBOX_CARDS} sandbox cards allowed` })
+        return true
+      }
       const existing = db.prepare('SELECT 1 FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?')
         .get(user.id, body.workshop_card_id)
       if (!existing) {
@@ -551,6 +568,7 @@ export async function handleWorkshopRoute(
     }
 
     const nextIds = Array.from(new Set(body.workshop_card_ids.filter((id): id is string => typeof id === 'string')))
+      .slice(0, MAX_SANDBOX_CARDS)
     const now = Date.now()
     const insertSandboxCard = db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
     db.transaction(() => {

@@ -3,7 +3,7 @@ import { registerCardListener } from '../shared/cards/card-listeners.ts'
 import type { PaymentInfo } from '../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../shared/game/types.ts'
-import type { CustomCardData } from '../shared/cards/custom-registry.ts'
+import { getCurrentSessionContext, type CustomCardData } from '../shared/cards/session-card-context.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './custom-code-executor/client.ts'
 
 export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void => {
@@ -33,24 +33,31 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       return response.result ?? undefined
     }
   }
+
+  // Register into session context if active, otherwise global (for tests)
+  const sessionCtx = getCurrentSessionContext()
   if (codeManifest.effectHooks.length > 0) {
-    registerCardEffect(effect)
+    if (sessionCtx) {
+      sessionCtx.registerEffect(effect)
+    } else {
+      registerCardEffect(effect)
+    }
   }
 
   for (const listener of codeManifest.listeners) {
-    registerCardListener({
+    const reg = {
       id: listener.registrationId,
       cardIds: listener.cardIds,
       actions: listener.actions,
       phases: listener.phases,
       order: listener.order,
       scope: listener.scope,
-      handler: (context) => {
+      handler: (context: CardListenerContext) => {
         const response = invokeCustomCodeListenerSync({
           compiledCode,
           cardId,
           registrationId: listener.registrationId,
-          context: context as CardListenerContext,
+          context,
         })
         if (!response.ok) {
           console.warn(`[custom-code-runtime] custom card ${cardId} listener "${listener.registrationId}" failed:`, response.error)
@@ -58,6 +65,11 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         }
         return response.result ?? undefined
       },
-    })
+    }
+    if (sessionCtx) {
+      sessionCtx.registerListener(reg)
+    } else {
+      registerCardListener(reg)
+    }
   }
 }

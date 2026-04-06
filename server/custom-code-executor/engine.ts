@@ -1,4 +1,4 @@
-import vm from 'node:vm'
+import ivm from 'isolated-vm'
 import type { ActionHookPhase } from '../../shared/actions/hooks.ts'
 import { validateCardCode } from '../ast-validator.ts'
 import { compileCardCode } from '../card-compiler.ts'
@@ -17,15 +17,7 @@ import type {
 } from '../../shared/cards/custom-code-types.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
-
-type CapturedListener = CustomCodeListenerManifest & {
-  handler: (context: unknown) => unknown
-}
-
-type ExecutionCapture = {
-  effect: Record<string, unknown> | null
-  listeners: CapturedListener[]
-}
+const ISOLATE_MEMORY_LIMIT_MB = 8
 
 const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
   typeof value === 'string' && [
@@ -44,92 +36,144 @@ const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
 const isCardListenerScope = (value: unknown): value is CardListenerScope =>
   value === 'player' || value === 'opponent' || value === 'any'
 
-const createBaseSandbox = (cardId: string) => ({
-  console: {
-    log: (...args: unknown[]) => console.log(`[executor:${cardId}]`, ...args),
-    warn: (...args: unknown[]) => console.warn(`[executor:${cardId}]`, ...args),
-  },
-  Math,
-  Number,
-  String,
-  Array,
-  Object,
-  Boolean,
-  JSON,
-  parseInt,
-  parseFloat,
-  isNaN,
-  isFinite,
-  Date,
-  exports: {},
-  module: { exports: {} },
-})
-
-const sanitizeSerializable = <T>(value: T): T => {
-  if (value == null) return value
-  return JSON.parse(JSON.stringify(value)) as T
-}
-
-const executeWithCapture = (
+/**
+ * Run compiled card code in a true V8 isolate (via isolated-vm).
+ *
+ * Unlike node:vm, this provides real security:
+ * - Separate V8 heap — no prototype chain escapes
+ * - Memory limit enforcement
+ * - CPU timeout enforcement
+ * - No access to Node.js APIs whatsoever
+ */
+function runInIsolate(
   compiledCode: string,
   cardId: string,
-  postlude = '',
-  inputs: Record<string, unknown> = {},
-): {
-  capture: ExecutionCapture
-  result?: unknown
-} => {
-  const capture: ExecutionCapture = {
-    effect: null,
-    listeners: [],
-  }
+  postlude: string,
+  inputs: Record<string, unknown>,
+): unknown {
+  const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB })
+  try {
+    const context = isolate.createContextSync()
+    const jail = context.global
 
-  const sandbox = {
-    ...createBaseSandbox(cardId),
-    __capture: capture,
-    ...inputs,
-    registerCardEffect: (effect: Record<string, unknown>) => {
-      capture.effect = {
-        ...(capture.effect ?? {}),
-        ...effect,
-        id: cardId,
+    // Provide safe built-in stubs (console, Math, etc.)
+    jail.setSync('global', jail.derefInto())
+    // JSON-serialize inputs to strip functions before passing into isolate
+    for (const [key, value] of Object.entries(inputs)) {
+      const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
+      jail.setSync(key, new ivm.ExternalCopy(jsonSafe).copyInto())
+    }
+
+    // Inject a minimal console stub
+    jail.setSync('__log', new ivm.Reference((...args: unknown[]) => {
+      console.log(`[executor:${cardId}]`, ...args)
+    }))
+    jail.setSync('__warn', new ivm.Reference((...args: unknown[]) => {
+      console.warn(`[executor:${cardId}]`, ...args)
+    }))
+
+    // The script:
+    // 1. Define stubs for console, registerCardEffect, registerCardListener
+    // 2. Run the compiled card code
+    // 3. Run the postlude to invoke specific hooks/listeners
+    // 4. Copy the result out as JSON
+    const wrappedCode = `
+      const console = {
+        log: (...args) => __log.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
+        warn: (...args) => __warn.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
+      };
+      const __capture = { effect: null, listeners: [] };
+      function registerCardEffect(effect) {
+        __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };
       }
-    },
-    registerCardListener: (listener: Record<string, unknown>) => {
-      const registrationId = `${cardId}:listener:${capture.listeners.length}`
-      capture.listeners.push({
-        registrationId,
-        cardIds: Array.isArray(listener.cardIds)
-          ? listener.cardIds.filter((item): item is string => typeof item === 'string')
-          : undefined,
-        actions: Array.isArray(listener.actions)
-          ? listener.actions.filter((item): item is string => typeof item === 'string')
-          : undefined,
-        phases: Array.isArray(listener.phases)
-          ? listener.phases.filter(isActionHookPhase)
-          : undefined,
-        order: typeof listener.order === 'number' ? listener.order : undefined,
-        scope: isCardListenerScope(listener.scope) ? listener.scope : undefined,
-        handler: typeof listener.handler === 'function'
-          ? listener.handler as (context: unknown) => unknown
-          : () => undefined,
-      })
-    },
-    __result: null as unknown,
+      function registerCardListener(listener) {
+        const registrationId = ${JSON.stringify(cardId)} + ':listener:' + __capture.listeners.length;
+        __capture.listeners.push({
+          registrationId,
+          cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(i => typeof i === 'string') : undefined,
+          actions: Array.isArray(listener.actions) ? listener.actions.filter(i => typeof i === 'string') : undefined,
+          phases: Array.isArray(listener.phases) ? listener.phases : undefined,
+          order: typeof listener.order === 'number' ? listener.order : undefined,
+          scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+          handler: typeof listener.handler === 'function' ? listener.handler : () => undefined,
+        });
+      }
+      function MinorImprovement(def) { return def; }
+      function Occupation(def) { return def; }
+      let __result = null;
+      ${compiledCode}
+      ${postlude}
+      JSON.stringify(__result);
+    `
+
+    const script = isolate.compileScriptSync(wrappedCode)
+    const resultJson = script.runSync(context, { timeout: EXECUTION_TIMEOUT_MS })
+    return resultJson ? JSON.parse(resultJson as string) : null
+  } finally {
+    isolate.dispose()
   }
+}
 
-  vm.runInNewContext(
-    `${compiledCode}\n${postlude}`,
-    sandbox,
-    {
-      timeout: EXECUTION_TIMEOUT_MS,
-      filename: `${cardId}.js`,
-    },
-  )
+/**
+ * Run compiled code to extract the manifest (effect hooks + listener registrations).
+ * This uses a lighter execution — just runs the top-level code to capture registrations.
+ */
+function runManifestExtraction(compiledCode: string, cardId: string): {
+  effectHooks: CardEffectHook[]
+  listeners: CustomCodeListenerManifest[]
+} {
+  const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB })
+  try {
+    const context = isolate.createContextSync()
+    const jail = context.global
+    jail.setSync('global', jail.derefInto())
 
-  return {
-    capture,
-    result: sanitizeSerializable(sandbox.__result),
+    const wrappedCode = `
+      const console = { log: () => {}, warn: () => {} };
+      function MinorImprovement(def) { return def; }
+      function Occupation(def) { return def; }
+      const __capture = { effect: null, listeners: [] };
+      function registerCardEffect(effect) {
+        __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };
+      }
+      function registerCardListener(listener) {
+        const registrationId = ${JSON.stringify(cardId)} + ':listener:' + __capture.listeners.length;
+        __capture.listeners.push({
+          registrationId,
+          cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(i => typeof i === 'string') : undefined,
+          actions: Array.isArray(listener.actions) ? listener.actions.filter(i => typeof i === 'string') : undefined,
+          phases: Array.isArray(listener.phases) ? listener.phases : undefined,
+          order: typeof listener.order === 'number' ? listener.order : undefined,
+          scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+          handler: typeof listener.handler === 'function' ? listener.handler : () => undefined,
+        });
+      }
+      ${compiledCode}
+      JSON.stringify({
+        effectKeys: __capture.effect ? Object.keys(__capture.effect).filter(k => typeof __capture.effect[k] === 'function') : [],
+        listeners: __capture.listeners.map(({ handler, ...rest }) => rest),
+      });
+    `
+
+    const script = isolate.compileScriptSync(wrappedCode)
+    const resultJson = script.runSync(context, { timeout: EXECUTION_TIMEOUT_MS })
+    const parsed = resultJson ? JSON.parse(resultJson as string) as {
+      effectKeys: string[]
+      listeners: CustomCodeListenerManifest[]
+    } : { effectKeys: [], listeners: [] }
+
+    const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectHook =>
+      cardEffectHooks.includes(hook as CardEffectHook),
+    )
+    const listeners = parsed.listeners.map((l) => ({
+      ...l,
+      phases: l.phases?.filter(isActionHookPhase),
+      scope: isCardListenerScope(l.scope) ? l.scope : undefined,
+    }))
+
+    return { effectHooks, listeners }
+  } finally {
+    isolate.dispose()
   }
 }
 
@@ -162,27 +206,23 @@ export const extractManifestFromCompiledCode = (
   compiledCode: string,
   cardId: string,
 ): CustomCodeManifest => {
-  const { capture } = executeWithCapture(compiledCode, cardId)
-  const effectHooks = cardEffectHooks.filter((hook) => typeof capture.effect?.[hook] === 'function')
-  return {
-    effectHooks,
-    listeners: capture.listeners.map(({ handler: _handler, ...listener }) => listener),
-  }
+  return runManifestExtraction(compiledCode, cardId)
 }
 
 export const invokeCustomCodeEffect = (
   request: CustomCodeEffectInvocation,
 ): CustomCodeEffectResult => {
   try {
-    const { result } = executeWithCapture(
-      request.compiledCode,
-      request.cardId,
-      `
+    const postlude = `
 const __handler = __capture.effect?.[${JSON.stringify(request.hook)}]
 __result = typeof __handler === 'function'
   ? __handler(__input_state, __input_player, __input_paymentInfo)
   : null
-      `,
+    `
+    const result = runInIsolate(
+      request.compiledCode,
+      request.cardId,
+      postlude,
       {
         __input_state: request.state,
         __input_player: request.player,
@@ -202,15 +242,16 @@ export const invokeCustomCodeListener = (
   request: CustomCodeListenerInvocation,
 ): CustomCodeListenerResult => {
   try {
-    const { result } = executeWithCapture(
-      request.compiledCode,
-      request.cardId,
-      `
+    const postlude = `
 const __listener = __capture.listeners.find((entry) => entry.registrationId === ${JSON.stringify(request.registrationId)})
 __result = __listener && typeof __listener.handler === 'function'
   ? __listener.handler(__input_context)
   : null
-      `,
+    `
+    const result = runInIsolate(
+      request.compiledCode,
+      request.cardId,
+      postlude,
       {
         __input_context: request.context,
       },

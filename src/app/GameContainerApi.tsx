@@ -6,8 +6,7 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
-import { majorImprovementIds } from '../../shared/game/major-improvements'
-import { occupationIds } from '../../shared/game/occupations'
+import { API_BASE } from '../config'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import { baseActionOrder } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
@@ -208,6 +207,7 @@ export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const isWsMode = currentUrlParams.get('transport') === 'ws'
+  const isEmbedded = currentUrlParams.get('embedded') === '1'
 
   const lockedViewPlayerId = useMemo(() => {
     const p = new URLSearchParams(window.location.search)
@@ -1011,8 +1011,6 @@ export const GameContainerApi = () => {
   }, [state])
 
   const resourceKeys = resourceKeyList
-  const majorIdSet = useMemo(() => new Set(majorImprovementIds), [])
-  const occupationIdSet = useMemo(() => new Set(occupationIds), [])
 
   const applyDevResource = useCallback(async () => {
     if (!devPlayerId || !state) return
@@ -1032,58 +1030,58 @@ export const GameContainerApi = () => {
   }, [state, devRound, transport])
 
   const stripCardId = (id: string) => id.trim()
-  const getCardType = useCallback((player: import('../../shared/game/types').PlayerState, cardId: string) => {
-    if (majorIdSet.has(cardId)) return 'major'
-    if (occupationIdSet.has(cardId)) return 'occupation'
-    if (player.occupationHand.includes(cardId)) return 'occupation'
-    if (player.minorHand.includes(cardId)) return 'minor'
-    return 'minor'
-  }, [majorIdSet, occupationIdSet])
 
-  const playDevCard = useCallback(() => {
+  const playDevCard = useCallback(async () => {
     if (!state || !devPlayerId) return
     const cardId = stripCardId(devCardId)
     if (!cardId) return
-    const targetPlayer = state.players.find((p) => p.id === devPlayerId)
-    if (!targetPlayer) return
-    const cardType = getCardType(targetPlayer, cardId)
-    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
-    const cp = clone.players.find((p) => p.id === devPlayerId)!
-    clone.players.forEach((p) => {
-      p.minorHand = p.minorHand.filter((e) => e !== cardId)
-      p.occupationHand = p.occupationHand.filter((e) => e !== cardId)
-    })
-    if (cardType === 'major') {
-      clone.availableMajorImprovements = clone.availableMajorImprovements.filter((e) => e !== cardId)
-      if (!cp.improvements.includes(cardId)) cp.improvements.push(cardId)
-      cp.playedCards.push(`major:${cardId}`)
-    } else if (cardType === 'occupation') {
-      if (!cp.occupationPlayed.includes(cardId)) cp.occupationPlayed.push(cardId)
-      cp.playedCards.push(`occupation:${cardId}`)
-    } else {
-      if (!cp.minorPlayed.includes(cardId)) cp.minorPlayed.push(cardId)
-      cp.playedCards.push(`minor:${cardId}`)
+    const playerIndex = state.players.findIndex((p) => p.id === devPlayerId)
+    if (playerIndex < 0) return
+    try {
+      const token = localStorage.getItem('open-agricola-token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const resp = await fetch(`${API_BASE}/api/game/dev/play-card`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ playerIndex, cardId }),
+      })
+      const data = await resp.json()
+      if (data.ok && data.state) {
+        await transport.loadGame(data.state)
+      } else {
+        console.error('playDevCard failed:', data.error)
+      }
+    } catch (e) {
+      console.error('playDevCard error', e)
     }
-    void transport.loadGame(clone).catch((e) => console.error('playDevCard error', e))
-  }, [state, devPlayerId, devCardId, getCardType, transport])
+  }, [state, devPlayerId, devCardId, transport])
 
-  const drawDevCard = useCallback(() => {
+  const drawDevCard = useCallback(async () => {
     if (!state || !devPlayerId) return
     const cardId = stripCardId(devCardId)
     if (!cardId) return
-    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
-    const cp = clone.players.find((p) => p.id === devPlayerId)!
-    clone.players.forEach((p) => {
-      p.minorHand = p.minorHand.filter((e) => e !== cardId)
-      p.occupationHand = p.occupationHand.filter((e) => e !== cardId)
-    })
-    if (occupationIdSet.has(cardId)) {
-      if (!cp.occupationHand.includes(cardId)) cp.occupationHand.push(cardId)
-    } else {
-      if (!cp.minorHand.includes(cardId)) cp.minorHand.push(cardId)
+    const playerIndex = state.players.findIndex((p) => p.id === devPlayerId)
+    if (playerIndex < 0) return
+    try {
+      const token = localStorage.getItem('open-agricola-token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const resp = await fetch(`${API_BASE}/api/game/dev/draw-card`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ playerIndex, cardId }),
+      })
+      const data = await resp.json()
+      if (data.ok && data.state) {
+        await transport.loadGame(data.state)
+      } else {
+        console.error('drawDevCard failed:', data.error)
+      }
+    } catch (e) {
+      console.error('drawDevCard error', e)
     }
-    void transport.loadGame(clone).catch((e) => console.error('drawDevCard error', e))
-  }, [state, devPlayerId, devCardId, occupationIdSet, transport])
+  }, [state, devPlayerId, devCardId, transport])
 
   const createDevPasture = useCallback(async () => {
     if (!state || !isInteractive || !devPlayerId) return
@@ -1205,11 +1203,11 @@ export const GameContainerApi = () => {
   }
 
   if (!state || !currentPlayer || !displayPlayer) {
-    return <div className="app">Loading...</div>
+    return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
   return (
-    <div className="app">
+    <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -1433,9 +1431,11 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
-        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
-      />
+      {!isEmbedded && (
+        <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+          onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+        />
+      )}
 
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}

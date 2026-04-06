@@ -12,6 +12,7 @@ export function getDb(): Database.Database {
   mkdirSync(DB_DIR, { recursive: true })
   _db = new Database(DB_PATH)
   _db.pragma('journal_mode = WAL')
+  _db.pragma('busy_timeout = 5000')
   _db.pragma('foreign_keys = ON')
   runMigrations(_db)
   return _db

@@ -359,298 +359,30 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle']
-
-function CardEditor({ initial, token, onSaved, onCancel, t }: {
+function CardEditor({ onSaved, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
   onSaved: () => void
   onCancel: () => void
+  onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
+  sandboxErrors?: string[] | null
+  onSandboxErrorsConsumed?: () => void
 }) {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [cardId, setCardId] = useState(initial?.card_id ?? 'CUSTOM_')
-  const [cardType, setCardType] = useState<'minor' | 'occupation'>(initial?.card_type ?? 'minor')
-  const [desc, setDesc] = useState(initial?.description ?? '')
-  const [vp, setVp] = useState(String((initial?.card_json as Record<string, unknown>)?.vp ?? 0))
-  const [cost, setCost] = useState<Record<string, number>>(
-    ((initial?.card_json as Record<string, unknown>)?.cost as Record<string, number>) ?? {}
-  )
-  const [dslText, setDslText] = useState(initial?.effect_dsl ? JSON.stringify(initial.effect_dsl, null, 2) : '')
-  const [effectMode, setEffectMode] = useState<'dsl' | 'code'>('dsl')
-  const [codeText, setCodeText] = useState('')
-  const [codeErrors, setCodeErrors] = useState<string[]>([])
-  const [validating, setValidating] = useState(false)
-  const [artUrl, setArtUrl] = useState<string | null>(initial?.art_url ?? null)
-  const [showAi, setShowAi] = useState(false)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const handleAiImport = (extracted: ExtractedCard, importedArtUrl: string | null) => {
-    setName(extracted.card.name)
-    setCardId(extracted.card.id)
-    setCardType(extracted.card.card_type)
-    setDesc((extracted.card.desc ?? []).join(' '))
-    setVp(String(extracted.card.vp ?? 0))
-    setCost(extracted.card.cost ?? {})
-    if (extracted.effects && Object.keys(extracted.effects).length > 0) {
-      setDslText(JSON.stringify(extracted.effects, null, 2))
-    }
-    if (importedArtUrl) setArtUrl(importedArtUrl)
-    setShowAi(false)
-  }
-
-  const handleCostChange = (res: string, val: string) => {
-    const n = Number(val)
-    if (n <= 0) {
-      const next = { ...cost }
-      delete next[res]
-      setCost(next)
-    } else {
-      setCost(prev => ({ ...prev, [res]: n }))
-    }
-  }
-
-  const handleValidateCode = async () => {
-    if (!codeText.trim()) { setCodeErrors([t('platform.enterCode')]); return }
-    setValidating(true)
-    setCodeErrors([])
-    try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards/validate-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({ source: codeText }),
-      })
-      const d = await r.json()
-      if (d.ok && d.valid) {
-        setCodeErrors([])
-        setError('')
-      } else {
-        setCodeErrors(d.errors ?? [t('platform.validationFailed')])
-      }
-    } catch {
-      setCodeErrors([t('platform.networkError')])
-    } finally {
-      setValidating(false)
-    }
-  }
-
-  const handleSave = async (publishStatus: 'draft' | 'published') => {
-    setError('')
-    if (!name.trim()) { setError(t('platform.cardNameRequired')); return }
-    if (!cardId.startsWith('CUSTOM_') || cardId.length < 8) { setError(t('platform.cardIdInvalid')); return }
-
-    let effectDsl = null
-    if (effectMode === 'dsl' && dslText.trim()) {
-      try { effectDsl = JSON.parse(dslText) } catch { setError(t('platform.dslJsonError')); return }
-    }
-
-    const cardJson = {
-      id: cardId,
-      name,
-      deck: 'CUSTOM',
-      number: 0,
-      desc: desc ? [desc] : [],
-      cost,
-      vp: Number(vp) || 0,
-      implemented: true,
-    }
-
-    setSaving(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({
-          id: initial?.id,
-          card_id: cardId,
-          card_type: cardType,
-          name,
-          description: desc,
-          card_json: cardJson,
-          effect_dsl: effectMode === 'dsl' ? effectDsl : null,
-          effect_code: effectMode === 'code' ? codeText : undefined,
-          art_url: artUrl,
-          status: publishStatus,
-        }),
-      })
-      const d = await r.json()
-      if (d.ok) {
-        onSaved()
-      } else {
-        setError(d.error ?? t('platform.saveFailed'))
-      }
-    } catch {
-      setError(t('platform.networkError'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (showAi) {
-    return (
-      <div className="ws-editor">
-        <AiCardDesigner
-          onImport={handleAiImport}
-          onClose={() => setShowAi(false)}
-        />
-      </div>
-    )
+  const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
+    // AI designer handles everything now; this callback is kept for interface compatibility
   }
 
   return (
-    <div className="ws-editor">
-      <div className="ws-editor-header">
-        <h2>{initial ? t('platform.editCard') : t('platform.createCardTitle')}</h2>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button type="button" className="btn-secondary ws-btn-sm ai-open-btn" onClick={() => setShowAi(true)}>
-            {t('platform.aiDesigner')}
-          </button>
-          <button type="button" className="btn-link" onClick={onCancel}>{t('platform.cancel')}</button>
-        </div>
-      </div>
-      {artUrl && <img src={artUrl} alt="card art" className="ws-editor-art-preview" />}
-
-      <div className="ws-editor-form">
-        <div className="ws-form-row">
-          <div className="form-field">
-            <label>{t('platform.cardName')}</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder={t('platform.cardNamePlaceholder')} />
-          </div>
-          <div className="form-field">
-            <label>{t('platform.cardType')}</label>
-            <select value={cardType} onChange={e => setCardType(e.target.value as 'minor' | 'occupation')}>
-              <option value="minor">{t('platform.minor')}</option>
-              <option value="occupation">{t('platform.occupation')}</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="form-field">
-          <label>{t('platform.cardId')}</label>
-          <input value={cardId} onChange={e => setCardId(e.target.value)} placeholder={t('platform.cardIdPlaceholder')} />
-        </div>
-
-        <div className="form-field">
-          <label>{t('platform.description')}</label>
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder={t('platform.descPlaceholder')} />
-        </div>
-
-        <div className="ws-form-row">
-          <div className="form-field ws-field-sm">
-            <label>{t('platform.vpField')}</label>
-            <input type="number" value={vp} onChange={e => setVp(e.target.value)} min={0} max={20} />
-          </div>
-        </div>
-
-        <div className="ws-cost-editor">
-          <label>{t('platform.costLabel')}</label>
-          <div className="ws-cost-grid">
-            {RESOURCE_KEYS.map(res => (
-              <div key={res} className="ws-cost-cell">
-                <span>{res}</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  value={cost[res] ?? 0}
-                  onChange={e => handleCostChange(res, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-field">
-          <div className="ws-effect-mode-toggle">
-            <button type="button" className={`ws-tab-sm${effectMode === 'dsl' ? ' active' : ''}`} onClick={() => setEffectMode('dsl')}>
-              {t('platform.dslMode')}
-            </button>
-            <button type="button" className={`ws-tab-sm${effectMode === 'code' ? ' active' : ''}`} onClick={() => setEffectMode('code')}>
-              {t('platform.codeMode')}
-            </button>
-          </div>
-
-          {effectMode === 'dsl' ? (
-            <>
-              <label>{t('platform.dslLabel')}</label>
-              <textarea
-                value={dslText}
-                onChange={e => setDslText(e.target.value)}
-                rows={8}
-                placeholder={'{\n  "onReturnHome": {\n    "optional": true,\n    "flow": [{ "action": "gain", "params": { "food": 2 } }]\n  }\n}'}
-                className="ws-code-input"
-              />
-              <p className="ws-code-note">{t('platform.dslNote')}</p>
-            </>
-          ) : (
-            <>
-              <label>{t('platform.tsLabel')}</label>
-              <textarea
-                value={codeText}
-                onChange={e => { setCodeText(e.target.value); setCodeErrors([]) }}
-                rows={12}
-                placeholder={'registerCardEffect({\n  id: "CUSTOM_MyCard",\n  onReturnHome: (state, player) => {\n    return { type: "leaf", actionId: "gain", params: { food: 2 }, sourceCard: "CUSTOM_MyCard" }\n  },\n})'}
-                className="ws-code-input"
-              />
-              <div className="ws-code-toolbar">
-                <button type="button" className="btn-secondary ws-btn-sm" onClick={handleValidateCode} disabled={validating}>
-                  {validating ? t('platform.validating') : t('platform.validateCode')}
-                </button>
-                <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
-                  const r = await fetch(`${API_BASE}/api/workshop/cards/generate-template`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-                    body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] } }),
-                  })
-                  const d = await r.json()
-                  if (d.ok && d.code) setCodeText(d.code)
-                }}>
-                  {t('platform.generateTemplate')}
-                </button>
-                {dslText.trim() && (
-                  <button type="button" className="btn-secondary ws-btn-sm" onClick={async () => {
-                    try {
-                      const dsl = JSON.parse(dslText)
-                      const r = await fetch(`${API_BASE}/api/workshop/cards/preview-code`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-                        body: JSON.stringify({ card_id: cardId, card_type: cardType, name, description: desc, card_json: { cost, vp: Number(vp) || 0, desc: desc ? [desc] : [] }, effect_dsl: dsl }),
-                      })
-                      const d = await r.json()
-                      if (d.ok && d.code) setCodeText(d.code)
-                    } catch { setError(t('platform.dslJsonError')) }
-                  }}>
-                    {t('platform.generateFromDsl')}
-                  </button>
-                )}
-                {codeErrors.length === 0 && codeText.trim() && !validating && (
-                  <span className="ws-code-ok">{t('platform.validationPassed')}</span>
-                )}
-              </div>
-              {codeErrors.length > 0 && (
-                <ul className="ws-code-errors">
-                  {codeErrors.map((e, i) => <li key={i}>{e}</li>)}
-                </ul>
-              )}
-              <p className="ws-code-note">
-                {t('platform.codeApiNote')}
-              </p>
-            </>
-          )}
-        </div>
-
-        {error && <div className="form-error">{error}</div>}
-
-        <div className="ws-editor-actions">
-          <button type="button" className="btn-secondary" onClick={() => handleSave('draft')} disabled={saving}>
-            {t('platform.saveDraft')}
-          </button>
-          <button type="button" className="btn-primary" onClick={() => handleSave('published')} disabled={saving}>
-            {t('platform.publishCard')}
-          </button>
-        </div>
-      </div>
+    <div className="ws-editor ws-editor-ai">
+      <AiCardDesigner
+        onImport={handleAiImport}
+        onClose={onCancel}
+        onSaved={onSaved}
+        onAddToSandboxAndRestart={onAddToSandboxAndRestart}
+        sandboxErrors={sandboxErrors}
+        onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+      />
     </div>
   )
 }
@@ -684,12 +416,10 @@ function WorkshopSection({
 
 function SandboxSummaryPanel({
   cards,
-  onOpenSandbox,
   settings,
   t,
 }: {
   cards: WorkshopCard[]
-  onOpenSandbox: () => void
   settings: SandboxSettings
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
@@ -711,11 +441,6 @@ function SandboxSummaryPanel({
             decks: settings.deck_ids.join(', '),
           })}
         </div>
-      </div>
-      <div className="ws-sandbox-summary-actions">
-        <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenSandbox}>
-          {t('platform.openSandbox')}
-        </button>
       </div>
     </div>
   )
@@ -1094,6 +819,9 @@ export function WorkshopPage() {
   const [featuredLoading, setFeaturedLoading] = useState(false)
   const [myLoading, setMyLoading] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
+  const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
+  const [sandboxActive, setSandboxActive] = useState(false)
+  const [sandboxKey, setSandboxKey] = useState(0)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1290,9 +1018,16 @@ export function WorkshopPage() {
       })
       const data = await response.json()
       if (data.ok) {
-        setPage('game')
+        const warnings: string[] = data.cardWarnings ?? []
+        setSandboxActive(true)
+        setSandboxKey(k => k + 1)
+        if (warnings.length > 0) {
+          // Cards had registration errors — feed back to AI designer
+          setPendingSandboxErrors(warnings)
+        }
       } else {
-        alert(t('platform.sandboxFailed', { error: data.error ?? t('platform.sandboxUnknownError') }))
+        const errors = [data.error ?? t('platform.sandboxUnknownError')]
+        setPendingSandboxErrors(errors)
       }
     } catch {
       alert(t('platform.sandboxNetworkError'))
@@ -1315,15 +1050,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => { setSelectedCard(null); setView('home') }}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            prevView.current = view
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <CardDetail
@@ -1358,14 +1085,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => { setEditCard(undefined); setView('home') }}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <CardEditor
@@ -1380,8 +1100,41 @@ export function WorkshopPage() {
             setEditCard(undefined)
             setView(prevView.current)
           }}
+          onAddToSandboxAndRestart={async (cardDbId: string) => {
+            await handleAddSandbox(cardDbId)
+            await handleStartSandboxGame()
+          }}
           t={t}
+          sandboxErrors={pendingSandboxErrors}
+          onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
         />
+        <div className="sandbox-embed">
+          <div className="sandbox-embed-toolbar">
+            {sandboxActive ? (
+              <>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                  {t('platform.restartSandbox')}
+                </button>
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                  {t('platform.closeSandbox')}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                {t('platform.startSandbox')}
+              </button>
+            )}
+            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+          </div>
+          {sandboxActive && (
+            <iframe
+              key={sandboxKey}
+              className="sandbox-embed-frame"
+              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              title="Sandbox"
+            />
+          )}
+        </div>
       </div>
     )
   }
@@ -1391,15 +1144,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          user={user}
-          sandboxCount={sandboxCards.length}
           onOpenHome={() => setView('home')}
-          onOpenSandbox={() => setView('sandbox')}
-          onCreateCard={() => {
-            prevView.current = view
-            setEditCard(undefined)
-            setView('editor')
-          }}
           t={t}
         />
         <SandboxView
@@ -1421,6 +1166,33 @@ export function WorkshopPage() {
             t={t}
           />
         )}
+        <div className="sandbox-embed">
+          <div className="sandbox-embed-toolbar">
+            {sandboxActive ? (
+              <>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                  {t('platform.restartSandbox')}
+                </button>
+                <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
+                  {t('platform.closeSandbox')}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                {t('platform.startSandbox')}
+              </button>
+            )}
+            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+          </div>
+          {sandboxActive && (
+            <iframe
+              key={sandboxKey}
+              className="sandbox-embed-frame"
+              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              title="Sandbox"
+            />
+          )}
+        </div>
       </div>
     )
   }
@@ -1429,15 +1201,7 @@ export function WorkshopPage() {
     <div className="ws-page">
       <WorkshopNav
         view={view}
-        user={user}
-        sandboxCount={sandboxCards.length}
         onOpenHome={() => setView('home')}
-        onOpenSandbox={() => setView('sandbox')}
-        onCreateCard={() => {
-          prevView.current = view
-          setEditCard(undefined)
-          setView('editor')
-        }}
         t={t}
       />
 
@@ -1445,7 +1209,6 @@ export function WorkshopPage() {
         <div className="ws-home-header">
           <SandboxSummaryPanel
             cards={sandboxCards}
-            onOpenSandbox={() => setView('sandbox')}
             settings={sandboxSettings}
             t={t}
           />
@@ -1554,19 +1317,11 @@ export function WorkshopPage() {
 
 function WorkshopNav({
   view,
-  user,
-  sandboxCount,
   onOpenHome,
-  onOpenSandbox,
-  onCreateCard,
   t,
 }: {
   view: View
-  user: { username: string; displayName: string } | null
-  sandboxCount: number
   onOpenHome: () => void
-  onOpenSandbox: () => void
-  onCreateCard: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   return (
@@ -1580,20 +1335,6 @@ function WorkshopNav({
           <button type="button" className="btn-link ws-nav-link" onClick={onOpenHome}>
             {t('platform.backToWorkshopHome')}
           </button>
-        )}
-        {user && (
-          <>
-            <button
-              type="button"
-              className={`btn-secondary ws-btn-sm ws-nav-action${view === 'sandbox' ? ' active' : ''}`}
-              onClick={onOpenSandbox}
-            >
-              {t('platform.sandbox')}{sandboxCount > 0 ? ` (${sandboxCount})` : ''}
-            </button>
-            <button type="button" className="btn-primary ws-btn-sm" onClick={onCreateCard}>
-              {t('platform.createCard')}
-            </button>
-          </>
         )}
       </div>
     </div>
