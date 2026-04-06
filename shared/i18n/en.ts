@@ -787,7 +787,7 @@ export const en = {
     searchBtn: 'Search',
     sortRecent: 'Recent',
     sortPopular: 'Popular',
-    createCard: '+ Create Card',
+    createCard: '+ Create / Edit Card',
     backToWorkshopHome: 'Back to home',
     myCardsSubtitle: 'See both your drafts and published cards here.',
     featuredSubtitle: 'Featured cards are marked with a star.',

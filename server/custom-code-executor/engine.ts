@@ -98,6 +98,8 @@ function runInIsolate(
           handler: typeof listener.handler === 'function' ? listener.handler : () => undefined,
         });
       }
+      function MinorImprovement(def) { return def; }
+      function Occupation(def) { return def; }
       let __result = null;
       ${compiledCode}
       ${postlude}
@@ -128,6 +130,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
 
     const wrappedCode = `
       const console = { log: () => {}, warn: () => {} };
+      function MinorImprovement(def) { return def; }
+      function Occupation(def) { return def; }
       const __capture = { effect: null, listeners: [] };
       function registerCardEffect(effect) {
         __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };
