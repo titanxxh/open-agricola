@@ -1004,6 +1004,11 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
         prerequisite: card?.prerequisite ?? (prerequisite || undefined),
         modifiers: card?.modifiers ?? [],
         implemented: true,
+        // Save raw form inputs for restoration
+        _draft: {
+          prerequisite: prerequisite || undefined,
+          costInput: costInput || undefined,
+        },
       }
 
       const body: Record<string, unknown> = {
@@ -1090,10 +1095,16 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
     setCardIdInput(apiCard.card_id)
     setArtUrl(apiCard.art_url ?? null)
     setCurrentCardDbId(apiCard.id)
-    if (cj.prerequisite) setPrerequisite(cj.prerequisite as string)
-    const costParts = Object.entries((cj.cost ?? {}) as Record<string, number>)
-      .map(([k, v]) => `${v} ${k}`)
-    setCostInput(costParts.join(' '))
+    // Restore raw form inputs from _draft, or fall back to parsed card_json
+    const draft = (cj._draft ?? {}) as { prerequisite?: string; costInput?: string }
+    setPrerequisite(draft.prerequisite ?? (cj.prerequisite as string) ?? '')
+    if (draft.costInput) {
+      setCostInput(draft.costInput)
+    } else {
+      const costParts = Object.entries((cj.cost ?? {}) as Record<string, number>)
+        .map(([k, v]) => `${v} ${k}`)
+      setCostInput(costParts.join(' '))
+    }
     setExtracted({
       card: cardData,
       effects: apiCard.effect_dsl ?? undefined,
