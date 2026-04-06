@@ -200,7 +200,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
 
       <div className="ai-config-bar-fields">
         <div className="ai-provider-btns">
-          {(['gemini', 'groq', 'openai', 'anthropic', 'openrouter', 'custom'] as LlmProvider[]).map(p => (
+          {(['gemini', 'openrouter'] as LlmProvider[]).map(p => (
             <button
               key={p}
               type="button"
