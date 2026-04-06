@@ -25,7 +25,7 @@ const DEFAULT_MODELS: Record<LlmProvider, string> = {
   anthropic: 'claude-sonnet-4-5',
   gemini: 'gemini-2.5-flash',
   groq: 'llama-3.3-70b-versatile',
-  openrouter: 'google/gemini-2.5-flash-preview',
+  openrouter: 'qwen/qwen3.6-plus:free',
   custom: 'gpt-4o',
 }
 
@@ -57,14 +57,12 @@ export const PROVIDER_MODELS: Record<LlmProvider, { id: string; label: string }[
     { id: 'qwen-qwq-32b', label: 'Qwen QwQ 32B' },
   ],
   openrouter: [
+    { id: 'qwen/qwen3.6-plus:free', label: 'Qwen 3.6 Plus (免费)' },
     { id: 'google/gemini-2.5-flash-preview', label: 'Gemini 2.5 Flash' },
     { id: 'google/gemini-2.5-pro-preview', label: 'Gemini 2.5 Pro' },
-    { id: 'anthropic/claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-    { id: 'openai/gpt-4o', label: 'GPT-4o' },
-    { id: 'deepseek/deepseek-chat-v3', label: 'DeepSeek V3' },
-    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
-    { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
-    { id: 'qwen/qwen-plus', label: 'Qwen Plus (通义千问)' },
+    { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (免费)' },
+    { id: 'deepseek/deepseek-r1:free', label: 'DeepSeek R1 (免费)' },
+    { id: 'meta-llama/llama-4-maverick:free', label: 'Llama 4 Maverick (免费)' },
   ],
   custom: [],
 }
