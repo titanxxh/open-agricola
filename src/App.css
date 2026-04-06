@@ -4297,6 +4297,25 @@
   font-size: 11px;
   color: #8a7a60;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-resend-btn {
+  font-size: 14px;
+  padding: 0 4px;
+  color: #8a7a60;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ai-message:hover .ai-resend-btn {
+  opacity: 1;
+}
+
+.ai-resend-btn:hover {
+  color: #3a5a2c;
 }
 
 .ai-message-content {
