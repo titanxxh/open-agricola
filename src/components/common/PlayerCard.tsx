@@ -6,7 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
 import { emptyResources } from '../../../shared/logic/state'
-import { getCustomCardArtUrl } from '../../../shared/cards/custom-registry'
+import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { CardWithCopy } from './CardWithCopy'
 
 export type CardType = 'major' | 'minor' | 'occupation'
@@ -53,8 +53,8 @@ type PlayerCardProps = {
 const getCardNumbering = (cardId: string): string => {
   const match = cardId.match(/^([A-E])(\d+)/)
   if (match) return `${match[1]}${match[2].padStart(3, '0')}`
-  // Custom cards: no numbering
-  if (cardId.startsWith('CUSTOM_')) return ''
+  // Custom cards: O-series numbering (minor O001+, occupation O500+)
+  if (cardId.startsWith('CUSTOM_')) return getCustomCardNumbering(cardId) ?? 'O000'
   return cardId
 }
 
