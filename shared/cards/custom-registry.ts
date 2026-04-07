@@ -22,6 +22,7 @@ export type { CustomCardData } from './session-card-context.ts'
 
 const customMinorImprovements = new Map<string, CardBase>()
 const customOccupations = new Map<string, CardBase>()
+const customArtUrls = new Map<string, string>()
 
 /**
  * Register a custom card (and optionally its DSL effects) into the runtime registry.
@@ -34,8 +35,8 @@ export function registerCustomCard(data: CustomCardData): void {
     return
   }
 
-  // Legacy global path (for tests without session context)
-  const { cardType, cardJson, effectDsl } = data
+  // Legacy global path (for tests without session context, and frontend)
+  const { cardType, cardJson, effectDsl, artUrl } = data
 
   const card = cardType === 'minor'
     ? new MinorImprovement(cardJson)
@@ -45,6 +46,10 @@ export function registerCustomCard(data: CustomCardData): void {
     customMinorImprovements.set(cardJson.id, card)
   } else {
     customOccupations.set(cardJson.id, card)
+  }
+
+  if (artUrl) {
+    customArtUrls.set(cardJson.id, artUrl)
   }
 
   if (effectDsl) {
@@ -75,10 +80,21 @@ export function getCustomOccupation(id: string): CardBase | null {
   return customOccupations.get(id) ?? null
 }
 
+/** Get the art URL for a custom card, or null if none. */
+export function getCustomCardArtUrl(id: string): string | null {
+  const sessionCtx = getCurrentSessionContext()
+  if (sessionCtx) {
+    const url = sessionCtx.customArtUrls.get(id)
+    if (url) return url
+  }
+  return customArtUrls.get(id) ?? null
+}
+
 /** Clear all custom cards — called when creating a fresh game session without workshop cards. */
 export function clearCustomCards(): void {
   customMinorImprovements.clear()
   customOccupations.clear()
+  customArtUrls.clear()
   clearCustomCardEffects()
   clearCustomCardListeners()
 }

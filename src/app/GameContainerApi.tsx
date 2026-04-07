@@ -1050,7 +1050,7 @@ export const GameContainerApi = () => {
       if (data.ok && data.state) {
         // Register custom cards before loading state so they resolve in the card registry
         if (data.customCardDefs) {
-          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
         }
         await transport.loadGame(data.state)
       } else {
@@ -1080,7 +1080,7 @@ export const GameContainerApi = () => {
       if (data.ok && data.state) {
         // Register custom cards before loading state so they resolve in the card registry
         if (data.customCardDefs) {
-          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
         }
         await transport.loadGame(data.state)
       } else {
