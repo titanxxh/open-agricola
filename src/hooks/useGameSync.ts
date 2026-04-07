@@ -3,6 +3,7 @@ import type { GameState, InteractionState, PendingAction } from '../../shared/ga
 import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateState } from '../../shared/game/serialization'
+import { registerCustomCard } from '../../shared/cards/custom-registry'
 
 export type SyncedPending = PendingAction
 
@@ -30,6 +31,12 @@ export const useGameSync = () => {
 
   const applySnapshot = useCallback((payload: GameSyncPayload) => {
     if (!mountedRef.current) return
+    // Register custom card definitions so they resolve via getMinorImprovement/getOccupation
+    if (payload.customCardDefs) {
+      for (const def of payload.customCardDefs) {
+        registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+      }
+    }
     const hydrated = rehydrateState(payload.state)
     setState(hydrated)
     setPending(payload.pending)
