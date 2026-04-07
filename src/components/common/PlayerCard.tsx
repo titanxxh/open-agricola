@@ -52,7 +52,10 @@ type PlayerCardProps = {
 
 const getCardNumbering = (cardId: string): string => {
   const match = cardId.match(/^([A-E])(\d+)/)
-  return match ? `${match[1]}${match[2].padStart(3, '0')}` : cardId
+  if (match) return `${match[1]}${match[2].padStart(3, '0')}`
+  // Custom cards: no numbering
+  if (cardId.startsWith('CUSTOM_')) return ''
+  return cardId
 }
 
 const getDeckFromId = (cardId: string): string | undefined => {
