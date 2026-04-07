@@ -6,6 +6,7 @@ import type { CardDefinition } from '../cards/types'
 export type CustomCardDef = {
   cardType: 'minor' | 'occupation'
   cardJson: CardDefinition
+  artUrl?: string | null
 }
 
 export type GameSyncPayload = {

@@ -6,6 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
 import { emptyResources } from '../../../shared/logic/state'
+import { getCustomCardArtUrl } from '../../../shared/cards/custom-registry'
 import { CardWithCopy } from './CardWithCopy'
 
 export type CardType = 'major' | 'minor' | 'occupation'
@@ -168,6 +169,18 @@ export const PlayerCard = ({
       const pos = getMajorIconPosition(cardId)
       return {
         backgroundPosition: `${pos.x} ${pos.y}`,
+      }
+    }
+    // Custom card art: use the uploaded image URL
+    const customArt = getCustomCardArtUrl(cardId)
+    if (customArt) {
+      // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
+      const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
+      const fullUrl = customArt.startsWith('http') ? customArt : `${apiBase}${customArt}`
+      return {
+        backgroundImage: `url(${fullUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
       }
     }
     const deckMap: Record<string, string> = {

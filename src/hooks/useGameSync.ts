@@ -34,7 +34,7 @@ export const useGameSync = () => {
     // Register custom card definitions so they resolve via getMinorImprovement/getOccupation
     if (payload.customCardDefs) {
       for (const def of payload.customCardDefs) {
-        registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+        registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
       }
     }
     const hydrated = rehydrateState(payload.state)

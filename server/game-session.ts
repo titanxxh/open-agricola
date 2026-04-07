@@ -262,14 +262,15 @@ export class GameSession {
    * Frontend uses this to register custom cards into its card registry so they
    * render identically to built-in cards.
    */
-  getCustomCardDefs(): Array<{ cardType: 'minor' | 'occupation'; cardJson: import('../shared/cards/types.ts').CardDefinition }> {
+  getCustomCardDefs(): import('../shared/protocol/game.ts').CustomCardDef[] {
     if (!this.sessionCardContext) return []
-    const defs: Array<{ cardType: 'minor' | 'occupation'; cardJson: import('../shared/cards/types.ts').CardDefinition }> = []
-    for (const [, card] of this.sessionCardContext.customMinors) {
-      defs.push({ cardType: 'minor', cardJson: card.toJSON() })
+    const defs: import('../shared/protocol/game.ts').CustomCardDef[] = []
+    const artUrls = this.sessionCardContext.customArtUrls
+    for (const [id, card] of this.sessionCardContext.customMinors) {
+      defs.push({ cardType: 'minor', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
     }
-    for (const [, card] of this.sessionCardContext.customOccupations) {
-      defs.push({ cardType: 'occupation', cardJson: card.toJSON() })
+    for (const [id, card] of this.sessionCardContext.customOccupations) {
+      defs.push({ cardType: 'occupation', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
     }
     return defs
   }

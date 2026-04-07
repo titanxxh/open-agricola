@@ -340,7 +340,7 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, status, author_id
+          `SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
           card_type: string
@@ -349,6 +349,7 @@ export const handleGameRoute = async (
           effect_code: string | null
           compiled_code: string | null
           code_manifest: string | null
+          art_url: string | null
           status: string; author_id: string
         } | undefined
         if (!row) continue
@@ -365,6 +366,7 @@ export const handleGameRoute = async (
             effectCode: row.effect_code ?? null,
             compiledCode: row.compiled_code ?? null,
             codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
+            artUrl: row.art_url ?? null,
           })
         } catch (err) {
           console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
