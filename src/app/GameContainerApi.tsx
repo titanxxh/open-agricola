@@ -7,8 +7,8 @@ import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
 import { API_BASE } from '../config'
-import { emptyResources, resourceKeyList } from '../../shared/logic/state'
-import { baseActionOrder } from '../../shared/logic/state'
+import { emptyResources, resourceKeyList, baseActionOrder } from '../../shared/logic/state'
+import { registerCustomCard } from '../../shared/cards/custom-registry'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
@@ -1048,6 +1048,10 @@ export const GameContainerApi = () => {
       })
       const data = await resp.json()
       if (data.ok && data.state) {
+        // Register custom cards before loading state so they resolve in the card registry
+        if (data.customCardDefs) {
+          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+        }
         await transport.loadGame(data.state)
       } else {
         console.error('playDevCard failed:', data.error)
@@ -1074,6 +1078,10 @@ export const GameContainerApi = () => {
       })
       const data = await resp.json()
       if (data.ok && data.state) {
+        // Register custom cards before loading state so they resolve in the card registry
+        if (data.customCardDefs) {
+          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson })
+        }
         await transport.loadGame(data.state)
       } else {
         console.error('drawDevCard failed:', data.error)

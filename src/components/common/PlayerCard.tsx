@@ -128,7 +128,8 @@ export const PlayerCard = ({
       }
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
-      if (minor) return {
+      if (!minor) return null
+      return {
         name: minor.name,
         description: minor.desc.join('\n'),
         cost: { ...emptyResources, ...minor.cost },
@@ -142,11 +143,10 @@ export const PlayerCard = ({
         isBaking: minor.isBaking,
         passing: minor.passing,
       }
-      // Fallback for custom cards not in built-in registry
-      return { name: cardId.replace(/^CUSTOM_/, ''), description: '', cost: emptyResources, deck: 'CUSTOM' }
     } else {
       const occupation = getOccupation(cardId)
-      if (occupation) return {
+      if (!occupation) return null
+      return {
         name: occupation.name,
         description: occupation.desc.join('\n'),
         cost: { ...emptyResources, ...occupation.cost },
@@ -157,8 +157,6 @@ export const PlayerCard = ({
         isCookery: occupation.isCookery,
         isBaking: occupation.isBaking,
       }
-      // Fallback for custom cards
-      return { name: cardId.replace(/^CUSTOM_/, ''), description: '', cost: emptyResources, deck: 'CUSTOM' }
     }
   }, [cardId, cardType, locale])
 

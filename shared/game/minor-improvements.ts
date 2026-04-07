@@ -6,6 +6,7 @@ import {
   minorImprovementCards,
   minorImprovementIds,
 } from '../cards/catalog'
+import { getCustomMinorImprovement } from '../cards/custom-registry'
 
 export type MinorImprovement = MinorImprovementCard | PlayerActionCard
 
@@ -15,3 +16,4 @@ export { minorImprovementIds }
 
 export const getMinorImprovement = (id: string) =>
   minorImprovements.find((improvement) => improvement.id === id)
+  ?? getCustomMinorImprovement(id)

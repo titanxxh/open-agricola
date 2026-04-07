@@ -58,6 +58,13 @@ const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): 
   return session.withCtx(() => fn(session))
 }
 
+/** Call a session method and build the respondWith payload (including custom card defs). */
+const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game-session.ts').SessionResponse) => {
+  const session = getSessionForRequest(req)
+  const resp = session.withCtx(() => fn(session))
+  return { resp, result: respondWith(resp, session) }
+}
+
 /** @deprecated Use getSessionForRequest instead. Kept for test compatibility. */
 export const setSession = (s: GameSession) => { userSessions.set('anonymous', s) }
 
@@ -78,10 +85,19 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(JSON.stringify(payload))
 }
 
-const respondWith = (resp: import('./game-session.ts').SessionResponse) => ({
-  ...resp,
-  state: serializeState(resp.state),
-})
+const respondWith = (resp: import('./game-session.ts').SessionResponse, session?: GameSession) => {
+  const result: Record<string, unknown> = {
+    ...resp,
+    state: serializeState(resp.state),
+  }
+  // Include custom card definitions so the frontend can register them
+  // in its card registry — custom cards render identically to built-in cards.
+  if (session) {
+    const defs = session.getCustomCardDefs()
+    if (defs.length > 0) result.customCardDefs = defs
+  }
+  return result
+}
 
 export const handleGameRoute = async (
   req: IncomingMessage,
@@ -93,8 +109,8 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'GET' && req.url === '/api/game/state') {
-    const resp = callSession(req, s => s.getState())
-    sendJson(res, 200, respondWith(resp))
+    const { result } = callAndRespond(req, s => s.getState())
+    sendJson(res, 200, result)
     return true
   }
 
@@ -104,8 +120,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.takeAction(body.playerIndex!, body.spaceId!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.takeAction(body.playerIndex!, body.spaceId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -115,8 +131,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.resolveChoice(body.playerIndex!, body.value!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.resolveChoice(body.playerIndex!, body.value!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -126,8 +142,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.takeAnytimeAction(body.playerIndex!, body.actionId!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.takeAnytimeAction(body.playerIndex!, body.actionId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -137,8 +153,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.confirmAnimalReorg(body.playerIndex!, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1]))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.confirmAnimalReorg(body.playerIndex!, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1]))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -148,38 +164,38 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.confirmHarvestFeed(body.playerIndex!, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1]))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.confirmHarvestFeed(body.playerIndex!, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1]))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
-    const resp = callSession(req, s => s.confirmNextPlayer())
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.confirmNextPlayer())
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
-    const resp = callSession(req, s => s.confirmPlayerSwitch())
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.confirmPlayerSwitch())
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
-    const resp = callSession(req, s => s.performRoundEnd())
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.performRoundEnd())
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo') {
-    const resp = callSession(req, s => s.undoStep())
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.undoStep())
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo-action') {
-    const resp = callSession(req, s => s.undoAction())
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.undoAction())
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -197,8 +213,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    const resp = callSession(req, s => s.loadState(body.state))
-    sendJson(res, 200, respondWith(resp))
+    const { result } = callAndRespond(req, s => s.loadState(body.state))
+    sendJson(res, 200, result)
     return true
   }
 
@@ -208,8 +224,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.startDevFenceSelect(body.playerIndex!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.startDevFenceSelect(body.playerIndex!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -223,8 +239,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.commitFarmChoice(body.playerIndex!, body.farmType!, body.payload!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.commitFarmChoice(body.playerIndex!, body.farmType!, body.payload!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -278,8 +294,8 @@ export const handleGameRoute = async (
       if (typeof body.seed === 'number') seed = body.seed
     } catch { /* no body or invalid JSON — use random seed */ }
     setSessionForRequest(req, new GameSession(seed))
-    const resp = callSession(req, s => s.getState())
-    sendJson(res, 200, respondWith(resp))
+    const { result } = callAndRespond(req, s => s.getState())
+    sendJson(res, 200, result)
     return true
   }
 
@@ -366,16 +382,10 @@ export const handleGameRoute = async (
       },
     )
     setSessionForRequest(req, sandboxSession)
-    const resp = callSession(req, s => s.getState())
-    // Build a map of custom card IDs → types for the client dev panel
-    const customCardTypes: Record<string, string> = {}
-    for (const cc of customCards) {
-      customCardTypes[cc.cardJson.id as string] = cc.cardType
-    }
+    const { result } = callAndRespond(req, s => s.getState())
     sendJson(res, 200, {
-      ...respondWith(resp),
+      ...result,
       customCardsLoaded: customCards.length,
-      customCardTypes,
       cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
     })
     return true
@@ -387,8 +397,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devPlayCard(body.playerIndex!, body.cardId!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devPlayCard(body.playerIndex!, body.cardId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -398,8 +408,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -409,8 +419,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devSetSpaceTaken(body.spaceId!, body.playerId ?? null))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devSetSpaceTaken(body.spaceId!, body.playerId ?? null))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -420,8 +430,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devSetCurrentPlayer(body.playerIndex!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devSetCurrentPlayer(body.playerIndex!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -431,8 +441,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devSetResources(body.playerIndex!, body.resources!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devSetResources(body.playerIndex!, body.resources!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -442,8 +452,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const resp = callSession(req, s => s.devAddRooms(body.playerIndex!, body.rooms!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devAddRooms(body.playerIndex!, body.rooms!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
@@ -453,8 +463,8 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid round' })
       return true
     }
-    const resp = callSession(req, s => s.devSetRound(body.round!))
-    sendJson(res, resp.ok ? 200 : 400, respondWith(resp))
+    const { resp, result } = callAndRespond(req, s => s.devSetRound(body.round!))
+    sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
