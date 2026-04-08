@@ -6,6 +6,7 @@ import { getMajorCardEffect } from '../../../shared/cards/major'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
 import { emptyResources } from '../../../shared/logic/state'
+import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { CardWithCopy } from './CardWithCopy'
 
 export type CardType = 'major' | 'minor' | 'occupation'
@@ -51,7 +52,10 @@ type PlayerCardProps = {
 
 const getCardNumbering = (cardId: string): string => {
   const match = cardId.match(/^([A-E])(\d+)/)
-  return match ? `${match[1]}${match[2].padStart(3, '0')}` : cardId
+  if (match) return `${match[1]}${match[2].padStart(3, '0')}`
+  // Custom cards: O-series numbering (minor O001+, occupation O500+)
+  if (cardId.startsWith('CUSTOM_')) return getCustomCardNumbering(cardId) ?? 'O000'
+  return cardId
 }
 
 const getDeckFromId = (cardId: string): string | undefined => {
@@ -128,37 +132,35 @@ export const PlayerCard = ({
       }
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
-      return minor
-        ? {
-            name: minor.name,
-            description: minor.desc.join('\n'),
-            cost: { ...emptyResources, ...minor.cost },
-            altCosts: minor.altCosts,
-            deck: minor.deck,
-            category: minor.category,
-            vp: minor.vp,
-            prerequisite: minor.prerequisite,
-            players: minor.players,
-            isCookery: minor.isCookery,
-            isBaking: minor.isBaking,
-            passing: minor.passing,
-          }
-        : null
+      if (!minor) return null
+      return {
+        name: minor.name,
+        description: minor.desc.join('\n'),
+        cost: { ...emptyResources, ...minor.cost },
+        altCosts: minor.altCosts,
+        deck: minor.deck,
+        category: minor.category,
+        vp: minor.vp,
+        prerequisite: minor.prerequisite,
+        players: minor.players,
+        isCookery: minor.isCookery,
+        isBaking: minor.isBaking,
+        passing: minor.passing,
+      }
     } else {
       const occupation = getOccupation(cardId)
-      return occupation
-        ? {
-            name: occupation.name,
-            description: occupation.desc.join('\n'),
-            cost: { ...emptyResources, ...occupation.cost },
-            deck: occupation.deck,
-            category: occupation.category,
-            prerequisite: occupation.prerequisite,
-            players: occupation.players,
-            isCookery: occupation.isCookery,
-            isBaking: occupation.isBaking,
-          }
-        : null
+      if (!occupation) return null
+      return {
+        name: occupation.name,
+        description: occupation.desc.join('\n'),
+        cost: { ...emptyResources, ...occupation.cost },
+        deck: occupation.deck,
+        category: occupation.category,
+        prerequisite: occupation.prerequisite,
+        players: occupation.players,
+        isCookery: occupation.isCookery,
+        isBaking: occupation.isBaking,
+      }
     }
   }, [cardId, cardType, locale])
 
@@ -170,6 +172,18 @@ export const PlayerCard = ({
       const pos = getMajorIconPosition(cardId)
       return {
         backgroundPosition: `${pos.x} ${pos.y}`,
+      }
+    }
+    // Custom card art: use the uploaded image URL
+    const customArt = getCustomCardArtUrl(cardId)
+    if (customArt) {
+      // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
+      const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
+      const fullUrl = customArt.startsWith('http') ? customArt : `${apiBase}${customArt}`
+      return {
+        backgroundImage: `url(${fullUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
       }
     }
     const deckMap: Record<string, string> = {

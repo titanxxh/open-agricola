@@ -347,8 +347,8 @@ function RefImagePicker({ cardType, selected, onToggle }: {
 // ── Canvas Art Processing ──────────────────────────────────────────────────────
 
 async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation'): Promise<string> {
-  const SIZE = 300
-  const BORDER = 6
+  const SIZE = 512
+  const BORDER = 8
   const GOLD = '#c9a227'
   const R = SIZE / 2 - BORDER / 2 - 2
 
@@ -367,9 +367,9 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
         if (cardType === 'occupation') {
           ctx.arc(cx, cy, R, 0, Math.PI * 2)
         } else {
-          // Pointy-top hexagon
+          // Flat-top hexagon (matching BGA card sprites)
           for (let i = 0; i < 6; i++) {
-            const angle = (Math.PI / 3) * i - Math.PI / 6
+            const angle = (Math.PI / 3) * i
             const x = cx + R * Math.cos(angle)
             const y = cy + R * Math.sin(angle)
             if (i === 0) ctx.moveTo(x, y)
@@ -470,13 +470,15 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
       const refImages = selectedRefs.length > 0
         ? (await Promise.all(selectedRefs.map(url => refCache?.get(url) ? Promise.resolve(refCache.get(url)!) : fetchRefImage(url)))).filter((r): r is ReferenceImage => r !== null)
         : undefined
-      const dataUrl = await generateCardArt(artPrompt, config, refImages)
-      if (!dataUrl) {
+      const rawDataUrl = await generateCardArt(artPrompt, config, refImages)
+      if (!rawDataUrl) {
         setArtError(locale === 'zh'
           ? '⚠️ 图片生成失败：API 未返回图片数据，请检查 API Key 权限和模型是否支持图片生成'
           : '⚠️ Image generation failed: API returned no image data. Check API key permissions and model support.')
         return
       }
+      // Process through hexagonal/circular gold border clipping
+      const dataUrl = await processCardArt(rawDataUrl, cardType)
       const uploaded = await uploadArt(dataUrl)
       if (!uploaded) {
         setArtError(locale === 'zh'

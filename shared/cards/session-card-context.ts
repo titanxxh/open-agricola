@@ -27,6 +27,7 @@ export type CustomCardData = {
   effectCode?: string | null
   compiledCode?: string | null
   codeManifest?: CustomCodeManifest | null
+  artUrl?: string | null
 }
 
 // ── Session context class ───────────────────────────────────────────────────
@@ -36,6 +37,8 @@ export class SessionCardContext {
   readonly customListeners: CardListenerRegistration[] = []
   readonly customMinors = new Map<string, CardBase>()
   readonly customOccupations = new Map<string, CardBase>()
+  /** Art URLs for custom cards, keyed by card ID. */
+  readonly customArtUrls = new Map<string, string>()
 
   registerEffect(effect: CardEffect): void {
     this.customEffects.set(effect.id, effect)
@@ -46,7 +49,7 @@ export class SessionCardContext {
   }
 
   registerCard(data: CustomCardData): void {
-    const { cardType, cardJson, effectDsl } = data
+    const { cardType, cardJson, effectDsl, artUrl } = data
     const card = cardType === 'minor'
       ? new MinorImprovement(cardJson)
       : new Occupation(cardJson)
@@ -55,6 +58,10 @@ export class SessionCardContext {
       this.customMinors.set(cardJson.id, card)
     } else {
       this.customOccupations.set(cardJson.id, card)
+    }
+
+    if (artUrl) {
+      this.customArtUrls.set(cardJson.id, artUrl)
     }
 
     if (effectDsl) {
@@ -88,6 +95,7 @@ export class SessionCardContext {
     this.customListeners.length = 0
     this.customMinors.clear()
     this.customOccupations.clear()
+    this.customArtUrls.clear()
   }
 }
 

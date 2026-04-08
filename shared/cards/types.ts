@@ -60,6 +60,34 @@ export class CardBase {
       registeredMinorImprovements.set(this.id, this)
     }
   }
+
+  /** Serialize back to a plain CardDefinition for transmission to the frontend. */
+  toJSON(): CardDefinition {
+    const def: CardDefinition = {
+      id: this.id,
+      name: this.name,
+      deck: this.deck,
+      number: this.number,
+      desc: this.desc,
+    }
+    if (this.category) def.category = this.category
+    if (this.cost) def.cost = this.cost
+    if (this.altCosts) def.altCosts = this.altCosts
+    if (this.vp !== undefined) def.vp = this.vp
+    if (this.prerequisite) def.prerequisite = this.prerequisite
+    if (this.isCookery) def.isCookery = this.isCookery
+    if (this.isBaking) def.isBaking = this.isBaking
+    if (this.returnCards) def.returnCards = this.returnCards
+    if (this.occupationPrerequisites) def.occupationPrerequisites = this.occupationPrerequisites
+    if (this.improvementPrerequisites) def.improvementPrerequisites = this.improvementPrerequisites
+    if (this.players) def.players = this.players
+    if (this.passing) def.passing = this.passing
+    if (this.newSet) def.newSet = this.newSet
+    if (this.modifier) def.modifier = this.modifier
+    if (this.modifiers) def.modifiers = this.modifiers
+    if (this.implemented !== undefined) def.implemented = this.implemented
+    return def
+  }
 }
 
 export class MinorImprovement extends CardBase {}

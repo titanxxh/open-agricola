@@ -18,7 +18,7 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   const result: CustomCardData[] = []
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, status, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
       card_type: string
       card_json: string
@@ -26,6 +26,7 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
       effect_code: string | null
       compiled_code: string | null
       code_manifest: string | null
+      art_url: string | null
       status: string; author_id: string
     } | undefined
     if (!row) continue
@@ -39,6 +40,7 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
         effectCode: row.effect_code ?? null,
         compiledCode: row.compiled_code ?? null,
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
+        artUrl: row.art_url ?? null,
       })
     } catch { /* skip malformed */ }
   }
@@ -432,19 +434,26 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message))
 }
 
-const toSyncPayload = (resp: SessionResponse): GameSyncPayload => ({
-  state: serializeState(resp.state),
-  pending: resp.pending,
-  interaction: resp.interaction,
-  scores: resp.scores ?? null,
-  pastureCapacities: resp.pastureCapacities,
-  historyLength: resp.historyLength,
-  hasActionStartSnapshot: resp.hasActionStartSnapshot,
-  ok: resp.ok,
-  actionAvailability: resp.actionAvailability,
-  cardAvailability: resp.cardAvailability,
-  error: resp.error,
-})
+const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPayload => {
+  const payload: GameSyncPayload = {
+    state: serializeState(resp.state),
+    pending: resp.pending,
+    interaction: resp.interaction,
+    scores: resp.scores ?? null,
+    pastureCapacities: resp.pastureCapacities,
+    historyLength: resp.historyLength,
+    hasActionStartSnapshot: resp.hasActionStartSnapshot,
+    ok: resp.ok,
+    actionAvailability: resp.actionAvailability,
+    cardAvailability: resp.cardAvailability,
+    error: resp.error,
+  }
+  if (session) {
+    const defs = session.getCustomCardDefs()
+    if (defs.length > 0) payload.customCardDefs = defs
+  }
+  return payload
+}
 
 const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCause) => {
   room.version += 1
@@ -454,7 +463,7 @@ const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCau
     version: room.version,
     sync: 'snapshot',
     cause,
-    payload: toSyncPayload(resp),
+    payload: toSyncPayload(resp, room.session),
     emittedAt: Date.now(),
   }
   broadcast(room, envelope)
@@ -478,7 +487,7 @@ const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
     version: room.version,
     sync: 'snapshot',
     cause: 'reconnect',
-    payload: toSyncPayload(resp),
+    payload: toSyncPayload(resp, room.session),
     emittedAt: Date.now(),
   }
   sendTo(ws, envelope)

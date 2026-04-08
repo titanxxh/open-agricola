@@ -1,6 +1,13 @@
 import type { InteractionState, PendingAction } from '../game/types'
 import type { SerializedGameState } from '../game/serialization'
 import type { PlayerScoreSummary } from '../logic/scoring'
+import type { CardDefinition } from '../cards/types'
+
+export type CustomCardDef = {
+  cardType: 'minor' | 'occupation'
+  cardJson: CardDefinition
+  artUrl?: string | null
+}
 
 export type GameSyncPayload = {
   state: SerializedGameState
@@ -14,6 +21,8 @@ export type GameSyncPayload = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
+  /** Custom card definitions for frontend registration — treated identically to built-in cards. */
+  customCardDefs?: CustomCardDef[]
 }
 
 export type StateUpdateCause =

@@ -256,6 +256,25 @@ export class GameSession {
     this.sessionCardContext = null
   }
 
+  /**
+   * Export custom card definitions for the frontend.
+   * Returns an array of { cardType, cardJson } for each custom card in this session.
+   * Frontend uses this to register custom cards into its card registry so they
+   * render identically to built-in cards.
+   */
+  getCustomCardDefs(): import('../shared/protocol/game.ts').CustomCardDef[] {
+    if (!this.sessionCardContext) return []
+    const defs: import('../shared/protocol/game.ts').CustomCardDef[] = []
+    const artUrls = this.sessionCardContext.customArtUrls
+    for (const [id, card] of this.sessionCardContext.customMinors) {
+      defs.push({ cardType: 'minor', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
+    }
+    for (const [id, card] of this.sessionCardContext.customOccupations) {
+      defs.push({ cardType: 'occupation', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
+    }
+    return defs
+  }
+
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
     const player = this.state.players[playerIndex]
