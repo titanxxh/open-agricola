@@ -347,8 +347,8 @@ function RefImagePicker({ cardType, selected, onToggle }: {
 // ── Canvas Art Processing ──────────────────────────────────────────────────────
 
 async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation'): Promise<string> {
-  const SIZE = 300
-  const BORDER = 6
+  const SIZE = 512
+  const BORDER = 8
   const GOLD = '#c9a227'
   const R = SIZE / 2 - BORDER / 2 - 2
 
@@ -367,9 +367,9 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
         if (cardType === 'occupation') {
           ctx.arc(cx, cy, R, 0, Math.PI * 2)
         } else {
-          // Pointy-top hexagon
+          // Flat-top hexagon (matching BGA card sprites)
           for (let i = 0; i < 6; i++) {
-            const angle = (Math.PI / 3) * i - Math.PI / 6
+            const angle = (Math.PI / 3) * i
             const x = cx + R * Math.cos(angle)
             const y = cy + R * Math.sin(angle)
             if (i === 0) ctx.moveTo(x, y)
