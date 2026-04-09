@@ -27,6 +27,7 @@ export type CardDefinition = {
   modifier?: CostModifier
   modifiers?: CostModifier[]
   implemented?: boolean
+  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
 const registeredMinorImprovements = new Map<string, CardBase>()
@@ -53,6 +54,7 @@ export class CardBase {
   modifier?: CostModifier
   modifiers?: CostModifier[]
   implemented?: boolean
+  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)
@@ -86,6 +88,7 @@ export class CardBase {
     if (this.modifier) def.modifier = this.modifier
     if (this.modifiers) def.modifiers = this.modifiers
     if (this.implemented !== undefined) def.implemented = this.implemented
+    if (this.locales) def.locales = this.locales
     return def
   }
 }

@@ -315,6 +315,50 @@ export function extractCardFromResponse(text: string): {
 }
 
 /**
+ * Translate card content (name, desc, prerequisite) to a target language.
+ * Uses the player's existing LLM config — calls the LLM directly from the browser.
+ */
+export async function translateCardContent(
+  content: { name: string; desc: string[]; prerequisite?: string },
+  targetLang: string,
+  config: LlmConfig,
+): Promise<{ name: string; desc: string[]; prerequisite?: string }> {
+  const langLabel = targetLang === 'en' ? 'English' : targetLang === 'zh' ? '中文' : targetLang
+  const prompt = `Translate the following Agricola board game card content to ${langLabel}. Return ONLY a JSON object with the translated fields, no explanation or markdown.
+
+Input:
+${JSON.stringify(content, null, 2)}
+
+Output format:
+{"name": "translated name", "desc": ["translated line 1", "translated line 2"], "prerequisite": "translated prerequisite or omit if empty"}
+
+Important:
+- Keep resource tags like <WOOD>, <FOOD>, <GRAIN> etc. unchanged
+- Keep game terminology accurate for board games
+- Return valid JSON only, no markdown code fences`
+
+  const messages: ChatMessage[] = [{ role: 'user', content: prompt }]
+  let full = ''
+  for await (const chunk of streamChat(messages, 'You are a professional translator for board game content.', config)) {
+    full += chunk
+  }
+
+  // Strip markdown code fences if present
+  const cleaned = full.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+  let parsed: { name: string; desc: string[]; prerequisite?: string }
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    throw new Error(`Translation failed: LLM returned invalid JSON`)
+  }
+  return {
+    name: parsed.name ?? content.name,
+    desc: Array.isArray(parsed.desc) ? parsed.desc : content.desc,
+    prerequisite: parsed.prerequisite ?? undefined,
+  }
+}
+
+/**
  * Parse card metadata from TypeScript source code.
  */
 function parseCardFromTs(code: string): {
@@ -342,7 +386,15 @@ function parseCardFromTs(code: string): {
 
   // Parse fields from the object literal
   const name = extractStringField(objStr, 'name') ?? cardId
-  const desc = extractArrayField(objStr, 'desc') ?? []
+  const descRaw = extractArrayField(objStr, 'desc') ?? []
+  const desc = descRaw.filter(line => {
+    const trimmed = line.trim()
+    // Filter out Chinese prerequisite patterns
+    if (/^前置条件[：:]/.test(trimmed)) return false
+    // Filter out English prerequisite patterns
+    if (/^[Pp]rerequisite[s]?\s*[：:]/i.test(trimmed)) return false
+    return true
+  })
   const vp = extractNumberField(objStr, 'vp') ?? 0
   const cost = extractObjectField(objStr, 'cost') ?? {}
   const modifiers = extractModifiers(objStr)
