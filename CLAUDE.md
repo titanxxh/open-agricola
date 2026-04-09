@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Open Agricola — an online implementation of the Agricola board game using React + TypeScript + Vite (frontend) and a Node.js WebSocket/HTTP server (backend). Backend-authoritative architecture with real-time multiplayer sync.
+Open Agricola — an online implementation of the Agricola board game using React + TypeScript + Vite (frontend) and a Node.js WebSocket/HTTP server (backend). Backend-authoritative architecture with real-time multiplayer sync. Includes a card workshop with LLM-assisted card design and user authentication.
 
 ## Commands
 
@@ -20,13 +20,13 @@ npm run server   # Backend on port 5175
 npm run dev      # Frontend on port 5173
 
 # Tests
-npm test                # Vitest unit tests (~295 cases, excludes e2e and scripts/)
+npm test                # Vitest unit tests (~631 cases, excludes e2e and scripts/)
 npm run test:e2e        # Playwright E2E tests (requires running server + frontend)
 npx vitest run tests/path/to/file.spec.ts   # Run a single test file
 
 # Lint & build
-npm run lint            # ESLint
-npm run build           # tsc + vite build (may fail on strict TS errors in test files; doesn't affect dev/server)
+npm run lint            # ESLint (~340 pre-existing any-type warnings, not blocking)
+npm run build           # tsc + vite build (warnings about /bga-img/* are cosmetic)
 ```
 
 ## Architecture
@@ -101,6 +101,21 @@ Actions are auto-discovered from per-effect files in `shared/actions/effects/*.t
 
 `RoomManager` (server/room-manager.ts) maintains `Map<roomId, Room>`. Each room has an independent `GameSession`. A persistent dev room (ID `dev`, configurable via `PERSISTENT_ROOM_ID`) survives backend restarts via JSON state files in `output/`.
 
+### Custom Cards & Workshop
+
+- `shared/cards/custom-registry.ts` — Runtime custom card registration
+- `shared/cards/custom-dsl-runner.ts` — DSL → ActionFlow (whitelisted actions only)
+- Workshop UI at `src/app/WorkshopPage.tsx` with LLM-assisted card design (`src/app/workshop/AiCardDesigner.tsx`)
+- Card art uploaded to `/api/workshop/art`, served from `/card-art/`
+- LLM API keys stored **only** in browser `localStorage` — server never sees them
+
+### Authentication & Persistence
+
+- User auth via `/api/auth/*` endpoints (register, login, logout, session validation)
+- `AuthContext.tsx` provides auth state and `apiFetch()` helper
+- Room persistence: `PERSIST_ROOMS=sqlite` uses SQLite (`DB_PATH=./data/open-agricola.db`), default is JSON files
+- `ALLOW_ANONYMOUS_WS=true` skips WS auth (default in dev)
+
 ### TypeScript & Build
 
 Three tsconfig projects: `tsconfig.app.json` (frontend + shared), `tsconfig.server.json`, `tsconfig.node.json`. No path aliases — all imports use relative paths. Vite serves BGA card images via a plugin reading from `BGA_IMAGE_DIR` (defaults to `../bga-agricola/img`); missing images only affect display, not rules.
@@ -127,6 +142,7 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 - **Default to 2-player games** in tests.
 - **Commit messages**: `feat:`, `fix:`, `refactor:` prefixes. English only.
 - **After code changes**: Run `npm test` to verify. Update relevant docs (`docs/IMPLEMENTATION_STATUS.md`, `docs/ENGINE_ARCHITECTURE.md`, `docs/cards_impl.md`, `docs/card_progress.md`).
+- **BGA reference**: For uncertain implementations, consult `output/bga-agricola` (the upstream BGA Agricola reference, gitignored) unless `docs/ENGINE_ARCHITECTURE.md` specifies a different design.
 
 ## URL Parameters (for manual testing)
 
@@ -140,76 +156,6 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 ?page=login         # Force login page (default: lobby when authenticated)
 ?page=workshop      # Open workshop
 ```
-
-## Platform Architecture (platform branch)
-
-The `platform` branch extends the game engine with full user/workshop support.
-
-### New Environment Variables
-
-```bash
-PERSIST_ROOMS=sqlite         # Use SQLite for room persistence (default: json files)
-ALLOW_ANONYMOUS_WS=true      # Skip WS auth (default: true in dev, false in production)
-DB_PATH=./data/open-agricola.db  # SQLite file path
-CARD_ART_DIR=./data/card-art     # Generated card art storage
-```
-
-### New API Routes
-
-```
-POST /api/auth/register       Register new user
-POST /api/auth/login          Login → returns session token
-POST /api/auth/logout         Invalidate session
-GET  /api/auth/me             Validate current session
-
-GET  /api/lobby/my-rooms      User's active rooms (SQLite mode)
-GET  /api/rooms               Live in-memory rooms
-
-GET  /api/workshop/cards      Browse published cards (paginated)
-POST /api/workshop/cards      Create/update card
-GET  /api/workshop/cards/:id  Card detail
-DELETE /api/workshop/cards/:id  Delete own card
-POST /api/workshop/cards/:id/like    Toggle like
-GET/POST /api/workshop/cards/:id/comments  Comments
-GET/POST/DELETE /api/workshop/sandbox      Sandbox management
-POST /api/workshop/art        Upload card art (base64 → file)
-
-GET  /card-art/:filename      Serve card art static files
-POST /api/game/new-sandbox    Start single-player game with workshop cards
-```
-
-### New Shared Modules
-
-- `shared/cards/custom-registry.ts` — Runtime custom card registration
-- `shared/cards/custom-dsl-runner.ts` — DSL → ActionFlow (whitelisted actions only)
-- `shared/protocol/ws.ts` — Added `auth` command, `authOk` event, `customCardIds` in `createRoom`
-
-### New Frontend Structure
-
-```
-src/
-  contexts/AuthContext.tsx      Auth state, apiFetch() helper
-  app/
-    PageRouter.tsx              ?page= URL routing
-    LoginPage.tsx               Register / login
-    LobbyPage.tsx               Lobby with room management
-    WorkshopPage.tsx            Card workshop (browse/edit/sandbox)
-    workshop/
-      AiCardDesigner.tsx        LLM chat + DALL-E art (API key stays in browser)
-  services/
-    llmService.ts               OpenAI/Anthropic streaming, art generation
-    llmPrompts.ts               System prompt + few-shot examples
-  components/common/
-    ResourceText.tsx            Parse <WOOD> tags → resource icons
-```
-
-### LLM Card Designer Security Model
-
-- API keys stored **only** in `localStorage('open-agricola-llm-config')`
-- All LLM requests are direct browser→provider CORS fetches
-- The game server **never** sees API keys
-- Generated cards are saved as DSL (no arbitrary code execution in V1)
-- Card art (base64) is uploaded to `/api/workshop/art` and served from `/card-art/`
 
 ## gstack
 
