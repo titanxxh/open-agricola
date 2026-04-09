@@ -76,10 +76,14 @@ All 9 active E2E specs in `e2e-tests/` are refactored:
 - Delete inline `postJson`, `getJson`, `screenshot`/`shot`, `saveState`, `giveResource`, `advanceRound` definitions
 - Import from `./fixtures`
 
+**Update `playwright.config.ts` `baseURL` to use env var:**
+- Change `baseURL` from hard-coded `'http://localhost:5173'` to `process.env.FRONTEND_URL ?? 'http://localhost:5173'`
+- This is Playwright's official recommended approach — `page.goto('/')` and relative paths will resolve against `baseURL`, which stays in sync with `FRONTEND_URL`
+- Tests should use `page.goto('/')` or relative paths for frontend navigation (resolved via `baseURL`), and `BACKEND_URL` from fixtures for API calls
+
 **What stays unchanged:**
 - All test logic, assertions, and selectors
 - `playwright.config.ts` core settings (timeout 120s, viewport 1920x1080, headless, `testDir: './e2e-tests'`)
-- `baseURL: 'http://localhost:5173'` in Playwright config (used by `page.goto('/')` style navigation)
 - The `.bak` file is left as-is (not active)
 
 ## Constraints
