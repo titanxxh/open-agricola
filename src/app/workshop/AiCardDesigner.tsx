@@ -1113,7 +1113,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
 
   const handleSaveCard = async () => {
     const dbId = await saveCardToWorkshop()
-    if (dbId) { setCurrentCardDbId(dbId); refreshMyCards(); onSaved?.() }
+    if (dbId) { setCurrentCardDbId(dbId); refreshMyCards() }
   }
 
   const handleSaveAndAddToSandbox = async () => {
