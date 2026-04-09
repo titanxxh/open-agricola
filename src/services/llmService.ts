@@ -342,7 +342,15 @@ function parseCardFromTs(code: string): {
 
   // Parse fields from the object literal
   const name = extractStringField(objStr, 'name') ?? cardId
-  const desc = extractArrayField(objStr, 'desc') ?? []
+  const descRaw = extractArrayField(objStr, 'desc') ?? []
+  const desc = descRaw.filter(line => {
+    const trimmed = line.trim()
+    // Filter out Chinese prerequisite patterns
+    if (/^前置条件[：:]/.test(trimmed)) return false
+    // Filter out English prerequisite patterns
+    if (/^[Pp]rerequisite[s]?\s*[：:]/i.test(trimmed)) return false
+    return true
+  })
   const vp = extractNumberField(objStr, 'vp') ?? 0
   const cost = extractObjectField(objStr, 'cost') ?? {}
   const modifiers = extractModifiers(objStr)

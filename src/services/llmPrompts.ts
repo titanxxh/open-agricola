@@ -49,6 +49,7 @@ const card = new MinorImprovement({
 - CARD_ID 必须以 "CUSTOM_" 开头，英文驼峰
 - deck 固定 'CUSTOM'，number 固定 0，implemented 固定 true
 - 即使只做小修改，也要重新输出完整代码
+- ❌ 禁止在 desc 数组中包含前置条件信息（如"前置条件：2 张职业卡"）——前置条件已在卡牌左上角单独显示
 
 ## Agricola 游戏规则速览
 
