@@ -27,6 +27,7 @@ export type CardDefinition = {
   modifier?: CostModifier
   modifiers?: CostModifier[]
   implemented?: boolean
+  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
 const registeredMinorImprovements = new Map<string, CardBase>()

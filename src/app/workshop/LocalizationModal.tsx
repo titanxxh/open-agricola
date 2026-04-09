@@ -84,6 +84,8 @@ export function LocalizationModal({
         desc: targetDesc.split('\n').filter(l => l.trim()),
         ...(targetPrerequisite.trim() ? { prerequisite: targetPrerequisite.trim() } : {}),
       }
+    } else {
+      delete updated[targetLang]
     }
     // Also store the current language content
     updated[currentLang] = {
@@ -131,6 +133,7 @@ export function LocalizationModal({
               className="localization-lang-select"
               value={targetLang}
               onChange={e => handleLangChange(e.target.value)}
+              disabled={translating}
             >
               {availableLangs.map(l => (
                 <option key={l} value={l}>{langLabel(l)}</option>

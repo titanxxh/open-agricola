@@ -345,7 +345,12 @@ Important:
 
   // Strip markdown code fences if present
   const cleaned = full.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
-  const parsed = JSON.parse(cleaned) as { name: string; desc: string[]; prerequisite?: string }
+  let parsed: { name: string; desc: string[]; prerequisite?: string }
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    throw new Error(`Translation failed: LLM returned invalid JSON`)
+  }
   return {
     name: parsed.name ?? content.name,
     desc: Array.isArray(parsed.desc) ? parsed.desc : content.desc,
