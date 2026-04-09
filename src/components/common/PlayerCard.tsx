@@ -133,8 +133,7 @@ export const PlayerCard = ({
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
       if (!minor) return null
-      const loc = (minor as Record<string, unknown>).locales as Record<string, { name: string; desc: string[]; prerequisite?: string }> | undefined
-      const locContent = loc?.[locale]
+      const locContent = minor.locales?.[locale]
       return {
         name: locContent?.name ?? minor.name,
         description: (locContent?.desc ?? minor.desc).join('\n'),
@@ -152,8 +151,7 @@ export const PlayerCard = ({
     } else {
       const occupation = getOccupation(cardId)
       if (!occupation) return null
-      const loc = (occupation as Record<string, unknown>).locales as Record<string, { name: string; desc: string[]; prerequisite?: string }> | undefined
-      const locContent = loc?.[locale]
+      const locContent = occupation.locales?.[locale]
       return {
         name: locContent?.name ?? occupation.name,
         description: (locContent?.desc ?? occupation.desc).join('\n'),
