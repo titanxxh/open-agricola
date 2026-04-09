@@ -359,10 +359,9 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ onSaved, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
-  onSaved: () => void
   onCancel: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
@@ -378,7 +377,6 @@ function CardEditor({ onSaved, onCancel, onAddToSandboxAndRestart, sandboxErrors
       <AiCardDesigner
         onImport={handleAiImport}
         onClose={onCancel}
-        onSaved={onSaved}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
         onSandboxErrorsConsumed={onSandboxErrorsConsumed}
@@ -1091,11 +1089,6 @@ export function WorkshopPage() {
         <CardEditor
           initial={editCard}
           token={token}
-          onSaved={() => {
-            setEditCard(undefined)
-            setView('home')
-            refreshAllSections()
-          }}
           onCancel={() => {
             setEditCard(undefined)
             setView(prevView.current)

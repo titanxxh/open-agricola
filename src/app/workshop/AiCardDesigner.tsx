@@ -920,10 +920,9 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
-  onSaved?: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
@@ -1346,7 +1345,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
           currentContent={{
             name: extracted?.card?.name ?? cardName,
             desc: extracted?.card?.desc ?? [],
-            prerequisite: extracted?.card?.prerequisite ?? prerequisite || undefined,
+            prerequisite: extracted?.card?.prerequisite ?? (prerequisite || undefined),
           }}
           currentLang={locale}
           locales={cardLocales}
