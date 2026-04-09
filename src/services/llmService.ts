@@ -315,6 +315,45 @@ export function extractCardFromResponse(text: string): {
 }
 
 /**
+ * Translate card content (name, desc, prerequisite) to a target language.
+ * Uses the player's existing LLM config — calls the LLM directly from the browser.
+ */
+export async function translateCardContent(
+  content: { name: string; desc: string[]; prerequisite?: string },
+  targetLang: string,
+  config: LlmConfig,
+): Promise<{ name: string; desc: string[]; prerequisite?: string }> {
+  const langLabel = targetLang === 'en' ? 'English' : targetLang === 'zh' ? '中文' : targetLang
+  const prompt = `Translate the following Agricola board game card content to ${langLabel}. Return ONLY a JSON object with the translated fields, no explanation or markdown.
+
+Input:
+${JSON.stringify(content, null, 2)}
+
+Output format:
+{"name": "translated name", "desc": ["translated line 1", "translated line 2"], "prerequisite": "translated prerequisite or omit if empty"}
+
+Important:
+- Keep resource tags like <WOOD>, <FOOD>, <GRAIN> etc. unchanged
+- Keep game terminology accurate for board games
+- Return valid JSON only, no markdown code fences`
+
+  const messages: ChatMessage[] = [{ role: 'user', content: prompt }]
+  let full = ''
+  for await (const chunk of streamChat(messages, 'You are a professional translator for board game content.', config)) {
+    full += chunk
+  }
+
+  // Strip markdown code fences if present
+  const cleaned = full.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+  const parsed = JSON.parse(cleaned) as { name: string; desc: string[]; prerequisite?: string }
+  return {
+    name: parsed.name ?? content.name,
+    desc: Array.isArray(parsed.desc) ? parsed.desc : content.desc,
+    prerequisite: parsed.prerequisite ?? undefined,
+  }
+}
+
+/**
  * Parse card metadata from TypeScript source code.
  */
 function parseCardFromTs(code: string): {

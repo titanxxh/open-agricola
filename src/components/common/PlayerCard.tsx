@@ -133,15 +133,17 @@ export const PlayerCard = ({
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
       if (!minor) return null
+      const loc = (minor as Record<string, unknown>).locales as Record<string, { name: string; desc: string[]; prerequisite?: string }> | undefined
+      const locContent = loc?.[locale]
       return {
-        name: minor.name,
-        description: minor.desc.join('\n'),
+        name: locContent?.name ?? minor.name,
+        description: (locContent?.desc ?? minor.desc).join('\n'),
         cost: { ...emptyResources, ...minor.cost },
         altCosts: minor.altCosts,
         deck: minor.deck,
         category: minor.category,
         vp: minor.vp,
-        prerequisite: minor.prerequisite,
+        prerequisite: locContent?.prerequisite ?? minor.prerequisite,
         players: minor.players,
         isCookery: minor.isCookery,
         isBaking: minor.isBaking,
@@ -150,13 +152,15 @@ export const PlayerCard = ({
     } else {
       const occupation = getOccupation(cardId)
       if (!occupation) return null
+      const loc = (occupation as Record<string, unknown>).locales as Record<string, { name: string; desc: string[]; prerequisite?: string }> | undefined
+      const locContent = loc?.[locale]
       return {
-        name: occupation.name,
-        description: occupation.desc.join('\n'),
+        name: locContent?.name ?? occupation.name,
+        description: (locContent?.desc ?? occupation.desc).join('\n'),
         cost: { ...emptyResources, ...occupation.cost },
         deck: occupation.deck,
         category: occupation.category,
-        prerequisite: occupation.prerequisite,
+        prerequisite: locContent?.prerequisite ?? occupation.prerequisite,
         players: occupation.players,
         isCookery: occupation.isCookery,
         isBaking: occupation.isBaking,

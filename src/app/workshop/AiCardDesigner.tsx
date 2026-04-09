@@ -7,6 +7,7 @@ import {
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
+import { LocalizationModal } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
 import { API_BASE } from '../../config'
@@ -945,6 +946,8 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
   const [autoSaveFlash, setAutoSaveFlash] = useState(false)
   const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showLocalizationModal, setShowLocalizationModal] = useState(false)
+  const [cardLocales, setCardLocales] = useState<Record<string, { name: string; desc: string[]; prerequisite?: string }>>({})
 
   // Pre-fetch 3 random minor + 3 random occupation reference images on mount
   useEffect(() => {
@@ -1059,6 +1062,7 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
           prerequisite: prerequisite || undefined,
           costInput: costInput || undefined,
         },
+        ...(Object.keys(cardLocales).length > 0 ? { locales: cardLocales } : {}),
       }
 
       const body: Record<string, unknown> = {
@@ -1160,6 +1164,9 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
       effects: apiCard.effect_dsl ?? undefined,
       sourceCode: apiCard.effect_code ?? undefined,
     })
+    // Restore locales from card_json
+    const savedLocales = (cj.locales ?? {}) as Record<string, { name: string; desc: string[]; prerequisite?: string }>
+    setCardLocales(savedLocales)
   }
 
   return (
@@ -1265,6 +1272,14 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
                 {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
               </button>
             )}
+            <button
+              type="button"
+              className="btn-primary ai-save-card-btn"
+              onClick={() => setShowLocalizationModal(true)}
+              disabled={!cardName.trim()}
+            >
+              {locale === 'zh' ? '本地化' : 'Localize'}
+            </button>
           </div>
 
           {/* Completeness + auto-save status */}
@@ -1326,6 +1341,22 @@ export function AiCardDesigner({ onImport, onClose, onSaved, onAddToSandboxAndRe
             />
           </div>
 
+      {showLocalizationModal && (
+        <LocalizationModal
+          currentContent={{
+            name: extracted?.card?.name ?? cardName,
+            desc: extracted?.card?.desc ?? [],
+            prerequisite: extracted?.card?.prerequisite ?? prerequisite || undefined,
+          }}
+          currentLang={locale}
+          locales={cardLocales}
+          onSave={(updatedLocales) => {
+            setCardLocales(updatedLocales)
+            setShowLocalizationModal(false)
+          }}
+          onClose={() => setShowLocalizationModal(false)}
+        />
+      )}
       {error && <div className="form-error ai-error" style={{ whiteSpace: 'pre-wrap' }}>{error}</div>}
     </div>
   )
