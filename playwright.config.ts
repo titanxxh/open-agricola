@@ -7,7 +7,7 @@ export default defineConfig({
   use: {
     headless: true,
     viewport: { width: 1920, height: 1080 },
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   },
   outputDir: './output/playwright',
 })
