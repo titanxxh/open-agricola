@@ -1,24 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { spawn } from 'child_process';
-
-let backendProcess;
-let frontendProcess;
-
-test.beforeAll(async () => {
-  backendProcess = spawn('npm', ['run', 'server'], { stdio: 'ignore' });
-  frontendProcess = spawn('npm', ['run', 'dev'], { stdio: 'ignore' });
-  await new Promise(r => setTimeout(r, 3000));
-});
-
-test.afterAll(async () => {
-  backendProcess?.kill();
-  frontendProcess?.kill();
-});
 
 test.describe('Harvest Phase Order Tests', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
     const devModeCheckbox = page.getByRole('checkbox', { name: /developer|开发者/i });
     if (!(await devModeCheckbox.isChecked())) {
       await devModeCheckbox.check();
@@ -26,8 +11,8 @@ test.describe('Harvest Phase Order Tests', () => {
   });
 
   test('harvest phase executes in correct order: field -> feed -> breed', async ({ page }) => {
-    await page.goto('http://localhost:5173/?player=p1');
-    
+    await page.goto('/?player=p1');
+
     const devModeCheckbox = page.getByRole('checkbox', { name: /developer|开发者/i });
     if (!(await devModeCheckbox.isChecked())) {
       await devModeCheckbox.check();
@@ -58,7 +43,7 @@ test.describe('Harvest Phase Order Tests', () => {
     ]);
 
     for (let i = 0; i < 2; i++) {
-      await pages[i].goto(`http://localhost:5173/?player=p${i + 1}`);
+      await pages[i].goto(`/?player=p${i + 1}`);
       const devModeCheckbox = pages[i].getByRole('checkbox', { name: /developer|开发者/i });
       if (!(await devModeCheckbox.isChecked())) {
         await devModeCheckbox.check();
@@ -66,7 +51,7 @@ test.describe('Harvest Phase Order Tests', () => {
     }
 
     const p1 = pages[0];
-    
+
     const roundInput = p1.getByText(/target round|目标回合/i).locator('xpath=..').getByRole('spinbutton');
     await roundInput.fill('4');
     await p1.getByRole('button', { name: /jump|快进/i }).click();
@@ -86,8 +71,8 @@ test.describe('Harvest Phase Order Tests', () => {
   });
 
   test('feeding phase handles multiple players needing conversion', async ({ page }) => {
-    await page.goto('http://localhost:5173/?player=p1');
-    
+    await page.goto('/?player=p1');
+
     const devModeCheckbox = page.getByRole('checkbox', { name: /developer|开发者/i });
     if (!(await devModeCheckbox.isChecked())) {
       await devModeCheckbox.check();
@@ -121,8 +106,8 @@ test.describe('Harvest Phase Order Tests', () => {
   });
 
   test('breeding phase only starts after all players fed', async ({ page }) => {
-    await page.goto('http://localhost:5173/?player=p1');
-    
+    await page.goto('/?player=p1');
+
     const devModeCheckbox = page.getByRole('checkbox', { name: /developer|开发者/i });
     if (!(await devModeCheckbox.isChecked())) {
       await devModeCheckbox.check();
