@@ -243,6 +243,7 @@ export const GameContainerApi = () => {
       setDevPlayerId(state.players[state.currentPlayerIndex]?.id ?? '')
     }
   }, [state?.currentPlayerIndex, viewPlayerId])
+
   const {
     pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
@@ -300,7 +301,11 @@ export const GameContainerApi = () => {
     ? state?.players.find((p) => p.id === lockedViewPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
-  const displayPlayer = (viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null
+  // In WS mode, viewPlayerId lets you peek at another player's board.
+  // In HTTP (sandbox) mode, display follows the current player so the panel switches on turn change.
+  const displayPlayer = isWs
+    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const activePlayer = interaction.stateId === 'confirmPlayerSwitch'
     ? state?.players[interaction.fromPlayerIndex] ?? currentPlayer
     : ('playerIndex' in interaction && typeof interaction.playerIndex === 'number')
@@ -1439,11 +1444,9 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      {!isEmbedded && (
-        <GameHeader locale={locale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
-          onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
-        />
-      )}
+      <GameHeader locale={locale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+      />
 
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}
