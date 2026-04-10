@@ -4878,7 +4878,7 @@
 }
 
 .app--embedded .header-compact {
-  display: none;
+  /* header is now shown in sandbox/embedded mode for scoring + undo controls */
 }
 
 .sandbox-embed-tips {

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { ResourceText } from '../components/common/ResourceText'
 import { API_BASE } from '../config'
 
@@ -1329,6 +1330,7 @@ function WorkshopNav({
             {t('platform.backToWorkshopHome')}
           </button>
         )}
+        <LocaleSwitcher />
       </div>
     </div>
   )

@@ -222,7 +222,7 @@ export const GameContainerApi = () => {
   const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
-  const { locale, setLocale } = useLocale()
+  const { locale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => currentUrlParams.get('devMode') === '1')
@@ -243,6 +243,7 @@ export const GameContainerApi = () => {
       setDevPlayerId(state.players[state.currentPlayerIndex]?.id ?? '')
     }
   }, [state?.currentPlayerIndex, viewPlayerId])
+
   const {
     pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
@@ -294,24 +295,28 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
-  const selfPlayer = lockedViewPlayerId
+  // In WS mode, selfPlayer is locked to the URL ?player= param.
+  // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
+  const selfPlayer = isWs && lockedViewPlayerId
     ? state?.players.find((p) => p.id === lockedViewPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
-  const displayPlayer = (viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null
+  // In WS mode, viewPlayerId lets you peek at another player's board.
+  // In HTTP (sandbox) mode, display follows the current player so the panel switches on turn change.
+  const displayPlayer = isWs
+    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const activePlayer = interaction.stateId === 'confirmPlayerSwitch'
     ? state?.players[interaction.fromPlayerIndex] ?? currentPlayer
     : ('playerIndex' in interaction && typeof interaction.playerIndex === 'number')
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
-  const isInteractive = !!(
-    activePlayer &&
-    selfPlayer &&
-    displayPlayer &&
-    activePlayer.id === selfPlayer.id &&
-    displayPlayer.id === selfPlayer.id
-  )
+  // In HTTP (non-WS) mode, one human controls all players — always interactive
+  const isInteractive = isWs
+    ? !!(activePlayer && selfPlayer && displayPlayer &&
+         activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
+    : !!(activePlayer && displayPlayer)
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -1439,11 +1444,9 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      {!isEmbedded && (
-        <GameHeader locale={locale} setLocale={setLocale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
-          onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
-        />
-      )}
+      <GameHeader locale={locale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
+        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
+      />
 
       <AnytimeBar
         anytimeActions={interaction.anytimeActions}

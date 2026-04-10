@@ -2355,10 +2355,12 @@ export class GameSession {
     if (!player) return this.respond(false, 'player not found')
     const isOccupation = this.isOccupationCard(cardId)
     if (isOccupation) {
+      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
       if (!player.occupationPlayed.includes(cardId)) {
         player.occupationPlayed.push(cardId)
       }
     } else {
+      player.minorHand = player.minorHand.filter((id) => id !== cardId)
       if (!player.minorPlayed.includes(cardId)) {
         player.minorPlayed.push(cardId)
       }

@@ -43,9 +43,8 @@ function ensureWorker(): Worker {
   if (worker) return worker
 
   const w = new Worker(WORKER_SCRIPT, {
-    // tsx doesn't automatically register its loader in Worker Threads.
-    // Pass --import tsx/esm so the worker can load .ts files.
-    execArgv: ['--import', 'tsx/esm'],
+    // Node 22+ can strip TypeScript type annotations natively.
+    execArgv: ['--experimental-strip-types', '--no-warnings'],
     // Worker-level resource limits as an extra safety net
     resourceLimits: {
       maxOldGenerationSizeMb: 64,
