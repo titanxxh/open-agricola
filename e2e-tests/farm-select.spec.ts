@@ -1,53 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { spawn } from 'child_process';
-import type { Page } from '@playwright/test';
-
-let backendProcess: ReturnType<typeof spawn>;
-let frontendProcess: ReturnType<typeof spawn>;
-
-test.beforeAll(async () => {
-  // Start backend
-  backendProcess = spawn('npm', ['run', 'server'], { stdio: 'ignore' });
-  // Start frontend
-  frontendProcess = spawn('npm', ['run', 'dev'], { stdio: 'ignore' });
-
-  // Wait for servers to be ready
-  await new Promise(r => setTimeout(r, 3000));
-});
-
-test.afterAll(async () => {
-  backendProcess?.kill();
-  frontendProcess?.kill();
-});
-
-// Helper: give resource via dev panel
-async function giveResource(page: Page, resource: string, amount: number) {
-  const devSection = page.locator('.dev-panel .dev-section');
-  const firstRow = devSection.locator('.dev-row').first();
-  const resourceSelect = firstRow.locator('select');
-  await resourceSelect.selectOption({ value: resource });
-  const amountInput = firstRow.locator('input[type="number"]');
-  await amountInput.fill(String(amount));
-  const applyBtn = firstRow.locator('button');
-  await applyBtn.click();
-  await page.waitForTimeout(300);
-}
-
-// Helper: advance to target round via dev panel
-async function advanceRound(page: Page, targetRound: number) {
-  const devSection = page.locator('.dev-panel .dev-section');
-  const roundRow = devSection.locator('.dev-row').nth(1);
-  const roundInput = roundRow.locator('input[type="number"]');
-  await roundInput.fill(String(targetRound));
-  const advanceBtn = roundRow.locator('button');
-  await advanceBtn.click();
-  await page.waitForTimeout(500);
-}
+import { giveResource, advanceRound } from './fixtures';
 
 test.describe('FarmSelect Interactions End-to-End Tests', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:5173/?player=p1');
+    await page.goto('/?player=p1');
     // Dev mode is enabled by default
     await page.waitForTimeout(500);
   });
