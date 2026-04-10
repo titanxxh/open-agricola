@@ -1,22 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { mkdirSync, writeFileSync } from 'fs'
-import path from 'path'
-
-const OUTPUT_DIR = path.resolve(process.cwd(), 'output/ws-e2e')
-const FRONTEND = 'http://localhost:5173'
+import { saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
 
 test.use({ viewport: { width: 1920, height: 1080 } })
-
-const shot = async (page: import('@playwright/test').Page, name: string) => {
-  mkdirSync(OUTPUT_DIR, { recursive: true })
-  await page.screenshot({ path: path.join(OUTPUT_DIR, `${name}.png`), fullPage: false })
-  console.log(`[Screenshot] ${name}`)
-}
-
-const saveState = (name: string, data: unknown) => {
-  mkdirSync(OUTPUT_DIR, { recursive: true })
-  writeFileSync(path.join(OUTPUT_DIR, `${name}.json`), JSON.stringify(data, null, 2))
-}
 
 test.describe('WS dual-player sync', () => {
   test('full game flow: create room, sync actions, confirm next player, undo', async ({ browser }) => {
@@ -29,9 +14,9 @@ test.describe('WS dual-player sync', () => {
 
     // Step 1: P1 creates room
     console.log('\n=== Step 1: P1 creates room ===')
-    await p1.goto(`${FRONTEND}/?player=p1&transport=ws`)
+    await p1.goto(`${FRONTEND_URL}/?player=p1&transport=ws`)
     await p1.waitForSelector('text=waiting for other player', { timeout: 15000 })
-    await shot(p1, '01-p1-waiting')
+    await saveScreenshot(p1, '01-p1-waiting')
 
     const bodyText = await p1.textContent('body')
     const roomMatch = bodyText?.match(/Room\s+(\w+)/)
@@ -41,13 +26,13 @@ test.describe('WS dual-player sync', () => {
 
     // Step 2: P2 joins room
     console.log('\n=== Step 2: P2 joins room ===')
-    await p2.goto(`${FRONTEND}/?player=p2&transport=ws`)
+    await p2.goto(`${FRONTEND_URL}/?player=p2&transport=ws`)
 
     await p1.waitForSelector('.board', { timeout: 15000 })
     await p2.waitForSelector('.board', { timeout: 15000 })
     console.log('Both boards loaded')
-    await shot(p1, '02-p1-board')
-    await shot(p2, '02-p2-board')
+    await saveScreenshot(p1, '02-p1-board')
+    await saveScreenshot(p2, '02-p2-board')
 
     // Step 3: P1 takes action (Forest) -> P2 sees taken
     console.log('\n=== Step 3: P1 action -> P2 sync ===')
@@ -63,8 +48,8 @@ test.describe('WS dual-player sync', () => {
     const p2TakenAfter = await p2.locator('button.action-card.taken').count()
     console.log(`P2 taken: ${p2TakenBefore} -> ${p2TakenAfter}`)
     expect(p2TakenAfter).toBeGreaterThan(p2TakenBefore)
-    await shot(p1, '03-p1-after-action')
-    await shot(p2, '03-p2-after-action')
+    await saveScreenshot(p1, '03-p1-after-action')
+    await saveScreenshot(p2, '03-p2-after-action')
 
     // Step 4: Confirm next player -> P2 becomes current
     console.log('\n=== Step 4: Confirm next player ===')
@@ -78,8 +63,8 @@ test.describe('WS dual-player sync', () => {
     } else {
       console.log('No confirm button visible, skipping')
     }
-    await shot(p1, '04-p1-after-confirm')
-    await shot(p2, '04-p2-after-confirm')
+    await saveScreenshot(p1, '04-p1-after-confirm')
+    await saveScreenshot(p2, '04-p2-after-confirm')
 
     // Step 5: P2 takes action -> P1 sees sync
     console.log('\n=== Step 5: P2 action -> P1 sync ===')
@@ -100,8 +85,8 @@ test.describe('WS dual-player sync', () => {
     } else {
       console.log('P2 has no enabled actions (not current player), skipping')
     }
-    await shot(p1, '05-p1-after-p2-action')
-    await shot(p2, '05-p2-after-p2-action')
+    await saveScreenshot(p1, '05-p1-after-p2-action')
+    await saveScreenshot(p2, '05-p2-after-p2-action')
 
     // Step 6: Undo test
     console.log('\n=== Step 6: Undo sync ===')
@@ -117,8 +102,8 @@ test.describe('WS dual-player sync', () => {
     } else {
       console.log('Undo button disabled or not available, skipping')
     }
-    await shot(p1, '06-p1-after-undo')
-    await shot(p2, '06-p2-after-undo')
+    await saveScreenshot(p1, '06-p1-after-undo')
+    await saveScreenshot(p2, '06-p2-after-undo')
 
     console.log('\n=== WS dual-player test complete ===')
     await ctx1.close()
