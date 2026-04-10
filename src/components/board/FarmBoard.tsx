@@ -501,6 +501,9 @@ export const FarmBoard = ({
             <span className="res-icon res-icon-sheep" /><span className="res-compact-num">{displayPlayer.resources.sheep}</span>
             <span className="res-icon res-icon-boar" /><span className="res-compact-num">{displayPlayer.resources.boar}</span>
             <span className="res-icon res-icon-cattle" /><span className="res-compact-num">{displayPlayer.resources.cattle}</span>
+            {displayPlayer.resources.begging > 0 && (<>
+              <span className="res-icon res-icon-begging" /><span className="res-compact-num">{displayPlayer.resources.begging}</span>
+            </>)}
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
