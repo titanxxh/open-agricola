@@ -1,37 +1,18 @@
 import { test, expect } from '@playwright/test';
-import { spawn } from 'child_process';
-
-let backendProcess;
-let frontendProcess;
-
-test.beforeAll(async () => {
-  // Start backend
-  backendProcess = spawn('npm', ['run', 'server'], { stdio: 'ignore' });
-  // Start frontend
-  frontendProcess = spawn('npm', ['run', 'dev'], { stdio: 'ignore' });
-  
-  // Wait for servers to be ready
-  await new Promise(r => setTimeout(r, 3000));
-});
-
-test.afterAll(async () => {
-  backendProcess?.kill();
-  frontendProcess?.kill();
-});
 
 test.describe('Agricola Action Cards End-to-End Tests', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
 
     // Enable dev mode
     const devModeCheckbox = page.getByRole('checkbox', { name: '开发者模式' });
     if (!(await devModeCheckbox.isChecked())) {
       await devModeCheckbox.check();
     }
-    
+
     // Switch to single-player view (p1) to stabilize tests
-    await page.goto('http://localhost:5173/?player=p1');
+    await page.goto('/?player=p1');
     const devModeCheckboxP1 = page.getByRole('checkbox', { name: '开发者模式' });
     if (!(await devModeCheckboxP1.isChecked())) {
       await devModeCheckboxP1.check();
