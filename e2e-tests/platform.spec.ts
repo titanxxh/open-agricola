@@ -103,9 +103,9 @@ test.describe('Platform: single-player game', () => {
     await expect(page.locator('text=单人模式')).toBeVisible({ timeout: 15000 })
 
     await page.click('text=单人模式')
-    // Should see the game header with player name
-    await expect(page.locator('.header')).toBeVisible({ timeout: 15000 })
-    await expect(page.locator('text=← 大厅')).toBeVisible()
+    // Should see the game header with back-to-lobby button
+    await expect(page.locator('.header-compact')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.header-lobby-btn')).toBeVisible()
   })
 })
 
@@ -161,7 +161,7 @@ test.describe('Platform: workshop', () => {
 
     await page.click('text=进入卡牌工坊')
     await expect(page.locator('text=卡牌工坊')).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('text=浏览')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '浏览' })).toBeVisible()
   })
 })
 
