@@ -297,13 +297,6 @@
   50% { opacity: 0.75; }
 }
 
-.global-locale-switcher {
-  position: fixed;
-  top: 10px;
-  right: 16px;
-  z-index: 9999;
-}
-
 .locale-select {
   border: none;
   border-radius: 8px;

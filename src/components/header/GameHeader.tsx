@@ -4,6 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
 import { harvestRounds } from '../../../shared/logic/state'
 import { setPage } from '../../app/PageRouter'
+import { LocaleSwitcher } from '../common/LocaleSwitcher'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -80,6 +81,7 @@ export const GameHeader = ({
           <span className="status-badge waiting-turn">{currentPlayer.name}</span>
         )}
         <div className="header-actions">
+          <LocaleSwitcher className="header-locale-select" />
           <button
             type="button"
             className="header-action-btn"

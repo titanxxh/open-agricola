@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { setPage } from './PageRouter'
 
 export function SettingsPage() {
@@ -69,6 +70,7 @@ export function SettingsPage() {
       <div className="settings-header">
         <button type="button" className="btn-link" onClick={() => setPage('lobby')}>{t('platform.backToLobby')}</button>
         <h1>{t('platform.settingsTitle')}</h1>
+        <LocaleSwitcher />
       </div>
 
       <div className="settings-content">
