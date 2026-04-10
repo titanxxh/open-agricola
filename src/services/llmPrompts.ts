@@ -113,7 +113,7 @@ registerCardListener({
 | during | 行动执行中 | 修改行动参数 |
 | immediatelyAfter | 行动刚完成 | 立即追加效果 |
 | after | 行动完全结束 | 最常用，行动后获得额外资源 |
-| computeCosts | 计算费用时 | 动态折扣 |
+| computeCosts | 计算费用时 | 建造/围栏/改良卡购买等费用折扣 |
 | computeReplace | 替换行动 | 把某行动替换为别的效果 |
 | isDoable | 判断行动可用性 | 让原本不可用的行动变可用 |
 
@@ -503,6 +503,38 @@ const card = new Occupation({
   deck: 'CUSTOM',
   number: 0,
   desc: ['每轮回家阶段，你可以选择获得 2 <FOOD> 或 1 <WOOD> 1 <CLAY>。'],
+  cost: {},
+  vp: 0,
+  implemented: true,
+})
+\`\`\`
+
+---
+
+## 示例 9：费用折扣（computeCosts）⭐
+
+> **注意**：通过 \`actions\` 字段区分折扣目标——\`construct\`/\`fencing\` 折扣行动空间费用，\`improvement-any\` 折扣改良卡购买费用。
+
+\`\`\`typescript
+const CARD_ID = 'CUSTOM_Bargainer'
+
+registerCardListener({
+  id: CARD_ID + '-card-discount',
+  cardIds: [CARD_ID],
+  actions: ['improvement-any'],
+  phases: ['computeCosts'],
+  handler: (context) => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    return { costs: { wood: -1 }, sourceCard: CARD_ID }
+  },
+})
+
+const card = new Occupation({
+  id: CARD_ID,
+  name: '砍价师',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['你购买改良卡时，费用减少 1 <WOOD>。'],
   cost: {},
   vp: 0,
   implemented: true,
