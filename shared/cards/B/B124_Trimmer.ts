@@ -1,6 +1,6 @@
-import { MinorImprovement } from '../types'
+import { Occupation } from '../types'
 
-export const B124_Trimmer = new MinorImprovement({
+export const B124_Trimmer = new Occupation({
   id: "B124_Trimmer",
   name: "Trimmer",
   deck: "B",
