@@ -19,12 +19,6 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Check Playwright browsers are installed
-if ! npx playwright install --dry-run chromium >/dev/null 2>&1; then
-  echo ">>> Playwright browsers not installed. Run: npx playwright install"
-  exit 1
-fi
-
 # Kill any existing servers on our ports
 echo ">>> Killing existing servers on ports $BACKEND_PORT and $FRONTEND_PORT..."
 lsof -ti :"$BACKEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
@@ -70,9 +64,12 @@ for i in $(seq 1 30); do
 done
 
 # Run Playwright tests (pass through all arguments)
+# Disable set -e so we can capture the exit code
 echo ">>> Running Playwright tests..."
+set +e
 npx playwright test "$@"
 TEST_EXIT=$?
+set -e
 
 echo ">>> Tests finished with exit code $TEST_EXIT"
 exit $TEST_EXIT
