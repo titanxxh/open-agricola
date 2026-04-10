@@ -294,7 +294,9 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
-  const selfPlayer = lockedViewPlayerId
+  // In WS mode, selfPlayer is locked to the URL ?player= param.
+  // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
+  const selfPlayer = isWs && lockedViewPlayerId
     ? state?.players.find((p) => p.id === lockedViewPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
@@ -305,13 +307,11 @@ export const GameContainerApi = () => {
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
-  const isInteractive = !!(
-    activePlayer &&
-    selfPlayer &&
-    displayPlayer &&
-    activePlayer.id === selfPlayer.id &&
-    displayPlayer.id === selfPlayer.id
-  )
+  // In HTTP (non-WS) mode, one human controls all players — always interactive
+  const isInteractive = isWs
+    ? !!(activePlayer && selfPlayer && displayPlayer &&
+         activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
+    : !!(activePlayer && displayPlayer)
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
