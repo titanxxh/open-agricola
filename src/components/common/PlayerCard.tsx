@@ -133,10 +133,17 @@ export const PlayerCard = ({
     } else if (cardType === 'minor') {
       const minor = getMinorImprovement(cardId)
       if (!minor) return null
+      const i18nKey = `minorImprovements.${cardId}`
+      const i18nName = t(locale, `${i18nKey}.name`)
+      const i18nDesc = t(locale, `${i18nKey}.description`)
       const locContent = minor.locales?.[locale]
+      // Use i18n if available (returns the key itself when missing), then card locales, then default
+      const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: locContent?.name ?? minor.name,
-        description: (locContent?.desc ?? minor.desc).join('\n'),
+        name: hasI18n ? i18nName : (locContent?.name ?? minor.name),
+        description: hasI18n && i18nDesc !== `${i18nKey}.description`
+          ? i18nDesc
+          : (locContent?.desc ?? minor.desc).join('\n'),
         cost: { ...emptyResources, ...minor.cost },
         altCosts: minor.altCosts,
         deck: minor.deck,
@@ -151,10 +158,16 @@ export const PlayerCard = ({
     } else {
       const occupation = getOccupation(cardId)
       if (!occupation) return null
+      const i18nKey = `occupations.${cardId}`
+      const i18nName = t(locale, `${i18nKey}.name`)
+      const i18nDesc = t(locale, `${i18nKey}.description`)
       const locContent = occupation.locales?.[locale]
+      const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: locContent?.name ?? occupation.name,
-        description: (locContent?.desc ?? occupation.desc).join('\n'),
+        name: hasI18n ? i18nName : (locContent?.name ?? occupation.name),
+        description: hasI18n && i18nDesc !== `${i18nKey}.description`
+          ? i18nDesc
+          : (locContent?.desc ?? occupation.desc).join('\n'),
         cost: { ...emptyResources, ...occupation.cost },
         deck: occupation.deck,
         category: occupation.category,
