@@ -4,7 +4,6 @@ import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
 import { harvestRounds } from '../../../shared/logic/state'
 import { setPage } from '../../app/PageRouter'
-import { LocaleSelect } from '../common/LocaleSwitcher'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -21,7 +20,6 @@ const PHASE_LABELS: Record<RoundPhase, Record<Locale, string>> = {
 
 type Props = {
   locale: Locale
-  setLocale: (value: Locale) => void
   state: GameState
   currentPlayer: PlayerState
   allWorkersUsed: boolean
@@ -39,7 +37,6 @@ type Props = {
 
 export const GameHeader = ({
   locale,
-  setLocale,
   state,
   currentPlayer,
   allWorkersUsed,
@@ -83,7 +80,6 @@ export const GameHeader = ({
           <span className="status-badge waiting-turn">{currentPlayer.name}</span>
         )}
         <div className="header-actions">
-          <LocaleSelect locale={locale} setLocale={setLocale} className="header-locale-select" />
           <button
             type="button"
             className="header-action-btn"
