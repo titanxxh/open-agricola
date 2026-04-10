@@ -48,6 +48,7 @@ const RATE_LIMIT_WINDOW = 60_000
 const RATE_LIMIT_MAX = 10
 
 function checkRateLimit(ip: string): boolean {
+  if (process.env.DISABLE_RATE_LIMIT === '1') return true
   const now = Date.now()
   const entry = loginAttempts.get(ip)
   if (!entry || now > entry.resetAt) {

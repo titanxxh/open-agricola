@@ -25,9 +25,9 @@ lsof -ti :"$BACKEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
 lsof -ti :"$FRONTEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
 sleep 1
 
-# Start backend
+# Start backend (disable rate limiting for test runs)
 echo ">>> Starting backend on port $BACKEND_PORT..."
-npm run server > /dev/null 2>&1 &
+DISABLE_RATE_LIMIT=1 npm run server > /dev/null 2>&1 &
 BACKEND_PID=$!
 
 # Start frontend
