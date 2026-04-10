@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'E130_Overachiever'
 
@@ -13,7 +13,7 @@ const DISCOUNT_RESOURCES = [
 const afterWishChildrenListener: CardListenerRegistration = {
   id: 'E130-overachiever-after-wish-children',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['after'],
   actions: ['wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
@@ -26,10 +26,10 @@ const afterWishChildrenListener: CardListenerRegistration = {
   },
 }
 
-const computeCardCostsListener: CardListenerRegistration = {
-  id: 'E130-overachiever-compute-card-costs',
+const computeCostsListener: CardListenerRegistration = {
+  id: 'E130-overachiever-compute-costs',
   cardIds: [CARD_ID],
-  phases: ['computeCardCosts' as ActionHookPhase],
+  phases: ['computeCosts'],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
@@ -45,7 +45,7 @@ const computeCardCostsListener: CardListenerRegistration = {
 }
 
 registerCardListener(afterWishChildrenListener)
-registerCardListener(computeCardCostsListener)
+registerCardListener(computeCostsListener)
 
 export const E130_Overachiever = new MinorImprovement({
   id: CARD_ID,

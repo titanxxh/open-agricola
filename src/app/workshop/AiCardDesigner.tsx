@@ -700,6 +700,11 @@ function AbilityPanel({
     if (cardName.trim()) parts.push(`卡牌名称: ${cardName.trim()}`)
     if (prerequisite?.trim()) parts.push(`前置条件: ${prerequisite.trim()}`)
     if (costHint?.trim()) parts.push(`消耗资源: ${costHint.trim()}`)
+    // Include existing source code as context when starting a fresh conversation
+    // (e.g., user navigated away, came back, and loaded a saved card)
+    if (messages.length === 0 && extracted?.sourceCode) {
+      parts.push(`\n当前已有代码:\n\`\`\`typescript\n${extracted.sourceCode}\n\`\`\``)
+    }
     const context = `[${parts.join(', ')}]\n`
 
     const userContent = input.trim()
@@ -721,7 +726,7 @@ function AbilityPanel({
       ...chatHistory.map(m => `[${m.role.toUpperCase()}]\n${m.content}`),
     ].join('\n\n---\n\n')
     await sendMessages(chatHistory, promptSnapshot)
-  }, [input, config, messages, streaming, sendMessages, cardType, cardName])
+  }, [input, config, messages, streaming, sendMessages, cardType, cardName, extracted])
 
   // Auto-inject sandbox errors
   useEffect(() => {

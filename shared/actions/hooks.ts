@@ -16,7 +16,6 @@ export type ActionHookPhase =
   | 'computeReplace'
   | 'isDoable'
   | 'canUseOccupied'
-  | 'computeCardCosts'
 
 export const actionHookPhases: ActionHookPhase[] = [
   'before',

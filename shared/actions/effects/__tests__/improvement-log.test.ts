@@ -137,7 +137,7 @@ describe('improvement logging', () => {
     expect(state.availableMajorImprovements).toContain('Major_ClayOven')
   })
 
-  it('improvement-any with sourceCard applies computeCardCosts discount', () => {
+  it('improvement-any with sourceCard applies computeCosts discount', () => {
     const state = createState()
     state.availableMajorImprovements = []
     const player = createPlayer()

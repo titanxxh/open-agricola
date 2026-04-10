@@ -50,7 +50,7 @@ export const buildCardCostListenerContext = (
     player,
     space: emptySpace,
     actionId,
-    phase: 'computeCardCosts',
+    phase: 'computeCosts',
   }
 }
 

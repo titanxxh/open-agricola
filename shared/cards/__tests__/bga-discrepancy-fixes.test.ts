@@ -144,13 +144,13 @@ describe('E130_Overachiever — resource choice discount', () => {
   })
 
   it('returns bonuses when actionCardId matches', () => {
-    const listener = findListener('E130-overachiever-compute-card-costs')!
+    const listener = findListener('E130-overachiever-compute-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: 'E130_Overachiever',
     } as any)
 
@@ -163,13 +163,13 @@ describe('E130_Overachiever — resource choice discount', () => {
   })
 
   it('does not return bonuses when actionCardId does not match', () => {
-    const listener = findListener('E130-overachiever-compute-card-costs')!
+    const listener = findListener('E130-overachiever-compute-costs')!
     const player = createPlayer()
     player.minorPlayed = ['E130_Overachiever']
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCardCosts',
+      actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: 'improvement-any',
     } as any)
     expect(result).toBeUndefined()
