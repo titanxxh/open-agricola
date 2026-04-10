@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
 
 type Mode = 'login' | 'register'
@@ -36,7 +37,9 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-top-bar" />
+        <div className="login-top-bar">
+          <LocaleSwitcher />
+        </div>
         <BrandMark
           title={t('platform.loginTitle')}
           titleAs="h1"
