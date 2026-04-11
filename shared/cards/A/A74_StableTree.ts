@@ -46,12 +46,7 @@ const listener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const flow = queueStableTreeWood(context.state, context.player)
     if (!flow) return
-    return {
-      flow,
-      logKey: 'log.cardEffectGain',
-      logParams: { cardId: CARD_ID, gain: 'futureMeeples: 3x1 WOOD' },
-      sourceCard: CARD_ID,
-    }
+    return { flow, sourceCard: CARD_ID }
   },
 }
 
