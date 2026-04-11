@@ -811,6 +811,8 @@ export const en = {
     vpLabel: '{vp} VP',
     addToSandbox: 'Add to Sandbox',
     edit: 'Edit',
+    publish: 'Publish',
+    unpublish: 'Unpublish',
     hideVersions: 'Hide Versions',
     versionHistory: 'Version History',
     unfeature: '★ Unfeature',

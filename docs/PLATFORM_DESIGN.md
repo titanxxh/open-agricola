@@ -600,6 +600,8 @@ WorkshopPage
 | 工坊精选页面 | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页 |
 | 生产部署 (Docker + GitHub Pages) | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `src/config.ts` |
 | 管理员角色 | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量 |
+| 管理员 API | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
+| 卡牌发布/取消发布 | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌 |
 
 ### 未完成（可选）
 

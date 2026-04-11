@@ -119,7 +119,7 @@ WS 模式通过 URL 参数 `?transport=ws` 启用。
 
 ### 4.2 Hook 系统
 
-9 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`、`canUseOccupied`。另有 `computeCardCosts` 用于改良购买时的动态费用修改。
+9 个行动相位：`before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`（含 decline 替换）、`isDoable`、`canUseOccupied`。卡牌购买费用折扣统一通过 `computeCosts` 阶段实现（以 `actions` 字段区分目标）。
 
 ### 4.2.1 BGA 风格交互协议
 
@@ -146,7 +146,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
 - `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
-251 个 A/B/C/D/E 牌文件，30+ 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+252 个 A/B/C/D/E 牌文件，58 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
@@ -165,7 +165,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 
 ### 5.1 单元测试
 
-vitest；当前仓库内 `*.test.ts` 约 65 个文件，用例数以实际测试输出为准。
+vitest；当前仓库内 `*.test.ts` 约 84 个文件，642+ 用例。
 
 | 类别 | 文件 |
 |---|---|
@@ -213,10 +213,10 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 251 个 A/B/C/D/E 牌文件中，当前有 45+ 张已接入 hook；仍有部分卡牌仅完成数据接入，复杂行为待补全。
+- 252 个 A/B/C/D/E 牌文件中，当前有 58 张已接入 hook；仍有部分卡牌仅完成数据接入，复杂行为待补全。
 - Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。`A88_HedgeKeeper` 使用与 BGA 一致的「空 `from` + `to: { wood: 1 }` + `max: 3`」`TradeModifier` 模拟围栏免木段数，而非单笔 `bonus` −3 Wood。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
-- D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCardCosts 折扣）均已实现。
+- D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCosts 折扣）均已实现。
 - 断线重连未实现（WS 断开后需刷新页面重连）。
 - BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
 - `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。

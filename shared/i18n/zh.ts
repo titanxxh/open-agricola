@@ -791,6 +791,8 @@ export const zh = {
     vpLabel: '{vp} 分',
     addToSandbox: '加入沙盒',
     edit: '编辑',
+    publish: '发布',
+    unpublish: '取消发布',
     hideVersions: '隐藏版本',
     versionHistory: '版本历史',
     unfeature: '★ 取消精选',

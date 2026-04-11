@@ -253,6 +253,28 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
     if (d.ok) setIsFeatured(d.featured)
   }
 
+  const [cardStatus, setCardStatus] = useState(card.status)
+
+  const handleTogglePublish = async () => {
+    const newStatus = cardStatus === 'published' ? 'draft' : 'published'
+    const r = await fetch(`${API_BASE}/api/workshop/cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify({
+        card_id: card.card_id,
+        card_type: card.card_type,
+        name: card.name,
+        description: card.description,
+        card_json: card.card_json,
+        effect_dsl: card.effect_dsl,
+        art_url: card.art_url,
+        status: newStatus,
+      }),
+    })
+    const d = await r.json()
+    if (d.ok) { setCardStatus(newStatus); onRefresh?.() }
+  }
+
   const cardJson = card.card_json
   const cost = cardJson.cost as Record<string, number> | undefined
   const vp = cardJson.vp as number | undefined
@@ -267,6 +289,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
           <h2>{card.name}</h2>
           <div className="ws-badges-row">
             <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
+            <span className={`ws-badge ws-badge-${cardStatus}`}>{cardStatus === 'published' ? t('platform.published') : t('platform.draft')}</span>
             {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
             <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
           </div>
@@ -293,6 +316,15 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
               <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>{t('platform.edit')}</button>
             )}
             {isOwner && (
+              <button
+                type="button"
+                className={`ws-btn-sm ${cardStatus === 'published' ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={handleTogglePublish}
+              >
+                {cardStatus === 'published' ? t('platform.unpublish') : t('platform.publish')}
+              </button>
+            )}
+            {isOwner && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={fetchVersions}>
                 {showVersions ? t('platform.hideVersions') : t('platform.versionHistory')}
               </button>
@@ -317,14 +349,21 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
             <p className="ws-empty">{t('platform.noVersions')}</p>
           ) : (
             <ul className="ws-versions">
-              {versions.map(v => (
-                <li key={v.id} className="ws-version-item">
-                  <span className="ws-version-num">v{v.version_number}</span>
-                  <span className="ws-version-date">{new Date(v.created_at).toLocaleString()}</span>
-                  <span className="ws-version-name">{(v.card_json as Record<string, unknown>).name as string || '—'}</span>
-                  <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>{t('platform.revert')}</button>
-                </li>
-              ))}
+              {versions.map(v => {
+                const vJson = v.card_json as Record<string, unknown>
+                const vDesc = Array.isArray(vJson.desc) ? (vJson.desc as string[]).join(' / ') : ''
+                return (
+                  <li key={v.id} className="ws-version-item">
+                    <div className="ws-version-header">
+                      <span className="ws-version-num">v{v.version_number}</span>
+                      <span className="ws-version-date">{new Date(v.created_at).toLocaleString()}</span>
+                      <span className="ws-version-name">{vJson.name as string || '—'}</span>
+                      <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>{t('platform.revert')}</button>
+                    </div>
+                    {vDesc && <p className="ws-version-desc">{vDesc}</p>}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>

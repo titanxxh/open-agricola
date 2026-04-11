@@ -1171,20 +1171,18 @@ PlayerSwitchNode(→ p1)
 
 引擎推进到 `PlayerSwitchNode` 时返回 `{ type: 'playerSwitch', targetPlayerId }` 给 `GameSession`。`GameSession` 设置 `pending = { type: 'confirmPlayerSwitch' }`，并标记 `undoBoundary`（undo 不能跨越此边界）。前端展示确认 UI，确认后 `GameSession.confirmPlayerSwitch()` 切换活跃玩家并继续推进引擎。
 
-#### 11.6.2c computeCardCosts 阶段
+#### 11.6.2c 卡牌购买费用折扣
 
-`computeCardCosts` 是行动生命周期中的扩展阶段，用于在购买改良/打出职业时动态修改卡牌本身的成本。与 `computeCosts`（修改行动空间的执行成本）不同，`computeCardCosts` 作用于被购买卡牌的费用。
+卡牌购买费用的折扣（如 E130_Overachiever）统一使用 `computeCosts` 阶段，通过 `actions` 字段（如 `'improvement-any'`）区分是行动空间费用还是卡牌购买费用。`resolveCardCostWithModifiers()` 在 `pay-helpers.ts` 中收集匹配的 listener 返回值并应用到卡牌基础费用上。
 
 ```ts
 // E130_Overachiever: improvement-any 折扣 1 wood
 {
-  phases: ['computeCardCosts'],
+  phases: ['computeCosts'],
   actions: ['improvement-any'],
   handler: (context) => ({ costs: { wood: -1 } })
 }
 ```
-
-`applyCardCostModifiers()` 在 `playMinorImprovement()` 中调用，收集所有 `computeCardCosts` 监听器的返回值并应用到卡牌基础费用上。
 
 #### 11.6.2d costOverride 机制
 
