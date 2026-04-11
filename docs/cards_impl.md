@@ -9,8 +9,8 @@
 | 原子行动 | Before | During | ImmediatelyAfter | After | ComputeCosts | ComputeArgs | ComputeReplace | IsDoable |
 |---|---|---|---|---|---|---|---|---|
 | PlaceFarmer | [A126_MasterWorkman](../shared/cards/A/A126_MasterWorkman.ts) | — | [C25_SteamMachine](../shared/cards/C/C25_SteamMachine.ts) | — | — | [E21_SheepRug](../shared/cards/E/E21_SheepRug.ts)、[A94_LazySowman](../shared/cards/A/A94_LazySowman.ts)、[B151_LittlePeasant](../shared/cards/B/B151_LittlePeasant.ts) | — | — |
-| Collect | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts)、[C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | — | — | — | — |
-| Gain | — | [E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts)、[E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | — | [A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
+| Collect | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [A108_MushroomCollector](../shared/cards/A/A108_MushroomCollector.ts)、[C52_HuntsmansHat](../shared/cards/C/C52_HuntsmansHat.ts)、[E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts) | [A17_ReclamationPlow](../shared/cards/A/A17_ReclamationPlow.ts)、[B34_SpecialFood](../shared/cards/B/B34_SpecialFood.ts) | — | — | — | — |
+| Gain | — | [E53_BoarSpear](../shared/cards/E/E53_BoarSpear.ts) | [E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts) | [A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | — | — | — | — |
 | Construct | — | — | — | [A110_Roughcaster](../shared/cards/A/A110_Roughcaster.ts) | [A128_RiparianBuilder](../shared/cards/A/A128_RiparianBuilder.ts)、[C88_CarpentersApprentice](../shared/cards/C/C88_CarpentersApprentice.ts) | — | — | [D119_WoodBarterer](../shared/cards/D/D119_WoodBarterer.ts)、[A123_FrameBuilder](../shared/cards/A/A123_FrameBuilder.ts) |
 | Plow | — | — | — | [A105_BarrowPusher](../shared/cards/A/A105_BarrowPusher.ts) | [C37_DwellingMound](../shared/cards/C/C37_DwellingMound.ts) | — | — | — |
 | FirstPlayer | — | — | — | — | — | — | — | — |
@@ -54,7 +54,7 @@
 注：本矩阵现在同时保留“已接入示例”和“排期目标示例”。实际完成状态以 `docs/card_progress.md` 为准；其中 `Harvest`、`StartOfTurn` 等格子当前可能由 `card-effects.ts` 承担，而不是原子行动 listener。
 注：`card-choice` 与农场类选择现在统一走服务端 `interaction` 协议对外暴露；前端不再依赖本地 `promptKey` 规则推导可选格/可选边，只消费服务端下发的白名单 args。
 注：当前 `anytime` 入口也并入同一协议层，前端通过 `interaction.anytimeActions` 渲染，服务端用根前插 flow 恢复到原选择流程。
-注：如 C75_Firewood 的 After/Improvement Hook 会返回通用 `cardEffectGain` 的 logKey，用于生成独立的行动日志条目（不进入 actionDetail）。
+注：大多数 card listener 已不再手写 `logKey`/`logParams`。当 flow 是 leaf 且 `sourceCard` 已设置、`actionId` 属于 `AUTO_LOGGED_CARD_EFFECT_ACTIONS`（`gain`、`take-from-card`、`bonus-vp`、`pay-resources`、`gain-other-players`）时，`shouldSkipImmediateListenerLog` 会自动跳过冗余日志；其余场景由 flow 执行时自动产出日志。
 注：`minor-improvement` / `improvement-any` 现在还会统一复用卡面 prerequisite 校验；除了 `occupationPrerequisites` / `improvementPrerequisites` 这类结构化字段外，也已接入一批常见文本前提（如 `2 Fields`、`2 Major Improvements`、`Cooking Improvement`、`1 Baking Improvement`）。因此这类前提会同时影响行动格开放性、改良选项列表，以及最终服务端提交校验。
 注：近期新增了几层 BGA 风格卡牌 helper：`pay-gain-node`（含 `payGainFlow/payThenGainFlow/payThenActionFlow/returnToSpaceThenGainFlow`）、`stage-effects`、`card-state/round-placement`、`action-snapshot`，并给 flow 叶子节点补了自定义 choice label。像 `A108_MushroomCollector`、`B109_PaperMaker`、`C96_Merchant`、`E128_Saddler`、`A37_Bucksaw`、`C75_Firewood`、`D119_WoodBarterer` 已从单卡手写流程收敛到公共抽象；`A17_ReclamationPlow`、`D150_GodlySpouse`、`A74_StableTree` 这类时序卡也不再手写散落的 `flagged/placedThisTurn/usedRound` 过程状态；同时 `B70_NewPurchase`、`A166_Haydryer`、`D99_EarthenwarePotter` 的阶段型 hook 已切到服务端 `Engine` 驱动的 `ActionFlow`，不再走即时 imperative 结算。
 注：`fence` 的提交链现已把“本次新建 pasture delta”连同 `newEdges` 一起挂到 `ActionExecutionResult.extraData`，因此 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接读取 `result.extraData.newPastures` / `result.extraData.newEdges`。`A83_ShepherdsCrook` 已切到这条通用链路，不再维护额外的累计 pasture 计数。
@@ -66,7 +66,7 @@
 
 | 效果阶段 | 已实现的卡牌 | 接入状态 | 说明 |
 |---|---|---|---|
-| onBuy | [Major_ClayOven](../shared/cards/major/index.ts)、[Major_StoneOven](../shared/cards/major/index.ts)、[Major_Well](../shared/cards/major/index.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts)、[B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts) | 已接入 | 建造/购买时立即触发 |
+| onBuy | [Major_ClayOven](../shared/cards/major/index.ts)、[Major_StoneOven](../shared/cards/major/index.ts)、[Major_Well](../shared/cards/major/index.ts)、[E74_AshTrees](../shared/cards/E/E74_AshTrees.ts)、[D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts)、[B65_GrainDepot](../shared/cards/B/B65_GrainDepot.ts)、[E33_BeaverColony](../shared/cards/E/E33_BeaverColony.ts)、[A136_DrudgeryReeve](../shared/cards/A/A136_DrudgeryReeve.ts) | 已接入 | 建造/购买时立即触发 |
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
 | onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发，现由 `GameSession` 统一按阶段 flow 推进 |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
@@ -88,6 +88,7 @@
 | onEndHarvest | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts)、[D115_FodderPlanter](../shared/cards/D/D115_FodderPlanter.ts) | 已接入 | 收获结束/繁殖后的阶段切点，支持返回可暂停/恢复的 `ActionFlow` |
 | onAfterHarvest | [D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts) | 已接入 | 收获阶段结束后触发，支持返回可暂停/恢复的 `ActionFlow` |
 | onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts) | 已接入 | 每回合开始前触发，支持返回可暂停/恢复的 `ActionFlow` |
+| computeBonusScore | [C133_Soldier](../shared/cards/C/C133_Soldier.ts)、[A136_DrudgeryReeve](../shared/cards/A/A136_DrudgeryReeve.ts) | 已接入 | 游戏结束计分时调用；按 `scoringPriority` 排序（小值优先），共享 `ScoringContext.reserved` 避免资源重复计分。Major Joinery/Pottery/Basket 也会扣除 reserved 资源 |
 
 ## 行动卡 Hook 示例
 

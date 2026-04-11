@@ -30,8 +30,8 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.occupationPlayed.push('B70_NewPurchase')
-    player.playedCards.push('occupation:B70_NewPurchase')
+    player.minorPlayed.push('B70_NewPurchase')
+    player.playedCards.push('minor:B70_NewPurchase')
     player.resources.food = 6
 
     session.loadState(state)

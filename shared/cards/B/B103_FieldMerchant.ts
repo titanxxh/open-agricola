@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B103_FieldMerchant'
 
@@ -12,6 +13,8 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.trueAction === false) return
+    if (context.actionContext?.checkedReplaceAction) return
     return {
       decline: true,
       alternativeFlow: {
@@ -40,17 +43,25 @@ const onPlayListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 1, reed: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { wood: 1, reed: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
+  },
+}
+
+const isDoableListener: CardListenerRegistration = {
+  id: 'B103-field-merchant-isdoable-improvement',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.doable) return
+    return { doable: true }
   },
 }
 
 registerCardListener(computeReplaceListener)
 registerCardListener(onPlayListener)
+registerCardListener(isDoableListener)
 
 export const B103_FieldMerchant = new Occupation({
   id: CARD_ID,

@@ -22,8 +22,6 @@ const grainRewardFlow = (
       params: { clay: clayToGain },
       sourceCard: CARD_ID,
     },
-    logKey: 'log.cardEffectGain',
-    logParams: { gain: { clay: clayToGain }, cardId: CARD_ID },
     sourceCard: CARD_ID,
   }
 }

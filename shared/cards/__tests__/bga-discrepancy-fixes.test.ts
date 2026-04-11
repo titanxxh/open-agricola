@@ -146,7 +146,7 @@ describe('E130_Overachiever — resource choice discount', () => {
   it('returns bonuses when actionCardId matches', () => {
     const listener = findListener('E130-overachiever-compute-costs')!
     const player = createPlayer()
-    player.minorPlayed = ['E130_Overachiever']
+    player.occupationPlayed = ['E130_Overachiever']
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
@@ -165,7 +165,7 @@ describe('E130_Overachiever — resource choice discount', () => {
   it('does not return bonuses when actionCardId does not match', () => {
     const listener = findListener('E130-overachiever-compute-costs')!
     const player = createPlayer()
-    player.minorPlayed = ['E130_Overachiever']
+    player.occupationPlayed = ['E130_Overachiever']
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('improvement-any'),
@@ -182,7 +182,7 @@ describe('B70_NewPurchase — grain and vegetable', () => {
   it('returns two optional exchanges before harvest rounds', () => {
     const effect = getCardEffect('B70_NewPurchase')!
     const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
+    player.minorPlayed = ['B70_NewPurchase']
     const state = createState(player)
     state.round = 4 // harvest round
 
@@ -199,7 +199,7 @@ describe('B70_NewPurchase — grain and vegetable', () => {
   it('does nothing on non-harvest rounds', () => {
     const effect = getCardEffect('B70_NewPurchase')!
     const player = createPlayer()
-    player.occupationPlayed = ['B70_NewPurchase']
+    player.minorPlayed = ['B70_NewPurchase']
     player.resources.food = 10
     const state = createState(player)
     state.round = 3

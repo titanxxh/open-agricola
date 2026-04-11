@@ -75,12 +75,10 @@ describe('A144_Sequestrator', () => {
       result: { type: 'ok' },
     } as any)
 
-    expect(result?.flow).toEqual({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { reed: 3 },
-      sourceCard: 'A144_Sequestrator',
-    })
+    // Resources go directly to the triggering player (no flow returned)
+    expect(result?.flow).toBeUndefined()
+    expect(result?.logKey).toBe('log.cardEffectGain')
+    expect(triggerPlayer.resources.reed).toBe(3)
     expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(0)
     expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
   })
@@ -107,12 +105,10 @@ describe('A144_Sequestrator', () => {
       result: { type: 'ok' },
     } as any)
 
-    expect(result?.flow).toEqual({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { clay: 4 },
-      sourceCard: 'A144_Sequestrator',
-    })
+    // Resources go directly to the triggering player (no flow returned)
+    expect(result?.flow).toBeUndefined()
+    expect(result?.logKey).toBe('log.cardEffectGain')
+    expect(triggerPlayer.resources.clay).toBe(4)
     expect(owner.cardStates?.A144_Sequestrator?.counters?.clay).toBe(0)
     expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
   })

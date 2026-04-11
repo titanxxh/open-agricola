@@ -69,7 +69,6 @@ describe('A105_BarrowPusher', () => {
       expect(result.flow.params).toEqual({ clay: 1, food: 1 })
       expect(result.flow.sourceCard).toBe('A105_BarrowPusher')
     }
-    expect(result?.logKey).toBe('log.cardEffectGain')
   })
 
   it('does not match on non-plow action', () => {

@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E57_CheeseFondue'
 
@@ -16,12 +17,7 @@ const listener: CardListenerRegistration = {
     if (context.player.resources.sheep > 0) bonus += 1
     if (context.player.resources.cattle > 0) bonus += 1
     if (bonus <= 0) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: bonus }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { food: bonus }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { food: bonus }), sourceCard: CARD_ID }
   },
 }
 

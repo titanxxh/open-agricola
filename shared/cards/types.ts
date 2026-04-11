@@ -16,6 +16,7 @@ export type CardDefinition = {
   altCosts?: Partial<Resource>[]
   vp?: number
   prerequisite?: string
+  maxRound?: number
   isCookery?: boolean
   isBaking?: boolean
   returnCards?: string[]
@@ -31,6 +32,7 @@ export type CardDefinition = {
 }
 
 const registeredMinorImprovements = new Map<string, CardBase>()
+const registeredOccupations = new Map<string, CardBase>()
 
 export class CardBase {
   id!: string
@@ -43,6 +45,7 @@ export class CardBase {
   altCosts?: Partial<Resource>[]
   vp?: number
   prerequisite?: string
+  maxRound?: number
   isCookery?: boolean
   isBaking?: boolean
   returnCards?: string[]
@@ -61,6 +64,9 @@ export class CardBase {
     if (this instanceof MinorImprovement || this instanceof PlayerActionCard) {
       registeredMinorImprovements.set(this.id, this)
     }
+    if (this instanceof Occupation) {
+      registeredOccupations.set(this.id, this)
+    }
   }
 
   /** Serialize back to a plain CardDefinition for transmission to the frontend. */
@@ -77,6 +83,7 @@ export class CardBase {
     if (this.altCosts) def.altCosts = this.altCosts
     if (this.vp !== undefined) def.vp = this.vp
     if (this.prerequisite) def.prerequisite = this.prerequisite
+    if (this.maxRound !== undefined) def.maxRound = this.maxRound
     if (this.isCookery) def.isCookery = this.isCookery
     if (this.isBaking) def.isBaking = this.isBaking
     if (this.returnCards) def.returnCards = this.returnCards
@@ -101,3 +108,6 @@ export class PlayerActionCard extends CardBase {}
 
 export const getRegisteredMinorImprovement = (id: string) =>
   registeredMinorImprovements.get(id)
+
+export const getRegisteredOccupation = (id: string) =>
+  registeredOccupations.get(id)

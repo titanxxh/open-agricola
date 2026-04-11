@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B67_HandTruck'
 
@@ -21,16 +22,32 @@ const listener: CardListenerRegistration = {
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { grain: workerCount }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { grain: workerCount }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { grain: workerCount }), sourceCard: CARD_ID }
+  },
+}
+
+const isDoableListener: CardListenerRegistration = {
+  id: 'B67-hand-truck-isdoable-bake',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['bake-bread'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.doable) return
+    const hasWorkersOnAccumulation = context.state.actionSpaces.some(
+      (space) =>
+        space.takenBy === context.player.id &&
+        Object.values(space.gainPerRound).some(
+          (value) => typeof value === 'number' && value > 0,
+        ),
+    )
+    if (!hasWorkersOnAccumulation) return
+    return { doable: true }
   },
 }
 
 registerCardListener(listener)
+registerCardListener(isDoableListener)
 
 export const B67_HandTruck = new MinorImprovement({
   id: CARD_ID,

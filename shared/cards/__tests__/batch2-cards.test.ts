@@ -79,7 +79,6 @@ describe('B75_WoodWorkshop', () => {
       expect(result.flow.params).toEqual({ wood: 1 })
       expect(result.flow.sourceCard).toBe('B75_WoodWorkshop')
     }
-    expect(result?.logKey).toBe('log.cardEffectGain')
   })
 
   it('isDoable returns true only when the preview wood unlocks an improvement', () => {

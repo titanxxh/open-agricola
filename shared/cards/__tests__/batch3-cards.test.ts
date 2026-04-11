@@ -9,6 +9,12 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import '../C/C144_ReedRoofRenovator'
 import '../B/B100_Clutterer'
 
+// Cards referenced in B100_Clutterer tests — import to register in type registry
+import '../B/B146_Illusionist'
+import '../A/A105_BarrowPusher'
+import '../B/B67_HandTruck'
+import '../A/A10_WoodenShed'
+
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
     id, name, color: id === 'p1' ? 'red' : 'blue',
@@ -67,7 +73,6 @@ describe('C144_ReedRoofRenovator', () => {
       expect(result.flow.params).toEqual({ reed: 1 })
       expect(result.flow.sourceCard).toBe('C144_ReedRoofRenovator')
     }
-    expect(result?.logKey).toBe('log.cardEffectGain')
     expect(p1.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
     expect(p2.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
   })
@@ -103,7 +108,7 @@ describe('C144_ReedRoofRenovator', () => {
 })
 
 describe('B100_Clutterer', () => {
-  it('logs a trigger after playing occupation', () => {
+  it('gives bonus VP when playing occupation with "accumulation" in desc', () => {
     const listener = findListener('B100-clutterer-after-occupation')
     expect(listener).toBeDefined()
 
@@ -111,29 +116,71 @@ describe('B100_Clutterer', () => {
     player.occupationPlayed = ['B100_Clutterer']
     const state = createState(player)
 
+    // B146_Illusionist has "accumulation" in its desc
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('play-occupation'),
       actionId: 'play-occupation', phase: 'after',
+      choice: 'B146_Illusionist',
     } as any)
-    expect(result?.logKey).toBe('log.cardEffectTrigger')
-    expect(result?.logParams?.cardId).toBe('B100_Clutterer')
-    expect(player.cardStates?.B100_Clutterer).toBeUndefined()
+    expect(result?.flow?.type).toBe('leaf')
+    if (result?.flow?.type === 'leaf') {
+      expect(result.flow.actionId).toBe('bonus-vp')
+    }
   })
 
-  it('does not trigger when card not played', () => {
-    const listener = findListener('B100-clutterer-after-occupation')
+  it('does not trigger for occupation without "accumulation" in desc', () => {
+    const listener = findListener('B100-clutterer-after-occupation')!
     const player = createPlayer()
-    const state = createState(player)
+    player.occupationPlayed = ['B100_Clutterer']
 
-    const result = executeCardListener(listener!, {
-      state, player, space: createSpace('play-occupation'),
+    const result = executeCardListener(listener, {
+      state: createState(player), player, space: createSpace('play-occupation'),
       actionId: 'play-occupation', phase: 'after',
+      choice: 'A105_BarrowPusher',
     } as any)
     expect(result).toBeUndefined()
   })
 
-  it('only matches play-occupation action', () => {
-    const listener = findListener('B100-clutterer-after-occupation')
-    expect(listener!.actions).toEqual(['play-occupation'])
+  it('does not trigger when card not played', () => {
+    const listener = findListener('B100-clutterer-after-occupation')!
+    const player = createPlayer()
+
+    const result = executeCardListener(listener, {
+      state: createState(player), player, space: createSpace('play-occupation'),
+      actionId: 'play-occupation', phase: 'after',
+      choice: 'B146_Illusionist',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('gives bonus VP for minor improvement with "accumulation" in desc', () => {
+    const listener = findListener('B100-clutterer-after-improvement')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    player.occupationPlayed = ['B100_Clutterer']
+
+    const result = executeCardListener(listener!, {
+      state: createState(player), player, space: createSpace('improvement-any'),
+      actionId: 'improvement-any', phase: 'after',
+      choice: 'minor:B67_HandTruck',
+    } as any)
+    expect(result?.flow?.type).toBe('leaf')
+    if (result?.flow?.type === 'leaf') {
+      expect(result.flow.actionId).toBe('bonus-vp')
+    }
+  })
+
+  it('does not trigger for minor without "accumulation"', () => {
+    const listener = findListener('B100-clutterer-after-improvement')!
+    const player = createPlayer()
+    player.occupationPlayed = ['B100_Clutterer']
+
+    const result = executeCardListener(listener, {
+      state: createState(player), player, space: createSpace('improvement-any'),
+      actionId: 'improvement-any', phase: 'after',
+      choice: 'minor:A10_WoodenShed',
+    } as any)
+    expect(result).toBeUndefined()
   })
 })

@@ -28,8 +28,11 @@ const createStorageReleaseListener = (params: {
     const amount = takeStoredResource(owner, CARD_ID, params.resource)
     if (amount <= 0) return
     const gain = { [params.resource]: amount } as Partial<Resource>
+    // Give resources directly to the acting player (who met the threshold),
+    // not the card owner — returning a flow would PlayerSwitch to the owner.
+    const target = context.player
+    target.resources[params.resource] = (target.resources[params.resource] ?? 0) + amount
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: gain, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
       logParams: { gain, cardId: CARD_ID },
       sourceCard: CARD_ID,

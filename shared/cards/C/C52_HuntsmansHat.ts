@@ -2,8 +2,12 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'C52_HuntsmansHat'
+
+// BGA also modifies the AnimalMarket flow (sheep+food / boar+food / pay food→cattle).
+// We don't have a separate AnimalMarket action space, so only PigMarket is handled here.
 
 const huntsmansHatListener: CardListenerRegistration = {
   id: 'C52-huntsmans-hat-after-collect',
@@ -16,9 +20,7 @@ const huntsmansHatListener: CardListenerRegistration = {
     const gained = (result as any)?.resourcesGained?.boar ?? 0
     if (gained <= 0) return
     return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: gained }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { food: gained }, cardId: CARD_ID },
+      flow: gainLeaf(CARD_ID, { food: gained }),
       sourceCard: CARD_ID,
     }
   },
@@ -33,6 +35,7 @@ export const C52_HuntsmansHat = new MinorImprovement({
   number: 52,
   category: "FOOD_PROVIDER",
   desc: ["For each new <PIG> you get from the effect of an action space, you also get 1 <FOOD>."],
+  vp: 1,
   cost: { reed: 1 },
   prerequisite: "Cooking Improvement",
   newSet: true,

@@ -94,8 +94,9 @@ registerCardListener({
   cardIds: [CARD_ID],           // 关联的卡牌 ID
   actions: ['plow'],            // 监听哪些行动
   phases: ['after'],            // 在行动的哪个阶段触发
+  // scope: 'opponent',         // 可选：'opponent' 表示对手执行行动时触发（默认为自己）
   handler: (context) => {
-    // context 包含：state, player, space, actionId 等
+    // context 包含：state, player, space, actionId, choice, result 等
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: CARD_ID },
@@ -121,16 +122,22 @@ registerCardListener({
 
 | action | 说明 |
 |--------|------|
-| collect | 拾取资源（森林、泥坑等） |
+| collect | 拾取资源（森林、泥坑等累积格） |
+| gain | 获得资源（gain leaf 执行后触发） |
+| receive | 接收资源（从其他玩家获得等） |
 | plow | 犁地 |
 | sow | 播种 |
 | construct | 建造房间 |
-| renovation | 翻修房屋 |
-| fencing | 围栏/建牧场 |
-| improvement-any | 打出改进牌 |
+| renovate-house | 翻修房屋 |
+| fence | 围栏/建牧场 |
+| stables | 建马厩 |
+| improvement-any | 打出改进牌（大/小改良） |
+| minor-improvement | 打出小改良（单独行动位） |
 | play-occupation | 打出职业牌 |
 | place-farmer | 放置工人 |
-| family-growth | 家庭扩展 |
+| wish-children | 家庭扩展（有房间前提） |
+| wish-children-growth | 家庭扩展（无房间前提） |
+| bake-bread | 烤面包 |
 
 ### handler 返回值（ActionHookResult）
 
@@ -148,9 +155,12 @@ return {
 ### handler 的 context 可用字段
 
 - \`context.state\` — 当前游戏状态
-- \`context.player\` — 当前玩家状态
+- \`context.player\` — 当前玩家状态（listener owner，即打出卡牌的玩家）
 - \`context.actionId\` — 触发的行动 ID
 - \`context.phase\` — 当前阶段
+- \`context.space\` — 当前行动位对象（含 id、resources 等）
+- \`context.choice\` — 玩家选择的卡牌（如打职业时为卡牌 ID，打改良时为 \`'minor:CardId'\` 或 \`'major:CardId'\`）
+- \`context.result\` — 行动执行结果（\`{ type: 'ok', resourcesGained?: {...} }\`），仅在 after/immediatelyAfter 阶段可用
 
 ## ActionFlow 返回值类型
 
@@ -191,6 +201,8 @@ return {
 | bonus-vp | 获得 1 额外胜利分数 | {} |
 | gain-other-players | 其他每位玩家各获得 | { food: 1 } |
 | bake-bread | 烤面包（粮食→食物） | {} |
+| store-on-card | 在卡牌上存放资源 | { clay: 8 } |
+| take-from-card | 从卡牌上取出资源 | { clay: 1 } |
 
 ## 可访问的游戏状态
 
@@ -234,7 +246,7 @@ modifiers: [
 ],
 \`\`\`
 
-- appliesTo 可用值：'construct'、'renovation'、'fencing'、'plow'、'occupation'、'stables'
+- appliesTo 可用值：'construct'、'renovate-house'、'fence'、'plow'、'occupation'、'stables'
 - max：每次行动最多使用次数
 
 ## 设计平衡参考
@@ -247,6 +259,31 @@ modifiers: [
 6. onBuy 只触发一次，可以稍强
 7. 行动触发（listener）效果根据行动频率调整：犁地/播种较少触发，收集资源频繁触发
 8. desc 描述清晰，资源用 <WOOD>、<FOOD>、<GRAIN>、<SCORE> 等标记
+
+## 计分系统：computeBonusScore
+
+用于在游戏结束时根据玩家状态计算额外分数。在 registerCardEffect 中定义：
+
+\`\`\`typescript
+registerCardEffect({
+  id: CARD_ID,
+  computeBonusScore: (_state, player, ctx) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+    // ctx.reserved 记录已被其他卡预留的资源，避免重复计分
+    const wood = (player.resources.wood ?? 0) - (ctx.reserved.wood ?? 0)
+    const stone = (player.resources.stone ?? 0) - (ctx.reserved.stone ?? 0)
+    const pairs = Math.max(0, Math.min(wood, stone))
+    if (pairs > 0) {
+      ctx.reserved.wood = (ctx.reserved.wood ?? 0) + pairs
+      ctx.reserved.stone = (ctx.reserved.stone ?? 0) + pairs
+    }
+    return pairs  // 返回 bonus VP 数量
+  },
+})
+\`\`\`
+
+- \`ctx.reserved\` 是共享的资源预留表，多张计分卡按 \`scoringPriority\`（小值优先）依次消费
+- 返回值为额外获得的 bonus VP 数量
 
 ## 沙盒限制
 
@@ -513,7 +550,7 @@ const card = new Occupation({
 
 ## 示例 9：费用折扣（computeCosts）⭐
 
-> **注意**：通过 \`actions\` 字段区分折扣目标——\`construct\`/\`fencing\` 折扣行动空间费用，\`improvement-any\` 折扣改良卡购买费用。
+> **注意**：通过 \`actions\` 字段区分折扣目标——\`construct\`/\`fence\` 折扣行动空间费用，\`improvement-any\` 折扣改良卡购买费用。
 
 \`\`\`typescript
 const CARD_ID = 'CUSTOM_Bargainer'
@@ -535,6 +572,122 @@ const card = new Occupation({
   deck: 'CUSTOM',
   number: 0,
   desc: ['你购买改良卡时，费用减少 1 <WOOD>。'],
+  cost: {},
+  vp: 0,
+  implemented: true,
+})
+\`\`\`
+
+---
+
+## 示例 10：对手行动触发（scope: 'opponent'）
+
+\`\`\`typescript
+const CARD_ID = 'CUSTOM_SpyMaster'
+
+registerCardListener({
+  id: CARD_ID + '-after-opponent-renovate',
+  cardIds: [CARD_ID],
+  actions: ['renovate-house'],
+  phases: ['immediatelyAfter'],
+  scope: 'opponent',  // 当对手翻修时触发，给卡牌拥有者资源
+  handler: (context) => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    return {
+      flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+})
+
+const card = new Occupation({
+  id: CARD_ID,
+  name: '间谍大师',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['每当对手翻修房屋时，你获得 1 <REED>。'],
+  cost: {},
+  vp: 0,
+  implemented: true,
+})
+\`\`\`
+
+---
+
+## 示例 11：卡牌上存放资源（store-on-card / take-from-card）
+
+\`\`\`typescript
+const CARD_ID = 'CUSTOM_GrainSilo'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    return {
+      type: 'leaf',
+      actionId: 'store-on-card',
+      params: { grain: 6 },
+      sourceCard: CARD_ID,
+    }
+  },
+})
+
+registerCardListener({
+  id: CARD_ID + '-after-sow',
+  cardIds: [CARD_ID],
+  actions: ['sow'],
+  phases: ['after'],
+  handler: (context) => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    // 使用 cardStates 获取卡上剩余资源
+    const stored = context.player.cardStates?.[CARD_ID]?.grain ?? 0
+    if (stored <= 0) return
+    return {
+      flow: { type: 'leaf', actionId: 'take-from-card', params: { grain: 1 }, sourceCard: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+})
+
+const card = new MinorImprovement({
+  id: CARD_ID,
+  name: '谷仓',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['打出时在此卡上放置 6 <GRAIN>。每次播种后，从此卡上取 1 <GRAIN>。'],
+  cost: { wood: 2 },
+  vp: 0,
+  implemented: true,
+})
+\`\`\`
+
+---
+
+## 示例 12：游戏结束计分（computeBonusScore）
+
+\`\`\`typescript
+const CARD_ID = 'CUSTOM_Shepherd'
+
+registerCardEffect({
+  id: CARD_ID,
+  computeBonusScore: (_state, player, ctx) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+    // 每 3 只羊（未被其他卡预留的）获得 1 bonus VP
+    const sheep = (player.resources.sheep ?? 0) - (ctx.reserved.sheep ?? 0)
+    const bonus = Math.floor(Math.max(0, sheep) / 3)
+    if (bonus > 0) {
+      ctx.reserved.sheep = (ctx.reserved.sheep ?? 0) + bonus * 3
+    }
+    return bonus
+  },
+})
+
+const card = new Occupation({
+  id: CARD_ID,
+  name: '牧羊人',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['游戏结束时，每 3 只 <SHEEP> 获得 1 bonus <SCORE>。'],
   cost: {},
   vp: 0,
   implemented: true,

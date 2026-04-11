@@ -28,8 +28,8 @@
 | B Deck | 180 | 9 | 19 | 152 |
 | C Deck | 180 | 13 | 29 | 138 |
 | D Deck | 180 | 11 | 30 | 139 |
-| E Deck | 168 | 8 | 38 | 122 |
-| **总计** | **898** | **78** | **138** | **682** |
+| E Deck | 168 | 9 | 37 | 122 |
+| **总计** | **898** | **79** | **137** | **682** |
 
 ---
 
@@ -66,7 +66,7 @@
 | E101_Blighter | Occupation | 打出时按剩余完整阶段给 bonus VP，之后封锁 `play-occupation` | ✅ |
 | B34_SpecialFood | Collect | 动物累积格收取前后检测是否全部收容，兑现等量 bonus VP（一次性） | ✅ |
 | A166_Haydryer | Harvest | 收获前效果，当前走 `onBeforeHarvest` 阶段 flow | ✅ |
-| C133_Soldier | EndOfGame | 游戏结束时 | ❌ |
+| C133_Soldier | EndOfGame | 游戏结束计分：每对未被其他卡预留的 wood+stone 获 1 bonus VP，通过 `computeBonusScore` + `ScoringContext.reserved` 实现 | ✅ |
 | B70_NewPurchase | StartOfTurn | 回合开始前结算购买效果，当前走 `onBeforeStartOfTurn` 阶段 flow | ✅ |
 
 ### During Hook
@@ -74,7 +74,7 @@
 |------|------|------|------|
 | E53_BoarSpear | Collect | 收取时交换资源 | ✅ |
 | A55_JunkRoom | Improvement | 打改良时获得食物 | ✅ |
-| E33_BeaverColony | Gain | 尚未实现；应在从行动格获得芦苇时追加 bonus VP，并处理带马厩牧场失效的持续约束 | ❌ |
+| E33_BeaverColony | ImmediatelyAfter(Collect, Gain) | 从芦苇行动格获得芦苇时追加 bonus VP；`onBuy` 触发动物重组，最小带马厩牧场通过 `getBlockedPastureId()` 失效 | ✅ |
 | C120_AgriculturalLabourer | Receive | Gain / Receive / Reap 获得谷物后，从牌上取黏土；其中 Reap 分支现走 `onAfterReap` 阶段 flow | ✅ |
 
 ### ImmediatelyAfter Hook
@@ -103,7 +103,7 @@
 | E130_Overachiever | WishChildren | 生孩子后可追加打改良 | ✅ |
 | B65_GrainDepot | Pay | 打出时按木/黏土/石头支付路径，通过 `onBuy` 排入未来回合谷物收益 | ✅ |
 | C71_SlurrySpreader | Reorganize | 收获繁殖导致的动物重组完成后，若本次至少繁殖出两种 newborn，则通过 `onEndHarvest` 阶段 flow 追加一次可选 `Sow` | ✅ |
-| B100_Clutterer | Occupation | 仅已接入打出职业后的触发痕迹；核心“按后续带 accumulation 文本的卡牌计分”仍未实现 | 🔧 |
+| B100_Clutterer | After(Occupation, Improvement) | 打出职业/小改良后，检查新打出卡的 desc 是否包含 “accumulation”，是则追加 bonus VP；使用动态文本匹配而非 BGA 硬编码列表 | ✅ |
 | A64_BarleyMill | Reap | 收割后，当前走 `onAfterReap` 阶段 flow，并按本次实际收割的谷物田数量结算 | ✅ |
 | D99_EarthenwarePotter | Harvest | 收获后效果，当前走 `onAfterHarvest` 阶段 flow | ✅ |
 | E128_Saddler | Receive | 接收后 | ✅ |
@@ -201,7 +201,7 @@
 | A126_MasterWorkman | Before(PlaceFarmer) | ✅ |
 | A127_Lodger | - | 🔧 |
 | A128_RiparianBuilder | After(opponent PlaceFarmer), ComputeCosts(Construct) | ✅ |
-| A136_DrudgeryReeve | - | ✅ |
+| A136_DrudgeryReeve | onBuy, computeBonusScore | ✅ |
 | A137_RiverineShepherd | - | 🔧 |
 | A144_Sequestrator | After(Fencing) | ✅ |
 | A148_Woolgrower | - | 🔧 |
@@ -234,7 +234,7 @@
 | B81_Handcart | - | 🔧 |
 | B86_TruffleSearcher | - | 🔧 |
 | B94_StockProtector | Before(Fencing), After(Fencing), IsDoable(Fencing) | ✅ |
-| B100_Clutterer | After(Occupation) | ✅ |
+| B100_Clutterer | After(Occupation, Improvement) | ✅ |
 | B103_FieldMerchant | After(Occupation), ComputeReplace(Improvement) | ✅ |
 | B109_PaperMaker | Before(Occupation), IsDoable(Occupation) | ✅ |
 | B115_TinsmithMaster | - | 🔧 |
@@ -284,7 +284,7 @@
 | C115_Sower | - | 🔧 |
 | C120_AgriculturalLabourer | After(Occupation, Gain, Receive), onAfterReap | ✅ |
 | C130_OutskirtsDirector | - | 🔧 |
-| C133_Soldier | - | ✅ |
+| C133_Soldier | computeBonusScore | ✅ |
 | C135_Constable | - | ✅ |
 | C142_MarketCrier | - | 🔧 |
 | C144_ReedRoofRenovator | - | ✅ |
@@ -343,7 +343,7 @@
 
 ---
 
-## E Deck 卡牌进度 (8✅ + 38🔧 / 168)
+## E Deck 卡牌进度 (9✅ + 37🔧 / 168)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -355,7 +355,7 @@
 | E22_GuestRoom | - | 🔧 |
 | E27_PiggyBank | - | 🔧 |
 | E30_ChildsToy | - | 🔧 |
-| E33_BeaverColony | During(Gain, Collect) | 🔧 |
+| E33_BeaverColony | ImmediatelyAfter(Collect, Gain), onBuy | ✅ |
 | E36_HerbalGarden | - | 🔧 |
 | E51_WhaleOil | Before(Occupation), IsDoable(Occupation) | 🔧 |
 | E52_Cubbyhole | After(Construct), onStartHarvestFeedingPhase | ✅ |

@@ -79,6 +79,7 @@ import { B48_ForestStone } from './B/B48_ForestStone'
 import { B55_MaintenancePremium } from './B/B55_MaintenancePremium'
 import { B65_GrainDepot } from './B/B65_GrainDepot'
 import { B67_HandTruck } from './B/B67_HandTruck'
+import { B70_NewPurchase } from './B/B70_NewPurchase'
 import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
@@ -167,6 +168,7 @@ import { D23_PioneeringSpirit } from './D/D23_PioneeringSpirit'
 import { D26_CarpentersYard } from './D/D26_CarpentersYard'
 import { D27_Retraining } from './D/D27_Retraining'
 import { D36_BreedRegistry } from './D/D36_BreedRegistry'
+import { D49_Bookshelf } from './D/D49_Bookshelf'
 import { D51_Archway } from './D/D51_Archway'
 import { D53_TeaHouse } from './D/D53_TeaHouse'
 import { D55_NewMarket } from './D/D55_NewMarket'
@@ -247,7 +249,6 @@ export const minorImprovementCards = [
   A10_WoodenShed,
   A106_SlurrySpreader,
   A128_RiparianBuilder,
-  A136_DrudgeryReeve,
   A14_CarpentersHammer,
   A17_ReclamationPlow,
   A22_Telegram,
@@ -294,10 +295,10 @@ export const minorImprovementCards = [
   B55_MaintenancePremium,
   B65_GrainDepot,
   B67_HandTruck,
+  B70_NewPurchase,
   B75_WoodWorkshop,
   B76_Ceilings,
   B81_Handcart,
-  B94_StockProtector,
   B1_UpscaleLifestyle,
   B4_WoodPile,
   B5_StoreofExperience,
@@ -346,6 +347,7 @@ export const minorImprovementCards = [
   D26_CarpentersYard,
   D27_Retraining,
   D36_BreedRegistry,
+  D49_Bookshelf,
   D51_Archway,
   D53_TeaHouse,
   D55_NewMarket,
@@ -404,6 +406,7 @@ export const occupationCards = [
   A123_FrameBuilder,
   A126_MasterWorkman,
   A127_Lodger,
+  A136_DrudgeryReeve,
   A137_RiverineShepherd,
   A144_Sequestrator,
   A148_Woolgrower,
@@ -426,6 +429,7 @@ export const occupationCards = [
   B151_LittlePeasant,
   B165_GameProvider,
   B86_TruffleSearcher,
+  B94_StockProtector,
   C85_DenBuilder,
   C86_LivestockFeeder,
   C87_Mason,

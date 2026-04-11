@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { payGainFlow } from '../helpers/pay-gain-node'
 
@@ -8,7 +8,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!harvestRounds.includes(state.round)) return
     return {
       type: 'seq',
@@ -20,7 +20,7 @@ registerCardEffect({
   },
 })
 
-export const B70_NewPurchase = new Occupation({
+export const B70_NewPurchase = new MinorImprovement({
   id: CARD_ID,
   name: "New Purchase",
   deck: "B",
