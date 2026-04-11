@@ -18,7 +18,6 @@
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { validateAndCompileCustomCode } from './engine.ts'
 import type {
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
@@ -111,8 +110,10 @@ function callWorkerSync(type: string, data: unknown): unknown {
 export const validateAndCompileCustomCodeRemote = async (
   source: string,
   cardId: string,
-): Promise<CustomCodeValidateResult> =>
-  validateAndCompileCustomCode(source, cardId)
+): Promise<CustomCodeValidateResult> => {
+  const { validateAndCompileCustomCode } = await import('./engine.ts')
+  return validateAndCompileCustomCode(source, cardId)
+}
 
 export const invokeCustomCodeEffectSync = (
   request: CustomCodeEffectInvocation,
