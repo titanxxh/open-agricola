@@ -45,6 +45,15 @@
   --color-danger-border: #f5c6cb;
 }
 
+/* ══════════ FOCUS STYLES ══════════ */
+button:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .app {
   min-height: 100vh;
   color: var(--color-text);
@@ -4716,15 +4725,15 @@
   background: #b93a2c;
 }
 
-.btn-danger-small {
+.btn-small.btn-danger-small {
   background: var(--color-danger);
-  color: #fff !important;
-  border-color: var(--color-danger) !important;
+  color: #fff;
+  border-color: var(--color-danger);
 }
 
-.btn-danger-small:hover {
+.btn-small.btn-danger-small:hover {
   background: #b93a2c;
-  border-color: #b93a2c !important;
+  border-color: #b93a2c;
 }
 
 .player-select-panel {
