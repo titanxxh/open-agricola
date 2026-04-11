@@ -74,7 +74,7 @@ import {
   shouldSkipImmediateListenerLog,
 } from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
-import { getLooseStableKeys, getPastureCapacity } from '../shared/actions/effects/animals.ts'
+import { getBlockedPastureId, getLooseStableKeys, getPastureCapacity } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
@@ -622,13 +622,14 @@ export class GameSession {
   private buildAnimalReorgZones(
     player: PlayerState,
   ): InteractionAnimalReorgZone[] {
+    const blocked = getBlockedPastureId(player)
     return [
       ...player.pastures.map((pasture) => ({
         id: pasture.id,
         zoneType: 'pasture' as const,
         animalType: pasture.animalType,
         animalCount: pasture.animalCount,
-        capacity: getPastureCapacity(pasture),
+        capacity: getPastureCapacity(pasture, blocked),
       })),
       {
         id: 'house',
@@ -1484,8 +1485,9 @@ export class GameSession {
   getPastureCapacities(): Record<string, Record<string, number>> {
     const result: Record<string, Record<string, number>> = {}
     this.state.players.forEach((player) => {
+      const blocked = getBlockedPastureId(player)
       result[player.id] = Object.fromEntries(
-        player.pastures.map((pasture) => [pasture.id, getPastureCapacity(pasture)]),
+        player.pastures.map((pasture) => [pasture.id, getPastureCapacity(pasture, blocked)]),
       )
     })
     return result
@@ -1684,11 +1686,12 @@ export class GameSession {
       return acc
     }, { sheep: 0, boar: 0, cattle: 0 })
 
+    const blocked = getBlockedPastureId(player)
     const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
     player.pastures = player.pastures.map((pasture) => {
       const assigned = pastureZones.find((z) => z.id === pasture.id)
       if (!assigned || !assigned.animalType) return { ...pasture, animalType: null, animalCount: 0 }
-      const capacity = getPastureCapacity(pasture)
+      const capacity = getPastureCapacity(pasture, blocked)
       const count = Math.max(0, Math.min(capacity, assigned.animalCount))
       return { ...pasture, animalType: count > 0 ? assigned.animalType : null, animalCount: count }
     })
