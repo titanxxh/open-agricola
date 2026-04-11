@@ -4,7 +4,7 @@ import { getMajorCardEffect } from '../major'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
-  'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites'
+  'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites' | 'maxRound'
 >
 
 const countOccupations = (player: PlayerState) => player.occupationPlayed.length
@@ -95,7 +95,11 @@ const meetsTextPrerequisite = (player: PlayerState, prerequisite?: string) => {
 export const meetsCardPrerequisites = (
   player: PlayerState,
   card: CardPrerequisiteSource,
+  round?: number,
 ) => {
+  if (card.maxRound !== undefined && round !== undefined && round > card.maxRound) {
+    return false
+  }
   if (!meetsNumericPrerequisite(countOccupations(player), card.occupationPrerequisites)) {
     return false
   }

@@ -28,7 +28,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'D14-hammer-crusher-isdoable-renovate',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.doable) return
+    if (context.player.houseType !== 'clay') return
+    // With 2 clay + 1 reed from this card, stone renovation becomes possible
+    return { doable: true }
+  },
+}
+
 registerCardListener(listener)
+registerCardListener(isDoableListener)
 
 export const D14_HammerCrusher = new MinorImprovement({
   id: CARD_ID,

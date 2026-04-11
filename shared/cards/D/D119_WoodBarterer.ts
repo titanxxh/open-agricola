@@ -13,6 +13,7 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.trueAction === false) return
     return {
       flow: {
         type: 'xor',
@@ -48,9 +49,9 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.doable) {
-      return { doable: true }
-    }
+    if (context.doable) return
+    if (context.trueAction === false) return
+    return { doable: true }
   },
 }
 

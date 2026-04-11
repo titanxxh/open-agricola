@@ -15,10 +15,12 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!hasCardCounter(player, CARD_ID, 'earlyBuy')) return
     if (state.round < 14) return
+    const n = Math.min(player.resources.clay ?? 0, player.familySize)
+    if (n <= 0) return
     return payGainFlow({
       cardId: CARD_ID,
-      cost: { clay: player.familySize },
-      gain: { score: player.familySize },
+      cost: { clay: n },
+      gain: { score: n },
       promptKey: 'ui.interactionEarthenwarePotter',
     })
   },

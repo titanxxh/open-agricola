@@ -81,7 +81,7 @@ describe('D49_Bookshelf', () => {
     const listener = findListener('D49-bookshelf-before-occupation')
     expect(listener).toBeDefined()
     const player = createPlayer()
-    player.occupationPlayed = ['D49_Bookshelf']
+    player.minorPlayed = ['D49_Bookshelf']
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('play-occupation'),
       actionId: 'play-occupation', phase: 'before',
@@ -95,26 +95,13 @@ describe('D49_Bookshelf', () => {
 })
 
 describe('E101_Blighter', () => {
-  it('triggers before play-occupation and logs block', () => {
-    const listener = findListener('E101-blighter-before-occupation')
+  it('has isDoable listener for play-occupation', () => {
+    const listener = findListener('E101-blighter-isdoable-occupation')
     expect(listener).toBeDefined()
-    const player = createPlayer()
-    player.occupationPlayed = ['E101_Blighter']
-    const result = executeCardListener(listener!, {
-      state: createState(player), player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'before',
-    } as any)
-    expect(result?.logKey).toBe('log.cardEffectBlock')
-    expect(player.cardStates?.E101_Blighter).toBeUndefined()
   })
 
-  it('does not trigger when card not played', () => {
-    const listener = findListener('E101-blighter-before-occupation')
-    const player = createPlayer()
-    const result = executeCardListener(listener!, {
-      state: createState(player), player, space: createSpace('play-occupation'),
-      actionId: 'play-occupation', phase: 'before',
-    } as any)
-    expect(result).toBeUndefined()
+  it('has onPlay listener', () => {
+    const listener = findListener('E101-blighter-after-play')
+    expect(listener).toBeDefined()
   })
 })

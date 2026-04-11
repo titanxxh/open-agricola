@@ -7,49 +7,11 @@ import {
 } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
 
 describe('PlaceFarmer card listeners', () => {
   beforeEach(() => {
     clearCardListeners()
   })
-
-  const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
-
-  const masterWorkmanDuringListener: CardListenerRegistration = {
-    id: 'A126-master-workman-during',
-    phases: ['during' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
-      const { state, space } = context
-      const round = state.round
-      
-      if (round >= 1 && round <= 4 && space.roundAvailable) {
-        const resource = RESOURCE_MAP[round - 1]
-        return { costs: { [resource]: -1 } }
-      }
-    },
-  }
-
-  const masterWorkmanComputeArgsListener: CardListenerRegistration = {
-    id: 'A126-master-workman-compute-args',
-    phases: ['computeArgs' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
-      const { state } = context
-      const round = state.round
-      
-      if (round >= 1 && round <= 4) {
-        return {
-          extraOptions: state.actionSpaces
-            .filter((space: any) => space.roundAvailable >= 1 && space.roundAvailable <= 4)
-            .map((space: any) => ({
-              value: space.id,
-              labelKey: space.nameKey,
-              labelParams: { resources: 'ignore' },
-            })),
-        }
-      }
-    },
-  }
 
   const steamMachineListener: CardListenerRegistration = {
     id: 'C25-steam-machine-immediately-after',
@@ -186,50 +148,7 @@ describe('PlaceFarmer card listeners', () => {
     }
   }
 
-  describe('A126_MasterWorkman', () => {
-    beforeEach(() => {
-      registerCardListener(masterWorkmanDuringListener)
-      registerCardListener(masterWorkmanComputeArgsListener)
-    })
-
-    it('registers during and computeArgs listeners', () => {
-      const listeners = getRegisteredCardListeners()
-      const masterWorkmanListeners = listeners.filter(l => l.id.startsWith('A126'))
-      expect(masterWorkmanListeners.length).toBe(2)
-      expect(masterWorkmanListeners.some(l => l.phases?.includes('during'))).toBe(true)
-      expect(masterWorkmanListeners.some(l => l.phases?.includes('computeArgs'))).toBe(true)
-    })
-
-    it('gives resource on round 1-4 during phase', () => {
-      const listeners = getRegisteredCardListeners()
-      const duringListener = listeners.find(l => l.id === 'A126-master-workman-during')
-      
-      const context = createMockContext({
-        state: { round: 2 },
-        space: { roundAvailable: 2 },
-        phase: 'during',
-      })
-
-      const result = duringListener?.handler(context as any)
-      expect(result).toBeDefined()
-      expect(result?.costs).toBeDefined()
-      expect(result?.costs?.clay).toBe(-1)
-    })
-
-    it('does not give resource outside rounds 1-4', () => {
-      const listeners = getRegisteredCardListeners()
-      const duringListener = listeners.find(l => l.id === 'A126-master-workman-during')
-      
-      const context = createMockContext({
-        state: { round: 5 },
-        space: { roundAvailable: 5 },
-        phase: 'during',
-      })
-
-      const result = duringListener?.handler(context as any)
-      expect(result).toBeUndefined()
-    })
-  })
+  // A126_MasterWorkman tests moved to dedicated test file
 
   describe('C25_SteamMachine', () => {
     beforeEach(() => {

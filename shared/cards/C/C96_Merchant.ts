@@ -14,13 +14,15 @@ const immediatelyAfterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.sourceCard === CARD_ID) return
+    if (context.trueAction === false) return
+    const secondActionId = context.actionId === 'minor-improvement' ? 'minor-improvement' : 'improvement-any'
     return payThenActionFlow({
       cardId: CARD_ID,
       cost: { food: 1 },
       promptKey: 'ui.interactionMerchantPrompt',
       action: {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: secondActionId,
         optional: true,
         promptKey: 'ui.interactionMerchantPrompt',
         sourceCard: CARD_ID,

@@ -30,7 +30,28 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'B67-hand-truck-isdoable-bake',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['bake-bread'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (context.doable) return
+    const hasWorkersOnAccumulation = context.state.actionSpaces.some(
+      (space) =>
+        space.takenBy === context.player.id &&
+        Object.values(space.gainPerRound).some(
+          (value) => typeof value === 'number' && value > 0,
+        ),
+    )
+    if (!hasWorkersOnAccumulation) return
+    return { doable: true }
+  },
+}
+
 registerCardListener(listener)
+registerCardListener(isDoableListener)
 
 export const B67_HandTruck = new MinorImprovement({
   id: CARD_ID,

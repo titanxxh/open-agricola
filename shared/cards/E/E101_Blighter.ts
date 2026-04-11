@@ -6,21 +6,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 const CARD_ID = 'E101_Blighter'
 const SCORE_MAP = [0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
 
-const listener: CardListenerRegistration = {
-  id: 'E101-blighter-before-occupation',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['play-occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    return {
-      logKey: 'log.cardEffectBlock',
-      logParams: { cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const isDoableListener: CardListenerRegistration = {
   id: 'E101-blighter-isdoable-occupation',
   cardIds: [CARD_ID],
@@ -59,7 +44,6 @@ const onPlayListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
 registerCardListener(isDoableListener)
 registerCardListener(onPlayListener)
 

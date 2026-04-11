@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
@@ -10,13 +10,13 @@ const DISCOUNT_RESOURCES = [
   'sheep', 'boar', 'cattle',
 ] as const
 
-const afterWishChildrenListener: CardListenerRegistration = {
-  id: 'E130-overachiever-after-wish-children',
+const beforeWishChildrenListener: CardListenerRegistration = {
+  id: 'E130-overachiever-before-wish-children',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actions: ['wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'improvement-any', optional: true, promptKey: 'ui.interactionOverachieverImprovement', sourceCard: CARD_ID },
       logKey: 'log.cardGrantedAction',
@@ -32,7 +32,7 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts'],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     return {
       bonuses: DISCOUNT_RESOURCES.map((res) => ({
@@ -44,10 +44,10 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterWishChildrenListener)
+registerCardListener(beforeWishChildrenListener)
 registerCardListener(computeCostsListener)
 
-export const E130_Overachiever = new MinorImprovement({
+export const E130_Overachiever = new Occupation({
   id: CARD_ID,
   name: "Overachiever",
   deck: "E",
