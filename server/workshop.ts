@@ -125,7 +125,7 @@ export async function handleWorkshopRoute(
   res: ServerResponse,
 ): Promise<boolean> {
   const url = req.url ?? ''
-  if (!url.startsWith('/api/workshop/')) return false
+  if (!url.startsWith('/api/workshop/') && !url.startsWith('/api/admin/')) return false
 
   const token = extractToken(req.headers.authorization)
   const user = validateSession(token)
