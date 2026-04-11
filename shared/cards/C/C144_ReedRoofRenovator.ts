@@ -14,12 +14,7 @@ const listener: CardListenerRegistration = {
   actions: ['renovate-house'],
   scope: 'opponent',
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { reed: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { reed: 1 }), sourceCard: CARD_ID }
   },
 }
 

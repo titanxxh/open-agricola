@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D49_Bookshelf'
 
@@ -12,12 +13,7 @@ const beforeListener: CardListenerRegistration = {
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { food: 3 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
 }
 

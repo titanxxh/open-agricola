@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B103_FieldMerchant'
 
@@ -42,12 +43,7 @@ const onPlayListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 1, reed: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { wood: 1, reed: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
   },
 }
 

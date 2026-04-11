@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B67_HandTruck'
 
@@ -21,12 +22,7 @@ const listener: CardListenerRegistration = {
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { grain: workerCount }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { grain: workerCount }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { grain: workerCount }), sourceCard: CARD_ID }
   },
 }
 
