@@ -11,6 +11,7 @@ import {
   resolveCardPreviewCostByProvider,
 } from '../../actions/effects/pay-helpers'
 import { computeAllBuyableCombinations, isComplexCost } from '../../actions/effects/pay'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B75_WoodWorkshop'
 
@@ -98,12 +99,7 @@ const beforeListener: CardListenerRegistration = {
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { wood: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
 

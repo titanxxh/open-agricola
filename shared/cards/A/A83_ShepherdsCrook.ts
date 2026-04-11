@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A83_ShepherdsCrook'
 const MIN_PASTURE_SIZE = 4
@@ -22,12 +23,7 @@ const listener: CardListenerRegistration = {
     ).length
     if (newBig <= 0) return
     const sheepGain = newBig * 2
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { sheep: sheepGain }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { sheep: sheepGain }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { sheep: sheepGain }), sourceCard: CARD_ID }
   },
 }
 

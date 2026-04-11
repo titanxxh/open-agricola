@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow } from '../../actions/effects/sow'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A65_SeedPellets'
 
@@ -20,12 +21,7 @@ const beforeSowListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { grain: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
 

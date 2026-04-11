@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A79_GardenHoe'
 
@@ -22,12 +23,7 @@ const listener: CardListenerRegistration = {
       },
     )
     if (!hasVegetable) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { clay: 1, stone: 1 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { clay: 1, stone: 1 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { clay: 1, stone: 1 }), sourceCard: CARD_ID }
   },
 }
 

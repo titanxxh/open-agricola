@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B94_StockProtector'
 
@@ -13,12 +14,7 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { wood: 2 }, cardId: CARD_ID },
-      sourceCard: CARD_ID,
-    }
+    return { flow: gainLeaf(CARD_ID, { wood: 2 }), sourceCard: CARD_ID }
   },
 }
 

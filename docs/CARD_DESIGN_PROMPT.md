@@ -1,6 +1,6 @@
 # Card Design Prompt 文档
 
-> **注意**：本文档为早期设计参考。实际 LLM 系统提示词以 `src/services/llmPrompts.ts` 中的 `CARD_DESIGNER_SYSTEM_PROMPT` 为准。以下内容可能与实际实现有差异。
+> **注意**：本文档为早期设计参考。实际 LLM 系统提示词以 `src/services/llmPrompts.ts` 中的 `CARD_DESIGNER_SYSTEM_PROMPT` 为准。以下内容可能与实际实现有差异。最近更新：action ID 已修正为 `renovate-house`（非 `renovation`）、`fence`（非 `fencing`）、`wish-children`（非 `family-growth`）；新增 `scope`、`context.choice`/`result`/`space`、`computeBonusScore`、`store-on-card`/`take-from-card` 等机制。
 
 ## 设计原则
 
@@ -72,7 +72,7 @@ registerCardListener({
 
 **可用 phases**: `before`, `during`, `immediatelyAfter`, `after`, `computeCosts`, `computeArgs`, `computeReplace`, `isDoable`
 
-**可用 actions**: `collect`, `construct`, `renovation`, `fencing`, `plow`, `sow`, `play-occupation`, `improvement-any`, `place-farmer`, `family-growth`
+**可用 actions**: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `play-occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`
 
 ### 5. 可用 actionId
 
