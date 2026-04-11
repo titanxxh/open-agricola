@@ -32,6 +32,7 @@ export type CardDefinition = {
 }
 
 const registeredMinorImprovements = new Map<string, CardBase>()
+const registeredOccupations = new Map<string, CardBase>()
 
 export class CardBase {
   id!: string
@@ -62,6 +63,9 @@ export class CardBase {
     Object.assign(this, data)
     if (this instanceof MinorImprovement || this instanceof PlayerActionCard) {
       registeredMinorImprovements.set(this.id, this)
+    }
+    if (this instanceof Occupation) {
+      registeredOccupations.set(this.id, this)
     }
   }
 
@@ -104,3 +108,6 @@ export class PlayerActionCard extends CardBase {}
 
 export const getRegisteredMinorImprovement = (id: string) =>
   registeredMinorImprovements.get(id)
+
+export const getRegisteredOccupation = (id: string) =>
+  registeredOccupations.get(id)
