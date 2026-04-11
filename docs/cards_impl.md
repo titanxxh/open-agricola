@@ -570,7 +570,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 
 **P0 - 全部阶段性 Hook 已接入**：
 - 所有 22 个 CardEffect Hook 均已定义并在 `game-session.ts` 中按 BGA 顺序调用
-- 架构机制已就绪（ActivateCardNode、PlayerSwitchNode、computeCardCosts、costOverride、gain params）
+- 架构机制已就绪（ActivateCardNode、PlayerSwitchNode、computeCosts、costOverride、gain params）
 
 **P1 - 待实现具体卡牌**：
 - ReturnHome 子阶段（BeforeReturnHome/StartReturnHome）：BGA 有 12 张卡待接入
