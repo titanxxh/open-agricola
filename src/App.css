@@ -4531,9 +4531,70 @@
 
 .ws-sandbox-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
+/* ── Tablet breakpoint ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .lobby-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .settings-page {
+    padding: 16px;
+  }
+
+  .settings-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .player-select-options {
+    flex-wrap: wrap;
+  }
+
+  .ws-detail-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .ai-card-id-input {
+    width: 100%;
+  }
+
+  .ws-sandbox-config-panel {
+    min-width: 0;
+  }
+}
+
+/* ── Small phone breakpoint ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .lobby-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 24px 20px;
+    border-radius: 12px;
+  }
+
+  .interaction-bar {
+    max-height: 30vh;
+  }
+
+  .header-compact {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .header-action-btn__label {
+    display: none;
+  }
+
+  .ai-card-info-bar {
+    padding: 8px 12px;
+    gap: 8px;
   }
 }
 
