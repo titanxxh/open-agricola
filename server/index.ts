@@ -274,7 +274,7 @@ const server = createServer(async (req, res) => {
   }
 
   // ── Workshop routes ────────────────────────────────────
-  if (req.url?.startsWith('/api/workshop/')) {
+  if (req.url?.startsWith('/api/workshop/') || req.url?.startsWith('/api/admin/')) {
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return
   }
