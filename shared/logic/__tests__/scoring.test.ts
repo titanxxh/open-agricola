@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../game/types'
 import { computeScores } from '../scoring'
 
+// Register card effects used by scoring (e.g. C133_Soldier.computeBonusScore)
+import '../../cards/C/C133_Soldier'
+
 const emptyResources = (): Resource => ({
   wood: 0,
   clay: 0,

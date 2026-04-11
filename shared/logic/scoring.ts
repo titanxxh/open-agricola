@@ -2,6 +2,7 @@ import type { GameState, PlayerState, Resource } from '../game/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
+import { collectBonusScores } from '../cards/card-effects'
 
 type ScoreCategoryKey =
   | 'fields'
@@ -234,6 +235,10 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       ],
     })
 
+    // Collect bonus scores first — they reserve resources that Major improvements must deduct
+    const bonusScoreResult = collectBonusScores(state, player)
+    const reserved = bonusScoreResult.reserved
+
     const cardEntries: ScoreEntry[] = []
     const cardBonusEntries: ScoreEntry[] = []
     player.improvements.forEach((cardId) => {
@@ -241,7 +246,11 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       if (!card) return
       cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
       if (card.scoring) {
-        const resourceCount = player.resources[card.scoring.resource] ?? 0
+        const resourceCount = Math.max(
+          0,
+          (player.resources[card.scoring.resource] ?? 0) -
+            (reserved[card.scoring.resource] ?? 0),
+        )
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
@@ -285,29 +294,17 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
         }
       })
     }
+
+    for (const entry of bonusScoreResult.entries) {
+      cardStateBonusVp += entry.score
+    }
+
     if (cardStateBonusVp > 0) {
       categories.push({
         key: 'cardStateBonusVp',
         total: cardStateBonusVp,
         entries: [{ type: 'bonus' as const, score: cardStateBonusVp }],
       })
-    }
-
-    const soldierBonus = player.occupationPlayed.includes('C133_Soldier')
-      ? Math.min(player.resources.wood, player.resources.stone)
-      : 0
-    if (soldierBonus > 0) {
-      const existing = categories.find((category) => category.key === 'cardStateBonusVp')
-      if (existing) {
-        existing.total += soldierBonus
-        existing.entries.push({ type: 'bonus' as const, score: soldierBonus })
-      } else {
-        categories.push({
-          key: 'cardStateBonusVp',
-          total: soldierBonus,
-          entries: [{ type: 'bonus' as const, score: soldierBonus }],
-        })
-      }
     }
 
     const beggingCount = player.resources.begging

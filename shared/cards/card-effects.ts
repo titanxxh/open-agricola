@@ -48,8 +48,26 @@ type EffectHandler = (state: GameState, player: PlayerState) => void
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 
+/**
+ * Mutable context passed through all computeBonusScore handlers during scoring.
+ *
+ * Cards are processed in scoringPriority order (lower first). Each card greedily
+ * takes max resources. This is optimal for the current card set because marginal
+ * values are monotonically: DrudgeryReeve (1/2/2) ≥ Soldier (1/1/…) ≥ Major (0-1).
+ * If a future card breaks this monotonicity, consider replacing greedy with
+ * interactive player choice (matching BGA's BeforeEndOfGame flow).
+ */
+export type ScoringContext = {
+  /** Resources already consumed by prior bonus-scoring cards (e.g. Soldier, DrudgeryReeve). */
+  reserved: Partial<Resource>
+}
+
+export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: ScoringContext) => number
+
 export type CardEffect = {
   id: string
+  /** Lower values run first in computeBonusScore ordering (default: 100). */
+  scoringPriority?: number
   onBuy?: FlowEffectHandlerWithPayment
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
@@ -72,6 +90,7 @@ export type CardEffect = {
   onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
+  computeBonusScore?: BonusScoreHandler
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -250,3 +269,49 @@ export const runEndHarvestFeedingPhaseHooks = (state: GameState, player: PlayerS
 
 export const runEndHarvestHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onEndHarvest')
+
+export type BonusScoreResult = {
+  entries: { cardId: string; score: number }[]
+  reserved: Partial<Resource>
+}
+
+/**
+ * Collect bonus VP from all cards that have computeBonusScore.
+ * Cards are processed in scoringPriority order (lower = first).
+ * A shared ScoringContext tracks reserved resources across cards.
+ */
+export const collectBonusScores = (
+  state: GameState,
+  player: PlayerState,
+): BonusScoreResult => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const withEffects = allCards
+    .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
+    .filter((item): item is { cardId: string; effect: CardEffect } =>
+      !!item.effect?.computeBonusScore,
+    )
+    .sort((a, b) => (a.effect.scoringPriority ?? 100) - (b.effect.scoringPriority ?? 100))
+
+  const ctx: ScoringContext = { reserved: {} }
+  const entries: { cardId: string; score: number }[] = []
+
+  for (const { cardId, effect } of withEffects) {
+    try {
+      const score = effect.computeBonusScore!(state, player, ctx)
+      if (score > 0) {
+        entries.push({ cardId, score })
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeBonusScore threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return { entries, reserved: ctx.reserved }
+}
