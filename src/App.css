@@ -4096,6 +4096,13 @@
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  .ai-designer-panels {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+}
+
 /* Art panel (left) */
 .ai-art-panel {
   display: flex;
