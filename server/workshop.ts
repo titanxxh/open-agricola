@@ -459,7 +459,7 @@ export async function handleWorkshopRoute(
     const row = db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as
       | { author_id: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    if (row.author_id !== user.id) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
+    if (row.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
     db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
     sendJson(res, 200, { ok: true })
     return true
@@ -698,6 +698,113 @@ export async function handleWorkshopRoute(
     const newVal = current.featured ? 0 : 1
     db.prepare('UPDATE workshop_cards SET featured = ? WHERE id = ?').run(newVal, cardDbId)
     sendJson(res, 200, { ok: true, featured: !!newVal })
+    return true
+  }
+
+  // ═══════════ ADMIN API ═══════════════════════════════════════════════════
+
+  // ── GET /api/admin/cards — list all cards with full details ─────────────
+  if (req.method === 'GET' && url.startsWith('/api/admin/cards')) {
+    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
+    const q = new URL(url, 'http://localhost').searchParams
+    const search = q.get('search')?.trim() ?? ''
+    const status = q.get('status')
+    const author = q.get('author')
+    const page = Math.max(1, Number(q.get('page') ?? '1'))
+    const limit = 50
+    const offset = (page - 1) * limit
+
+    let where = '1=1'
+    const params: unknown[] = []
+    if (search) { where += ' AND (w.name LIKE ? OR w.card_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
+    if (status === 'draft' || status === 'published') { where += ' AND w.status = ?'; params.push(status) }
+    if (author) { where += ' AND u.username = ?'; params.push(author) }
+
+    const rows = db.prepare(`
+      SELECT w.*, u.username AS author_name
+      FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id
+      WHERE ${where}
+      ORDER BY w.updated_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as Record<string, unknown>[]
+    const total = (db.prepare(`SELECT COUNT(*) as cnt FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id WHERE ${where}`).get(...params) as { cnt: number }).cnt
+
+    sendJson(res, 200, {
+      ok: true,
+      cards: rows.map(r => ({
+        ...r,
+        card_json: typeof r.card_json === 'string' ? JSON.parse(r.card_json as string) : r.card_json,
+        effect_dsl: r.effect_dsl && typeof r.effect_dsl === 'string' ? JSON.parse(r.effect_dsl as string) : r.effect_dsl,
+        code_manifest: r.code_manifest && typeof r.code_manifest === 'string' ? JSON.parse(r.code_manifest as string) : r.code_manifest,
+      })),
+      page,
+      total,
+    })
+    return true
+  }
+
+  // ── GET /api/admin/cards/:id/export — export a single card as JSON ─────
+  const adminExportMatch = /^\/api\/admin\/cards\/([^/]+)\/export$/.exec(url)
+  if (req.method === 'GET' && adminExportMatch) {
+    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
+    const cardDbId = adminExportMatch[1]!
+    const row = db.prepare(`
+      SELECT w.*, u.username AS author_name
+      FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id
+      WHERE w.id = ?
+    `).get(cardDbId) as Record<string, unknown> | undefined
+    if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
+
+    const card = {
+      ...row,
+      card_json: typeof row.card_json === 'string' ? JSON.parse(row.card_json as string) : row.card_json,
+      effect_dsl: row.effect_dsl && typeof row.effect_dsl === 'string' ? JSON.parse(row.effect_dsl as string) : row.effect_dsl,
+      code_manifest: row.code_manifest && typeof row.code_manifest === 'string' ? JSON.parse(row.code_manifest as string) : row.code_manifest,
+    }
+    sendJson(res, 200, { ok: true, card })
+    return true
+  }
+
+  // ── DELETE /api/admin/cards/:id — admin delete any card ────────────────
+  const adminDeleteMatch = /^\/api\/admin\/cards\/([^/]+)$/.exec(url)
+  if (req.method === 'DELETE' && adminDeleteMatch) {
+    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
+    const cardDbId = adminDeleteMatch[1]!
+    const row = db.prepare('SELECT card_id, name FROM workshop_cards WHERE id = ?').get(cardDbId) as
+      | { card_id: string; name: string } | undefined
+    if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
+    db.prepare('DELETE FROM workshop_card_versions WHERE card_id = ?').run(cardDbId)
+    db.prepare('DELETE FROM card_likes WHERE card_id = ?').run(cardDbId)
+    db.prepare('DELETE FROM card_comments WHERE card_id = ?').run(cardDbId)
+    db.prepare('DELETE FROM sandbox_cards WHERE workshop_card_id = ?').run(cardDbId)
+    db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
+    sendJson(res, 200, { ok: true, deleted: { id: cardDbId, card_id: row.card_id, name: row.name } })
+    return true
+  }
+
+  // ── POST /api/admin/cards/:id/status — admin set card status ──────────
+  const adminStatusMatch = /^\/api\/admin\/cards\/([^/]+)\/status$/.exec(url)
+  if (req.method === 'POST' && adminStatusMatch) {
+    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
+    const cardDbId = adminStatusMatch[1]!
+    const body = await parseBody<{ status?: string }>(req)
+    const newStatus = body?.status === 'published' ? 'published' : 'draft'
+    const row = db.prepare('SELECT id FROM workshop_cards WHERE id = ?').get(cardDbId) as { id: string } | undefined
+    if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
+    db.prepare('UPDATE workshop_cards SET status = ?, updated_at = ? WHERE id = ?').run(newStatus, Date.now(), cardDbId)
+    sendJson(res, 200, { ok: true, status: newStatus })
+    return true
+  }
+
+  // ── GET /api/admin/users — list all users ─────────────────────────────
+  if (req.method === 'GET' && url.startsWith('/api/admin/users')) {
+    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
+    const rows = db.prepare(`
+      SELECT u.id, u.username, u.display_name, u.created_at, u.last_login_at,
+        (SELECT COUNT(*) FROM workshop_cards WHERE author_id = u.id) AS card_count
+      FROM users u ORDER BY u.created_at DESC
+    `).all() as Record<string, unknown>[]
+    sendJson(res, 200, { ok: true, users: rows })
     return true
   }
 
