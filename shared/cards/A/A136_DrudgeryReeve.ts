@@ -1,7 +1,45 @@
-import { MinorImprovement } from '../types'
+import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
-export const A136_DrudgeryReeve = new MinorImprovement({
-  id: "A136_DrudgeryReeve",
+const CARD_ID = 'A136_DrudgeryReeve'
+
+// BGA: remaining turns → wood gained on buy
+// 14 total rounds; remainingTurns = 14 - currentRound
+const WOOD_BY_REMAINING: number[] = [0, 1, 1, 2, 2, 2, 3, 3, 3, 4]
+
+// BGA: sets of building resources → bonus VP
+const BONUS_BY_SETS: number[] = [0, 1, 3, 5]
+
+registerCardEffect({
+  id: CARD_ID,
+  scoringPriority: 0, // before Soldier (priority 10) — higher marginal value per set
+  onBuy: (state, _player) => {
+    const remainingTurns = 14 - state.round
+    const wood = WOOD_BY_REMAINING[remainingTurns] ?? (remainingTurns >= 9 ? 4 : 0)
+    if (wood > 0) {
+      return gainLeaf(CARD_ID, { wood })
+    }
+  },
+  computeBonusScore: (_state, player, ctx) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+    const wood = (player.resources.wood ?? 0) - (ctx.reserved.wood ?? 0)
+    const clay = (player.resources.clay ?? 0) - (ctx.reserved.clay ?? 0)
+    const stone = (player.resources.stone ?? 0) - (ctx.reserved.stone ?? 0)
+    const reed = (player.resources.reed ?? 0) - (ctx.reserved.reed ?? 0)
+    const sets = Math.max(0, Math.min(wood, clay, stone, reed, 3))
+    if (sets > 0) {
+      ctx.reserved.wood = (ctx.reserved.wood ?? 0) + sets
+      ctx.reserved.clay = (ctx.reserved.clay ?? 0) + sets
+      ctx.reserved.stone = (ctx.reserved.stone ?? 0) + sets
+      ctx.reserved.reed = (ctx.reserved.reed ?? 0) + sets
+    }
+    return BONUS_BY_SETS[sets] ?? 0
+  },
+})
+
+export const A136_DrudgeryReeve = new Occupation({
+  id: CARD_ID,
   name: "Drudgery Reeve",
   deck: "A",
   number: 136,
