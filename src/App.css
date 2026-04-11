@@ -3455,6 +3455,10 @@ a:focus-visible,
 .ws-badge-published { background: var(--color-success-bg); color: var(--color-success); }
 .ws-badge-draft { background: #fff3cd; color: #856404; }
 
+.ws-version-item { border-bottom: 1px solid var(--color-border-light); padding: 8px 0; }
+.ws-version-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ws-version-desc { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }
+
 .ws-author {
   font-size: 12px;
   color: var(--color-text-muted);
