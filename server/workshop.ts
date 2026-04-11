@@ -704,7 +704,7 @@ export async function handleWorkshopRoute(
   // ═══════════ ADMIN API ═══════════════════════════════════════════════════
 
   // ── GET /api/admin/cards — list all cards with full details ─────────────
-  if (req.method === 'GET' && url.startsWith('/api/admin/cards')) {
+  if (req.method === 'GET' && (url === '/api/admin/cards' || url.startsWith('/api/admin/cards?'))) {
     if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
     const q = new URL(url, 'http://localhost').searchParams
     const search = q.get('search')?.trim() ?? ''
