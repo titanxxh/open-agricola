@@ -90,10 +90,10 @@ export function LoginPage() {
             />
           </div>
 
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
 
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? '...' : mode === 'login' ? t('platform.loginBtn') : t('platform.registerBtn')}
+          <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
+            {loading ? t('platform.loading') : mode === 'login' ? t('platform.loginBtn') : t('platform.registerBtn')}
           </button>
         </form>
 
