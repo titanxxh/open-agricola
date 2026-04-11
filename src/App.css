@@ -549,7 +549,7 @@ a:focus-visible,
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 143px;
   height: 40px;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .action-card.action-s .action-desc {
@@ -4604,6 +4604,16 @@ a:focus-visible,
   .ai-card-info-bar {
     padding: 8px 12px;
     gap: 8px;
+  }
+
+  .sow-choice-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .header-action-btn {
+    min-height: 40px;
+    padding: 0 10px;
   }
 }
 
