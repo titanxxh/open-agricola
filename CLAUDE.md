@@ -20,7 +20,7 @@ npm run server   # Backend on port 5175
 npm run dev      # Frontend on port 5173
 
 # Tests
-npm test                # Vitest unit tests (~631 cases, excludes e2e and scripts/)
+npm test                # Vitest unit tests (~642 cases, excludes e2e and scripts/)
 npm run test:e2e        # Playwright E2E tests (requires running server + frontend)
 npx vitest run tests/path/to/file.spec.ts   # Run a single test file
 
@@ -68,7 +68,7 @@ Card effects extend the game through hooks rather than modifying core paths. Hoo
 - `before`, `during`, `immediatelyAfter`, `after` — execution lifecycle
 - `computeCosts`, `computeArgs`, `computeReplace` — action customization
 - `isDoable` — availability override
-- `computeCardCosts` — card cost modification
+- `canUseOccupied` — allow using occupied action spaces
 
 ### Transport Abstraction (src/services/)
 

@@ -1,6 +1,6 @@
 # Card Design Prompt 文档
 
-本文档定义了 AI 卡牌设计师的系统 prompt 内容。修改此文档后需同步更新 `src/services/llmPrompts.ts`。
+> **注意**：本文档为早期设计参考。实际 LLM 系统提示词以 `src/services/llmPrompts.ts` 中的 `CARD_DESIGNER_SYSTEM_PROMPT` 为准。以下内容可能与实际实现有差异。
 
 ## 设计原则
 
