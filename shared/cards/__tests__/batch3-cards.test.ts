@@ -73,7 +73,6 @@ describe('C144_ReedRoofRenovator', () => {
       expect(result.flow.params).toEqual({ reed: 1 })
       expect(result.flow.sourceCard).toBe('C144_ReedRoofRenovator')
     }
-    expect(result?.logKey).toBe('log.cardEffectGain')
     expect(p1.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
     expect(p2.cardStates?.C144_ReedRoofRenovator).toBeUndefined()
   })

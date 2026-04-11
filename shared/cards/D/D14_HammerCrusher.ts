@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D14_HammerCrusher'
 
@@ -17,12 +18,10 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'gain', params: { clay: 2, reed: 1 }, sourceCard: CARD_ID },
+          gainLeaf(CARD_ID, { clay: 2, reed: 1 }),
           { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.interactionHammerCrusherBuild' },
         ],
       },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { clay: 2, reed: 1 }, cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },
