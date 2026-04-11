@@ -27,5 +27,6 @@ export const C37_DwellingMound = new MinorImprovement({
   desc: ["From now on, you must pay 1 <FOOD> for each new field tile that you place in your farmyard."],
   cost: { food: 1 },
   prerequisite: "Play in Round 3 or Before",
+  maxRound: 3,
   vp: 3,
 })

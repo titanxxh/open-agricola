@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -12,7 +12,7 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID },
       logKey: 'log.cardEffectGain',
@@ -28,7 +28,7 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.workersAvailable <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'place-farmer', optional: true, promptKey: 'ui.interactionStockProtectorPlace' },
@@ -45,7 +45,7 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.doable) return
     const previewPlayer = {
       ...context.player,
@@ -63,7 +63,7 @@ registerCardListener(beforeListener)
 registerCardListener(afterListener)
 registerCardListener(isDoableListener)
 
-export const B94_StockProtector = new MinorImprovement({
+export const B94_StockProtector = new Occupation({
   id: CARD_ID,
   name: "Stock Protector",
   deck: "B",

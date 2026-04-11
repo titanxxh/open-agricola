@@ -143,7 +143,7 @@ describe('improvement logging', () => {
     const player = createPlayer()
     player.resources.clay = 0
     player.minorHand = ['A53_Claypipe']
-    player.minorPlayed = ['E130_Overachiever']
+    player.occupationPlayed = ['E130_Overachiever']
 
     // Without sourceCard, cannot afford (clay = 0, Claypipe costs 1 clay)
     const resultWithout = playImprovement(state, player, 'minor:A53_Claypipe', 'any')

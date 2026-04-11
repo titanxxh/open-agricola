@@ -16,6 +16,7 @@ const OVEN_IMPROVEMENTS = new Set([
   'E63_IronOven',
   'E64_SimpleOven',
   'D59_EarthOven',
+  'A60_OrientalFireplace',
 ])
 
 const CARD_ID = 'C75_Firewood'

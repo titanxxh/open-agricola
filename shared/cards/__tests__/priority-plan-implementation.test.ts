@@ -265,7 +265,7 @@ describe('priority plan implementations', () => {
   it('B94 Stock Protector can make fencing doable with bonus wood', () => {
     const listener = findListener('B94-stock-protector-isdoable-fencing')
     const player = createPlayer()
-    player.minorPlayed = ['B94_StockProtector']
+    player.occupationPlayed = ['B94_StockProtector']
     player.resources.wood = 2
 
     const result = executeCardListener(listener!, {

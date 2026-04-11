@@ -12,6 +12,8 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.trueAction === false) return
+    if (context.actionContext?.checkedReplaceAction) return
     return {
       decline: true,
       alternativeFlow: {
@@ -49,8 +51,21 @@ const onPlayListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'B103-field-merchant-isdoable-improvement',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.doable) return
+    return { doable: true }
+  },
+}
+
 registerCardListener(computeReplaceListener)
 registerCardListener(onPlayListener)
+registerCardListener(isDoableListener)
 
 export const B103_FieldMerchant = new Occupation({
   id: CARD_ID,

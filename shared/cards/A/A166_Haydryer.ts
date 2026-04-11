@@ -27,5 +27,5 @@ export const A166_Haydryer = new Occupation({
   category: "LIVESTOCK_PROVIDER",
   desc: ["Before each harvest, you can pay (4 minus your pasture count) <FOOD> to get 1 <CATTLE>."],
   cost: {},
-  players: "1+",
+  players: "4+",
 })

@@ -12,6 +12,9 @@ const listener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const actionContext = context.actionContext ?? {}
+    if (actionContext.checkedReplaceAction === true) return
+    if (actionContext.maxSelections !== undefined || actionContext.cropType !== undefined) return
     const hasVegetable = context.player.fields.some(
       (field) => {
         const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0

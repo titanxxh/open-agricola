@@ -83,6 +83,7 @@ export const C60_SmallPottersOven = new MinorImprovement({
   desc: [
     "When you play this card, you immediately get 5 <FOOD>. Each time before you get a __Bake Bread__ action, you can build the __Clay Oven__ or __Stone Oven__ major improvement.",
   ],
+  vp: 5,
   cost: { clay: 2 },
   prerequisite: "Return the Clay / Stone Oven",
   returnCards: ['Major_ClayOven', 'Major_StoneOven'],

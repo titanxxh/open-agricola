@@ -200,7 +200,7 @@ export const isMinorImprovementPlayable = (
   if (allowedPurchases && !allowedPurchases.includes(improvement.id)) {
     return false
   }
-  if (!meetsCardPrerequisites(player, improvement)) return false
+  if (!meetsCardPrerequisites(player, improvement, state.round)) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
@@ -215,7 +215,7 @@ const buildPlayableMinorOptions = (
       (improvement): improvement is ResolvedMinorImprovement =>
         !!improvement,
     )
-    .filter((improvement) => meetsCardPrerequisites(player, improvement))
+    .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -256,7 +256,7 @@ const buildMinorImprovementOptions = (
       (improvement): improvement is ResolvedMinorImprovement =>
         !!improvement,
     )
-    .filter((improvement) => meetsCardPrerequisites(player, improvement))
+    .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round))
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
@@ -471,7 +471,7 @@ const playMinorImprovement = (
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
-  if (!meetsCardPrerequisites(player, improvement)) {
+  if (!meetsCardPrerequisites(player, improvement, state.round)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
   const targetImprovement: ResolvedMinorImprovement = improvement
