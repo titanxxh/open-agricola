@@ -31,6 +31,7 @@ import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
 import { storeOnCardAction } from './effects/store-on-card'
 import { gainOtherPlayersAction } from './effects/gain-other-players'
+import { scytheHarvestFieldAction } from './effects/scythe-harvest-field'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -67,6 +68,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   payGrainAnyAction,
   storeOnCardAction,
   gainOtherPlayersAction,
+  scytheHarvestFieldAction,
   constructAction,
   placeFarmerAction,
   setFirstPlayerAction,
