@@ -7,7 +7,7 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
-    const stored = player.cardStates?.E134_Omnifarmer?.storedTypes as number | undefined
+    const stored = (player.cardStates?.[CARD_ID]?.extraData?.storedTypes as number | undefined)
     if (!stored || stored < 2) return 0
     const vpMap = [0, 0, 3, 5, 7, 9]
     return vpMap[Math.min(stored, 5)] ?? 9
