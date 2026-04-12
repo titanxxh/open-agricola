@@ -33,7 +33,7 @@ BACKEND_HOST="$LAN_IP" nohup npm run server > backend.log 2>&1 &
 echo "  PID: $!"
 
 echo "Starting frontend (port 5173 on $LAN_IP)..."
-nohup npx vite --host "$LAN_IP" > frontend.log 2>&1 &
+BACKEND_HOST="$LAN_IP" nohup npx vite --host "$LAN_IP" > frontend.log 2>&1 &
 echo "  PID: $!"
 
 sleep 2
