@@ -1,7 +1,33 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'E133_ChampionBreeder'
+
+registerCardEffect({
+  id: CARD_ID,
+  onEndHarvest: (state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    const summary = state.harvestBreedSummary?.[player.id]
+    if (!summary) return
+    const { animalCount } = summary
+    if (animalCount >= 3) {
+      return {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },
+        ],
+      }
+    }
+    if (animalCount >= 2) {
+      return { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID }
+    }
+    return undefined
+  },
+})
 
 export const E133_ChampionBreeder = new Occupation({
-  id: "E133_ChampionBreeder",
+  id: CARD_ID,
   name: "Champion Breeder",
   deck: "E",
   number: 133,
