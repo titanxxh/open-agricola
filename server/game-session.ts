@@ -151,6 +151,7 @@ type StageResumeState = {
     | 'onEndHarvestFieldPhase'
     | 'onHarvestFeedingPhase'
     | 'onEndHarvestFeedingPhase'
+    | 'onBeforeReturnHome'
   playerIndex: number
   cardIndex: number
 }
@@ -1284,6 +1285,9 @@ export class GameSession {
       case 'onStartHarvestFeedingPhase':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onBeforeReturnHome':
+        this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
       case 'onReturnHome':
         this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
@@ -1929,6 +1933,13 @@ export class GameSession {
     this.pushHistory()
     this.state.phase = 'returning-home'
     this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
+    return this.continueBeforeReturnHomeHooks()
+  }
+
+  private continueBeforeReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
+      return this.respond()
+    }
     this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
     return this.continueStartReturnHomeHooks()
   }
