@@ -27,9 +27,9 @@
 | A Deck | 180 | 28 | 22 | 130 |
 | B Deck | 180 | 9 | 19 | 152 |
 | C Deck | 180 | 15 | 27 | 138 |
-| D Deck | 180 | 13 | 28 | 139 |
-| E Deck | 168 | 12 | 34 | 122 |
-| **总计** | **898** | **87** | **130** | **681** |
+| D Deck | 180 | 14 | 27 | 139 |
+| E Deck | 168 | 13 | 33 | 122 |
+| **总计** | **898** | **89** | **128** | **681** |
 
 ---
 
@@ -295,7 +295,7 @@
 
 ---
 
-## D Deck 卡牌进度 (13✅ + 28🔧 / 180)
+## D Deck 卡牌进度 (14✅ + 27🔧 / 180)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -307,7 +307,7 @@
 | D27_Retraining | - | 🔧 |
 | D36_BreedRegistry | - | ✅ |
 | D49_Bookshelf | Before(Occupation), IsDoable(Occupation) | ✅ |
-| D51_Archway | Before(ReturnHome) | 🔧 |
+| D51_Archway | onBeforeReturnHome, onReturnHome | ✅ |
 | D53_TeaHouse | - | 🔧 |
 | D55_NewMarket | - | 🔧 |
 | D70_StrawManure | - | 🔧 |
@@ -343,7 +343,7 @@
 
 ---
 
-## E Deck 卡牌进度 (12✅ + 34🔧 / 168)
+## E Deck 卡牌进度 (13✅ + 33🔧 / 168)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -368,7 +368,7 @@
 | E76_LumberPile | - | 🔧 |
 | E78_SleightofHand | - | 🔧 |
 | E82_Profiteering | - | 🔧 |
-| E84_DollysMother | - | 🔧 |
+| E84_DollysMother | onEndHarvestFeedingPhase, onEndHarvest | ✅ |
 | E85_MasterTanner | - | 🔧 |
 | E86_PenBuilder | - | 🔧 |
 | E90_DungCollector | - | 🔧 |

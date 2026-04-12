@@ -70,7 +70,7 @@
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
 | onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发，现由 `GameSession` 统一按阶段 flow 推进 |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
-| onBeforeReturnHome | — | 已接入（stage hook 未接入） | 回家阶段最先触发（BGA: 1 张卡 D51_Archway，为行动卡类型，暂未实现） |
+| onBeforeReturnHome | [D51_Archway](../shared/cards/D/D51_Archway.ts) | 已接入 | 回家阶段最先触发（BGA: 1 张卡）；D51 给予额外 place-farmer 行动（1/1） |
 | onStartReturnHome | [D107_Bellfounder](../shared/cards/D/D107_Bellfounder.ts) | 已接入 | 回家阶段工人返回前（BGA: 11 张卡）；D107 可弃全部黏土换 3 食物或 1 VP（1/11） |
 | onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | 已接入 | 每回合回家阶段触发 |
 | onAfterRoundEnd | [D167_PureBreeder](../shared/cards/D/D167_PureBreeder.ts) | 已接入 | 非收获回合结束后可繁殖一种动物（BGA: 1 张卡，1/1） |
@@ -82,7 +82,7 @@
 | onAfterReap | [A64_BarleyMill](../shared/cards/A/A64_BarleyMill.ts)、[C120_AgriculturalLabourer](../shared/cards/C/C120_AgriculturalLabourer.ts) | 已接入 | 收获田地后触发，支持返回可暂停/恢复的 `ActionFlow` |
 | onStartHarvestFeedingPhase | [E52_Cubbyhole](../shared/cards/E/E52_Cubbyhole.ts) | 已接入 | 喂食阶段开始（BGA: 3 张卡）；E52 取出卡上食物（1/3） |
 | onHarvestFeedingPhase | [C63_CraftBrewery](../shared/cards/C/C63_CraftBrewery.ts) | 已接入 | 喂食阶段中（BGA: 11 张卡）；C63 可用 1 供应谷物 + 1 田地谷物换 4 食物 + 2 VP（1/11） |
-| onEndHarvestFeedingPhase | — | 已接入 | 喂食阶段结束（BGA: 4 张卡）；stage hook 已接入但暂无卡牌实现（0/4） |
+| onEndHarvestFeedingPhase | [E84_DollysMother](../shared/cards/E/E84_DollysMother.ts) | 已接入 | 喂食阶段结束（BGA: 4 张卡）；E84 添加虚拟羊使 1 只羊也能繁殖（1/4） |
 | onBeforeFeed | — | 已接入 | 喂食前触发 |
 | onAfterFeed | — | 已接入 | 喂食后触发 |
 | onEndHarvest | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts)、[D115_FodderPlanter](../shared/cards/D/D115_FodderPlanter.ts)、[E133_ChampionBreeder](../shared/cards/E/E133_ChampionBreeder.ts) | 已接入 | 收获结束/繁殖后；E133 按繁殖新生动物数给 1-2 VP |
