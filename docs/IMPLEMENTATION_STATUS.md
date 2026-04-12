@@ -146,7 +146,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
 - `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
-252 个 A/B/C/D/E 牌文件，69 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+252 个 A/B/C/D/E 牌文件，71 张已实现 hook 注册。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
