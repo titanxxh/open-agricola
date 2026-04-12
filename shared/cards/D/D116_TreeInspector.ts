@@ -43,8 +43,16 @@ registerCardEffect({
       }
     }
   },
-  onRoundStart: (_state, player) => {
-    // Accumulate 1 wood on card each round
+  onRoundStart: (state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    // Check if the newly revealed action this round is a Quarry
+    const revealedAction = state.roundActionOrder[state.round - 1]
+    if (revealedAction === 'western-quarry' || revealedAction === 'eastern-quarry') {
+      // Discard all stored wood
+      setStoredResource(player, CARD_ID, 'wood', 0)
+      return
+    }
+    // Otherwise accumulate 1 wood
     const current = getStoredResource(player, CARD_ID, 'wood')
     setStoredResource(player, CARD_ID, 'wood', current + 1)
   },

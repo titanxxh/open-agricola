@@ -5,10 +5,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'C104_Collector'
 
-// Most valuable resources first for auto-selection
-const RESOURCE_TYPES = [
-  'cattle', 'boar', 'sheep', 'stone', 'reed', 'vegetable', 'grain', 'clay', 'wood', 'food',
-] as const
+const RESOURCE_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
 
 const USES_TO_RESOURCES: Record<number, number> = { 1: 6, 2: 7, 3: 8, 4: 9 }
 
@@ -26,16 +23,48 @@ registerPlayerActionSpace({
     execute: ({ player }) => {
       const useCount = (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) + 1
       writeCardExtraData(player, CARD_ID, 'used', useCount)
-      // Gain 1 begging marker
+      writeCardExtraData(player, CARD_ID, 'pendingSelections', [])
       player.resources.begging += 1
-      // Auto-select N most valuable different resource types
-      const n = USES_TO_RESOURCES[useCount] ?? 6
-      const gained: Partial<Record<string, number>> = {}
-      for (let i = 0; i < Math.min(n, RESOURCE_TYPES.length); i++) {
-        const res = RESOURCE_TYPES[i]
-        player.resources[res as keyof typeof player.resources] += 1
+      return {
+        type: 'choice' as const,
+        promptKey: 'ui.interactionCollectorSelect',
+        options: RESOURCE_TYPES.map((r) => ({
+          value: r,
+          labelKey: `resources.${r}`,
+        })),
+      }
+    },
+    resolveChoice: ({ player }, choice) => {
+      const selections = readCardExtraData<string[]>(player, CARD_ID, 'pendingSelections') ?? []
+      if (selections.includes(choice)) {
+        // Already selected this type — ignore, re-present same options
+        const remaining = RESOURCE_TYPES.filter((r) => !selections.includes(r))
+        return {
+          type: 'choice' as const,
+          promptKey: 'ui.interactionCollectorSelect',
+          options: remaining.map((r) => ({ value: r, labelKey: `resources.${r}` })),
+        }
+      }
+      selections.push(choice)
+      writeCardExtraData(player, CARD_ID, 'pendingSelections', selections)
+      const useCount = readCardExtraData<number>(player, CARD_ID, 'used') ?? 1
+      const needed = USES_TO_RESOURCES[useCount] ?? 6
+      if (selections.length < needed) {
+        // More selections needed — present remaining types
+        const remaining = RESOURCE_TYPES.filter((r) => !selections.includes(r))
+        return {
+          type: 'choice' as const,
+          promptKey: 'ui.interactionCollectorSelect',
+          options: remaining.map((r) => ({ value: r, labelKey: `resources.${r}` })),
+        }
+      }
+      // All selections made — give 1 of each selected resource
+      const gained: Record<string, number> = {}
+      for (const res of selections) {
+        (player.resources as Record<string, number>)[res] = ((player.resources as Record<string, number>)[res] ?? 0) + 1
         gained[res] = 1
       }
+      writeCardExtraData(player, CARD_ID, 'pendingSelections', null)
       return { type: 'ok' as const, resourcesGained: gained }
     },
   }),
