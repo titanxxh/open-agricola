@@ -70,19 +70,19 @@
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
 | onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发，现由 `GameSession` 统一按阶段 flow 推进 |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
-| onBeforeReturnHome | — | 已接入 | 回家阶段最先触发（BGA: D51_Archway） |
-| onStartReturnHome | [D107_Bellfounder](../shared/cards/D/D107_Bellfounder.ts) | 已接入 | 回家阶段工人返回前；D107 可弃全部黏土换 3 食物或 1 VP |
+| onBeforeReturnHome | — | 已接入（stage hook 未接入） | 回家阶段最先触发（BGA: 1 张卡 D51_Archway，为行动卡类型，暂未实现） |
+| onStartReturnHome | [D107_Bellfounder](../shared/cards/D/D107_Bellfounder.ts) | 已接入 | 回家阶段工人返回前（BGA: 11 张卡）；D107 可弃全部黏土换 3 食物或 1 VP（1/11） |
 | onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | 已接入 | 每回合回家阶段触发 |
-| onAfterRoundEnd | [D167_PureBreeder](../shared/cards/D/D167_PureBreeder.ts) | 已接入 | 非收获回合结束后可繁殖一种动物 |
+| onAfterRoundEnd | [D167_PureBreeder](../shared/cards/D/D167_PureBreeder.ts) | 已接入 | 非收获回合结束后可繁殖一种动物（BGA: 1 张卡，1/1） |
 | onBeforeHarvest | [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts) | 已接入 | 收获前触发，支持返回可暂停/恢复的 `ActionFlow` |
-| onStartHarvest | [C24_BedintheGrainField](../shared/cards/C/C24_BedintheGrainField.ts) | 已接入 | 收获开始时触发；C24 一次性在下次收获时触发家庭扩展 |
-| onStartHarvestFieldPhase | [E73_Scythe](../shared/cards/E/E73_Scythe.ts) | 已接入 | 田地阶段开始；E73 选择一块田全部收割（通过 `scythe-harvest-field` 内部 action） |
-| onHarvestFieldPhase | [A112_ScytheWorker](../shared/cards/A/A112_ScytheWorker.ts)、[E112_GrainThief](../shared/cards/E/E112_GrainThief.ts) | 已接入 | 田地阶段中（reap 前）；A112 每块谷田额外 +1 谷物；E112 逐田选择是否保护（`grain-thief-protect` action） |
-| onEndHarvestFieldPhase | [E112_GrainThief](../shared/cards/E/E112_GrainThief.ts) | 已接入 | 田地阶段结束（reap 后）；E112 恢复被保护谷田的 remaining |
+| onStartHarvest | [C24_BedintheGrainField](../shared/cards/C/C24_BedintheGrainField.ts) | 已接入 | 收获开始时触发（BGA: 16 张卡）；C24 一次性在下次收获时触发家庭扩展（1/16） |
+| onStartHarvestFieldPhase | [E73_Scythe](../shared/cards/E/E73_Scythe.ts) | 已接入 | 田地阶段开始（BGA: 7 张卡）；E73 选择一块田全部收割（`scythe-harvest-field` 内部 action）（1/7） |
+| onHarvestFieldPhase | [A112_ScytheWorker](../shared/cards/A/A112_ScytheWorker.ts)、[E112_GrainThief](../shared/cards/E/E112_GrainThief.ts) | 已接入 | 田地阶段中 reap 前（BGA: 10 张卡）；A112 每块谷田额外 +1 谷物；E112 逐田选择保护（`grain-thief-protect` action）（2/10） |
+| onEndHarvestFieldPhase | [E112_GrainThief](../shared/cards/E/E112_GrainThief.ts) | 已接入 | 田地阶段结束 reap 后（BGA: 6 张卡）；E112 恢复被保护谷田的 remaining（1/6） |
 | onAfterReap | [A64_BarleyMill](../shared/cards/A/A64_BarleyMill.ts)、[C120_AgriculturalLabourer](../shared/cards/C/C120_AgriculturalLabourer.ts) | 已接入 | 收获田地后触发，支持返回可暂停/恢复的 `ActionFlow` |
-| onStartHarvestFeedingPhase | — | 已接入 | 喂食阶段开始（BGA: C107_Baker 等 3 张卡） |
-| onHarvestFeedingPhase | [C63_CraftBrewery](../shared/cards/C/C63_CraftBrewery.ts) | 已接入 | 喂食阶段中；C63 可用 1 供应谷物 + 1 田地谷物换 4 食物 + 2 VP |
-| onEndHarvestFeedingPhase | — | 已接入 | 喂食阶段结束（BGA: E83_ShepherdsWhistle 等 4 张卡） |
+| onStartHarvestFeedingPhase | [E52_Cubbyhole](../shared/cards/E/E52_Cubbyhole.ts) | 已接入 | 喂食阶段开始（BGA: 3 张卡）；E52 取出卡上食物（1/3） |
+| onHarvestFeedingPhase | [C63_CraftBrewery](../shared/cards/C/C63_CraftBrewery.ts) | 已接入 | 喂食阶段中（BGA: 11 张卡）；C63 可用 1 供应谷物 + 1 田地谷物换 4 食物 + 2 VP（1/11） |
+| onEndHarvestFeedingPhase | — | 已接入 | 喂食阶段结束（BGA: 4 张卡）；stage hook 已接入但暂无卡牌实现（0/4） |
 | onBeforeFeed | — | 已接入 | 喂食前触发 |
 | onAfterFeed | — | 已接入 | 喂食后触发 |
 | onEndHarvest | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts)、[D115_FodderPlanter](../shared/cards/D/D115_FodderPlanter.ts)、[E133_ChampionBreeder](../shared/cards/E/E133_ChampionBreeder.ts) | 已接入 | 收获结束/繁殖后；E133 按繁殖新生动物数给 1-2 VP |
