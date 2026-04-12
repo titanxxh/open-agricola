@@ -13,9 +13,9 @@ export const scytheHarvestFieldAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params, sourceCard }) => {
     const fieldIndex = params?.fieldIndex as number | undefined
-    if (fieldIndex === undefined) return { type: 'fail' }
+    if (fieldIndex === undefined) return { type: 'fail', logKey: 'log.actionFail' }
     const field = player.fields[fieldIndex]
-    if (!field || !field.crop || field.remaining <= 0) return { type: 'fail' }
+    if (!field || !field.crop || field.remaining <= 0) return { type: 'fail', logKey: 'log.actionFail' }
     const crop = field.crop
     const amount = field.remaining
     player.resources[crop] += amount
