@@ -75,6 +75,7 @@ import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
 import { B21_HayloftBarn } from './B/B21_HayloftBarn'
 import { B23_FinalScenario } from './B/B23_FinalScenario'
+import { B30_WoodPalisades } from './B/B30_WoodPalisades'
 import { B3_Moonshine } from './B/B3_Moonshine'
 import { B34_SpecialFood } from './B/B34_SpecialFood'
 import { B42_ForestInn } from './B/B42_ForestInn'
@@ -88,6 +89,7 @@ import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
+import { B99_Tutor } from './B/B99_Tutor'
 import { B136_HouseSteward } from './B/B136_HouseSteward'
 import { B94_StockProtector } from './B/B94_StockProtector'
 import { B1_UpscaleLifestyle } from './B/B1_UpscaleLifestyle'
@@ -232,6 +234,7 @@ import { E27_PiggyBank } from './E/E27_PiggyBank'
 import { E30_ChildsToy } from './E/E30_ChildsToy'
 import { E33_BeaverColony } from './E/E33_BeaverColony'
 import { E36_HerbalGarden } from './E/E36_HerbalGarden'
+import { E38_RodCollection } from './E/E38_RodCollection'
 import { E4_Thunderbolt } from './E/E4_Thunderbolt'
 import { E5_NightLoot } from './E/E5_NightLoot'
 import { E51_WhaleOil } from './E/E51_WhaleOil'
@@ -308,6 +311,7 @@ export const minorImprovementCards = [
   B21_HayloftBarn,
   B23_FinalScenario,
   B3_Moonshine,
+  B30_WoodPalisades,
   B34_SpecialFood,
   B42_ForestInn,
   B48_ForestStone,
@@ -396,6 +400,7 @@ export const minorImprovementCards = [
   E30_ChildsToy,
   E33_BeaverColony,
   E36_HerbalGarden,
+  E38_RodCollection,
   E4_Thunderbolt,
   E5_NightLoot,
   E51_WhaleOil,
@@ -458,6 +463,7 @@ export const occupationCards = [
   B86_TruffleSearcher,
   B94_StockProtector,
   B98_OrganicFarmer,
+  B99_Tutor,
   B136_HouseSteward,
   C85_DenBuilder,
   C86_LivestockFeeder,
