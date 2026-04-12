@@ -28,6 +28,7 @@ export type EngineNode = {
 
 export type EngineChoice = {
   promptKey?: string
+  promptParams?: Record<string, unknown>
   options: ActionChoiceOption[]
 }
 

@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check existing session on mount
   useEffect(() => {
+    // Dev shortcut: ?player=p1 skips auth entirely (for restart-intranet.sh dev links)
+    const params = new URLSearchParams(window.location.search)
+    const devPlayer = params.get('player')
+    if (devPlayer && (params.get('transport') === 'ws' || params.get('devMode'))) {
+      const displayName = devPlayer === 'p1' ? 'Player 1' : devPlayer === 'p2' ? 'Player 2' : devPlayer
+      setState({ user: { id: devPlayer, username: devPlayer, displayName }, token: null, loading: false })
+      return
+    }
+
     const savedToken = localStorage.getItem(TOKEN_KEY)
     if (!savedToken) {
       setState({ user: null, token: null, loading: false })

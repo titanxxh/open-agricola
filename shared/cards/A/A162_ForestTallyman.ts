@@ -1,4 +1,41 @@
 import { PlayerActionCard } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+
+const CARD_ID = 'A162_ForestTallyman'
+
+registerPlayerActionSpace({
+  cardId: CARD_ID,
+  access: 'owner',
+  createDefinition: (ownerId) => ({
+    id: CARD_ID,
+    nameKey: 'cards.A162_ForestTallyman.name',
+    descriptionKey: 'cards.A162_ForestTallyman.desc',
+    canBeExecutedByPlayer: (state, player) => {
+      if (player.id !== ownerId) return false
+      const forest = state.actionSpaces.find((s) => s.id === 'forest')
+      const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
+      return !!(forest?.takenBy && clayPit?.takenBy)
+    },
+    execute: ({ player }) => {
+      player.resources.clay += 2
+      player.resources.wood += 3
+      return { type: 'ok', resourcesGained: { clay: 2, wood: 3 } }
+    },
+  }),
+})
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const newSpaces = createPlayerActionSpaces(state)
+    for (const space of newSpaces) {
+      if (!state.actionSpaces.some((s) => s.id === space.id)) {
+        state.actionSpaces.push(space)
+      }
+    }
+  },
+})
 
 export const A162_ForestTallyman = new PlayerActionCard({
   id: "A162_ForestTallyman",

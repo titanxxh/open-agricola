@@ -64,11 +64,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5175',
+        target: `http://${process.env.BACKEND_HOST || 'localhost'}:5175`,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:5175',
+        target: `ws://${process.env.BACKEND_HOST || 'localhost'}:5175`,
         ws: true,
       },
     },

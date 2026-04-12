@@ -1,5 +1,12 @@
 import type { Resource, CostModifier } from '../game/types'
 
+export type CardExchange = {
+  from: Partial<Resource>
+  to: Partial<Resource>
+  max?: number
+  trigger?: 'bake-bread' | 'anytime'
+}
+
 export type CardPrerequisites = {
   min?: number
   max?: number
@@ -27,6 +34,7 @@ export type CardDefinition = {
   newSet?: boolean
   modifier?: CostModifier
   modifiers?: CostModifier[]
+  exchanges?: CardExchange[]
   implemented?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
@@ -56,6 +64,7 @@ export class CardBase {
   newSet?: boolean
   modifier?: CostModifier
   modifiers?: CostModifier[]
+  exchanges?: CardExchange[]
   implemented?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
@@ -94,6 +103,7 @@ export class CardBase {
     if (this.newSet) def.newSet = this.newSet
     if (this.modifier) def.modifier = this.modifier
     if (this.modifiers) def.modifiers = this.modifiers
+    if (this.exchanges) def.exchanges = this.exchanges
     if (this.implemented !== undefined) def.implemented = this.implemented
     if (this.locales) def.locales = this.locales
     return def

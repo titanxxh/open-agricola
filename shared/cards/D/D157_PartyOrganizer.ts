@@ -1,7 +1,20 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'D157_PartyOrganizer'
+
+registerCardEffect({
+  id: CARD_ID,
+  computeBonusScore: (state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+    if (player.familySize < 5) return 0
+    const othersWithFive = state.players.filter((p) => p.id !== player.id && p.familySize >= 5)
+    return othersWithFive.length === 0 ? 3 : 0
+  },
+})
 
 export const D157_PartyOrganizer = new Occupation({
-  id: "D157_PartyOrganizer",
+  id: CARD_ID,
   name: "Party Organizer",
   deck: "D",
   number: 157,

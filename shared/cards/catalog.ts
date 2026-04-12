@@ -22,6 +22,7 @@ import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
 import { A22_Telegram } from './A/A22_Telegram'
 import { A23_StoneCompany } from './A/A23_StoneCompany'
 import { A28_ForestSchool } from './A/A28_ForestSchool'
+import { A31_DebtSecurity } from './A/A31_DebtSecurity'
 import { A29_AleBenches } from './A/A29_AleBenches'
 import { A3_PaperKnife } from './A/A3_PaperKnife'
 import { A37_Bucksaw } from './A/A37_Bucksaw'
@@ -48,6 +49,8 @@ import { A88_HedgeKeeper } from './A/A88_HedgeKeeper'
 import { A89_StablePlanner } from './A/A89_StablePlanner'
 import { A92_AdoptiveParents } from './A/A92_AdoptiveParents'
 import { A94_LazySowman } from './A/A94_LazySowman'
+import { A133_Braggart } from './A/A133_Braggart'
+import { A134_FullFarmer } from './A/A134_FullFarmer'
 import { A97_Freshman } from './A/A97_Freshman'
 import { A1_Shelter } from './A/A1_Shelter'
 import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
@@ -67,11 +70,13 @@ import { B146_Illusionist } from './B/B146_Illusionist'
 import { B149_OpenAirFarmer } from './B/B149_OpenAirFarmer'
 import { B15_CarpentersBench } from './B/B15_CarpentersBench'
 import { B151_LittlePeasant } from './B/B151_LittlePeasant'
+import { B153_Housemaster } from './B/B153_Housemaster'
 import { B165_GameProvider } from './B/B165_GameProvider'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
 import { B21_HayloftBarn } from './B/B21_HayloftBarn'
 import { B23_FinalScenario } from './B/B23_FinalScenario'
+import { B30_WoodPalisades } from './B/B30_WoodPalisades'
 import { B3_Moonshine } from './B/B3_Moonshine'
 import { B34_SpecialFood } from './B/B34_SpecialFood'
 import { B42_ForestInn } from './B/B42_ForestInn'
@@ -84,6 +89,9 @@ import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
+import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
+import { B99_Tutor } from './B/B99_Tutor'
+import { B136_HouseSteward } from './B/B136_HouseSteward'
 import { B94_StockProtector } from './B/B94_StockProtector'
 import { B1_UpscaleLifestyle } from './B/B1_UpscaleLifestyle'
 import { B4_WoodPile } from './B/B4_WoodPile'
@@ -92,6 +100,9 @@ import { B6_ExcursiontotheQuarry } from './B/B6_ExcursiontotheQuarry'
 import { B7_Wage } from './B/B7_Wage'
 import { B8_MarketStall } from './B/B8_MarketStall'
 import { B9_BeatingRod } from './B/B9_BeatingRod'
+import { C30_HalfTimberedHouse } from './C/C30_HalfTimberedHouse'
+import { C100_Butler } from './C/C100_Butler'
+import { C134_CowPrince } from './C/C134_CowPrince'
 import { C1_Overhaul } from './C/C1_Overhaul'
 import { C10_BunkBeds } from './C/C10_BunkBeds'
 import { C104_Collector } from './C/C104_Collector'
@@ -141,6 +152,11 @@ import { C5_Remodeling } from './C/C5_Remodeling'
 import { C6_StoneClearing } from './C/C6_StoneClearing'
 import { C7_BladeShears } from './C/C7_BladeShears'
 import { C9_AutomaticWaterTrough } from './C/C9_AutomaticWaterTrough'
+import { D29_MuckRake } from './D/D29_MuckRake'
+import { D33_SummerHouse } from './D/D33_SummerHouse'
+import { D34_LuxuriousHostel } from './D/D34_LuxuriousHostel'
+import { D135_GardeningHeadOfficial } from './D/D135_GardeningHeadOfficial'
+import { D136_AnimalActivist } from './D/D136_AnimalActivist'
 import { D10_StorksNest } from './D/D10_StorksNest'
 import { D100_LordoftheManor } from './D/D100_LordoftheManor'
 import { D101_SugarBaker } from './D/D101_SugarBaker'
@@ -191,6 +207,9 @@ import { D6_PetrifiedWood } from './D/D6_PetrifiedWood'
 import { D7_Trident } from './D/D7_Trident'
 import { D8_FernSeeds } from './D/D8_FernSeeds'
 import { D9_GameTrade } from './D/D9_GameTrade'
+import { E135_Pickler } from './E/E135_Pickler'
+import { E136_AnimalHusbandryWorker } from './E/E136_AnimalHusbandryWorker'
+import { E154_Margrave } from './E/E154_Margrave'
 import { E10_StrawHat } from './E/E10_StrawHat'
 import { E21_SheepRug } from './E/E21_SheepRug'
 import { E103_Wolf } from './E/E103_Wolf'
@@ -216,12 +235,15 @@ import { E27_PiggyBank } from './E/E27_PiggyBank'
 import { E30_ChildsToy } from './E/E30_ChildsToy'
 import { E33_BeaverColony } from './E/E33_BeaverColony'
 import { E36_HerbalGarden } from './E/E36_HerbalGarden'
+import { E38_RodCollection } from './E/E38_RodCollection'
 import { E4_Thunderbolt } from './E/E4_Thunderbolt'
 import { E5_NightLoot } from './E/E5_NightLoot'
 import { E51_WhaleOil } from './E/E51_WhaleOil'
 import { E52_Cubbyhole } from './E/E52_Cubbyhole'
 import { E53_BoarSpear } from './E/E53_BoarSpear'
 import { E62_SourDough } from './E/E62_SourDough'
+import { E63_IronOven } from './E/E63_IronOven'
+import { E64_SimpleOven } from './E/E64_SimpleOven'
 import { E71_CowPatty } from './E/E71_CowPatty'
 import { E73_Scythe } from './E/E73_Scythe'
 import { E74_AshTrees } from './E/E74_AshTrees'
@@ -255,6 +277,7 @@ export const minorImprovementCards = [
   A23_StoneCompany,
   A28_ForestSchool,
   A29_AleBenches,
+  A31_DebtSecurity,
   A3_PaperKnife,
   A37_Bucksaw,
   A39_Chapel,
@@ -289,6 +312,7 @@ export const minorImprovementCards = [
   B21_HayloftBarn,
   B23_FinalScenario,
   B3_Moonshine,
+  B30_WoodPalisades,
   B34_SpecialFood,
   B42_ForestInn,
   B48_ForestStone,
@@ -319,6 +343,7 @@ export const minorImprovementCards = [
   C25_SteamMachine,
   C27_Blueprint,
   C29_BeerTable,
+  C30_HalfTimberedHouse,
   C31_WritingChamber,
   C37_DwellingMound,
   C51_FishingNet,
@@ -346,6 +371,9 @@ export const minorImprovementCards = [
   D23_PioneeringSpirit,
   D26_CarpentersYard,
   D27_Retraining,
+  D29_MuckRake,
+  D33_SummerHouse,
+  D34_LuxuriousHostel,
   D36_BreedRegistry,
   D49_Bookshelf,
   D51_Archway,
@@ -373,12 +401,15 @@ export const minorImprovementCards = [
   E30_ChildsToy,
   E33_BeaverColony,
   E36_HerbalGarden,
+  E38_RodCollection,
   E4_Thunderbolt,
   E5_NightLoot,
   E51_WhaleOil,
   E52_Cubbyhole,
   E53_BoarSpear,
   E62_SourDough,
+  E63_IronOven,
+  E64_SimpleOven,
   E71_CowPatty,
   E73_Scythe,
   E74_AshTrees,
@@ -406,6 +437,8 @@ export const occupationCards = [
   A123_FrameBuilder,
   A126_MasterWorkman,
   A127_Lodger,
+  A133_Braggart,
+  A134_FullFarmer,
   A136_DrudgeryReeve,
   A137_RiverineShepherd,
   A144_Sequestrator,
@@ -427,9 +460,13 @@ export const occupationCards = [
   B146_Illusionist,
   B149_OpenAirFarmer,
   B151_LittlePeasant,
+  B153_Housemaster,
   B165_GameProvider,
   B86_TruffleSearcher,
   B94_StockProtector,
+  B98_OrganicFarmer,
+  B99_Tutor,
+  B136_HouseSteward,
   C85_DenBuilder,
   C86_LivestockFeeder,
   C87_Mason,
@@ -440,7 +477,9 @@ export const occupationCards = [
   C104_Collector,
   C115_Sower,
   C120_AgriculturalLabourer,
+  C100_Butler,
   C133_Soldier,
+  C134_CowPrince,
   C135_Constable,
   C142_MarketCrier,
   C144_ReedRoofRenovator,
@@ -460,6 +499,8 @@ export const occupationCards = [
   D131_CraftsmanshipPromoter,
   D132_HideFarmer,
   D134_OysterEater,
+  D135_GardeningHeadOfficial,
+  D136_AnimalActivist,
   D137_TradeTeacher,
   D150_GodlySpouse,
   D157_PartyOrganizer,
@@ -478,6 +519,8 @@ export const occupationCards = [
   E130_Overachiever,
   E133_ChampionBreeder,
   E134_Omnifarmer,
+  E135_Pickler,
+  E136_AnimalHusbandryWorker,
   E148_Lazybones,
   E151_DeliveryNurse,
   E153_StoneSculptor,
@@ -493,6 +536,7 @@ export const occupationCards = [
   E91_PlowBuilder,
   E92_FieldDoctor,
   E93_Motivator,
+  E154_Margrave,
 ]
 
 // All cards for reference and developer mode

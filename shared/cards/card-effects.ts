@@ -1,4 +1,6 @@
 import type { ActionFlow, GameState, PlayerState, Resource } from '../game/types'
+import type { AnimalZone } from '../actions/effects/animals'
+import type { ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
 
@@ -91,6 +93,8 @@ export type CardEffect = {
   onAfterHarvest?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
+  computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
+  onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()

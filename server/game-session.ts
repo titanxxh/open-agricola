@@ -74,7 +74,7 @@ import {
   shouldSkipImmediateListenerLog,
 } from '../shared/cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../shared/logic/scoring.ts'
-import { getBlockedPastureId, getLooseStableKeys, getPastureCapacity } from '../shared/actions/effects/animals.ts'
+import { computeAnimalZones } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
@@ -251,6 +251,15 @@ export class GameSession {
         extraMinorIds,
         extraOccupationIds,
       })
+    }
+    this.syncDynamicActionSpaces()
+  }
+
+  private syncDynamicActionSpaces() {
+    for (const space of this.state.actionSpaces) {
+      if (!this.registry.get(space.id)) {
+        this.registry.register(space)
+      }
     }
   }
 
@@ -631,30 +640,13 @@ export class GameSession {
   private buildAnimalReorgZones(
     player: PlayerState,
   ): InteractionAnimalReorgZone[] {
-    const blocked = getBlockedPastureId(player)
-    return [
-      ...player.pastures.map((pasture) => ({
-        id: pasture.id,
-        zoneType: 'pasture' as const,
-        animalType: pasture.animalType,
-        animalCount: pasture.animalCount,
-        capacity: getPastureCapacity(pasture, blocked),
-      })),
-      {
-        id: 'house',
-        zoneType: 'house' as const,
-        animalType: player.houseAnimalType ?? null,
-        animalCount: player.houseAnimalCount ?? 0,
-        capacity: 1,
-      },
-      ...getLooseStableKeys(player).map((key) => ({
-        id: `stable:${key}`,
-        zoneType: 'stable' as const,
-        animalType: player.stableAnimals?.[key] ?? null,
-        animalCount: player.stableAnimals?.[key] ? 1 : 0,
-        capacity: 1,
-      })),
-    ]
+    return computeAnimalZones(player).map((zone) => ({
+      id: zone.id,
+      zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+      animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+      animalCount: zone.animalCount ?? 0,
+      capacity: zone.capacity,
+    }))
   }
 
   private buildInteraction(): InteractionState {
@@ -719,6 +711,7 @@ export class GameSession {
         playerIndex: this.pending.playerIndex,
         spaceId: this.pending.spaceId,
         promptKey: this.pending.promptKey,
+        promptParams: this.pending.promptParams,
         options: this.pending.options,
         costOverride: this.pending.costOverride,
         farm,
@@ -731,6 +724,7 @@ export class GameSession {
       playerIndex: this.pending.playerIndex,
       spaceId: this.pending.spaceId,
       promptKey: this.pending.promptKey,
+      promptParams: this.pending.promptParams,
       options: this.pending.options,
       costOverride: this.pending.costOverride,
       allowedCommands: [...allowedCommands],
@@ -1397,6 +1391,7 @@ export class GameSession {
               this.pending = {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
                 options: result.options ?? [], promptKey: result.promptKey,
+                promptParams: result.promptParams,
                 costOverride: this.engine?.getLastComputedCosts(),
                 actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
               }
@@ -1421,6 +1416,7 @@ export class GameSession {
         this.pending = {
           type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
+          promptParams: step.choice.promptParams,
           costOverride: this.engine?.getLastComputedCosts(),
           actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
         }
@@ -1574,9 +1570,9 @@ export class GameSession {
   getPastureCapacities(): Record<string, Record<string, number>> {
     const result: Record<string, Record<string, number>> = {}
     this.state.players.forEach((player) => {
-      const blocked = getBlockedPastureId(player)
+      const zones = computeAnimalZones(player)
       result[player.id] = Object.fromEntries(
-        player.pastures.map((pasture) => [pasture.id, getPastureCapacity(pasture, blocked)]),
+        zones.filter((z) => z.zoneType === 'pasture').map((z) => [z.id, z.capacity]),
       )
     })
     return result
@@ -1709,6 +1705,7 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
@@ -1775,12 +1772,13 @@ export class GameSession {
       return acc
     }, { sheep: 0, boar: 0, cattle: 0 })
 
-    const blocked = getBlockedPastureId(player)
+    const computedZones = computeAnimalZones(player)
+    const zoneCapacity = (id: string) => computedZones.find((z) => z.id === id)?.capacity ?? 0
     const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
     player.pastures = player.pastures.map((pasture) => {
       const assigned = pastureZones.find((z) => z.id === pasture.id)
       if (!assigned || !assigned.animalType) return { ...pasture, animalType: null, animalCount: 0 }
-      const capacity = getPastureCapacity(pasture, blocked)
+      const capacity = zoneCapacity(pasture.id)
       const count = Math.max(0, Math.min(capacity, assigned.animalCount))
       return { ...pasture, animalType: count > 0 ? assigned.animalType : null, animalCount: count }
     })
@@ -2046,6 +2044,7 @@ export class GameSession {
 
   loadState(raw: unknown): SessionResponse {
     this.state = rebuildActiveModifiers(normalizeState(raw as GameState))
+    this.syncDynamicActionSpaces()
     if (!this.state.roundStartSnapshot) {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     }
@@ -2092,6 +2091,7 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
@@ -2497,6 +2497,9 @@ export class GameSession {
         player.activeModifiers.push(modifier)
       }
     })
+    // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
+    runCardEffectHook(this.state, player, cardId, 'onBuy')
+    this.syncDynamicActionSpaces()
     return this.respond()
   }
 

@@ -3,6 +3,8 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
+import { PlayerCard } from '../common/PlayerCard'
+import { getOccupation } from '../../../shared/game/occupations'
 
 const BOARD_W = 1000
 const BOARD_H = 795
@@ -511,6 +513,41 @@ export const ActionBoard = ({
           ))}
         </div>
       </div>
+
+      {/* Dynamic PlayerActionCard action spaces — rendered as BGA-style cards */}
+      {baseActions.filter((s) => !BASE_POS[s.id]).length > 0 && (
+        <div className="player-action-cards-row">
+          <h3>{t(locale, 'ui.playerActionCards')}</h3>
+          <div className="hand-row">
+            {baseActions.filter((s) => !BASE_POS[s.id]).map((space) => {
+              const canTake = canTakeAction(space, currentPlayer)
+              const isOccupation = !!getOccupation(space.id)
+              const cardType = isOccupation ? 'occupation' as const : 'minor' as const
+              const owner = players.find((p) =>
+                p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
+              )
+              return (
+                <div key={space.id} className="player-action-card-wrapper">
+                  <PlayerCard
+                    locale={locale}
+                    cardId={space.id}
+                    cardType={cardType}
+                    onClick={() => canTake && takeAction(space)}
+                    disabled={!canTake}
+                    usable={canTake && !space.takenBy}
+                    className={space.takenBy ? 'taken' : ''}
+                  />
+                  {owner && (
+                    <div className="player-action-card-owner" data-player-color={owner.color}>
+                      {owner.name}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {tooltip && (
         <div

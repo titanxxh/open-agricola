@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
@@ -14,6 +15,57 @@ const isResourceExchangeLabelParams = (
   value: unknown,
 ): value is ResourceExchangeLabelParams =>
   !!value && typeof value === 'object'
+
+function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
+  locale: Locale
+  options: { value: string; labelKey: string }[]
+  needed: number
+  resolveChoice: (value: string) => void
+  isInteractive: boolean
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  const toggle = (value: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(value)) {
+        next.delete(value)
+      } else if (next.size < needed) {
+        next.add(value)
+      }
+      return next
+    })
+  }
+
+  return (
+    <div className="collector-multi-select">
+      <div className="interaction-subtitle">
+        {t(locale, 'ui.interactionCollectorCount', { selected: selected.size, needed })}
+      </div>
+      <div className="collector-options">
+        {options.map((option) => (
+          <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
+            <input
+              type="checkbox"
+              checked={selected.has(option.value)}
+              onChange={() => toggle(option.value)}
+              disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
+            />
+            <span className={`card-res-icon ${option.value}`} />
+            {t(locale, option.labelKey)}
+          </label>
+        ))}
+      </div>
+      <button
+        className="collector-confirm"
+        onClick={() => resolveChoice([...selected].join(','))}
+        disabled={!isInteractive || selected.size !== needed}
+      >
+        {t(locale, 'ui.interactionConfirmButton')} ({selected.size}/{needed})
+      </button>
+    </div>
+  )
+}
 
 type Props = {
   pendingAnimalReorg: PendingAnimalReorg | null
@@ -174,7 +226,15 @@ export const InteractionBar = ({
           {isSelectingSow && sowErrorText ? (
             <div className="interaction-error">{sowErrorText}</div>
           ) : null}
-          {pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
+          {pendingChoice.promptKey === 'ui.interactionCollectorSelect' ? (
+            <CollectorMultiSelect
+              locale={locale}
+              options={visibleOptions}
+              needed={(pendingChoice.promptParams?.needed as number) ?? 6}
+              resolveChoice={resolveChoice}
+              isInteractive={isInteractive}
+            />
+          ) : pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
             <div className="interaction-actions">
               {visibleOptions.map((option) => (
                 <button

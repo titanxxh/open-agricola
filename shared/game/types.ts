@@ -234,7 +234,7 @@ export type ActionChoiceOption = {
 
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown>; extraData?: Record<string, unknown> }
-  | { type: 'choice'; promptKey?: string; options: ActionChoiceOption[] }
+  | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[] }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow }
@@ -290,6 +290,7 @@ export type PendingAction =
       spaceId: string
       options: ActionChoiceOption[]
       promptKey?: string
+      promptParams?: Record<string, unknown>
       costOverride?: Partial<Resource>
       actionContext?: Record<string, unknown>
     }
@@ -374,6 +375,7 @@ export type InteractionState =
       playerIndex: number
       spaceId: string
       promptKey?: string
+      promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
     })
@@ -382,6 +384,7 @@ export type InteractionState =
       playerIndex: number
       spaceId: string
       promptKey?: string
+      promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
       farm: InteractionFarmSelection

@@ -454,6 +454,7 @@ export const GameContainerApi = () => {
     interaction.stateId === 'choice' || interaction.stateId === 'farmSelect'
       ? {
           promptKey: interaction.promptKey,
+          promptParams: interaction.promptParams,
           options: interaction.options,
           playerIndex: interaction.playerIndex,
           spaceId: interaction.spaceId,
@@ -507,9 +508,18 @@ export const GameContainerApi = () => {
       }
     })
   }, [state?.roundActionOrder, actionMap])
-  const baseActions = useMemo(() =>
-    baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s),
-  [actionMap])
+  const baseActions = useMemo(() => {
+    const base = baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s)
+    // Append dynamic PlayerActionCard action spaces not in the predefined list
+    const baseIds = new Set(baseActionOrder)
+    const roundIds = new Set((state?.roundActionOrder ?? []).filter(Boolean))
+    for (const [id, space] of actionMap) {
+      if (!baseIds.has(id) && !roundIds.has(id) && !base.some((s) => s.id === id)) {
+        base.push(space)
+      }
+    }
+    return base
+  }, [actionMap, state?.roundActionOrder])
 
   const playedCards = displayPlayer?.playedCards ?? [
     ...(displayPlayer?.improvements ?? []).map((id: string) => `major:${id}`),
