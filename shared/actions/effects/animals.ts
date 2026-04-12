@@ -1,5 +1,16 @@
 import type { PlayerState, Pasture } from '../../game/types'
 import { positionKey } from '../../game/farm'
+import { getCardEffect } from '../../cards/card-effects'
+
+export type AnimalZone = {
+  id: string
+  zoneType: 'pasture' | 'house' | 'stable' | 'card'
+  capacity: number
+  animalType?: string | null
+  animalCount?: number
+  cardId?: string
+  pastureIndex?: number
+}
 
 /**
  * Returns the pasture ID that E33_BeaverColony blocks (cannot hold animals).
@@ -31,6 +42,46 @@ export const getLooseStableKeys = (player: PlayerState) => {
     .filter((key) => !pastureTiles.has(key))
 }
 
+export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
+  const blocked = getBlockedPastureId(player)
+  const zones: AnimalZone[] = [
+    ...player.pastures.map((pasture, index) => ({
+      id: pasture.id,
+      zoneType: 'pasture' as const,
+      capacity: getPastureCapacity(pasture, blocked),
+      animalType: (pasture.animalType as string) ?? null,
+      animalCount: pasture.animalCount,
+      pastureIndex: index,
+    })),
+    {
+      id: 'house',
+      zoneType: 'house' as const,
+      capacity: 1,
+      animalType: (player.houseAnimalType as string) ?? null,
+      animalCount: player.houseAnimalCount ?? 0,
+    },
+    ...getLooseStableKeys(player).map((key) => ({
+      id: `stable:${key}`,
+      zoneType: 'stable' as const,
+      capacity: 1,
+      animalType: (player.stableAnimals?.[key] as string) ?? null,
+      animalCount: player.stableAnimals?.[key] ? 1 : 0,
+    })),
+  ]
+  const allCards = [
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+    ...(player.improvements ?? []),
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (effect?.onComputeAnimalZones) {
+      effect.onComputeAnimalZones(player, zones)
+    }
+  }
+  return zones
+}
+
 export const getAssignedAnimalCount = (player: PlayerState) => {
   const pastureCount = player.pastures.reduce(
     (sum, pasture) => sum + pasture.animalCount,
@@ -44,15 +95,13 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
   return pastureCount + houseCount + stableCount
 }
 
-export const getTotalAnimalCapacity = (player: PlayerState) => {
-  const blocked = getBlockedPastureId(player)
-  return player.pastures.reduce((sum, pasture) => sum + getPastureCapacity(pasture, blocked), 0) +
-    1 +
-    getLooseStableKeys(player).length
-}
+export const getTotalAnimalCapacity = (player: PlayerState) =>
+  computeAnimalZones(player).reduce((sum, zone) => sum + zone.capacity, 0)
 
 export const enforceAnimalCapacity = (player: PlayerState) => {
-  const blocked = getBlockedPastureId(player)
+  const zones = computeAnimalZones(player)
+  const zoneCapacity = (id: string) => zones.find((z) => z.id === id)?.capacity ?? 0
+
   const totals = {
     sheep: player.resources.sheep,
     boar: player.resources.boar,
@@ -64,7 +113,7 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
     stableAnimals[key] = player.stableAnimals?.[key] ?? null
   })
   player.pastures = player.pastures.map((pasture) => {
-    const capacity = getPastureCapacity(pasture, blocked)
+    const capacity = zoneCapacity(pasture.id)
     if (pasture.animalType) {
       const remaining = totals[pasture.animalType]
       const count = Math.min(remaining, capacity)
@@ -77,9 +126,10 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
     }
     return { ...pasture, animalCount: 0, animalType: null }
   })
+  const houseCapacity = zoneCapacity('house')
   const houseCount =
     player.houseAnimalType && totals[player.houseAnimalType] > 0
-      ? Math.min(1, totals[player.houseAnimalType])
+      ? Math.min(houseCapacity, totals[player.houseAnimalType])
       : 0
   if (player.houseAnimalType) {
     totals[player.houseAnimalType] -= houseCount
@@ -91,8 +141,9 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
   looseStableKeys.forEach((key) => {
     const type = stableAnimals[key]
     if (!type) return
+    const cap = zoneCapacity(`stable:${key}`)
     const remaining = totals[type]
-    const count = Math.min(remaining, 1)
+    const count = Math.min(remaining, cap)
     totals[type] -= count
     stableAnimals[key] = count > 0 ? type : null
   })
@@ -100,7 +151,7 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
     pasture: Pasture,
     animalType: 'sheep' | 'boar' | 'cattle',
   ) => {
-    const capacity = getPastureCapacity(pasture, blocked)
+    const capacity = zoneCapacity(pasture.id)
     const remaining = totals[animalType]
     if (remaining <= 0) return pasture
     const count = Math.min(remaining, capacity)
