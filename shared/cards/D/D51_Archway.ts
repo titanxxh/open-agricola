@@ -1,8 +1,32 @@
 import { PlayerActionCard } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'D51_Archway'
+
+// BGA-aligned: onBeforeReturnHome gives each farmer on this card an optional
+// archway-move-farmer action (choose unoccupied space → execute it).
+// No workersAvailable manipulation — the farmer is "moved" from D51 to the target space.
+//
+// Limitation: PlayerActionCard action space infrastructure (creating the actual
+// action space on the board so any player can use it for 1 FOOD) is not yet
+// implemented. Currently only the onBeforeReturnHome effect works for the card owner.
+registerCardEffect({
+  id: CARD_ID,
+  onBeforeReturnHome: (state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    // Check if there are unoccupied action spaces the player can use
+    const hasAvailable = state.actionSpaces.some(
+      (s) => !s.takenBy && s.id !== CARD_ID && s.canBeExecutedByPlayer(state, player),
+    )
+    if (!hasAvailable) return
+    return {
+      type: 'leaf',
+      actionId: 'archway-move-farmer',
+      sourceCard: CARD_ID,
+      optional: true,
+    }
+  },
+})
 
 export const D51_Archway = new PlayerActionCard({
   id: CARD_ID,
@@ -12,43 +36,7 @@ export const D51_Archway = new PlayerActionCard({
   category: "FOOD_PROVIDER",
   desc: ["This card is an action space for all. A player who uses it immediately gets 1 <FOOD>. Immediately before the returning home phase, they can use an unoccupied action space with the person from this card."],
   cost: {"clay":2},
+  vp: 4,
   prerequisite: "No Occupations",
   occupationPrerequisites: {"max":0},
-})
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
-    // D51 is a PlayerActionCard (registered as minor improvement) — check minorPlayed
-    if (!player.minorPlayed.includes(CARD_ID)) return
-    // Check if there are unoccupied action spaces available
-    const available = state.actionSpaces.filter(
-      (s) => !s.takenBy && s.canBeExecutedByPlayer(state, player),
-    )
-    if (available.length === 0) return
-    // Grant temporary worker for the extra placement (idempotent via flag)
-    // The handler may be called twice: once by runBeforeReturnHomeHooks (imperative scan)
-    // and once by continueStageHook (flow scan). Use a flag to avoid double-granting.
-    if (!readCardExtraData<boolean>(player, CARD_ID, 'workerGranted')) {
-      player.workersAvailable += 1
-      writeCardExtraData(player, CARD_ID, 'workerGranted', true)
-    }
-    return {
-      type: 'leaf',
-      actionId: 'place-farmer',
-      sourceCard: CARD_ID,
-      optional: true,
-    }
-  },
-  onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
-    // If worker was granted but not consumed (player declined optional place-farmer),
-    // reclaim it so return-home doesn't see an extra worker
-    if (readCardExtraData<boolean>(player, CARD_ID, 'workerGranted')) {
-      if (player.workersAvailable > 0) {
-        player.workersAvailable -= 1
-      }
-      writeCardExtraData(player, CARD_ID, 'workerGranted', false)
-    }
-  },
 })
