@@ -24,12 +24,12 @@
 | 类型 | 总数 | 已实现 | 部分实现 | 未实现 |
 |------|------|--------|----------|--------|
 | Major Improvements | 10 | 10 | 0 | 0 |
-| A Deck | 180 | 27 | 22 | 131 |
+| A Deck | 180 | 28 | 22 | 130 |
 | B Deck | 180 | 9 | 19 | 152 |
-| C Deck | 180 | 13 | 29 | 138 |
-| D Deck | 180 | 11 | 30 | 139 |
-| E Deck | 168 | 9 | 37 | 122 |
-| **总计** | **898** | **79** | **137** | **682** |
+| C Deck | 180 | 15 | 27 | 138 |
+| D Deck | 180 | 13 | 28 | 139 |
+| E Deck | 168 | 12 | 34 | 122 |
+| **总计** | **898** | **87** | **130** | **681** |
 
 ---
 
@@ -155,7 +155,7 @@
 
 ---
 
-## A Deck 卡牌进度 (27✅ + 22🔧 / 180)
+## A Deck 卡牌进度 (28✅ + 21🔧 / 180)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -195,7 +195,7 @@
 | A108_MushroomCollector | ImmediatelyAfter(Collect) | ✅ |
 | A109_SmallTrader | After(Improvement) | ✅ |
 | A110_Roughcaster | After(Construct, Renovation) | ✅ |
-| A112_ScytheWorker | - | 🔧 |
+| A112_ScytheWorker | onBuy, onHarvestFieldPhase | ✅ |
 | A119_FirewoodCollector | - | 🔧 |
 | A123_FrameBuilder | TradeModifier(Construct, Renovation), IsDoable(Construct, Renovation) | ✅ |
 | A126_MasterWorkman | Before(PlaceFarmer) | ✅ |
@@ -246,7 +246,7 @@
 
 ---
 
-## C Deck 卡牌进度 (13✅ + 29🔧 / 180)
+## C Deck 卡牌进度 (15✅ + 27🔧 / 180)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -258,7 +258,7 @@
 | C18_RollOverPlow | - | 🔧 |
 | C19_SwingPlow | - | 🔧 |
 | C23_JobContract | - | 🔧 |
-| C24_BedintheGrainField | - | 🔧 |
+| C24_BedintheGrainField | onBuy, onStartHarvest | ✅ |
 | C25_SteamMachine | ImmediatelyAfter(PlaceFarmer) | ✅ |
 | C27_Blueprint | - | 🔧 |
 | C29_BeerTable | - | 🔧 |
@@ -268,7 +268,7 @@
 | C52_HuntsmansHat | ImmediatelyAfter(Collect) | ✅ |
 | C57_Crudite | - | 🔧 |
 | C60_SmallPottersOven | Before(BakeBread), IsDoable(BakeBread), ReturnCards(onBuy) | ✅ |
-| C63_CraftBrewery | - | 🔧 |
+| C63_CraftBrewery | onHarvestFeedingPhase | ✅ |
 | C71_Slurry | - | 🔧 |
 | C71_SlurrySpreader | After(Reorganize) | 🔧 |
 | C75_Firewood | After(Improvement) | ✅ |
@@ -295,7 +295,7 @@
 
 ---
 
-## D Deck 卡牌进度 (11✅ + 30🔧 / 180)
+## D Deck 卡牌进度 (13✅ + 28🔧 / 180)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -339,11 +339,11 @@
 | D157_PartyOrganizer | - | ✅ |
 | D158_BeanCounter | - | 🔧 |
 | D164_PetGrower | - | 🔧 |
-| D167_PureBreeder | - | 🔧 |
+| D167_PureBreeder | onBuy, onAfterRoundEnd | ✅ |
 
 ---
 
-## E Deck 卡牌进度 (9✅ + 37🔧 / 168)
+## E Deck 卡牌进度 (12✅ + 34🔧 / 168)
 
 | ID | Hook 覆盖 | 状态 |
 |----|-----------|------|
@@ -362,7 +362,7 @@
 | E53_BoarSpear | During(Collect, Gain, Receive), After(Collect) | ✅ |
 | E62_SourDough | - | 🔧 |
 | E71_CowPatty | - | 🔧 |
-| E73_Scythe | - | 🔧 |
+| E73_Scythe | onStartHarvestFieldPhase | ✅ |
 | E74_AshTrees | Before(Fencing) | ✅ |
 | E75_StoneAxe | - | 🔧 |
 | E76_LumberPile | - | 🔧 |
@@ -378,11 +378,11 @@
 | E101_Blighter | After(Occupation), Before(Occupation), IsDoable(Occupation) | ✅ |
 | E103_Wolf | After(Obtain, Gain, Receive, Reap, Collect) | 🔧 |
 | E109_BraidMaker | - | 🔧 |
-| E112_GrainThief | - | 🔧 |
+| E112_GrainThief | onHarvestFieldPhase, onEndHarvestFieldPhase | ✅ |
 | E123_ResourceHoarder | ComputeCosts(Renovation, Construct) | 🔧 |
 | E124_MayorCandidate | - | ✅ |
 | E130_Overachiever | After(WishChildren), ComputeCardCosts(Improvement) | ✅ |
-| E133_ChampionBreeder | - | 🔧 |
+| E133_ChampionBreeder | onEndHarvest | ✅ |
 | E134_Omnifarmer | - | 🔧 |
 | E148_Lazybones | - | 🔧 |
 | E151_DeliveryNurse | - | 🔧 |
