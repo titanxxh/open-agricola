@@ -454,6 +454,7 @@ export const GameContainerApi = () => {
     interaction.stateId === 'choice' || interaction.stateId === 'farmSelect'
       ? {
           promptKey: interaction.promptKey,
+          promptParams: interaction.promptParams,
           options: interaction.options,
           playerIndex: interaction.playerIndex,
           spaceId: interaction.spaceId,
