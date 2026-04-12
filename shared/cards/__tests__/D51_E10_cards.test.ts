@@ -5,6 +5,7 @@ import {
   getPlayerActionSpaceConfig,
   createPlayerActionSpaces,
 } from '../player-action-space'
+import { moveFarmerToSpaceAction } from '../../actions/effects/move-farmer-to-space'
 
 // Import cards to register effects
 import '../D/D51_Archway'
@@ -24,6 +25,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     newbornCount: 0, pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
+    activeModifiers: [], cardStates: {},
   }) as PlayerState
 
 const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace =>
@@ -45,6 +47,7 @@ const createState = (players: PlayerState[], spaces: ActionSpace[] = []): GameSt
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
+    phase: 'work',
   }) as GameState
 
 describe('PlayerActionSpace infrastructure', () => {
@@ -77,5 +80,253 @@ describe('PlayerActionSpace infrastructure', () => {
     player.minorPlayed = ['A55_JunkRoom']
     const spaces = createPlayerActionSpaces(createState([player]))
     expect(spaces.length).toBe(0)
+  })
+})
+
+describe('D51_Archway', () => {
+  it('action space execute gives 1 food', () => {
+    const config = getPlayerActionSpaceConfig('D51_Archway')!
+    const def = config.createDefinition('p1')
+    const player = createPlayer()
+    const result = def.execute!({
+      state: createState([player]),
+      player,
+      space: createSpace('D51_Archway'),
+    } as any)
+    expect(result.type).toBe('ok')
+    expect(player.resources.food).toBe(1)
+  })
+
+  it('onBuy adds D51 action space to state', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const player = createPlayer()
+    player.minorPlayed = ['D51_Archway']
+    const state = createState([player])
+    expect(state.actionSpaces.length).toBe(0)
+    effect.onBuy!(state, player)
+    expect(state.actionSpaces.some((s) => s.id === 'D51_Archway')).toBe(true)
+  })
+
+  it('onBuy does not duplicate action space', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const player = createPlayer()
+    player.minorPlayed = ['D51_Archway']
+    const state = createState([player])
+    effect.onBuy!(state, player)
+    effect.onBuy!(state, player)
+    expect(state.actionSpaces.filter((s) => s.id === 'D51_Archway').length).toBe(1)
+  })
+
+  it('onBeforeReturnHome triggers when player worker is on D51', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const player = createPlayer()
+    player.minorPlayed = ['D51_Archway']
+    const d51Space = createSpace('D51_Archway', { takenBy: 'p1' })
+    const targetSpace = createSpace('day-laborer')
+    const state = createState([player], [d51Space, targetSpace])
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('leaf')
+    expect((flow as any).actionId).toBe('move-farmer-to-space')
+    expect((flow as any).params.excludeSpaceId).toBe('D51_Archway')
+    expect((flow as any).optional).toBe(true)
+  })
+
+  it('onBeforeReturnHome does not trigger when different player on D51', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const p1 = createPlayer('p1')
+    p1.minorPlayed = ['D51_Archway']
+    const d51Space = createSpace('D51_Archway', { takenBy: 'p2' })
+    const targetSpace = createSpace('day-laborer')
+    const state = createState([p1], [d51Space, targetSpace])
+    const flow = effect.onBeforeReturnHome!(state, p1)
+    expect(flow).toBeUndefined()
+  })
+
+  it('onBeforeReturnHome does not trigger when no one on D51', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const player = createPlayer()
+    player.minorPlayed = ['D51_Archway']
+    const d51Space = createSpace('D51_Archway')
+    const targetSpace = createSpace('day-laborer')
+    const state = createState([player], [d51Space, targetSpace])
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+
+  it('onBeforeReturnHome does not trigger when no available spaces', () => {
+    const effect = getCardEffect('D51_Archway')!
+    const player = createPlayer()
+    player.minorPlayed = ['D51_Archway']
+    const d51Space = createSpace('D51_Archway', { takenBy: 'p1' })
+    const occupiedSpace = createSpace('day-laborer', { takenBy: 'p2' })
+    const state = createState([player], [d51Space, occupiedSpace])
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+})
+
+describe('E10_StrawHat', () => {
+  it('triggers on round 3 with worker on farmland', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: 'p1' })
+    const target = createSpace('day-laborer')
+    const state = createState([player], [farmland, target])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.children.length).toBe(2)
+      expect((flow!.children[0] as any).actionId).toBe('move-farmer-to-space')
+      expect((flow!.children[0] as any).params.excludeSpaceId).toBe('farmland')
+      expect((flow!.children[1] as any).actionId).toBe('gain')
+    }
+  })
+
+  it('triggers on round 6', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: 'p1' })
+    const target = createSpace('day-laborer')
+    const state = createState([player], [farmland, target])
+    state.round = 6
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+  })
+
+  it('does not trigger on round 4', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: 'p1' })
+    const state = createState([player], [farmland])
+    state.round = 4
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+
+  it('does not trigger when worker not on farmland', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: 'p2' })
+    const state = createState([player], [farmland])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+
+  it('does not trigger when farmland has no worker', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland')
+    const state = createState([player], [farmland])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+
+  it('only offers food when no available spaces', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: 'p1' })
+    const occupied = createSpace('day-laborer', { takenBy: 'p2' })
+    const state = createState([player], [farmland, occupied])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.children.length).toBe(1)
+      expect((flow!.children[0] as any).actionId).toBe('gain')
+    }
+  })
+
+  it('does not trigger without card played', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    const farmland = createSpace('farmland', { takenBy: 'p1' })
+    const state = createState([player], [farmland])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeUndefined()
+  })
+})
+
+describe('move-farmer-to-space action', () => {
+  it('execute lists unoccupied spaces excluding source', () => {
+    const player = createPlayer()
+    const source = createSpace('D51_Archway', { takenBy: 'p1' })
+    const available = createSpace('day-laborer')
+    const occupied = createSpace('plow', { takenBy: 'p2' })
+    const state = createState([player], [source, available, occupied])
+    const result = moveFarmerToSpaceAction.execute({
+      state, player, space: source,
+      params: { excludeSpaceId: 'D51_Archway' },
+    } as any)
+    expect(result.type).toBe('choice')
+    if (result.type === 'choice') {
+      expect(result.options!.length).toBe(1)
+      expect(result.options![0].value).toBe('day-laborer')
+    }
+  })
+
+  it('execute returns fail when no spaces available', () => {
+    const player = createPlayer()
+    const source = createSpace('D51_Archway', { takenBy: 'p1' })
+    const occupied = createSpace('plow', { takenBy: 'p2' })
+    const state = createState([player], [source, occupied])
+    const result = moveFarmerToSpaceAction.execute({
+      state, player, space: source,
+      params: { excludeSpaceId: 'D51_Archway' },
+    } as any)
+    expect(result.type).toBe('fail')
+  })
+
+  it('execute includes occupied Lessons with A28_ForestSchool', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['A28_ForestSchool']
+    const source = createSpace('D51_Archway', { takenBy: 'p1' })
+    const lessons = createSpace('lessons', { takenBy: 'p2' })
+    const state = createState([player], [source, lessons])
+    const result = moveFarmerToSpaceAction.execute({
+      state, player, space: source,
+      params: { excludeSpaceId: 'D51_Archway' },
+    } as any)
+    expect(result.type).toBe('choice')
+    if (result.type === 'choice') {
+      expect(result.options!.some((o) => o.value === 'lessons')).toBe(true)
+    }
+  })
+
+  it('resolveChoice executes target space and marks takenBy', () => {
+    const executeSpy = vi.fn(() => ({ type: 'ok' as const }))
+    const player = createPlayer()
+    const target = createSpace('day-laborer', { execute: executeSpy } as any)
+    const state = createState([player], [target])
+    const result = moveFarmerToSpaceAction.resolveChoice!(
+      { state, player, space: createSpace('source') } as any,
+      'day-laborer',
+    )
+    expect(result.type).toBe('ok')
+    expect(target.takenBy).toBe('p1')
+    expect(executeSpy).toHaveBeenCalled()
+  })
+
+  it('resolveChoice returns fail for invalid choice', () => {
+    const player = createPlayer()
+    const state = createState([player], [])
+    const result = moveFarmerToSpaceAction.resolveChoice!(
+      { state, player, space: createSpace('source') } as any,
+      'nonexistent',
+    )
+    expect(result.type).toBe('fail')
   })
 })
