@@ -831,7 +831,7 @@ result.options = [...result.options, ...extraOptions]
 return {
 type: 'choice',
 nodeId: this.pendingChoiceNodeId ?? node.id,
-choice: { promptKey: result.promptKey, options: result.options },
+choice: { promptKey: result.promptKey, promptParams: result.promptParams, options: result.options },
 }
       }
       if (result.type === 'flow') {

@@ -3,6 +3,7 @@ import type { FarmTilePosition, GameState, InteractionAnimalReorgZone } from '..
 
 export type PendingChoice = {
   promptKey?: string
+  promptParams?: Record<string, unknown>
   options: ActionChoiceOption[]
   playerIndex: number
   spaceId: string

@@ -97,6 +97,7 @@ export const en = {
       'Sow vegetable and bake bread with Stone Oven',
     interactionMoveFarmerToSpace: 'Move your person to an unoccupied action space',
     interactionCollectorSelect: 'Select a resource type to gain',
+    interactionCollectorCount: 'Selected: {selected} / Required: {needed}',
     interactionForestInn: 'Choose a wood exchange option',
     interactionForestInn5: 'Exchange 5 wood → 8 wood + 2 food',
     interactionForestInn7: 'Exchange 7 wood → 8 wood + 4 food',

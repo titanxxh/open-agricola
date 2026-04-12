@@ -4,7 +4,6 @@ import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
 import { PlayerCard } from '../common/PlayerCard'
-import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
 
 const BOARD_W = 1000
@@ -524,17 +523,26 @@ export const ActionBoard = ({
               const canTake = canTakeAction(space, currentPlayer)
               const isOccupation = !!getOccupation(space.id)
               const cardType = isOccupation ? 'occupation' as const : 'minor' as const
+              const owner = players.find((p) =>
+                p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
+              )
               return (
-                <PlayerCard
-                  key={space.id}
-                  locale={locale}
-                  cardId={space.id}
-                  cardType={cardType}
-                  onClick={() => canTake && takeAction(space)}
-                  disabled={!canTake}
-                  usable={canTake && !space.takenBy}
-                  className={space.takenBy ? 'taken' : ''}
-                />
+                <div key={space.id} className="player-action-card-wrapper">
+                  <PlayerCard
+                    locale={locale}
+                    cardId={space.id}
+                    cardType={cardType}
+                    onClick={() => canTake && takeAction(space)}
+                    disabled={!canTake}
+                    usable={canTake && !space.takenBy}
+                    className={space.takenBy ? 'taken' : ''}
+                  />
+                  {owner && (
+                    <div className="player-action-card-owner" data-player-color={owner.color}>
+                      {owner.name}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>

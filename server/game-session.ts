@@ -711,6 +711,7 @@ export class GameSession {
         playerIndex: this.pending.playerIndex,
         spaceId: this.pending.spaceId,
         promptKey: this.pending.promptKey,
+        promptParams: this.pending.promptParams,
         options: this.pending.options,
         costOverride: this.pending.costOverride,
         farm,
@@ -723,6 +724,7 @@ export class GameSession {
       playerIndex: this.pending.playerIndex,
       spaceId: this.pending.spaceId,
       promptKey: this.pending.promptKey,
+      promptParams: this.pending.promptParams,
       options: this.pending.options,
       costOverride: this.pending.costOverride,
       allowedCommands: [...allowedCommands],
@@ -1389,6 +1391,7 @@ export class GameSession {
               this.pending = {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
                 options: result.options ?? [], promptKey: result.promptKey,
+                promptParams: result.promptParams,
                 costOverride: this.engine?.getLastComputedCosts(),
                 actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
               }
@@ -1413,6 +1416,7 @@ export class GameSession {
         this.pending = {
           type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
+          promptParams: step.choice.promptParams,
           costOverride: this.engine?.getLastComputedCosts(),
           actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
         }
@@ -1701,6 +1705,7 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
@@ -2086,6 +2091,7 @@ export class GameSession {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
         options: result.options ?? [], promptKey: result.promptKey,
+        promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }

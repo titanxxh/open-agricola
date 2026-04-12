@@ -92,6 +92,7 @@ export const zh = {
     interactionSowVegetableBakeStoneOven: '播种蔬菜并用石制烤炉烤面包',
     interactionMoveFarmerToSpace: '将工人移动到一个未被占用的行动格',
     interactionCollectorSelect: '选择一种资源类型获得',
+    interactionCollectorCount: '已选择: {selected} / 需选择: {needed}',
     interactionForestInn: '选择木材兑换方案',
     interactionForestInn5: '用 5 木换 8 木 + 2 食物',
     interactionForestInn7: '用 7 木换 8 木 + 4 食物',
