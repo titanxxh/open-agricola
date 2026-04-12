@@ -2481,6 +2481,9 @@ export class GameSession {
         player.activeModifiers.push(modifier)
       }
     })
+    // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
+    // Ignore returned flow in dev mode — just run for side effects
+    runCardEffectHook(this.state, player, cardId, 'onBuy')
     return this.respond()
   }
 
