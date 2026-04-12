@@ -252,6 +252,15 @@ export class GameSession {
         extraOccupationIds,
       })
     }
+    this.syncDynamicActionSpaces()
+  }
+
+  private syncDynamicActionSpaces() {
+    for (const space of this.state.actionSpaces) {
+      if (!this.registry.get(space.id)) {
+        this.registry.register(space)
+      }
+    }
   }
 
   /** Run a function with this session's card context active. */
@@ -2030,6 +2039,7 @@ export class GameSession {
 
   loadState(raw: unknown): SessionResponse {
     this.state = rebuildActiveModifiers(normalizeState(raw as GameState))
+    this.syncDynamicActionSpaces()
     if (!this.state.roundStartSnapshot) {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     }
@@ -2482,8 +2492,8 @@ export class GameSession {
       }
     })
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
-    // Ignore returned flow in dev mode — just run for side effects
     runCardEffectHook(this.state, player, cardId, 'onBuy')
+    this.syncDynamicActionSpaces()
     return this.respond()
   }
 
