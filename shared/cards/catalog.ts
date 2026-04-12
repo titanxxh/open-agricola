@@ -70,6 +70,7 @@ import { B146_Illusionist } from './B/B146_Illusionist'
 import { B149_OpenAirFarmer } from './B/B149_OpenAirFarmer'
 import { B15_CarpentersBench } from './B/B15_CarpentersBench'
 import { B151_LittlePeasant } from './B/B151_LittlePeasant'
+import { B153_Housemaster } from './B/B153_Housemaster'
 import { B165_GameProvider } from './B/B165_GameProvider'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
@@ -459,6 +460,7 @@ export const occupationCards = [
   B146_Illusionist,
   B149_OpenAirFarmer,
   B151_LittlePeasant,
+  B153_Housemaster,
   B165_GameProvider,
   B86_TruffleSearcher,
   B94_StockProtector,
