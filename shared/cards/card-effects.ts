@@ -74,17 +74,17 @@ export type CardEffect = {
   onRoundEnd?: EffectHandler
   onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: EffectHandler
-  onStartReturnHome?: EffectHandler
-  onAfterRoundEnd?: EffectHandler
+  onStartReturnHome?: FlowEffectHandler
+  onAfterRoundEnd?: FlowEffectHandler
   onBeforeHarvest?: FlowEffectHandler
-  onStartHarvest?: EffectHandler
-  onStartHarvestFieldPhase?: EffectHandler
-  onHarvestFieldPhase?: EffectHandler
-  onEndHarvestFieldPhase?: EffectHandler
+  onStartHarvest?: FlowEffectHandler
+  onStartHarvestFieldPhase?: FlowEffectHandler
+  onHarvestFieldPhase?: FlowEffectHandler
+  onEndHarvestFieldPhase?: FlowEffectHandler
   onAfterReap?: FlowEffectHandler
   onStartHarvestFeedingPhase?: FlowEffectHandler
-  onHarvestFeedingPhase?: EffectHandler
-  onEndHarvestFeedingPhase?: EffectHandler
+  onHarvestFeedingPhase?: FlowEffectHandler
+  onEndHarvestFeedingPhase?: FlowEffectHandler
   onBeforeFeed?: EffectHandler
   onAfterFeed?: EffectHandler
   onEndHarvest?: FlowEffectHandler
