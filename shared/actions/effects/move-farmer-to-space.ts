@@ -1,24 +1,25 @@
 import type { ActionDefinition } from '../../game/types'
 
 /**
- * Move a farmer from D51_Archway to an unoccupied action space and execute it.
- * BGA-aligned: no workersAvailable manipulation — the farmer is physically moved.
+ * Move a farmer from a source action space to an unoccupied action space and execute it.
+ * Used by D51_Archway (move from Archway) and E10_StrawHat (move from Farmland).
  *
- * - execute(): lists available unoccupied spaces (excluding D51 itself) → returns choice
+ * - execute(): lists available unoccupied spaces (excluding params.excludeSpaceId) → returns choice
  * - resolveChoice(): marks target space as takenBy, executes the space's action
  *
  * Special case: A28_ForestSchool allows moving to occupied Lessons spaces.
  */
-export const archwayMoveFarmerAction: ActionDefinition = {
-  id: 'archway-move-farmer',
-  nameKey: 'actions.archway-move-farmer.name',
-  descriptionKey: 'actions.archway-move-farmer.description',
+export const moveFarmerToSpaceAction: ActionDefinition = {
+  id: 'move-farmer-to-space',
+  nameKey: 'actions.move-farmer-to-space.name',
+  descriptionKey: 'actions.move-farmer-to-space.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player }) => {
+  execute: ({ state, player, params }) => {
+    const excludeId = params?.excludeSpaceId as string | undefined
     const spaces = state.actionSpaces.filter(
-      (s) => !s.takenBy && s.id !== 'D51_Archway' && s.canBeExecutedByPlayer(state, player),
+      (s) => !s.takenBy && s.id !== excludeId && s.canBeExecutedByPlayer(state, player),
     )
     // A28_ForestSchool: allow occupied Lessons spaces
     if (player.occupationPlayed.includes('A28_ForestSchool')) {
@@ -33,7 +34,7 @@ export const archwayMoveFarmerAction: ActionDefinition = {
     if (spaces.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
     return {
       type: 'choice',
-      promptKey: 'ui.interactionArchwayMoveFarmer',
+      promptKey: 'ui.interactionMoveFarmerToSpace',
       options: spaces.map((s) => ({ value: s.id, labelKey: s.nameKey })),
     }
   },

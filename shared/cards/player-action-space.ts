@@ -1,0 +1,58 @@
+import type { ActionDefinition, ActionSpace, GameState, Resource } from '../game/types'
+
+export type PlayerActionSpaceConfig = {
+  /** The card ID */
+  cardId: string
+  /** Who can use this action space: 'all' = any player, 'owner' = only the player who played it */
+  access: 'all' | 'owner'
+  /** Build the ActionDefinition for this card's action space */
+  createDefinition: (ownerId: string) => Omit<ActionDefinition, 'roundAvailable' | 'gainPerRound'>
+}
+
+const registry = new Map<string, PlayerActionSpaceConfig>()
+
+export const registerPlayerActionSpace = (config: PlayerActionSpaceConfig) => {
+  registry.set(config.cardId, config)
+}
+
+export const getPlayerActionSpaceConfig = (cardId: string) => registry.get(cardId)
+
+const emptyResources: Resource = {
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+}
+
+/**
+ * Scan all players' minorPlayed, find PlayerActionCards with registered configs,
+ * and create ActionSpace objects for them.
+ */
+export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
+  const spaces: ActionSpace[] = []
+  for (const player of state.players) {
+    for (const cardId of player.minorPlayed) {
+      const config = registry.get(cardId)
+      if (!config) continue
+      // Don't create duplicate if already exists
+      if (spaces.some((s) => s.id === cardId)) continue
+      const def = config.createDefinition(player.id)
+      spaces.push({
+        ...def,
+        id: cardId,
+        roundAvailable: 1,
+        gainPerRound: {},
+        resources: { ...emptyResources },
+        takenBy: null,
+      } as ActionSpace)
+    }
+  }
+  return spaces
+}

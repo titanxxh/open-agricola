@@ -1,4 +1,37 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { ActionFlow } from '../../game/types'
+
+const CARD_ID = 'E10_StrawHat'
+const TRIGGER_ROUNDS = [3, 6]
+const FARMLAND_SPACE_ID = 'farmland'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBeforeReturnHome: (state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    if (!TRIGGER_ROUNDS.includes(state.round)) return
+    // Check if player has a worker on Farmland
+    const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)
+    if (!farmland || farmland.takenBy !== player.id) return
+    // Check if unoccupied spaces are available (excluding Farmland)
+    const hasAvailable = state.actionSpaces.some(
+      (s) => !s.takenBy && s.id !== FARMLAND_SPACE_ID && s.canBeExecutedByPlayer(state, player),
+    )
+    const children: ActionFlow[] = []
+    if (hasAvailable) {
+      children.push({
+        type: 'leaf',
+        actionId: 'move-farmer-to-space',
+        params: { excludeSpaceId: FARMLAND_SPACE_ID },
+        sourceCard: CARD_ID,
+      })
+    }
+    children.push(gainLeaf(CARD_ID, { food: 1 }))
+    return { type: 'xor', optional: true, children }
+  },
+})
 
 export const E10_StrawHat = new MinorImprovement({
   id: "E10_StrawHat",
