@@ -41,8 +41,14 @@ registerCardEffect({
     }
   },
   onReturnHome: (_state, player) => {
-    // Clear the workerGranted flag at the end of the returning home phase
     if (!player.minorPlayed.includes(CARD_ID)) return
-    writeCardExtraData(player, CARD_ID, 'workerGranted', false)
+    // If worker was granted but not consumed (player declined optional place-farmer),
+    // reclaim it so return-home doesn't see an extra worker
+    if (readCardExtraData<boolean>(player, CARD_ID, 'workerGranted')) {
+      if (player.workersAvailable > 0) {
+        player.workersAvailable -= 1
+      }
+      writeCardExtraData(player, CARD_ID, 'workerGranted', false)
+    }
   },
 })
