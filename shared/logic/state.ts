@@ -9,6 +9,7 @@ import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../game/types'
+import { createPlayerActionSpaces } from '../cards/player-action-space'
 
 export const emptyResources: Resource = {
   wood: 0,
@@ -202,6 +203,16 @@ export const normalizeState = (raw: GameState): GameState => {
       takenBy: stored?.takenBy ?? null,
     }
   })
+  // Append PlayerActionCard dynamic spaces
+  const playerActionSpaces = createPlayerActionSpaces({ players: raw.players } as GameState)
+  for (const pas of playerActionSpaces) {
+    const stored = spaceMap.get(pas.id)
+    if (stored) {
+      pas.resources = stored.resources ?? pas.resources
+      pas.takenBy = stored.takenBy ?? null
+    }
+    actionSpaces.push(pas)
+  }
   const needsHands = raw.players.some(
     (player) =>
       (player.minorHand?.length ?? 0) === 0 ||

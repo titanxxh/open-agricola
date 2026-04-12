@@ -2,6 +2,7 @@ import type { ActionSpace, GameState } from './types'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 import { getCardModifiers } from '../cards/card-modifiers'
+import { createPlayerActionSpaces } from '../cards/player-action-space'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
@@ -57,5 +58,15 @@ export const rehydrateState = (raw: SerializedGameState): GameState => {
       takenBy: saved?.takenBy ?? null,
     }
   })
+  // Append PlayerActionCard dynamic spaces
+  const playerActionSpaces = createPlayerActionSpaces(restored)
+  for (const pas of playerActionSpaces) {
+    const saved = raw.actionSpaces?.find((s) => s.id === pas.id)
+    if (saved) {
+      pas.resources = saved.resources ?? pas.resources
+      pas.takenBy = saved.takenBy ?? null
+    }
+    restored.actionSpaces.push(pas)
+  }
   return restored
 }
