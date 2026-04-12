@@ -2,7 +2,7 @@ import type { GameState, PlayerState, Resource } from '../game/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
-import { collectBonusScores } from '../cards/card-effects'
+import { collectBonusScores, getCardEffect } from '../cards/card-effects'
 
 type ScoreCategoryKey =
   | 'fields'
@@ -315,6 +315,30 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       quantity: beggingCount,
       entries: [{ type: 'quantity', quantity: beggingCount, score: beggingScore }],
     })
+
+    // Post-scoring card hooks
+    const allCards = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
+    let postScoreVp = 0
+    for (const cardId of allCards) {
+      const effect = getCardEffect(cardId)
+      if (effect?.computePostScore) {
+        postScoreVp += effect.computePostScore(state, player, categories)
+      }
+    }
+    if (postScoreVp !== 0) {
+      // Add/subtract from the cardStateBonusVp category if it exists, or add a new entry
+      const bonusCategory = categories.find((c) => c.key === 'cardStateBonusVp')
+      if (bonusCategory) {
+        bonusCategory.total += postScoreVp
+        bonusCategory.entries.push({ type: 'bonus' as const, score: postScoreVp })
+      } else {
+        categories.push({
+          key: 'cardStateBonusVp',
+          total: postScoreVp,
+          entries: [{ type: 'bonus' as const, score: postScoreVp }],
+        })
+      }
+    }
 
     const total = categories.reduce((sum, category) => sum + category.total, 0)
     return {
