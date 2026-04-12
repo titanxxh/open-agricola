@@ -512,6 +512,27 @@ export const ActionBoard = ({
         </div>
       </div>
 
+      {/* Dynamic PlayerActionCard action spaces */}
+      {baseActions.filter((s) => !BASE_POS[s.id]).length > 0 && (
+        <div className="player-action-cards-row">
+          {baseActions.filter((s) => !BASE_POS[s.id]).map((space) => {
+            const canTake = canTakeAction(space, currentPlayer)
+            return (
+              <button
+                key={space.id}
+                className={`action-card player-action-card ${canTake ? '' : 'disabled'} ${space.takenBy ? 'taken' : ''}`}
+                onClick={() => canTake && takeAction(space)}
+                disabled={!canTake}
+                title={t(locale, space.descriptionKey)}
+              >
+                <h4 className="action-header">{t(locale, space.nameKey)}</h4>
+                <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {tooltip && (
         <div
           className="round-action-tooltip"
