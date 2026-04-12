@@ -1,4 +1,27 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+
+const CARD_ID = 'C24_BedintheGrainField'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'nextHarvestReady', true)
+  },
+  onStartHarvest: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    const ready = readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')
+    if (!ready) return
+    writeCardExtraData(player, CARD_ID, 'nextHarvestReady', false)
+    if (player.rooms <= player.familySize) return
+    return {
+      type: 'leaf',
+      actionId: 'wish-children-growth',
+      sourceCard: CARD_ID,
+    }
+  },
+})
 
 export const C24_BedintheGrainField = new MinorImprovement({
   id: "C24_BedintheGrainField",
