@@ -1,7 +1,18 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'E124_MayorCandidate'
+
+registerCardEffect({
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+    return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
+  },
+})
 
 export const E124_MayorCandidate = new Occupation({
-  id: "E124_MayorCandidate",
+  id: CARD_ID,
   name: "Mayor Candidate",
   deck: "E",
   number: 124,
