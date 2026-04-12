@@ -3,6 +3,9 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
+import { PlayerCard } from '../common/PlayerCard'
+import { getMinorImprovement } from '../../../shared/game/minor-improvements'
+import { getOccupation } from '../../../shared/game/occupations'
 
 const BOARD_W = 1000
 const BOARD_H = 795
@@ -512,24 +515,29 @@ export const ActionBoard = ({
         </div>
       </div>
 
-      {/* Dynamic PlayerActionCard action spaces */}
+      {/* Dynamic PlayerActionCard action spaces — rendered as BGA-style cards */}
       {baseActions.filter((s) => !BASE_POS[s.id]).length > 0 && (
         <div className="player-action-cards-row">
-          {baseActions.filter((s) => !BASE_POS[s.id]).map((space) => {
-            const canTake = canTakeAction(space, currentPlayer)
-            return (
-              <button
-                key={space.id}
-                className={`action-card player-action-card ${canTake ? '' : 'disabled'} ${space.takenBy ? 'taken' : ''}`}
-                onClick={() => canTake && takeAction(space)}
-                disabled={!canTake}
-                title={t(locale, space.descriptionKey)}
-              >
-                <h4 className="action-header">{t(locale, space.nameKey)}</h4>
-                <div className="action-desc">{t(locale, space.descriptionKey)}</div>
-              </button>
-            )
-          })}
+          <h3>{t(locale, 'ui.playerActionCards')}</h3>
+          <div className="hand-row">
+            {baseActions.filter((s) => !BASE_POS[s.id]).map((space) => {
+              const canTake = canTakeAction(space, currentPlayer)
+              const isOccupation = !!getOccupation(space.id)
+              const cardType = isOccupation ? 'occupation' as const : 'minor' as const
+              return (
+                <PlayerCard
+                  key={space.id}
+                  locale={locale}
+                  cardId={space.id}
+                  cardType={cardType}
+                  onClick={() => canTake && takeAction(space)}
+                  disabled={!canTake}
+                  usable={canTake && !space.takenBy}
+                  className={space.takenBy ? 'taken' : ''}
+                />
+              )
+            })}
+          </div>
         </div>
       )}
 

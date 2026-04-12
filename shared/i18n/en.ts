@@ -35,6 +35,7 @@ export const en = {
     fieldEmpty: 'Empty field',
     playedCards: 'Played Cards',
     handCards: 'Hand Cards',
+    playerActionCards: 'Player Action Cards',
     minorCards: 'Minor Improvements',
     noHandCards: 'No cards in hand',
     handHidden: 'Hand cards are hidden',

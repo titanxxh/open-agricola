@@ -35,6 +35,7 @@ export const zh = {
     fieldEmpty: '空地',
     playedCards: '已打出卡牌',
     handCards: '手牌',
+    playerActionCards: '玩家行动卡',
     minorCards: '小改进',
     noHandCards: '没有手牌',
     handHidden: '手牌对其他玩家不可见',
