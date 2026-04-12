@@ -531,6 +531,8 @@ export const en = {
     E52_Cubbyhole: { name: 'Cubbyhole', description: 'For each room that you add to your house, place 1 <FOOD> from the general supply on this card. At the start of each feeding phase, you get <FOOD> equal to the amount on this card.' },
     E53_BoarSpear: { name: 'Boar Spear', description: 'Each time you get at least 1 <PIG> outside of the breeding phase of a harvest, you can immediately turn them into 4 <FOOD> each.' },
     E62_SourDough: { name: 'Sour Dough', description: 'Once per round, if all players have at least 1 person left to place, you can skip placing a person and take a __Bake Bread__ action instead.' },
+    E63_IronOven: { name: 'Iron Oven', description: '[Bake Bread action:] 1 <GRAIN> → 6 <FOOD>' },
+    E64_SimpleOven: { name: 'Simple Oven', description: '[Bake Bread action:] 1 <GRAIN> → 3 <FOOD>' },
     E71_CowPatty: { name: 'Cow Patty', description: 'Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it.' },
     E73_Scythe: { name: 'Scythe', description: 'During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it.' },
     E74_AshTrees: { name: 'Ash Trees', description: 'When you play this card, immediately place (up to) 5 fences from your supply on it. When you build fences, fences taken from this card cost you nothing.' },

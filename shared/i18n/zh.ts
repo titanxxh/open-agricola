@@ -512,6 +512,8 @@ export const zh = {
     E52_Cubbyhole: { name: '储物格', description: '你每增加一间房，从公共供给在本牌上放 1 <FOOD>。每次喂养阶段开始时，你获得等同于本牌上数量的 <FOOD>。' },
     E53_BoarSpear: { name: '野猪矛', description: '每当你在收获的繁殖阶段之外获得至少 1 <PIG>，你可以立刻将它们各转化为 4 <FOOD>。' },
     E62_SourDough: { name: '酸面团', description: '每回合一次，若所有玩家至少还有 1 名工人可放置，你可以跳过放置工人并改为进行一次 __Bake Bread__ 行动。' },
+    E63_IronOven: { name: '铁炉', description: '[烤面包行动:] 1 <GRAIN> → 6 <FOOD>' },
+    E64_SimpleOven: { name: '简易炉', description: '[烤面包行动:] 1 <GRAIN> → 3 <FOOD>' },
     E71_CowPatty: { name: '牛粪', description: '每当你在与牧场正交相邻的田播种时，你可在该田额外放置 1 个同类作物。' },
     E73_Scythe: { name: '长柄镰', description: '每次收获田地阶段，你可以选择恰好一块田并收割其中所有作物。' },
     E74_AshTrees: { name: '白蜡树', description: '打出本牌时，立即将（至多）5 段围栏从供给区放到本牌上。你建造围栏时，从本牌取出的围栏免费。' },
