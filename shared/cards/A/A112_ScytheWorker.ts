@@ -1,7 +1,27 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'A112_ScytheWorker'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    return gainLeaf(CARD_ID, { grain: 1 })
+  },
+  onHarvestFieldPhase: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    const grainFieldCount = player.fields.filter(
+      (field) => field.crop === 'grain' && field.remaining > 0,
+    ).length
+    if (grainFieldCount <= 0) return
+    return gainLeaf(CARD_ID, { grain: grainFieldCount })
+  },
+})
 
 export const A112_ScytheWorker = new Occupation({
-  id: "A112_ScytheWorker",
+  id: CARD_ID,
   name: "Scythe Worker",
   deck: "A",
   number: 112,

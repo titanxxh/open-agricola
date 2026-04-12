@@ -1,7 +1,40 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'D107_Bellfounder'
+
+registerCardEffect({
+  id: CARD_ID,
+  onStartReturnHome: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    const allClay = player.resources.clay ?? 0
+    if (allClay < 1) return
+    return {
+      type: 'xor',
+      optional: true,
+      promptKey: 'ui.interactionBellfounder',
+      children: [
+        {
+          type: 'seq',
+          children: [
+            { type: 'leaf', actionId: 'pay-resources', params: { clay: allClay }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
+          ],
+        },
+        {
+          type: 'seq',
+          children: [
+            { type: 'leaf', actionId: 'pay-resources', params: { clay: allClay }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },
+          ],
+        },
+      ],
+    }
+  },
+})
 
 export const D107_Bellfounder = new Occupation({
-  id: "D107_Bellfounder",
+  id: CARD_ID,
   name: "Bellfounder",
   deck: "D",
   number: 107,
