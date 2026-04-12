@@ -38,10 +38,10 @@ const emptyResources: Resource = {
 export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
   const spaces: ActionSpace[] = []
   for (const player of state.players) {
-    for (const cardId of player.minorPlayed) {
+    const allPlayed = [...player.minorPlayed, ...player.occupationPlayed]
+    for (const cardId of allPlayed) {
       const config = registry.get(cardId)
       if (!config) continue
-      // Don't create duplicate if already exists
       if (spaces.some((s) => s.id === cardId)) continue
       const def = config.createDefinition(player.id)
       spaces.push({
