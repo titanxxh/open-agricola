@@ -222,6 +222,8 @@ import { E51_WhaleOil } from './E/E51_WhaleOil'
 import { E52_Cubbyhole } from './E/E52_Cubbyhole'
 import { E53_BoarSpear } from './E/E53_BoarSpear'
 import { E62_SourDough } from './E/E62_SourDough'
+import { E63_IronOven } from './E/E63_IronOven'
+import { E64_SimpleOven } from './E/E64_SimpleOven'
 import { E71_CowPatty } from './E/E71_CowPatty'
 import { E73_Scythe } from './E/E73_Scythe'
 import { E74_AshTrees } from './E/E74_AshTrees'
@@ -379,6 +381,8 @@ export const minorImprovementCards = [
   E52_Cubbyhole,
   E53_BoarSpear,
   E62_SourDough,
+  E63_IronOven,
+  E64_SimpleOven,
   E71_CowPatty,
   E73_Scythe,
   E74_AshTrees,
