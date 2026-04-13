@@ -73,11 +73,26 @@
 
 ### 🔧 8. 对手交互机制 — 部分实现
 
-**现状**: `card-listeners.ts` 已支持 `scope: 'opponent' | 'any'`，Engine 已有 `PlayerSwitchNode`。但完整的"对手选择→确认"UI 交互流未实现。BGA 中 52 张卡有对手交互。
+**现状**: `card-listeners.ts` 已支持 `scope: 'opponent' | 'any'`，Engine 已有 `PlayerSwitchNode`。已实现 C144_ReedRoofRenovator（被动收益）和 A128_RiparianBuilder（授予行动）两张对手交互卡。BGA 中 52 张卡有对手交互。
 
-**BGA 阻塞卡牌 (代表性)**: A50, A128, A132, A142, A144, A150, A154, A156, A158, A159, A160, B27, B79, B138, B143, B159, C48, C51, C81, C120, C141, C144-C153, C163, C164, C167, D14, D51, D128, D134, D139, D149, D157, D160, D163, E66, E95, E103, E148, E149, E154, E156, E160
+**交互模式分类** (绝大多数不需要对手做选择):
 
-**复杂度**: 复杂 — 后端 scope 已就绪，需要前端交互流（对手收到提示→选择→确认）+ GameSession 跨玩家 pending 管理。
+| 模式 | 描述 | 对手决策 | 复杂度 | 约占比 |
+|------|------|---------|--------|-------|
+| 被动收益 | 对手执行某动作 → 卡主自动获资源 | 无 | 简单 | ~60% |
+| 卡主可选 | 对手执行某动作 → 卡主决定是否触发效果 | 无（卡主选） | 简单 | ~15% |
+| 授予行动 | 对手执行某动作 → 卡主获得额外行动机会 | 无（卡主选） | 中等 | ~15% |
+| 强制支付 | 对手使用某行动格前必须支付资源给卡主 | 自动支付 | 中等 | ~5% |
+| 元效果 | 对手行动后卡主获得使用同一行动格的权利 | 无（卡主选） | 复杂 | 仅 C150 |
+
+**代表性卡牌**:
+- 被动收益: C141_SheepProvider, D139_Chairman, E66_BarnShed, D134_OysterEater
+- 卡主可选: A132_Publican, A156_Buyer
+- 授予行动: A150_Stagehand, E95_Miller, A128_RiparianBuilder(✅), C144_ReedRoofRenovator(✅)
+- 强制支付: C51_FishingNet
+- 元效果: C150_ParrotBreeder
+
+**复杂度**: 简单-中等 — 后端 `scope:'opponent'` + `PlayerSwitchNode` 已就绪，~90% 的卡只需写一个 opponent-scope listener（参考 C144/A128 模式），不需要对手做选择。
 
 ### 🔧 9. 交换卡未实现 — 需要数据补充
 
