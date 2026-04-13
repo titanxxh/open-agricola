@@ -173,6 +173,7 @@ import { D131_CraftsmanshipPromoter } from './D/D131_CraftsmanshipPromoter'
 import { D132_HideFarmer } from './D/D132_HideFarmer'
 import { D134_OysterEater } from './D/D134_OysterEater'
 import { D137_TradeTeacher } from './D/D137_TradeTeacher'
+import { D139_Chairman } from './D/D139_Chairman'
 import { D14_HammerCrusher } from './D/D14_HammerCrusher'
 import { D150_GodlySpouse } from './D/D150_GodlySpouse'
 import { D157_PartyOrganizer } from './D/D157_PartyOrganizer'
@@ -504,6 +505,7 @@ export const occupationCards = [
   D135_GardeningHeadOfficial,
   D136_AnimalActivist,
   D137_TradeTeacher,
+  D139_Chairman,
   D150_GodlySpouse,
   D157_PartyOrganizer,
   D158_BeanCounter,
