@@ -112,6 +112,7 @@ import { C13_WoodSlideHammer } from './C/C13_WoodSlideHammer'
 import { C130_OutskirtsDirector } from './C/C130_OutskirtsDirector'
 import { C133_Soldier } from './C/C133_Soldier'
 import { C135_Constable } from './C/C135_Constable'
+import { C141_SheepProvider } from './C/C141_SheepProvider'
 import { C144_ReedRoofRenovator } from './C/C144_ReedRoofRenovator'
 import { C142_MarketCrier } from './C/C142_MarketCrier'
 import { C148_MudWallower } from './C/C148_MudWallower'
@@ -481,6 +482,7 @@ export const occupationCards = [
   C133_Soldier,
   C134_CowPrince,
   C135_Constable,
+  C141_SheepProvider,
   C142_MarketCrier,
   C144_ReedRoofRenovator,
   C148_MudWallower,
