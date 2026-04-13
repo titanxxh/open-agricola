@@ -625,6 +625,33 @@ export class GameSession {
         flow: { type: 'leaf', actionId: action.id },
       })
     }
+    // Card-sourced anytime actions via CardListener phases:['anytime']
+    const anytimeContext: import('../shared/cards/card-listeners').CardListenerContext = {
+      state: this.state,
+      player,
+      space,
+      actionId: 'anytime',
+      phase: 'anytime',
+    }
+    const matchedAnytime = getMatchingListeners(anytimeContext)
+    for (const entry of matchedAnytime) {
+      if (!entry.cardId) continue
+      if (entry.ownerPlayerId !== player.id) continue
+      const result = executeCardListener(entry.registration, anytimeContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (!result?.flow) continue
+      anytimeEntries.push({
+        descriptor: {
+          id: entry.registration.id,
+          labelKey: result.labelKey ?? `cards.${entry.cardId}.anytime`,
+          labelParams: result.labelParams,
+          sourceCard: entry.cardId,
+        },
+        flow: result.flow,
+      })
+    }
+
     return anytimeEntries
   }
 

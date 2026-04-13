@@ -16,6 +16,7 @@ export type ActionHookPhase =
   | 'computeReplace'
   | 'isDoable'
   | 'canUseOccupied'
+  | 'anytime'
 
 export const actionHookPhases: ActionHookPhase[] = [
   'before',
@@ -53,6 +54,8 @@ export type ActionHookResult = {
   sourceCard?: string
   logKey?: string
   logParams?: Record<string, unknown>
+  labelKey?: string
+  labelParams?: Record<string, unknown>
   decline?: boolean
   alternativeFlow?: ActionFlow
 }
