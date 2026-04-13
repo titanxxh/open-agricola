@@ -92,6 +92,7 @@ import { B70_NewPurchase } from './B/B70_NewPurchase'
 import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
+import { B83_MuddyPuddles } from './B/B83_MuddyPuddles'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
 import { B99_Tutor } from './B/B99_Tutor'
@@ -243,6 +244,7 @@ import { E30_ChildsToy } from './E/E30_ChildsToy'
 import { E33_BeaverColony } from './E/E33_BeaverColony'
 import { E36_HerbalGarden } from './E/E36_HerbalGarden'
 import { E38_RodCollection } from './E/E38_RodCollection'
+import { E40_BeeStatue } from './E/E40_BeeStatue'
 import { E4_Thunderbolt } from './E/E4_Thunderbolt'
 import { E5_NightLoot } from './E/E5_NightLoot'
 import { E51_WhaleOil } from './E/E51_WhaleOil'
@@ -331,6 +333,7 @@ export const minorImprovementCards = [
   B75_WoodWorkshop,
   B76_Ceilings,
   B81_Handcart,
+  B83_MuddyPuddles,
   B1_UpscaleLifestyle,
   B4_WoodPile,
   B5_StoreofExperience,
@@ -410,6 +413,7 @@ export const minorImprovementCards = [
   E33_BeaverColony,
   E36_HerbalGarden,
   E38_RodCollection,
+  E40_BeeStatue,
   E4_Thunderbolt,
   E5_NightLoot,
   E51_WhaleOil,
