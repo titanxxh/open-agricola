@@ -6,14 +6,15 @@
 
 | | BGA 总数 | 有文件 | 已实现 Hook | 仅数据定义 | 无文件 | 5+人卡(BGA未实现) |
 |---|---|---|---|---|---|---|
-| A Deck | 180 | 59 | 25 | 34 | 121 | 12 |
-| B Deck | 180 | 35 | 10 | 25 | 145 | 12 |
-| C Deck | 182 | 49 | 13 | 36 | 133 | 12 |
-| D Deck | 181 | 53 | 10 | 43 | 128 | 12 |
-| E Deck | 169 | 56 | 14 | 42 | 113 | 0 |
-| **总计** | **892** | **252** | **72** | **180** | **640** | **48** |
+| A Deck | 180 | 68 | 36 | 32 | 112 | 12 |
+| B Deck | 180 | 41 | 17 | 24 | 139 | 12 |
+| C Deck | 182 | 55 | 23 | 32 | 127 | 12 |
+| D Deck | 181 | 64 | 28 | 36 | 117 | 12 |
+| E Deck | 169 | 66 | 28 | 38 | 103 | 0 |
+| **总计** | **892** | **294** | **132** | **162** | **598** | **48** |
 
 > Major Improvements (10张) 已全部实现，不计入上表。
+> 截至 2026-04-13 更新。
 
 ## 状态说明
 
@@ -26,134 +27,106 @@
 
 ## 缺失基础设施分析
 
-### 1. PlayerActionCard 行动格 (部分完成)
+### ✅ 1. PlayerActionCard 行动格 — 已完成
 
-**现状**: D51_Archway 已实现 `onBuy` 触发的个人行动格创建。但其他需要 PlayerActionCard 的卡牌仍缺失各自的行动格效果定义。
+**现状**: `player-action-space.ts` 注册机制 + `syncDynamicActionSpaces()` + 前端 ActionBoard 渲染均已实现。11 张 PlayerActionCard 已全部注册（A39, B42, C104, C162, D23, D51, D116, D127, E81, E161, B100）。包含 owner 显示、meeple 渲染、multi-select UI (C104)。
 
-**阻塞卡牌**: A39_Chapel, B42_ForestInn, C104_Collector, C162_ForestOwner, D23_PioneeringSpirit, D116_TreeInspector, D127_HardworkingMan, E81_AlchemistsLab, E161_ElderBaker
+### ✅ 2. 动物容量修改器 — 已完成
 
-**复杂度**: 中等 — 每张卡需要定义独立的 ActionFlow 并绑定到个人行动格，核心框架已有，只需逐卡扩展。
+**现状**: `onComputeAnimalZones` hook 已在 `card-effects.ts` 中定义，`computeAnimalZones()` 在 `animals.ts` 中统一调用。A12_DrinkingTrough 已实现（+2 per pasture）。
 
-### 2. 动物容量修改器 (computeDropZones)
+**仍需实现的卡牌**: A86_AnimalTamer, E11_PettingZoo, E12_AnimalBedding, E86_PenBuilder — 只需编写 `onComputeAnimalZones` handler，基础设施已就绪。
 
-**现状**: 动物放置目前通过 `computeDropZones` 计算容量，但缺少卡牌修改容量的扩展点。
+### ✅ 3. 烹饪/交换改良注册 — 已完成
 
-**阻塞卡牌**: A12_DrinkingTrough (+2 per pasture), A86_AnimalTamer, E11_PettingZoo, E12_AnimalBedding, E86_PenBuilder
+**现状**: `CardExchange` 类型 + `exchange-registry.ts` 已实现。卡牌通过 `exchanges` 属性声明兑换比率，`getPlayerBakeRates()` 动态收集。E63_IronOven、E64_SimpleOven 已接入。
 
-**复杂度**: 中等 — 需要在 `animalPlacement` 模块中添加 modifier 注册机制，类似现有的 `computeCosts` hook。
+**仍需实现的卡牌**: A60_OrientalFireplace, B80_HardPorcelain 及其他 ~10 张 BGA 有 `getExchanges()` 的卡 — 只需添加 `exchanges` 属性。
 
-### 3. Anytime 动作扩展
+### ✅ 4. computeBonusScore 计分卡 — 已完成
 
-**现状**: `bake-bread` 和 `anytime-reorg` 已接入根前插 flow，但卡牌级别的随时可用行动尚未支持。
+**现状**: 45 张卡已实现 `computeBonusScore` hook，含 `computePostScore` 用于需要完整计分结果的卡牌。`ScoringContext.reserved` 支持资源去重。
 
-**阻塞卡牌**: A48_ShavingHorse, A102_Grocer, E13_StoneHouseReconstruction, E14_WoodSaw
+### 🔧 5. Anytime 动作系统 — 未实现
 
-**复杂度**: 中等 — 需要让卡牌注册自定义 anytime action，并在 anytime 列表中动态展示。
+**现状**: `bake-bread` 和 `anytime-reorg` 已硬编码，但卡牌级别的自定义 anytime action 尚未支持。BGA 中 43 张卡使用 `isAnytime()` 机制。
 
-### 4. 烹饪/交换改良注册
+**BGA 阻塞卡牌**: A48, A71, A102, A153, B21, B35, B69, B83, B154, B157, C18, C46, C53, C57, C64, C69, C84, C85, C87, C94, C101, C115, C120, C143, C150, D13, D46, D56, D71, D87, D106, D114, D122, D124, D129, E13, E14, E27, E53, E85, E86, E91, E103
 
-**现状**: Major Improvements 的烹饪兑换已全部实现（Fireplace、Cooking Hearth 等），但 Minor Improvement 级别的烹饪/交换卡缺少注册入口。
+**复杂度**: 高 — 需要卡牌注册自定义 anytime action + UI 动态展示 + engine 支持 anytime flow 插入。
 
-**阻塞卡牌**: A60_OrientalFireplace, E63_IronOven, E64_SimpleOven, B80_HardPorcelain
+### 🔧 6. Holder Card 资源堆叠 — 未实现
 
-**复杂度**: 简单 — 只需将这些卡的兑换比率注册到现有的 cooking exchange registry。
+**现状**: 部分卡牌用 `cardStates[cardId].extraData` 手动管理存储资源。BGA 有统一的 `getNextResource()`/`addResource()` 机制，17 张卡使用。
 
-### 5. computeBonusScore 计分卡
+**BGA 阻塞卡牌**: A40, A102, A144, B21, B48, B55, B83, B137, C75, C81, C115, C120, D118, E40, E56, E103, E162
 
-**现状**: `computeBonusScore` 基础设施已存在（C133_Soldier、A136_DrudgeryReeve 已使用），但大量纯计分卡尚未实现。
+**复杂度**: 中等 — 需要统一的 card holder 存储模型（`cardStates` 中增加 `resources` 字段 + 自动累积/消费方法）。
 
-**阻塞卡牌**: A31, A32, A38, A98, A99, A100, A101, A133, A134, A135, C30, C33, C35, C59, C134, D100, E32, E34, E35, E37, E38
+### 🔧 7. 未来回合放置 (futureMeeples) — 部分实现
 
-**复杂度**: 简单 — 基础设施已就绪，每张卡只需编写一个 `computeBonusScore` 函数，典型实现 5-15 行。
+**现状**: A74_StableTree 使用 `place-future-meeples` action。BGA 中 75 张卡涉及 futureMeeple 放置（大部分是 round-card 资源追加类卡牌 A43-A47, B43-B47 等）。
 
-### 6. 未来回合放置 (futureMeeples)
+**BGA 阻塞卡牌 (代表性)**: A43-A47, A69, B41, B43-B47, B60, B65, B66, B74, B76, B78, C43-C47, C64, C65, C74, C77-C79, D40-D47, D57, D67, D69, D78, E41-E47, E56, E104, E108, E119, E120, E139
 
-**现状**: A74_StableTree 已使用 future meeples 机制，但更复杂的"在未来回合格放置资源"尚未通用化。
+**复杂度**: 复杂 — 需要扩展回合卡资源累积机制，允许卡牌在指定未来行动格上放置自定义资源。A74 仅为简单案例。
 
-**阻塞卡牌**: E28, E40, E41, E42, E43, E44, E45, E46, E56
+### 🔧 8. 对手交互机制 — 部分实现
 
-**复杂度**: 复杂 — 需要扩展回合卡的资源累积机制，允许卡牌在指定未来回合格上放置自定义资源。
+**现状**: `card-listeners.ts` 已支持 `scope: 'opponent' | 'any'`，Engine 已有 `PlayerSwitchNode`。但完整的"对手选择→确认"UI 交互流未实现。BGA 中 52 张卡有对手交互。
 
-### 7. 对手交互机制
+**BGA 阻塞卡牌 (代表性)**: A50, A128, A132, A142, A144, A150, A154, A156, A158, A159, A160, B27, B79, B138, B143, B159, C48, C51, C81, C120, C141, C144-C153, C163, C164, C167, D14, D51, D128, D134, D139, D149, D157, D160, D163, E66, E95, E103, E148, E149, E154, E156, E160
 
-**现状**: 当前所有卡牌效果仅影响自身玩家，缺少 `scope:'opponent'` 或 `PlayerSwitch` 到对手的能力。
+**复杂度**: 复杂 — 后端 scope 已就绪，需要前端交互流（对手收到提示→选择→确认）+ GameSession 跨玩家 pending 管理。
 
-**阻塞卡牌**: A50, A132, A142, A150, A154, A156, A158, A159, A160, C51, E49, E95, E144, E154, E156, E160
+### 🔧 9. 交换卡未实现 — 需要数据补充
 
-**复杂度**: 复杂 — 需要在 Hook 系统中支持跨玩家触发，并在 Engine 中处理多玩家交互流程。
+**现状**: BGA 中有 `getExchanges()` 方法但我们尚未创建文件的卡牌。
+
+**缺失卡牌**: A61_WinnowingFan, B80_HardPorcelain, B101_FurnitureCarpenter, B104_SheepWalker, C50_StableYard, C62_CookeryExtension, C139_BasketmakersWife, D62_BeerTap, D82_HuntingTrophy, D162_ClayFirer
+
+**复杂度**: 简单 — 创建文件 + 添加 `exchanges` 属性即可。
 
 ---
 
 ## 分批实现建议
 
-### 第一批：纯计分卡 (computeBonusScore only)
+### ✅ 第一批：纯计分卡 — 已完成
 
-约 21 张卡，无需新基础设施，直接用现有 `computeBonusScore` 机制。每张卡仅需实现一个计分函数。
+45 张卡已实现 `computeBonusScore` / `computePostScore` hook。
 
-| 卡牌 | 描述 |
-|------|------|
-| A31 | 计分 |
-| A32 | 计分 |
-| A38 | 计分 |
-| A98 | 计分 |
-| A99 | 计分 |
-| A100 | 计分 |
-| A101 | 计分 |
-| A133 | 计分 |
-| A134 | 计分 |
-| A135 | 计分 |
-| C30 | 计分 |
-| C33 | 计分 |
-| C35 | 计分 |
-| C59 | 计分 |
-| C134 | 计分 |
-| D100 | 计分（已有文件 LordoftheManor，仅需加 hook） |
-| E32 | 计分 |
-| E34 | 计分 |
-| E35 | 计分 |
-| E37 | 计分 |
-| E38 | 计分 |
+### ✅ 第二批：简单 onBuy / 阶段触发 — 大部分完成
 
-### 第二批：简单 onBuy / 阶段触发
+已实现的代表性卡牌：A22, A23, A58, B48, B65, C24, D22, A85, A127, B55, A119, A148, B149 等。剩余简单阶段触发卡可直接实现。
 
-约 30+ 张卡，仅需 `onBuy` 或简单阶段 hook（`onReturnHome`, `onRoundStart`, `onHarvest` 等）。
+### 第三批：行动触发 (listener) — 持续进行
 
-代表性卡牌：
-- **onBuy 获取资源**: A22_Telegram, A23_StoneCompany, B48_ForestStone, C23_JobContract, D22_WorkPermit
-- **onReturnHome**: A85_Homekeeper, B76_Ceilings, C31_WritingChamber
-- **onRoundStart**: A119_FirewoodCollector, A127_Lodger, B55_MaintenancePremium, D85_Reader
-- **onHarvest**: A148_Woolgrower, B149_OpenAirFarmer, C84_PerennialRye, D70_StrawManure
-- **onBuy + 简单效果**: A14_CarpentersHammer, A58_AsparagusKnife, B15_CarpentersBench, C17_NewlyPlowedField
+约 100+ 张卡，需要 `registerCardListener` + 各种行动 phase hook。已实现 56 张 listener 卡。
 
-### 第三批：行动触发 (listener)
-
-约 100+ 张卡，需要 `registerCardListener` + 各种行动 phase hook。
-
-按行动类型分组：
-- **Plow 犁地**: A71_ClearingSpade, A72_CalciumFertilizers, C18_RollOverPlow, C19_SwingPlow, D20_TurnwrestPlow
-- **Sow 播种**: A106_SlurrySpreader, C115_Sower, D115_FodderPlanter(已实现)
-- **Fencing 围栏**: A89_StablePlanner, C85_DenBuilder, E16_BriarHedge
-- **Collect 收取**: A70_LiftingMachine, B81_Handcart, C57_Crudite, D66_PotterCeramics
-- **Improvement 改良**: A40_PottersYard, B86_TruffleSearcher, C87_Mason, D26_CarpentersYard
-- **Construct 建造**: A82_WorkCertificate, B21_HayloftBarn, D36_BreedRegistry
-- **Renovation 翻新**: A87_Conservator, B19_MoldboardPlow, C27_Blueprint
-- **Occupation 出牌**: A92_AdoptiveParents, B23_FinalScenario, C29_BeerTable, D27_Retraining
+剩余按行动类型分组：
+- **Plow 犁地**: A71, A72, C18, C19, D20 等
+- **Sow 播种**: A106, C115 等
+- **Fencing 围栏**: A89, C85, E16 等
+- **Collect 收取**: A70, B81, C57, D66 等
+- **Improvement 改良**: A40, B86, C87, D26 等
+- **Construct 建造**: A82, B21, D36 等
+- **Renovation 翻新**: A87, B19, C27 等
+- **Occupation 出牌**: A92, B23, C29, D27 等
 
 ### 第四批：需要新基础设施
 
-| 基础设施 | 阻塞卡牌 |
-|----------|----------|
-| PlayerActionCard 行动格 | A39_Chapel, B42_ForestInn, C104_Collector, C162_ForestOwner, D23_PioneeringSpirit, D116_TreeInspector, D127_HardworkingMan, E81_AlchemistsLab, E161_ElderBaker |
-| Animal capacity modifiers | A12_DrinkingTrough, A86_AnimalTamer, E11_PettingZoo, E12_AnimalBedding, E86_PenBuilder |
-| Anytime actions | A48_ShavingHorse, A102_Grocer, E13_StoneHouseReconstruction, E14_WoodSaw |
-| Cooking exchange registry | A60_OrientalFireplace, E63_IronOven, E64_SimpleOven, B80_HardPorcelain |
-| Future round placement | E28, E40, E41, E42, E43, E44, E45, E46, E56 |
+| 基础设施 | 状态 | 阻塞卡牌 |
+|----------|------|----------|
+| Anytime 动作系统 | ❌ 未实现 | 43 张卡（见§5） |
+| Holder Card 资源堆叠 | ❌ 未实现 | 17 张卡（见§6） |
+| 未来回合放置 | 🔧 部分 | 75 张卡（见§7） |
+| 交换卡数据补充 | 🔧 部分 | 10 张卡（见§9） |
 
 ### 第五批：对手交互卡
 
-约 16+ 张卡，需要 `scope:'opponent'` 或 `PlayerSwitch` 机制。
+52 张卡，需要前端交互流（对手收到提示→选择→确认）。后端 `scope:'opponent'` + `PlayerSwitchNode` 已就绪。
 
-A50, A132, A142, A150, A154, A156, A158, A159, A160, C51_FishingNet, E49, E95, E144, E154, E156, E160
+代表性：A50, A128, A132, A142, A150, A154, A156, A158-A160, B27, B79, C48, C51, C141-C153, D14, D134, D139, E66, E95, E148, E154, E156, E160 等
 
 ### 第六批：5+人卡 (低优先级)
 
@@ -161,7 +134,7 @@ A50, A132, A142, A150, A154, A156, A158, A159, A160, C51_FishingNet, E49, E95, E
 
 ---
 
-## A Deck 详细状态 (25✅ / 180)
+## A Deck 详细状态 (36✅ / 180)
 
 A Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
 
@@ -353,7 +326,7 @@ A Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
 
 ---
 
-## B Deck 详细状态 (10✅ / 180)
+## B Deck 详细状态 (17✅ / 180)
 
 B Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
 
@@ -542,7 +515,7 @@ B Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
 
 ---
 
-## C Deck 详细状态 (13✅ / 182)
+## C Deck 详细状态 (23✅ / 182)
 
 C Deck: 小改良 1-80, 职业 81-168, 5+人 169-182 (注意 C 有 182 张)
 
@@ -732,7 +705,7 @@ C Deck: 小改良 1-80, 职业 81-168, 5+人 169-182 (注意 C 有 182 张)
 
 ---
 
-## D Deck 详细状态 (10✅ / 181)
+## D Deck 详细状态 (28✅ / 181)
 
 D Deck: 小改良 1-80, 职业 81-168, 5+人 169-181 (注意 D 有 181 张)
 
@@ -922,7 +895,7 @@ D Deck: 小改良 1-80, 职业 81-168, 5+人 169-181 (注意 D 有 181 张)
 
 ---
 
-## E Deck 详细状态 (14✅ / 169)
+## E Deck 详细状态 (28✅ / 169)
 
 E Deck: 小改良 1-80, 职业 81-168, 无5+人卡 (169张)
 
