@@ -1,5 +1,6 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
+import { A102_Grocer } from './A/A102_Grocer'
 import { A105_BarrowPusher } from './A/A105_BarrowPusher'
 import { A106_SlurrySpreader } from './A/A106_SlurrySpreader'
 import { A108_MushroomCollector } from './A/A108_MushroomCollector'
@@ -435,6 +436,7 @@ export const minorImprovementCards = [
   E9_BarteringHut,
 ]
 export const occupationCards = [
+  A102_Grocer,
   A105_BarrowPusher,
   A108_MushroomCollector,
   A109_SmallTrader,
