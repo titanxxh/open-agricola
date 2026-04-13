@@ -154,13 +154,19 @@ export type FutureMeeple = {
   resources: Partial<Resource>
 }
 
-export type FutureMeepleRequest = {
-  cardId: string
-  playerId: string
-  startRound: number
-  count: number
-  resources: Partial<Resource>
-}
+export type FutureMeepleRequest =
+  | {
+      cardId: string
+      playerId: string
+      startRound: number
+      count: number
+      resources: Partial<Resource>
+    }
+  | {
+      cardId: string
+      playerId: string
+      entries: { round: number; resources: Partial<Resource> }[]
+    }
 
 export type HarvestReapSummary = {
   resources: Partial<Resource>
