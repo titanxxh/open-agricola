@@ -329,6 +329,28 @@ export const ActionBoard = ({
     )
   }
 
+  const lazyboneStablesBySpace = useMemo(() => {
+    const map = new Map<string, PlayerState>()
+    for (const player of players) {
+      const spaces = (player.cardStates?.['E148_Lazybones']?.extraData as { spaces?: string[] } | undefined)?.spaces
+      if (!spaces) continue
+      for (const spaceId of spaces) {
+        map.set(spaceId, player)
+      }
+    }
+    return map
+  }, [players])
+
+  const renderStableMarker = (space: ActionSpace) => {
+    const owner = lazyboneStablesBySpace.get(space.id)
+    if (!owner) return null
+    return (
+      <div className="lazybones-stable-marker" data-player-color={owner.color} title={`${owner.name}: Lazybones`}>
+        <span className="res-icon res-icon-barn" />
+      </div>
+    )
+  }
+
   const renderFarmerHolder = (space: ActionSpace) => {
     const markers = farmerMarkersBySpace.get(space.id)
     const fallbackPlayer = space.takenBy ? players.find((pl) => pl.id === space.takenBy) : null
@@ -440,6 +462,7 @@ export const ActionBoard = ({
                 </button>
                 {renderResourceHolder(space)}
                 {renderFarmerHolder(space)}
+                {renderStableMarker(space)}
               </div>
             )
           })}
@@ -537,6 +560,7 @@ export const ActionBoard = ({
                     usable={canTake && !space.takenBy}
                     className={space.takenBy ? 'taken' : ''}
                   />
+                  {renderFarmerHolder(space)}
                   {owner && (
                     <div className="player-action-card-owner" data-player-color={owner.color}>
                       {owner.name}

@@ -1,5 +1,6 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
+import { A102_Grocer } from './A/A102_Grocer'
 import { A105_BarrowPusher } from './A/A105_BarrowPusher'
 import { A106_SlurrySpreader } from './A/A106_SlurrySpreader'
 import { A108_MushroomCollector } from './A/A108_MushroomCollector'
@@ -9,13 +10,16 @@ import { A112_ScytheWorker } from './A/A112_ScytheWorker'
 import { A119_FirewoodCollector } from './A/A119_FirewoodCollector'
 import { A123_FrameBuilder } from './A/A123_FrameBuilder'
 import { A126_MasterWorkman } from './A/A126_MasterWorkman'
+import { A132_Publican } from './A/A132_Publican'
 import { A127_Lodger } from './A/A127_Lodger'
 import { A128_RiparianBuilder } from './A/A128_RiparianBuilder'
 import { A136_DrudgeryReeve } from './A/A136_DrudgeryReeve'
 import { A137_RiverineShepherd } from './A/A137_RiverineShepherd'
 import { A14_CarpentersHammer } from './A/A14_CarpentersHammer'
 import { A144_Sequestrator } from './A/A144_Sequestrator'
+import { A156_Buyer } from './A/A156_Buyer'
 import { A148_Woolgrower } from './A/A148_Woolgrower'
+import { A150_Stagehand } from './A/A150_Stagehand'
 import { A162_ForestTallyman } from './A/A162_ForestTallyman'
 import { A165_PigBreeder } from './A/A165_PigBreeder'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
@@ -88,6 +92,7 @@ import { B70_NewPurchase } from './B/B70_NewPurchase'
 import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
+import { B83_MuddyPuddles } from './B/B83_MuddyPuddles'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
 import { B99_Tutor } from './B/B99_Tutor'
@@ -112,6 +117,7 @@ import { C13_WoodSlideHammer } from './C/C13_WoodSlideHammer'
 import { C130_OutskirtsDirector } from './C/C130_OutskirtsDirector'
 import { C133_Soldier } from './C/C133_Soldier'
 import { C135_Constable } from './C/C135_Constable'
+import { C141_SheepProvider } from './C/C141_SheepProvider'
 import { C144_ReedRoofRenovator } from './C/C144_ReedRoofRenovator'
 import { C142_MarketCrier } from './C/C142_MarketCrier'
 import { C148_MudWallower } from './C/C148_MudWallower'
@@ -165,6 +171,7 @@ import { D103_CanalBoatman } from './D/D103_CanalBoatman'
 import { D107_Bellfounder } from './D/D107_Bellfounder'
 import { D115_FodderPlanter } from './D/D115_FodderPlanter'
 import { D116_TreeInspector } from './D/D116_TreeInspector'
+import { D122_ClayCarrier } from './D/D122_ClayCarrier'
 import { D124_Emissary } from './D/D124_Emissary'
 import { D126_FieldCultivator } from './D/D126_FieldCultivator'
 import { D127_HardworkingMan } from './D/D127_HardworkingMan'
@@ -172,6 +179,7 @@ import { D131_CraftsmanshipPromoter } from './D/D131_CraftsmanshipPromoter'
 import { D132_HideFarmer } from './D/D132_HideFarmer'
 import { D134_OysterEater } from './D/D134_OysterEater'
 import { D137_TradeTeacher } from './D/D137_TradeTeacher'
+import { D139_Chairman } from './D/D139_Chairman'
 import { D14_HammerCrusher } from './D/D14_HammerCrusher'
 import { D150_GodlySpouse } from './D/D150_GodlySpouse'
 import { D157_PartyOrganizer } from './D/D157_PartyOrganizer'
@@ -236,6 +244,7 @@ import { E30_ChildsToy } from './E/E30_ChildsToy'
 import { E33_BeaverColony } from './E/E33_BeaverColony'
 import { E36_HerbalGarden } from './E/E36_HerbalGarden'
 import { E38_RodCollection } from './E/E38_RodCollection'
+import { E40_BeeStatue } from './E/E40_BeeStatue'
 import { E4_Thunderbolt } from './E/E4_Thunderbolt'
 import { E5_NightLoot } from './E/E5_NightLoot'
 import { E51_WhaleOil } from './E/E51_WhaleOil'
@@ -259,6 +268,7 @@ import { E90_DungCollector } from './E/E90_DungCollector'
 import { E91_PlowBuilder } from './E/E91_PlowBuilder'
 import { E92_FieldDoctor } from './E/E92_FieldDoctor'
 import { E93_Motivator } from './E/E93_Motivator'
+import { E95_Miller } from './E/E95_Miller'
 import { E1_PoleBarns } from './E/E1_PoleBarns'
 import { E2_RenovationMaterials } from './E/E2_RenovationMaterials'
 import { E3_TeaTime } from './E/E3_TeaTime'
@@ -323,6 +333,7 @@ export const minorImprovementCards = [
   B75_WoodWorkshop,
   B76_Ceilings,
   B81_Handcart,
+  B83_MuddyPuddles,
   B1_UpscaleLifestyle,
   B4_WoodPile,
   B5_StoreofExperience,
@@ -402,6 +413,7 @@ export const minorImprovementCards = [
   E33_BeaverColony,
   E36_HerbalGarden,
   E38_RodCollection,
+  E40_BeeStatue,
   E4_Thunderbolt,
   E5_NightLoot,
   E51_WhaleOil,
@@ -428,6 +440,7 @@ export const minorImprovementCards = [
   E9_BarteringHut,
 ]
 export const occupationCards = [
+  A102_Grocer,
   A105_BarrowPusher,
   A108_MushroomCollector,
   A109_SmallTrader,
@@ -437,12 +450,15 @@ export const occupationCards = [
   A123_FrameBuilder,
   A126_MasterWorkman,
   A127_Lodger,
+  A132_Publican,
   A133_Braggart,
   A134_FullFarmer,
   A136_DrudgeryReeve,
   A137_RiverineShepherd,
   A144_Sequestrator,
   A148_Woolgrower,
+  A150_Stagehand,
+  A156_Buyer,
   A162_ForestTallyman,
   A165_PigBreeder,
   A85_Homekeeper,
@@ -481,6 +497,7 @@ export const occupationCards = [
   C133_Soldier,
   C134_CowPrince,
   C135_Constable,
+  C141_SheepProvider,
   C142_MarketCrier,
   C144_ReedRoofRenovator,
   C148_MudWallower,
@@ -493,6 +510,7 @@ export const occupationCards = [
   D107_Bellfounder,
   D115_FodderPlanter,
   D116_TreeInspector,
+  D122_ClayCarrier,
   D124_Emissary,
   D126_FieldCultivator,
   D127_HardworkingMan,
@@ -502,6 +520,7 @@ export const occupationCards = [
   D135_GardeningHeadOfficial,
   D136_AnimalActivist,
   D137_TradeTeacher,
+  D139_Chairman,
   D150_GodlySpouse,
   D157_PartyOrganizer,
   D158_BeanCounter,
@@ -536,6 +555,7 @@ export const occupationCards = [
   E91_PlowBuilder,
   E92_FieldDoctor,
   E93_Motivator,
+  E95_Miller,
   E154_Margrave,
 ]
 

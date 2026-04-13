@@ -1,11 +1,71 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { registerCardEffect } from '../card-effects'
+import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+
+const CARD_ID = 'C51_FishingNet'
+
+/**
+ * Part 1: When an opponent uses the Fishing accumulation space,
+ * the card owner gains 1 food (simplified from "opponent pays 1 food")
+ * and the card is flagged for the delayed return-home effect.
+ */
+const listener: CardListenerRegistration = {
+  id: 'C51-fishing-net-opponent-fishing',
+  cardIds: [CARD_ID],
+  actions: ['place-farmer'],
+  phases: ['after' as ActionHookPhase],
+  scope: 'opponent',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.space?.id !== 'fishing') return
+    const ownerId = context.ownerPlayer?.id
+    if (!ownerId) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'gain-trigger-player',
+            params: { food: 1, targetPlayerId: ownerId },
+            sourceCard: CARD_ID,
+          },
+          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
+
+/**
+ * Part 2: During the returning-home phase, if the card is flagged
+ * (meaning an opponent used Fishing this round), place 2 food
+ * on the Fishing action space and unflag the card.
+ */
+registerCardEffect({
+  id: CARD_ID,
+  onReturnHome: (state, player) => {
+    if (!isCardFlagged(player, CARD_ID)) return
+    setCardFlag(player, CARD_ID, false)
+    const fishingSpace = state.actionSpaces.find(s => s.id === 'fishing')
+    if (fishingSpace) {
+      fishingSpace.resources.food = (fishingSpace.resources.food ?? 0) + 2
+    }
+  },
+})
 
 export const C51_FishingNet = new MinorImprovement({
-  id: "C51_FishingNet",
+  id: CARD_ID,
   name: "Fishing Net",
   deck: "C",
   number: 51,
   category: "FOOD_PROVIDER",
   desc: ["Each time another player uses the __Fishing__ accumulation space, they must first pay you 1 <FOOD>. Then, in the returning home phase of that round, place 2 <FOOD> on __Fishing__."],
   cost: {"reed":1},
+  vp: 1,
 })

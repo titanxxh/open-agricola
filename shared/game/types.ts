@@ -130,6 +130,7 @@ export type CardState = {
   infobox?: string
   counters?: Record<string, number>
   extraData?: Record<string, unknown>
+  stack?: string[]
 }
 
 export type CardResourceStats = {

@@ -56,15 +56,6 @@ import {
   runRoundEndHooks,
   runBeforeFeedHooks,
   runAfterFeedHooks,
-  runBeforeReturnHomeHooks,
-  runStartReturnHomeHooks,
-  runAfterRoundEndHooks,
-  runStartHarvestHooks,
-  runStartHarvestFieldPhaseHooks,
-  runHarvestFieldPhaseHooks,
-  runEndHarvestFieldPhaseHooks,
-  runHarvestFeedingPhaseHooks,
-  runEndHarvestFeedingPhaseHooks,
   runCardEffectHook,
 } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
@@ -634,6 +625,33 @@ export class GameSession {
         flow: { type: 'leaf', actionId: action.id },
       })
     }
+    // Card-sourced anytime actions via CardListener phases:['anytime']
+    const anytimeContext: import('../shared/cards/card-listeners').CardListenerContext = {
+      state: this.state,
+      player,
+      space,
+      actionId: 'anytime',
+      phase: 'anytime',
+    }
+    const matchedAnytime = getMatchingListeners(anytimeContext)
+    for (const entry of matchedAnytime) {
+      if (!entry.cardId) continue
+      if (entry.ownerPlayerId !== player.id) continue
+      const result = executeCardListener(entry.registration, anytimeContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (!result?.flow) continue
+      anytimeEntries.push({
+        descriptor: {
+          id: entry.registration.id,
+          labelKey: result.labelKey ?? `cards.${entry.cardId}.anytime`,
+          labelParams: result.labelParams,
+          sourceCard: entry.cardId,
+        },
+        flow: result.flow,
+      })
+    }
+
     return anytimeEntries
   }
 
@@ -1052,11 +1070,6 @@ export class GameSession {
     if (this.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
-    const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runStartHarvestHooks(this.state, player)
-    })
     return this.continueFromStartHarvest()
   }
 
@@ -1069,13 +1082,8 @@ export class GameSession {
 
   private continueHarvestFieldStart(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
       this.state.phase = 'field'
       this.state.log.unshift({ key: 'log.harvestPhaseReap' })
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runStartHarvestFieldPhaseHooks(this.state, player)
-      })
     }
     if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
@@ -1084,13 +1092,6 @@ export class GameSession {
   }
 
   private continueHarvestFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runHarvestFieldPhaseHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -1118,12 +1119,6 @@ export class GameSession {
   }
 
   private continueEndFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      this.getHarvestPlayerIndices().forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runEndHarvestFieldPhaseHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -1151,10 +1146,6 @@ export class GameSession {
       harvestOrder.forEach((index) => {
         const player = this.state.players[index]
         if (player) runBeforeFeedHooks(this.state, player)
-      })
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runHarvestFeedingPhaseHooks(this.state, player)
       })
     }
     if (this.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
@@ -1340,6 +1331,10 @@ export class GameSession {
           continue
         }
         this.finalizeActionLog(player)
+        if (this.hasPendingAnimals(player)) {
+          this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+          return
+        }
         const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
         if (!allWorkersUsed) {
           const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
@@ -1930,7 +1925,6 @@ export class GameSession {
 
     this.pushHistory()
     this.state.phase = 'returning-home'
-    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
     return this.continueBeforeReturnHomeHooks()
   }
 
@@ -1938,7 +1932,6 @@ export class GameSession {
     if (this.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
     return this.continueStartReturnHomeHooks()
   }
 
@@ -1977,11 +1970,6 @@ export class GameSession {
 
   private startBreedPhase(): SessionResponse {
     this.state.phase = 'breeding'
-    const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runEndHarvestFeedingPhaseHooks(this.state, player)
-    })
     return this.continueAfterFeedingPhase()
   }
 
@@ -2023,7 +2011,6 @@ export class GameSession {
   private finalizeRound(): SessionResponse {
     this.state.phase = 'preparation'
     this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
-    this.state.players.forEach((p) => runAfterRoundEndHooks(this.state, p))
     return this.continueAfterRoundEnd()
   }
 

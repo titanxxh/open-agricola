@@ -935,5 +935,9 @@ export const en = {
     C104_Collector: { name: 'Collector', desc: 'Get 1 begging + choose 6/7/8/9 different goods (max 4 uses).' },
     A39_Chapel: { name: 'Chapel', desc: 'Get 3 bonus VP. Others pay 1 grain to owner.' },
     A162_ForestTallyman: { name: 'Forest Tallyman', desc: 'When Forest + Clay Pit occupied: get 2 clay + 3 wood.' },
+    D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
+    E86_PenBuilder: { anytime: 'Pen Builder: Pay 1 Wood → +2 Animal Capacity' },
+    A102_Grocer: { anytime: 'Grocer: Pay 1 Food → Buy top good' },
+    B83_MuddyPuddles: { anytime: 'Muddy Puddles: Pay 1 Clay → Take top good' },
   },
 }

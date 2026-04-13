@@ -226,6 +226,49 @@ a:focus-visible,
   align-items: center;
 }
 
+.player-action-card-wrapper .farmer-holder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-end;
+  align-items: flex-end;
+  gap: 2px 4px;
+  padding: 6px 8px 6px;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.lazybones-stable-marker {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 16;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+  padding: 2px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.lazybones-stable-marker .res-icon-barn {
+  font-size: 18px;
+}
+
+.lazybones-stable-marker[data-player-color="red"] { border: 2px solid var(--color-danger); }
+.lazybones-stable-marker[data-player-color="red"] .res-icon-barn { background-position-x: 0%; }
+.lazybones-stable-marker[data-player-color="yellow"] { border: 2px solid #d6b332; }
+.lazybones-stable-marker[data-player-color="yellow"] .res-icon-barn { background-position-x: 25%; }
+.lazybones-stable-marker[data-player-color="blue"] { border: 2px solid #3f6ee8; }
+.lazybones-stable-marker[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
+.lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
+.lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+
 .player-action-card-owner {
   font-size: 11px;
   font-weight: 600;
@@ -2121,6 +2164,13 @@ a:focus-visible,
 
 .card-future-text {
   white-space: nowrap;
+}
+
+.card-stack {
+  display: flex;
+  gap: 1px;
+  flex-wrap: wrap;
+  padding: 2px 4px;
 }
 
 .played-card-stats-tooltip {

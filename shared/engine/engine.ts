@@ -48,6 +48,7 @@ export class Engine {
     | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     | null = null
   private flowNodeCounter = 0
+  private beforePhaseFlowNodeIds = new Set<string>()
   private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
 
   getLastComputedCosts() {
@@ -144,6 +145,14 @@ export class Engine {
         { ...event, ownerPlayerId: entry.ownerPlayerId },
       )
     })
+  }
+
+  private collectNodeIds(node: EngineNode, ids: Set<string>): void {
+    ids.add(node.id)
+    const children = (node as any).children as EngineNode[] | undefined
+    if (children) {
+      for (const child of children) this.collectNodeIds(child, ids)
+    }
   }
 
   private cloneNode(node: EngineNode): EngineNode {
@@ -703,6 +712,9 @@ export class Engine {
       if (result?.flow) {
         const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
         const flowNode = this.buildFlowNode(result.flow)
+        if (node.phase === 'before') {
+          this.collectNodeIds(flowNode, this.beforePhaseFlowNodeIds)
+        }
         if (needsSwitch) {
           const switchTo = new PlayerSwitchNode(`ps-to-${node.id}`, ownerPlayerId)
           const switchBack = new PlayerSwitchNode(`ps-back-${node.id}`, context.player.id)
@@ -782,14 +794,16 @@ export class Engine {
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
       this.lastComputedCosts = executionContext.costs
-      const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
-      const beforeActivateNodes = this.buildActivateCardNodes(
-        beforePhase.matchedListeners, 'before', replacedActionId,
-      )
-      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
-        node.beforePhaseResolved = true
-        this.tree.insertBefore(node.id, beforeActivateNodes)
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      if (!this.beforePhaseFlowNodeIds.has(node.id)) {
+        const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
+        const beforeActivateNodes = this.buildActivateCardNodes(
+          beforePhase.matchedListeners, 'before', replacedActionId,
+        )
+        if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
+          node.beforePhaseResolved = true
+          this.tree.insertBefore(node.id, beforeActivateNodes)
+          return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+        }
       }
       const result = action.execute(executionContext)
       const duringPhase = this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
@@ -983,7 +997,8 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         )
         executionContext.costs =
           Object.keys(costOverride).length > 0 ? costOverride : undefined
-        const beforePhase = this.hooks.before({ ...executionContext, actionId })
+        const skipBefore = this.beforePhaseFlowNodeIds.has(child.id)
+        const beforePhase = skipBefore ? { matchedListeners: [] } : this.hooks.before({ ...executionContext, actionId })
         const beforeActivateNodes = this.buildActivateCardNodes(
           beforePhase.matchedListeners, 'before', actionId,
         )
