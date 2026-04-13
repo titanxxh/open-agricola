@@ -261,9 +261,13 @@ a:focus-visible,
 }
 
 .lazybones-stable-marker[data-player-color="red"] { border: 2px solid var(--color-danger); }
+.lazybones-stable-marker[data-player-color="red"] .res-icon-barn { background-position-x: 0%; }
 .lazybones-stable-marker[data-player-color="yellow"] { border: 2px solid #d6b332; }
+.lazybones-stable-marker[data-player-color="yellow"] .res-icon-barn { background-position-x: 25%; }
 .lazybones-stable-marker[data-player-color="blue"] { border: 2px solid #3f6ee8; }
+.lazybones-stable-marker[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
+.lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
 
 .player-action-card-owner {
   font-size: 11px;
