@@ -264,6 +264,7 @@ import { E90_DungCollector } from './E/E90_DungCollector'
 import { E91_PlowBuilder } from './E/E91_PlowBuilder'
 import { E92_FieldDoctor } from './E/E92_FieldDoctor'
 import { E93_Motivator } from './E/E93_Motivator'
+import { E95_Miller } from './E/E95_Miller'
 import { E1_PoleBarns } from './E/E1_PoleBarns'
 import { E2_RenovationMaterials } from './E/E2_RenovationMaterials'
 import { E3_TeaTime } from './E/E3_TeaTime'
@@ -546,6 +547,7 @@ export const occupationCards = [
   E91_PlowBuilder,
   E92_FieldDoctor,
   E93_Motivator,
+  E95_Miller,
   E154_Margrave,
 ]
 
