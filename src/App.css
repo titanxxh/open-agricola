@@ -244,6 +244,27 @@ a:focus-visible,
   z-index: 15;
 }
 
+.lazybones-stable-marker {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 16;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+  padding: 2px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.lazybones-stable-marker .res-icon-barn {
+  font-size: 18px;
+}
+
+.lazybones-stable-marker[data-player-color="red"] { border: 2px solid var(--color-danger); }
+.lazybones-stable-marker[data-player-color="yellow"] { border: 2px solid #d6b332; }
+.lazybones-stable-marker[data-player-color="blue"] { border: 2px solid #3f6ee8; }
+.lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
+
 .player-action-card-owner {
   font-size: 11px;
   font-weight: 600;
