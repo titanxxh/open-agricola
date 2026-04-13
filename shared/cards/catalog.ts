@@ -15,6 +15,7 @@ import { A136_DrudgeryReeve } from './A/A136_DrudgeryReeve'
 import { A137_RiverineShepherd } from './A/A137_RiverineShepherd'
 import { A14_CarpentersHammer } from './A/A14_CarpentersHammer'
 import { A144_Sequestrator } from './A/A144_Sequestrator'
+import { A156_Buyer } from './A/A156_Buyer'
 import { A148_Woolgrower } from './A/A148_Woolgrower'
 import { A162_ForestTallyman } from './A/A162_ForestTallyman'
 import { A165_PigBreeder } from './A/A165_PigBreeder'
@@ -445,6 +446,7 @@ export const occupationCards = [
   A137_RiverineShepherd,
   A144_Sequestrator,
   A148_Woolgrower,
+  A156_Buyer,
   A162_ForestTallyman,
   A165_PigBreeder,
   A85_Homekeeper,

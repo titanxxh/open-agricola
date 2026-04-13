@@ -149,6 +149,7 @@
 - [A137_RiverineShepherd](../shared/cards/A/A137_RiverineShepherd.ts)
 - [A144_Sequestrator](../shared/cards/A/A144_Sequestrator.ts)
 - [A148_Woolgrower](../shared/cards/A/A148_Woolgrower.ts)
+- [A156_Buyer](../shared/cards/A/A156_Buyer.ts)
 - [A162_ForestTallyman](../shared/cards/A/A162_ForestTallyman.ts)
 - [A165_PigBreeder](../shared/cards/A/A165_PigBreeder.ts)
 - [A166_Haydryer](../shared/cards/A/A166_Haydryer.ts)

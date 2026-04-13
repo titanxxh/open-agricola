@@ -328,7 +328,7 @@ A Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
 | A153 | Storehouse Keeper | 职业 | listener | 中等 |
 | A154 | Tinsmith | 职业 | opponent interaction | 复杂(需基础设施) |
 | A155 | Clay Mixer | 职业 | listener | 中等 |
-| A156 | Taster | 职业 | opponent interaction | 复杂(需基础设施) |
+| A156 | Buyer | 职业 | opponent interaction | 已实现 |
 | A157 | Chamberlain | 职业 | listener | 中等 |
 | A158 | Fence Builder | 职业 | opponent interaction | 复杂(需基础设施) |
 | A159 | Field Watchman | 职业 | opponent interaction | 复杂(需基础设施) |
