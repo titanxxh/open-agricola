@@ -1,0 +1,158 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game-session'
+import { getCardStack } from '../../shared/cards/helpers/card-state'
+
+import '../../shared/cards/A/A102_Grocer'
+
+describe('A102_Grocer session', () => {
+  const setup = () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    player.occupationHand.push('A102_Grocer')
+    session.loadState(state)
+    session.devPlayCard(0, 'A102_Grocer')
+    return session
+  }
+
+  /** Take farmland action to enter active interaction with a plow choice */
+  const enterActiveInteraction = (session: GameSession) => {
+    const resp = session.takeAction(0, 'farmland')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    return resp
+  }
+
+  it('onBuy places 8 items on the stack', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    const stack = getCardStack(player, 'A102_Grocer')
+    expect(stack).toEqual([
+      'wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable',
+    ])
+    expect(stack.length).toBe(8)
+  })
+
+  it('anytime action appears during active interaction with food and non-empty stack', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 5
+    session.loadState(state)
+
+    const resp = enterActiveInteraction(session)
+
+    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    expect(anytimeIds).toContain('A102-grocer-anytime')
+  })
+
+  it('anytime action not available without food', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 0
+    session.loadState(state)
+
+    const resp = enterActiveInteraction(session)
+
+    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    expect(anytimeIds).not.toContain('A102-grocer-anytime')
+  })
+
+  it('anytime action not available with empty stack', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 5
+    // Clear the stack
+    player.cardStates!['A102_Grocer']!.stack = []
+    session.loadState(state)
+
+    const resp = enterActiveInteraction(session)
+
+    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    expect(anytimeIds).not.toContain('A102-grocer-anytime')
+  })
+
+  it('taking top: pay 1 food, gain vegetable (top of stack)', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 5
+    player.resources.vegetable = 0
+    session.loadState(state)
+
+    enterActiveInteraction(session)
+
+    const resp = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(resp.ok).toBe(true)
+
+    const updatedPlayer = resp.state.players[0]!
+    expect(updatedPlayer.resources.food).toBe(4) // 5 - 1
+    expect(updatedPlayer.resources.vegetable).toBe(1) // 0 + 1 (top was vegetable)
+    // Stack should now have 7 items
+    const stack = getCardStack(updatedPlayer, 'A102_Grocer')
+    expect(stack.length).toBe(7)
+    expect(stack[stack.length - 1]).toBe('reed') // new top
+  })
+
+  it('second take: gain reed (new top after first take)', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 5
+    player.resources.vegetable = 0
+    player.resources.reed = 0
+    session.loadState(state)
+
+    enterActiveInteraction(session)
+
+    // First take: vegetable
+    const resp1 = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(resp1.ok).toBe(true)
+    expect(resp1.state.players[0]!.resources.vegetable).toBe(1)
+
+    // Second take: reed
+    const resp2 = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(resp2.ok).toBe(true)
+
+    const updatedPlayer = resp2.state.players[0]!
+    expect(updatedPlayer.resources.food).toBe(3) // 5 - 2
+    expect(updatedPlayer.resources.reed).toBe(1)
+    expect(updatedPlayer.resources.vegetable).toBe(1)
+    const stack = getCardStack(updatedPlayer, 'A102_Grocer')
+    expect(stack.length).toBe(6)
+    expect(stack[stack.length - 1]).toBe('clay') // new top
+  })
+
+  it('can drain the entire stack', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.food = 10
+    session.loadState(state)
+
+    enterActiveInteraction(session)
+
+    // Take all 8 items
+    let lastResp: any
+    for (let i = 0; i < 8; i++) {
+      lastResp = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+      expect(lastResp.ok).toBe(true)
+    }
+
+    const updatedPlayer = lastResp.state.players[0]!
+    expect(updatedPlayer.resources.food).toBe(2) // 10 - 8
+    const stack = getCardStack(updatedPlayer, 'A102_Grocer')
+    expect(stack.length).toBe(0)
+
+    // Verify anytime is no longer available after stack is drained
+    const anytimeIds = lastResp.interaction.anytimeActions.map((a: any) => a.id)
+    expect(anytimeIds).not.toContain('A102-grocer-anytime')
+  })
+})
