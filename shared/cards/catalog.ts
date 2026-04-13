@@ -169,6 +169,7 @@ import { D103_CanalBoatman } from './D/D103_CanalBoatman'
 import { D107_Bellfounder } from './D/D107_Bellfounder'
 import { D115_FodderPlanter } from './D/D115_FodderPlanter'
 import { D116_TreeInspector } from './D/D116_TreeInspector'
+import { D122_ClayCarrier } from './D/D122_ClayCarrier'
 import { D124_Emissary } from './D/D124_Emissary'
 import { D126_FieldCultivator } from './D/D126_FieldCultivator'
 import { D127_HardworkingMan } from './D/D127_HardworkingMan'
@@ -503,6 +504,7 @@ export const occupationCards = [
   D107_Bellfounder,
   D115_FodderPlanter,
   D116_TreeInspector,
+  D122_ClayCarrier,
   D124_Emissary,
   D126_FieldCultivator,
   D127_HardworkingMan,
