@@ -9,6 +9,7 @@ import { A112_ScytheWorker } from './A/A112_ScytheWorker'
 import { A119_FirewoodCollector } from './A/A119_FirewoodCollector'
 import { A123_FrameBuilder } from './A/A123_FrameBuilder'
 import { A126_MasterWorkman } from './A/A126_MasterWorkman'
+import { A132_Publican } from './A/A132_Publican'
 import { A127_Lodger } from './A/A127_Lodger'
 import { A128_RiparianBuilder } from './A/A128_RiparianBuilder'
 import { A136_DrudgeryReeve } from './A/A136_DrudgeryReeve'
@@ -440,6 +441,7 @@ export const occupationCards = [
   A123_FrameBuilder,
   A126_MasterWorkman,
   A127_Lodger,
+  A132_Publican,
   A133_Braggart,
   A134_FullFarmer,
   A136_DrudgeryReeve,
