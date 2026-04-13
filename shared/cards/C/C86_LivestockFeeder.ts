@@ -1,4 +1,25 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'C86_LivestockFeeder'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
+  onComputeAnimalZones: (player, zones) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    const grain = player.resources.grain ?? 0
+    if (grain <= 0) return
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      capacity: grain,
+      animalType: null,
+      animalCount: 0,
+    })
+  },
+})
 
 export const C86_LivestockFeeder = new Occupation({
   id: "C86_LivestockFeeder",
