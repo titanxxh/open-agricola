@@ -18,6 +18,7 @@ import { A14_CarpentersHammer } from './A/A14_CarpentersHammer'
 import { A144_Sequestrator } from './A/A144_Sequestrator'
 import { A156_Buyer } from './A/A156_Buyer'
 import { A148_Woolgrower } from './A/A148_Woolgrower'
+import { A150_Stagehand } from './A/A150_Stagehand'
 import { A162_ForestTallyman } from './A/A162_ForestTallyman'
 import { A165_PigBreeder } from './A/A165_PigBreeder'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
@@ -448,6 +449,7 @@ export const occupationCards = [
   A137_RiverineShepherd,
   A144_Sequestrator,
   A148_Woolgrower,
+  A150_Stagehand,
   A156_Buyer,
   A162_ForestTallyman,
   A165_PigBreeder,
