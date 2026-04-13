@@ -917,5 +917,7 @@ export const zh = {
     A162_ForestTallyman: { name: '森林记录员', desc: '当森林+泥坑都被占用时：获得 2 黏土 + 3 木。' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
     E86_PenBuilder: { anytime: '围栏工：付1木材 → 动物容量+2' },
+    A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
+    B83_MuddyPuddles: { anytime: '泥塘：付1黏土 → 取顶部商品' },
   },
 }
