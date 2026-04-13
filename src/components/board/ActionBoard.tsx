@@ -537,6 +537,7 @@ export const ActionBoard = ({
                     usable={canTake && !space.takenBy}
                     className={space.takenBy ? 'taken' : ''}
                   />
+                  {renderFarmerHolder(space)}
                   {owner && (
                     <div className="player-action-card-owner" data-player-color={owner.color}>
                       {owner.name}

@@ -1340,6 +1340,10 @@ export class GameSession {
           continue
         }
         this.finalizeActionLog(player)
+        if (this.hasPendingAnimals(player)) {
+          this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+          return
+        }
         const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
         if (!allWorkersUsed) {
           const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
