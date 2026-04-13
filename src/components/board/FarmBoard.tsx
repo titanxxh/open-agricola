@@ -231,6 +231,7 @@ const PlayedCardStats = ({
   futureEntries,
   displayCounters,
   resourceStats,
+  stack,
 }: {
   locale: Locale
   rawId: string
@@ -245,6 +246,7 @@ const PlayedCardStats = ({
   }[]
   displayCounters: Record<string, number>
   resourceStats?: CardResourceStats
+  stack: string[]
 }) => {
   const [open, setOpen] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
@@ -254,7 +256,7 @@ const PlayedCardStats = ({
   const visibleCounters = Object.fromEntries(
     Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
   )
-  const hasCounters = Object.keys(visibleCounters).length > 0
+  const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0
   const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
   const hasGained = hasAnyResource(resourceStats?.gained ?? {})
   const hasResourceStats = hasPaid || hasGained || bonusVp > 0
@@ -335,6 +337,17 @@ const PlayedCardStats = ({
               </div>
             )
           })}
+          {stack.length > 0 && (
+            <div className="card-stack">
+              {[...stack].reverse().map((res, i) => (
+                <span
+                  key={`stack-${i}`}
+                  className={`res-icon res-icon-${res}`}
+                  title={`#${stack.length - i}: ${res}`}
+                />
+              ))}
+            </div>
+          )}
           {futureEntries.map((entry, entryIndex) => {
             const label = formatResources(
               locale,
@@ -915,6 +928,7 @@ export const FarmBoard = ({
           const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
           const resourceStats = readCardResourceStats(displayPlayer, rawId)
+          const cardStack = displayPlayer.cardStates?.[rawId]?.stack ?? []
           const internalKeys = new Set(['usedRound'])
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
@@ -931,6 +945,7 @@ export const FarmBoard = ({
               futureEntries={futureEntries}
               displayCounters={displayCounters}
               resourceStats={resourceStats}
+              stack={cardStack}
             />
           )
         })}

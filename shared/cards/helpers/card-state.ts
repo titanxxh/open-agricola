@@ -133,3 +133,18 @@ export const addCardResourceGained = (
 ) => {
   addCardResourceStats(player, cardId, 'gained', resources)
 }
+
+export const getCardStack = (player: PlayerState, cardId: string): string[] =>
+  player.cardStates?.[cardId]?.stack ?? []
+
+export const pushToCardStack = (player: PlayerState, cardId: string, items: string[]): void => {
+  const state = ensureCardState(player, cardId)
+  if (!state.stack) state.stack = []
+  state.stack.push(...items)
+}
+
+export const popFromCardStack = (player: PlayerState, cardId: string): string | undefined => {
+  const stack = player.cardStates?.[cardId]?.stack
+  if (!stack || stack.length === 0) return undefined
+  return stack.pop()
+}

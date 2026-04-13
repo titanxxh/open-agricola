@@ -2166,6 +2166,13 @@ a:focus-visible,
   white-space: nowrap;
 }
 
+.card-stack {
+  display: flex;
+  gap: 1px;
+  flex-wrap: wrap;
+  padding: 2px 4px;
+}
+
 .played-card-stats-tooltip {
   position: fixed;
   z-index: 40;
