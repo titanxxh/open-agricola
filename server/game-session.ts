@@ -56,15 +56,6 @@ import {
   runRoundEndHooks,
   runBeforeFeedHooks,
   runAfterFeedHooks,
-  runBeforeReturnHomeHooks,
-  runStartReturnHomeHooks,
-  runAfterRoundEndHooks,
-  runStartHarvestHooks,
-  runStartHarvestFieldPhaseHooks,
-  runHarvestFieldPhaseHooks,
-  runEndHarvestFieldPhaseHooks,
-  runHarvestFeedingPhaseHooks,
-  runEndHarvestFeedingPhaseHooks,
   runCardEffectHook,
 } from '../shared/cards/card-effects.ts'
 import { positionKey } from '../shared/game/farm.ts'
@@ -1052,11 +1043,6 @@ export class GameSession {
     if (this.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
-    const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runStartHarvestHooks(this.state, player)
-    })
     return this.continueFromStartHarvest()
   }
 
@@ -1069,13 +1055,8 @@ export class GameSession {
 
   private continueHarvestFieldStart(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
       this.state.phase = 'field'
       this.state.log.unshift({ key: 'log.harvestPhaseReap' })
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runStartHarvestFieldPhaseHooks(this.state, player)
-      })
     }
     if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
@@ -1084,13 +1065,6 @@ export class GameSession {
   }
 
   private continueHarvestFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runHarvestFieldPhaseHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -1118,12 +1092,6 @@ export class GameSession {
   }
 
   private continueEndFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      this.getHarvestPlayerIndices().forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runEndHarvestFieldPhaseHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -1151,10 +1119,6 @@ export class GameSession {
       harvestOrder.forEach((index) => {
         const player = this.state.players[index]
         if (player) runBeforeFeedHooks(this.state, player)
-      })
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runHarvestFeedingPhaseHooks(this.state, player)
       })
     }
     if (this.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
@@ -1934,7 +1898,6 @@ export class GameSession {
 
     this.pushHistory()
     this.state.phase = 'returning-home'
-    this.state.players.forEach((p) => runBeforeReturnHomeHooks(this.state, p))
     return this.continueBeforeReturnHomeHooks()
   }
 
@@ -1942,7 +1905,6 @@ export class GameSession {
     if (this.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((p) => runStartReturnHomeHooks(this.state, p))
     return this.continueStartReturnHomeHooks()
   }
 
@@ -1981,11 +1943,6 @@ export class GameSession {
 
   private startBreedPhase(): SessionResponse {
     this.state.phase = 'breeding'
-    const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runEndHarvestFeedingPhaseHooks(this.state, player)
-    })
     return this.continueAfterFeedingPhase()
   }
 
@@ -2027,7 +1984,6 @@ export class GameSession {
   private finalizeRound(): SessionResponse {
     this.state.phase = 'preparation'
     this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
-    this.state.players.forEach((p) => runAfterRoundEndHooks(this.state, p))
     return this.continueAfterRoundEnd()
   }
 
