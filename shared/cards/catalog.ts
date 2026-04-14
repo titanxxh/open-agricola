@@ -68,6 +68,17 @@ import { A6_StorageBarn } from './A/A6_StorageBarn'
 import { A7_GardenersKnife } from './A/A7_GardenersKnife'
 import { A8_FoodBasket } from './A/A8_FoodBasket'
 import { A9_YoungAnimalMarket } from './A/A9_YoungAnimalMarket'
+import { A13_RenovationCompany } from './A/A13_RenovationCompany'
+import { A19_Handplow } from './A/A19_Handplow'
+import { A33_BigCountry } from './A/A33_BigCountry'
+import { A36_FacadesCarving } from './A/A36_FacadesCarving'
+import { A44_PondHut } from './A/A44_PondHut'
+import { A47_Trellises } from './A/A47_Trellises'
+import { A57_MilkingParlor } from './A/A57_MilkingParlor'
+import { A69_LargeGreenhouse } from './A/A69_LargeGreenhouse'
+import { A117_WoodCarrier } from './A/A117_WoodCarrier'
+import { A125_Priest } from './A/A125_Priest'
+import { A135_AnimalReeve } from './A/A135_AnimalReeve'
 import { B27_Toolbox } from './B/B27_Toolbox'
 import { B38_FutureBuildingSite } from './B/B38_FutureBuildingSite'
 import { B10_Caravan } from './B/B10_Caravan'
@@ -339,6 +350,14 @@ export const minorImprovementCards = [
   A7_GardenersKnife,
   A8_FoodBasket,
   A9_YoungAnimalMarket,
+  A13_RenovationCompany,
+  A19_Handplow,
+  A33_BigCountry,
+  A36_FacadesCarving,
+  A44_PondHut,
+  A47_Trellises,
+  A57_MilkingParlor,
+  A69_LargeGreenhouse,
   B27_Toolbox,
   B38_FutureBuildingSite,
   B10_Caravan,
@@ -500,6 +519,9 @@ export const occupationCards = [
   A87_Conservator,
   A88_HedgeKeeper,
   A89_StablePlanner,
+  A117_WoodCarrier,
+  A125_Priest,
+  A135_AnimalReeve,
   A92_AdoptiveParents,
   A94_LazySowman,
   A97_Freshman,
