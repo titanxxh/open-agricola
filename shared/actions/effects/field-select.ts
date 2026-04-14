@@ -44,7 +44,7 @@ export const fieldSelectAction: ActionDefinition = {
       for (const key of fields) {
         const [r, c] = key.split('-').map(Number)
         const field = player.fields.find(f => f.row === r && f.col === c && f.crop && f.remaining > 0)
-        if (field) {
+        if (field && field.crop) {
           player.resources[field.crop] = (player.resources[field.crop] ?? 0) + 1
         }
       }
