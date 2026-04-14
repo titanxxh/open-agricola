@@ -1,8 +1,18 @@
-import type { ActionFlow, GameState, PlayerState, Resource } from '../game/types'
+import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
 import type { AnimalZone } from '../actions/effects/animals'
 import type { ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
+
+/**
+ * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
+ * The card is responsible for handling the sow result via onSowExtraField.
+ */
+export type ExtraSowableField = {
+  tile: FarmTilePosition
+  allowedCrops: ('grain' | 'vegetable')[]
+  sourceCard: string
+}
 
 export type PaymentInfo = {
   resourcesPaid: Partial<Resource>
@@ -95,6 +105,10 @@ export type CardEffect = {
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
+  /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
+  onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
+  /** Handle sowing into an extra field returned by onComputeSowableFields. */
+  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: 'grain' | 'vegetable') => boolean
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -318,4 +332,59 @@ export const collectBonusScores = (
     }
   }
   return { entries, reserved: ctx.reserved }
+}
+
+/**
+ * Collect extra sowable fields from all card effects that have onComputeSowableFields.
+ */
+export const computeExtraSowableFields = (player: PlayerState): ExtraSowableField[] => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const extras: ExtraSowableField[] = []
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.onComputeSowableFields) continue
+    try {
+      extras.push(...effect.onComputeSowableFields(player))
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[card-effects] custom card ${cardId} onComputeSowableFields threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return extras
+}
+
+/**
+ * Handle sowing into an extra field. Returns true if a card handled the sow.
+ */
+export const handleSowExtraField = (
+  player: PlayerState,
+  tile: FarmTilePosition,
+  crop: 'grain' | 'vegetable',
+): boolean => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.onSowExtraField) continue
+    try {
+      if (effect.onSowExtraField(player, tile, crop)) return true
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[card-effects] custom card ${cardId} onSowExtraField threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return false
 }

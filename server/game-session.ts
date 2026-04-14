@@ -52,6 +52,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
+import { computeExtraSowableFields, handleSowExtraField } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -2391,15 +2392,31 @@ export class GameSession {
             typeof (field as { row?: unknown }).row === 'number' &&
             typeof (field as { col?: unknown }).col === 'number')
           : undefined
+        // Compute extra valid positions from card effects (e.g. B72 pasture sowing)
+        const extraFields = computeExtraSowableFields(player)
+        const extraValidPositions = new Set(
+          extraFields.map((f) => positionKey(f.tile)),
+        )
         const result = applyFarmChoice(normalized, 'sow', payload as any, {
           sowOptions: {
             maxSelections,
             excludedFields,
+            extraValidPositions: extraValidPositions.size > 0 ? extraValidPositions : undefined,
           },
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        // Handle extra field sowing via card effects
+        if (extraValidPositions.size > 0) {
+          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
+          for (const sel of sowPayload.crops ?? []) {
+            const key = positionKey({ row: sel.row, col: sel.col })
+            if (extraValidPositions.has(key)) {
+              handleSowExtraField(this.state.players[playerIndex]!, { row: sel.row, col: sel.col }, sel.crop)
+            }
+          }
+        }
         break
       }
     }

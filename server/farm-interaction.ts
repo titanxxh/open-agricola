@@ -11,6 +11,7 @@ import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
 import { validatePlowSelection } from './plow-validation.ts'
+import { computeExtraSowableFields } from '../shared/cards/card-effects.ts'
 
 const sanitizePayableCost = (
   costOverride?: Partial<Resource>,
@@ -126,6 +127,21 @@ export const buildSowFarmInteraction = (
     if (allowedCrops.length === 0) return []
     return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
   })
+  // Add extra sowable fields from card effects (e.g. B72 pastures)
+  const extraFields = computeExtraSowableFields(player)
+  for (const extra of extraFields) {
+    const key = positionKey(extra.tile)
+    if (excludedKeys.has(key)) continue
+    // Filter allowed crops by what the player actually has
+    const filteredCrops = extra.allowedCrops.filter((crop) => {
+      if (crop === 'grain') return (normalized.resources.grain ?? 0) > 0
+      if (crop === 'vegetable') return (normalized.resources.vegetable ?? 0) > 0
+      return false
+    })
+    if (filteredCrops.length === 0) continue
+    selectableFields.push({ tile: extra.tile, allowedCrops: filteredCrops })
+  }
+
   const rawMaxSelections = typeof actionContext?.maxSelections === 'number'
     ? Math.max(0, Math.floor(actionContext.maxSelections))
     : undefined

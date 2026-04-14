@@ -95,6 +95,7 @@ import { B55_MaintenancePremium } from './B/B55_MaintenancePremium'
 import { B65_GrainDepot } from './B/B65_GrainDepot'
 import { B67_HandTruck } from './B/B67_HandTruck'
 import { B70_NewPurchase } from './B/B70_NewPurchase'
+import { B72_LoveforAgriculture } from './B/B72_LoveforAgriculture'
 import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
@@ -354,6 +355,7 @@ export const minorImprovementCards = [
   B65_GrainDepot,
   B67_HandTruck,
   B70_NewPurchase,
+  B72_LoveforAgriculture,
   B75_WoodWorkshop,
   B76_Ceilings,
   B81_Handcart,
