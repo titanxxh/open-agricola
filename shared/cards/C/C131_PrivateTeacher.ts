@@ -1,0 +1,47 @@
+import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+
+const CARD_ID = 'C131_PrivateTeacher'
+
+const LESSONS_SPACES = ['lessons', 'lessons-2', 'lessons-4']
+
+const listener: CardListenerRegistration = {
+  id: 'C131-private-teacher-after-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.space?.id !== 'grain-seeds') return
+    const lessonsOccupied = LESSONS_SPACES.some(
+      (id) => !!context.state.actionSpaces.find((s) => s.id === id)?.takenBy,
+    )
+    if (!lessonsOccupied) return
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'play-occupation',
+        optional: true,
+        sourceCard: CARD_ID,
+        params: { costOverride: { food: 1 } },
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
+
+export const C131_PrivateTeacher = new Occupation({
+  id: CARD_ID,
+  name: 'Private Teacher',
+  deck: 'C',
+  number: 131,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['Each time you use the __Grain Seeds__ action space when any __Lessons__ action space is occupied, you can also play an occupation for an occupation cost of 1 <FOOD>.'],
+  cost: {},
+  players: '3+',
+  newSet: true,
+})
