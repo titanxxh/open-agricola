@@ -45,6 +45,17 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
     return countFields(player) >= Number(fieldsMatch[1])
   }
 
+  const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
+  if (grainFieldsMatch) {
+    const grainFields = player.fields.filter((f) => f.crop === 'grain')
+    return grainFields.length >= Number(grainFieldsMatch[1])
+  }
+
+  const pastureMatch = trimmed.match(/^(\d+)\s+Pastures?$/i)
+  if (pastureMatch) {
+    return player.pastures.length >= Number(pastureMatch[1])
+  }
+
   const majorImprovementsMatch = trimmed.match(/^(\d+)\s+Major Improvements?$/i)
   if (majorImprovementsMatch) {
     return countMajorImprovements(player) >= Number(majorImprovementsMatch[1])
