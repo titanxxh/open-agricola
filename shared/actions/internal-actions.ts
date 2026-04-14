@@ -36,6 +36,7 @@ import { scytheHarvestFieldAction } from './effects/scythe-harvest-field'
 import { grainThiefProtectAction } from './effects/grain-thief-protect'
 import { moveFarmerToSpaceAction } from './effects/move-farmer-to-space'
 import { popCardStackAction } from './effects/pop-card-stack'
+import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -80,4 +81,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   placeFarmerAction,
   setFirstPlayerAction,
   popCardStackAction,
+  buildFarmhandRoomAction,
 ]

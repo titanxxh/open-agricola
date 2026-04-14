@@ -100,6 +100,7 @@ import { B75_WoodWorkshop } from './B/B75_WoodWorkshop'
 import { B76_Ceilings } from './B/B76_Ceilings'
 import { B81_Handcart } from './B/B81_Handcart'
 import { B83_MuddyPuddles } from './B/B83_MuddyPuddles'
+import { B85_FarmHand } from './B/B85_FarmHand'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
 import { B99_Tutor } from './B/B99_Tutor'
@@ -360,6 +361,7 @@ export const minorImprovementCards = [
   B76_Ceilings,
   B81_Handcart,
   B83_MuddyPuddles,
+  B85_FarmHand,
   B1_UpscaleLifestyle,
   B4_WoodPile,
   B5_StoreofExperience,
