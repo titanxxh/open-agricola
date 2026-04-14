@@ -161,6 +161,9 @@ type Props = {
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
+  fieldSelectableSet: Set<string>
+  pendingFieldSelections: Set<string>
+  toggleFieldSelection: (tile: FarmTilePosition) => void
   pendingSowSelections: Record<string, 'grain' | 'vegetable'>
   sowRemaining: { grain: number; vegetable: number }
   sowSelectableMap: Map<string, ('grain' | 'vegetable')[]>
@@ -442,6 +445,9 @@ export const FarmBoard = ({
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
+  fieldSelectableSet,
+  pendingFieldSelections,
+  toggleFieldSelection,
   pendingSowSelections,
   sowRemaining,
   sowSelectableMap,
@@ -606,10 +612,12 @@ export const FarmBoard = ({
             isInteractive && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
             : false
+          const isFieldSelectable = isInteractive && fieldSelectableSet.has(tileKey)
+          const isFieldSelected = isInteractive && pendingFieldSelections.has(tileKey)
           const isTileSelectable =
-            isRoomSelectable || isPlowSelectable || isStableSelectable
+            isRoomSelectable || isPlowSelectable || isStableSelectable || isFieldSelectable
           const isTileSelected =
-            isRoomSelected || isPlowSelected || isStableSelected
+            isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
           const fieldInfo = fieldMap.get(tileKey)
           const isEmptyField = !!fieldInfo && fieldInfo.crop === null
           const cropStack =
@@ -678,6 +686,10 @@ export const FarmBoard = ({
                 }
                 if (isStableSelectable) {
                   toggleStableTile({ row: tileRow, col: tileCol })
+                  return
+                }
+                if (isFieldSelectable) {
+                  toggleFieldSelection({ row: tileRow, col: tileCol })
                   return
                 }
                 if (isPlowSelectable) {
