@@ -154,13 +154,19 @@ export type FutureMeeple = {
   resources: Partial<Resource>
 }
 
-export type FutureMeepleRequest = {
-  cardId: string
-  playerId: string
-  startRound: number
-  count: number
-  resources: Partial<Resource>
-}
+export type FutureMeepleRequest =
+  | {
+      cardId: string
+      playerId: string
+      startRound: number
+      count: number
+      resources: Partial<Resource>
+    }
+  | {
+      cardId: string
+      playerId: string
+      entries: { round: number; resources: Partial<Resource> }[]
+    }
 
 export type HarvestReapSummary = {
   resources: Partial<Resource>
@@ -234,7 +240,7 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; logParams?: Record<string, unknown>; extraData?: Record<string, unknown> }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; extraData?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[] }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
@@ -258,6 +264,10 @@ export type ActionFlow =
       optional?: boolean
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
+    }
+  | {
+      type: 'playerSwitch'
+      targetPlayerId: string
     }
 
 export type ActionDefinition = {
@@ -362,6 +372,12 @@ export type InteractionFarmSelection =
         allowedCrops: ('grain' | 'vegetable')[]
       }[]
       maxSelections?: number
+    }
+  | {
+      farmType: 'field-select'
+      selectableFields: FarmTilePosition[]
+      maxSelections: number
+      minSelections?: number
     }
 
 type InteractionBase = {

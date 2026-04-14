@@ -35,10 +35,11 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 `server/room-manager.ts` — WebSocket 主链路。
 
 - 每个房间持有独立 `GameSession` 实例。
-- 支持 `ClientCommand`（共享类型）：`action`、`choice`、`anytime`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
+- 支持 `ClientCommand`（共享类型）：`action`、`choice`、`anytime`、`reorg`、`feed`、`commitFarm`、`nextPlayer`、`roundEnd`、`undoStep`、`undoAction`、`newGame`（可选 seed）、`loadGame`、`devDrawCard`、`devPlayCard`、`devCreatePasture`、`getState`、`createRoom`、`joinRoom`。
 - 状态变更后广播 `StateUpdateEnvelope`（含 version + cause）给房间内所有客户端。
 - 连接断开时清理玩家；非固定房间在无人连接后会先保留在内存与 SQLite 中，允许分享链接后的短时断线/刷新重连，并由空房 TTL 统一回收。
-- **固定持久化房间（dev）**：房间 ID 由 `PERSISTENT_ROOM_ID` 指定，默认 `dev`。后端启动时若存在 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）则恢复该房间状态，否则新建空局；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁，便于重启后端后继续对局。固定房间的 WS 加入现在支持 `requestedPlayerIndex`，前端会把 `player=p1/p2` 固定映射到 0/1 号位，刷新重连时会替换旧连接而不是误占另一个空位。为兼容旧环境，固定 dev 房间仍会回退读取 `.persisted-room.json`。文档中的访问示例统一写作 `http://<host>:5173/...`；同机本地调试时 `<host>` 可视为 `localhost`，局域网场景请使用 `./restart-intranet.sh` 输出的地址。
+- **固定持久化房间（dev）**：房间 ID 由 `PERSISTENT_ROOM_ID` 指定，默认 `dev`。后端启动时会先按 `PERSIST_ROOMS` 恢复该房间状态；当前代码默认使用 SQLite（`data/open-agricola.db` 的 `rooms.state_json`），若显式设为 `json` 则读写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）。固定房间仍兼容回退读取旧 `.persisted-room.json`。每次该房间状态变更后都会立即持久化；该房间在无人连接时也不销毁，便于重启后端后继续对局。固定房间的 WS 加入支持 `requestedPlayerIndex`，前端会把 `player=p1/p2` 固定映射到 0/1 号位，刷新重连时会替换旧连接而不是误占另一个空位。文档中的访问示例统一写作 `http://<host>:5173/...`；同机本地调试时 `<host>` 可视为 `localhost`，局域网场景请使用 `./restart-intranet.sh` 输出的地址。
+- `./restart-intranet.sh` 现在使用当前仓库下的绝对路径 `node_modules/.bin/tsx` / `vite` 启动服务，并按同样的绝对路径精确停止旧进程，避免误杀别的 clone / worktree 中的 Vite 或后端进程。
 - SQLite 房间恢复现在覆盖 `waiting` 与 `playing` 两种状态；等待中的房间在后端重启后也会回到内存，避免分享链接后出现 `room not found`。房间关联的 `custom_card_ids` 会随房间一起持久化，`newGame` 重开时也会继续带上这些自定义卡。
 
 ### 2.3 HTTP API
@@ -46,9 +47,9 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 `server/game-router.ts` — 开发/调试/兼容通道。
 
 - 端点：`/api/game/state`、`/api/game/action`、`/api/game/choice`、`/api/game/anytime`、`/api/game/commit-farm`、`/api/game/reorg`、`/api/game/feed`、`/api/game/next-player`、`/api/game/round-end`、`/api/game/undo`、`/api/game/undo-action`、`/api/game/new`（支持 seed）、`/api/game/load`、`/api/game/validate`（纯预检，主链已不依赖）。
-- Dev 端点：`/api/game/dev/create-pasture`、`/api/game/dev/play-card`、`/api/game/dev/set-space-taken`、`/api/game/dev/set-current-player`、`/api/game/dev/set-round`、`/api/game/dev/set-resources`。
+- Dev 端点：`/api/game/dev/create-pasture`、`/api/game/dev/play-card`、`/api/game/dev/draw-card`、`/api/game/dev/set-space-taken`、`/api/game/dev/set-current-player`、`/api/game/dev/set-round`、`/api/game/dev/set-resources`。
 - `/api/rooms` — 列出当前活跃房间。
-- HTTP 使用单例 `GameSession`，仅用于单机调试。多人对局走 WS。
+- HTTP 使用“按用户分桶”的 `GameSession`（未登录时回退到匿名 session），仅用于单机调试/测试准备。多人对局走 WS；WS 房间内的开发者工具摸牌/打牌也直接走房间级命令，不再先改 HTTP session 再 `loadGame` 回房间。
 - `/api/game/new-sandbox` 现在会创建单浏览器 hot-seat 沙盒局，支持 `playerCount`、`deckIds`、`customCardIds`，并使用固定 `playerA/playerB/...` 命名，而不是沿用登录名或 WS 房间座位语义。
 
 ### 2.4 Workshop / Sandbox / 自定义代码

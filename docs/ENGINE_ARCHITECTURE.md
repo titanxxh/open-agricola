@@ -126,10 +126,11 @@ Phase 2 前端联调已完成：
 - `GameContainerApi` 通过 URL 参数 `?transport=ws` 切换 WS 模式。
 - P1（`?player=p1&transport=ws`）自动创建房间并等待，P2（`?player=p2&transport=ws`）通过 `/api/rooms` 自动发现并加入。
 - 房间满员后后端广播 `gameStarted`，前端自动进入游戏。
-- `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
+- `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devDrawCard`/`devPlayCard`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
-- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时从 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）恢复该房间状态；每次该房间状态变更后写回对应文件；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
+- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时按 `PERSIST_ROOMS` 恢复该房间状态；当前默认后端是 SQLite（`data/open-agricola.db` 中的 `rooms.state_json`），若显式设为 `json` 则读写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）。每次该房间状态变更后都会立刻写回；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
+- `./restart-intranet.sh` 现在直接使用当前仓库的绝对路径二进制启动 `tsx` / `vite`，并按同样的绝对路径匹配旧进程，避免跨 clone/worktree 的全局 `pkill` 误伤。
 - 普通 SQLite 房间同样遵循“空房先保留、TTL 后回收”的策略：连接全部断开时不会立刻从内存删掉，而是保留分享链接可重连的窗口期。服务端启动恢复范围也覆盖 `waiting` 与 `playing` 房间，因此等待中的房间不会再因为后端重启直接丢失。恢复与重开都会继续带上房间记录里的 `custom_card_ids`。
 
 #### 4.3.2 如果后续要支持 patch，同步协议应如何设计
@@ -840,7 +841,7 @@ HTTP 不再承担多人对局主链路，但仍然重要：
 - `GET /api/game/state`：补拉当前快照
 - `POST /api/game/new`：创建新对局或测试重置
 - `POST /api/game/load`：加载测试状态
-- `POST /api/game/dev/*`：开发者调试与 E2E 场景布置
+- `POST /api/game/dev/*`：HTTP 单机调试与 E2E 场景布置；WS 房间内的开发者工具命令应优先走房间级 `ClientCommand`
 
 ### 10.2 设计边界
 

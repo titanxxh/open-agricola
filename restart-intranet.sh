@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BACKEND_BIN="$SCRIPT_DIR/node_modules/.bin/tsx"
+FRONTEND_BIN="$SCRIPT_DIR/node_modules/.bin/vite"
+
+if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
+  echo "Error: dependencies are missing. Run: npm install"
+  exit 1
+fi
+
+cd "$SCRIPT_DIR"
+
 # LAN IPv4 for binding Vite / backend (macOS: en0; Linux: eth0)
 get_lan_ip() {
   case "$(uname -s)" in
@@ -24,16 +35,16 @@ fi
 
 echo "Using LAN IP: $LAN_IP"
 echo "Stopping existing processes..."
-pkill -f "vite" 2>/dev/null || true
-pkill -f "tsx server/index.ts" 2>/dev/null || true
+pkill -f "$FRONTEND_BIN" 2>/dev/null || true
+pkill -f "$BACKEND_BIN $SCRIPT_DIR/server/index.ts" 2>/dev/null || true
 sleep 1
 
-echo "Starting backend (port 5175 on $LAN_IP)..."
-BACKEND_HOST="$LAN_IP" nohup npm run server > backend.log 2>&1 &
+echo "Starting backend (port 5175 on $LAN_IP, persistent dev room via SQLite)..."
+PERSIST_ROOMS=sqlite ALLOW_ANONYMOUS_WS=true PERSISTENT_ROOM_ID=dev BACKEND_HOST="$LAN_IP" nohup "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts" > "$SCRIPT_DIR/backend.log" 2>&1 &
 echo "  PID: $!"
 
 echo "Starting frontend (port 5173 on $LAN_IP)..."
-BACKEND_HOST="$LAN_IP" nohup npx vite --host "$LAN_IP" > frontend.log 2>&1 &
+BACKEND_HOST="$LAN_IP" nohup "$FRONTEND_BIN" --host "$LAN_IP" > "$SCRIPT_DIR/frontend.log" 2>&1 &
 echo "  PID: $!"
 
 sleep 2

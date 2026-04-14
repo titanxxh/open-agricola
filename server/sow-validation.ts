@@ -22,6 +22,8 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 type SowValidationOptions = {
   maxSelections?: number
   excludedFields?: FarmTilePosition[]
+  /** Extra valid positions (e.g. pasture tiles from B72). These bypass the field check. */
+  extraValidPositions?: Set<string>
 }
 
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
@@ -73,10 +75,13 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     const field = fieldMap.get(key)
-    if (!field || field.crop !== null) {
+    const isExtraField = options.extraValidPositions?.has(key) ?? false
+    if (!isExtraField && (!field || field.crop !== null)) {
       return { ok: false, error: { code: 'NOT_EMPTY' } }
     }
     used.add(key)
+    // Don't count extra fields toward resource usage — the card handles deduction
+    if (isExtraField) continue
     if (crop === 'grain') grainCount += 1
     if (crop === 'vegetable') vegetableCount += 1
   }
@@ -97,6 +102,9 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       (item) => item.row === field.row && item.col === field.col,
     )
     if (!selection) return field
+    // Skip extra fields — they are handled by the card
+    const key = positionKey({ row: field.row, col: field.col })
+    if (options.extraValidPositions?.has(key)) return field
     if (selection.crop === 'grain') {
       return { ...field, crop: 'grain', remaining: 3 }
     }

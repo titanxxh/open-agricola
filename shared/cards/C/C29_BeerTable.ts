@@ -1,4 +1,26 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { payLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'C29_BeerTable'
+
+registerCardEffect({
+  id: CARD_ID,
+  onEndHarvestFieldPhase: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    if ((player.resources.grain ?? 0) < 1) return
+    return {
+      type: 'seq',
+      optional: true,
+      children: [
+        payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
+        { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
+      ],
+    }
+  },
+})
 
 export const C29_BeerTable = new MinorImprovement({
   id: "C29_BeerTable",

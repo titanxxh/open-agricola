@@ -46,10 +46,10 @@ const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> =
     ),
 })
 
-const buildBonusVpFlow = (count: number): ActionFlow => ({
-  type: 'seq',
+const buildBonusVpFlow = (count: number) => ({
+  type: 'seq' as const,
   children: [
-    { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+    { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
     ...Array.from({ length: count }, () => ({
       type: 'leaf' as const,
       actionId: 'bonus-vp',

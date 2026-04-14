@@ -52,6 +52,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
+import { computeExtraSowableFields, handleSowExtraField } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -96,6 +97,7 @@ import {
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import {
   buildFenceFarmInteraction,
+  buildFieldSelectFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
@@ -199,6 +201,7 @@ export class GameSession {
   private nextActionToken = 1
   private loggedImprovementThisAction = false
   private loggedBakeBreadThisAction = false
+  private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -293,6 +296,9 @@ export class GameSession {
   }
 
   private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
+    if (flow.type === 'playerSwitch') {
+      return new PlayerSwitchNode(`ps-${counter.value++}`, flow.targetPlayerId)
+    }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
         `action-${flow.actionId}-${counter.value++}`,
@@ -536,6 +542,8 @@ export class GameSession {
         return 'plow' as const
       case 'ui.interactionSowSelect':
         return 'sow' as const
+      case 'ui.interactionFieldSelect':
+        return 'field-select' as const
       default:
         return null
     }
@@ -566,6 +574,11 @@ export class GameSession {
     return buildFenceFarmInteraction(this.state.players[pending.playerIndex]!, pending)
   }
 
+  private buildFieldSelectInteraction(player: PlayerState): InteractionFarmSelection {
+    const actionContext = this.pending.type === 'choice' ? this.pending.actionContext : undefined
+    return buildFieldSelectFarmInteraction(player, actionContext)
+  }
+
   private buildFarmInteraction(
     pending: Extract<PendingAction, { type: 'choice' }>,
   ): InteractionFarmSelection | null {
@@ -583,6 +596,8 @@ export class GameSession {
         return this.buildPlowInteraction(player, pending.costOverride)
       case 'sow':
         return this.buildSowInteraction(player)
+      case 'field-select':
+        return this.buildFieldSelectInteraction(player)
       default:
         return null
     }
@@ -1305,8 +1320,8 @@ export class GameSession {
 
   private runEngineSteps(): void {
     if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
-    const player = this.state.players[this.activePlayerIndex]
-    const space = this.getSpaceById(this.activeSpaceId)
+    let player = this.state.players[this.activePlayerIndex]
+    let space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return
 
     while (true) {
@@ -1315,6 +1330,7 @@ export class GameSession {
       this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
+        this.deferredPlayerSwitch = null
         const isActionEngine = this.engineSource?.kind === 'action'
         const stageResume = this.stageResume
         this.engine = null
@@ -1347,20 +1363,30 @@ export class GameSession {
       }
 
       if (step.type === 'playerSwitch') {
-        this.pushHistory(false, true)
         const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
         if (toIndex !== -1 && toIndex !== this.activePlayerIndex) {
-          this.pending = {
-            type: 'confirmPlayerSwitch',
-            fromPlayerIndex: this.activePlayerIndex!,
-            toPlayerIndex: toIndex,
-          }
-          return
+          this.pushHistory(false, true)
+          const fromIndex = this.activePlayerIndex!
+          this.activePlayerIndex = toIndex
+          player = this.state.players[this.activePlayerIndex]!
+          space = this.getSpaceById(this.activeSpaceId!) ?? space
+          this.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
         }
         continue
       }
 
       if (step.type === 'choice') {
+        // Lazy confirmation: if we silently switched players and now hit a choice,
+        // show confirmPlayerSwitch first. The ChoiceNode stays unresolved in the engine.
+        if (this.deferredPlayerSwitch) {
+          this.pending = {
+            type: 'confirmPlayerSwitch',
+            fromPlayerIndex: this.deferredPlayerSwitch.fromPlayerIndex,
+            toPlayerIndex: this.deferredPlayerSwitch.toPlayerIndex,
+          }
+          this.deferredPlayerSwitch = null
+          return
+        }
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
           let autoPromptKey = step.choice.promptKey
@@ -1885,6 +1911,7 @@ export class GameSession {
     if (this.pending.type !== 'confirmPlayerSwitch') return this.respond(false, 'no pending player switch')
     this.pushHistory(false, true)
     this.activePlayerIndex = this.pending.toPlayerIndex
+    this.deferredPlayerSwitch = null
     this.pending = { type: 'none' }
     this.runEngineSteps()
     return this.respond()
@@ -2149,7 +2176,7 @@ export class GameSession {
 
   commitFarmChoice(
     playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
+    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select',
     payload: Record<string, unknown>,
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
@@ -2391,15 +2418,58 @@ export class GameSession {
             typeof (field as { row?: unknown }).row === 'number' &&
             typeof (field as { col?: unknown }).col === 'number')
           : undefined
+        // Compute extra valid positions from card effects (e.g. B72 pasture sowing)
+        const extraFields = computeExtraSowableFields(player)
+        const extraValidPositions = new Set(
+          extraFields.map((f) => positionKey(f.tile)),
+        )
         const result = applyFarmChoice(normalized, 'sow', payload as any, {
           sowOptions: {
             maxSelections,
             excludedFields,
+            extraValidPositions: extraValidPositions.size > 0 ? extraValidPositions : undefined,
           },
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        // Handle extra field sowing via card effects
+        if (extraValidPositions.size > 0) {
+          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
+          for (const sel of sowPayload.crops ?? []) {
+            const key = positionKey({ row: sel.row, col: sel.col })
+            if (extraValidPositions.has(key)) {
+              handleSowExtraField(this.state.players[playerIndex]!, { row: sel.row, col: sel.col }, sel.crop)
+            }
+          }
+        }
+        break
+      }
+      case 'field-select': {
+        const selectedFields = (payload as { fields?: { row: number; col: number }[] }).fields ?? []
+        const maxSel = (this.pending.actionContext?.maxSelections as number) ?? 1
+        if (selectedFields.length > maxSel) {
+          return this.respond(false, 'too many field selections')
+        }
+        // Validate each field exists in the player's fields
+        for (const sel of selectedFields) {
+          const exists = player.fields.some(f => f.row === sel.row && f.col === sel.col)
+          if (!exists) return this.respond(false, 'invalid field position')
+        }
+        this.pushHistory()
+        // Resolve the choice with position keys
+        const choiceValue = selectedFields.length > 0
+          ? selectedFields.map(f => `${f.row}-${f.col}`).join(',')
+          : 'cancel'
+        // Use the engine to resolve the pending choice
+        const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('field-select')
+        this.engine?.resolveChoice(choiceValue, {
+          state: this.state,
+          player: this.state.players[playerIndex]!,
+          space,
+        })
+        this.flushEngineLog()
+        this.runEngineSteps()
         break
       }
     }

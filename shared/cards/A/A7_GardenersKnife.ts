@@ -1,13 +1,34 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'A7_GardenersKnife'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const grainFields = player.fields.filter((f) => f.crop === 'grain').length
+    const vegFields = player.fields.filter((f) => f.crop === 'vegetable').length
+    if (grainFields === 0 && vegFields === 0) return
+    const params: Record<string, number> = {}
+    if (grainFields > 0) params.food = grainFields
+    if (vegFields > 0) params.grain = vegFields
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params,
+    }
+  },
+})
 
 export const A7_GardenersKnife = new MinorImprovement({
-  id: "A7_GardenersKnife",
+  id: CARD_ID,
   name: "Gardener's Knife",
-  deck: "A",
+  deck: 'A',
   number: 7,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately get 1 <GRAIN> from the general supply."],
+  category: 'FOOD_PROVIDER',
+  desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
   cost: { wood: 1 },
   passing: true,
-  implemented: false,
+  newSet: true,
 })

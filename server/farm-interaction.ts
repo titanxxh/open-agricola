@@ -1,4 +1,5 @@
 import type {
+  FarmTilePosition,
   InteractionFarmSelection,
   PendingAction,
   PlayerState,
@@ -11,6 +12,7 @@ import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
 import { validatePlowSelection } from './plow-validation.ts'
+import { computeExtraSowableFields } from '../shared/cards/card-effects.ts'
 
 const sanitizePayableCost = (
   costOverride?: Partial<Resource>,
@@ -126,6 +128,21 @@ export const buildSowFarmInteraction = (
     if (allowedCrops.length === 0) return []
     return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
   })
+  // Add extra sowable fields from card effects (e.g. B72 pastures)
+  const extraFields = computeExtraSowableFields(player)
+  for (const extra of extraFields) {
+    const key = positionKey(extra.tile)
+    if (excludedKeys.has(key)) continue
+    // Filter allowed crops by what the player actually has
+    const filteredCrops = extra.allowedCrops.filter((crop) => {
+      if (crop === 'grain') return (normalized.resources.grain ?? 0) > 0
+      if (crop === 'vegetable') return (normalized.resources.vegetable ?? 0) > 0
+      return false
+    })
+    if (filteredCrops.length === 0) continue
+    selectableFields.push({ tile: extra.tile, allowedCrops: filteredCrops })
+  }
+
   const rawMaxSelections = typeof actionContext?.maxSelections === 'number'
     ? Math.max(0, Math.floor(actionContext.maxSelections))
     : undefined
@@ -133,6 +150,25 @@ export const buildSowFarmInteraction = (
     ? undefined
     : Math.min(rawMaxSelections, selectableFields.length)
   return { farmType: 'sow', selectableFields, maxSelections }
+}
+
+export const buildFieldSelectFarmInteraction = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): InteractionFarmSelection => {
+  const filter = actionContext?.fieldFilter as string | undefined
+  const maxSelections = (actionContext?.maxSelections as number) ?? 1
+  const minSelections = (actionContext?.minSelections as number) ?? 0
+  const selectableFields: FarmTilePosition[] = player.fields
+    .filter((f) => {
+      if (filter === 'has-vegetable') return f.crop === 'vegetable' && f.remaining > 0
+      if (filter === 'has-grain') return f.crop === 'grain' && f.remaining > 0
+      if (filter === 'has-crop') return f.crop !== null && f.remaining > 0
+      if (filter === 'empty') return f.crop === null
+      return f.crop !== null && f.remaining > 0
+    })
+    .map((f) => ({ row: f.row, col: f.col }))
+  return { farmType: 'field-select', selectableFields, maxSelections, minSelections }
 }
 
 export const buildFenceFarmInteraction = (

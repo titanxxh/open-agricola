@@ -41,16 +41,8 @@ describe('C141_SheepProvider session', () => {
     // Confirm animal reorg for opponent (p1) — engine finishes, after-hooks fire
     resp = session.confirmAnimalReorg(1, [])
 
-    // After-hooks create a PlayerSwitch to owner for the grain gain
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
-    resp = session.confirmPlayerSwitch()
-
-    // After grain gain, PlayerSwitch back to opponent
-    if (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
-    }
-
-    // Grain should be gained by owner
+    // After-hooks silently switch to owner, auto-gain grain, and switch back
+    // Grain should be gained by owner (no confirmPlayerSwitch needed for auto-gains)
     expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
   })
 

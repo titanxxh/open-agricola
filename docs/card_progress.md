@@ -4,17 +4,70 @@
 
 ## 总览
 
-| | BGA 总数 | 有文件 | 已实现 Hook | 仅数据定义 | 无文件 | 5+人卡(BGA未实现) |
-|---|---|---|---|---|---|---|
-| A Deck | 180 | 68 | 36 | 32 | 112 | 12 |
-| B Deck | 180 | 41 | 17 | 24 | 139 | 12 |
-| C Deck | 182 | 55 | 23 | 32 | 127 | 12 |
-| D Deck | 181 | 64 | 28 | 36 | 117 | 12 |
-| E Deck | 169 | 66 | 28 | 38 | 103 | 0 |
-| **总计** | **892** | **294** | **132** | **162** | **598** | **48** |
+| | BGA 总数 | 已实现 Hook | 仅数据 | 无文件 | 5+人卡(BGA未实现) |
+|---|---|---|---|---|---|
+| A Deck | 180 | 47 | 29 | 104 | 12 |
+| B Deck | 180 | 25 | 22 | 133 | 12 |
+| C Deck | 182 | 37 | 26 | 119 | 12 |
+| D Deck | 181 | 44 | 26 | 111 | 12 |
+| E Deck | 169 | 38 | 31 | 100 | 0 |
+| **总计** | **892** | **191** | **134** | **567** | **48** |
 
 > Major Improvements (10张) 已全部实现，不计入上表。
-> 截至 2026-04-13 更新。
+> 截至 2026-04-14 更新。848 tests passing。
+
+## 未实现卡牌总结（701 张）
+
+### 按效果模式分类
+
+不区分有无文件，统一按卡牌运行时行为模式分类：
+
+| 批次 | 效果模式 | 数量 | 难度 | 基础设施 |
+|---|---|---|---|---|
+| 1 | 纯数据/无逻辑 + 交换/计分 | 29 | 零~极低 | ✅ |
+| 2 | 一次性购买效果 (onBuy) | 142 | 低 | ✅ |
+| 3 | 单事件监听：PlaceFarmer 触发 | 63 | 低-中 | ✅ |
+| 4 | 单事件监听：AfterCollect + After 行动 | 55 | 低-中 | ✅ |
+| 5 | 单事件监听：Harvest 各阶段 | 37 | 低-中 | ✅ |
+| 6 | 单事件监听：回合/工作阶段触发 | 59 | 低-中 | ✅ |
+| 7 | 单事件监听：Compute 修改器 | 17 | 低-中 | ✅ |
+| 8 | 费用修改器 (computeCosts) | 25 | 中 | ✅ |
+| 9 | Anytime 动作 | 20 | 中 | ✅ |
+| 10 | 动物容量扩展 (computeDropZones) | 10 | 中 | ✅ |
+| 11 | 资源存储/释放 (holder/stack) | 19 | 中 | ✅ |
+| 12 | 收获阶段特殊 | 15 | 中 | ✅ |
+| 13 | 多事件监听 | 52 | 中-高 | ✅ |
+| 14 | 玩家选择交互 (SPECIAL_EFFECT) | 18 | 中-高 | 部分需新增 |
+| 15 | 对手交互 | 23 | 中-高 | ✅ |
+| 16 | 流程替换/特殊机制 | ~28 | 高 | 部分需新增 |
+| 17 | Anytime 交换/静态 | 10 | 低 | ✅ |
+
+### 推荐实现顺序
+
+| 批次 | 效果模式 | 数量 | 累计实现数 | 累计率 | 理由 |
+|---|---|---|---|---|---|
+| 1 | 纯数据 + 交换/计分 | 29 | 220 | 24.7% | 零/极低难度，创建文件或加 exchanges 即完成 |
+| 2 | 一次性购买效果 | 142 | 362 | 40.6% | 统一 onBuy 模式，5-15 行/张，BGA 直接翻译 |
+| 3 | 单事件监听：PlaceFarmer | 63 | 425 | 47.6% | 最常见事件类型，放农民到行动格时触发 |
+| 4 | 单事件监听：AfterCollect + After 行动 | 55 | 480 | 53.8% | 行动完成后触发，模式统一 |
+| 5 | 单事件监听：Harvest 阶段 | 37 | 517 | 58.0% | 收获各子阶段触发，需按阶段分组测试 |
+| 6 | 单事件监听：回合/工作阶段 | 59 | 576 | 64.6% | StartOfTurn/ReturnHome/EndWorkPhase 等 |
+| 7 | 单事件监听：Compute 修改器 + Anytime 交换 | 27 | 603 | 67.6% | ComputeCardCosts/DropZones/Args 等 |
+| 8 | 费用修改器 | 25 | 628 | 70.4% | computeCosts hook，模式统一 |
+| 9 | Anytime 动作 | 20 | 648 | 72.6% | phases: ['anytime']，每张需独立 handler |
+| 10 | 动物容量扩展 | 10 | 658 | 73.8% | computeDropZones/onComputeAnimalZones |
+| 11 | 资源存储/释放 | 19 | 677 | 75.9% | counters/stack 管理，需跨回合状态 |
+| 12 | 收获阶段特殊 | 15 | 692 | 77.6% | 修改收获/喂食/繁殖逻辑 |
+| 13 | 多事件监听 | 52 | 744 | 83.4% | 2+ handler，最大复杂批次 |
+| 14 | 玩家选择交互 | 18 | 762 | 85.4% | 需 ChoiceNode / SPECIAL_EFFECT 对应 |
+| 15 | 对手交互 | 23 | 785 | 88.0% | opponent scope + PlayerSwitch |
+| 16 | 流程替换/特殊机制 | ~28 | 813 | 91.1% | case-by-case，部分需新基础设施 |
+
+> 批次 1-7（412 张，低-中难度）完成后实现率达 67.6%，全部基础设施已就绪。
+> 批次 8-12（89 张，中难度）完成后实现率达 77.6%，模式统一可批量实现。
+> 批次 13-16（121 张，中-高难度）需逐一分析，完成后实现率达 91.1%。
+
+---
 
 ## 状态说明
 
@@ -25,1113 +78,432 @@
 
 ---
 
-## 缺失基础设施分析
+## 基础设施状态
 
-### ✅ 1. PlayerActionCard 行动格 — 已完成
+所有主要基础设施均已完成：
 
-**现状**: `player-action-space.ts` 注册机制 + `syncDynamicActionSpaces()` + 前端 ActionBoard 渲染均已实现。11 张 PlayerActionCard 已全部注册（A39, B42, C104, C162, D23, D51, D116, D127, E81, E161, B100）。包含 owner 显示、meeple 渲染、multi-select UI (C104)。
-
-### ✅ 2. 动物容量修改器 — 已完成
-
-**现状**: `onComputeAnimalZones` hook 已在 `card-effects.ts` 中定义，`computeAnimalZones()` 在 `animals.ts` 中统一调用。A12_DrinkingTrough 已实现（+2 per pasture）。
-
-**仍需实现的卡牌**: A86_AnimalTamer, E11_PettingZoo, E12_AnimalBedding, E86_PenBuilder — 只需编写 `onComputeAnimalZones` handler，基础设施已就绪。
-
-### ✅ 3. 烹饪/交换改良注册 — 已完成
-
-**现状**: `CardExchange` 类型 + `exchange-registry.ts` 已实现。卡牌通过 `exchanges` 属性声明兑换比率，`getPlayerBakeRates()` 动态收集。E63_IronOven、E64_SimpleOven 已接入。
-
-**仍需实现的卡牌**: A60_OrientalFireplace, B80_HardPorcelain 及其他 ~10 张 BGA 有 `getExchanges()` 的卡 — 只需添加 `exchanges` 属性。
-
-### ✅ 4. computeBonusScore 计分卡 — 已完成
-
-**现状**: 45 张卡已实现 `computeBonusScore` hook，含 `computePostScore` 用于需要完整计分结果的卡牌。`ScoringContext.reserved` 支持资源去重。
-
-### 🔧 5. Anytime 动作系统 — 未实现
-
-**现状**: `bake-bread` 和 `anytime-reorg` 已硬编码，但卡牌级别的自定义 anytime action 尚未支持。BGA 中 43 张卡使用 `isAnytime()` 机制。
-
-**BGA 阻塞卡牌**: A48, A71, A102, A153, B21, B35, B69, B83, B154, B157, C18, C46, C53, C57, C64, C69, C84, C85, C87, C94, C101, C115, C120, C143, C150, D13, D46, D56, D71, D87, D106, D114, D122, D124, D129, E13, E14, E27, E53, E85, E86, E91, E103
-
-**复杂度**: 高 — 需要卡牌注册自定义 anytime action + UI 动态展示 + engine 支持 anytime flow 插入。
-
-### 🔧 6. Holder Card 资源堆叠 — 未实现
-
-**现状**: 部分卡牌用 `cardStates[cardId].extraData` 手动管理存储资源。BGA 有统一的 `getNextResource()`/`addResource()` 机制，17 张卡使用。
-
-**BGA 阻塞卡牌**: A40, A102, A144, B21, B48, B55, B83, B137, C75, C81, C115, C120, D118, E40, E56, E103, E162
-
-**复杂度**: 中等 — 需要统一的 card holder 存储模型（`cardStates` 中增加 `resources` 字段 + 自动累积/消费方法）。
-
-### 🔧 7. 未来回合放置 (futureMeeples) — 部分实现
-
-**现状**: A74_StableTree 使用 `place-future-meeples` action。BGA 中 75 张卡涉及 futureMeeple 放置（大部分是 round-card 资源追加类卡牌 A43-A47, B43-B47 等）。
-
-**BGA 阻塞卡牌 (代表性)**: A43-A47, A69, B41, B43-B47, B60, B65, B66, B74, B76, B78, C43-C47, C64, C65, C74, C77-C79, D40-D47, D57, D67, D69, D78, E41-E47, E56, E104, E108, E119, E120, E139
-
-**复杂度**: 复杂 — 需要扩展回合卡资源累积机制，允许卡牌在指定未来行动格上放置自定义资源。A74 仅为简单案例。
-
-### 🔧 8. 对手交互机制 — 部分实现
-
-**现状**: `card-listeners.ts` 已支持 `scope: 'opponent' | 'any'`，Engine 已有 `PlayerSwitchNode`。已实现 C144_ReedRoofRenovator（被动收益）和 A128_RiparianBuilder（授予行动）两张对手交互卡。BGA 中 52 张卡有对手交互。
-
-**交互模式分类** (绝大多数不需要对手做选择):
-
-| 模式 | 描述 | 对手决策 | 复杂度 | 约占比 |
-|------|------|---------|--------|-------|
-| 被动收益 | 对手执行某动作 → 卡主自动获资源 | 无 | 简单 | ~60% |
-| 卡主可选 | 对手执行某动作 → 卡主决定是否触发效果 | 无（卡主选） | 简单 | ~15% |
-| 授予行动 | 对手执行某动作 → 卡主获得额外行动机会 | 无（卡主选） | 中等 | ~15% |
-| 强制支付 | 对手使用某行动格前必须支付资源给卡主 | 自动支付 | 中等 | ~5% |
-| 元效果 | 对手行动后卡主获得使用同一行动格的权利 | 无（卡主选） | 复杂 | 仅 C150 |
-
-**代表性卡牌**:
-- 被动收益: C141_SheepProvider, D139_Chairman, E66_BarnShed, D134_OysterEater
-- 卡主可选: A132_Publican, A156_Buyer
-- 授予行动: A150_Stagehand, E95_Miller, A128_RiparianBuilder(✅), C144_ReedRoofRenovator(✅)
-- 强制支付: C51_FishingNet
-- 元效果: C150_ParrotBreeder
-
-**复杂度**: 简单-中等 — 后端 `scope:'opponent'` + `PlayerSwitchNode` 已就绪，~90% 的卡只需写一个 opponent-scope listener（参考 C144/A128 模式），不需要对手做选择。
-
-### 🔧 9. 交换卡未实现 — 需要数据补充
-
-**现状**: BGA 中有 `getExchanges()` 方法但我们尚未创建文件的卡牌。
-
-**缺失卡牌**: A61_WinnowingFan, B80_HardPorcelain, B101_FurnitureCarpenter, B104_SheepWalker, C50_StableYard, C62_CookeryExtension, C139_BasketmakersWife, D62_BeerTap, D82_HuntingTrophy, D162_ClayFirer
-
-**复杂度**: 简单 — 创建文件 + 添加 `exchanges` 属性即可。
+| 基础设施 | 状态 | 说明 |
+|----------|------|------|
+| PlayerActionCard 行动格 | ✅ | 11 张卡已注册，含 owner 显示、meeple 渲染 |
+| 动物容量修改器 | ✅ | `onComputeAnimalZones` hook，A12 已实现 |
+| 烹饪/交换改良 | ✅ | `CardExchange` + `exchange-registry.ts` |
+| computeBonusScore 计分 | ✅ | 45+ 张卡已实现 |
+| Anytime 动作系统 | ✅ | CardListener `phases: ['anytime']` |
+| Holder Card 资源堆叠 | ✅ | counters + stack 两种模式 |
+| Future Meeples 扩展 | ✅ | 简单/entries 两种形式 + removeFutureMeeples |
+| 对手交互机制 | ✅ | 8 张卡覆盖 4 种模式，gain-trigger-player action |
+| Field Select UI | ✅ | 第 6 种 farm interaction type |
+| PlayerSwitch in ActionFlow | ✅ | 懒确认机制，deferredPlayerSwitch |
+| resourcesPaid 追踪 | ✅ | pay-resources 返回实际支付资源 |
+| computeReplace | ✅ | 替换行动效果（day-laborer 等） |
+| onGainResource (after:gain) | ✅ | 资源获取后触发（E103_Wolf） |
 
 ---
 
-## 分批实现建议
+## 未实现卡牌详细分类
 
-### ✅ 第一批：纯计分卡 — 已完成
+统一按效果模式分类，不区分有无 `.ts` 文件。
 
-45 张卡已实现 `computeBonusScore` / `computePostScore` hook。
+### 批次 1：纯数据 + 交换/计分（29 张）
 
-### ✅ 第二批：简单 onBuy / 阶段触发 — 大部分完成
+**NO_LOGIC（22 张）— BGA 也无逻辑或逻辑在核心路径：**
+A10, A41, A85, A87, A106, B10, C10, D85, E16, A113, A169-A180, B169-B180, C169-C180, D169-D180 (5+人卡构造函数only), B31(scoreOnly), C32, C105, C109, D11, D25, D37, D108, D155, D159, E29, E96, E132
 
-已实现的代表性卡牌：A22, A23, A58, B48, B65, C24, D22, A85, A127, B55, A119, A148, B149 等。剩余简单阶段触发卡可直接实现。
+**EXCHANGE_ONLY（6 张）：** E153, B32, B80, B104, C62, D162
 
-### 第三批：行动触发 (listener) — 持续进行
+**SCORE_ONLY（1 张）：** B31
 
-约 100+ 张卡，需要 `registerCardListener` + 各种行动 phase hook。已实现 56 张 listener 卡。
+### 批次 2：一次性购买效果（142 张）
 
-剩余按行动类型分组：
-- **Plow 犁地**: A71, A72, C18, C19, D20 等
-- **Sow 播种**: A106, C115 等
-- **Fencing 围栏**: A89, C85, E16 等
-- **Collect 收取**: A70, B81, C57, D66 等
-- **Improvement 改良**: A40, B86, C87, D26 等
-- **Construct 建造**: A82, B21, D36 等
-- **Renovation 翻新**: A87, B19, C27 等
-- **Occupation 出牌**: A92, B23, C29, D27 等
+onBuy 触发，一次性获取资源/执行行动。
 
-### 第四批：需要新基础设施
+**A (22):** A1, A2, A4, A5, A6, A7, A8, A9, A13, A19, A33, A36, A44, A47, A57, A69, A89, A117, A125, A135, E155, E159
+**B (32):** B1, B2, B4, B5, B6, B7, B8, B9, B14, B20, B22, B33, B37, B41, B44, B45, B46, B52, B59, B66, B71, B73, B74, B78, B84, B88, B93, B96, B102, B105, B113, B119, B123, B125, B127, B141, B149, B164, B167
+**C (22):** C1, C2, C3, C4, C5, C6, C7, C8, C9, C16, C38, C40, C44, C47, C50, C65, C72, C74, C77, C78, C79, C83, C108, C118, C127, C136, C139, C156, C161, C165, C166
+**D (16):** D1, D2, D3, D4, D6, D9, D40, D41, D43, D44, D45, D47, D57, D62, D67, D69, D78, D91, D120, D131, D145
+**E (25):** E1, E2, E3, E5, E6, E7, E8, E9, E25, E30, E36, E41, E42, E43, E44, E45, E46, E65, E76, E78, E94, E97, E98, E104, E106, E119, E120, E127, E138, E139, E145
 
-| 基础设施 | 状态 | 阻塞卡牌 |
-|----------|------|----------|
-| Anytime 动作系统 | ❌ 未实现 | 43 张卡（见§5） |
-| Holder Card 资源堆叠 | ❌ 未实现 | 17 张卡（见§6） |
-| 未来回合放置 | 🔧 部分 | 75 张卡（见§7） |
-| 交换卡数据补充 | 🔧 部分 | 10 张卡（见§9） |
+### 批次 3-7：单事件监听（241 张）
 
-### 第五批：对手交互卡
+合并所有单一 listener handler 卡，按事件类型分批。
 
-52 张卡，需要前端交互流（对手收到提示→选择→确认）。后端 `scope:'opponent'` + `PlayerSwitchNode` 已就绪。
+#### 批次 3：PlaceFarmer 触发（63 张）
 
-代表性：A50, A128, A132, A142, A150, A154, A156, A158-A160, B27, B79, C48, C51, C141-C153, D14, D134, D139, E66, E95, E148, E154, E156, E160 等
+包含 222 张无文件 + 19 张有文件的 LISTENER_SIMPLE 卡中 PlaceFarmer 相关的。
 
-### 第六批：5+人卡 (低优先级)
+| 触发行动格 | 数量 | 卡牌 |
+|---|---|---|
+| Plow/Cultivate | 6 | A18, A24, C20, C91, D90, E17 |
+| Fishing | 7 | A51, A78, A138, B40, B47, B60, E55 |
+| DayLaborer | 7 | B77, B87, B91, C45, C138, D147, E59 |
+| GrainSeeds/VegSeeds | 8 | A67, B62, B142, B166, C90, C131, E67, E121 |
+| GrainUtilization | 1 | D101 |
+| Animal Market | 10 | A46, A66, A147, B92, C15, C147, D16, D164, D165, E166 |
+| BeforeCollect | 7 | A91, A107, A115, A161, C76, D105, D125 |
+| 其他行动格 | 13 | A52, A114, A122, A140, A155, A163, B43, B56, B64, B90, B112, D28, D83, D110, E137, E141 |
 
-48 张 BGA 自身未实现的卡（`implemented=false`），分布在 A169-180、B169-180、C169-180、D169-180。可最后处理或跳过。
+##### AfterPlaceFarmer / ImmediatelyAfter（11 张）
+A168, B24, B28, B144, C82, C126, D68, D151, E19, E115, E131
 
----
+#### 批次 4：AfterCollect + After 行动（55 张）
 
-## A Deck 详细状态 (36✅ / 180)
+##### AfterCollect（18 张）
+A15, A23, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73, D140, E15
 
-A Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
+##### After 行动（after:Plow/Sow/Fencing/Stables/Construct/Renovation/Improvement/Occupation）（31 张）
 
-### ✅ 已实现 (25)
+| 触发事件 | 数量 | 卡牌 |
+|---|---|---|
+| AfterPlow | 2 | D104, E164 |
+| AfterSow | 4 | C73, D58, E50, E79 |
+| AfterFencing | 4 | A34, A68, D89, E108 |
+| AfterStables | 2 | D168, E114 |
+| AfterConstruct | 5 | A21, A93, B111, D94, D123 |
+| AfterRenovation | 3 | A45, B134, D111 |
+| AfterImprovement | 8 | A131, C43, D80, E18, E31, E54, E122, E146 |
+| AfterOccupation | 5 | C68, D42, E89, E157, E163 |
 
-| 卡牌ID | 名称 | 类型 | 实现的 Hooks |
-|--------|------|------|-------------|
-| A17 | ReclamationPlow | 小改良 | listener(after:Collect), before:Collect — 收取后 xor flow 决定是否犁地 |
-| A28 | ForestSchool | 小改良 | listener(computeArgs), canUseOccupied, effect — 森林行动格可使用已占用格 |
-| A29 | AleBenches | 小改良 | effect, onReturnHome — 回家阶段获食物 |
-| A37 | Bucksaw | 小改良 | listener(after:Renovation) — 翻新后支付得收益 |
-| A53 | Claypipe | 小改良 | effect, onBuy, onReturnHome — 支持回溯建材，回家阶段结算 |
-| A55 | JunkRoom | 小改良 | listener(during/after:Improvement) — 打改良时获食物 |
-| A64 | BarleyMill | 小改良 | effect — 烘焙增强 |
-| A65 | SeedPellets | 小改良 | listener(before:Sow), isDoable, effect — 播种前获谷物 |
-| A74 | StableTree | 小改良 | listener(after:Stables), effect, onBuy — 建马厩后排入 future meeples |
-| A79 | GardenHoe | 小改良 | listener(after:Sow) — 播种后有蔬菜田则获黏土+石头 |
-| A81 | InterimStorage | 小改良 | listener(before), effect, onRoundStart — 回合开始存储 |
-| A83 | ShepherdsCrook | 小改良 | listener(immediatelyAfter/after:Fencing) — 围栏后得羊 |
-| A84 | Silage | 小改良 | effect, onReturnHome — 回家阶段效果 |
-| A88 | HedgeKeeper | 职业 | (注：用户提供数据标记为✅但脚本显示无hook，待核实) |
-| A94 | LazySowman | 职业 | listener(computeArgs/computeReplace), isDoable, effect, onPlay — 简化播种 |
-| A97 | Freshman | 职业 | listener(after/computeReplace), isDoable, onPlay — 替换行动效果 |
-| A105 | BarrowPusher | 职业 | listener(after:Plow), onPlay — 犁地后效果 |
-| A108 | MushroomCollector | 职业 | listener(immediatelyAfter/after:Collect), onPlay — 收取后交换 |
-| A109 | SmallTrader | 职业 | listener(after:Improvement), onPlay — 打改良后效果 |
-| A110 | Roughcaster | 职业 | listener(after:Construct/Renovation), onPlay — 建造/翻新后 |
-| A112 | ScytheWorker | 职业 | effect, onBuy, onHarvest, onPlay — 收获阶段效果 |
-| A126 | MasterWorkman | 职业 | listener(before:PlaceFarmer), isDoable — 1-4轮行动格放人前获资源 |
-| A128 | RiparianBuilder | 职业 | listener(after/computeCosts) — 建造费用修改 |
-| A136 | DrudgeryReeve | 职业 | computeBonusScore, before, effect, onBuy, onPlay — 预留资源计分 |
-| A144 | Sequestrator | 职业 | listener(after), effect, onBuy, onPlay — 行动后效果 |
-| A166 | Haydryer | 职业 | effect, onPlay — 收获前效果 |
+##### AfterExchange / AfterPay / AfterRevealAction / AfterWishChildren（6 张）
+A30, A63, C61 (exchange), B18 (pay), C21 (reveal), E113 (wish children)
 
-### 🔧 仅数据定义 (34)
+#### 批次 5：Harvest 各阶段（37 张）
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 备注 |
-|--------|------|------|---------|------|
-| A1 | Shelter | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A2 | ShiftingCultivation | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A3 | PaperKnife | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A4 | Baseboards | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A5 | ClayEmbankment | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A6 | StorageBarn | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A7 | GardenersKnife | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A8 | FoodBasket | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A9 | YoungAnimalMarket | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A10 | WoodenShed | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| A14 | CarpentersHammer | 小改良 | BGA: listener after Construct | 建造后效果，中等 |
-| A22 | Telegram | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| A23 | StoneCompany | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| A39 | Chapel | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| A40 | PottersYard | 小改良 | BGA: listener after Improvement | 打改良后效果，中等 |
-| A41 | VegetableSlicer | 小改良 | BGA: listener | 中等 |
-| A58 | AsparagusKnife | 小改良 | BGA: onBuy + effect | 购买时效果，简单 |
-| A70 | LiftingMachine | 小改良 | BGA: listener after Collect | 收取后效果，中等 |
-| A71 | ClearingSpade | 小改良 | BGA: listener after Plow | 犁地后效果，中等 |
-| A72 | CalciumFertilizers | 小改良 | BGA: listener after Plow | 犁地后效果，中等 |
-| A82 | WorkCertificate | 职业 | BGA: listener after Construct | 建造后效果，中等 |
-| A85 | Homekeeper | 职业 | BGA: onReturnHome | 回家阶段，简单 |
-| A87 | Conservator | 职业 | BGA: listener after Renovation | 翻新后，中等 |
-| A89 | StablePlanner | 职业 | BGA: listener after Fencing | 围栏后，中等 |
-| A92 | AdoptiveParents | 职业 | BGA: listener after GrowFamily | 生育后，中等 |
-| A106 | SlurrySpreader | 小改良 | BGA: listener after Sow | 播种后效果，中等 |
-| A119 | FirewoodCollector | 职业 | BGA: onRoundStart | 回合开始，简单 |
-| A123 | FrameBuilder | 职业 | BGA: listener after Construct | 建造后，中等 |
-| A127 | Lodger | 职业 | BGA: onRoundStart | 回合开始获食物，简单 |
-| A137 | RiverineShepherd | 职业 | BGA: listener | 中等 |
-| A148 | Woolgrower | 职业 | BGA: onHarvest | 收获阶段，简单 |
-| A162 | ForestTallyman | 职业 | BGA: computeBonusScore + listener | 计分+行动触发，中等 |
-| A165 | PigBreeder | 职业 | BGA: listener | 中等 |
-| (A88) | HedgeKeeper | 职业 | BGA: listener after Fencing | 已标记✅但hook存疑，待核实 |
+| 阶段 | 数量 | 卡牌 |
+|---|---|---|
+| StartHarvest | 6 | D61, D153, E61, E117, E147, E149 |
+| BeforeHarvest | 3 | C92, D32, D98 |
+| HarvestFieldPhase | 4 | A104, A118, B50, E107 |
+| EndHarvestFieldPhase | 3 | A61, C54, C110 |
+| HarvestFeedingPhase | 6 | A62, C55, D133, E39, E48, E142 |
+| EndHarvestFeedingPhase | 2 | C41, D76 |
+| AfterReorganize (breeding) | 2 | C71, E90 |
+| AfterHarvest | 3 | B82, C34, C66 |
+| EndHarvest | 3 | A145, C124, E99 |
+| EndOfRound | 3 | B53, D64, D79 |
 
-### ❌ 无文件但 BGA 有逻辑 (代表性)
+#### 批次 6：回合/工作阶段触发（59 张）
 
-以下列出 BGA 中有 listener/score/activate 方法的卡牌（不含纯数据和 5+人卡）：
+| 阶段 | 数量 | 卡牌 |
+|---|---|---|
+| StartOfTurn | 12 | A90, B57, B97, B114, B118, B135, C103, C159, E88, E102, E126, E152, E168 |
+| BeforeStartOfTurn | 4 | B106, C111, C157, D48 |
+| StartOfWork | 6 | A76, B81, C123, C125, D54, E100 |
+| StartReturnHome | 9 | A35, A100, A127, A141, A151, A152, A157, C97, E20 |
+| ReturnHome | 2 | B139, D52 |
+| AfterWorkPhase | 1 | B140 |
+| EndWorkPhase | 6 | B158, D130, D142, E23, E26, E158 |
+| Preparation | 1 | A49 |
+| BeforeEndOfGame | 1 | B133 |
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 复杂度 |
-|--------|------|------|---------|--------|
-| A11 | Turnwrest Plow | 小改良 | listener after Plow | 简单 |
-| A12 | Drinking Trough | 小改良 | animal capacity modifier | 中等(需基础设施) |
-| A13 | Landing Net | 小改良 | listener after Collect | 简单 |
-| A15 | Spindle | 小改良 | listener | 简单 |
-| A16 | Grain Cart | 小改良 | listener after Collect | 简单 |
-| A18 | Bucket | 小改良 | effect | 简单 |
-| A19 | Brewery | 小改良 | cooking exchange | 中等(需基础设施) |
-| A20 | Windmill | 小改良 | listener + score | 中等 |
-| A21 | Herb Garden | 小改良 | onBuy | 简单 |
-| A24 | Clay Mixer | 小改良 | listener after Collect | 简单 |
-| A25 | Manger | 小改良 | onBuy + score | 简单 |
-| A26 | Fish Trap | 小改良 | effect | 简单 |
-| A27 | Sowing Machine | 小改良 | listener | 中等 |
-| A30 | Dovecote | 小改良 | score | 简单 |
-| A31 | Mansion | 小改良 | computeBonusScore | 简单 |
-| A32 | Village Church | 小改良 | computeBonusScore | 简单 |
-| A33 | Half-timbered House | 小改良 | computeBonusScore + listener | 中等 |
-| A34 | Storehouse | 小改良 | listener + score | 中等 |
-| A35 | Corn Scoop | 小改良 | listener after Sow | 简单 |
-| A36 | Bean Field | 小改良 | onBuy + sow | 中等 |
-| A38 | Corner Cupboard | 小改良 | computeBonusScore | 简单 |
-| A42 | Shepherds Pipe | 小改良 | listener | 中等 |
-| A43 | Cooking Corner | 小改良 | cooking exchange | 中等(需基础设施) |
-| A44 | Clogs | 小改良 | listener | 简单 |
-| A45 | Canoe | 小改良 | listener after Collect | 简单 |
-| A46 | Reed Pond | 小改良 | listener | 简单 |
-| A47 | Clay Supports | 小改良 | listener after Construct | 中等 |
-| A48 | Shaving Horse | 小改良 | anytime action | 中等(需基础设施) |
-| A49 | Broom | 小改良 | listener | 简单 |
-| A50 | Animal Pen | 小改良 | opponent interaction | 复杂(需基础设施) |
-| A51 | Water Mill | 小改良 | listener + score | 中等 |
-| A52 | Market Cart | 小改良 | listener | 中等 |
-| A54 | Wild Boar Trap | 小改良 | listener after Collect | 简单 |
-| A56 | Clay Roof | 小改良 | listener after Construct | 中等 |
-| A57 | Grape Press | 小改良 | listener | 中等 |
-| A59 | Wooden Crane | 小改良 | listener | 中等 |
-| A60 | Oriental Fireplace | 小改良 | cooking exchange | 中等(需基础设施) |
-| A61 | Corn Storehouse | 小改良 | onHarvest + score | 中等 |
-| A62 | Building Material | 小改良 | onBuy | 简单 |
-| A63 | Wooden Hut Extension | 小改良 | listener after Construct | 中等 |
-| A66 | Cattle Market | 小改良 | listener | 中等 |
-| A67 | Milling Stone | 小改良 | effect | 简单 |
-| A68 | Piecework | 小改良 | listener | 中等 |
-| A69 | Harness | 小改良 | listener after Plow | 简单 |
-| A73 | Millstone | 小改良 | listener + score | 中等 |
-| A75 | Stablehand | 小改良 | listener | 中等 |
-| A76 | Fruit Tree | 小改良 | onRoundStart + score | 中等 |
-| A77 | Fence Delivery | 小改良 | listener after Fencing | 中等 |
-| A78 | Yoke | 小改良 | listener after Plow | 简单 |
-| A80 | Bottle | 小改良 | listener | 简单 |
-| A86 | Animal Tamer | 职业 | animal capacity modifier | 中等(需基础设施) |
-| A90 | Net Fisherman | 职业 | listener | 中等 |
-| A91 | Harvest Helper | 职业 | onHarvest | 简单 |
-| A93 | Manservant | 职业 | listener | 中等 |
-| A95 | Fence Overseer | 职业 | listener after Fencing | 中等 |
-| A96 | Hut Builder | 职业 | listener after Construct | 中等 |
-| A98 | Farmer | 职业 | computeBonusScore | 简单 |
-| A99 | Yeoman Farmer | 职业 | computeBonusScore | 简单 |
-| A100 | Greengrocer | 职业 | computeBonusScore | 简单 |
-| A101 | Patron | 职业 | computeBonusScore | 简单 |
-| A102 | Grocer | 职业 | anytime action | 中等(需基础设施) |
-| A103 | Clay Deliveryman | 职业 | listener after Collect | 简单 |
-| A104 | Tutor | 职业 | listener | 中等 |
-| A107 | Wood Distributor | 职业 | listener | 中等 |
-| A111 | Baker | 职业 | listener | 中等 |
-| A113 | Reed Buyer | 职业 | listener after Collect | 简单 |
-| A114 | Bricklayer | 职业 | listener after Construct | 中等 |
-| A115 | Stone Deliveryman | 职业 | listener after Collect | 简单 |
-| A116 | Reeve | 职业 | listener | 中等 |
-| A117 | Harvest Tradesman | 职业 | onHarvest | 简单 |
-| A118 | Brush Maker | 职业 | listener | 中等 |
-| A120 | Forester | 职业 | listener + score | 中等 |
-| A121 | Stockman | 职业 | listener | 中等 |
-| A122 | Renovator | 职业 | listener after Renovation | 中等 |
-| A124 | Grump | 职业 | listener | 中等 |
-| A125 | Groom | 职业 | listener | 中等 |
-| A129 | Stone Breaker | 职业 | listener | 中等 |
-| A130 | Animal Dealer | 职业 | listener | 中等 |
-| A131 | Seasonal Worker | 职业 | listener | 中等 |
-| A132 | Estate Manager | 职业 | opponent interaction | 复杂(需基础设施) |
-| A133 | Head of the Family | 职业 | computeBonusScore | 简单 |
-| A134 | Academic | 职业 | computeBonusScore | 简单 |
-| A135 | Educator | 职业 | computeBonusScore | 简单 |
-| A138 | Mushroom Picker | 职业 | listener | 中等 |
-| A139 | Magician | 职业 | listener | 中等 |
-| A140 | Berry Picker | 职业 | listener | 中等 |
-| A141 | Pastor | 职业 | listener | 中等 |
-| A142 | Ratcatcher | 职业 | opponent interaction | 复杂(需基础设施) |
-| A143 | Consultant | 职业 | listener | 中等 |
-| A145 | Shepherd | 职业 | listener | 中等 |
-| A146 | Merchant | 职业 | listener | 中等 |
-| A147 | Plowman | 职业 | listener | 中等 |
-| A149 | Plow Driver | 职业 | listener | 中等 |
-| A150 | Chief | 职业 | opponent interaction | 复杂(需基础设施) |
-| A151 | Stonecutter | 职业 | listener | 中等 |
-| A152 | Clay Worker | 职业 | listener | 中等 |
-| A153 | Storehouse Keeper | 职业 | listener | 中等 |
-| A154 | Tinsmith | 职业 | opponent interaction | 复杂(需基础设施) |
-| A155 | Clay Mixer | 职业 | listener | 中等 |
-| A156 | Buyer | 职业 | opponent interaction | 已实现 |
-| A157 | Chamberlain | 职业 | listener | 中等 |
-| A158 | Fence Builder | 职业 | opponent interaction | 复杂(需基础设施) |
-| A159 | Field Watchman | 职业 | opponent interaction | 复杂(需基础设施) |
-| A160 | Fence Deliveryman | 职业 | opponent interaction | 复杂(需基础设施) |
-| A161 | Animal Keeper | 职业 | listener | 中等 |
-| A163 | Wooden Hut Builder | 职业 | listener after Construct | 中等 |
-| A164 | Cattle Whisperer | 职业 | listener | 中等 |
-| A167 | Charcoal Burner | 职业 | listener | 中等 |
-| A168 | Wood Cutter | 职业 | listener | 中等 |
+#### 批次 7：Compute 修改器 + Anytime 交换（27 张）
 
----
+##### Compute 修改器（17 张）
 
-## B Deck 详细状态 (17✅ / 180)
+| 类型 | 数量 | 卡牌 |
+|---|---|---|
+| ComputeCardCosts | 3 | A75, B95, C27 |
+| ComputeDropZones | 5 | A148, B12, B86, D86, E12 |
+| ComputeArgsPlaceFarmer | 3 | A26, B129, E129 |
+| ComputePlaceFarmerFlow | 4 | D138, E24, E92, E151 |
+| ComputeCostsFencing | 1 | A88 |
 
-B Deck: 小改良 1-80, 职业 81-168, 5+人 169-180
+##### Anytime 交换/静态（10 张）
+B69, B157, C94, D106, E13, E14, A60, B101, D53, D59, E62
 
-### ✅ 已实现 (10)
+### 批次 8-12：中等复杂度效果模式
 
-| 卡牌ID | 名称 | 类型 | 实现的 Hooks |
-|--------|------|------|-------------|
-| B34 | SpecialFood | 小改良 | listener(before/after:Collect) — 动物收取前后检测全部收容，兑现 bonus VP |
-| B65 | GrainDepot | 小改良 | effect, onBuy — 购买时获谷物 |
-| B67 | HandTruck | 小改良 | listener(before:BakeBread), isDoable — 烤面包前按人数获谷物 |
-| B70 | NewPurchase | 小改良 | effect — 回合开始前结算购买效果 |
-| B75 | WoodWorkshop | 小改良 | listener(before:Improvement), isDoable, effect — 改良前获木材 |
-| B94 | StockProtector | 职业 | listener(before/after), isDoable, effect, onPlay — 保护库存 |
-| B100 | Clutterer | 职业 | listener(after), onPlay — 行动后效果 |
-| B103 | FieldMerchant | 职业 | listener(after/computeReplace), isDoable, onPlay — 替换效果 |
-| B109 | PaperMaker | 职业 | listener(before/after), isDoable, onPlay — 行动前后效果 |
-| B151 | LittlePeasant | 职业 | listener(after/computeArgs), canUseOccupied, effect, onPlay — 小农民 |
+#### 批次 8：费用修改器 (computeCosts)（25 张）
 
-### 🔧 仅数据定义 (25)
+修改 construct/renovation/fencing/occupation/card 费用。基础设施已有 `computeCosts` hook。
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 备注 |
-|--------|------|------|---------|------|
-| B1 | UpscaleLifestyle | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B2 | MiniPasture | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B3 | Moonshine | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B4 | WoodPile | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B5 | StoreofExperience | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B6 | ExcursiontotheQuarry | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B7 | Wage | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B8 | MarketStall | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B9 | BeatingRod | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B10 | Caravan | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| B15 | CarpentersBench | 小改良 | BGA: onBuy + listener | 购买+行动触发，中等 |
-| B19 | MoldboardPlow | 小改良 | BGA: listener after Renovation | 翻新后，中等 |
-| B21 | HayloftBarn | 小改良 | BGA: listener after Construct | 建造后，中等 |
-| B23 | FinalScenario | 小改良 | BGA: listener after Occupation | 出职业后，中等 |
-| B42 | ForestInn | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| B48 | ForestStone | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| B55 | MaintenancePremium | 小改良 | BGA: onRoundStart | 回合开始，简单 |
-| B76 | Ceilings | 小改良 | BGA: onReturnHome | 回家阶段，简单 |
-| B81 | Handcart | 小改良 | BGA: listener after Collect | 收取后，中等 |
-| B86 | TruffleSearcher | 职业 | BGA: listener | 中等 |
-| B115 | TinsmithMaster | 职业 | BGA: listener | 中等 |
-| B124 | Trimmer | 职业 | BGA: listener | 中等 |
-| B146 | Illusionist | 职业 | BGA: listener | 中等 |
-| B149 | OpenAirFarmer | 职业 | BGA: onHarvest | 收获阶段，简单 |
-| B165 | GameProvider | 职业 | BGA: listener | 中等 |
+| 卡牌 | 说明 |
+|---|---|
+| A14 | 一次建 2+ 房时减免建材 |
+| A123 | 木材替代黏土/石头 |
+| C14 | 建造/翻新免芦苇 |
+| E109 | Basket 费用减免 |
+| E123 | 资源栈抵扣建造费用 |
+| E27 | 存食物抵扣大改良 |
+| A16 | 围栏费用减免 |
+| A27 | 烤炉费用减免 |
+| A149 | 自有行动格建房减免 |
+| B13 | 木房建造减免 |
+| B126 | 按材料类型减房费 |
+| B128 | 翻新触发+费用减免 |
+| B145 | 建造/翻新减 1 建材 |
+| B155 | 职业费用减免 |
+| C56 | 马厩食物+免费围栏 |
+| C95 | 条件性卡牌费用减免 |
+| C128 | 早期木房费用减免 |
+| D13 | anytime 翻新减费 |
+| D15 | 黏土房免费黏土 |
+| D81 | 翻新后得石+少芦苇 |
+| D95 | 条件性卡牌费用减免 |
+| D117 | 木材抵扣改良费 |
+| D121 | 黏土翻新/建造减费 |
+| E60 | 职业费用减免 |
+| E87 | 翻新费用减免+犁地 |
+| E150 | 石房建造减费+行动格 |
 
-### ❌ 无文件但 BGA 有逻辑 (代表性)
+#### 批次 9：Anytime 动作（20 张）
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 复杂度 |
-|--------|------|------|---------|--------|
-| B11 | Cattle Feed | 小改良 | listener | 简单 |
-| B12 | Water Trough | 小改良 | animal capacity | 中等(需基础设施) |
-| B13 | Pelts | 小改良 | listener | 简单 |
-| B14 | Clay Path | 小改良 | listener | 简单 |
-| B16 | Riding Plow | 小改良 | listener after Plow | 简单 |
-| B17 | Wooden Path | 小改良 | listener | 简单 |
-| B18 | Corn Sheaf | 小改良 | onBuy | 简单 |
-| B20 | Horse | 小改良 | listener | 中等 |
-| B22 | Frame | 小改良 | listener after Construct | 中等 |
-| B24 | Milling Stone | 小改良 | effect | 简单 |
-| B25 | Outhouse | 小改良 | effect | 简单 |
-| B26 | Loom | 小改良 | onHarvest + score | 中等 |
-| B27 | Cattle Farm | 小改良 | listener + score | 中等 |
-| B28 | Corn Chamber | 小改良 | onHarvest + score | 中等 |
-| B29 | Clay Path | 小改良 | listener | 简单 |
-| B30 | Village Well | 小改良 | computeBonusScore | 简单 |
-| B31 | Quarry | 小改良 | onRoundStart | 简单 |
-| B32 | Duck Pond | 小改良 | score | 简单 |
-| B33 | Pig Pen | 小改良 | listener | 中等 |
-| B35 | Half-timbered House | 小改良 | computeBonusScore | 简单 |
-| B36 | Greenhouse | 小改良 | onHarvest + score | 中等 |
-| B37 | Plow | 小改良 | effect | 简单 |
-| B38 | Vegetable Garden | 小改良 | onBuy + score | 中等 |
-| B39 | Animal Enclosure | 小改良 | listener | 中等 |
-| B40 | Fish Pond | 小改良 | listener | 中等 |
-| B41 | Wooden Storehouse | 小改良 | listener | 中等 |
-| B43 | Shelter Workshop | 小改良 | listener | 中等 |
-| B44 | Milking Stool | 小改良 | onHarvest | 简单 |
-| B45 | Brewer | 小改良 | listener | 中等 |
-| B46 | Mini Ranch | 小改良 | listener | 中等 |
-| B47 | Goose Pond | 小改良 | listener | 中等 |
-| B49 | Horse Plow | 小改良 | listener after Plow | 简单 |
-| B50 | Sleeping Corner | 小改良 | listener after GrowFamily | 中等 |
-| B51 | Straw Roof | 小改良 | listener after Construct | 中等 |
-| B52 | Stone Trough | 小改良 | animal capacity | 中等(需基础设施) |
-| B53 | Corn Sack | 小改良 | listener | 简单 |
-| B54 | Wishing Well | 小改良 | listener | 中等 |
-| B56 | Manure | 小改良 | listener after Sow | 简单 |
-| B57 | Pottery Workshop | 小改良 | cooking exchange | 中等(需基础设施) |
-| B58 | Pottery | 小改良 | effect | 简单 |
-| B59 | Hedge | 小改良 | listener after Fencing | 中等 |
-| B60 | Axe | 小改良 | listener | 简单 |
-| B61 | Indoor Well | 小改良 | onRoundStart + score | 中等 |
-| B62 | Reed Hut | 小改良 | listener after Construct | 中等 |
-| B63 | Grain Elevator | 小改良 | listener | 中等 |
-| B64 | Milling Machine | 小改良 | listener | 中等 |
-| B66 | Fodder Beets | 小改良 | listener | 简单 |
-| B68 | Stone Cart | 小改良 | listener after Collect | 简单 |
-| B69 | Animal Market | 小改良 | listener | 中等 |
-| B71 | Threshing Floor | 小改良 | listener | 中等 |
-| B72 | Herd Animals | 小改良 | listener | 中等 |
-| B73 | Slaughterhouse | 小改良 | cooking exchange | 中等(需基础设施) |
-| B74 | Clay Plastering | 小改良 | listener after Construct | 中等 |
-| B77 | Stone Extension | 小改良 | listener after Construct | 中等 |
-| B78 | Garden Shed | 小改良 | listener | 中等 |
-| B79 | Hay Rack | 小改良 | listener | 中等 |
-| B80 | Hard Porcelain | 小改良 | cooking exchange | 中等(需基础设施) |
-| B82 | Market Woman | 职业 | listener | 中等 |
-| B83 | Reed Collector | 职业 | listener after Collect | 简单 |
-| B84 | Tutor | 职业 | listener | 中等 |
-| B85 | Brickworker | 职业 | listener | 中等 |
-| B87 | Pigkeeper | 职业 | listener | 中等 |
-| B88 | Well Builder | 职业 | listener | 中等 |
-| B89 | Clay Seller | 职业 | listener | 中等 |
-| B90 | Baker | 职业 | listener | 中等 |
-| B91 | Horse Trainer | 职业 | listener | 中等 |
-| B92 | Clay Hut Builder | 职业 | listener after Construct | 中等 |
-| B93 | Overseer | 职业 | listener | 中等 |
-| B95 | Animal Breeder | 职业 | listener | 中等 |
-| B96 | Storyteller | 职业 | listener | 中等 |
-| B97 | Stone Carrier | 职业 | listener | 中等 |
-| B98 | Woodworker | 职业 | listener | 中等 |
-| B99 | Grain Farmer | 职业 | listener | 中等 |
-| B101 | Fence Deliveryman | 职业 | listener after Fencing | 中等 |
-| B102 | Vegetable Farmer | 职业 | listener | 中等 |
-| B104 | Animal Farmer | 职业 | listener | 中等 |
-| B105 | Carpenter | 职业 | listener | 中等 |
-| B106 | Toolmaker | 职业 | listener | 中等 |
-| B107 | Milkmaid | 职业 | listener | 中等 |
-| B108 | Pottery Seller | 职业 | listener | 中等 |
-| B110 | Road Builder | 职业 | listener | 中等 |
-| B111 | Country Doctor | 职业 | listener after GrowFamily | 中等 |
-| B112 | Cook | 职业 | cooking exchange | 中等(需基础设施) |
-| B113 | Ranch Hand | 职业 | listener | 中等 |
-| B114 | Manservant | 职业 | listener | 中等 |
-| B116 | Meat Seller | 职业 | listener | 中等 |
-| B117 | Pieceworker | 职业 | listener | 中等 |
-| B118 | Pig Catcher | 职业 | listener | 中等 |
-| B119 | Hay Merchant | 职业 | listener | 中等 |
-| B120 | Swineherd | 职业 | listener | 中等 |
-| B121 | Grain Merchant | 职业 | listener | 中等 |
-| B122 | Cattleman | 职业 | listener | 中等 |
-| B123 | Stone Trader | 职业 | listener | 中等 |
-| B125 | Wood Buyer | 职业 | listener | 中等 |
-| B126 | Conjurer | 职业 | listener | 复杂 |
-| B127 | Harvest Worker | 职业 | onHarvest | 简单 |
-| B128 | Seasonal Worker | 职业 | listener | 中等 |
-| B129 | Plumber | 职业 | listener | 中等 |
-| B130 | Schnapps Distiller | 职业 | listener | 中等 |
-| B131 | Clay Deliveryman | 职业 | listener after Collect | 简单 |
-| B132 | Night Watchman | 职业 | listener | 中等 |
-| B133 | Animal Handler | 职业 | listener | 中等 |
-| B134 | Clay Seller | 职业 | listener | 中等 |
-| B135 | Mushroom Gatherer | 职业 | listener | 中等 |
-| B136 | Guildmaster | 职业 | computeBonusScore | 简单 |
-| B137 | Hide Farmer | 职业 | listener | 中等 |
-| B138 | Landlord | 职业 | computeBonusScore | 简单 |
-| B139 | Bookkeeper | 职业 | listener | 中等 |
-| B140 | Childminder | 职业 | listener | 中等 |
-| B141 | Quarryman | 职业 | listener | 中等 |
-| B142 | Clay Potter | 职业 | listener | 中等 |
-| B143 | Pig Farmer | 职业 | listener | 中等 |
-| B144 | Field Worker | 职业 | listener | 中等 |
-| B145 | House Steward | 职业 | listener | 中等 |
-| B147 | Field Guard | 职业 | listener | 中等 |
-| B148 | Charcoal Burner | 职业 | listener | 中等 |
-| B150 | Grain Hauler | 职业 | listener | 中等 |
-| B152 | Fence Builder | 职业 | listener after Fencing | 中等 |
-| B153 | Veterinarian | 职业 | listener | 中等 |
-| B154 | Manor Lord | 职业 | listener | 中等 |
-| B155 | Carpenter | 职业 | listener | 中等 |
-| B156 | Shepherd | 职业 | listener | 中等 |
-| B157 | Ox Driver | 职业 | listener | 中等 |
-| B158 | Reed Merchant | 职业 | listener | 中等 |
-| B159 | Scythe Maker | 职业 | listener | 中等 |
-| B160 | Inspector | 职业 | listener | 中等 |
-| B161 | Juggler | 职业 | listener | 中等 |
-| B162 | Water Carrier | 职业 | listener | 中等 |
-| B163 | Village Elder | 职业 | computeBonusScore | 简单 |
-| B164 | Cattle Farmer | 职业 | listener | 中等 |
-| B166 | Plowmaker | 职业 | listener | 中等 |
-| B167 | Baker's Boy | 职业 | listener | 中等 |
-| B168 | Fishmonger | 职业 | listener | 中等 |
+使用现有 `phases: ['anytime']` 基础设施。部分需要 args/act 交互。
+
+A71, C18, C85, C87, C115, D71, E85, E91, A153, B35, B154, C46, C53, C64, C84, C101, C143, D46, D56, D87, D124, D129
+
+#### 批次 10：动物容量扩展 (computeDropZones)（10 张）
+
+使用 `onComputeAnimalZones` 或 `computeDropZones` 扩展动物容量。基础设施已有。
+
+A11, A86, B11, B148, C11, C12, C89, D12, D148, E11
+
+#### 批次 11：资源存储/释放 (holder/stack)（19 张）
+
+卡牌存储资源，按条件释放。使用 `counters` / `stack` 基础设施。
+
+B19, B48, B55, C19, D20, D126, E22, E51, E162, B21, D118, D156, E28, E47, E56, E110, E140, B137
+
+#### 批次 12：收获阶段特殊（15 张）
+
+修改收获/喂食/繁殖阶段逻辑。
+
+E30, E36, D132, A59, B61, C49, C70, C98, D84, D113, E58, E68, E69, E70, E72, E110, E132
+
+### 批次 13-16：高复杂度效果模式
+
+#### 批次 13：多事件监听（52 张）
+
+监听 2+ 不同事件，有独立 handler。最大的子类型。
+
+A22, A40, A82, A92, B23, B124, C23, C57, C93, C130, C148, D22, D27, D93, D102, D132, D134, D137, A35, A50, A54, A77, A80, A96, A116, A120, A121, A129, A130, A139, A142, A167, B16, B25, B29, B49, B54, B58, B79, B89, B107, B108, B110, B116, B117, B160, B162, B168, C42, C80, C106, C107, C113, C116, C119, C121, C132, C145, C155, C163, C164, D39, D63, D65, D84, D96, D97, D109, D112, D113, D141, D143, D144, D146, D166, E47, E58, E66, E68, E69, E70, E72, E77, E111, E116, E118, E132, E140, E143, E165
+
+#### 批次 14：玩家选择交互 (SPECIAL_EFFECT)（18 张）
+
+BGA 使用 `args{X}/act{X}` 方法实现多步选择。需要 ChoiceNode 或 XOR flow 对应。
+
+A3, A58, A72, A137, B3, B115, B146, D93, D102, D132, D137, E71, C57, D71, E22, E85
+
+#### SPECIAL_EFFECT 卡牌分析（BGA args/act 交互模式）
+
+BGA 的 SPECIAL_EFFECT 是一种流程节点，卡牌定义 `args{Method}()` 返回 UI 数据 + `act{Method}()` 处理玩家选择。共 ~40 张卡使用交互式 args/act 模式。
+
+##### 按选择类型分组
+
+**1. 田地/作物选择（17 张）— 选择 1+ 个田地进行操作**
+
+我们已有 `field-select` farm interaction 基础设施，可直接复用。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| A58 | 🔧 | 选蔬菜田收 1 菜换 3 食+1 分（ReturnHome r8/10/12） |
+| A70 | ✅ | 选蔬菜田取 1 菜到仓库（EndOfRound） |
+| A71 | 🔧 | 选源田(≥2作物)+目标空田，移 1 作物（anytime） |
+| A84 | ✅ | 选谷田吃 1 谷作为繁殖费（ReturnHome） |
+| A112 | ✅ | 选谷田额外收获（HarvestFieldPhase） |
+| B115 | 🔧 | 选已播田放额外 1 作物（AfterSow） |
+| B165 | ✅ | 选谷田吃 1 谷换食物（anytime） |
+| C18 | 🔧 | 选种植田弃所有作物+犁 1 田（anytime） |
+| C57 | 🔧 | 选蔬菜田(≥2菜)弃 1 菜→4 食（anytime） |
+| C63 | ✅ | 选谷田吃 1 谷（anytime/harvest） |
+| C69 | ✅ | 选正好 3 谷的田换 1 菜（anytime） |
+| D70 | ✅ | 选 1-2 蔬菜田各加 1 菜（HarvestFieldPhase） |
+| D71 | 🔧 | 选收获后仅 1 作物的田弃之+播种（anytime） |
+| D72 | ✅ | 选田额外收获（HarvestFieldPhase） |
+| E4 | ✅ | 选谷田全弃，每谷得 2 木（onBuy） |
+| E71 | 🔧 | 选邻接牧场的已播田加 1 作物（AfterSow） |
+| E73 | ✅ | 选≥2作物的田一次全收（HarvestFieldPhase） |
+| E112 | ✅ | 选谷田跳过正常收获改从仓库拿（HarvestFieldPhase） |
+
+> 其中 10 张已实现(✅)，8 张未实现(🔧)。未实现的可复用 `field-select` 基础设施。
+
+**2. 数量选择（8 张）— 选一个数字 0-N**
+
+需要简单数量选择 UI。可用 XOR flow（每个数量一个选项）或新增 `quantity-select` choice 类型。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| A102 | ✅ | 选购买数量（从卡牌栈，1 食/个） |
+| A136 | ✅ | 选几组建材计分（1-3 组） |
+| B83 | ✅ | 选购买数量（从卡牌栈，1 黏土/个） |
+| C133 | ✅ | 选几组资源计分 |
+| D132 | 🔧 | 选几个空地付食物（避免扣分） |
+| E22 | 🔧 | 选存多少食物到卡上 |
+| E74 | ✅ | 选用几根免费围栏 |
+| E85 | 🔧 | 选移多少食物到卡上 |
+
+> 5 张已实现，3 张未实现。
+
+**3. 资源类型多选（4 张）— 选 N 种不同资源**
+
+需要资源类型选择 UI。可用 XOR 或多选 choice。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| C104 | ✅ | 选 6-9 种不同资源各得 1 |
+| D137 | 🔧 | 选至多 2 种货物购买（after Lessons） |
+| E5 | 🔧 | 选 2 种不同建材从累积格取 |
+| E78 | 🔧 | 选至多 4 种建材等量互换 |
+
+> 1 张已实现，3 张未实现。
+
+**4. 马厩/农场位置选择（4 张）— 选农场格子**
+
+需要农场格子选择 UI。可复用 farm interaction 的 stables 模式。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| B85 | ✅ | 选 2×2 格子建 FarmHand 马厩 |
+| D102 | 🔧 | 选哪个马厩回收（得木+谷+食+改良） |
+| E76 | 🔧 | 选至多 3 个马厩回收（每个得 3 木） |
+| E148 | ✅ | 选行动格放马厩 |
+
+> 2 张已实现，2 张未实现。
+
+**5. 行动格选择（2 张）— 选一个行动格执行**
+
+需要行动格选择 UI + 嵌套完整行动流程。实现最复杂。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| D51 | ✅ | 选空行动格移农民过去执行（BeforeReturnHome） |
+| E10 | ✅ | 选空行动格移农民（EndWorkPhase r3/r6） |
+
+> 2 张均已实现。
+
+**6. 手牌选择（2 张）— 从手牌中选卡**
+
+需要手牌选择 UI。
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| A3 | 🔧 | 选 3 张职业，随机 1 张可免费打 |
+| B146 | 🔧 | 弃 1 张手牌得额外建材 |
+
+> 均未实现。
+
+**7. 农民回收（1 张）**
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| D93 | 🔧 | 选已占行动格召回自己农民（付 1 羊+2 食） |
+
+**8. 复合多步（3 张）**
+
+| 卡牌 | 状态 | 操作 |
+|---|---|---|
+| C146 | ✅ | 买时选资源对放卡上 → 对手翻新时选拿哪对 |
+| D161 | ✅ | 翻新后自动报价买菜 |
+| E76 | 🔧 | FarmHand 判断 → 马厩选择（多步） |
+
+##### 与我们现有机制的映射
+
+| BGA SPECIAL_EFFECT 类型 | 我们的实现机制 | 可用性 |
+|---|---|---|
+| 田地选择 | `field-select` farm interaction | ✅ 已有 |
+| 数量选择 | XOR flow (每个数量一个选项) | ✅ 可用 |
+| 资源类型多选 | XOR flow 或 `resolveChoice` | ✅ 可用 |
+| 马厩位置选择 | `stables` farm interaction | ✅ 已有 |
+| 行动格选择 | `resolveChoice` 已有实现 (D51/E10) | ✅ 已有 |
+| 手牌选择 | 需新增 `card-select` choice 类型 | ❌ 未实现 |
+| 农民回收 | 需新增 `farmer-recall` choice 类型 | ❌ 未实现 |
+| 复合多步 | seq + 多个 ChoiceNode | ✅ 可用 |
+
+##### 基础设施缺口
+
+1. **手牌选择 UI**：A3、B146 需要从手牌中选卡。需要新的 `card-select` pending state + 前端列表选择组件。影响 2 张卡。
+2. **农民回收 UI**：D93 需要选择已放置的农民召回。需要在行动格上标注可选择状态。影响 1 张卡。
+3. **数量滑块**：D132、E22、E85 的数量选择用 XOR 可能选项太多（如 E22 可存 0-15 食物）。可考虑新增 `quantity-input` choice 类型，但 XOR 也可凑合。
+
+> 大部分 SPECIAL_EFFECT 卡（~30/40）可用现有机制实现，仅 3 张需要新基础设施。
+
+#### 批次 15：对手交互（23 张）— 按交互模式分组
+
+##### PASSIVE_BENEFIT — 被动收益（11 张）
+
+对手做 X 时，卡主自动获得资源，无需选择。
+
+| 卡牌 | 触发事件 | 效果 |
+|---|---|---|
+| B143 | 对手使用 Hollow | 卡主得 1 黏土 |
+| B159 | 对手犁相邻田 | 卡主得 1 食物 |
+| B163 | 任何人建房（卡主仅 2 房） | 卡主得 3 木 +2 黏土 +1 芦苇 +1 石 |
+| C137 | 任何人建烘焙改良 | 卡主得 1 木 +1 食物 |
+| D77 | 任何人翻新为石 | 卡主每新石房得 1 黏土 |
+| D160 | 对手首次放农民在家庭成长 | 卡主得 1 谷物 |
+| D163 | 对手翻新为石/建石房 | 卡主得 1 石头 |
+| E49 | 任何人建木房 | 卡主得 1 食物 |
+| E144 | 任何人打食物转换卡 | 卡主得对应建材 +1 芦苇 |
+| E156 | 对手打含黏土费用的改良 | 卡主得 1 食物 +1 黏土 |
+| E160 | 对手使用 Fishing | 对手得 1 食物，卡主得 1 蔬菜 |
+
+##### OWNER_OPTIONAL — 卡主可选（9 张）
+
+对手做 X 时，卡主可选择性行动。
+
+| 卡牌 | 触发事件 | 可选效果 |
+|---|---|---|
+| A154 | 对手收取食物累积格 | 付 1 谷物给对手，得 1 分 |
+| A158 | 对手使用 Traveling Players | 交换 1 谷/羊/菜 → 4/5/7 食物 |
+| A159 | 对手使用 Fishing/ReedBank | 付 1 木给对手，得 2-3 食物 |
+| C149 | 对手翻新为石 | 付 2 食物，免费建 1 黏土房 |
+| C152 | 对手使用 Traveling Players | 付 1 食物给对手，免费打 1 职业 |
+| C153 | 对手翻新 | 付 2 木，得 1 谷 +1 食 +1 分 |
+| C167 | 对手使用 Fencing | 买 1 羊/猪/牛，付 1/2/2 食物 |
+| D128 | 对手建房 | 付 1 食物给对手，建 1 房（付全价） |
+| D149 | 对手使用 Quarry | 必选：1 食物 或 建 1 免费马厩 |
+
+##### FORCED_PAYMENT — 强制支付（1 张）
+B138: 对手收取 5+ 木时，必须付 1 食物给卡主
+
+##### GRANT_ACTION — 授予行动（1 张）
+C151: 对手使用 Grain Utilization 时，卡主可选执行播种
+
+##### META_EFFECT — 多阶段效果（1 张）
+A160: 对手使用 Traveling Players → 卡主自动得 1 食 +1 木 + 可选付 2 食买 1 菜
+
+### 批次 16：流程替换/特殊机制（~28 张）
+
+不归入以上类别的复杂卡 + SPECIAL 类型：
+
+**流程替换/假农民等：**
+A20, B26, B160, C23, C112, C129, C140, C150, C158, C160, D17, D18, D21, D24, D50, E105
+
+**SPECIAL 类型：**
+PlayerActionCard (2): C22, C39
+FieldDetails (3): B68, D75, E80
+GetBaseCosts (1): B36
+ComplexBuy (2): A20, E125
+
+**理由**：最大批次。每张需创建文件 + 1 个 listener，逻辑清晰。
+
+**建议按事件类型分子批实现（见上方详细分组）：**
+1. PlaceFarmer 触发（56 张）— 最常见，放农民到特定行动格时触发
+2. AfterCollect（17 张）— 收取后效果
+3. After 行动（31 张）— after:Plow/Sow/Fencing/Construct 等
+4. Harvest 阶段（34 张）— StartHarvest/Feeding/EndHarvest 等
+5. 回合/工作阶段（47 张）— StartOfTurn/ReturnHome/EndWorkPhase 等
+6. Compute 修改器 + Anytime + 静态（19 张）
 
 ---
 
-## C Deck 详细状态 (23✅ / 182)
+## 各 Deck 已实现卡牌列表
 
-C Deck: 小改良 1-80, 职业 81-168, 5+人 169-182 (注意 C 有 182 张)
+### A Deck（47 张已实现）
 
-### ✅ 已实现 (13)
+A12, A17, A25, A28, A29, A31, A32, A37, A38, A39, A48, A53, A55, A64, A65, A70, A73, A74, A79, A81, A83, A84, A94, A97, A98, A99, A101, A102, A105, A108, A109, A110, A112, A119, A126, A128, A132, A133, A134, A136, A143, A144, A150, A156, A162, A165, A166
 
-| 卡牌ID | 名称 | 类型 | 实现的 Hooks |
-|--------|------|------|-------------|
-| C24 | BedintheGrainField | 小改良 | effect, onBuy — 购买时效果 |
-| C25 | SteamMachine | 小改良 | listener(immediatelyAfter/after:PlaceFarmer) — 放置后烤面包 |
-| C37 | DwellingMound | 小改良 | listener(computeCosts) — 修改建造费用 |
-| C52 | HuntsmansHat | 小改良 | listener(immediatelyAfter/after:Collect), effect — 猪市场收取后按猪获食物 |
-| C60 | SmallPottersOven | 小改良 | listener(before), isDoable, effect, onBuy — 陶器烤炉效果 |
-| C63 | CraftBrewery | 小改良 | effect, onHarvest — 收获阶段酿酒 |
-| C71 | SlurrySpreader | 小改良 | effect — 泥浆撒布器 |
-| C75 | Firewood | 小改良 | listener(after:Improvement), effect, onReturnHome — 改良后取木材 |
-| C88 | CarpentersApprentice | 职业 | listener(before/after/computeCosts), isDoable, effect, onPlay — 木工学徒 |
-| C96 | Merchant | 职业 | listener(immediatelyAfter/after:Improvement), onPlay — 改良后追加改良 |
-| C120 | AgriculturalLabourer | 职业 | listener(after:Receive/Gain), effect, onPlay — 获谷物后从牌上取黏土 |
-| C133 | Soldier | 职业 | computeBonusScore, after, effect, onPlay — 预留资源计分 |
-| C144 | ReedRoofRenovator | 职业 | listener(immediatelyAfter/after:Renovation), effect, onBuy — 翻新后效果 |
+### B Deck（25 张已实现）
 
-### 🔧 仅数据定义 (36)
+B27, B30, B34, B38, B39, B42, B65, B67, B70, B72, B75, B76, B83, B85, B94, B98, B99, B100, B103, B109, B132, B136, B151, B153, B165
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 备注 |
-|--------|------|------|---------|------|
-| C1 | Overhaul | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C2 | Stable | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C3 | CarriageTrip | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C4 | WritingBoards | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C5 | Remodeling | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C6 | StoneClearing | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C7 | BladeShears | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C8 | PlantFertilizer | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C9 | AutomaticWaterTrough | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C10 | BunkBeds | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| C13 | WoodSlideHammer | 小改良 | BGA: listener | 中等 |
-| C17 | NewlyPlowedField | 小改良 | BGA: onBuy + plow | 购买时犁地，简单 |
-| C18 | RollOverPlow | 小改良 | BGA: listener after Plow | 犁地后，中等 |
-| C19 | SwingPlow | 小改良 | BGA: listener after Plow | 犁地后，中等 |
-| C23 | JobContract | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| C27 | Blueprint | 小改良 | BGA: listener after Renovation | 翻新后，中等 |
-| C29 | BeerTable | 小改良 | BGA: listener after Occupation | 出职业后，中等 |
-| C31 | WritingChamber | 小改良 | BGA: onReturnHome | 回家阶段，简单 |
-| C51 | FishingNet | 小改良 | BGA: opponent interaction | 复杂(需基础设施) |
-| C57 | Crudite | 小改良 | BGA: listener after Collect | 收取后，中等 |
-| C71 | Slurry | 小改良 | BGA: listener | (与 C71_SlurrySpreader 同ID，不同实现) |
-| C84 | PerennialRye | 小改良 | BGA: onHarvest | 收获阶段，简单 |
-| C85 | DenBuilder | 职业 | BGA: listener after Fencing | 围栏后，中等 |
-| C86 | LivestockFeeder | 职业 | BGA: listener | 中等 |
-| C87 | Mason | 职业 | BGA: listener after Improvement | 改良后，中等 |
-| C93 | InnerDistrictsDirector | 职业 | BGA: listener | 中等 |
-| C99 | GardenDesigner | 职业 | BGA: listener | 中等 |
-| C104 | Collector | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| C115 | Sower | 职业 | BGA: listener after Sow | 播种后，中等 |
-| C130 | OutskirtsDirector | 小改良 | BGA: listener | 中等 |
-| C135 | Constable | 职业 | BGA: listener | 中等 |
-| C142 | MarketCrier | 职业 | BGA: listener | 中等 |
-| C148 | MudWallower | 职业 | BGA: listener | 中等 |
-| C156 | HoofCaregiver | 职业 | BGA: listener | 中等 |
-| C162 | ForestOwner | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| C168 | AnimalCatcher | 小改良 | BGA: listener | 中等 |
+### C Deck（37 张已实现）
 
-### ❌ 无文件但 BGA 有逻辑 (代表性)
+C17, C24, C25, C29, C30, C31, C33, C35, C37, C48, C51, C52, C59, C60, C63, C67, C69, C75, C81, C86, C88, C96, C99, C100, C104, C120, C122, C133, C134, C135, C141, C142, C144, C146, C162, C168
 
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 复杂度 |
-|--------|------|------|---------|--------|
-| C11 | Fire Pit | 小改良 | cooking exchange | 中等(需基础设施) |
-| C12 | Clay Oven | 小改良 | cooking exchange | 中等(需基础设施) |
-| C14 | Loom | 小改良 | onHarvest + score | 中等 |
-| C15 | Sawhorse | 小改良 | listener | 简单 |
-| C16 | Corn Scoop | 小改良 | listener | 简单 |
-| C20 | Millstone | 小改良 | effect | 简单 |
-| C21 | Manger | 小改良 | onBuy + score | 简单 |
-| C22 | Grain Cart | 小改良 | listener after Collect | 简单 |
-| C26 | Horse | 小改良 | listener | 中等 |
-| C28 | Dovecote | 小改良 | score | 简单 |
-| C30 | Village Well | 小改良 | computeBonusScore | 简单 |
-| C32 | Reed Hut | 小改良 | listener after Construct | 中等 |
-| C33 | Mansion | 小改良 | computeBonusScore | 简单 |
-| C34 | Clay Path | 小改良 | listener | 简单 |
-| C35 | Corner Cupboard | 小改良 | computeBonusScore | 简单 |
-| C36 | Barn | 小改良 | listener | 中等 |
-| C38 | Corn Storehouse | 小改良 | onHarvest + score | 中等 |
-| C39 | Straw Roof | 小改良 | listener after Construct | 中等 |
-| C40 | Field | 小改良 | onBuy + plow | 中等 |
-| C41 | Clay Supports | 小改良 | listener after Construct | 中等 |
-| C42 | Animal Pen | 小改良 | listener | 中等 |
-| C43 | Quarry | 小改良 | onRoundStart | 简单 |
-| C44 | Cow Pasture | 小改良 | listener | 中等 |
-| C45 | Grape Press | 小改良 | listener | 中等 |
-| C46 | Reed Pond | 小改良 | listener | 简单 |
-| C47 | Broom | 小改良 | listener | 简单 |
-| C48 | Grain Elevator | 小改良 | listener | 中等 |
-| C49 | Vegetable Garden | 小改良 | onBuy + score | 中等 |
-| C50 | Windmill | 小改良 | listener + score | 中等 |
-| C53 | Fruit Tree | 小改良 | onRoundStart + score | 中等 |
-| C54 | Half-timbered House | 小改良 | computeBonusScore | 简单 |
-| C55 | Indoor Well | 小改良 | onRoundStart + score | 中等 |
-| C56 | Canoe | 小改良 | listener after Collect | 简单 |
-| C58 | Market Cart | 小改良 | listener | 中等 |
-| C59 | Storehouse | 小改良 | computeBonusScore | 简单 |
-| C61 | Spindle | 小改良 | listener | 简单 |
-| C62 | Clay Roof | 小改良 | listener after Construct | 中等 |
-| C64 | Building Material | 小改良 | onBuy | 简单 |
-| C65 | Herb Garden | 小改良 | onBuy | 简单 |
-| C66 | Greenhouse | 小改良 | onHarvest + score | 中等 |
-| C67 | Stone Extension | 小改良 | listener after Construct | 中等 |
-| C68 | Wild Boar Trap | 小改良 | listener after Collect | 简单 |
-| C69 | Fish Trap | 小改良 | effect | 简单 |
-| C70 | Axe | 小改良 | listener | 简单 |
-| C72 | Wooden Hut Extension | 小改良 | listener after Construct | 中等 |
-| C73 | Yoke | 小改良 | listener after Plow | 简单 |
-| C74 | Landing Net | 小改良 | listener after Collect | 简单 |
-| C76 | Shepherd's Pipe | 小改良 | listener | 中等 |
-| C77 | Duck Pond | 小改良 | score | 简单 |
-| C78 | Clogs | 小改良 | listener | 简单 |
-| C79 | Clay Extension | 小改良 | listener after Construct | 中等 |
-| C80 | Bean Field | 小改良 | onBuy + sow | 中等 |
-| C81 | Net Fisherman | 职业 | listener | 中等 |
-| C82 | Clay Worker | 职业 | listener | 中等 |
-| C83 | Harvest Helper | 职业 | onHarvest | 简单 |
-| C89 | Animal Dealer | 职业 | listener | 中等 |
-| C90 | Grocer | 职业 | anytime action | 中等(需基础设施) |
-| C91 | Plowman | 职业 | listener | 中等 |
-| C92 | Bricklayer | 职业 | listener | 中等 |
-| C94 | Reeve | 职业 | listener | 中等 |
-| C95 | Hut Builder | 职业 | listener after Construct | 中等 |
-| C97 | Plow Driver | 职业 | listener | 中等 |
-| C98 | Seasonal Worker | 职业 | listener | 中等 |
-| C100 | Manservant | 职业 | listener | 中等 |
-| C101 | Cattleman | 职业 | listener | 中等 |
-| C102 | Forester | 职业 | listener + score | 中等 |
-| C103 | Wood Distributor | 职业 | listener | 中等 |
-| C105 | Renovator | 职业 | listener after Renovation | 中等 |
-| C106 | Clay Deliveryman | 职业 | listener after Collect | 简单 |
-| C107 | Mushroom Picker | 职业 | listener | 中等 |
-| C108 | Stockman | 职业 | listener | 中等 |
-| C109 | Baker | 职业 | listener | 中等 |
-| C110 | Stone Deliveryman | 职业 | listener after Collect | 简单 |
-| C111 | Harvest Tradesman | 职业 | onHarvest | 简单 |
-| C112 | Reed Buyer | 职业 | listener after Collect | 简单 |
-| C113 | Groom | 职业 | listener | 中等 |
-| C114 | Brush Maker | 职业 | listener | 中等 |
-| C116 | Stonecutter | 职业 | listener | 中等 |
-| C117 | Stablehand | 职业 | listener | 中等 |
-| C118 | Grump | 职业 | listener | 中等 |
-| C119 | Fence Overseer | 职业 | listener after Fencing | 中等 |
-| C121 | Stone Breaker | 职业 | listener | 中等 |
-| C122 | Consultant | 职业 | listener | 中等 |
-| C123 | Shepherd | 职业 | listener | 中等 |
-| C124 | Animal Keeper | 职业 | listener | 中等 |
-| C125 | Pastor | 职业 | listener | 中等 |
-| C126 | Merchant | 职业 | listener | 中等 |
-| C127 | Berry Picker | 职业 | listener | 中等 |
-| C128 | Magician | 职业 | listener | 中等 |
-| C129 | Tutor | 职业 | listener | 中等 |
-| C131 | Woodworker | 职业 | listener | 中等 |
-| C132 | Wooden Hut Builder | 职业 | listener after Construct | 中等 |
-| C134 | Head of the Family | 职业 | computeBonusScore | 简单 |
-| C136 | Yeoman Farmer | 职业 | computeBonusScore | 简单 |
-| C137 | Greengrocer | 职业 | computeBonusScore | 简单 |
-| C138 | Academic | 职业 | computeBonusScore | 简单 |
-| C139 | Educator | 职业 | computeBonusScore | 简单 |
-| C140 | Charcoal Burner | 职业 | listener | 中等 |
-| C141 | Pig Breeder | 职业 | listener | 中等 |
-| C143 | Cattle Whisperer | 职业 | listener | 中等 |
-| C145 | Wood Cutter | 职业 | listener | 中等 |
-| C146 | Chamberlain | 职业 | listener | 中等 |
-| C147 | Storehouse Keeper | 职业 | listener | 中等 |
-| C149 | Clay Mixer | 职业 | listener | 中等 |
-| C150 | Ratcatcher | 职业 | opponent interaction | 复杂(需基础设施) |
-| C151 | Taster | 职业 | opponent interaction | 复杂(需基础设施) |
-| C152 | Field Watchman | 职业 | opponent interaction | 复杂(需基础设施) |
-| C153 | Estate Manager | 职业 | opponent interaction | 复杂(需基础设施) |
-| C154 | Fence Builder | 职业 | opponent interaction | 复杂(需基础设施) |
-| C155 | Chief | 职业 | opponent interaction | 复杂(需基础设施) |
-| C157 | Tinsmith | 职业 | opponent interaction | 复杂(需基础设施) |
-| C158 | Fence Deliveryman | 职业 | opponent interaction | 复杂(需基础设施) |
-| C159 | Merchant | 职业 | listener | 中等 |
-| C160 | Mushroom Gatherer | 职业 | listener | 中等 |
-| C161 | Night Watchman | 职业 | listener | 中等 |
-| C163 | Slaughterer | 职业 | listener | 中等 |
-| C164 | Animal Farmer | 职业 | listener | 中等 |
-| C165 | Wool Merchant | 职业 | listener | 中等 |
-| C166 | Pig Farmer | 职业 | listener | 中等 |
-| C167 | Fieldworker | 职业 | listener | 中等 |
+### D Deck（44 张已实现）
 
----
+D5, D7, D8, D10, D14, D23, D29, D30, D31, D33, D34, D35, D36, D38, D49, D51, D55, D60, D66, D70, D72, D74, D82, D88, D92, D99, D100, D107, D114, D115, D116, D119, D122, D127, D135, D136, D139, D150, D152, D154, D157, D158, D161, D167
 
-## D Deck 详细状态 (28✅ / 181)
+### E Deck（38 张已实现）
 
-D Deck: 小改良 1-80, 职业 81-168, 5+人 169-181 (注意 D 有 181 张)
-
-### ✅ 已实现 (10)
-
-| 卡牌ID | 名称 | 类型 | 实现的 Hooks |
-|--------|------|------|-------------|
-| D14 | HammerCrusher | 小改良 | listener(before:Renovation), isDoable — 翻修前获黏土+芦苇 |
-| D49 | Bookshelf | 小改良 | listener(before), isDoable — 行动前效果 |
-| D51 | Archway | 职业 | before, effect, onBuy — 个人行动格(PlayerActionCard) |
-| D99 | EarthenwarePotter | 职业 | effect, onBuy, onPlay, after — 陶器工效果 |
-| D107 | Bellfounder | 职业 | effect, onPlay — 铸钟师 |
-| D115 | FodderPlanter | 职业 | effect, onPlay — 饲料种植者 |
-| D119 | WoodBarterer | 职业 | listener(before), isDoable, onPlay — 木材以物换物 |
-| D150 | GodlySpouse | 职业 | listener(after), effect, onPlay — 虔诚配偶 |
-| D152 | Patron | 职业 | listener(before), isDoable, onPlay — 赞助人 |
-| D167 | PureBreeder | 职业 | effect, onBuy, onPlay — 纯种繁殖者 |
-
-### 🔧 仅数据定义 (43)
-
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 备注 |
-|--------|------|------|---------|------|
-| D1 | ZigzagHarrow | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D2 | DwellingPlan | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D3 | Furrows | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D4 | CrossCutWood | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D5 | FieldClay | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D6 | PetrifiedWood | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D7 | Trident | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D8 | FernSeeds | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D9 | GameTrade | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D10 | StorksNest | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| D20 | TurnwrestPlow | 小改良 | BGA: listener after Plow | 犁地后，中等 |
-| D22 | WorkPermit | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| D23 | PioneeringSpirit | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| D26 | CarpentersYard | 小改良 | BGA: listener after Improvement | 改良后，中等 |
-| D27 | Retraining | 小改良 | BGA: listener after Occupation | 出职业后，中等 |
-| D36 | BreedRegistry | 小改良 | BGA: listener | 中等 |
-| D53 | TeaHouse | 小改良 | BGA: listener | 中等 |
-| D55 | NewMarket | 小改良 | BGA: listener | 中等 |
-| D66 | PotterCeramics | 小改良 | BGA: listener after Collect | 收取后，中等 |
-| D70 | StrawManure | 小改良 | BGA: onHarvest | 收获阶段，简单 |
-| D71 | Changeover | 小改良 | BGA: listener | 中等 |
-| D72 | StableManure | 小改良 | BGA: listener | 中等 |
-| D73 | (unnamed) | 小改良 | BGA: listener | 中等 |
-| D74 | RoyalWood | 小改良 | BGA: listener | 中等 |
-| D85 | Reader | 职业 | BGA: onRoundStart | 回合开始，简单 |
-| D92 | ChildOmbudsman | 职业 | BGA: listener | 中等 |
-| D93 | SheepInspector | 职业 | BGA: listener | 中等 |
-| D94 | HenpeckedHusband | 职业 | BGA: listener | 中等 |
-| D98 | Transactor | 职业 | BGA: listener | 中等 |
-| D100 | LordoftheManor | 职业 | BGA: computeBonusScore | 简单 — 仅需加 hook |
-| D101 | SugarBaker | 职业 | BGA: listener | 中等 |
-| D102 | SampleStableMaker | 职业 | BGA: listener | 中等 |
-| D103 | CanalBoatman | 职业 | BGA: listener | 中等 |
-| D116 | TreeInspector | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| D124 | Emissary | 职业 | BGA: listener | 中等 |
-| D126 | FieldCultivator | 职业 | BGA: listener | 中等 |
-| D127 | HardworkingMan | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| D131 | CraftsmanshipPromoter | 职业 | BGA: listener | 中等 |
-| D132 | HideFarmer | 职业 | BGA: listener | 中等 |
-| D134 | OysterEater | 职业 | BGA: listener | 中等 |
-| D137 | TradeTeacher | 职业 | BGA: listener | 中等 |
-| D157 | PartyOrganizer | 职业 | BGA: listener | 中等 |
-| D158 | BeanCounter | 职业 | BGA: listener | 中等 |
-| D164 | PetGrower | 小改良 | BGA: listener | 中等 |
-
-### ❌ 无文件但 BGA 有逻辑 (代表性)
-
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 复杂度 |
-|--------|------|------|---------|--------|
-| D11 | Riding Plow | 小改良 | listener after Plow | 简单 |
-| D12 | Drinking Trough | 小改良 | animal capacity | 中等(需基础设施) |
-| D13 | Landing Net | 小改良 | listener after Collect | 简单 |
-| D15 | Corn Scoop | 小改良 | listener after Sow | 简单 |
-| D16 | Clay Path | 小改良 | listener | 简单 |
-| D17 | Wooden Path | 小改良 | listener | 简单 |
-| D18 | Pelts | 小改良 | listener | 简单 |
-| D19 | Spindle | 小改良 | listener | 简单 |
-| D21 | Horse | 小改良 | listener | 中等 |
-| D24 | Manger | 小改良 | onBuy + score | 简单 |
-| D25 | Bucket | 小改良 | effect | 简单 |
-| D28 | Cattle Feed | 小改良 | listener | 简单 |
-| D29 | Loom | 小改良 | onHarvest + score | 中等 |
-| D30 | Dovecote | 小改良 | score | 简单 |
-| D31 | Village Well | 小改良 | computeBonusScore | 简单 |
-| D32 | Duck Pond | 小改良 | score | 简单 |
-| D33 | Greenhouse | 小改良 | onHarvest + score | 中等 |
-| D34 | Corn Chamber | 小改良 | onHarvest + score | 中等 |
-| D35 | Half-timbered House | 小改良 | computeBonusScore | 简单 |
-| D37 | Vegetable Garden | 小改良 | onBuy + score | 中等 |
-| D38 | Mansion | 小改良 | computeBonusScore | 简单 |
-| D39 | Corner Cupboard | 小改良 | computeBonusScore | 简单 |
-| D40 | Windmill | 小改良 | listener + score | 中等 |
-| D41 | Storehouse | 小改良 | listener + score | 中等 |
-| D42 | Quarry | 小改良 | onRoundStart | 简单 |
-| D43 | Reed Pond | 小改良 | listener | 简单 |
-| D44 | Fruit Tree | 小改良 | onRoundStart + score | 中等 |
-| D45 | Indoor Well | 小改良 | onRoundStart + score | 中等 |
-| D46 | Bean Field | 小改良 | onBuy + sow | 中等 |
-| D47 | Corn Storehouse | 小改良 | onHarvest + score | 中等 |
-| D48 | Frame | 小改良 | listener after Construct | 中等 |
-| D50 | Herb Garden | 小改良 | onBuy | 简单 |
-| D52 | Clay Mixer | 小改良 | listener after Collect | 简单 |
-| D54 | Clay Oven | 小改良 | cooking exchange | 中等(需基础设施) |
-| D56 | Grape Press | 小改良 | listener | 中等 |
-| D57 | Straw Roof | 小改良 | listener after Construct | 中等 |
-| D58 | Clay Roof | 小改良 | listener after Construct | 中等 |
-| D59 | Clay Supports | 小改良 | listener after Construct | 中等 |
-| D60 | Wild Boar Trap | 小改良 | listener after Collect | 简单 |
-| D61 | Fish Trap | 小改良 | effect | 简单 |
-| D62 | Cattle Market | 小改良 | listener | 中等 |
-| D63 | Sowing Machine | 小改良 | listener | 中等 |
-| D64 | Axe | 小改良 | listener | 简单 |
-| D65 | Canoe | 小改良 | listener after Collect | 简单 |
-| D67 | Animal Pen | 小改良 | listener | 中等 |
-| D68 | Building Material | 小改良 | onBuy | 简单 |
-| D69 | Broom | 小改良 | listener | 简单 |
-| D75 | Shepherd's Pipe | 小改良 | listener | 中等 |
-| D76 | Water Mill | 小改良 | listener + score | 中等 |
-| D77 | Wooden Crane | 小改良 | listener | 中等 |
-| D78 | Grain Cart | 小改良 | listener after Collect | 简单 |
-| D79 | Piecework | 小改良 | listener | 中等 |
-| D80 | Harness | 小改良 | listener after Plow | 简单 |
-| D81 | Clay Mixer | 职业 | listener | 中等 |
-| D82 | Net Fisherman | 职业 | listener | 中等 |
-| D83 | Harvest Helper | 职业 | onHarvest | 简单 |
-| D84 | Slaughterer | 职业 | listener | 中等 |
-| D86 | Animal Tamer | 职业 | animal capacity modifier | 中等(需基础设施) |
-| D87 | Plowman | 职业 | listener | 中等 |
-| D88 | Hut Builder | 职业 | listener after Construct | 中等 |
-| D89 | Renovator | 职业 | listener after Renovation | 中等 |
-| D90 | Reeve | 职业 | listener | 中等 |
-| D91 | Harvest Tradesman | 职业 | onHarvest | 简单 |
-| D95 | Groom | 职业 | listener | 中等 |
-| D96 | Fence Overseer | 职业 | listener after Fencing | 中等 |
-| D97 | Stockman | 职业 | listener | 中等 |
-| D104 | Bricklayer | 职业 | listener | 中等 |
-| D105 | Baker | 职业 | listener | 中等 |
-| D106 | Stone Deliveryman | 职业 | listener after Collect | 简单 |
-| D108 | Mushroom Picker | 职业 | listener | 中等 |
-| D109 | Forester | 职业 | listener + score | 中等 |
-| D110 | Consultant | 职业 | listener | 中等 |
-| D111 | Manservant | 职业 | listener | 中等 |
-| D112 | Charcoal Burner | 职业 | listener | 中等 |
-| D113 | Clay Deliveryman | 职业 | listener after Collect | 简单 |
-| D114 | Reed Buyer | 职业 | listener after Collect | 简单 |
-| D117 | Seasonal Worker | 职业 | listener | 中等 |
-| D118 | Stone Breaker | 职业 | listener | 中等 |
-| D119 | (see above) | 职业 | (已实现) | — |
-| D120 | Brush Maker | 职业 | listener | 中等 |
-| D121 | Shepherd | 职业 | listener | 中等 |
-| D122 | Pastor | 职业 | listener | 中等 |
-| D123 | Berry Picker | 职业 | listener | 中等 |
-| D125 | Wood Distributor | 职业 | listener | 中等 |
-| D128 | Stablehand | 职业 | listener | 中等 |
-| D129 | Animal Keeper | 职业 | listener | 中等 |
-| D130 | Grump | 职业 | listener | 中等 |
-| D133 | Magician | 职业 | listener | 中等 |
-| D135 | Patron | 职业 | computeBonusScore | 简单 |
-| D136 | Academic | 职业 | computeBonusScore | 简单 |
-| D138 | Farmer | 职业 | computeBonusScore | 简单 |
-| D139 | Yeoman Farmer | 职业 | computeBonusScore | 简单 |
-| D140 | Greengrocer | 职业 | computeBonusScore | 简单 |
-| D141 | Educator | 职业 | computeBonusScore | 简单 |
-| D142 | Head of the Family | 职业 | computeBonusScore | 简单 |
-| D143 | Stonecutter | 职业 | listener | 中等 |
-| D144 | Chamberlain | 职业 | listener | 中等 |
-| D145 | Merchant | 职业 | listener | 中等 |
-| D146 | Animal Dealer | 职业 | listener | 中等 |
-| D147 | Clay Worker | 职业 | listener | 中等 |
-| D148 | Storehouse Keeper | 职业 | listener | 中等 |
-| D149 | Cattleman | 职业 | listener | 中等 |
-| D151 | Cattle Whisperer | 职业 | listener | 中等 |
-| D153 | Wood Cutter | 职业 | listener | 中等 |
-| D154 | Woolgrower | 职业 | listener | 中等 |
-| D155 | Pig Breeder | 职业 | listener | 中等 |
-| D156 | Wooden Hut Builder | 职业 | listener after Construct | 中等 |
-| D159 | Plow Driver | 职业 | listener | 中等 |
-| D160 | Animal Farmer | 职业 | listener | 中等 |
-| D161 | Ratcatcher | 职业 | opponent interaction | 复杂(需基础设施) |
-| D162 | Field Watchman | 职业 | opponent interaction | 复杂(需基础设施) |
-| D163 | Taster | 职业 | opponent interaction | 复杂(需基础设施) |
-| D165 | Estate Manager | 职业 | opponent interaction | 复杂(需基础设施) |
-| D166 | Chief | 职业 | opponent interaction | 复杂(需基础设施) |
-| D168 | Tinsmith | 职业 | opponent interaction | 复杂(需基础设施) |
-
----
-
-## E Deck 详细状态 (28✅ / 169)
-
-E Deck: 小改良 1-80, 职业 81-168, 无5+人卡 (169张)
-
-### ✅ 已实现 (14)
-
-| 卡牌ID | 名称 | 类型 | 实现的 Hooks |
-|--------|------|------|-------------|
-| E10 | StrawHat | 小改良 | effect — 草帽效果 |
-| E21 | SheepRug | 小改良 | listener(canUseOccupied) — 允许使用已占用行动格 |
-| E33 | BeaverColony | 小改良 | listener(immediatelyAfter/after:Collect/Gain), effect, onBuy — 芦苇收取追加VP，建马厩+动物重组 |
-| E52 | Cubbyhole | 小改良 | listener(after), effect — 行动后效果 |
-| E53 | BoarSpear | 小改良 | listener(during/after:Collect) — 收取时交换资源 |
-| E57 | CheeseFondue | 小改良 | listener(after) — 行动后效果 |
-| E73 | Scythe | 小改良 | effect — 镰刀效果 |
-| E74 | AshTrees | 小改良 | listener(before/after:Fencing), isDoable, effect, onBuy — 免费围栏 |
-| E84 | DollysMother | 小改良 | during, effect — 期间效果 |
-| E101 | Blighter | 职业 | listener(after), isDoable, onPlay — 按阶段给VP后封锁出职业 |
-| E112 | GrainThief | 职业 | effect, onHarvest, onPlay — 收获阶段偷谷物 |
-| E128 | Saddler | 职业 | listener(after), onPlay — 行动后效果 |
-| E130 | Overachiever | 职业 | listener(before/computeCosts), onPlay — 修改费用 |
-| E133 | ChampionBreeder | 职业 | during, effect, onPlay — 冠军繁殖者 |
-
-### 🔧 仅数据定义 (42)
-
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 备注 |
-|--------|------|------|---------|------|
-| E1 | PoleBarns | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E2 | RenovationMaterials | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E3 | TeaTime | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E4 | Thunderbolt | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E5 | NightLoot | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E6 | Recount | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E7 | Pumpernickel | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E8 | FarmersMarket | 小改良 | BGA: 无逻辑 | 纯数据卡 |
-| E16 | BriarHedge | 小改良 | BGA: listener after Fencing | 围栏后，中等 |
-| E22 | GuestRoom | 小改良 | BGA: listener | 中等 |
-| E27 | PiggyBank | 小改良 | BGA: listener | 中等 |
-| E30 | ChildsToy | 小改良 | BGA: listener after GrowFamily | 中等 |
-| E36 | HerbalGarden | 小改良 | BGA: onBuy | 购买时效果，简单 |
-| E51 | WhaleOil | 小改良 | BGA: listener | 中等 |
-| E62 | SourDough | 小改良 | BGA: listener | 中等 |
-| E71 | CowPatty | 小改良 | BGA: listener | 中等 |
-| E75 | StoneAxe | 小改良 | BGA: listener | 中等 |
-| E76 | LumberPile | 小改良 | BGA: listener | 中等 |
-| E78 | SleightofHand | 小改良 | BGA: listener | 中等 |
-| E81 | AlchemistsLab | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| E82 | Profiteering | 小改良 | BGA: listener | 中等 |
-| E85 | MasterTanner | 职业 | BGA: listener | 中等 |
-| E86 | PenBuilder | 职业 | BGA: animal capacity modifier | 需要 animal capacity 基础设施 |
-| E90 | DungCollector | 职业 | BGA: listener | 中等 |
-| E91 | PlowBuilder | 职业 | BGA: listener | 中等 |
-| E92 | FieldDoctor | 职业 | BGA: listener | 中等 |
-| E93 | Motivator | 职业 | BGA: listener | 中等 |
-| E103 | Wolf | 职业 | BGA: listener | 中等 |
-| E109 | BraidMaker | 职业 | BGA: listener | 中等 |
-| E123 | ResourceHoarder | 职业 | BGA: listener | 中等 |
-| E124 | MayorCandidate | 职业 | BGA: listener | 中等 |
-| E134 | Omnifarmer | 职业 | BGA: computeBonusScore | 简单 |
-| E148 | Lazybones | 职业 | BGA: listener | 中等 |
-| E151 | DeliveryNurse | 职业 | BGA: listener | 中等 |
-| E153 | StoneSculptor | 职业 | BGA: listener | 中等 |
-| E155 | Visionary | 职业 | BGA: listener | 中等 |
-| E159 | OldMiser | 职业 | BGA: listener | 中等 |
-| E161 | ElderBaker | 职业 | BGA: PlayerActionCard | 需要 PlayerActionCard 基础设施 |
-| E162 | Entrepreneur | 职业 | BGA: listener | 中等 |
-| E166 | Roastmaster | 职业 | BGA: listener | 中等 |
-| E167 | DairyCrier | 职业 | BGA: listener | 中等 |
-| E9 | BarteringHut | 小改良 | BGA: listener | 中等 |
-
-### ❌ 无文件但 BGA 有逻辑 (代表性)
-
-| 卡牌ID | 名称 | 类型 | BGA 逻辑 | 复杂度 |
-|--------|------|------|---------|--------|
-| E9 | Bartering Hut | 小改良 | listener | 中等 |
-| E11 | Petting Zoo | 小改良 | animal capacity modifier | 中等(需基础设施) |
-| E12 | Animal Bedding | 小改良 | animal capacity modifier | 中等(需基础设施) |
-| E13 | Stone House Reconstruction | 小改良 | anytime action | 中等(需基础设施) |
-| E14 | Wood Saw | 小改良 | anytime action | 中等(需基础设施) |
-| E15 | Pelts | 小改良 | listener | 简单 |
-| E17 | Corn Sheaf | 小改良 | onBuy | 简单 |
-| E18 | Clay Path | 小改良 | listener | 简单 |
-| E19 | Wooden Path | 小改良 | listener | 简单 |
-| E20 | Cattle Feed | 小改良 | listener | 简单 |
-| E23 | Manger | 小改良 | onBuy + score | 简单 |
-| E24 | Outhouse | 小改良 | effect | 简单 |
-| E25 | Horse | 小改良 | listener | 中等 |
-| E26 | Loom | 小改良 | onHarvest + score | 中等 |
-| E28 | Future Planning | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E29 | Riding Plow | 小改良 | listener after Plow | 简单 |
-| E31 | Dovecote | 小改良 | score | 简单 |
-| E32 | Village Well | 小改良 | computeBonusScore | 简单 |
-| E34 | Half-timbered House | 小改良 | computeBonusScore | 简单 |
-| E35 | Corner Cupboard | 小改良 | computeBonusScore | 简单 |
-| E37 | Mansion | 小改良 | computeBonusScore | 简单 |
-| E38 | Storehouse | 小改良 | computeBonusScore | 简单 |
-| E39 | Duck Pond | 小改良 | score | 简单 |
-| E40 | Future Investment | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E41 | Future Harvest | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E42 | Future Fencing | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E43 | Future Building | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E44 | Future Sowing | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E45 | Future Renovation | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E46 | Future Growth | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E47 | Corn Storehouse | 小改良 | onHarvest + score | 中等 |
-| E48 | Greenhouse | 小改良 | onHarvest + score | 中等 |
-| E49 | Animal Pen | 小改良 | opponent interaction | 复杂(需基础设施) |
-| E50 | Vegetable Garden | 小改良 | onBuy + score | 中等 |
-| E54 | Grain Elevator | 小改良 | listener | 中等 |
-| E55 | Windmill | 小改良 | listener + score | 中等 |
-| E56 | Future Occupation | 小改良 | futureMeeples | 复杂(需基础设施) |
-| E58 | Wild Boar Trap | 小改良 | listener after Collect | 简单 |
-| E59 | Quarry | 小改良 | onRoundStart | 简单 |
-| E60 | Building Material | 小改良 | onBuy | 简单 |
-| E61 | Fruit Tree | 小改良 | onRoundStart + score | 中等 |
-| E63 | Iron Oven | 小改良 | cooking exchange | 中等(需基础设施) |
-| E64 | Simple Oven | 小改良 | cooking exchange | 中等(需基础设施) |
-| E65 | Bean Field | 小改良 | onBuy + sow | 中等 |
-| E66 | Reed Pond | 小改良 | listener | 简单 |
-| E67 | Indoor Well | 小改良 | onRoundStart + score | 中等 |
-| E68 | Herb Garden | 小改良 | onBuy | 简单 |
-| E69 | Corn Scoop | 小改良 | listener after Sow | 简单 |
-| E70 | Clay Mixer | 小改良 | listener after Collect | 简单 |
-| E72 | Fish Trap | 小改良 | effect | 简单 |
-| E77 | Market Cart | 小改良 | listener | 中等 |
-| E79 | Grain Cart | 小改良 | listener after Collect | 简单 |
-| E80 | Wooden Crane | 小改良 | listener | 中等 |
-| E83 | Harvest Helper | 职业 | onHarvest | 简单 |
-| E87 | Net Fisherman | 职业 | listener | 中等 |
-| E88 | Plowman | 职业 | listener | 中等 |
-| E89 | Hut Builder | 职业 | listener after Construct | 中等 |
-| E94 | Clay Deliveryman | 职业 | listener after Collect | 简单 |
-| E95 | Ratcatcher | 职业 | opponent interaction | 复杂(需基础设施) |
-| E96 | Reeve | 职业 | listener | 中等 |
-| E97 | Harvest Tradesman | 职业 | onHarvest | 简单 |
-| E98 | Renovator | 职业 | listener after Renovation | 中等 |
-| E99 | Stone Breaker | 职业 | listener | 中等 |
-| E100 | Forester | 职业 | listener + score | 中等 |
-| E102 | Mushroom Picker | 职业 | listener | 中等 |
-| E104 | Brush Maker | 职业 | listener | 中等 |
-| E105 | Seasonal Worker | 职业 | listener | 中等 |
-| E106 | Stablehand | 职业 | listener | 中等 |
-| E107 | Groom | 职业 | listener | 中等 |
-| E108 | Shepherd | 职业 | listener | 中等 |
-| E110 | Animal Keeper | 职业 | listener | 中等 |
-| E111 | Manservant | 职业 | listener | 中等 |
-| E113 | Stockman | 职业 | listener | 中等 |
-| E114 | Consultant | 职业 | listener | 中等 |
-| E115 | Reed Buyer | 职业 | listener after Collect | 简单 |
-| E116 | Stone Deliveryman | 职业 | listener after Collect | 简单 |
-| E117 | Grump | 职业 | listener | 中等 |
-| E118 | Fence Overseer | 职业 | listener after Fencing | 中等 |
-| E119 | Bricklayer | 职业 | listener | 中等 |
-| E120 | Baker | 职业 | listener | 中等 |
-| E121 | Wood Distributor | 职业 | listener | 中等 |
-| E122 | Charcoal Burner | 职业 | listener | 中等 |
-| E125 | Pastor | 职业 | listener | 中等 |
-| E126 | Berry Picker | 职业 | listener | 中等 |
-| E127 | Magician | 职业 | listener | 中等 |
-| E129 | Cattleman | 职业 | listener | 中等 |
-| E131 | Animal Dealer | 职业 | listener | 中等 |
-| E132 | Clay Worker | 职业 | listener | 中等 |
-| E135 | Merchant | 职业 | listener | 中等 |
-| E136 | Greengrocer | 职业 | computeBonusScore | 简单 |
-| E137 | Academic | 职业 | computeBonusScore | 简单 |
-| E138 | Yeoman Farmer | 职业 | computeBonusScore | 简单 |
-| E139 | Farmer | 职业 | computeBonusScore | 简单 |
-| E140 | Educator | 职业 | computeBonusScore | 简单 |
-| E141 | Head of the Family | 职业 | computeBonusScore | 简单 |
-| E142 | Stonecutter | 职业 | listener | 中等 |
-| E143 | Chamberlain | 职业 | listener | 中等 |
-| E144 | Taster | 职业 | opponent interaction | 复杂(需基础设施) |
-| E145 | Animal Farmer | 职业 | listener | 中等 |
-| E146 | Storehouse Keeper | 职业 | listener | 中等 |
-| E147 | Wooden Hut Builder | 职业 | listener after Construct | 中等 |
-| E149 | Pig Breeder | 职业 | listener | 中等 |
-| E150 | Wood Cutter | 职业 | listener | 中等 |
-| E152 | Cattle Whisperer | 职业 | listener | 中等 |
-| E154 | Estate Manager | 职业 | opponent interaction | 复杂(需基础设施) |
-| E156 | Chief | 职业 | opponent interaction | 复杂(需基础设施) |
-| E157 | Plow Driver | 职业 | listener | 中等 |
-| E158 | Fence Builder | 职业 | listener after Fencing | 中等 |
-| E160 | Tinsmith | 职业 | opponent interaction | 复杂(需基础设施) |
-| E163 | Woolgrower | 职业 | listener | 中等 |
-| E164 | Hide Farmer | 职业 | listener | 中等 |
-| E165 | Night Watchman | 职业 | listener | 中等 |
-| E166 | (see above) | 职业 | (已实现) | — |
-| E168 | Fieldworker | 职业 | listener | 中等 |
-| E169 | Pig Farmer | 职业 | listener | 中等 |
-
----
-
-## 附录：已实现卡牌完整列表
-
-### 全部 72 张已实现卡 (按 Deck 排列)
-
-```
-A: A17, A28, A29, A37, A53, A55, A64, A65, A74, A79, A81, A83, A84, A88,
-   A94, A97, A105, A108, A109, A110, A112, A126, A128, A136, A144, A166
-B: B34, B65, B67, B70, B75, B94, B100, B103, B109, B151
-C: C24, C25, C37, C52, C60, C63, C71, C75, C88, C96, C120, C133, C144
-D: D14, D49, D51, D99, D107, D115, D119, D150, D152, D167
-E: E10, E21, E33, E52, E53, E57, E73, E74, E84, E101, E112, E128, E130, E133
-```
-
-### Hook 覆盖矩阵
-
-| Hook 类型 | 使用的卡牌 |
-|----------|-----------|
-| before | A17, A65, A81, A126, B34, B67, B75, B94, B109, C60, C88, D14, D49, D51, D119, D152, E74, E101, E130 |
-| during | A55, E53, E84, E133 |
-| immediatelyAfter | A83, A108, C25, C52, C96, C144, E33 |
-| after | A17, A37, A55, A74, A79, A83, A105, A108, A109, A110, A128, A144, B34, B94, B100, B103, B109, B151, C75, C88, C120, C133, C144, D99, D150, E33, E52, E57, E101, E128 |
-| computeCosts | A128, C37, C88, E130 |
-| computeArgs | A28, A94, B151 |
-| computeReplace | A94, A97, B103 |
-| computeBonusScore | A136, C133 |
-| isDoable | A65, A94, A97, A126, B67, B75, B94, B103, B109, C60, C88, D14, D49, D119, D152, E74, E101 |
-| canUseOccupied | A28, B151, E21 |
-| onBuy | A53, A74, A112, A136, A144, B65, C24, C60, C144, D51, D99, D167, E33, E74 |
-| onPlay | A94, A97, A105, A108, A109, A110, A112, A136, A144, A166, B94, B100, B103, B109, B151, C88, C96, C120, C133, D99, D107, D115, D119, D150, D152, D167, E101, E112, E128, E130, E133 |
-| onReturnHome | A29, A53, A84, C75 |
-| onRoundStart | A81 |
-| onHarvest | A112, C63, E112 |
-| effect | A28, A29, A53, A55, A64, A65, A74, A81, A84, A94, A112, A136, A144, A166, B65, B70, B75, B94, B151, C24, C60, C63, C71, C75, C88, C120, C133, C144, D49, D51, D99, D107, D115, D150, D167, E10, E33, E52, E73, E74, E84, E112, E133 |
+E4, E10, E21, E32, E33, E34, E35, E37, E38, E40, E52, E53, E57, E63, E64, E73, E74, E75, E81, E82, E83, E84, E86, E95, E101, E103, E112, E124, E128, E130, E133, E134, E135, E136, E148, E154, E161, E167

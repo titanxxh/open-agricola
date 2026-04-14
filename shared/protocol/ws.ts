@@ -22,7 +22,7 @@ export type ClientCommand =
   | {
       type: 'commitFarm'
       playerIndex: number
-      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select'
       payload: Record<string, unknown>
     }
   | { type: 'nextPlayer' }
@@ -32,6 +32,8 @@ export type ClientCommand =
   | { type: 'undoAction' }
   | { type: 'newGame'; seed?: number }
   | { type: 'loadGame'; state: unknown }
+  | { type: 'devDrawCard'; playerIndex: number; cardId: string }
+  | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }

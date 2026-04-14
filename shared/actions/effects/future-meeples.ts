@@ -40,26 +40,60 @@ const addResourceCounts = (
   })
 }
 
+export const removeFutureMeeples = (
+  state: GameState,
+  filter: { playerId: string; cardId: string; rounds?: number[] },
+): void => {
+  state.futureMeeples = state.futureMeeples.filter((entry) => {
+    if (entry.playerId !== filter.playerId || entry.cardId !== filter.cardId) return true
+    if (filter.rounds && !filter.rounds.includes(entry.round)) return true
+    return false
+  })
+}
+
+export const buildFutureEntries = (
+  baseRound: number,
+  items: { offset: number; resources: Partial<Resource> }[],
+): { round: number; resources: Partial<Resource> }[] =>
+  items.map(({ offset, resources }) => ({ round: baseRound + offset, resources }))
+
 export const resolveFutureMeepleRequests = (state: GameState) => {
   if (state.pendingFutureMeeples.length === 0) return
   const requests = [...state.pendingFutureMeeples]
   state.pendingFutureMeeples = []
   const nextEntries = [...state.futureMeeples]
   requests.forEach((request, requestIndex) => {
-    const startRound = clampRound(request.startRound)
-    const endRound = clampRound(request.startRound + request.count - 1)
-    for (let round = startRound; round <= endRound; round += 1) {
-      const actionId = state.roundActionOrder[round - 1] ?? null
-      const resources: Partial<Resource> = {}
-      addResourceCounts(resources, request.resources)
-      nextEntries.push({
-        id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
-        cardId: request.cardId,
-        playerId: request.playerId,
-        round,
-        actionId,
-        resources,
-      })
+    if ('entries' in request) {
+      for (const entry of request.entries) {
+        const round = clampRound(entry.round)
+        if (round <= state.round) continue
+        const resources: Partial<Resource> = {}
+        addResourceCounts(resources, entry.resources)
+        nextEntries.push({
+          id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
+          cardId: request.cardId,
+          playerId: request.playerId,
+          round,
+          actionId: state.roundActionOrder[round - 1] ?? null,
+          resources,
+        })
+      }
+    } else {
+      const startRound = clampRound(request.startRound)
+      const endRound = clampRound(request.startRound + request.count - 1)
+      for (let round = startRound; round <= endRound; round += 1) {
+        const actionId = state.roundActionOrder[round - 1] ?? null
+        const resources: Partial<Resource> = {}
+        addResourceCounts(resources, request.resources)
+        nextEntries.push({
+          id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
+          cardId: request.cardId,
+          playerId: request.playerId,
+          round,
+          actionId,
+          resources,
+        })
+      }
     }
   })
   state.futureMeeples = nextEntries

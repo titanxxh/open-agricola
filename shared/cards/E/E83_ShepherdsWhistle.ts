@@ -1,0 +1,39 @@
+import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { getLooseStableKeys } from '../../actions/effects/animals'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'E83_ShepherdsWhistle'
+
+/**
+ * E83 Shepherd's Whistle — At the start of the breeding phase of each harvest,
+ * if you have at least 1 unfenced stable without an animal, you get 1 sheep.
+ *
+ * BGA reference: onPlayerEndHarvestFeedingPhase — checks for empty unfenced stables.
+ * The BGA version also offers reorganize if unfenced stables exist but none are empty;
+ * we simplify to just checking for an empty unfenced stable (no reorganize flow).
+ */
+
+const hasEmptyUnfencedStable = (player: import('../../game/types').PlayerState): boolean => {
+  const looseStableKeys = getLooseStableKeys(player)
+  return looseStableKeys.some((key) => !player.stableAnimals?.[key])
+}
+
+registerCardEffect({
+  id: CARD_ID,
+  onEndHarvestFeedingPhase: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    if (!hasEmptyUnfencedStable(player)) return
+    return gainLeaf(CARD_ID, { sheep: 1 })
+  },
+})
+
+export const E83_ShepherdsWhistle = new MinorImprovement({
+  id: CARD_ID,
+  name: "Shepherd's Whistle",
+  deck: 'E',
+  number: 83,
+  category: 'ANIMALS_',
+  desc: ['At the start of the breeding phase of each harvest, if you have at least 1 unfenced stable without an animal, you get 1 <SHEEP>.'],
+  cost: { wood: 1 },
+})

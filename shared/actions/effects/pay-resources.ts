@@ -24,10 +24,11 @@ export const payResourcesAction: ActionDefinition = {
     if (sourceCard) {
       return {
         type: 'ok',
+        resourcesPaid: cost as Partial<Resource>,
         logKey: 'log.cardEffectPay',
         logParams: { cost: cost as Partial<Resource>, cardId: sourceCard },
       }
     }
-    return { type: 'ok' }
+    return { type: 'ok', resourcesPaid: cost as Partial<Resource> }
   },
 }

@@ -1,0 +1,62 @@
+import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { positionKey } from '../../game/farm'
+import type { PlayerState } from '../../game/types'
+
+const CARD_ID = 'A73_AgriculturalFertilizers'
+
+const countUsedSpaces = (player: PlayerState): number => {
+  const occupied = new Set<string>()
+  player.roomTiles.forEach((t) => occupied.add(positionKey(t)))
+  player.fields.forEach((f) => occupied.add(positionKey({ row: f.row, col: f.col })))
+  player.stableTiles.forEach((t) => occupied.add(positionKey(t)))
+  player.pastures.flatMap((p) => p.tiles).forEach((t) => occupied.add(positionKey(t)))
+  return occupied.size
+}
+
+const beforeListener: CardListenerRegistration = {
+  id: 'A73-agri-fert-before',
+  cardIds: [CARD_ID],
+  actions: ['construct', 'fence', 'stables'],
+  phases: ['before' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    writeCardExtraData(context.player, CARD_ID, 'spacesBefore', countUsedSpaces(context.player))
+  },
+}
+
+const afterListener: CardListenerRegistration = {
+  id: 'A73-agri-fert-after',
+  cardIds: [CARD_ID],
+  actions: ['construct', 'fence', 'stables'],
+  phases: ['after' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const before = readCardExtraData<number>(context.player, CARD_ID, 'spacesBefore') ?? 0
+    const after = countUsedSpaces(context.player)
+    if (after - before < 2) return
+    return {
+      flow: { type: 'leaf', actionId: 'sow', optional: true, sourceCard: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(beforeListener)
+registerCardListener(afterListener)
+
+export const A73_AgriculturalFertilizers = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Agricultural Fertilizers',
+  deck: 'A',
+  number: 73,
+  category: 'CROP_PROVIDER',
+  desc: [
+    'Each time after you turn at least 2 unused spaces into used spaces in one action, you get an additional __Sow__ action.',
+  ],
+  cost: {},
+  prerequisite: '1 Pasture',
+})

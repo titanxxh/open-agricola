@@ -109,12 +109,8 @@ describe('E95_Miller session', () => {
     // Skip the optional bake action
     resp = session.resolveChoice(0, '__skip__')
 
-    // Should switch back to opponent
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 0,
-      toPlayerIndex: 1,
-    })
+    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.pending.type).toBe('confirmNextPlayer')
 
     // Verify no grain consumed, no food gained
     const owner = resp.state.players[0]!
