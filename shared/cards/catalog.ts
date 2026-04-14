@@ -16,6 +16,7 @@ import { A128_RiparianBuilder } from './A/A128_RiparianBuilder'
 import { A136_DrudgeryReeve } from './A/A136_DrudgeryReeve'
 import { A137_RiverineShepherd } from './A/A137_RiverineShepherd'
 import { A14_CarpentersHammer } from './A/A14_CarpentersHammer'
+import { A143_Stonecutter } from './A/A143_Stonecutter'
 import { A144_Sequestrator } from './A/A144_Sequestrator'
 import { A156_Buyer } from './A/A156_Buyer'
 import { A148_Woolgrower } from './A/A148_Woolgrower'
@@ -113,7 +114,9 @@ import { C10_BunkBeds } from './C/C10_BunkBeds'
 import { C104_Collector } from './C/C104_Collector'
 import { C115_Sower } from './C/C115_Sower'
 import { C120_AgriculturalLabourer } from './C/C120_AgriculturalLabourer'
+import { C122_Bricklayer } from './C/C122_Bricklayer'
 import { C13_WoodSlideHammer } from './C/C13_WoodSlideHammer'
+import { C14_StrawThatchedRoof } from './C/C14_StrawThatchedRoof'
 import { C130_OutskirtsDirector } from './C/C130_OutskirtsDirector'
 import { C133_Soldier } from './C/C133_Soldier'
 import { C135_Constable } from './C/C135_Constable'
@@ -139,9 +142,11 @@ import { C52_HuntsmansHat } from './C/C52_HuntsmansHat'
 import { C57_Crudite } from './C/C57_Crudite'
 import { C60_SmallPottersOven } from './C/C60_SmallPottersOven'
 import { C63_CraftBrewery } from './C/C63_CraftBrewery'
+import { C67_MineralFeeder } from './C/C67_MineralFeeder'
 import { C71_Slurry } from './C/C71_Slurry'
 import { C71_SlurrySpreader } from './C/C71_SlurrySpreader'
 import { C75_Firewood } from './C/C75_Firewood'
+import { C81_MaterialHub } from './C/C81_MaterialHub'
 import { C8_PlantFertilizer } from './C/C8_PlantFertilizer'
 import { C84_PerennialRye } from './C/C84_PerennialRye'
 import { C85_DenBuilder } from './C/C85_DenBuilder'
@@ -202,6 +207,7 @@ import { D71_Changeover } from './D/D71_Changeover'
 import { D72_StableManure } from './D/D72_StableManure'
 import { D74_RoyalWood } from './D/D74_RoyalWood'
 import { D85_Reader } from './D/D85_Reader'
+import { D88_Millwright } from './D/D88_Millwright'
 import { D92_ChildOmbudsman } from './D/D92_ChildOmbudsman'
 import { D93_SheepInspector } from './D/D93_SheepInspector'
 import { D94_HenpeckedHusband } from './D/D94_HenpeckedHusband'
@@ -261,6 +267,7 @@ import { E76_LumberPile } from './E/E76_LumberPile'
 import { E78_SleightofHand } from './E/E78_SleightofHand'
 import { E81_AlchemistsLab } from './E/E81_AlchemistsLab'
 import { E82_Profiteering } from './E/E82_Profiteering'
+import { E83_ShepherdsWhistle } from './E/E83_ShepherdsWhistle'
 import { E84_DollysMother } from './E/E84_DollysMother'
 import { E85_MasterTanner } from './E/E85_MasterTanner'
 import { E86_PenBuilder } from './E/E86_PenBuilder'
@@ -344,6 +351,7 @@ export const minorImprovementCards = [
   C1_Overhaul,
   C10_BunkBeds,
   C13_WoodSlideHammer,
+  C14_StrawThatchedRoof,
   C130_OutskirtsDirector,
   C168_AnimalCatcher,
   C17_NewlyPlowedField,
@@ -362,9 +370,11 @@ export const minorImprovementCards = [
   C57_Crudite,
   C60_SmallPottersOven,
   C63_CraftBrewery,
+  C67_MineralFeeder,
   C71_Slurry,
   C71_SlurrySpreader,
   C75_Firewood,
+  C81_MaterialHub,
   C8_PlantFertilizer,
   C84_PerennialRye,
   C2_Stable,
@@ -430,6 +440,7 @@ export const minorImprovementCards = [
   E78_SleightofHand,
   E81_AlchemistsLab,
   E82_Profiteering,
+  E83_ShepherdsWhistle,
   E84_DollysMother,
   E1_PoleBarns,
   E2_RenovationMaterials,
@@ -455,6 +466,7 @@ export const occupationCards = [
   A134_FullFarmer,
   A136_DrudgeryReeve,
   A137_RiverineShepherd,
+  A143_Stonecutter,
   A144_Sequestrator,
   A148_Woolgrower,
   A150_Stagehand,
@@ -493,6 +505,7 @@ export const occupationCards = [
   C104_Collector,
   C115_Sower,
   C120_AgriculturalLabourer,
+  C122_Bricklayer,
   C100_Butler,
   C133_Soldier,
   C134_CowPrince,
@@ -526,6 +539,7 @@ export const occupationCards = [
   D158_BeanCounter,
   D167_PureBreeder,
   D85_Reader,
+  D88_Millwright,
   D92_ChildOmbudsman,
   D93_SheepInspector,
   D94_HenpeckedHusband,
