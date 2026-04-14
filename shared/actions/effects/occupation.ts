@@ -1,7 +1,8 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
+import { activateCard } from './activate-card'
 
 const canAffordWithPaperMaker = (
   player: PlayerState,
@@ -32,6 +33,7 @@ export const playOccupation = (
   player: PlayerState,
   occupationId: string,
   costOverride?: Partial<PlayerState['resources']>,
+  state?: GameState,
 ): ActionExecutionResult => {
   const occupation = getOccupation(occupationId)
   if (!occupation) {
@@ -56,6 +58,13 @@ export const playOccupation = (
       player.activeModifiers.push(modifier)
     }
   })
+  // Trigger onBuy hook — if it returns a flow, propagate it to the engine
+  if (state) {
+    const activation = activateCard(state, player, occupation.id, 'onBuy')
+    if (activation.type === 'flow') {
+      return activation
+    }
+  }
   return { type: 'ok' }
 }
 
@@ -141,10 +150,10 @@ export const playOccupationAction: ActionDefinition = {
       options: playableOptions,
     }
   },
-  resolveChoice: ({ player, space, params }, choice) => {
+  resolveChoice: ({ player, space, params, state }, choice) => {
     const cost =
       (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
       getLessonsCost(player, space.id)
-    return playOccupation(player, choice, cost)
+    return playOccupation(player, choice, cost, state)
   },
 }
