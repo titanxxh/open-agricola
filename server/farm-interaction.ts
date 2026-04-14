@@ -1,4 +1,5 @@
 import type {
+  FarmTilePosition,
   InteractionFarmSelection,
   PendingAction,
   PlayerState,
@@ -149,6 +150,25 @@ export const buildSowFarmInteraction = (
     ? undefined
     : Math.min(rawMaxSelections, selectableFields.length)
   return { farmType: 'sow', selectableFields, maxSelections }
+}
+
+export const buildFieldSelectFarmInteraction = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): InteractionFarmSelection => {
+  const filter = actionContext?.fieldFilter as string | undefined
+  const maxSelections = (actionContext?.maxSelections as number) ?? 1
+  const minSelections = (actionContext?.minSelections as number) ?? 0
+  const selectableFields: FarmTilePosition[] = player.fields
+    .filter((f) => {
+      if (filter === 'has-vegetable') return f.crop === 'vegetable' && f.remaining > 0
+      if (filter === 'has-grain') return f.crop === 'grain' && f.remaining > 0
+      if (filter === 'has-crop') return f.crop !== null && f.remaining > 0
+      if (filter === 'empty') return f.crop === null
+      return f.crop !== null && f.remaining > 0
+    })
+    .map((f) => ({ row: f.row, col: f.col }))
+  return { farmType: 'field-select', selectableFields, maxSelections, minSelections }
 }
 
 export const buildFenceFarmInteraction = (

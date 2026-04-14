@@ -22,7 +22,7 @@ export type ClientCommand =
   | {
       type: 'commitFarm'
       playerIndex: number
-      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select'
       payload: Record<string, unknown>
     }
   | { type: 'nextPlayer' }

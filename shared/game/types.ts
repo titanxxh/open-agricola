@@ -369,6 +369,12 @@ export type InteractionFarmSelection =
       }[]
       maxSelections?: number
     }
+  | {
+      farmType: 'field-select'
+      selectableFields: FarmTilePosition[]
+      maxSelections: number
+      minSelections?: number
+    }
 
 type InteractionBase = {
   allowedCommands: InteractionCommand[]
