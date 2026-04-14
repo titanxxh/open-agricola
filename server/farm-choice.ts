@@ -43,6 +43,7 @@ type FarmChoiceOptions = {
   sowOptions?: {
     maxSelections?: number
     excludedFields?: FarmTilePosition[]
+    extraValidPositions?: Set<string>
   }
 }
 
