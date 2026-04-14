@@ -1,7 +1,47 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import type { ActionFlow } from '../../game/types'
+
+const CARD_ID = 'D70_StrawManure'
+
+registerCardEffect({
+  id: CARD_ID,
+  onStartHarvestFieldPhase: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    // Need grain to pay and at least one vegetable field with crops
+    if ((player.resources.grain ?? 0) < 1) return
+    const vegFields = player.fields.filter(f => f.crop === 'vegetable' && f.remaining >= 1)
+    if (vegFields.length === 0) return
+
+    const children: ActionFlow[] = [
+      {
+        type: 'leaf',
+        actionId: 'pay-resources',
+        params: { grain: 1 },
+        sourceCard: CARD_ID,
+      },
+      {
+        type: 'leaf',
+        actionId: 'field-select',
+        sourceCard: CARD_ID,
+        actionContext: {
+          fieldFilter: 'has-vegetable',
+          maxSelections: 2,
+          fieldEffect: 'add-vegetable',
+        },
+      },
+    ]
+
+    return {
+      type: 'seq',
+      optional: true,
+      children,
+    }
+  },
+})
 
 export const D70_StrawManure = new MinorImprovement({
-  id: "D70_StrawManure",
+  id: CARD_ID,
   name: "Straw Manure",
   deck: "D",
   number: 70,
