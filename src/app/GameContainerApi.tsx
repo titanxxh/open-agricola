@@ -6,9 +6,7 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
-import { API_BASE } from '../config'
 import { emptyResources, resourceKeyList, baseActionOrder } from '../../shared/logic/state'
-import { registerCustomCard } from '../../shared/cards/custom-registry'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
@@ -1080,22 +1078,8 @@ export const GameContainerApi = () => {
     const playerIndex = state.players.findIndex((p) => p.id === devPlayerId)
     if (playerIndex < 0) return
     try {
-      const token = localStorage.getItem('open-agricola-token')
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const resp = await fetch(`${API_BASE}/api/game/dev/play-card`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ playerIndex, cardId }),
-      })
-      const data = await resp.json()
-      if (data.ok && data.state) {
-        // Register custom cards before loading state so they resolve in the card registry
-        if (data.customCardDefs) {
-          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
-        }
-        await transport.loadGame(data.state)
-      } else {
+      const data = await transport.devPlayCard(playerIndex, cardId)
+      if (!data.ok) {
         console.error('playDevCard failed:', data.error)
       }
     } catch (e) {
@@ -1110,22 +1094,8 @@ export const GameContainerApi = () => {
     const playerIndex = state.players.findIndex((p) => p.id === devPlayerId)
     if (playerIndex < 0) return
     try {
-      const token = localStorage.getItem('open-agricola-token')
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const resp = await fetch(`${API_BASE}/api/game/dev/draw-card`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ playerIndex, cardId }),
-      })
-      const data = await resp.json()
-      if (data.ok && data.state) {
-        // Register custom cards before loading state so they resolve in the card registry
-        if (data.customCardDefs) {
-          for (const def of data.customCardDefs) registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
-        }
-        await transport.loadGame(data.state)
-      } else {
+      const data = await transport.devDrawCard(playerIndex, cardId)
+      if (!data.ok) {
         console.error('drawDevCard failed:', data.error)
       }
     } catch (e) {
