@@ -16,42 +16,56 @@
 > Major Improvements (10张) 已全部实现，不计入上表。
 > 截至 2026-04-14 更新。848 tests passing。
 
-## 未对齐卡牌总结（701 张未实现）
+## 未实现卡牌总结（701 张）
 
-### 按 BGA 逻辑类型分类
+### 按效果模式分类
 
-| 类型 | 有文件 | 无文件 | 合计 | 难度 |
+不区分有无文件，统一按卡牌运行时行为模式分类：
+
+| 批次 | 效果模式 | 数量 | 难度 | 基础设施 |
 |---|---|---|---|---|
-| **ON_BUY** (一次性购买效果) | 46 | 96 | **142** | 低 |
-| **LISTENER_SIMPLE** (单一监听) | 19 | 222 | **241** | 低-中 |
-| **LISTENER_COMPLEX** (复杂监听) | 56 | 152 | **208** | 中-高 |
-| **OPPONENT** (对手交互) | 0 | 23 | **23** | 中-高 |
-| **NO_LOGIC** (无逻辑/核心路径) | 9 | 13 | **22** | 零 |
-| **EXCHANGE/SCORE** (仅交换或计分) | 1 | 5 | **6** | 极低 |
-| **SPECIAL** (PlayerActionCard/FieldDetails) | 0 | 8 | **8** | 高 |
-| **5+人卡** (BGA 自身未实现) | 0 | 48 | **48** | N/A |
-| **合计** | **131** | **567** | **698** | — |
+| 1 | 纯数据/无逻辑 + 交换/计分 | 29 | 零~极低 | ✅ |
+| 2 | 一次性购买效果 (onBuy) | 142 | 低 | ✅ |
+| 3 | 单事件监听：PlaceFarmer 触发 | 63 | 低-中 | ✅ |
+| 4 | 单事件监听：AfterCollect + After 行动 | 55 | 低-中 | ✅ |
+| 5 | 单事件监听：Harvest 各阶段 | 37 | 低-中 | ✅ |
+| 6 | 单事件监听：回合/工作阶段触发 | 59 | 低-中 | ✅ |
+| 7 | 单事件监听：Compute 修改器 | 17 | 低-中 | ✅ |
+| 8 | 费用修改器 (computeCosts) | 25 | 中 | ✅ |
+| 9 | Anytime 动作 | 20 | 中 | ✅ |
+| 10 | 动物容量扩展 (computeDropZones) | 10 | 中 | ✅ |
+| 11 | 资源存储/释放 (holder/stack) | 19 | 中 | ✅ |
+| 12 | 收获阶段特殊 | 15 | 中 | ✅ |
+| 13 | 多事件监听 | 52 | 中-高 | ✅ |
+| 14 | 玩家选择交互 (SPECIAL_EFFECT) | 18 | 中-高 | 部分需新增 |
+| 15 | 对手交互 | 23 | 中-高 | ✅ |
+| 16 | 流程替换/特殊机制 | ~28 | 高 | 部分需新增 |
+| 17 | Anytime 交换/静态 | 10 | 低 | ✅ |
 
-> 3 张有文件卡属边界情况未计入分类。
+### 推荐实现顺序
 
-### 推荐实现顺序与 ROI 分析
+| 批次 | 效果模式 | 数量 | 累计实现数 | 累计率 | 理由 |
+|---|---|---|---|---|---|
+| 1 | 纯数据 + 交换/计分 | 29 | 220 | 24.7% | 零/极低难度，创建文件或加 exchanges 即完成 |
+| 2 | 一次性购买效果 | 142 | 362 | 40.6% | 统一 onBuy 模式，5-15 行/张，BGA 直接翻译 |
+| 3 | 单事件监听：PlaceFarmer | 63 | 425 | 47.6% | 最常见事件类型，放农民到行动格时触发 |
+| 4 | 单事件监听：AfterCollect + After 行动 | 55 | 480 | 53.8% | 行动完成后触发，模式统一 |
+| 5 | 单事件监听：Harvest 阶段 | 37 | 517 | 58.0% | 收获各子阶段触发，需按阶段分组测试 |
+| 6 | 单事件监听：回合/工作阶段 | 59 | 576 | 64.6% | StartOfTurn/ReturnHome/EndWorkPhase 等 |
+| 7 | 单事件监听：Compute 修改器 + Anytime 交换 | 27 | 603 | 67.6% | ComputeCardCosts/DropZones/Args 等 |
+| 8 | 费用修改器 | 25 | 628 | 70.4% | computeCosts hook，模式统一 |
+| 9 | Anytime 动作 | 20 | 648 | 72.6% | phases: ['anytime']，每张需独立 handler |
+| 10 | 动物容量扩展 | 10 | 658 | 73.8% | computeDropZones/onComputeAnimalZones |
+| 11 | 资源存储/释放 | 19 | 677 | 75.9% | counters/stack 管理，需跨回合状态 |
+| 12 | 收获阶段特殊 | 15 | 692 | 77.6% | 修改收获/喂食/繁殖逻辑 |
+| 13 | 多事件监听 | 52 | 744 | 83.4% | 2+ handler，最大复杂批次 |
+| 14 | 玩家选择交互 | 18 | 762 | 85.4% | 需 ChoiceNode / SPECIAL_EFFECT 对应 |
+| 15 | 对手交互 | 23 | 785 | 88.0% | opponent scope + PlayerSwitch |
+| 16 | 流程替换/特殊机制 | ~28 | 813 | 91.1% | case-by-case，部分需新基础设施 |
 
-| 优先级 | 批次 | 数量 | 累计实现率 | 理由 |
-|---|---|---|---|---|
-| ⭐1 | ON_BUY 有文件卡 | 46 | 26.6% | 已有文件，5-15 行 hook，1-2h 全部完成 |
-| ⭐2 | LISTENER_SIMPLE 有文件 + EXCHANGE | 20 | 28.8% | 已有文件，10-20 行 handler |
-| 3 | ON_BUY 无文件卡 | 96 | 39.6% | 需创建文件但逻辑简单，BGA 直接翻译 |
-| 4 | LISTENER_SIMPLE 无文件卡 | 222 | 64.5% | 按事件类型分 6 子批（见详细分组） |
-| 5 | LISTENER_COMPLEX 全部 | 208 | 87.8% | 按 8 子类型分组（COMPUTE_COSTS/ANYTIME/HOLDER 优先） |
-| 6 | OPPONENT 全部 | 23 | 90.4% | 按 5 模式分组（PASSIVE_BENEFIT 11 张最优先） |
-| 7 | SPECIAL + NO_LOGIC | 30 | 93.7% | 需专门基础设施或核心路径修改 |
-| 8 | 5+人卡 | 48 | 99.1% | BGA 未实现，最低优先级 |
-
-前 4 批（384 张）覆盖 55% 未实现卡，全部基础设施已就绪，无阻塞。
-
-**LISTENER_SIMPLE 子批分布**：PlaceFarmer(56) > 回合阶段(47) > Harvest(34) > After行动(31) > AfterCollect(17) > 其他(37)
-**LISTENER_COMPLEX 优先子类型**：COMPUTE_COSTS(25) + ANYTIME(20) + CONDITIONAL_ROOM(10) = 55 张模式统一卡，推荐先做
-**OPPONENT 分布**：PASSIVE_BENEFIT(11) > OWNER_OPTIONAL(9) > 其他(3)
+> 批次 1-7（412 张，低-中难度）完成后实现率达 67.6%，全部基础设施已就绪。
+> 批次 8-12（89 张，中难度）完成后实现率达 77.6%，模式统一可批量实现。
+> 批次 13-16（121 张，中-高难度）需逐一分析，完成后实现率达 91.1%。
 
 ---
 
@@ -86,62 +100,36 @@
 
 ---
 
-## 未实现卡牌分类
+## 未实现卡牌详细分类
 
-### 一、已有文件但未实现 Hook（134 张）
+统一按效果模式分类，不区分有无 `.ts` 文件。
 
-按 BGA 逻辑类型分类：
+### 批次 1：纯数据 + 交换/计分（29 张）
 
-| 类型 | 数量 | 说明 |
-|------|------|------|
-| NO_LOGIC | 9 | BGA 也无逻辑，或逻辑硬编码在核心路径 |
-| ON_BUY | 46 | 仅 onBuy 一次性效果 |
-| EXCHANGE_ONLY | 1 | 仅 exchanges 数组 |
-| LISTENER_SIMPLE | 19 | 单一 listener + 1 个 handler |
-| LISTENER_COMPLEX | 56 | 多 handler 或 args/act 交互 |
-| 待分类 | 3 | 边界情况 |
+**NO_LOGIC（22 张）— BGA 也无逻辑或逻辑在核心路径：**
+A10, A41, A85, A87, A106, B10, C10, D85, E16, A113, A169-A180, B169-B180, C169-C180, D169-D180 (5+人卡构造函数only), B31(scoreOnly), C32, C105, C109, D11, D25, D37, D108, D155, D159, E29, E96, E132
 
-**NO_LOGIC（9 张）— 无需实现或需核心路径支持：**
-A10, A41, A85, A87, A106, B10, C10, D85, E16
+**EXCHANGE_ONLY（6 张）：** E153, B32, B80, B104, C62, D162
 
-**ON_BUY（46 张）— 最容易批量实现：**
-A1, A2, A4, A5, A6, A7, A8, A9, A89, B1, B2, B4, B5, B6, B7, B8, B9, B149, C1, C2, C3, C4, C5, C6, C7, C8, C9, C156, D1, D2, D3, D4, D6, D9, D131, E1, E2, E3, E6, E7, E8, E9, E76, E78, E155, E159
+**SCORE_ONLY（1 张）：** B31
 
-**EXCHANGE_ONLY（1 张）：** E153
+### 批次 2：一次性购买效果（142 张）
 
-**LISTENER_SIMPLE（19 张）：**
-A23, A88, A127, A148, B81, B86, C13, C27, C71, D53, D94, D98, D101, D164, E62, E90, E92, E151, E166
+onBuy 触发，一次性获取资源/执行行动。
 
-**LISTENER_COMPLEX（56 张）：**
-A3, A14, A22, A40, A58, A71, A72, A82, A92, A123, A137, B3, B15, B19, B21, B23, B48, B55, B115, B124, B146, C14, C18, C19, C23, C57, C84, C85, C87, C93, C115, C130, C148, D20, D22, D26, D27, D71, D93, D102, D103, D124, D126, D132, D134, D137, E22, E27, E30, E36, E51, E71, E85, E91, E93, E109, E123, E162
+**A (22):** A1, A2, A4, A5, A6, A7, A8, A9, A13, A19, A33, A36, A44, A47, A57, A69, A89, A117, A125, A135, E155, E159
+**B (32):** B1, B2, B4, B5, B6, B7, B8, B9, B14, B20, B22, B33, B37, B41, B44, B45, B46, B52, B59, B66, B71, B73, B74, B78, B84, B88, B93, B96, B102, B105, B113, B119, B123, B125, B127, B141, B149, B164, B167
+**C (22):** C1, C2, C3, C4, C5, C6, C7, C8, C9, C16, C38, C40, C44, C47, C50, C65, C72, C74, C77, C78, C79, C83, C108, C118, C127, C136, C139, C156, C161, C165, C166
+**D (16):** D1, D2, D3, D4, D6, D9, D40, D41, D43, D44, D45, D47, D57, D62, D67, D69, D78, D91, D120, D131, D145
+**E (25):** E1, E2, E3, E5, E6, E7, E8, E9, E25, E30, E36, E41, E42, E43, E44, E45, E46, E65, E76, E78, E94, E97, E98, E104, E106, E119, E120, E127, E138, E139, E145
 
-### 二、无文件卡牌（567 张，含 48 张 5+人卡）
+### 批次 3-7：单事件监听（241 张）
 
-按 BGA 逻辑类型分类（不含 48 张 5+人卡 = 519 张有效卡）：
+合并所有单一 listener handler 卡，按事件类型分批。
 
-| 类型 | 数量 | 说明 | 实现难度 |
-|------|------|------|----------|
-| NO_LOGIC | 13 | BGA 也无逻辑 | 零 — 只需创建数据文件 |
-| SCORE_ONLY | 1 | 仅 computeBonusScore | 极低 |
-| EXCHANGE_ONLY | 4 | 仅 exchanges 数组 | 极低 |
-| ON_BUY | 96 | onBuy 一次性效果 | 低 |
-| LISTENER_SIMPLE | 222 | 单一事件监听 | 低-中 |
-| LISTENER_COMPLEX | 152 | 复杂多 handler | 中-高 |
-| OPPONENT_SIMPLE | 20 | 对手简单触发 | 中 |
-| OPPONENT_COMPLEX | 3 | 对手复杂交互 | 高 |
-| SPECIAL | 8 | PlayerActionCard/FieldDetails 等 | 高 |
+#### 批次 3：PlaceFarmer 触发（63 张）
 
-#### ON_BUY 无文件卡牌（96 张）
-
-**A Deck (11):** A13, A19, A33, A36, A44, A47, A57, A69, A117, A125, A135
-**B Deck (30):** B14, B20, B22, B33, B37, B41, B44, B45, B46, B52, B59, B66, B71, B73, B74, B78, B84, B88, B93, B96, B102, B105, B113, B119, B123, B125, B127, B141, B164, B167
-**C Deck (21):** C16, C38, C40, C44, C47, C50, C65, C72, C74, C77, C78, C79, C83, C108, C118, C127, C136, C139, C161, C165, C166
-**D Deck (15):** D40, D41, D43, D44, D45, D47, D57, D62, D67, D69, D78, D91, D120, D145, D162
-**E Deck (19):** E25, E41, E42, E43, E44, E45, E46, E65, E94, E97, E98, E104, E106, E119, E120, E127, E138, E139, E145
-
-#### LISTENER_SIMPLE 无文件卡牌（222 张）— 按事件类型分组
-
-##### PlaceFarmer 触发（56 张）
+包含 222 张无文件 + 19 张有文件的 LISTENER_SIMPLE 卡中 PlaceFarmer 相关的。
 
 | 触发行动格 | 数量 | 卡牌 |
 |---|---|---|
@@ -149,15 +137,18 @@ A3, A14, A22, A40, A58, A71, A72, A82, A92, A123, A137, B3, B15, B19, B21, B23, 
 | Fishing | 7 | A51, A78, A138, B40, B47, B60, E55 |
 | DayLaborer | 7 | B77, B87, B91, C45, C138, D147, E59 |
 | GrainSeeds/VegSeeds | 8 | A67, B62, B142, B166, C90, C131, E67, E121 |
-| Animal Market | 8 | A46, A66, A147, B92, C15, C147, D16, D165 |
+| GrainUtilization | 1 | D101 |
+| Animal Market | 10 | A46, A66, A147, B92, C15, C147, D16, D164, D165, E166 |
 | BeforeCollect | 7 | A91, A107, A115, A161, C76, D105, D125 |
 | 其他行动格 | 13 | A52, A114, A122, A140, A155, A163, B43, B56, B64, B90, B112, D28, D83, D110, E137, E141 |
 
 ##### AfterPlaceFarmer / ImmediatelyAfter（11 张）
 A168, B24, B28, B144, C82, C126, D68, D151, E19, E115, E131
 
-##### AfterCollect（17 张）
-A15, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73, D140, E15
+#### 批次 4：AfterCollect + After 行动（55 张）
+
+##### AfterCollect（18 张）
+A15, A23, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73, D140, E15
 
 ##### After 行动（after:Plow/Sow/Fencing/Stables/Construct/Renovation/Improvement/Occupation）（31 张）
 
@@ -167,7 +158,7 @@ A15, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73
 | AfterSow | 4 | C73, D58, E50, E79 |
 | AfterFencing | 4 | A34, A68, D89, E108 |
 | AfterStables | 2 | D168, E114 |
-| AfterConstruct | 4 | A21, A93, B111, D123 |
+| AfterConstruct | 5 | A21, A93, B111, D94, D123 |
 | AfterRenovation | 3 | A45, B134, D111 |
 | AfterImprovement | 8 | A131, C43, D80, E18, E31, E54, E122, E146 |
 | AfterOccupation | 5 | C68, D42, E89, E157, E163 |
@@ -175,131 +166,122 @@ A15, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73
 ##### AfterExchange / AfterPay / AfterRevealAction / AfterWishChildren（6 张）
 A30, A63, C61 (exchange), B18 (pay), C21 (reveal), E113 (wish children)
 
-##### Harvest 阶段（34 张）
+#### 批次 5：Harvest 各阶段（37 张）
 
 | 阶段 | 数量 | 卡牌 |
 |---|---|---|
 | StartHarvest | 6 | D61, D153, E61, E117, E147, E149 |
-| BeforeHarvest | 2 | C92, D32 |
+| BeforeHarvest | 3 | C92, D32, D98 |
 | HarvestFieldPhase | 4 | A104, A118, B50, E107 |
 | EndHarvestFieldPhase | 3 | A61, C54, C110 |
 | HarvestFeedingPhase | 6 | A62, C55, D133, E39, E48, E142 |
 | EndHarvestFeedingPhase | 2 | C41, D76 |
+| AfterReorganize (breeding) | 2 | C71, E90 |
 | AfterHarvest | 3 | B82, C34, C66 |
 | EndHarvest | 3 | A145, C124, E99 |
 | EndOfRound | 3 | B53, D64, D79 |
 
-##### 回合/工作阶段触发（47 张）
+#### 批次 6：回合/工作阶段触发（59 张）
 
 | 阶段 | 数量 | 卡牌 |
 |---|---|---|
 | StartOfTurn | 12 | A90, B57, B97, B114, B118, B135, C103, C159, E88, E102, E126, E152, E168 |
 | BeforeStartOfTurn | 4 | B106, C111, C157, D48 |
-| StartOfWork | 5 | A76, C123, C125, D54, E100 |
-| StartReturnHome | 8 | A35, A100, A141, A151, A152, A157, C97, E20 |
+| StartOfWork | 6 | A76, B81, C123, C125, D54, E100 |
+| StartReturnHome | 9 | A35, A100, A127, A141, A151, A152, A157, C97, E20 |
 | ReturnHome | 2 | B139, D52 |
 | AfterWorkPhase | 1 | B140 |
 | EndWorkPhase | 6 | B158, D130, D142, E23, E26, E158 |
 | Preparation | 1 | A49 |
 | BeforeEndOfGame | 1 | B133 |
 
-##### Compute 修改器（10 张）
+#### 批次 7：Compute 修改器 + Anytime 交换（27 张）
+
+##### Compute 修改器（17 张）
 
 | 类型 | 数量 | 卡牌 |
 |---|---|---|
-| ComputeCardCosts | 2 | A75, B95 |
-| ComputeDropZones | 3 | B12, D86, E12 |
+| ComputeCardCosts | 3 | A75, B95, C27 |
+| ComputeDropZones | 5 | A148, B12, B86, D86, E12 |
 | ComputeArgsPlaceFarmer | 3 | A26, B129, E129 |
-| ComputePlaceFarmerFlow | 2 | D138, E24 |
+| ComputePlaceFarmerFlow | 4 | D138, E24, E92, E151 |
+| ComputeCostsFencing | 1 | A88 |
 
-##### Anytime（6 张）
-B69, B157, C94, D106, E13, E14
+##### Anytime 交换/静态（10 张）
+B69, B157, C94, D106, E13, E14, A60, B101, D53, D59, E62
 
-##### 非 Listener（仅交换/静态，3 张）
-A60, B101, D59
+### 批次 8-12：中等复杂度效果模式
 
-#### LISTENER_COMPLEX（有文件 56 + 无文件 152 = 208 张）— 按子类型分组
-
-##### COMPUTE_COSTS — 费用修改器（25 张）
+#### 批次 8：费用修改器 (computeCosts)（25 张）
 
 修改 construct/renovation/fencing/occupation/card 费用。基础设施已有 `computeCosts` hook。
 
-| 卡牌 | 说明 | 有文件 |
-|---|---|---|
-| A14 | 一次建 2+ 房时减免建材 | ✅ |
-| A123 | 木材替代黏土/石头 | ✅ |
-| C14 | 建造/翻新免芦苇 | ✅ |
-| E109 | Basket 费用减免 | ✅ |
-| E123 | 资源栈抵扣建造费用 | ✅ |
-| E27 | 存食物抵扣大改良 | ✅ |
-| A16 | 围栏费用减免 | ❌ |
-| A27 | 烤炉费用减免 | ❌ |
-| A149 | 自有行动格建房减免 | ❌ |
-| B13 | 木房建造减免 | ❌ |
-| B126 | 按材料类型减房费 | ❌ |
-| B128 | 翻新触发+费用减免 | ❌ |
-| B145 | 建造/翻新减 1 建材 | ❌ |
-| B155 | 职业费用减免 | ❌ |
-| C56 | 马厩食物+免费围栏 | ❌ |
-| C95 | 条件性卡牌费用减免 | ❌ |
-| C128 | 早期木房费用减免 | ❌ |
-| D13 | anytime 翻新减费 | ❌ |
-| D15 | 黏土房免费黏土 | ❌ |
-| D81 | 翻新后得石+少芦苇 | ❌ |
-| D95 | 条件性卡牌费用减免 | ❌ |
-| D117 | 木材抵扣改良费 | ❌ |
-| D121 | 黏土翻新/建造减费 | ❌ |
-| E60 | 职业费用减免 | ❌ |
-| E87 | 翻新费用减免+犁地 | ❌ |
-| E150 | 石房建造减费+行动格 | ❌ |
+| 卡牌 | 说明 |
+|---|---|
+| A14 | 一次建 2+ 房时减免建材 |
+| A123 | 木材替代黏土/石头 |
+| C14 | 建造/翻新免芦苇 |
+| E109 | Basket 费用减免 |
+| E123 | 资源栈抵扣建造费用 |
+| E27 | 存食物抵扣大改良 |
+| A16 | 围栏费用减免 |
+| A27 | 烤炉费用减免 |
+| A149 | 自有行动格建房减免 |
+| B13 | 木房建造减免 |
+| B126 | 按材料类型减房费 |
+| B128 | 翻新触发+费用减免 |
+| B145 | 建造/翻新减 1 建材 |
+| B155 | 职业费用减免 |
+| C56 | 马厩食物+免费围栏 |
+| C95 | 条件性卡牌费用减免 |
+| C128 | 早期木房费用减免 |
+| D13 | anytime 翻新减费 |
+| D15 | 黏土房免费黏土 |
+| D81 | 翻新后得石+少芦苇 |
+| D95 | 条件性卡牌费用减免 |
+| D117 | 木材抵扣改良费 |
+| D121 | 黏土翻新/建造减费 |
+| E60 | 职业费用减免 |
+| E87 | 翻新费用减免+犁地 |
+| E150 | 石房建造减费+行动格 |
 
-##### ANYTIME — Anytime 动作（20 张）
+#### 批次 9：Anytime 动作（20 张）
 
 使用现有 `phases: ['anytime']` 基础设施。部分需要 args/act 交互。
 
-有文件(7)：A71, C18, C85, C87, C115, D71, E85, E91
-无文件(13)：A153, B35, B154, C46, C53, C64, C84, C101, C143, D46, D56, D87, D124, D129
+A71, C18, C85, C87, C115, D71, E85, E91, A153, B35, B154, C46, C53, C64, C84, C101, C143, D46, D56, D87, D124, D129
 
-##### HOLDER_STACK — 资源存储管理（19 张）
-
-卡牌存储资源，按条件释放。使用 `counters` / `stack` 基础设施。
-
-有文件(6)：B19, B48, B55, C19, D20, D126, E22, E51, E162
-无文件(10)：B21, D118, D156, E28, E47, E56, E110, E140, B137
-
-##### MULTI_LISTENER — 多事件监听（52 张）
-
-监听 2+ 不同事件，有独立 handler。最大的子类型。
-
-有文件(12)：A22, A40, A82, A92, B23, B124, C23, C57, C93, C130, C148, D22, D27, D93, D102, D132, D134, D137
-无文件(34)：A35, A50, A54, A77, A80, A96, A116, A120, A121, A129, A130, A139, A142, A167, B16, B25, B29, B49, B54, B58, B79, B89, B107, B108, B110, B116, B117, B160, B162, B168, C42, C80, C106, C107, C113, C116, C119, C121, C132, C145, C155, C163, C164, D39, D63, D65, D84, D96, D97, D109, D112, D113, D141, D143, D144, D146, D166, E47, E58, E66, E68, E69, E70, E72, E77, E111, E116, E118, E132, E140, E143, E165
-
-##### ARGS_ACT — 需要玩家选择的 SPECIAL_EFFECT（18 张）
-
-BGA 使用 `args{X}/act{X}` 方法实现多步选择。我们需要对应的 ChoiceNode 或 XOR flow。
-
-有文件(8)：A3, A58, A72, A137, B3, B115, B146, D93, D102, D132, D137, E71
-无文件(6)：C57 (也在 anytime), D71 (也在 anytime), E22 (也在 holder), E85 (也在 anytime)
-
-##### CONDITIONAL_ROOM — 条件性房间/动物容量（10 张）
+#### 批次 10：动物容量扩展 (computeDropZones)（10 张）
 
 使用 `onComputeAnimalZones` 或 `computeDropZones` 扩展动物容量。基础设施已有。
 
-有文件(1)：A11
-无文件(9)：A86, B11, B148, C11, C12, C89, D12, D148, E11
+A11, A86, B11, B148, C11, C12, C89, D12, D148, E11
 
-##### HARVEST_SPECIAL — 特殊收获行为（15 张）
+#### 批次 11：资源存储/释放 (holder/stack)（19 张）
+
+卡牌存储资源，按条件释放。使用 `counters` / `stack` 基础设施。
+
+B19, B48, B55, C19, D20, D126, E22, E51, E162, B21, D118, D156, E28, E47, E56, E110, E140, B137
+
+#### 批次 12：收获阶段特殊（15 张）
 
 修改收获/喂食/繁殖阶段逻辑。
 
-有文件(3)：E30, E36, D132
-无文件(12)：A59, B61, C49, C70, C98, D84, D113, E58, E68, E69, E70, E72, E110, E132
+E30, E36, D132, A59, B61, C49, C70, C98, D84, D113, E58, E68, E69, E70, E72, E110, E132
 
-##### OTHER_COMPLEX — 其他复杂卡（~20 张）
+### 批次 13-16：高复杂度效果模式
 
-不归入以上类别的复杂卡：流程替换、假农民系统、多阶段 onBuy 等。
+#### 批次 13：多事件监听（52 张）
 
-A20, B26, B160, C23, C112, C129, C140, C150, C158, C160, D17, D18, D21, D24, D50, E105
+监听 2+ 不同事件，有独立 handler。最大的子类型。
+
+A22, A40, A82, A92, B23, B124, C23, C57, C93, C130, C148, D22, D27, D93, D102, D132, D134, D137, A35, A50, A54, A77, A80, A96, A116, A120, A121, A129, A130, A139, A142, A167, B16, B25, B29, B49, B54, B58, B79, B89, B107, B108, B110, B116, B117, B160, B162, B168, C42, C80, C106, C107, C113, C116, C119, C121, C132, C145, C155, C163, C164, D39, D63, D65, D84, D96, D97, D109, D112, D113, D141, D143, D144, D146, D166, E47, E58, E66, E68, E69, E70, E72, E77, E111, E116, E118, E132, E140, E143, E165
+
+#### 批次 14：玩家选择交互 (SPECIAL_EFFECT)（18 张）
+
+BGA 使用 `args{X}/act{X}` 方法实现多步选择。需要 ChoiceNode 或 XOR flow 对应。
+
+A3, A58, A72, A137, B3, B115, B146, D93, D102, D132, D137, E71, C57, D71, E22, E85
 
 #### SPECIAL_EFFECT 卡牌分析（BGA args/act 交互模式）
 
@@ -434,7 +416,7 @@ BGA 的 SPECIAL_EFFECT 是一种流程节点，卡牌定义 `args{Method}()` 返
 
 > 大部分 SPECIAL_EFFECT 卡（~30/40）可用现有机制实现，仅 3 张需要新基础设施。
 
-#### OPPONENT 无文件卡牌（23 张）— 按交互模式分组
+#### 批次 15：对手交互（23 张）— 按交互模式分组
 
 ##### PASSIVE_BENEFIT — 被动收益（11 张）
 
@@ -479,43 +461,18 @@ C151: 对手使用 Grain Utilization 时，卡主可选执行播种
 ##### META_EFFECT — 多阶段效果（1 张）
 A160: 对手使用 Traveling Players → 卡主自动得 1 食 +1 木 + 可选付 2 食买 1 菜
 
-#### OPPONENT 无文件卡牌（23 张）
+### 批次 16：流程替换/特殊机制（~28 张）
 
-**SIMPLE (20):** A154, A158, A159, B138, B143, B159, B163, C137, C149, C151, C152, C153, C167, D77, D128, D149, D160, E49, E156, E160
-**COMPLEX (3):** A160, D163, E144
+不归入以上类别的复杂卡 + SPECIAL 类型：
 
-#### SPECIAL 无文件卡牌（8 张）
+**流程替换/假农民等：**
+A20, B26, B160, C23, C112, C129, C140, C150, C158, C160, D17, D18, D21, D24, D50, E105
 
+**SPECIAL 类型：**
 PlayerActionCard (2): C22, C39
 FieldDetails (3): B68, D75, E80
 GetBaseCosts (1): B36
 ComplexBuy (2): A20, E125
-
----
-
-## 推荐实现顺序
-
-### 第 1 批：ON_BUY 有文件卡（46 张）⭐ 最高优先
-
-**理由**：已有 .ts 文件，只需添加 `registerCardEffect` + `onBuy` hook，每张 5-15 行代码。可并行实现，1-2 小时完成全部。
-
-**卡牌**：A1-A9, A89, B1-B9, B149, C1-C9, C156, D1-D4, D6, D9, D131, E1-E3, E6-E9, E76, E78, E155, E159
-
-### 第 2 批：LISTENER_SIMPLE 有文件卡（19 张）
-
-**理由**：已有文件，单一 listener handler，每张 10-20 行。
-
-**卡牌**：A23, A88, A127, A148, B81, B86, C13, C27, C71, D53, D94, D98, D101, D164, E62, E90, E92, E151, E166
-
-### 第 3 批：EXCHANGE_ONLY + NO_LOGIC 有文件卡（10 张）
-
-**理由**：E153 只需 exchanges 数组。NO_LOGIC 卡需分析是否需要在核心路径添加支持。
-
-### 第 4 批：ON_BUY 无文件卡（96 张）
-
-**理由**：需创建文件 + 实现 onBuy，但逻辑简单。可参考 BGA 的 `onBuy` 方法直接翻译。
-
-### 第 5 批：LISTENER_SIMPLE 无文件卡（222 张）⭐ 数量最多
 
 **理由**：最大批次。每张需创建文件 + 1 个 listener，逻辑清晰。
 
@@ -526,34 +483,6 @@ ComplexBuy (2): A20, E125
 4. Harvest 阶段（34 张）— StartHarvest/Feeding/EndHarvest 等
 5. 回合/工作阶段（47 张）— StartOfTurn/ReturnHome/EndWorkPhase 等
 6. Compute 修改器 + Anytime + 静态（19 张）
-
-### 第 6 批：LISTENER_COMPLEX（208 张）
-
-**理由**：复杂度高，按子类型分组实现（见上方详细分组）：
-
-| 子类型 | 数量 | 基础设施 | 推荐顺序 |
-|---|---|---|---|
-| COMPUTE_COSTS 费用修改器 | 25 | ✅ 已有 | ⭐优先 — 模式统一 |
-| ANYTIME 动作 | 20 | ✅ 已有 | ⭐优先 — 模式统一 |
-| CONDITIONAL_ROOM 动物容量 | 10 | ✅ 已有 | ⭐优先 — computeDropZones |
-| HARVEST_SPECIAL 收获特殊 | 15 | ✅ 已有 | 中等 — 需测试各阶段 |
-| HOLDER_STACK 资源存储 | 19 | ✅ 已有 | 中等 — 需 stack/counter |
-| ARGS_ACT 玩家选择 | 18 | 需 ChoiceNode | 较难 — 需 SPECIAL_EFFECT 对应 |
-| MULTI_LISTENER 多事件 | 52 | ✅ 已有 | 较难 — 最大量，逐一翻译 |
-| OTHER_COMPLEX 其他 | ~20 | 部分需新基础 | 最难 — case-by-case |
-
-**推荐内部顺序**：先做 COMPUTE_COSTS + ANYTIME + CONDITIONAL_ROOM（55 张），基础设施全部就绪，模式高度统一。
-
-### 第 7 批：OPPONENT 卡（23 张）
-
-**理由**：对手交互基础设施已有（4 种模式均已验证）。按模式分子批：
-1. PASSIVE_BENEFIT（11 张）— 最简单，自动 gain，无需 UI 交互
-2. OWNER_OPTIONAL（9 张）— 需 optional wrapper，已有模式
-3. FORCED_PAYMENT + GRANT_ACTION + META_EFFECT（3 张）— 逐一处理
-
-### 第 8 批：SPECIAL + 5+人卡（8 + 48 = 56 张）
-
-**理由**：需专门基础设施（FieldDetails、PlayerActionCard 等），或 BGA 自身未实现。最低优先级。
 
 ---
 
