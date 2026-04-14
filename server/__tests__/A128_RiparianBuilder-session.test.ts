@@ -59,13 +59,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.playerIndex).toBe(0)
 
     resp = session.resolveChoice(0, '__skip__')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 0,
-      toPlayerIndex: 1,
-    })
-
-    resp = session.confirmPlayerSwitch()
+    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 
@@ -108,14 +102,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[1]!.rooms).toBe(2)
 
-    // Should switch back to player 1 after construct completes
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 0,
-      toPlayerIndex: 1,
-    })
-
-    resp = session.confirmPlayerSwitch()
+    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 

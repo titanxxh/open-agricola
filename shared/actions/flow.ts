@@ -131,6 +131,10 @@ const evaluateFlowDoable = (
   resolveAction: FlowActionResolver,
   seenActionIds: Set<string>,
 ): boolean => {
+  if (flow.type === 'playerSwitch') {
+    return true
+  }
+
   if (flow.optional) {
     return true
   }
@@ -156,6 +160,9 @@ const evaluateFlowDoable = (
   }
 
   return flow.children.every((child) => {
+    if (child.type === 'playerSwitch') {
+      return true
+    }
     if (child.optional) {
       return true
     }
