@@ -794,6 +794,18 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
+      if (msg.type === 'devDrawCard') {
+        const resp = callRoom(s => s.devDrawCard(msg.playerIndex, msg.cardId))
+        broadcastState(room, resp, 'dev')
+        return
+      }
+
+      if (msg.type === 'devPlayCard') {
+        const resp = callRoom(s => s.devPlayCard(msg.playerIndex, msg.cardId))
+        broadcastState(room, resp, 'dev')
+        return
+      }
+
       if (msg.type === 'devCreatePasture') {
         const resp = callRoom(s => s.startDevFenceSelect(currentPlayerIndex))
         broadcastState(room, resp, 'action')

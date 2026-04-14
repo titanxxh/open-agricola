@@ -32,6 +32,8 @@ export type ClientCommand =
   | { type: 'undoAction' }
   | { type: 'newGame'; seed?: number }
   | { type: 'loadGame'; state: unknown }
+  | { type: 'devDrawCard'; playerIndex: number; cardId: string }
+  | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
   | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }
