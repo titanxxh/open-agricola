@@ -130,6 +130,7 @@ import { C135_Constable } from './C/C135_Constable'
 import { C141_SheepProvider } from './C/C141_SheepProvider'
 import { C144_ReedRoofRenovator } from './C/C144_ReedRoofRenovator'
 import { C142_MarketCrier } from './C/C142_MarketCrier'
+import { C146_WorkshopAssistant } from './C/C146_WorkshopAssistant'
 import { C148_MudWallower } from './C/C148_MudWallower'
 import { C156_HoofCaregiver } from './C/C156_HoofCaregiver'
 import { C162_ForestOwner } from './C/C162_ForestOwner'
@@ -198,6 +199,7 @@ import { D14_HammerCrusher } from './D/D14_HammerCrusher'
 import { D150_GodlySpouse } from './D/D150_GodlySpouse'
 import { D157_PartyOrganizer } from './D/D157_PartyOrganizer'
 import { D158_BeanCounter } from './D/D158_BeanCounter'
+import { D161_CabbageBuyer } from './D/D161_CabbageBuyer'
 import { D164_PetGrower } from './D/D164_PetGrower'
 import { D167_PureBreeder } from './D/D167_PureBreeder'
 import { D20_TurnwrestPlow } from './D/D20_TurnwrestPlow'
@@ -530,6 +532,7 @@ export const occupationCards = [
   C141_SheepProvider,
   C142_MarketCrier,
   C144_ReedRoofRenovator,
+  C146_WorkshopAssistant,
   C148_MudWallower,
   C156_HoofCaregiver,
   C162_ForestOwner,
@@ -555,6 +558,7 @@ export const occupationCards = [
   D150_GodlySpouse,
   D157_PartyOrganizer,
   D158_BeanCounter,
+  D161_CabbageBuyer,
   D167_PureBreeder,
   D85_Reader,
   D88_Millwright,
