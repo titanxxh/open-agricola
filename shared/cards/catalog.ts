@@ -44,6 +44,7 @@ import { A65_SeedPellets } from './A/A65_SeedPellets'
 import { A70_LiftingMachine } from './A/A70_LiftingMachine'
 import { A71_ClearingSpade } from './A/A71_ClearingSpade'
 import { A72_CalciumFertilizers } from './A/A72_CalciumFertilizers'
+import { A73_AgriculturalFertilizers } from './A/A73_AgriculturalFertilizers'
 import { A74_StableTree } from './A/A74_StableTree'
 import { A79_GardenHoe } from './A/A79_GardenHoe'
 import { A81_InterimStorage } from './A/A81_InterimStorage'
@@ -321,6 +322,7 @@ export const minorImprovementCards = [
   A70_LiftingMachine,
   A71_ClearingSpade,
   A72_CalciumFertilizers,
+  A73_AgriculturalFertilizers,
   A74_StableTree,
   A79_GardenHoe,
   A81_InterimStorage,

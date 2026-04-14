@@ -1,0 +1,149 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game-session'
+
+import '../../shared/cards/A/A73_AgriculturalFertilizers'
+
+const CARD_ID = 'A73_AgriculturalFertilizers'
+
+const edgesForTwoTiles = [
+  'H-1-1',
+  'H-1-2',
+  'H-2-1',
+  'H-2-2',
+  'V-1-1',
+  'V-1-3',
+]
+
+const edgesForOneTile = [
+  'H-1-1',
+  'H-2-1',
+  'V-1-1',
+  'V-1-2',
+]
+
+describe('A73_AgriculturalFertilizers session', () => {
+  const setupFencing = () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.playedCards.push(`minor:${CARD_ID}`)
+    player.resources.wood = 20
+    player.resources.grain = 3
+    player.resources.vegetable = 1
+    // Add empty fields for sow
+    player.fields = [
+      { row: 0, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 4, crop: null, remaining: 0 },
+    ]
+
+    session.loadState(state)
+    return session
+  }
+
+  it('grants optional sow after fencing 2+ tiles', () => {
+    const session = setupFencing()
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+
+    resp = session.commitFarmChoice(0, 'fence', {
+      edges: edgesForTwoTiles,
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(true)
+    // After fencing 2 tiles, optional sow should be offered
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.pending.options.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+    expect(resp.pending.options.some((o) => o.labelKey === 'ui.interactionOptionalSkip')).toBe(true)
+  })
+
+  it('does NOT grant sow after fencing only 1 tile', () => {
+    const session = setupFencing()
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+
+    resp = session.commitFarmChoice(0, 'fence', {
+      edges: edgesForOneTile,
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(true)
+    // Only 1 tile fenced, no sow offered
+    expect(resp.pending.type).not.toBe('choice')
+  })
+
+  it('grants optional sow after building 2 stables via farm-expansion', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.playedCards.push(`minor:${CARD_ID}`)
+    player.resources.wood = 20
+    player.resources.grain = 2
+    player.resources.vegetable = 1
+    player.fields = [
+      { row: 0, col: 3, crop: null, remaining: 0 },
+    ]
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    // Without reed, only stables is available — OR auto-selects it
+    // The pending is the stable selection
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('stable')
+    if (resp.interaction.farm.farmType !== 'stable') return
+
+    const tiles = resp.interaction.farm.selectableTiles
+    expect(tiles.length).toBeGreaterThanOrEqual(2)
+    const [s1, s2] = tiles
+
+    resp = session.commitFarmChoice(0, 'stable', { stables: [s1!, s2!] })
+    expect(resp.ok).toBe(true)
+    // 2 stables built => 2 new used spaces => optional sow offered
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.pending.options.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+  })
+
+  it('cannot play A73 without at least 1 pasture (prerequisite)', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    // No pastures
+    player.pastures = []
+    player.minorHand.push(CARD_ID)
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    // A73 should not be in the playable options (no pasture)
+    const a73Option = resp.pending.options.find(
+      (option) => option.value === CARD_ID,
+    )
+    expect(a73Option).toBeUndefined()
+  })
+})
