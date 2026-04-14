@@ -1,6 +1,7 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
 import { A102_Grocer } from './A/A102_Grocer'
+import { A25_Bassinet } from './A/A25_Bassinet'
 import { A105_BarrowPusher } from './A/A105_BarrowPusher'
 import { A106_SlurrySpreader } from './A/A106_SlurrySpreader'
 import { A108_MushroomCollector } from './A/A108_MushroomCollector'
@@ -34,6 +35,7 @@ import { A37_Bucksaw } from './A/A37_Bucksaw'
 import { A39_Chapel } from './A/A39_Chapel'
 import { A40_PottersYard } from './A/A40_PottersYard'
 import { A41_VegetableSlicer } from './A/A41_VegetableSlicer'
+import { A48_ShavingHorse } from './A/A48_ShavingHorse'
 import { A53_Claypipe } from './A/A53_Claypipe'
 import { A55_JunkRoom } from './A/A55_JunkRoom'
 import { A58_AsparagusKnife } from './A/A58_AsparagusKnife'
@@ -65,6 +67,8 @@ import { A6_StorageBarn } from './A/A6_StorageBarn'
 import { A7_GardenersKnife } from './A/A7_GardenersKnife'
 import { A8_FoodBasket } from './A/A8_FoodBasket'
 import { A9_YoungAnimalMarket } from './A/A9_YoungAnimalMarket'
+import { B27_Toolbox } from './B/B27_Toolbox'
+import { B38_FutureBuildingSite } from './B/B38_FutureBuildingSite'
 import { B10_Caravan } from './B/B10_Caravan'
 import { B100_Clutterer } from './B/B100_Clutterer'
 import { B103_FieldMerchant } from './B/B103_FieldMerchant'
@@ -97,6 +101,7 @@ import { B83_MuddyPuddles } from './B/B83_MuddyPuddles'
 import { B86_TruffleSearcher } from './B/B86_TruffleSearcher'
 import { B98_OrganicFarmer } from './B/B98_OrganicFarmer'
 import { B99_Tutor } from './B/B99_Tutor'
+import { B132_EstateMaster } from './B/B132_EstateMaster'
 import { B136_HouseSteward } from './B/B136_HouseSteward'
 import { B94_StockProtector } from './B/B94_StockProtector'
 import { B1_UpscaleLifestyle } from './B/B1_UpscaleLifestyle'
@@ -107,6 +112,8 @@ import { B7_Wage } from './B/B7_Wage'
 import { B8_MarketStall } from './B/B8_MarketStall'
 import { B9_BeatingRod } from './B/B9_BeatingRod'
 import { C30_HalfTimberedHouse } from './C/C30_HalfTimberedHouse'
+import { C48_Farmstead } from './C/C48_Farmstead'
+import { C69_LandConsolidation } from './C/C69_LandConsolidation'
 import { C100_Butler } from './C/C100_Butler'
 import { C134_CowPrince } from './C/C134_CowPrince'
 import { C1_Overhaul } from './C/C1_Overhaul'
@@ -163,6 +170,8 @@ import { C5_Remodeling } from './C/C5_Remodeling'
 import { C6_StoneClearing } from './C/C6_StoneClearing'
 import { C7_BladeShears } from './C/C7_BladeShears'
 import { C9_AutomaticWaterTrough } from './C/C9_AutomaticWaterTrough'
+import { D82_HuntingTrophy } from './D/D82_HuntingTrophy'
+import { D114_SeedTrader } from './D/D114_SeedTrader'
 import { D29_MuckRake } from './D/D29_MuckRake'
 import { D33_SummerHouse } from './D/D33_SummerHouse'
 import { D34_LuxuriousHostel } from './D/D34_LuxuriousHostel'
@@ -286,6 +295,8 @@ import { E9_BarteringHut } from './E/E9_BarteringHut'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
+  A25_Bassinet,
+  A48_ShavingHorse,
   A106_SlurrySpreader,
   A128_RiparianBuilder,
   A14_CarpentersHammer,
@@ -322,6 +333,8 @@ export const minorImprovementCards = [
   A7_GardenersKnife,
   A8_FoodBasket,
   A9_YoungAnimalMarket,
+  B27_Toolbox,
+  B38_FutureBuildingSite,
   B10_Caravan,
   B15_CarpentersBench,
   B19_MoldboardPlow,
@@ -363,6 +376,8 @@ export const minorImprovementCards = [
   C27_Blueprint,
   C29_BeerTable,
   C30_HalfTimberedHouse,
+  C48_Farmstead,
+  C69_LandConsolidation,
   C31_WritingChamber,
   C37_DwellingMound,
   C51_FishingNet,
@@ -386,6 +401,7 @@ export const minorImprovementCards = [
   C9_AutomaticWaterTrough,
   D10_StorksNest,
   D14_HammerCrusher,
+  D82_HuntingTrophy,
   D164_PetGrower,
   D20_TurnwrestPlow,
   D22_WorkPermit,
@@ -493,6 +509,7 @@ export const occupationCards = [
   B86_TruffleSearcher,
   B94_StockProtector,
   B98_OrganicFarmer,
+  B132_EstateMaster,
   B99_Tutor,
   B136_HouseSteward,
   C85_DenBuilder,
@@ -521,6 +538,7 @@ export const occupationCards = [
   D102_SampleStableMaker,
   D103_CanalBoatman,
   D107_Bellfounder,
+  D114_SeedTrader,
   D115_FodderPlanter,
   D116_TreeInspector,
   D122_ClayCarrier,
