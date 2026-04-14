@@ -201,6 +201,7 @@ export class GameSession {
   private nextActionToken = 1
   private loggedImprovementThisAction = false
   private loggedBakeBreadThisAction = false
+  private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -295,6 +296,9 @@ export class GameSession {
   }
 
   private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
+    if (flow.type === 'playerSwitch') {
+      return new PlayerSwitchNode(`ps-${counter.value++}`, flow.targetPlayerId)
+    }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
         `action-${flow.actionId}-${counter.value++}`,
@@ -1316,8 +1320,8 @@ export class GameSession {
 
   private runEngineSteps(): void {
     if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
-    const player = this.state.players[this.activePlayerIndex]
-    const space = this.getSpaceById(this.activeSpaceId)
+    let player = this.state.players[this.activePlayerIndex]
+    let space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return
 
     while (true) {
@@ -1326,6 +1330,7 @@ export class GameSession {
       this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
+        this.deferredPlayerSwitch = null
         const isActionEngine = this.engineSource?.kind === 'action'
         const stageResume = this.stageResume
         this.engine = null
@@ -1358,20 +1363,30 @@ export class GameSession {
       }
 
       if (step.type === 'playerSwitch') {
-        this.pushHistory(false, true)
         const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
         if (toIndex !== -1 && toIndex !== this.activePlayerIndex) {
-          this.pending = {
-            type: 'confirmPlayerSwitch',
-            fromPlayerIndex: this.activePlayerIndex!,
-            toPlayerIndex: toIndex,
-          }
-          return
+          this.pushHistory(false, true)
+          const fromIndex = this.activePlayerIndex!
+          this.activePlayerIndex = toIndex
+          player = this.state.players[this.activePlayerIndex]!
+          space = this.getSpaceById(this.activeSpaceId!) ?? space
+          this.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
         }
         continue
       }
 
       if (step.type === 'choice') {
+        // Lazy confirmation: if we silently switched players and now hit a choice,
+        // show confirmPlayerSwitch first. The ChoiceNode stays unresolved in the engine.
+        if (this.deferredPlayerSwitch) {
+          this.pending = {
+            type: 'confirmPlayerSwitch',
+            fromPlayerIndex: this.deferredPlayerSwitch.fromPlayerIndex,
+            toPlayerIndex: this.deferredPlayerSwitch.toPlayerIndex,
+          }
+          this.deferredPlayerSwitch = null
+          return
+        }
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
           let autoPromptKey = step.choice.promptKey
@@ -1896,6 +1911,7 @@ export class GameSession {
     if (this.pending.type !== 'confirmPlayerSwitch') return this.respond(false, 'no pending player switch')
     this.pushHistory(false, true)
     this.activePlayerIndex = this.pending.toPlayerIndex
+    this.deferredPlayerSwitch = null
     this.pending = { type: 'none' }
     this.runEngineSteps()
     return this.respond()

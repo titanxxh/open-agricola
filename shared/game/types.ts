@@ -265,6 +265,10 @@ export type ActionFlow =
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
     }
+  | {
+      type: 'playerSwitch'
+      targetPlayerId: string
+    }
 
 export type ActionDefinition = {
   id: string

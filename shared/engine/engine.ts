@@ -355,6 +355,9 @@ export class Engine {
 
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
+    if (flow.type === 'playerSwitch') {
+      return new PlayerSwitchNode(`ps-flow-${this.flowNodeCounter++}`, flow.targetPlayerId)
+    }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
         nextId(),

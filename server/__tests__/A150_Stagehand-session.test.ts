@@ -55,13 +55,7 @@ describe('A150_Stagehand session', () => {
 
     // First choice: optional "do or skip" wrapping the XOR
     resp = session.resolveChoice(0, '__skip__')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 0,
-      toPlayerIndex: 1,
-    })
-
-    resp = session.confirmPlayerSwitch()
+    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 
@@ -105,14 +99,7 @@ describe('A150_Stagehand session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
 
-    // Should switch back to player 1 after construct completes
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 0,
-      toPlayerIndex: 1,
-    })
-
-    resp = session.confirmPlayerSwitch()
+    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 

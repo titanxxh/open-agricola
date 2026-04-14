@@ -129,7 +129,7 @@ function effectToHandler(
     const children: ActionFlow[] = effect.flow.map((step) => stepToLeaf(step, cardId))
     if (children.length === 0) return undefined
     if (children.length === 1) {
-      return { ...children[0]!, optional: effect.optional ?? false }
+      return { ...(children[0] as Extract<ActionFlow, { type: 'leaf' }>), optional: effect.optional ?? false }
     }
     return {
       type: 'seq',
