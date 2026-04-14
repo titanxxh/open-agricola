@@ -1,7 +1,32 @@
 import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { getPlowableTiles } from '../../actions/effects/plow'
+
+const CARD_ID = 'E90_DungCollector'
+
+registerCardEffect({
+  id: CARD_ID,
+  onEndHarvest: (state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+
+    const bredAnimalCount = state.harvestBreedSummary?.[player.id]?.animalCount ?? 0
+    if (bredAnimalCount < 2) return
+    if (getPlowableTiles(player).length === 0) return
+    if (player.resources.food < 1) return
+
+    return {
+      type: 'seq',
+      optional: true,
+      children: [
+        { type: 'leaf', actionId: 'pay-resources', params: { food: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
+      ],
+    }
+  },
+})
 
 export const E90_DungCollector = new Occupation({
-  id: "E90_DungCollector",
+  id: CARD_ID,
   name: "Dung Collector",
   deck: "E",
   number: 90,
