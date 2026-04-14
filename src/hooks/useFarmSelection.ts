@@ -23,6 +23,7 @@ export const useFarmSelection = () => {
     Record<string, 'grain' | 'vegetable'>
   >({})
   const [sowError, setSowError] = useState<string | null>(null)
+  const [pendingFieldSelections, setPendingFieldSelections] = useState<Set<string>>(new Set())
 
   const toggleFenceEdge = (edgeId: string) => {
     setPendingFenceEdges((prev) =>
@@ -108,6 +109,23 @@ export const useFarmSelection = () => {
     setSowError(null)
   }
 
+  const toggleFieldSelection = (
+    tile: FarmTilePosition,
+    maxFieldSelections: number,
+    positionKey: (tile: FarmTilePosition) => string,
+  ) => {
+    const key = positionKey(tile)
+    setPendingFieldSelections((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else if (next.size < maxFieldSelections) {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
   return {
     pendingFenceEdges,
     setPendingFenceEdges,
@@ -134,5 +152,8 @@ export const useFarmSelection = () => {
     toggleStableTile,
     togglePlowTile,
     updateSowSelection,
+    pendingFieldSelections,
+    setPendingFieldSelections,
+    toggleFieldSelection,
   }
 }

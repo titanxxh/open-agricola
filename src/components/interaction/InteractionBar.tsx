@@ -79,6 +79,8 @@ type Props = {
   pendingStableTilesLength: number
   maxStableSelections: number
   pendingSowSelectionsLength?: number
+  pendingFieldSelectionsLength: number
+  maxFieldSelections: number
   hasPendingPlowSelection: boolean
   fenceErrorText: string
   roomErrorText: string
@@ -110,6 +112,8 @@ export const InteractionBar = ({
   pendingStableTilesLength,
   maxStableSelections,
   pendingSowSelectionsLength,
+  pendingFieldSelectionsLength,
+  maxFieldSelections,
   hasPendingPlowSelection,
   fenceErrorText,
   roomErrorText,
@@ -133,7 +137,8 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionRoomSelect' ||
     pendingChoice?.promptKey === 'ui.interactionStableSelect' ||
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionSowSelect'
+    pendingChoice?.promptKey === 'ui.interactionSowSelect' ||
+    pendingChoice?.promptKey === 'ui.interactionFieldSelect'
   const visibleOptions =
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
@@ -146,6 +151,9 @@ export const InteractionBar = ({
   const isStableConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
     pendingStableTilesLength === 0
+  const isFieldSelectConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionFieldSelect' &&
+    pendingFieldSelectionsLength === 0
 
   const hasContent = !!(
     pendingAnimalReorg ||
@@ -211,6 +219,14 @@ export const InteractionBar = ({
               })}
             </div>
           ) : null}
+          {pendingChoice.promptKey === 'ui.interactionFieldSelect' ? (
+            <div className="interaction-subtitle">
+              {t(locale, 'ui.interactionFieldSelectSubtitle', {
+                selected: pendingFieldSelectionsLength,
+                max: maxFieldSelections,
+              })}
+            </div>
+          ) : null}
           {isSelectingFences && fenceErrorText ? (
             <div className="interaction-error">{fenceErrorText}</div>
           ) : null}
@@ -253,7 +269,10 @@ export const InteractionBar = ({
                       !hasPendingPlowSelection) ||
                     (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
                       option.value === 'confirm' &&
-                      (pendingSowSelectionsLength ?? 0) === 0)
+                      (pendingSowSelectionsLength ?? 0) === 0) ||
+                    (pendingChoice.promptKey === 'ui.interactionFieldSelect' &&
+                      option.value === 'confirm' &&
+                      isFieldSelectConfirmDisabled)
                   }
                 >
                   {option.labelKey === 'prompt.selectPaymentOption' && option.labelParams && typeof option.labelParams === 'object' && 'resourcesPaid' in option.labelParams ? (
