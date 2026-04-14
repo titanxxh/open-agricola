@@ -609,6 +609,39 @@ import { E146_Reseller } from './E/E146_Reseller'
 import { E157_Usufructuary } from './E/E157_Usufructuary'
 import { E163_Patroness } from './E/E163_Patroness'
 import { E164_MountainPlowman } from './E/E164_MountainPlowman'
+// Harvest listener cards (batch)
+import { A61_WinnowingFan } from './A/A61_WinnowingFan'
+import { A62_BeerKeg } from './A/A62_BeerKeg'
+import { A104_WoodHarvester } from './A/A104_WoodHarvester'
+import { A118_Treegardener } from './A/A118_Treegardener'
+import { A145_Ropemaker } from './A/A145_Ropemaker'
+import { B50_ButterChurn } from './B/B50_ButterChurn'
+import { B53_SculptureCourse } from './B/B53_SculptureCourse'
+import { B82_ValueAssets } from './B/B82_ValueAssets'
+import { C34_ElephantgrassPlant } from './C/C34_ElephantgrassPlant'
+import { C41_FarmStore } from './C/C41_FarmStore'
+import { C54_MarketBooth } from './C/C54_MarketBooth'
+import { C55_Studio } from './C/C55_Studio'
+import { C66_EternalRyeCultivation } from './C/C66_EternalRyeCultivation'
+import { C92_AutumnMother } from './C/C92_AutumnMother'
+import { C110_HomeBrewer } from './C/C110_HomeBrewer'
+import { C124_StoneImporter } from './C/C124_StoneImporter'
+import { D32_WoodRake } from './D/D32_WoodRake'
+import { D61_BaleofStraw } from './D/D61_BaleofStraw'
+import { D64_BakingCourse } from './D/D64_BakingCourse'
+import { D76_SocialBenefits } from './D/D76_SocialBenefits'
+import { D79_CarrotMuseum } from './D/D79_CarrotMuseum'
+import { D133_BeerTentOperator } from './D/D133_BeerTentOperator'
+import { D153_WealthyMan } from './D/D153_WealthyMan'
+import { E39_Paintbrush } from './E/E39_Paintbrush'
+import { E48_TownHall } from './E/E48_TownHall'
+import { E61_RaisedBed } from './E/E61_RaisedBed'
+import { E99_UncaringParents } from './E/E99_UncaringParents'
+import { E107_LandSurveyor } from './E/E107_LandSurveyor'
+import { E117_PipeSmoker } from './E/E117_PipeSmoker'
+import { E142_Smuggler } from './E/E142_Smuggler'
+import { E147_AnimalDriver } from './E/E147_AnimalDriver'
+import { E149_MidnightFencer } from './E/E149_MidnightFencer'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -923,6 +956,25 @@ export const minorImprovementCards = [
   E7_Pumpernickel,
   E8_FarmersMarket,
   E9_BarteringHut,
+  // Harvest listener minor improvements
+  A61_WinnowingFan,
+  A62_BeerKeg,
+  B50_ButterChurn,
+  B53_SculptureCourse,
+  B82_ValueAssets,
+  C34_ElephantgrassPlant,
+  C41_FarmStore,
+  C54_MarketBooth,
+  C55_Studio,
+  C66_EternalRyeCultivation,
+  D32_WoodRake,
+  D61_BaleofStraw,
+  D64_BakingCourse,
+  D76_SocialBenefits,
+  D79_CarrotMuseum,
+  E39_Paintbrush,
+  E48_TownHall,
+  E61_RaisedBed,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1222,6 +1274,21 @@ export const occupationCards = [
   A161_PatchCaretaker,
   A163_BuildingExpert,
   A168_AnimalTeacher,
+  // Harvest listener occupations
+  A104_WoodHarvester,
+  A118_Treegardener,
+  A145_Ropemaker,
+  C92_AutumnMother,
+  C110_HomeBrewer,
+  C124_StoneImporter,
+  D133_BeerTentOperator,
+  D153_WealthyMan,
+  E99_UncaringParents,
+  E107_LandSurveyor,
+  E117_PipeSmoker,
+  E142_Smuggler,
+  E147_AnimalDriver,
+  E149_MidnightFencer,
 ]
 
 // All cards for reference and developer mode
