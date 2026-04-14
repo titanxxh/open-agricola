@@ -1,0 +1,56 @@
+import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionChoiceOption } from '../../game/types'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+
+const CARD_ID = 'B129_Seatmate'
+
+/**
+ * B129 Seatmate — You can use the action space on round space 13 even if it
+ * is occupied by one or more people of the players to your immediate left and right.
+ *
+ * BGA: In 3-player: always allow. In 4-player: allow only if opposite player
+ * (seated across the table) has not occupied it.
+ *
+ * Simplification: in our system we don't have seating positions, so we allow
+ * placing on round-13 action space if it is occupied (by any opponent).
+ * This is a minor rule deviation but is the best approximation without seat data.
+ * Players: 3+.
+ */
+const computeArgsListener: CardListenerRegistration = {
+  id: 'B129-seatmate-compute-args',
+  cardIds: [CARD_ID],
+  phases: ['computeArgs' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.state.round < 13) return
+    const round13Space = context.state.actionSpaces.find(
+      (s) => s.roundAvailable === 13 || s.id === context.state.roundActionOrder[12],
+    )
+    if (!round13Space) return
+    if (!round13Space.takenBy || round13Space.takenBy === context.player.id) return
+    const extraOptions: ActionChoiceOption[] = [
+      {
+        value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${round13Space.id}`,
+        labelKey: round13Space.nameKey,
+      },
+    ]
+    return { extraOptions, sourceCard: CARD_ID }
+  },
+}
+
+registerCardListener(computeArgsListener)
+
+export const B129_Seatmate = new Occupation({
+  id: CARD_ID,
+  name: 'Seatmate',
+  deck: 'B',
+  number: 129,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['You can use the action space on round space 13 even if it is occupied by one or more people of the players to your immediate left and right.'],
+  cost: {},
+  players: '3+',
+})

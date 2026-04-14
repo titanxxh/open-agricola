@@ -1,12 +1,68 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+
+const CARD_ID = 'E62_SourDough'
+
+/**
+ * E62 Sour Dough — Once per round, if all players have at least 1 person left
+ * to place, you can skip placing a person and take a __Bake Bread__ action instead.
+ *
+ * BGA: canBeActivated → !isFlagged && allPlayersCanPlace.
+ * onPlayerStartOfTurn → unflagCardNode.
+ *
+ * Implementation: anytime listener (flag-gated, once per round).
+ * Check all players still have workersAvailable > 0.
+ * Effect: bake-bread action (player must have a baking improvement).
+ *
+ * Prerequisite: 3 Occupations and 1 Baking Improvement.
+ */
+registerCardEffect({
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    setCardFlag(player, CARD_ID, false)
+  },
+})
+
+const anytimeListener: CardListenerRegistration = {
+  id: 'E62-sour-dough-anytime',
+  cardIds: [CARD_ID],
+  phases: ['anytime' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    if (isCardFlagged(context.player, CARD_ID)) return
+    // All players must still have workers to place
+    const allPlayersHaveWorkers = context.state.players.every(
+      (p) => p.workersAvailable > 0,
+    )
+    if (!allPlayersHaveWorkers) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'bake-bread', sourceCard: CARD_ID },
+        ],
+      },
+      sourceCard: CARD_ID,
+      labelKey: 'cards.E62_SourDough.anytime',
+    }
+  },
+}
+
+registerCardListener(anytimeListener)
 
 export const E62_SourDough = new MinorImprovement({
-  id: "E62_SourDough",
-  name: "Sour Dough",
-  deck: "E",
+  id: CARD_ID,
+  name: 'Sour Dough',
+  deck: 'E',
   number: 62,
-  desc: ["Once per round, if all players have at least 1 person left to place, you can skip placing a person and take a __Bake Bread__ action instead."],
+  desc: ['Once per round, if all players have at least 1 person left to place, you can skip placing a person and take a __Bake Bread__ action instead.'],
   cost: {},
-  prerequisite: "3 Occupations and 1 Baking Improvement",
-  occupationPrerequisites: {"min":3},
+  prerequisite: '3 Occupations and 1 Baking Improvement',
+  occupationPrerequisites: { min: 3 },
 })
