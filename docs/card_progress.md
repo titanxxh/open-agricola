@@ -6,15 +6,15 @@
 
 | | BGA 总数 | 有文件 | 已实现 Hook | 仅数据定义 | 无文件 | 5+人卡(BGA未实现) |
 |---|---|---|---|---|---|---|
-| A Deck | 180 | 68 | 36 | 32 | 112 | 12 |
-| B Deck | 180 | 41 | 17 | 24 | 139 | 12 |
-| C Deck | 182 | 55 | 23 | 32 | 127 | 12 |
-| D Deck | 181 | 64 | 28 | 36 | 117 | 12 |
-| E Deck | 169 | 66 | 28 | 38 | 103 | 0 |
-| **总计** | **892** | **294** | **132** | **162** | **598** | **48** |
+| A Deck | 180 | 72 | 42 | 30 | 108 | 12 |
+| B Deck | 180 | 42 | 19 | 23 | 138 | 12 |
+| C Deck | 182 | 56 | 29 | 27 | 126 | 12 |
+| D Deck | 181 | 66 | 37 | 29 | 115 | 12 |
+| E Deck | 169 | 68 | 34 | 34 | 101 | 0 |
+| **总计** | **892** | **304** | **161** | **143** | **588** | **48** |
 
 > Major Improvements (10张) 已全部实现，不计入上表。
-> 截至 2026-04-13 更新。
+> 截至 2026-04-14 更新。802 tests passing。
 
 ## 状态说明
 
@@ -47,52 +47,32 @@
 
 **现状**: 45 张卡已实现 `computeBonusScore` hook，含 `computePostScore` 用于需要完整计分结果的卡牌。`ScoringContext.reserved` 支持资源去重。
 
-### 🔧 5. Anytime 动作系统 — 未实现
+### ✅ 5. Anytime 动作系统 — 已完成
 
-**现状**: `bake-bread` 和 `anytime-reorg` 已硬编码，但卡牌级别的自定义 anytime action 尚未支持。BGA 中 43 张卡使用 `isAnytime()` 机制。
+**现状**: CardListener `phases: ['anytime']` 机制已实现。`buildAnytimeEntries()` 自动扫描所有 anytime listener。验证卡牌: D122_ClayCarrier (once-per-round 交换), E86_PenBuilder (无限次动物容量), A102_Grocer (stack 购买), B83_MuddyPuddles (stack 购买)。
 
-**BGA 阻塞卡牌**: A48, A71, A102, A153, B21, B35, B69, B83, B154, B157, C18, C46, C53, C57, C64, C69, C84, C85, C87, C94, C101, C115, C120, C143, C150, D13, D46, D56, D71, D87, D106, D114, D122, D124, D129, E13, E14, E27, E53, E85, E86, E91, E103
+### ✅ 6. Holder Card 资源堆叠 — 已完成
 
-**复杂度**: 高 — 需要卡牌注册自定义 anytime action + UI 动态展示 + engine 支持 anytime flow 插入。
+**现状**: 两种存储模式均已实现:
+- `CardState.counters` — 单一类型计数（12+ 张卡使用，如 C120_AgriculturalLabourer, C75_Firewood）
+- `CardState.stack` — 有序混合类型 LIFO 栈（A102_Grocer, B83_MuddyPuddles, E40_BeeStatue）
+- `store-on-card` / `take-from-card` / `pop-card-stack` actions
+- 前端 `PlayedCardStats` 渲染 counters + stack
 
-### 🔧 6. Holder Card 资源堆叠 — 未实现
+### ✅ 7. 未来回合放置 (futureMeeples) — 已完成
 
-**现状**: 部分卡牌用 `cardStates[cardId].extraData` 手动管理存储资源。BGA 有统一的 `getNextResource()`/`addResource()` 机制，17 张卡使用。
+**现状**: `FutureMeepleRequest` 支持简单形式 (startRound/count) + entries 数组形式（变量数量/轮次）。`removeFutureMeeples()` 支持按 cardId 删除。`buildFutureEntries()` 便捷 helper。验证: B76_Ceilings (放置+翻新时删除)。
 
-**BGA 阻塞卡牌**: A40, A102, A144, B21, B48, B55, B83, B137, C75, C81, C115, C120, D118, E40, E56, E103, E162
+### ✅ 8. 对手交互机制 — 已完成
 
-**复杂度**: 中等 — 需要统一的 card holder 存储模型（`cardStates` 中增加 `resources` 字段 + 自动累积/消费方法）。
-
-### 🔧 7. 未来回合放置 (futureMeeples) — 部分实现
-
-**现状**: A74_StableTree 使用 `place-future-meeples` action。BGA 中 75 张卡涉及 futureMeeple 放置（大部分是 round-card 资源追加类卡牌 A43-A47, B43-B47 等）。
-
-**BGA 阻塞卡牌 (代表性)**: A43-A47, A69, B41, B43-B47, B60, B65, B66, B74, B76, B78, C43-C47, C64, C65, C74, C77-C79, D40-D47, D57, D67, D69, D78, E41-E47, E56, E104, E108, E119, E120, E139
-
-**复杂度**: 复杂 — 需要扩展回合卡资源累积机制，允许卡牌在指定未来行动格上放置自定义资源。A74 仅为简单案例。
-
-### 🔧 8. 对手交互机制 — 部分实现
-
-**现状**: `card-listeners.ts` 已支持 `scope: 'opponent' | 'any'`，Engine 已有 `PlayerSwitchNode`。已实现 C144_ReedRoofRenovator（被动收益）和 A128_RiparianBuilder（授予行动）两张对手交互卡。BGA 中 52 张卡有对手交互。
-
-**交互模式分类** (绝大多数不需要对手做选择):
-
-| 模式 | 描述 | 对手决策 | 复杂度 | 约占比 |
-|------|------|---------|--------|-------|
-| 被动收益 | 对手执行某动作 → 卡主自动获资源 | 无 | 简单 | ~60% |
-| 卡主可选 | 对手执行某动作 → 卡主决定是否触发效果 | 无（卡主选） | 简单 | ~15% |
-| 授予行动 | 对手执行某动作 → 卡主获得额外行动机会 | 无（卡主选） | 中等 | ~15% |
-| 强制支付 | 对手使用某行动格前必须支付资源给卡主 | 自动支付 | 中等 | ~5% |
-| 元效果 | 对手行动后卡主获得使用同一行动格的权利 | 无（卡主选） | 复杂 | 仅 C150 |
-
-**代表性卡牌**:
-- 被动收益: C141_SheepProvider, D139_Chairman, E66_BarnShed, D134_OysterEater
+**现状**: 8 张对手交互卡已实现，覆盖所有 4 种交互模式:
+- 被动收益: C141_SheepProvider, D139_Chairman
 - 卡主可选: A132_Publican, A156_Buyer
-- 授予行动: A150_Stagehand, E95_Miller, A128_RiparianBuilder(✅), C144_ReedRoofRenovator(✅)
-- 强制支付: C51_FishingNet
-- 元效果: C150_ParrotBreeder
+- 授予行动: A150_Stagehand, E95_Miller
+- 强制支付+延迟: C51_FishingNet
+- 预放马厩触发: E148_Lazybones
 
-**复杂度**: 简单-中等 — 后端 `scope:'opponent'` + `PlayerSwitchNode` 已就绪，~90% 的卡只需写一个 opponent-scope listener（参考 C144/A128 模式），不需要对手做选择。
+新增 `gain-trigger-player` action 支持定向资源转移。
 
 ### 🔧 9. 交换卡未实现 — 需要数据补充
 
