@@ -1,0 +1,56 @@
+import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+
+const CARD_ID = 'E14_WoodSaw'
+
+/**
+ * E14 Wood Saw — Each time all other players have more people than you,
+ * you can take a __Build Rooms__ action without placing a person.
+ *
+ * BGA: isListeningTo → all other players have more farmers than this player.
+ * onPlayerAtAnytime → construct action (optional).
+ *
+ * Implementation: anytime listener checks if ALL other players have more
+ * farmers. If so, offer the construct action.
+ */
+const anytimeListener: CardListenerRegistration = {
+  id: 'E14-wood-saw-anytime',
+  cardIds: [CARD_ID],
+  phases: ['anytime' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const myFamilySize = context.player.familySize
+    // Check if ALL other players have more farmers than current player
+    const otherPlayers = context.state.players.filter(
+      (p) => p.id !== context.player.id,
+    )
+    if (otherPlayers.length === 0) return
+    const allOthersHaveMore = otherPlayers.every((p) => p.familySize > myFamilySize)
+    if (!allOthersHaveMore) return
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'construct',
+        optional: true,
+        sourceCard: CARD_ID,
+        params: { maxRooms: 1 },
+      },
+      sourceCard: CARD_ID,
+      labelKey: 'cards.E14_WoodSaw.anytime',
+    }
+  },
+}
+
+registerCardListener(anytimeListener)
+
+export const E14_WoodSaw = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Wood Saw',
+  deck: 'E',
+  number: 14,
+  category: 'FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION',
+  desc: ['Each time all other players have more people than you, you can take a __Build Rooms__ action without placing a person.'],
+  cost: { wood: 1 },
+})
