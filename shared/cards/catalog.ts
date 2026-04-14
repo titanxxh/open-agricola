@@ -642,6 +642,48 @@ import { E117_PipeSmoker } from './E/E117_PipeSmoker'
 import { E142_Smuggler } from './E/E142_Smuggler'
 import { E147_AnimalDriver } from './E/E147_AnimalDriver'
 import { E149_MidnightFencer } from './E/E149_MidnightFencer'
+// Round/work phase trigger cards (batch 3)
+import { A35_SwimmingClass } from './A/A35_SwimmingClass'
+import { A49_NestSite } from './A/A49_NestSite'
+import { A76_Cob } from './A/A76_Cob'
+import { A90_PlowDriver } from './A/A90_PlowDriver'
+import { A100_Curator } from './A/A100_Curator'
+import { A141_TurnipFarmer } from './A/A141_TurnipFarmer'
+import { A151_Minstrel } from './A/A151_Minstrel'
+import { A152_NightSchoolStudent } from './A/A152_NightSchoolStudent'
+import { A157_Bohemian } from './A/A157_Bohemian'
+import { B57_Scullery } from './B/B57_Scullery'
+import { B97_Scholar } from './B/B97_Scholar'
+import { B106_MoralCrusader } from './B/B106_MoralCrusader'
+import { B114_Childless } from './B/B114_Childless'
+import { B118_SmallscaleFarmer } from './B/B118_SmallscaleFarmer'
+import { B133_VillagePeasant } from './B/B133_VillagePeasant'
+import { B135_NutritionExpert } from './B/B135_NutritionExpert'
+import { B139_ForestScientist } from './B/B139_ForestScientist'
+import { B140_FarmyardWorker } from './B/B140_FarmyardWorker'
+import { B158_DistrictManager } from './B/B158_DistrictManager'
+import { C97_SeedResearcher } from './C/C97_SeedResearcher'
+import { C103_GreenGrocer } from './C/C103_GreenGrocer'
+import { C111_SmallAnimalBreeder } from './C/C111_SmallAnimalBreeder'
+import { C123_Freemason } from './C/C123_Freemason'
+import { C125_Nightworker } from './C/C125_Nightworker'
+import { C157_ResourceAnalyzer } from './C/C157_ResourceAnalyzer'
+import { C159_FishermansFriend } from './C/C159_FishermansFriend'
+import { D48_CivicFacade } from './D/D48_CivicFacade'
+import { D52_RollingPin } from './D/D52_RollingPin'
+import { D54_TroutPool } from './D/D54_TroutPool'
+import { D130_RecreationalCarpenter } from './D/D130_RecreationalCarpenter'
+import { D142_PotatoPlanter } from './D/D142_PotatoPlanter'
+import { E20_IronHoe } from './E/E20_IronHoe'
+import { E23_Apiary } from './E/E23_Apiary'
+import { E26_Sundial } from './E/E26_Sundial'
+import { E88_MasterFencer } from './E/E88_MasterFencer'
+import { E100_MuseumCaretaker } from './E/E100_MuseumCaretaker'
+import { E102_Acquirer } from './E/E102_Acquirer'
+import { E126_TaxCollector } from './E/E126_TaxCollector'
+import { E152_BargainHunter } from './E/E152_BargainHunter'
+import { E158_StoneCustodian } from './E/E158_StoneCustodian'
+import { E168_AnimalTamersApprentice } from './E/E168_AnimalTamersApprentice'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -975,6 +1017,17 @@ export const minorImprovementCards = [
   E39_Paintbrush,
   E48_TownHall,
   E61_RaisedBed,
+  // Round/work phase trigger cards (batch 3) — minor improvements
+  A35_SwimmingClass,
+  A49_NestSite,
+  A76_Cob,
+  B57_Scullery,
+  D48_CivicFacade,
+  D52_RollingPin,
+  D54_TroutPool,
+  E20_IronHoe,
+  E23_Apiary,
+  E26_Sundial,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1289,6 +1342,38 @@ export const occupationCards = [
   E142_Smuggler,
   E147_AnimalDriver,
   E149_MidnightFencer,
+  // Round/work phase trigger cards (batch 3) — occupations
+  A90_PlowDriver,
+  A100_Curator,
+  A141_TurnipFarmer,
+  A151_Minstrel,
+  A152_NightSchoolStudent,
+  A157_Bohemian,
+  B97_Scholar,
+  B106_MoralCrusader,
+  B114_Childless,
+  B118_SmallscaleFarmer,
+  B133_VillagePeasant,
+  B135_NutritionExpert,
+  B139_ForestScientist,
+  B140_FarmyardWorker,
+  B158_DistrictManager,
+  C97_SeedResearcher,
+  C103_GreenGrocer,
+  C111_SmallAnimalBreeder,
+  C123_Freemason,
+  C125_Nightworker,
+  C157_ResourceAnalyzer,
+  C159_FishermansFriend,
+  D130_RecreationalCarpenter,
+  D142_PotatoPlanter,
+  E88_MasterFencer,
+  E100_MuseumCaretaker,
+  E102_Acquirer,
+  E126_TaxCollector,
+  E152_BargainHunter,
+  E158_StoneCustodian,
+  E168_AnimalTamersApprentice,
 ]
 
 // All cards for reference and developer mode
