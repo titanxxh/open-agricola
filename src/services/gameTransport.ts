@@ -277,7 +277,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow', payload })
+    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select', payload })
   }
 
   async confirmReorg(_playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {

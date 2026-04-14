@@ -97,6 +97,7 @@ import {
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import {
   buildFenceFarmInteraction,
+  buildFieldSelectFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
@@ -537,6 +538,8 @@ export class GameSession {
         return 'plow' as const
       case 'ui.interactionSowSelect':
         return 'sow' as const
+      case 'ui.interactionFieldSelect':
+        return 'field-select' as const
       default:
         return null
     }
@@ -567,6 +570,11 @@ export class GameSession {
     return buildFenceFarmInteraction(this.state.players[pending.playerIndex]!, pending)
   }
 
+  private buildFieldSelectInteraction(player: PlayerState): InteractionFarmSelection {
+    const actionContext = this.pending.type === 'choice' ? this.pending.actionContext : undefined
+    return buildFieldSelectFarmInteraction(player, actionContext)
+  }
+
   private buildFarmInteraction(
     pending: Extract<PendingAction, { type: 'choice' }>,
   ): InteractionFarmSelection | null {
@@ -584,6 +592,8 @@ export class GameSession {
         return this.buildPlowInteraction(player, pending.costOverride)
       case 'sow':
         return this.buildSowInteraction(player)
+      case 'field-select':
+        return this.buildFieldSelectInteraction(player)
       default:
         return null
     }
@@ -2150,7 +2160,7 @@ export class GameSession {
 
   commitFarmChoice(
     playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
+    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select',
     payload: Record<string, unknown>,
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
@@ -2417,6 +2427,33 @@ export class GameSession {
             }
           }
         }
+        break
+      }
+      case 'field-select': {
+        const selectedFields = (payload as { fields?: { row: number; col: number }[] }).fields ?? []
+        const maxSel = (this.pending.actionContext?.maxSelections as number) ?? 1
+        if (selectedFields.length > maxSel) {
+          return this.respond(false, 'too many field selections')
+        }
+        // Validate each field exists in the player's fields
+        for (const sel of selectedFields) {
+          const exists = player.fields.some(f => f.row === sel.row && f.col === sel.col)
+          if (!exists) return this.respond(false, 'invalid field position')
+        }
+        this.pushHistory()
+        // Resolve the choice with position keys
+        const choiceValue = selectedFields.length > 0
+          ? selectedFields.map(f => `${f.row}-${f.col}`).join(',')
+          : 'cancel'
+        // Use the engine to resolve the pending choice
+        const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('field-select')
+        this.engine?.resolveChoice(choiceValue, {
+          state: this.state,
+          player: this.state.players[playerIndex]!,
+          space,
+        })
+        this.flushEngineLog()
+        this.runEngineSteps()
         break
       }
     }
