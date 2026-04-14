@@ -1,13 +1,31 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'C6_StoneClearing'
+
+// BGA: Immediately place 1 stone on each empty field (complex SPECIAL_EFFECT).
+// Simplified: gain 1 stone per empty field tile the player has.
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const emptyFields = player.fields.filter((f) => f.crop === null).length
+    if (emptyFields === 0) return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { stone: emptyFields },
+    }
+  },
+})
 
 export const C6_StoneClearing = new MinorImprovement({
-  id: "C6_StoneClearing",
+  id: CARD_ID,
   name: "Stone Clearing",
   deck: "C",
   number: 6,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Immediately get 1 <STONE> for every 2 unfenced farmyard spaces you have."],
-  cost: { food: 2 },
+  desc: ["Immediately place 1 <STONE> on each of your empty fields. Harvest them during the next field phase."],
+  cost: { food: 1 },
   passing: true,
-  implemented: false,
 })

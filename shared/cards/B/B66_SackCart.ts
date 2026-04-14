@@ -1,0 +1,33 @@
+import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+
+const CARD_ID = 'B66_SackCart'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    return queueFutureMeeplesFlow(state, {
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: [
+        { round: 5, resources: { grain: 1 } },
+        { round: 8, resources: { grain: 1 } },
+        { round: 11, resources: { grain: 1 } },
+        { round: 14, resources: { grain: 1 } },
+      ].filter((e) => e.round > state.round),
+    })
+  },
+})
+
+export const B66_SackCart = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Sack Cart',
+  deck: 'B',
+  number: 66,
+  category: 'CROP_PROVIDER',
+  desc: ['Place 1 <GRAIN> each on the remaining spaces for rounds 5, 8, 11, and 14. At the start of these rounds, you get the <GRAIN>.'],
+  cost: { wood: 2 },
+  prerequisite: '2 Occupations',
+  occupationPrerequisites: { min: 2 },
+})
