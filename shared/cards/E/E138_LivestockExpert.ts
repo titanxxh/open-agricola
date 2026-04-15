@@ -9,13 +9,7 @@ registerCardEffect({
   onBuy: (state, player) => {
     if (state.round > 11) return
 
-    const animals: Array<{ type: 'sheep' | 'boar' | 'cattle'; count: number }> = [
-      { type: 'sheep', count: player.resources.sheep },
-      { type: 'boar', count: player.resources.boar },
-      { type: 'cattle', count: player.resources.cattle },
-    ]
-
-    // Also count animals in pastures and house
+    // Count animals in pastures and house
     const pastureAnimals: Record<string, number> = {}
     for (const pasture of player.pastures) {
       if (pasture.animalType && pasture.animalCount > 0) {

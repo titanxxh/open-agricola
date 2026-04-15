@@ -1,6 +1,5 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'E145_Parvenu'
 
