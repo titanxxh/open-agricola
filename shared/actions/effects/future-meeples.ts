@@ -6,9 +6,10 @@ import type {
   Resource,
 } from '../../game/types'
 
-export const futureMeeplesNode = (): ActionFlow => ({
+export const futureMeeplesNode = (request?: FutureMeepleRequest): ActionFlow => ({
   type: 'leaf',
   actionId: 'future-meeples',
+  ...(request ? { params: { __futureMeepleRequest: request } } : {}),
 })
 
 export const queueFutureMeeples = (
@@ -106,7 +107,12 @@ export const futureMeeplesAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state }) => {
+  execute: ({ state, params }) => {
+    // If params contain an inline queue request (from anytime handlers), queue it first
+    const inlineRequest = params?.__futureMeepleRequest as FutureMeepleRequest | undefined
+    if (inlineRequest) {
+      queueFutureMeeples(state, inlineRequest)
+    }
     resolveFutureMeepleRequests(state)
     return { type: 'ok' }
   },
