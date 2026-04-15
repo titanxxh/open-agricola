@@ -62,7 +62,8 @@ describe('A28_ForestSchool session', () => {
     expect(resp.pending.type).toBe('confirmNextPlayer')
     expect(resp.state.players[0]!.workersAvailable).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.state.players[0]!.resources.food).toBe(0)
+    // D152_Patron grants 2 food before playing an occupation
+    expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationHand).not.toContain('A123_FrameBuilder')
     expect(resp.state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy).toBe(resp.state.players[1]!.id)
