@@ -306,6 +306,7 @@ import { C169_FastMason } from './C/C169_FastMason'
 import { C170_AmateurFencer } from './C/C170_AmateurFencer'
 import { C171_YoungArtist } from './C/C171_YoungArtist'
 import { C69_LandConsolidation } from './C/C69_LandConsolidation'
+import { C70_LettucePatch } from './C/C70_LettucePatch'
 import { C100_Butler } from './C/C100_Butler'
 import { C134_CowPrince } from './C/C134_CowPrince'
 import { C1_Overhaul } from './C/C1_Overhaul'
@@ -586,7 +587,10 @@ import { E53_BoarSpear } from './E/E53_BoarSpear'
 import { E62_SourDough } from './E/E62_SourDough'
 import { E63_IronOven } from './E/E63_IronOven'
 import { E64_SimpleOven } from './E/E64_SimpleOven'
+import { E69_MelonPatch } from './E/E69_MelonPatch'
+import { E70_CropRotationField } from './E/E70_CropRotationField'
 import { E71_CowPatty } from './E/E71_CowPatty'
+import { E72_ArtichokeField } from './E/E72_ArtichokeField'
 import { E73_Scythe } from './E/E73_Scythe'
 import { E74_AshTrees } from './E/E74_AshTrees'
 import { E75_StoneAxe } from './E/E75_StoneAxe'
@@ -1520,6 +1524,10 @@ export const occupationCards = [
   D113_FoodMerchant,
   E58_LunchtimeBeer,
   E132_VeggieLover,
+  C70_LettucePatch,
+  E69_MelonPatch,
+  E70_CropRotationField,
+  E72_ArtichokeField,
 ]
 
 // All cards for reference and developer mode
