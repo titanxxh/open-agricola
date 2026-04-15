@@ -718,6 +718,7 @@ import { D48_CivicFacade } from './D/D48_CivicFacade'
 import { D52_RollingPin } from './D/D52_RollingPin'
 import { D56_FatstockStretcher } from './D/D56_FatstockStretcher'
 import { D54_TroutPool } from './D/D54_TroutPool'
+import { D129_LumberVirtuoso } from './D/D129_LumberVirtuoso'
 import { D130_RecreationalCarpenter } from './D/D130_RecreationalCarpenter'
 import { D142_PotatoPlanter } from './D/D142_PotatoPlanter'
 import { E20_IronHoe } from './E/E20_IronHoe'
@@ -1466,6 +1467,7 @@ export const occupationCards = [
   C53_GypsysCrock,
   D56_FatstockStretcher,
   D87_MasterBuilder,
+  D129_LumberVirtuoso,
 ]
 
 // All cards for reference and developer mode
