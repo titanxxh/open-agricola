@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { getCardStack, pushToCardStack, popFromCardStack, writeCardInfobox } from '../helpers/card-state'
+import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../game/types'
 
@@ -10,11 +10,6 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 const getMissingBuildingResources = (player: { resources: Resource }): (keyof Resource)[] =>
   BUILDING_RESOURCES.filter((res) => (player.resources[res] ?? 0) === 0)
-
-const updateInfobox = (player: any) => {
-  const stack = getCardStack(player, CARD_ID)
-  writeCardInfobox(player, CARD_ID, `${stack.length} Food stored`)
-}
 
 /**
  * E162 Entrepreneur: At the start of each round, you can move 1 food to this card

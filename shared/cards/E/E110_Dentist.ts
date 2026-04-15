@@ -1,14 +1,9 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { getCardStack, pushToCardStack, writeCardInfobox } from '../helpers/card-state'
+import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E110_Dentist'
-
-const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0]) => {
-  const woodCount = getCardStack(player, CARD_ID).length
-  writeCardInfobox(player, CARD_ID, `${woodCount} Wood`)
-}
 
 registerCardEffect({
   id: CARD_ID,

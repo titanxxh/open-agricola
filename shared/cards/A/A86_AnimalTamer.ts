@@ -1,7 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'A86_AnimalTamer'
 
