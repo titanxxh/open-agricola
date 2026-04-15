@@ -459,6 +459,7 @@ export const zh = {
     B23_FinalScenario: { name: '终局情景', description: '翻开第 14 回合的行动位卡。直到第 14 回合开始前，仅你可以使用它。' },
     B3_Moonshine: { name: '私酿酒', description: '随机选择你手牌中的 1 张职业。要么支付 2 <FOOD> 打出它，要么将其交给下家。' },
     B34_SpecialFood: { name: '特制食物', description: '下一次你从累积格取动物并全部安置到农场时，每只动物获得 1 额外 <SCORE>。' },
+    B38_FutureBuildingSite: { name: '未来建地', description: '在接下来 4 个回合格上各放 1 <WOOD>。这些回合开始时获得该 <WOOD>。下一次你建造房间时，移除本牌承诺的未来回合 <WOOD>。' },
     B42_ForestInn: { name: '森林旅馆', description: '这是所有人共用的行动位。使用者可用 5/7/9 <WOOD> 换取 8 <WOOD> 和 2/4/7 <FOOD>。其他玩家使用时需先支付你 1 <FOOD>。' },
     B48_ForestStone: { name: '森林石料', description: '在本牌上放 2 <FOOD>。每当你使用木材累积格时，将其中 1 <FOOD> 移到你的供给区。每当你使用石料累积格时，在本牌上加 2 <FOOD>。' },
     B55_MaintenancePremium: { name: '维护奖金', description: '在本牌上放 3 <FOOD>。每当你使用木材累积格时，从本牌获得 1 <FOOD>。每当你翻修时将本牌补至 3 <FOOD>。' },
