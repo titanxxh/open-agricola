@@ -951,5 +951,10 @@ export const en = {
     C64_CornSchnappsDistillery: { anytime: 'Corn Schnapps: Pay 1 Grain → Food on next 4 rounds' },
     D46_PelletPress: { anytime: 'Pellet Press: Pay 1 Reed → Food on next 4 rounds' },
     C84_PerennialRye: { anytime: 'Perennial Rye: Pay 1 Grain → Breed 1 animal type' },
+    D124_Emissary: { anytime: 'Emissary: Place 1 good → 1 Stone' },
+    C85_DenBuilder: { anytime: 'Den Builder: Pay 1 Grain + 2 Food → Room for 1 person' },
+    C115_Sower: { anytime: 'Sower: Use reed for supply or Sow action' },
+    C53_GypsysCrock: { anytime: "Gypsy's Crock: Bonus food from cooking pairs" },
+    D56_FatstockStretcher: { anytime: 'Fatstock Stretcher: Bonus food from cooking sheep/pig' },
   },
 }

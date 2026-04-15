@@ -335,6 +335,7 @@ import { C37_DwellingMound } from './C/C37_DwellingMound'
 import { C51_FishingNet } from './C/C51_FishingNet'
 import { C52_HuntsmansHat } from './C/C52_HuntsmansHat'
 import { C57_Crudite } from './C/C57_Crudite'
+import { C53_GypsysCrock } from './C/C53_GypsysCrock'
 import { C60_SmallPottersOven } from './C/C60_SmallPottersOven'
 import { C63_CraftBrewery } from './C/C63_CraftBrewery'
 import { C64_CornSchnappsDistillery } from './C/C64_CornSchnappsDistillery'
@@ -714,6 +715,7 @@ import { C157_ResourceAnalyzer } from './C/C157_ResourceAnalyzer'
 import { C159_FishermansFriend } from './C/C159_FishermansFriend'
 import { D48_CivicFacade } from './D/D48_CivicFacade'
 import { D52_RollingPin } from './D/D52_RollingPin'
+import { D56_FatstockStretcher } from './D/D56_FatstockStretcher'
 import { D54_TroutPool } from './D/D54_TroutPool'
 import { D130_RecreationalCarpenter } from './D/D130_RecreationalCarpenter'
 import { D142_PotatoPlanter } from './D/D142_PotatoPlanter'
@@ -1460,6 +1462,8 @@ export const occupationCards = [
   C46_Mandoline,
   C64_CornSchnappsDistillery,
   D46_PelletPress,
+  C53_GypsysCrock,
+  D56_FatstockStretcher,
 ]
 
 // All cards for reference and developer mode
