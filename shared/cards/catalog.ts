@@ -54,6 +54,7 @@ import { A48_ShavingHorse } from './A/A48_ShavingHorse'
 import { A53_Claypipe } from './A/A53_Claypipe'
 import { A55_JunkRoom } from './A/A55_JunkRoom'
 import { A58_AsparagusKnife } from './A/A58_AsparagusKnife'
+import { A59_PotatoRidger } from './A/A59_PotatoRidger'
 import { A64_BarleyMill } from './A/A64_BarleyMill'
 import { A65_SeedPellets } from './A/A65_SeedPellets'
 import { A70_LiftingMachine } from './A/A70_LiftingMachine'
@@ -257,6 +258,7 @@ import { B43_Chophouse } from './B/B43_Chophouse'
 import { B47_HerringPot } from './B/B47_HerringPot'
 import { B56_Brook } from './B/B56_Brook'
 import { B60_BrewingWater } from './B/B60_BrewingWater'
+import { B61_ThreeFieldRotation } from './B/B61_ThreeFieldRotation'
 import { B62_Pitchfork } from './B/B62_Pitchfork'
 import { B64_MillWheel } from './B/B64_MillWheel'
 import { B77_LoamPit } from './B/B77_LoamPit'
@@ -281,6 +283,7 @@ import { C44_ChickenCoop } from './C/C44_ChickenCoop'
 import { C46_Mandoline } from './C/C46_Mandoline'
 import { C47_GardenClaw } from './C/C47_GardenClaw'
 import { C48_Farmstead } from './C/C48_Farmstead'
+import { C49_BeerStall } from './C/C49_BeerStall'
 import { C50_StableYard } from './C/C50_StableYard'
 import { C59_SchnappsDistillery } from './C/C59_SchnappsDistillery'
 import { C65_Granary } from './C/C65_Granary'
@@ -360,6 +363,7 @@ import { C89_StableMaster } from './C/C89_StableMaster'
 import { C93_InnerDistrictsDirector } from './C/C93_InnerDistrictsDirector'
 import { C94_StableCleaner } from './C/C94_StableCleaner'
 import { C96_Merchant } from './C/C96_Merchant'
+import { C98_CubeCutter } from './C/C98_CubeCutter'
 import { C99_GardenDesigner } from './C/C99_GardenDesigner'
 import { C2_Stable } from './C/C2_Stable'
 import { C3_CarriageTrip } from './C/C3_CarriageTrip'
@@ -400,6 +404,7 @@ import { D81_RoofLadder } from './D/D81_RoofLadder'
 import { D82_HuntingTrophy } from './D/D82_HuntingTrophy'
 import { D91_Plowman } from './D/D91_Plowman'
 import { D99_EarthenwarePotter } from './D/D99_EarthenwarePotter'
+import { D113_FoodMerchant } from './D/D113_FoodMerchant'
 import { D114_SeedTrader } from './D/D114_SeedTrader'
 import { D118_Bonehead } from './D/D118_Bonehead'
 import { D119_WoodBarterer } from './D/D119_WoodBarterer'
@@ -472,6 +477,7 @@ import { D70_StrawManure } from './D/D70_StrawManure'
 import { D71_Changeover } from './D/D71_Changeover'
 import { D72_StableManure } from './D/D72_StableManure'
 import { D74_RoyalWood } from './D/D74_RoyalWood'
+import { D84_FeedPellets } from './D/D84_FeedPellets'
 import { D85_Reader } from './D/D85_Reader'
 import { D87_MasterBuilder } from './D/D87_MasterBuilder'
 import { D88_Millwright } from './D/D88_Millwright'
@@ -533,6 +539,7 @@ import { E112_GrainThief } from './E/E112_GrainThief'
 import { E123_ResourceHoarder } from './E/E123_ResourceHoarder'
 import { E124_MayorCandidate } from './E/E124_MayorCandidate'
 import { E130_Overachiever } from './E/E130_Overachiever'
+import { E132_VeggieLover } from './E/E132_VeggieLover'
 import { E133_ChampionBreeder } from './E/E133_ChampionBreeder'
 import { E134_Omnifarmer } from './E/E134_Omnifarmer'
 import { E148_Lazybones } from './E/E148_Lazybones'
@@ -553,6 +560,7 @@ import { E166_Roastmaster } from './E/E166_Roastmaster'
 import { E17_SkimmerPlow } from './E/E17_SkimmerPlow'
 import { E19_OxGoad } from './E/E19_OxGoad'
 import { E55_StoneWeir } from './E/E55_StoneWeir'
+import { E58_LunchtimeBeer } from './E/E58_LunchtimeBeer'
 import { E59_CombandCutter } from './E/E59_CombandCutter'
 import { E60_WorkingGloves } from './E/E60_WorkingGloves'
 import { E67_GrainBag } from './E/E67_GrainBag'
@@ -1504,6 +1512,14 @@ export const occupationCards = [
   E56_RomanPot,
   E110_Dentist,
   E140_Carter,
+  A59_PotatoRidger,
+  B61_ThreeFieldRotation,
+  C49_BeerStall,
+  C98_CubeCutter,
+  D84_FeedPellets,
+  D113_FoodMerchant,
+  E58_LunchtimeBeer,
+  E132_VeggieLover,
 ]
 
 // All cards for reference and developer mode
