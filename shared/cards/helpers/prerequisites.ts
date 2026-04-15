@@ -1,6 +1,7 @@
 import type { PlayerState } from '../../game/types'
 import type { CardDefinition } from '../types'
 import { getMajorCardEffect } from '../major'
+import { checkCustomPrerequisite } from './prerequisite-registry'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -39,6 +40,9 @@ const meetsNumericPrerequisite = (
 const meetsTextClause = (player: PlayerState, clause: string) => {
   const trimmed = clause.trim()
   if (!trimmed) return true
+
+  const custom = checkCustomPrerequisite(trimmed, player)
+  if (custom !== null) return custom
 
   const fieldsMatch = trimmed.match(/^(\d+)\s+Fields?$/i)
   if (fieldsMatch) {

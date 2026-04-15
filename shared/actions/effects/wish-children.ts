@@ -1,7 +1,11 @@
 import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import { getExtraRoomCapacity } from '../../cards/card-effects'
+
+const effectiveRooms = (player: PlayerState) =>
+  player.rooms + getExtraRoomCapacity(player)
 
 export const growFamily = (player: PlayerState): ActionExecutionResult => {
-  if (player.rooms <= player.familySize) {
+  if (effectiveRooms(player) <= player.familySize) {
     return { type: 'fail', logKey: 'log.familyGrowthFail' }
   }
   player.familySize += 1
@@ -23,7 +27,7 @@ export const wishChildrenAction: ActionDefinition = {
   descriptionKey: 'actions.wish-children-growth.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => player.rooms > player.familySize,
+  canBeExecutedByPlayer: (_, player) => effectiveRooms(player) > player.familySize,
   execute: ({ player }) => growFamily(player),
 }
 

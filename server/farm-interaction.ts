@@ -8,6 +8,7 @@ import type {
 import { applyCostOverride } from '../shared/actions/effects/pay.ts'
 import { canAffordTypedFlatCost } from '../shared/actions/effects/pay-helpers.ts'
 import { getMaxBuildableRooms } from '../shared/actions/effects/room-payment.ts'
+import { readCardExtraData } from '../shared/cards/helpers/card-state.ts'
 import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
@@ -115,9 +116,15 @@ export const buildSowFarmInteraction = (
       })
       : [],
   )
+  const allowedKeys = actionContext?.allowedFields === 'fromSelectedFields' && typeof actionContext?.sourceCard === 'string'
+    ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedFields') ?? [])
+    : null
+
   const selectableFields = normalized.fields.flatMap((field) => {
     if (field.crop !== null) return []
-    if (excludedKeys.has(positionKey({ row: field.row, col: field.col }))) return []
+    const key = positionKey({ row: field.row, col: field.col })
+    if (excludedKeys.has(key)) return []
+    if (allowedKeys && !allowedKeys.has(key)) return []
     const allowedCrops: ('grain' | 'vegetable')[] = []
     if ((normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
