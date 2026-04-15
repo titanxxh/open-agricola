@@ -71,6 +71,7 @@
 | onRoundStart | — | 已接入 | 每回合开始时触发（仅 Major_Well 通过 futureMeeples 间接使用） |
 | onHarvest | [Major_Pottery](../shared/cards/major/index.ts)、[Major_Basket](../shared/cards/major/index.ts)、[Major_Joinery](../shared/cards/major/index.ts) | 已接入 | 收获阶段触发，现由 `GameSession` 统一按阶段 flow 推进 |
 | onRoundEnd | — | 已接入 | game-session finalizeRound 中调用 |
+| onEndTurn | [D74_RoyalWood](../shared/cards/D/D74_RoyalWood.ts) | 已接入 | 单次 person-action turn 结束时触发；不等待 returning-home |
 | onBeforeReturnHome | [D51_Archway](../shared/cards/D/D51_Archway.ts) | 已接入 | 回家阶段最先触发（BGA: 1 张卡）；D51 给予额外 place-farmer 行动（1/1） |
 | onStartReturnHome | [D107_Bellfounder](../shared/cards/D/D107_Bellfounder.ts) | 已接入 | 回家阶段工人返回前（BGA: 11 张卡）；D107 可弃全部黏土换 3 食物或 1 VP（1/11） |
 | onReturnHome | [C75_Firewood](../shared/cards/C/C75_Firewood.ts)、[A84_Silage](../shared/cards/A/A84_Silage.ts)、[A53_Claypipe](../shared/cards/A/A53_Claypipe.ts) | 已接入 | 每回合回家阶段触发 |

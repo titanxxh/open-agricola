@@ -44,18 +44,13 @@ const afterListener: CardListenerRegistration = {
 registerCardListener(beforeListener)
 registerCardListener(afterListener)
 
-/**
- * onBeforeStartOfTurn: reset woodSpent
- * onReturnHome: refund floor(woodSpent / 2) wood
- */
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onBuy: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'woodSpent', 0)
     writeCardExtraData(player, CARD_ID, 'woodBefore', 0)
   },
-  onReturnHome: (_state, player) => {
+  onEndTurn: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const totalSpent = readCardExtraData<number>(player, CARD_ID, 'woodSpent') ?? 0
     const refund = Math.floor(totalSpent / 2)
