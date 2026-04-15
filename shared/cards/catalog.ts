@@ -761,6 +761,27 @@ import { E126_TaxCollector } from './E/E126_TaxCollector'
 import { E152_BargainHunter } from './E/E152_BargainHunter'
 import { E158_StoneCustodian } from './E/E158_StoneCustodian'
 import { E168_AnimalTamersApprentice } from './E/E168_AnimalTamersApprentice'
+import { A50_MilkJug } from './A/A50_MilkJug'
+import { A77_Hod } from './A/A77_Hod'
+import { A80_StoneTongs } from './A/A80_StoneTongs'
+import { A116_WoodCutter } from './A/A116_WoodCutter'
+import { A121_ClayPuncher } from './A/A121_ClayPuncher'
+import { B54_Tumbrel } from './B/B54_Tumbrel'
+import { B58_CrackWeeder } from './B/B58_CrackWeeder'
+import { B79_Corf } from './B/B79_Corf'
+import { B110_Pavior } from './B/B110_Pavior'
+import { B116_Shoreforester } from './B/B116_Shoreforester'
+import { B117_Informant } from './B/B117_Informant'
+import { B160_PubOwner } from './B/B160_PubOwner'
+import { C106_PotatoHarvester } from './C/C106_PotatoHarvester'
+import { C121_ClayKneader } from './C/C121_ClayKneader'
+import { C164_GermanHeathKeeper } from './C/C164_GermanHeathKeeper'
+import { D65_GrainSieve } from './D/D65_GrainSieve'
+import { D109_SowingMaster } from './D/D109_SowingMaster'
+import { D141_SeedSeller } from './D/D141_SeedSeller'
+import { D143_TreeCutter } from './D/D143_TreeCutter'
+import { D146_Porter } from './D/D146_Porter'
+import { E66_BarnShed } from './E/E66_BarnShed'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -1122,6 +1143,15 @@ export const minorImprovementCards = [
   E20_IronHoe,
   E23_Apiary,
   E26_Sundial,
+  // Batch 13 wave 1 — minor improvements
+  A50_MilkJug,
+  A77_Hod,
+  A80_StoneTongs,
+  B54_Tumbrel,
+  B58_CrackWeeder,
+  B79_Corf,
+  D65_GrainSieve,
+  E66_BarnShed,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1528,6 +1558,20 @@ export const occupationCards = [
   E69_MelonPatch,
   E70_CropRotationField,
   E72_ArtichokeField,
+  // Batch 13 wave 1 — occupations
+  A116_WoodCutter,
+  A121_ClayPuncher,
+  B110_Pavior,
+  B116_Shoreforester,
+  B117_Informant,
+  B160_PubOwner,
+  C106_PotatoHarvester,
+  C121_ClayKneader,
+  C164_GermanHeathKeeper,
+  D109_SowingMaster,
+  D141_SeedSeller,
+  D143_TreeCutter,
+  D146_Porter,
 ]
 
 // All cards for reference and developer mode
