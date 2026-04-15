@@ -1,5 +1,6 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
+import { A11_MudPatch } from './A/A11_MudPatch'
 import { A102_Grocer } from './A/A102_Grocer'
 import { A25_Bassinet } from './A/A25_Bassinet'
 import { A105_BarrowPusher } from './A/A105_BarrowPusher'
@@ -66,6 +67,7 @@ import { A82_WorkCertificate } from './A/A82_WorkCertificate'
 import { A83_ShepherdsCrook } from './A/A83_ShepherdsCrook'
 import { A84_Silage } from './A/A84_Silage'
 import { A85_Homekeeper } from './A/A85_Homekeeper'
+import { A86_AnimalTamer } from './A/A86_AnimalTamer'
 import { A87_Conservator } from './A/A87_Conservator'
 import { A88_HedgeKeeper } from './A/A88_HedgeKeeper'
 import { A75_LumberMill } from './A/A75_LumberMill'
@@ -152,6 +154,7 @@ import { B44_ChickStable } from './B/B44_ChickStable'
 import { B45_StrawberryPatch } from './B/B45_StrawberryPatch'
 import { B46_ClubHouse } from './B/B46_ClubHouse'
 import { B10_Caravan } from './B/B10_Caravan'
+import { B11_Feedyard } from './B/B11_Feedyard'
 import { B52_GrowingFarm } from './B/B52_GrowingFarm'
 import { B59_FoodChest } from './B/B59_FoodChest'
 import { B66_SackCart } from './B/B66_SackCart'
@@ -193,6 +196,7 @@ import { B109_PaperMaker } from './B/B109_PaperMaker'
 import { B115_TinsmithMaster } from './B/B115_TinsmithMaster'
 import { B124_Trimmer } from './B/B124_Trimmer'
 import { B146_Illusionist } from './B/B146_Illusionist'
+import { B148_PetBroker } from './B/B148_PetBroker'
 import { B149_OpenAirFarmer } from './B/B149_OpenAirFarmer'
 import { B13_CarpentersParlor } from './B/B13_CarpentersParlor'
 import { B15_CarpentersBench } from './B/B15_CarpentersBench'
@@ -303,6 +307,8 @@ import { C100_Butler } from './C/C100_Butler'
 import { C134_CowPrince } from './C/C134_CowPrince'
 import { C1_Overhaul } from './C/C1_Overhaul'
 import { C10_BunkBeds } from './C/C10_BunkBeds'
+import { C11_WildlifeReserve } from './C/C11_WildlifeReserve'
+import { C12_CattleFarm } from './C/C12_CattleFarm'
 import { C101_StallHolder } from './C/C101_StallHolder'
 import { C104_Collector } from './C/C104_Collector'
 import { C115_Sower } from './C/C115_Sower'
@@ -350,6 +356,7 @@ import { C85_DenBuilder } from './C/C85_DenBuilder'
 import { C86_LivestockFeeder } from './C/C86_LivestockFeeder'
 import { C87_Mason } from './C/C87_Mason'
 import { C88_CarpentersApprentice } from './C/C88_CarpentersApprentice'
+import { C89_StableMaster } from './C/C89_StableMaster'
 import { C93_InnerDistrictsDirector } from './C/C93_InnerDistrictsDirector'
 import { C94_StableCleaner } from './C/C94_StableCleaner'
 import { C96_Merchant } from './C/C96_Merchant'
@@ -441,6 +448,7 @@ import { D105_Sculptor } from './D/D105_Sculptor'
 import { D110_FishFarmer } from './D/D110_FishFarmer'
 import { D125_ForestTrader } from './D/D125_ForestTrader'
 import { D147_TrapBuilder } from './D/D147_TrapBuilder'
+import { D148_DomesticianExpert } from './D/D148_DomesticianExpert'
 import { D151_SpinDoctor } from './D/D151_SpinDoctor'
 import { D165_PigStalker } from './D/D165_PigStalker'
 import { D167_PureBreeder } from './D/D167_PureBreeder'
@@ -480,6 +488,7 @@ import { D7_Trident } from './D/D7_Trident'
 import { D8_FernSeeds } from './D/D8_FernSeeds'
 import { D9_GameTrade } from './D/D9_GameTrade'
 import { D11_LawnFertilizer } from './D/D11_LawnFertilizer'
+import { D12_MilkingPlace } from './D/D12_MilkingPlace'
 import { D25_WitchesDanceFloor } from './D/D25_WitchesDanceFloor'
 import { D37_Sculpture } from './D/D37_Sculpture'
 import { D108_StoneCarver } from './D/D108_StoneCarver'
@@ -513,6 +522,7 @@ import { E135_Pickler } from './E/E135_Pickler'
 import { E136_AnimalHusbandryWorker } from './E/E136_AnimalHusbandryWorker'
 import { E154_Margrave } from './E/E154_Margrave'
 import { E10_StrawHat } from './E/E10_StrawHat'
+import { E11_PettingZoo } from './E/E11_PettingZoo'
 import { E21_SheepRug } from './E/E21_SheepRug'
 import { E103_Wolf } from './E/E103_Wolf'
 import { E109_BraidMaker } from './E/E109_BraidMaker'
@@ -1468,6 +1478,16 @@ export const occupationCards = [
   D56_FatstockStretcher,
   D87_MasterBuilder,
   D129_LumberVirtuoso,
+  A11_MudPatch,
+  A86_AnimalTamer,
+  B11_Feedyard,
+  B148_PetBroker,
+  C11_WildlifeReserve,
+  C12_CattleFarm,
+  C89_StableMaster,
+  D12_MilkingPlace,
+  D148_DomesticianExpert,
+  E11_PettingZoo,
 ]
 
 // All cards for reference and developer mode
