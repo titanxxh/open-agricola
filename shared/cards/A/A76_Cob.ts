@@ -9,7 +9,7 @@ const CARD_ID = 'A76_Cob'
 // BGA: startOfWork → we use onRoundStart (fires after accumulation, before work phase)
 registerCardEffect({
   id: CARD_ID,
-  onRoundStart: (state, player) => {
+  onRoundStart: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     if ((player.resources.clay ?? 0) < 1) return
     if ((player.resources.grain ?? 0) < 1) return
