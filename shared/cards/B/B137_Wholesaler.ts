@@ -1,0 +1,143 @@
+import { Occupation } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'B137_Wholesaler'
+
+type WholesalerData = {
+  vegetableTaken: boolean
+  boarTaken: boolean
+  stoneTaken: boolean
+  cattleTaken: boolean
+}
+
+const INITIAL_DATA: WholesalerData = {
+  vegetableTaken: false,
+  boarTaken: false,
+  stoneTaken: false,
+  cattleTaken: false,
+}
+
+const getData = (context: CardListenerContext): WholesalerData =>
+  readCardExtraData<WholesalerData>(context.player, CARD_ID, 'wholesaler') ?? { ...INITIAL_DATA }
+
+/**
+ * Place 1 vegetable, 1 pig, 1 stone, and 1 cattle on this card.
+ * Each time you use VegetableSeeds (round 8+), PigMarket (round 9+),
+ * EasternQuarry (round 10+), or CattleMarket (round 11+), you get the
+ * corresponding good from this card.
+ */
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'wholesaler', { ...INITIAL_DATA })
+  },
+})
+
+/**
+ * After using VegetableSeeds, gain 1 vegetable from card.
+ */
+const afterVegetableSeedsListener: CardListenerRegistration = {
+  id: 'B137-wholesaler-after-vegetable-seeds',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.space?.id !== 'vegetable-seeds') return
+    const data = getData(context)
+    if (data.vegetableTaken) return
+    data.vegetableTaken = true
+    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
+    return {
+      flow: gainLeaf(CARD_ID, { vegetable: 1 }),
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+/**
+ * After using PigMarket, gain 1 boar from card.
+ */
+const afterPigMarketListener: CardListenerRegistration = {
+  id: 'B137-wholesaler-after-pig-market',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.space?.id !== 'pig-market') return
+    const data = getData(context)
+    if (data.boarTaken) return
+    data.boarTaken = true
+    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
+    return {
+      flow: gainLeaf(CARD_ID, { boar: 1 }),
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+/**
+ * After using EasternQuarry, gain 1 stone from card.
+ */
+const afterEasternQuarryListener: CardListenerRegistration = {
+  id: 'B137-wholesaler-after-eastern-quarry',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.space?.id !== 'eastern-quarry') return
+    const data = getData(context)
+    if (data.stoneTaken) return
+    data.stoneTaken = true
+    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
+    return {
+      flow: gainLeaf(CARD_ID, { stone: 1 }),
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+/**
+ * After using CattleMarket, gain 1 cattle from card.
+ */
+const afterCattleMarketListener: CardListenerRegistration = {
+  id: 'B137-wholesaler-after-cattle-market',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.space?.id !== 'cattle-market') return
+    const data = getData(context)
+    if (data.cattleTaken) return
+    data.cattleTaken = true
+    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
+    return {
+      flow: gainLeaf(CARD_ID, { cattle: 1 }),
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(afterVegetableSeedsListener)
+registerCardListener(afterPigMarketListener)
+registerCardListener(afterEasternQuarryListener)
+registerCardListener(afterCattleMarketListener)
+
+export const B137_Wholesaler = new Occupation({
+  id: CARD_ID,
+  name: 'Wholesaler',
+  deck: 'B',
+  number: 137,
+  category: 'GOODS_PROVIDER',
+  desc: ['Place 1 <VEGETABLE>, 1 <BOAR>, 1 <STONE>, and 1 <CATTLE> on this card. Each time you use __Vegetable Seeds__, __Pig Market__, __Eastern Quarry__, or __Cattle Market__, you get the corresponding good from this card.'],
+  cost: {},
+  players: '3+',
+})

@@ -401,6 +401,7 @@ import { D82_HuntingTrophy } from './D/D82_HuntingTrophy'
 import { D91_Plowman } from './D/D91_Plowman'
 import { D99_EarthenwarePotter } from './D/D99_EarthenwarePotter'
 import { D114_SeedTrader } from './D/D114_SeedTrader'
+import { D118_Bonehead } from './D/D118_Bonehead'
 import { D119_WoodBarterer } from './D/D119_WoodBarterer'
 import { D15_ClaySupports } from './D/D15_ClaySupports'
 import { D121_ClayPlasterer } from './D/D121_ClayPlasterer'
@@ -493,6 +494,7 @@ import { D25_WitchesDanceFloor } from './D/D25_WitchesDanceFloor'
 import { D37_Sculpture } from './D/D37_Sculpture'
 import { D108_StoneCarver } from './D/D108_StoneCarver'
 import { D155_Ebonist } from './D/D155_Ebonist'
+import { D156_RetailDealer } from './D/D156_RetailDealer'
 import { D159_ReedSeller } from './D/D159_ReedSeller'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D170_FoldBuilder } from './D/D170_FoldBuilder'
@@ -526,6 +528,7 @@ import { E11_PettingZoo } from './E/E11_PettingZoo'
 import { E21_SheepRug } from './E/E21_SheepRug'
 import { E103_Wolf } from './E/E103_Wolf'
 import { E109_BraidMaker } from './E/E109_BraidMaker'
+import { E110_Dentist } from './E/E110_Dentist'
 import { E112_GrainThief } from './E/E112_GrainThief'
 import { E123_ResourceHoarder } from './E/E123_ResourceHoarder'
 import { E124_MayorCandidate } from './E/E124_MayorCandidate'
@@ -557,6 +560,7 @@ import { E115_SeedServant } from './E/E115_SeedServant'
 import { E121_HillCultivator } from './E/E121_HillCultivator'
 import { E131_MarketMaster } from './E/E131_MarketMaster'
 import { E137_FlaxFarmer } from './E/E137_FlaxFarmer'
+import { E140_Carter } from './E/E140_Carter'
 import { E141_VegetableVendor } from './E/E141_VegetableVendor'
 import { E167_DairyCrier } from './E/E167_DairyCrier'
 import { E22_GuestRoom } from './E/E22_GuestRoom'
@@ -600,6 +604,7 @@ import { E7_Pumpernickel } from './E/E7_Pumpernickel'
 import { E8_FarmersMarket } from './E/E8_FarmersMarket'
 import { E9_BarteringHut } from './E/E9_BarteringHut'
 import { E25_BumperCrop } from './E/E25_BumperCrop'
+import { E28_Bookmark } from './E/E28_Bookmark'
 import { E29_Heirloom } from './E/E29_Heirloom'
 import { E32_Nave } from './E/E32_Nave'
 import { E34_LandRegister } from './E/E34_LandRegister'
@@ -611,6 +616,7 @@ import { E43_BarnCats } from './E/E43_BarnCats'
 import { E44_FodderBeets } from './E/E44_FodderBeets'
 import { E45_FruitLadder } from './E/E45_FruitLadder'
 import { E46_WaterlilyPond } from './E/E46_WaterlilyPond'
+import { E56_RomanPot } from './E/E56_RomanPot'
 import { E57_CheeseFondue } from './E/E57_CheeseFondue'
 import { E65_Almsbag } from './E/E65_Almsbag'
 import { E94_Prophet } from './E/E94_Prophet'
@@ -688,6 +694,7 @@ import { D79_CarrotMuseum } from './D/D79_CarrotMuseum'
 import { D133_BeerTentOperator } from './D/D133_BeerTentOperator'
 import { D153_WealthyMan } from './D/D153_WealthyMan'
 import { E39_Paintbrush } from './E/E39_Paintbrush'
+import { E47_SyrupTap } from './E/E47_SyrupTap'
 import { E48_TownHall } from './E/E48_TownHall'
 import { E61_RaisedBed } from './E/E61_RaisedBed'
 import { E99_UncaringParents } from './E/E99_UncaringParents'
@@ -714,6 +721,7 @@ import { B114_Childless } from './B/B114_Childless'
 import { B118_SmallscaleFarmer } from './B/B118_SmallscaleFarmer'
 import { B133_VillagePeasant } from './B/B133_VillagePeasant'
 import { B135_NutritionExpert } from './B/B135_NutritionExpert'
+import { B137_Wholesaler } from './B/B137_Wholesaler'
 import { B139_ForestScientist } from './B/B139_ForestScientist'
 import { B140_FarmyardWorker } from './B/B140_FarmyardWorker'
 import { B158_DistrictManager } from './B/B158_DistrictManager'
@@ -1488,6 +1496,14 @@ export const occupationCards = [
   D12_MilkingPlace,
   D148_DomesticianExpert,
   E11_PettingZoo,
+  B137_Wholesaler,
+  D118_Bonehead,
+  D156_RetailDealer,
+  E28_Bookmark,
+  E47_SyrupTap,
+  E56_RomanPot,
+  E110_Dentist,
+  E140_Carter,
 ]
 
 // All cards for reference and developer mode
