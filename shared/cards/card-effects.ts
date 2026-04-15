@@ -104,6 +104,7 @@ export type CardEffect = {
   onBeforeStartOfTurn?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
+  computeExtraRoomCapacity?: (player: PlayerState) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
@@ -332,6 +333,29 @@ export const collectBonusScores = (
     }
   }
   return { entries, reserved: ctx.reserved }
+}
+
+export const getExtraRoomCapacity = (player: PlayerState): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let extra = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.computeExtraRoomCapacity) continue
+    try {
+      extra += effect.computeExtraRoomCapacity(player)
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[card-effects] custom card ${cardId} computeExtraRoomCapacity threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return extra
 }
 
 /**

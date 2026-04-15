@@ -3,7 +3,7 @@ import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData, writeCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
 
@@ -62,9 +62,10 @@ registerCardListener(afterExchangeListener)
 
 registerCardEffect({
   id: CARD_ID,
-  // TODO: Room provision — when food-on-card equals player.rooms, provides +1 room capacity.
-  // This requires a dynamic rooms modifier that is beyond the current extension points.
-  // For now, the card tracks food placement but does not modify room capacity.
+  computeExtraRoomCapacity: (player) => {
+    const foodOnCard = getCardStack(player, CARD_ID).length
+    return foodOnCard > 0 && foodOnCard === player.rooms ? 1 : 0
+  },
 })
 
 export const E85_MasterTanner = new Occupation({

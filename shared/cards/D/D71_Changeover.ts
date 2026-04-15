@@ -43,6 +43,7 @@ const anytimeListener: CardListenerRegistration = {
             actionId: 'sow',
             sourceCard: CARD_ID,
             optional: true,
+            actionContext: { allowedFields: 'fromSelectedFields', sourceCard: CARD_ID },
           },
         ],
       },
