@@ -1,0 +1,18 @@
+import { MinorImprovement } from '../types'
+
+const CARD_ID = 'B80_HardPorcelain'
+
+export const B80_HardPorcelain = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Hard Porcelain',
+  deck: 'B',
+  number: 80,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['At any time, you can exchange 2/3/4 <CLAY> for 1/2/3 <STONE>.'],
+  cost: { clay: 1 },
+  exchanges: [
+    { from: { clay: 2 }, to: { stone: 1 }, trigger: 'anytime' },
+    { from: { clay: 3 }, to: { stone: 2 }, trigger: 'anytime' },
+    { from: { clay: 4 }, to: { stone: 3 }, trigger: 'anytime' },
+  ],
+})

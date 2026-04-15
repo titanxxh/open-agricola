@@ -1,0 +1,47 @@
+import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+
+const CARD_ID = 'E89_Stallwright'
+
+// E89 Stallwright: After you play your 2nd, 3rd, 5th, and 7th occupation (including this one),
+// you can build 1 stable at no cost.
+const TRIGGER_COUNTS = new Set([2, 3, 5, 7])
+
+const listener: CardListenerRegistration = {
+  id: 'E89-stallwright-after-occupation',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['play-occupation'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const n = context.player.occupationPlayed.length
+    if (!TRIGGER_COUNTS.has(n)) return
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'stables',
+        optional: true,
+        sourceCard: CARD_ID,
+        actionContext: { max: 1, costs: {}, trueAction: false },
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
+
+export const E89_Stallwright = new Occupation({
+  id: CARD_ID,
+  name: 'Stallwright',
+  deck: 'E',
+  number: 89,
+  category: 'FARMYARD_STABLE_BUILDING',
+  desc: [
+    'After you play your 2nd, 3rd, 5th, and 7th occupation (including this one), you can build 1 stable at no cost.',
+  ],
+  cost: {},
+  players: '1+',
+})

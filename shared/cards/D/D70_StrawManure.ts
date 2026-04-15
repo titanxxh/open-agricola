@@ -1,8 +1,19 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'D70_StrawManure'
+
+registerFieldEffect('add-vegetable', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (field && field.crop === 'vegetable') {
+      field.remaining += 1
+    }
+  }
+})
 
 registerCardEffect({
   id: CARD_ID,

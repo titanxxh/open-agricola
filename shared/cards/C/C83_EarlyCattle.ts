@@ -1,0 +1,28 @@
+import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'C83_EarlyCattle'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { cattle: 2 },
+    }
+  },
+})
+
+export const C83_EarlyCattle = new MinorImprovement({
+  id: CARD_ID,
+  name: "Early Cattle",
+  deck: "C",
+  number: 83,
+  category: "ANIMAL_HANDLER",
+  desc: ["When you play this card, you immediately get 2 <CATTLE>. Worth -3 <SCORE>."],
+  vp: -3,
+  prerequisite: "1 Pasture",
+  newSet: true,
+})

@@ -1,11 +1,64 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+
+const CARD_ID = 'C18_RollOverPlow'
+
+registerFieldEffect('discard-all-crops', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.crop)
+    if (field) {
+      field.remaining = 0
+      field.crop = null
+    }
+  }
+})
+
+const anytimeListener: CardListenerRegistration = {
+  id: 'C18-roll-over-plow-anytime',
+  cardIds: [CARD_ID],
+  phases: ['anytime' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const plantedFields = context.player.fields.filter(f => f.crop !== null && f.remaining > 0)
+    if (plantedFields.length < 3) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'field-select',
+            sourceCard: CARD_ID,
+            actionContext: {
+              fieldFilter: 'has-crop',
+              maxSelections: 1,
+              fieldEffect: 'discard-all-crops',
+            },
+          },
+          {
+            type: 'leaf',
+            actionId: 'plow',
+            sourceCard: CARD_ID,
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+      labelKey: 'cards.C18_RollOverPlow.anytime',
+    }
+  },
+}
+
+registerCardListener(anytimeListener)
 
 export const C18_RollOverPlow = new MinorImprovement({
-  id: "C18_RollOverPlow",
-  name: "Roll-Over Plow",
-  deck: "C",
+  id: CARD_ID,
+  name: 'Roll-Over Plow',
+  deck: 'C',
   number: 18,
-  category: "FARM_PLANNER",
-  desc: ["At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field."],
-  cost: {"wood":2},
+  category: 'FARM_PLANNER',
+  desc: ['At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field.'],
+  cost: { wood: 2 },
 })
