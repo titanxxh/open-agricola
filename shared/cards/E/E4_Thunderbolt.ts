@@ -1,7 +1,21 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'E4_Thunderbolt'
+
+registerFieldEffect('remove-all-grain-for-wood', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain')
+    if (field) {
+      const grainCount = field.remaining
+      field.remaining = 0
+      field.crop = null
+      player.resources.wood = (player.resources.wood ?? 0) + grainCount * 2
+    }
+  }
+})
 
 registerCardEffect({
   id: CARD_ID,

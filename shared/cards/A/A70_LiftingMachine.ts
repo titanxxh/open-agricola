@@ -1,7 +1,20 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'A70_LiftingMachine'
+
+registerFieldEffect('take-vegetable', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'vegetable' && f.remaining > 0)
+    if (field) {
+      field.remaining -= 1
+      if (field.remaining <= 0) field.crop = null
+      player.resources.vegetable = (player.resources.vegetable ?? 0) + 1
+    }
+  }
+})
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 registerCardEffect({

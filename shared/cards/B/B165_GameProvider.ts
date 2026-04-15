@@ -1,7 +1,23 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'B165_GameProvider'
+
+registerFieldEffect('discard-grain-for-pigs', ({ player, fields }) => {
+  let grainsRemoved = 0
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain' && f.remaining > 0)
+    if (field) {
+      field.remaining -= 1
+      if (field.remaining <= 0) field.crop = null
+      grainsRemoved++
+    }
+  }
+  const pigs = grainsRemoved >= 4 ? 3 : grainsRemoved >= 3 ? 2 : grainsRemoved >= 1 ? 1 : 0
+  player.resources.boar = (player.resources.boar ?? 0) + pigs
+})
 
 registerCardEffect({
   id: CARD_ID,
