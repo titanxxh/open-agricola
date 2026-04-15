@@ -1,10 +1,31 @@
 import { MinorImprovement } from '../types'
-// BGA: onBuy triggers forceReorganizeIfNeeded (animal reorg since a pasture must stay empty).
-// The pasture restriction is enforced in animal placement logic.
-// TODO: implement "one pasture must be empty" animal placement restriction and trigger reorg on buy.
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'E36_HerbalGarden'
+
+registerCardEffect({
+  id: CARD_ID,
+  onComputeAnimalZones: (player, zones) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    // At least one pasture must contain no animals.
+    // Find the best pasture to block: prefer one that's already empty,
+    // otherwise pick the one with the smallest capacity.
+    const pastures = zones.filter(z => z.zoneType === 'pasture')
+    if (pastures.length === 0) return
+    // First try to find an already-empty pasture (animalCount === 0)
+    const emptyPasture = pastures.find(p => (p.animalCount ?? 0) === 0)
+    if (emptyPasture) {
+      emptyPasture.capacity = 0
+      return
+    }
+    // No empty pasture — block the one with smallest capacity
+    const sorted = [...pastures].sort((a, b) => a.capacity - b.capacity)
+    sorted[0]!.capacity = 0
+  },
+})
 
 export const E36_HerbalGarden = new MinorImprovement({
-  id: 'E36_HerbalGarden',
+  id: CARD_ID,
   name: 'Herbal Garden',
   deck: 'E',
   number: 36,
