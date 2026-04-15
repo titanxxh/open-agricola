@@ -2,8 +2,20 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'C18_RollOverPlow'
+
+registerFieldEffect('discard-all-crops', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.crop)
+    if (field) {
+      field.remaining = 0
+      field.crop = null
+    }
+  }
+})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C18-roll-over-plow-anytime',

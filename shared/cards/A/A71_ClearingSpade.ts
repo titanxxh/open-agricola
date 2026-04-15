@@ -2,8 +2,36 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'A71_ClearingSpade'
+
+registerFieldEffect('store-source-field', ({ player, fields, sourceCard }) => {
+  if (sourceCard && fields.length > 0) {
+    const [r, c] = fields[0]!.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (field && field.crop && field.remaining >= 2) {
+      writeCardExtraData(player, sourceCard, 'moveSourceField', fields[0])
+    }
+  }
+})
+
+registerFieldEffect('move-crop-from-source', ({ player, fields, sourceCard }) => {
+  const sourceKey = readCardExtraData<string>(player, sourceCard!, 'moveSourceField')
+  if (sourceKey && fields.length > 0) {
+    const [tr, tc] = fields[0]!.split('-').map(Number)
+    const targetField = player.fields.find(f => f.row === tr && f.col === tc)
+    if (!targetField || targetField.crop !== null) return
+    const [sr, sc] = sourceKey.split('-').map(Number)
+    const sourceField = player.fields.find(f => f.row === sr && f.col === sc)
+    if (sourceField && sourceField.remaining >= 2 && sourceField.crop) {
+      sourceField.remaining -= 1
+      targetField.crop = sourceField.crop
+      targetField.remaining = 1
+    }
+  }
+})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'A71-clearing-spade-anytime',

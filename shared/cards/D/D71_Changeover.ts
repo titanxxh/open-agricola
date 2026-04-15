@@ -2,8 +2,20 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 
 const CARD_ID = 'D71_Changeover'
+
+registerFieldEffect('discard-single-crop', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find(f => f.row === r && f.col === c && f.remaining === 1)
+    if (field) {
+      field.remaining = 0
+      field.crop = null
+    }
+  }
+})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D71-changeover-anytime',
