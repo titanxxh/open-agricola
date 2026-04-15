@@ -1098,6 +1098,7 @@ type ActionHookResult = {
 - `onRoundStart`
 - `onHarvest`
 - `onRoundEnd`
+- `onEndTurn`
 - `onReturnHome`
 
 完整的阶段型 Hook 清单（按触发顺序）：
@@ -1107,7 +1108,7 @@ type ActionHookResult = {
   onBeforeStartOfTurn → onRoundStart
 
 工作阶段:
-  PlaceFarmer → 各原子行动
+  PlaceFarmer → 各原子行动 → onEndTurn
 
 回家阶段:
   onBeforeReturnHome → onStartReturnHome → onReturnHome
@@ -1125,7 +1126,7 @@ type ActionHookResult = {
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
-当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer` 这类“按本次实际收割田地数结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取。
+当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndTurn`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer` 这类“按本次实际收割田地数结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取。
 
 #### 11.6.2a ActivateCardNode 架构
 

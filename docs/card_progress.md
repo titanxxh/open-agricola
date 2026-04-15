@@ -101,6 +101,7 @@
 | resourcesPaid 追踪 | ✅ | pay-resources 返回实际支付资源 |
 | computeReplace | ✅ | 替换行动效果（day-laborer 等） |
 | onGainResource (after:gain) | ✅ | 资源获取后触发（E103_Wolf） |
+| onEndTurn 阶段 Hook | ✅ | person-action turn 收束点；D74_RoyalWood 已迁移到该时机 |
 
 ---
 

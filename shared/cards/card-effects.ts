@@ -20,7 +20,7 @@ export type PaymentInfo = {
   returnedCardId?: string
 }
 
-export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onReturnHome'
+export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'
   | 'onBeforeReturnHome' | 'onStartReturnHome'
   | 'onAfterRoundEnd'
   | 'onBeforeHarvest' | 'onStartHarvest'
@@ -36,6 +36,7 @@ export const cardEffectHooks: CardEffectHook[] = [
   'onRoundStart',
   'onHarvest',
   'onRoundEnd',
+  'onEndTurn',
   'onReturnHome',
   'onBeforeReturnHome',
   'onStartReturnHome',
@@ -84,6 +85,7 @@ export type CardEffect = {
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: EffectHandler
+  onEndTurn?: FlowEffectHandler
   onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: FlowEffectHandler
   onStartReturnHome?: FlowEffectHandler
