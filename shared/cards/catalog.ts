@@ -782,6 +782,27 @@ import { D141_SeedSeller } from './D/D141_SeedSeller'
 import { D143_TreeCutter } from './D/D143_TreeCutter'
 import { D146_Porter } from './D/D146_Porter'
 import { E66_BarnShed } from './E/E66_BarnShed'
+import { A120_ClayHutBuilder } from './A/A120_ClayHutBuilder'
+import { A139_HollowWarden } from './A/A139_HollowWarden'
+import { A142_Cordmaker } from './A/A142_Cordmaker'
+import { B25_BreadPaddle } from './B/B25_BreadPaddle'
+import { B49_Scales } from './B/B49_Scales'
+import { B89_Groom } from './B/B89_Groom'
+import { B107_Manservant } from './B/B107_Manservant'
+import { B108_OvenFiringBoy } from './B/B108_OvenFiringBoy'
+import { B162_ForestClearer } from './B/B162_ForestClearer'
+import { B168_PastureMaster } from './B/B168_PastureMaster'
+import { C107_Baker } from './C/C107_Baker'
+import { C113_WinterCaretaker } from './C/C113_WinterCaretaker'
+import { C145_ForestReviewer } from './C/C145_ForestReviewer'
+import { C163_MaterialDeliveryman } from './C/C163_MaterialDeliveryman'
+import { D39_TruffleSlicer } from './D/D39_TruffleSlicer'
+import { D63_Lynchet } from './D/D63_Lynchet'
+import { D97_BeggingStudent } from './D/D97_BeggingStudent'
+import { D166_StableMilker } from './D/D166_StableMilker'
+import { E111_Recluse } from './E/E111_Recluse'
+import { E116_FirCutter } from './E/E116_FirCutter'
+import { E165_MasterHuntsman } from './E/E165_MasterHuntsman'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -1152,6 +1173,11 @@ export const minorImprovementCards = [
   B79_Corf,
   D65_GrainSieve,
   E66_BarnShed,
+  // Batch 13 wave 2 — minor improvements
+  B25_BreadPaddle,
+  B49_Scales,
+  D39_TruffleSlicer,
+  D63_Lynchet,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1572,6 +1598,24 @@ export const occupationCards = [
   D141_SeedSeller,
   D143_TreeCutter,
   D146_Porter,
+  // Batch 13 wave 2 — occupations
+  A120_ClayHutBuilder,
+  A139_HollowWarden,
+  A142_Cordmaker,
+  B89_Groom,
+  B107_Manservant,
+  B108_OvenFiringBoy,
+  B162_ForestClearer,
+  B168_PastureMaster,
+  C107_Baker,
+  C113_WinterCaretaker,
+  C145_ForestReviewer,
+  C163_MaterialDeliveryman,
+  D97_BeggingStudent,
+  D166_StableMilker,
+  E111_Recluse,
+  E116_FirCutter,
+  E165_MasterHuntsman,
 ]
 
 // All cards for reference and developer mode
