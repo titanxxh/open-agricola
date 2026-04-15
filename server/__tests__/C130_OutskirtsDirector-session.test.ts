@@ -1,0 +1,110 @@
+import { describe, expect, it } from 'vitest'
+import {
+  getRegisteredCardListeners,
+  executeCardListener,
+} from '../../shared/cards/card-listeners'
+import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+
+import '../../shared/cards/C/C130_OutskirtsDirector'
+
+const CARD_ID = 'C130_OutskirtsDirector'
+
+const createPlayer = (id = 'p1'): PlayerState =>
+  ({
+    id, name: id, color: 'red',
+    resources: {
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 5,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    },
+    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    fields: [], fences: 0, roomTiles: [], stableTiles: [],
+    improvements: [], minorHand: [], minorPlayed: [],
+    occupationHand: [], occupationPlayed: [CARD_ID], playedCards: [`occupation:${CARD_ID}`],
+    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    newbornCount: 0, pastures: [], fenceSegments: [],
+    majorEffects: { wellRounds: 0 }, startPlayer: false,
+    activeModifiers: [],
+  }) as PlayerState
+
+const createSpace = (id: string): ActionSpace =>
+  ({
+    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
+    roundAvailable: 1, gainPerRound: {},
+    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
+    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+    takenBy: null,
+  }) as ActionSpace
+
+const createState = (player: PlayerState): GameState => {
+  const groveSpace = createSpace('grove')
+  const hollowSpace = createSpace('hollow-4')
+  return {
+    round: 1, currentPlayerIndex: 0, players: [player],
+    actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
+    roundActionOrder: Array.from({ length: 14 }).map(() => null),
+    gameSeed: 1, availableMajorImprovements: [],
+    futureMeeples: [], pendingFutureMeeples: [],
+    gameOver: false, workPhaseObtainedResources: {},
+  } as GameState
+}
+
+const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+
+describe('C130_OutskirtsDirector', () => {
+  it('places 2 reed on hollow-4 when using grove', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player)
+    const groveSpace = state.actionSpaces.find(s => s.id === 'grove')!
+    const hollowSpace = state.actionSpaces.find(s => s.id === 'hollow-4')!
+
+    expect(hollowSpace.resources.reed).toBe(0)
+
+    const result = executeCardListener(listener!, {
+      state, player, space: groveSpace,
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+
+    expect(hollowSpace.resources.reed).toBe(2)
+    expect(result).toBeDefined()
+    expect(result!.flow!.type).toBe('seq')
+    const children = (result!.flow as any).children
+    expect(children[0].actionId).toBe('place-farmer')
+  })
+
+  it('places 2 reed on grove when using hollow-4', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player)
+    const groveSpace = state.actionSpaces.find(s => s.id === 'grove')!
+    const hollowSpace = state.actionSpaces.find(s => s.id === 'hollow-4')!
+
+    expect(groveSpace.resources.reed).toBe(0)
+
+    executeCardListener(listener!, {
+      state, player, space: hollowSpace,
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+
+    expect(groveSpace.resources.reed).toBe(2)
+  })
+
+  it('does not trigger on unrelated spaces', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player)
+
+    const result = executeCardListener(listener!, {
+      state, player, space: createSpace('forest'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+
+    expect(result).toBeUndefined()
+  })
+})

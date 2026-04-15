@@ -803,6 +803,25 @@ import { D166_StableMilker } from './D/D166_StableMilker'
 import { E111_Recluse } from './E/E111_Recluse'
 import { E116_FirCutter } from './E/E116_FirCutter'
 import { E165_MasterHuntsman } from './E/E165_MasterHuntsman'
+import { A54_Credit } from './A/A54_Credit'
+import { A96_TaskArtisan } from './A/A96_TaskArtisan'
+import { A129_Swagman } from './A/A129_Swagman'
+import { A130_MummysBoy } from './A/A130_MummysBoy'
+import { A167_BreederBuyer } from './A/A167_BreederBuyer'
+import { B16_MiningHammer } from './B/B16_MiningHammer'
+import { B29_CookeryLesson } from './B/B29_CookeryLesson'
+import { C42_RavenousHunger } from './C/C42_RavenousHunger'
+import { C80_RockyTerrain } from './C/C80_RockyTerrain'
+import { C116_FurnitureMaker } from './C/C116_FurnitureMaker'
+import { C119_SkillfulRenovator } from './C/C119_SkillfulRenovator'
+import { C132_TimberShingleMaker } from './C/C132_TimberShingleMaker'
+import { C155_FoodDistributor } from './C/C155_FoodDistributor'
+import { D96_Furnisher } from './D/D96_Furnisher'
+import { D112_YoungFarmer } from './D/D112_YoungFarmer'
+import { D144_WaterWorker } from './D/D144_WaterWorker'
+import { E77_Mattock } from './E/E77_Mattock'
+import { E118_KindlingGatherer } from './E/E118_KindlingGatherer'
+import { E143_Hewer } from './E/E143_Hewer'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -1178,6 +1197,13 @@ export const minorImprovementCards = [
   B49_Scales,
   D39_TruffleSlicer,
   D63_Lynchet,
+  // Batch 13 wave 3 — minor improvements
+  A54_Credit,
+  B16_MiningHammer,
+  B29_CookeryLesson,
+  C42_RavenousHunger,
+  C80_RockyTerrain,
+  E77_Mattock,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1616,6 +1642,20 @@ export const occupationCards = [
   E111_Recluse,
   E116_FirCutter,
   E165_MasterHuntsman,
+  // Batch 13 wave 3 — occupations
+  A96_TaskArtisan,
+  A129_Swagman,
+  A130_MummysBoy,
+  A167_BreederBuyer,
+  C116_FurnitureMaker,
+  C119_SkillfulRenovator,
+  C132_TimberShingleMaker,
+  C155_FoodDistributor,
+  D96_Furnisher,
+  D112_YoungFarmer,
+  D144_WaterWorker,
+  E118_KindlingGatherer,
+  E143_Hewer,
 ]
 
 // All cards for reference and developer mode
