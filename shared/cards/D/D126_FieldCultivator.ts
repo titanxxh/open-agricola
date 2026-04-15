@@ -1,9 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { pushToCardStack, getCardStack, writeCardInfobox, popFromCardStack } from '../helpers/card-state'
-import { gainResources } from '../../actions/effects/gain'
-import { addCardResourceGained } from '../helpers/card-state'
-import type { ActionFlow, Resource } from '../../game/types'
+import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
+import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'D126_FieldCultivator'
 
