@@ -961,5 +961,8 @@ export const en = {
     A71_ClearingSpade: { anytime: 'Clearing Spade: Move 1 crop to empty field' },
     C18_RollOverPlow: { anytime: 'Roll-Over Plow: Discard field crops → Plow' },
     D71_Changeover: { anytime: 'Changeover: Discard 1-crop field → Sow' },
+    E91_PlowBuilder: { anytime: 'Plow Builder: Pay 1 Food → Plow (harvest + Joinery)' },
+    D129_LumberVirtuoso: { anytime: 'Lumber Virtuoso: Discard wood to 5 → Build Stables/Rooms' },
+    E85_MasterTanner: { anytime: 'Master Tanner: Place food on card from cooked pig/cattle' },
   },
 }
