@@ -464,6 +464,7 @@ import { D71_Changeover } from './D/D71_Changeover'
 import { D72_StableManure } from './D/D72_StableManure'
 import { D74_RoyalWood } from './D/D74_RoyalWood'
 import { D85_Reader } from './D/D85_Reader'
+import { D87_MasterBuilder } from './D/D87_MasterBuilder'
 import { D88_Millwright } from './D/D88_Millwright'
 import { D92_ChildOmbudsman } from './D/D92_ChildOmbudsman'
 import { D93_SheepInspector } from './D/D93_SheepInspector'
@@ -1464,6 +1465,7 @@ export const occupationCards = [
   D46_PelletPress,
   C53_GypsysCrock,
   D56_FatstockStretcher,
+  D87_MasterBuilder,
 ]
 
 // All cards for reference and developer mode

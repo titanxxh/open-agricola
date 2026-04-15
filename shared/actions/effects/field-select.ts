@@ -1,5 +1,5 @@
 import type { ActionDefinition } from '../../game/types'
-import { writeCardExtraData } from '../../cards/helpers/card-state'
+import { writeCardExtraData, readCardExtraData } from '../../cards/helpers/card-state'
 
 export const fieldSelectAction: ActionDefinition = {
   id: 'field-select',
@@ -87,6 +87,60 @@ export const fieldSelectAction: ActionDefinition = {
           field.remaining -= 1
           if (field.remaining <= 0) field.crop = null
           player.resources.vegetable = (player.resources.vegetable ?? 0) + 1
+        }
+      }
+    }
+
+    if (effect === 'store-source-field') {
+      // Store the selected source field key for the next step
+      if (sourceCard && fields.length > 0) {
+        // Validate: selected field must have remaining >= 2
+        const [r, c] = fields[0]!.split('-').map(Number)
+        const field = player.fields.find(f => f.row === r && f.col === c)
+        if (!field || !field.crop || field.remaining < 2) {
+          return { type: 'ok' }
+        }
+        writeCardExtraData(player, sourceCard, 'moveSourceField', fields[0])
+      }
+    }
+
+    if (effect === 'discard-all-crops') {
+      for (const key of fields) {
+        const [r, c] = key.split('-').map(Number)
+        const field = player.fields.find(f => f.row === r && f.col === c && f.crop)
+        if (field) {
+          field.remaining = 0
+          field.crop = null
+        }
+      }
+    }
+
+    if (effect === 'discard-single-crop') {
+      for (const key of fields) {
+        const [r, c] = key.split('-').map(Number)
+        const field = player.fields.find(f => f.row === r && f.col === c && f.remaining === 1)
+        if (field) {
+          field.remaining = 0
+          field.crop = null
+        }
+      }
+    }
+
+    if (effect === 'move-crop-from-source') {
+      const sourceKey = readCardExtraData<string>(player, sourceCard!, 'moveSourceField')
+      if (sourceKey && fields.length > 0) {
+        // Validate: target field must be empty (plowed but unsown)
+        const [tr, tc] = fields[0]!.split('-').map(Number)
+        const targetField = player.fields.find(f => f.row === tr && f.col === tc)
+        if (!targetField || targetField.crop !== null) {
+          return { type: 'ok' }
+        }
+        const [sr, sc] = sourceKey.split('-').map(Number)
+        const sourceField = player.fields.find(f => f.row === sr && f.col === sc)
+        if (sourceField && sourceField.remaining >= 2 && sourceField.crop) {
+          sourceField.remaining -= 1
+          targetField.crop = sourceField.crop
+          targetField.remaining = 1
         }
       }
     }

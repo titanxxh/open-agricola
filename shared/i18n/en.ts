@@ -956,5 +956,10 @@ export const en = {
     C115_Sower: { anytime: 'Sower: Use reed for supply or Sow action' },
     C53_GypsysCrock: { anytime: "Gypsy's Crock: Bonus food from cooking pairs" },
     D56_FatstockStretcher: { anytime: 'Fatstock Stretcher: Bonus food from cooking sheep/pig' },
+    C87_Mason: { anytime: 'Mason: Add stored stone room for free' },
+    D87_MasterBuilder: { anytime: 'Master Builder: Add 1 free room (5+ rooms)' },
+    A71_ClearingSpade: { anytime: 'Clearing Spade: Move 1 crop to empty field' },
+    C18_RollOverPlow: { anytime: 'Roll-Over Plow: Discard field crops → Plow' },
+    D71_Changeover: { anytime: 'Changeover: Discard 1-crop field → Sow' },
   },
 }
