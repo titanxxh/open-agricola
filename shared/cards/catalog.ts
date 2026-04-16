@@ -877,6 +877,11 @@ import { C140_PackagingArtist } from './C/C140_PackagingArtist'
 import { C154_TwinResearcher } from './C/C154_TwinResearcher'
 import { C160_Outrider } from './C/C160_Outrider'
 import { D21_Recruitment } from './D/D21_Recruitment'
+// Wave 3: COMPUTE_COST cards (2026-04-17)
+import { A27_OvenSite } from './A/A27_OvenSite'
+import { B155_ArtTeacher } from './B/B155_ArtTeacher'
+import { C95_BasketWeaver } from './C/C95_BasketWeaver'
+import { D95_SiteManager } from './D/D95_SiteManager'
 import './C/C39_StudioBoat'
 
 export const minorImprovementCards = [
@@ -1281,6 +1286,8 @@ export const minorImprovementCards = [
   C26_Flail,
   C28_TeachersDesk,
   D21_Recruitment,
+  // Wave 3 (2026-04-17)
+  A27_OvenSite,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1772,6 +1779,10 @@ export const occupationCards = [
   C140_PackagingArtist,
   C154_TwinResearcher,
   C160_Outrider,
+  // Wave 3 (2026-04-17)
+  B155_ArtTeacher,
+  C95_BasketWeaver,
+  D95_SiteManager,
 ]
 
 // All cards for reference and developer mode
