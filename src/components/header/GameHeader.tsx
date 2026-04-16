@@ -23,36 +23,21 @@ type Props = {
   locale: Locale
   state: GameState
   currentPlayer: PlayerState
-  allWorkersUsed: boolean
   devMode: boolean
   setDevMode: (value: boolean) => void
   myPlayerName: string | null
   isMyTurn: boolean
-  onUndo: () => void
-  onUndoAction: () => void
-  onShowScoring: () => void
-  historyLength: number
-  hasActionStartSnapshot: boolean
-  isInteractive: boolean
 }
 
 export const GameHeader = ({
   locale,
   state,
   currentPlayer,
-  allWorkersUsed,
   devMode,
   setDevMode,
   myPlayerName,
   isMyTurn,
-  onUndo,
-  onUndoAction,
-  onShowScoring,
-  historyLength,
-  hasActionStartSnapshot,
-  isInteractive,
 }: Props) => {
-  void allWorkersUsed
   const [menuOpen, setMenuOpen] = useState(false)
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
@@ -82,42 +67,6 @@ export const GameHeader = ({
         )}
         <div className="header-actions">
           <LocaleSwitcher className="header-locale-select" />
-          <button
-            type="button"
-            className="header-action-btn"
-            onClick={onUndo}
-            disabled={!isInteractive || historyLength === 0}
-            title={t(locale, 'ui.undoStep')}
-          >
-            <span className="header-action-btn__icon" aria-hidden>
-              ↩
-            </span>
-            <span className="header-action-btn__label">{t(locale, 'ui.undoStep')}</span>
-          </button>
-          <button
-            type="button"
-            className="header-action-btn"
-            onClick={onUndoAction}
-            disabled={!isInteractive || !hasActionStartSnapshot}
-            title={t(locale, 'ui.undoAction')}
-          >
-            <span className="header-action-btn__icon" aria-hidden>
-              ⟲
-            </span>
-            <span className="header-action-btn__label">{t(locale, 'ui.undoAction')}</span>
-          </button>
-          <button
-            type="button"
-            className="header-action-btn"
-            onClick={onShowScoring}
-            disabled={!isInteractive}
-            title={t(locale, 'ui.scoringPadButton')}
-          >
-            <span className="header-action-btn__icon" aria-hidden>
-              📊
-            </span>
-            <span className="header-action-btn__label">{t(locale, 'ui.scoringPadButton')}</span>
-          </button>
           <button
             type="button"
             className="header-action-btn"

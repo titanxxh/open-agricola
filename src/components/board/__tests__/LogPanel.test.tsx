@@ -90,4 +90,14 @@ describe('LogPanel', () => {
     expect(text).toContain("Small Potter's Oven")
     expect(html.match(/log-card-link/g)?.length ?? 0).toBe(2)
   })
+
+  it('renders bottom and sidebar variant classes', () => {
+    const bottomHtml = renderToStaticMarkup(<LogPanel locale="en" log={[]} />)
+    const sidebarHtml = renderToStaticMarkup(
+      <LogPanel locale="en" log={[]} variant="sidebar" />,
+    )
+
+    expect(bottomHtml).toContain('class="log log-bottom"')
+    expect(sidebarHtml).toContain('class="log log-sidebar"')
+  })
 })

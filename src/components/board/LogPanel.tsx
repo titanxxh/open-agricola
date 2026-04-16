@@ -9,6 +9,7 @@ import { ResourceLine } from '../common/ResourceLine'
 type Props = {
   locale: Locale
   log: GameState['log']
+  variant?: 'bottom' | 'sidebar'
 }
 
 type CardRef = { id: string; type: CardType; name: string }
@@ -202,8 +203,8 @@ const LogEntry = ({ parts, cardRefs, locale }: { parts: ReactNode[]; cardRefs: C
   )
 }
 
-export const LogPanel = ({ locale, log }: Props) => (
-  <section className="log log-bottom">
+export const LogPanel = ({ locale, log, variant = 'bottom' }: Props) => (
+  <section className={`log ${variant === 'sidebar' ? 'log-sidebar' : 'log-bottom'}`}>
     <h3>{t(locale, 'ui.actionLog')}</h3>
     <ul>
       {log.map((entry, index) => {

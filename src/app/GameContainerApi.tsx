@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
@@ -21,7 +21,6 @@ import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
-import { AnytimeBar } from '../components/interaction/AnytimeBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 
@@ -233,6 +232,8 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  const [headerHeight, setHeaderHeight] = useState(0)
 
   useEffect(() => {
     if (state && viewPlayerId) {
@@ -318,6 +319,31 @@ export const GameContainerApi = () => {
     ? !!(activePlayer && selfPlayer && displayPlayer &&
          activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
     : !!(activePlayer && displayPlayer)
+  const hasGameView = !!(state && currentPlayer && displayPlayer)
+
+  useLayoutEffect(() => {
+    if (!hasGameView) return
+    const node = headerRef.current
+    if (!node) return
+
+    const updateHeaderHeight = () => {
+      const nextHeight = Math.ceil(node.getBoundingClientRect().height)
+      setHeaderHeight((current) => (current === nextHeight ? current : nextHeight))
+    }
+
+    updateHeaderHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeaderHeight)
+      return () => window.removeEventListener('resize', updateHeaderHeight)
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateHeaderHeight()
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasGameView])
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -496,8 +522,6 @@ export const GameContainerApi = () => {
           foodUsed: interaction.foodUsed,
         }
       : null
-  const allWorkersUsed = state?.players.every((p) => p.workersAvailable <= 0) ?? false
-
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId !== 'idle') return false
@@ -1444,52 +1468,59 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      <GameHeader locale={locale} state={state} currentPlayer={currentPlayer} allWorkersUsed={allWorkersUsed} devMode={devMode} setDevMode={setDevMode} myPlayerName={selfPlayer?.name ?? null} isMyTurn={isMyTurn}
-        onUndo={undoStep} onUndoAction={undoAction} onShowScoring={() => setShowScoringPad(true)} historyLength={historyLength} hasActionStartSnapshot={hasActionStartSnapshot} isInteractive={isInteractive}
-      />
-
-      <AnytimeBar
-        anytimeActions={interaction.anytimeActions}
-        locale={locale}
-        isInteractive={isInteractive}
-        takeAnytimeAction={takeAnytimeAction}
-      />
+      <div ref={headerRef}>
+        <GameHeader
+          locale={locale}
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={devMode}
+          setDevMode={setDevMode}
+          myPlayerName={selfPlayer?.name ?? null}
+          isMyTurn={isMyTurn}
+        />
+      </div>
 
       <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
 
-      <main className="board">
-        <section className="board-panel board-action">
-          <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
-        </section>
-        <section className="board-panel board-farm">
-          <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
-            currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-            nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-            playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
-            fieldMap={fieldMap} stablePositions={stablePositions}
-            pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-            pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-            roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-            maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-            fieldSelectableSet={fieldSelectableSet} pendingFieldSelections={pendingFieldSelections} toggleFieldSelection={wrappedToggleFieldSelection}
-            pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
-            pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-            stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-            hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
-            existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-            toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-            togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-            toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-            confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-            setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-            isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-            selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-            isInteractive={isInteractive}
-          />
-        </section>
-      </main>
-
-      <LogPanel locale={locale} log={state.log} />
+      <div
+        className="game-layout"
+        style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
+      >
+        <div className="game-layout__main">
+          <main className="board">
+            <section className="board-panel board-action">
+              <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+            </section>
+            <section className="board-panel board-farm">
+              <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
+                currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+                nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+                playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+                fieldMap={fieldMap} stablePositions={stablePositions}
+                pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
+                pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+                roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
+                maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
+                fieldSelectableSet={fieldSelectableSet} pendingFieldSelections={pendingFieldSelections} toggleFieldSelection={wrappedToggleFieldSelection}
+                pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
+                pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
+                stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+                existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+                toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+                togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
+                toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+                confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+                setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+                isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
+                selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+                isInteractive={isInteractive}
+              />
+            </section>
+          </main>
+        </div>
+        <LogPanel locale={locale} log={state.log} variant="sidebar" />
+      </div>
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
@@ -1509,6 +1540,13 @@ export const GameContainerApi = () => {
         resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
         isInteractive={isInteractive}
+        onUndo={undoStep}
+        onUndoAction={undoAction}
+        onShowScoring={() => setShowScoringPad(true)}
+        historyLength={historyLength}
+        hasActionStartSnapshot={hasActionStartSnapshot}
+        anytimeActions={interaction.anytimeActions}
+        takeAnytimeAction={takeAnytimeAction}
       />
     </div>
   )

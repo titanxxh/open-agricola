@@ -19,6 +19,8 @@
 /* ══════════ DESIGN TOKENS ══════════ */
 :root {
   --agricola-font: 'Dominican', 'CalibriB', serif;
+  --app-edge-padding: clamp(12px, 2vw, 24px);
+  --game-header-gap: 8px;
   --color-primary: #3a5a2c;
   --color-primary-hover: #2d4a21;
   --color-accent: #d4a017;
@@ -43,6 +45,7 @@
   --color-error-bg: #fde8e8;
   --color-danger: #d74a3a;
   --color-danger-border: #f5c6cb;
+  --interaction-bar-max-height: 40vh;
 }
 
 /* ══════════ FOCUS STYLES ══════════ */
@@ -58,7 +61,7 @@ a:focus-visible,
   min-height: 100vh;
   color: var(--color-text);
   background: url('/bga-img/background.jpg');
-  padding: clamp(12px, 2vw, 24px);
+  padding: var(--app-edge-padding);
   box-sizing: border-box;
   overflow-x: hidden;
 }
@@ -78,12 +81,42 @@ a:focus-visible,
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 40vh;
+  gap: 10px;
+  max-height: var(--interaction-bar-max-height);
   overflow-y: auto;
 }
 
+.interaction-bar__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.interaction-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.interaction-bar__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(205, 185, 150, 0.85);
+}
+
 /* Padding when interaction bar is visible (fixed bottom) */
+.app {
+  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-max-height));
+}
 
 .anytime-bar {
   background: rgba(255, 255, 255, 0.9);
@@ -121,6 +154,26 @@ a:focus-visible,
 .anytime-actions button:disabled {
   background: #9ca3af;
   cursor: not-allowed;
+}
+
+.anytime-bar--inline {
+  flex: 1 1 320px;
+  min-width: 0;
+  justify-content: flex-end;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.anytime-bar--inline .anytime-title {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.anytime-bar--inline .anytime-actions {
+  justify-content: flex-end;
 }
 
 .interaction-title {
@@ -499,6 +552,18 @@ a:focus-visible,
 }
 
 /* ══════════ BOARD & ACTIONS ══════════ */
+.game-layout {
+  --game-header-height: 0px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: clamp(12px, 2vw, 20px);
+  align-items: start;
+}
+
+.game-layout__main {
+  min-width: 0;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2306,6 +2371,16 @@ a:focus-visible,
   margin-top: clamp(12px, 2vw, 20px);
 }
 
+.log-sidebar {
+  align-self: start;
+  position: sticky;
+  top: calc(var(--game-header-height) + var(--game-header-gap));
+  margin-top: 0;
+  max-height: calc(100vh - var(--game-header-height) - var(--game-header-gap) - var(--interaction-bar-max-height) - var(--spacing-md));
+  max-height: calc(100dvh - var(--game-header-height) - var(--game-header-gap) - var(--interaction-bar-max-height) - var(--spacing-md));
+  overflow-y: auto;
+}
+
 .log h3 {
   margin-top: 0;
   margin-bottom: 8px;
@@ -2473,7 +2548,7 @@ a:focus-visible,
   justify-content: center;
   align-items: flex-start;
   padding: 40px 16px;
-  z-index: 20;
+  z-index: 60;
 }
 
 .scoring-pad {
@@ -2717,13 +2792,28 @@ a:focus-visible,
 /* ══════════ MOBILE & RESPONSIVE ══════════ */
 @media (max-width: 1100px) {
   /* Reduce app padding to give board more width */
+  :root {
+    --app-edge-padding: 6px;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
   .app {
-    padding: 6px;
+    padding: var(--app-edge-padding);
   }
 
   .board {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .log-sidebar {
+    position: static;
+    top: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   /* Action board: remove wrapper chrome so board fills full width */
@@ -2809,7 +2899,7 @@ a:focus-visible,
   padding: 6px 12px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin-bottom: 8px;
+  margin-bottom: var(--game-header-gap);
   gap: 8px;
   position: sticky;
   top: 0;
@@ -5097,10 +5187,6 @@ a:focus-visible,
 
 .app--embedded {
   padding-top: 0;
-}
-
-.app--embedded .header-compact {
-  /* header is now shown in sandbox/embedded mode for scoring + undo controls */
 }
 
 .sandbox-embed-tips {
