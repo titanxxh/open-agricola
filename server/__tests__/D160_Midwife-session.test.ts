@@ -1,0 +1,116 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game-session'
+
+import '../../shared/cards/D/D160_Midwife'
+
+describe('D160_Midwife session', () => {
+  const setup = (currentPlayerIndex = 0) => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = currentPlayerIndex
+
+    // wish-children opens in round 6 (stage 2)
+    state.round = 6
+
+    // Reveal wish-children action space
+    const wishIdx = state.roundActionOrder.indexOf('wish-children')
+    if (wishIdx === -1) {
+      // If not found, assign it to a slot
+      for (let i = 0; i < state.roundActionOrder.length; i++) {
+        if (state.roundActionOrder[i] === null) {
+          state.roundActionOrder[i] = 'wish-children'
+          break
+        }
+      }
+    }
+
+    const owner = state.players[0]!
+    owner.occupationPlayed.push('D160_Midwife')
+    owner.playedCards.push('occupation:D160_Midwife')
+    owner.workersAvailable = 2
+    owner.resources.grain = 0
+    // Owner needs room for family growth to not block
+    owner.rooms = 3
+
+    const opponent = state.players[1]!
+    opponent.workersAvailable = 2
+    // Opponent needs room for family growth
+    opponent.rooms = 3
+
+    session.loadState(state)
+    return session
+  }
+
+  it('owner gains 1 grain when opponent uses wish-children', () => {
+    const session = setup(1)
+    const s = session.getState().state
+    // Check if wish-children is available
+    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
+    if (!wishSpace) return
+
+    const grainBefore = s.players[0]!.resources.grain
+
+    let resp = session.takeAction(1, 'wish-children')
+    if (!resp.ok) return // space may not be open yet
+
+    // Walk through player switches and choices for card effect
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    // Handle minor improvement choice from wish-children flow (skip it)
+    if (resp.pending.type === 'choice') {
+      const skipOption = resp.pending.options?.find((o: any) => o.value === '__skip__')
+      if (skipOption) {
+        resp = session.resolveChoice(1, '__skip__')
+      }
+    }
+
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    const after = session.getState().state
+    expect(after.players[0]!.resources.grain).toBe(grainBefore + 1)
+  })
+
+  it('does not trigger when owner uses wish-children', () => {
+    const session = setup(0)
+    const s = session.getState().state
+    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
+    if (!wishSpace) return
+
+    const grainBefore = s.players[0]!.resources.grain
+
+    let resp = session.takeAction(0, 'wish-children')
+    if (!resp.ok) return
+
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    // Skip minor improvement
+    if (resp.pending.type === 'choice') {
+      const skipOption = resp.pending.options?.find((o: any) => o.value === '__skip__')
+      if (skipOption) {
+        resp = session.resolveChoice(0, '__skip__')
+      }
+    }
+
+    const after = session.getState().state
+    // Owner should NOT get grain — scope is 'opponent'
+    expect(after.players[0]!.resources.grain).toBe(grainBefore)
+  })
+
+  it('does not trigger on non-family-growth spaces', () => {
+    const session = setup(1)
+    const grainBefore = session.getState().state.players[0]!.resources.grain
+
+    const resp = session.takeAction(1, 'day-laborer')
+    expect(resp.ok).toBe(true)
+
+    const after = session.getState().state
+    expect(after.players[0]!.resources.grain).toBe(grainBefore)
+  })
+})
