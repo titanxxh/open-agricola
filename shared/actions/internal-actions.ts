@@ -40,6 +40,7 @@ import { popCardStackAction } from './effects/pop-card-stack'
 import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 import { fieldSelectAction } from './effects/field-select'
+import { discardFromHandAction } from './effects/discard-from-hand'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -88,4 +89,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   fieldSelectAction,
+  discardFromHandAction,
 ]
