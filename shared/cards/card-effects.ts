@@ -1,6 +1,6 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
 import type { AnimalZone } from '../actions/effects/animals'
-import type { ScoreCategoryResult } from '../logic/scoring'
+import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
 
@@ -76,6 +76,11 @@ export type ScoringContext = {
 }
 
 export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: ScoringContext) => number
+export type SharedPostScoreHandler = (
+  state: GameState,
+  owner: PlayerState,
+  summaries: PlayerScoreSummary[],
+) => Array<{ playerId: string; score: number }>
 
 export type CardEffect = {
   id: string
@@ -106,6 +111,7 @@ export type CardEffect = {
   onBeforeStartOfTurn?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
+  computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */

@@ -1,6 +1,7 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { AnytimeAction } from '../../../shared/game/types'
+import { translateCardText } from '../common/cardText'
 
 type Props = {
   anytimeActions: AnytimeAction[]
@@ -27,7 +28,11 @@ export const AnytimeBar = ({
             onClick={() => takeAnytimeAction(action.id)}
             disabled={!isInteractive}
           >
-            {t(locale, action.labelKey, action.labelParams as Record<string, string | number> | undefined)}
+            {translateCardText(
+              locale,
+              action.labelKey,
+              action.labelParams as Record<string, string | number> | undefined,
+            )}
           </button>
         ))}
       </div>
