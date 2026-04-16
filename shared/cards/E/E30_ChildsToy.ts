@@ -1,11 +1,20 @@
 import { MinorImprovement } from '../types'
-// BGA: onBuy triggers a UI notification that harvest costs have changed.
-// The actual effect (newborns cost 2 food instead of 1 during feeding) is handled
-// in the feeding phase logic. No ActionFlow needed for onBuy.
-// TODO: implement newborn feeding cost modifier in harvest feeding phase.
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'E30_ChildsToy'
+
+registerCardEffect({
+  id: CARD_ID,
+  onBeforeFeed: (_state, player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    // Remove newborn discount by setting newbornCount to 0
+    // This makes newborns cost 2 food like adults
+    player.newbornCount = 0
+  },
+})
 
 export const E30_ChildsToy = new MinorImprovement({
-  id: "E30_ChildsToy",
+  id: CARD_ID,
   name: "Child's Toy",
   deck: 'E',
   number: 30,

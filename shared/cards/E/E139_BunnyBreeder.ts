@@ -1,6 +1,5 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'E139_BunnyBreeder'
@@ -13,13 +12,12 @@ const CARD_ID = 'E139_BunnyBreeder'
 // (not immediately). Currently the player gains the food immediately as an approximation.
 registerCardEffect({
   id: CARD_ID,
-  onBuy: (state, player) => {
+  onBuy: (state, _player) => {
     const turnsLeft = 14 - state.round
     if (turnsLeft <= 0) return
 
     const xorChildren: ActionFlow[] = []
     for (let i = 1; i <= turnsLeft; i++) {
-      const targetRound = state.round + i
       // Pre-queue future meeple and offer a corresponding gain node (approximation)
       xorChildren.push({
         type: 'leaf' as const,

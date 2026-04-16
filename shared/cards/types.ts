@@ -36,6 +36,8 @@ export type CardDefinition = {
   modifiers?: CostModifier[]
   exchanges?: CardExchange[]
   implemented?: boolean
+  evenMoreSet?: boolean
+  extraVp?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -66,6 +68,8 @@ export class CardBase {
   modifiers?: CostModifier[]
   exchanges?: CardExchange[]
   implemented?: boolean
+  evenMoreSet?: boolean
+  extraVp?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {
@@ -105,6 +109,8 @@ export class CardBase {
     if (this.modifiers) def.modifiers = this.modifiers
     if (this.exchanges) def.exchanges = this.exchanges
     if (this.implemented !== undefined) def.implemented = this.implemented
+    if (this.evenMoreSet) def.evenMoreSet = this.evenMoreSet
+    if (this.extraVp) def.extraVp = this.extraVp
     if (this.locales) def.locales = this.locales
     return def
   }

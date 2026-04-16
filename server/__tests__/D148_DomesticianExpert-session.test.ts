@@ -1,0 +1,89 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game-session'
+import { computeAnimalZones } from '../../shared/actions/effects/animals'
+
+import '../../shared/cards/D/D148_DomesticianExpert'
+
+describe('D148_DomesticianExpert session', () => {
+  const setup = (roomTiles?: Array<{row: number, col: number}>) => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    player.occupationHand.push('D148_DomesticianExpert')
+
+    if (roomTiles) {
+      player.roomTiles = roomTiles
+      player.rooms = roomTiles.length
+    }
+
+    session.loadState(state)
+    session.devPlayCard(0, 'D148_DomesticianExpert')
+    return session
+  }
+
+  it('1 adjacent pair gives capacity 2', () => {
+    // Two vertically adjacent rooms
+    const session = setup([{ row: 0, col: 0 }, { row: 1, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
+    expect(cardZone).toBeDefined()
+    expect(cardZone!.zoneType).toBe('card')
+    expect(cardZone!.capacity).toBe(2)
+    expect(cardZone!.animalType).toBe('sheep')
+  })
+
+  it('2 adjacent pairs gives capacity 4', () => {
+    // L-shape: (0,0)-(0,1) and (0,0)-(1,0) = 2 pairs
+    const session = setup([{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
+    expect(cardZone).toBeDefined()
+    expect(cardZone!.capacity).toBe(4)
+  })
+
+  it('animalType restricted to sheep', () => {
+    const session = setup([{ row: 0, col: 0 }, { row: 1, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
+    expect(cardZone).toBeDefined()
+    expect(cardZone!.animalType).toBe('sheep')
+  })
+
+  it('default 2 rooms are adjacent — zone exists', () => {
+    // Use default room tiles (no override)
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    // Default rooms: (2,0) and (1,0) — vertically adjacent
+    expect(player.roomTiles.length).toBe(2)
+
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
+    expect(cardZone).toBeDefined()
+    expect(cardZone!.capacity).toBe(2)
+  })
+
+  it('no zone when single room (no adjacent pairs)', () => {
+    const session = setup([{ row: 0, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
+    expect(cardZone).toBeUndefined()
+  })
+})

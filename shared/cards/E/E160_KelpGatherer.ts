@@ -1,0 +1,62 @@
+import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'E160_KelpGatherer'
+
+/**
+ * E160 Kelp Gatherer (Occupation, E, 160)
+ * Each time another player uses the Fishing accumulation space,
+ * the opponent gets 1 extra food and the card owner gets 1 vegetable.
+ *
+ * BGA: onPlayerPlaceFarmer — if opponent uses Fishing, opponent gains 1 food
+ * and owner gains 1 vegetable.
+ *
+ * scope 'opponent' — fires when an opponent uses the fishing space.
+ * Players 4+.
+ */
+
+const listener: CardListenerRegistration = {
+  id: 'E160-kelp-gatherer-opponent-fishing',
+  cardIds: [CARD_ID],
+  actions: ['place-farmer'],
+  phases: ['after' as ActionHookPhase],
+  scope: 'opponent',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.space?.id !== 'fishing') return
+    const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'gain-trigger-player',
+            params: { food: 1, targetPlayerId: triggerPlayerId },
+            sourceCard: CARD_ID,
+          },
+          gainLeaf(CARD_ID, { vegetable: 1 }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(listener)
+
+export const E160_KelpGatherer = new Occupation({
+  id: CARD_ID,
+  name: 'Kelp Gatherer',
+  deck: 'E',
+  number: 160,
+  category: 'FOOD_PROVIDER',
+  desc: [
+    'Each time another player uses the __Fishing__ accumulation space, they get 1 extra <FOOD> and you get 1 <VEGETABLE>.',
+  ],
+  cost: {},
+  players: '4+',
+  newSet: true,
+})

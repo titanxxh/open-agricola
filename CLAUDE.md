@@ -142,6 +142,7 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 - **Default to 2-player games** in tests.
 - **Commit messages**: `feat:`, `fix:`, `refactor:` prefixes. English only.
 - **After code changes**: Run `npm test` to verify. Update relevant docs (`docs/IMPLEMENTATION_STATUS.md`, `docs/ENGINE_ARCHITECTURE.md`, `docs/cards_impl.md`, `docs/card_progress.md`).
+- **After git push**: Check GitHub Actions at https://github.com/titanxxh/open-agricola/actions to verify CI passes. If the action fails, fix the issue immediately before continuing other work.
 - **BGA reference**: For uncertain implementations, consult `output/bga-agricola` (the upstream BGA Agricola reference, gitignored) unless `docs/ENGINE_ARCHITECTURE.md` specifies a different design.
 
 ## URL Parameters (for manual testing)

@@ -66,16 +66,16 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'INVALID_CROP' } }
     }
     const pos = { row, col }
-    if (!isWithinFarm(pos)) {
+    const key = positionKey(pos)
+    const isExtraField = options.extraValidPositions?.has(key) ?? false
+    if (!isExtraField && !isWithinFarm(pos)) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
-    const key = positionKey(pos)
     if (used.has(key)) continue
     if (excluded.has(key)) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     const field = fieldMap.get(key)
-    const isExtraField = options.extraValidPositions?.has(key) ?? false
     if (!isExtraField && (!field || field.crop !== null)) {
       return { ok: false, error: { code: 'NOT_EMPTY' } }
     }

@@ -1,6 +1,5 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B33_Mantlepiece'
 

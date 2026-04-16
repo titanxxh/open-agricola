@@ -1,6 +1,5 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'E6_Recount'
 

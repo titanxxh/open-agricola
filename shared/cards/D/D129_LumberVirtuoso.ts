@@ -52,7 +52,7 @@ registerCardEffect({
     if (options.length === 0) return
 
     const choice: ActionFlow = options.length === 1
-      ? { ...options[0]!, optional: true }
+      ? { ...options[0]!, optional: true } as ActionFlow
       : { type: 'xor', optional: true, children: options }
 
     return choice
