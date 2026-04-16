@@ -1,0 +1,77 @@
+import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'D50_ForeignAid'
+
+/**
+ * D50 Foreign Aid (Minor Improvement):
+ * Must be played by round 11.
+ * On purchase: gain 6 food.
+ * Drawback: The card owner cannot use action spaces that are revealed in
+ * rounds 12, 13, or 14 (the last 3 round-action spaces).
+ *
+ * Implementation: computeArgs listener on place-farmer that filters out
+ * blocked action spaces from the choice options for the card owner.
+ */
+
+/** Returns the set of action space IDs that are revealed in rounds 12-14 */
+const getBlockedSpaceIds = (state: { roundActionOrder: (string | null)[] }): Set<string> => {
+  const blocked = new Set<string>()
+  // roundActionOrder indices 11, 12, 13 correspond to rounds 12, 13, 14
+  for (let i = 11; i <= 13; i++) {
+    const spaceId = state.roundActionOrder[i]
+    if (spaceId) blocked.add(spaceId)
+  }
+  return blocked
+}
+
+// onBuy: gain 6 food
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: () => {
+    return gainLeaf(CARD_ID, { food: 6 })
+  },
+})
+
+// computeArgs: filter out rounds 12-14 action spaces from place-farmer choices
+const computeArgsListener: CardListenerRegistration = {
+  id: 'D50-foreign-aid-compute-args-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['computeArgs' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const blocked = getBlockedSpaceIds(context.state)
+    if (blocked.size === 0) return
+    // Mutate the result options to filter out blocked spaces
+    const result = context.result
+    if (result && result.type === 'choice' && Array.isArray(result.options)) {
+      result.options = result.options.filter(
+        (opt) => !blocked.has(opt.value),
+      )
+    }
+  },
+}
+
+registerCardListener(computeArgsListener)
+
+export { getBlockedSpaceIds }
+
+export const D50_ForeignAid = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Foreign Aid',
+  deck: 'D',
+  number: 50,
+  category: 'FOOD_PROVIDER',
+  desc: [
+    'When you play this card, you receive 6 <FOOD>.',
+    'You cannot use the action spaces that are placed on round spaces 12, 13, and 14.',
+  ],
+  cost: {},
+  maxRound: 11,
+  players: '1+',
+})

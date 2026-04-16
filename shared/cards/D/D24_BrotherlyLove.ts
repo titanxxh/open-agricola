@@ -1,0 +1,93 @@
+import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionChoiceOption } from '../../game/types'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { getRoundPlacementOrder } from '../helpers/round-placement'
+
+const CARD_ID = 'D24_BrotherlyLove'
+
+/**
+ * D24 Brotherly Love — Minor Improvement
+ *
+ * If you have exactly 4 family members and 3 are already placed, the 4th
+ * can go on the same action space as one of your other family members.
+ *
+ * BGA: onPlayerComputeArgsPlaceFarmer — if familySize == 4 and
+ * workersAvailable == 1 (i.e., 3 placed, 1 remaining), add all spaces
+ * where the player's own farmers are placed as extra options.
+ *
+ * canUseOccupied: allow using spaces occupied by the player's own farmers
+ * under the same conditions.
+ *
+ * Implementation:
+ * - computeArgs on place-farmer: when familySize == 4 and workersAvailable == 1,
+ *   add all spaces with own farmers as extra choices
+ * - canUseOccupied: allow those spaces
+ */
+
+const isActive = (context: CardListenerContext): boolean => {
+  if (!context.player.minorPlayed.includes(CARD_ID)) return false
+  return context.player.familySize === 4 && context.player.workersAvailable === 1
+}
+
+const getOwnFarmerSpaceIds = (context: CardListenerContext): string[] => {
+  const placements = getRoundPlacementOrder(context.player)
+  // Return unique space IDs where the player has placed farmers this round
+  return [...new Set(placements)]
+}
+
+const computeArgsListener: CardListenerRegistration = {
+  id: 'D24-brotherly-love-compute-args-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['computeArgs' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!isActive(context)) return
+    const ownSpaceIds = getOwnFarmerSpaceIds(context)
+    if (ownSpaceIds.length === 0) return
+    const extraOptions: ActionChoiceOption[] = []
+    for (const spaceId of ownSpaceIds) {
+      const space = context.state.actionSpaces.find((s) => s.id === spaceId)
+      if (!space) continue
+      // Only add occupied spaces (they should all be occupied since farmer placed there)
+      if (!space.takenBy) continue
+      if (!space.canBeExecutedByPlayer(context.state, context.player)) continue
+      extraOptions.push({
+        value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`,
+        labelKey: space.nameKey,
+      })
+    }
+    if (extraOptions.length === 0) return
+    return { extraOptions, sourceCard: CARD_ID }
+  },
+}
+
+const canUseOccupiedListener: CardListenerRegistration = {
+  id: 'D24-brotherly-love-can-use-occupied',
+  cardIds: [CARD_ID],
+  phases: ['canUseOccupied' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!isActive(context)) return
+    if (!context.space?.takenBy) return
+    // Only allow if the space is occupied by the player's own farmer
+    if (context.space.takenBy !== context.player.id) return
+    return { canUseOccupied: true }
+  },
+}
+
+registerCardListener(computeArgsListener)
+registerCardListener(canUseOccupiedListener)
+
+export const D24_BrotherlyLove = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Brotherly Love',
+  deck: 'D',
+  number: 24,
+  category: 'ACTIONS_BOOSTER',
+  desc: [
+    'If you have exactly 4 family members and 3 are already placed, the 4th can go on the same action space as one of your other family members.',
+  ],
+  cost: {},
+})
