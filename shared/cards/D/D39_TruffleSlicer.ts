@@ -48,8 +48,6 @@ export const D39_TruffleSlicer = new MinorImprovement({
   deck: 'D',
   number: 39,
   category: 'BONUS_POINTS',
-  desc: [
-    'Each time you use a wood accumulation space (Forest, Copse, or Grove) and you have at least 1 <BOAR>, you can pay 1 <FOOD> for 1 bonus <SCORE>.',
-  ],
+  desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
   cost: {},
 })

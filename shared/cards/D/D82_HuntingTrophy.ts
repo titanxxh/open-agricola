@@ -20,7 +20,9 @@ export const D82_HuntingTrophy = new MinorImprovement({
   deck: 'D',
   number: 82,
   category: 'FOOD_PROVIDER',
-  desc: ['When you play this card (costs 1 <BOAR>), you immediately get 3 <FOOD>. You can also convert <BOAR> to <FOOD> at a rate of 1:4 at any time.'],
+  desc: [
+    'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. Fences built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
+  ],
   cost: { boar: 1 },
   vp: 1,
   exchanges: [{ from: { boar: 1 }, to: { food: 4 }, trigger: 'anytime' }],

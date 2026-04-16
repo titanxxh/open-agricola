@@ -36,7 +36,7 @@ export const E110_Dentist = new Occupation({
   deck: 'E',
   number: 110,
   category: 'FOOD_PROVIDER',
-  desc: ['At the start of each harvest, you can place 1 <WOOD> from your supply on this card (irretrievable). In each feeding phase, you get 1 <FOOD> for each <WOOD> on this card.'],
+  desc: ['At the start of each harvest, you can place 1 <WOOD> from your supply on this card, irretrievably. In each feeding phase, you get 1 <FOOD> for each <WOOD> on this card.'],
   cost: {},
   players: '1+',
 })

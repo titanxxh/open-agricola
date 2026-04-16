@@ -48,7 +48,7 @@ export const E109_BraidMaker = new Occupation({
   number: 109,
   category: 'FOOD_PROVIDER',
   desc: [
-    "Each harvest, you can use this card to exchange 1 <REED> for 2 <FOOD>. You can build the __Basketmaker's Workshop__ for 1 <REED> and 1 <STONE> even when taking a __Minor Improvement__ action.",
+    "Each harvest, you can use this card to exchange 1 <REED> for 2 <FOOD>. You can build the  __Basketmaker's Workshop__ for 1 <REED> and 1 <STONE> even when taking a __Minor Improvement__ action. ",
   ],
   cost: {},
   players: '1+',

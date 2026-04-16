@@ -17,7 +17,9 @@ export const D154_ChimneySweep = new Occupation({
   deck: "D",
   number: 154,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each other player who has a stone house."],
+  desc: [
+    'Renovating to stone costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house.',
+  ],
   cost: {},
   players: "3+",
 })

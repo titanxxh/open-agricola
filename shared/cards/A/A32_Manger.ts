@@ -22,6 +22,6 @@ export const A32_Manger = new MinorImprovement({
   deck: "A",
   number: 32,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1/2/3/4 bonus <SCORE> if your pastures cover 6/7/8/10+ spaces total."],
+  desc: ["During scoring, if your pastures cover at least 6/7/8/10 farmyard spaces, you get 1/2/3/4 bonus <SCORE>."],
   cost: { wood: 2 },
 })

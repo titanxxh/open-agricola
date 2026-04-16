@@ -83,7 +83,7 @@ export const E144_WaresSalesman = new Occupation({
   number: 144,
   category: 'GOODS_PROVIDER',
   desc: [
-    'Each time any player plays a cooking improvement, you get 1 of the primary building resource in its cost and 1 <REED>.',
+    'Each time any player (including you) plays or builds a card that lets them turn building resources into <FOOD>, you get exactly 1 corresponding building resource and 1 <REED>.',
   ],
   cost: {},
   players: '3+',

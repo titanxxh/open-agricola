@@ -59,7 +59,7 @@ export const C137_CharcoalBurner = new Occupation({
   number: 137,
   category: 'GOODS_PROVIDER',
   desc: [
-    'Each time any player plays or builds an improvement that has bake capability, you get 1 <WOOD> and 1 <FOOD>.',
+    'Each time any player (including you) plays or builds a <BAKE>-improvement, you get 1 <WOOD> and 1 <FOOD>.',
   ],
   cost: {},
   players: '3+',

@@ -70,8 +70,7 @@ export const E105_Pioneer = new Occupation({
   number: 105,
   category: 'GOODS_PROVIDER',
   desc: [
-    'When you play this card, you receive 1 building resource of your choice (wood/clay/reed/stone) and 1 <FOOD>.',
-    'Each time you use the most recently revealed action space, you receive 1 building resource of your choice and 1 <FOOD>.',
+    'When you play this card and each time before you use the most recent action space card, you get 1 building resource of your choice and 1 <FOOD>.',
   ],
   cost: {},
   players: '1+',

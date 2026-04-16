@@ -19,7 +19,11 @@ export const E64_SimpleOven = new MinorImprovement({
   deck: "E",
   number: 64,
   category: "FOOD_GRAIN",
-  desc: ["[Bake Bread action:] 1 <GRAIN> → 3 <FOOD>"],
+  desc: [
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW-1X> 3<FOOD>',
+    'When you play this card, you can immediately take a __Bake Bread__ action.',
+  ],
   cost: { clay: 2 },
   vp: 1,
   isBaking: true,

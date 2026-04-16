@@ -38,7 +38,7 @@ export const A150_Stagehand = new Occupation({
   deck: 'A',
   number: 150,
   category: 'ACTION_SPACE_EXTENDER',
-  desc: ['Each time another player uses the Traveling Players accumulation space, you can take your choice of a Build Fences, Build Stables, or Build Rooms action.'],
+  desc: ['Each time another player uses the __Traveling Players__ accumulation space, you can take your choice of a __Build Fences__, __Build Stables__, or __Build Rooms__ action.'],
   cost: {},
   players: '1+',
 })

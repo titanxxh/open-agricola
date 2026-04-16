@@ -17,6 +17,8 @@ export const D31_Storeroom = new MinorImprovement({
   deck: "D",
   number: 31,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each pair of grain and vegetable in your supply."],
+  desc: [
+    'During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and fields), rounded up.',
+  ],
   cost: { reed: 1 },
 })

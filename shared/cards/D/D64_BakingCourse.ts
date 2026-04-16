@@ -26,7 +26,11 @@ export const D64_BakingCourse = new MinorImprovement({
   deck: "D",
   number: 64,
   category: "FOOD_PROVIDER",
-  desc: ["[__Bake Bread__ action:] <GRAIN> <ARROW> 2<FOOD>. At the end of each round that does not end with a harvest, you can take a __Bake Bread__ action."],
+  desc: [
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW> 2<FOOD>',
+    'At the end of each round that does not end with a harvest, you can take a __Bake Bread__ action.',
+  ],
   cost: {},
   prerequisite: "1 Occupation",
   occupationPrerequisites: { min: 1 },

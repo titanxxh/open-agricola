@@ -20,6 +20,6 @@ export const C59_SchnappsDistillery = new MinorImprovement({
   deck: "C",
   number: 59,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1/2 bonus <SCORE> for exactly 5/6+ vegetables (in supply and on fields)."],
+  desc: ["In each feeding phase, you can use this card to turn exactly 1 <VEGETABLE> into 5 <FOOD>. During scoring, you get 1 bonus <SCORE> each for your 5th and 6th <VEGETABLE>."],
   cost: { wood: 2, clay: 1 },
 })

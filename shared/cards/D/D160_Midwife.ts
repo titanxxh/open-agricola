@@ -39,7 +39,7 @@ export const D160_Midwife = new Occupation({
   number: 160,
   category: 'CROP_PROVIDER',
   desc: [
-    'Each time another player uses __Family Growth__, you get 1 <GRAIN>.',
+    'Each time another player uses the first person they place in a round to take a __Family Growth__ action, you get 1 <GRAIN> from the general supply.',
   ],
   cost: {},
   players: '4+',

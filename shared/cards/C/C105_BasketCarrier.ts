@@ -6,7 +6,7 @@ export const C105_BasketCarrier = new Occupation({
   deck: 'C',
   number: 105,
   category: 'GOODS_PROVIDER',
-  desc: ['Once each harvest, you can buy 1 wood, 1 reed, and 1 grain for 2 food total.'],
+  desc: ['Once each harvest, you can buy 1 <WOOD>, 1 <REED>, and 1 <GRAIN> for 2 <FOOD> total.'],
   cost: {},
   players: '1+',
 })

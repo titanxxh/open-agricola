@@ -32,7 +32,9 @@ export const D99_EarthenwarePotter = new Occupation({
   deck: "D",
   number: 99,
   category: "POINTS_PROVIDER",
-  desc: ["If you played this card in round 4 or earlier, after the final harvest you can pay 1 <CLAY> per family member to get 1 bonus <SCORE> each."],
+  desc: [
+    'If you play this card in round 4 or before, after the final harvest, you get 1 bonus <SCORE> for each person for which you then pay 1 <CLAY>.',
+  ],
   cost: {},
   players: "1+",
 })

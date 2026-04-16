@@ -13,13 +13,10 @@ export const cookingHearth1: MajorCardEffect = {
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
   description: [
     '[Anytime]',
-    'Vegetable → 3 food',
-    'Boar → 3 food',
-    'Sheep → 2 food',
-    'Cattle → 4 food',
-    '[Bake Bread action]',
-    'Grain → 3 food',
-    '[May upgrade from Fireplace by returning it]',
+    '<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>',
+    '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 4<FOOD>',
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW> 3<FOOD>',
   ],
 }
 

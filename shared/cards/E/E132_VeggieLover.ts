@@ -37,7 +37,12 @@ export const E132_VeggieLover = new Occupation({
   deck: "E",
   number: 132,
   category: "POINTS_PROVIDER",
-  desc: ['During the feeding phase: pay 1 <GRAIN> + 1 <VEGETABLE> → 6 <FOOD>. Scoring: 1/2/3 grain+vegetable sets → 2/4/6 bonus VP.'],
+  desc: [
+    '[Harvest]',
+    '<GRAIN_VEG_STACK> <ARROW-1X> 6<FOOD>',
+    '[Scoring]',
+    '1/2/3 <GRAIN_VEG_STACK> <ARROW-1X> 2/4/6 <SCORE>',
+  ],
   cost: {},
   players: "3+",
 })

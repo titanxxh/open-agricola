@@ -33,7 +33,7 @@ export const B132_EstateMaster = new Occupation({
   deck: 'B',
   number: 132,
   category: 'POINTS_PROVIDER',
-  desc: ['During scoring, you get 1 bonus <SCORE> for every 3 used farmyard spaces (rooms, fields, pastures, stables).'],
+  desc: ['Once you have no unused farmyard spaces left, you get 1 bonus <SCORE> for each <VEGETABLE> that you harvest.'],
   cost: {},
   players: '1+',
 })

@@ -69,6 +69,6 @@ export const A48_ShavingHorse = new MinorImprovement({
   deck: 'A',
   number: 48,
   category: 'FOOD_PROVIDER',
-  desc: ['Each time you receive <WOOD> from an action space, you can exchange 1 <WOOD> for 3 <FOOD>.'],
+  desc: ['Each time after you obtain at least 1 <WOOD>, if you then have 5 or more <WOOD> in your supply, you can exchange 1 <WOOD> for 3 <FOOD>. With 7 or more <WOOD>, you must do so.'],
   cost: {},
 })

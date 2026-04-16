@@ -30,6 +30,6 @@ export const A59_PotatoRidger = new MinorImprovement({
   deck: 'A',
   number: 59,
   category: 'FOOD_PROVIDER',
-  desc: ['Each time after you harvest 1+ <VEGETABLE>, if you then have 3+ <VEGETABLE>, you can turn exactly 1 <VEGETABLE> into 6 <FOOD>. With 4+ <VEGETABLE>, you must do so.'],
+  desc: ['Each time after you harvest 1+ <VEGETABLE>, if you then have 3+ <VEGETABLE> in your supply, you can turn exactly 1 <VEGETABLE> into 6 <FOOD>. With 4+ <VEGETABLE>, you must do so.'],
   cost: { wood: 1 },
 })

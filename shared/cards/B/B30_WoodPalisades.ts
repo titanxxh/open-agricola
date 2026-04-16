@@ -17,7 +17,7 @@ export const B30_WoodPalisades = new MinorImprovement({
   deck: "B",
   number: 30,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each fence segment you have."],
+  desc: ['Instead of a fence piece, you can place 2 <WOOD> from your supply on the fence spaces at the edge of your farmyard. These fence spaces with 2 <WOOD> are each worth 1 <SCORE>.'],
   cost: {},
   vp: 0,
 })

@@ -50,7 +50,7 @@ export const C112_Thresher = new Occupation({
   number: 112,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Each time before you use the __Grain Utilization__, __Farmland__, or __Cultivation__ action space, you can exchange 1 <GRAIN> for 1 <FOOD>.',
+    'Immediately before each time you use the __Grain Utilization__, __Farmland__, or __Cultivation__ action space, you can buy 1 <GRAIN> for 1 <FOOD>.',
   ],
   cost: {},
   players: '1+',

@@ -63,7 +63,7 @@ export const A154_Paymaster = new Occupation({
   number: 154,
   category: 'BONUS_POINT_GENERATOR',
   desc: [
-    'Each time another player uses a food accumulation space (__Fishing__ or __Traveling Players__), you can give them 1 <GRAIN> to get 1 bonus <SCORE>.',
+    'Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
   ],
   cost: {},
   players: '3+',

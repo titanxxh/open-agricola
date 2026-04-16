@@ -29,7 +29,7 @@ export const C48_Farmstead = new MinorImprovement({
   deck: 'C',
   number: 48,
   category: 'FOOD_PROVIDER',
-  desc: ['Place 1 <FOOD> on each of the next 5 round spaces. At the start of these rounds, you get the <FOOD>.'],
+  desc: ['After each turn in which you make at least one unused farmyard space used, you get 1 <FOOD>.'],
   cost: { wood: 1, clay: 1 },
   implemented: true,
 })

@@ -19,7 +19,7 @@ export const A134_FullFarmer = new Occupation({
   deck: "A",
   number: 134,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> per pasture that is at full capacity."],
+  desc: ["When you play this card, you immediately get 1 <WOOD> and 1 <CLAY>. During scoring, you get 1 bonus <SCORE> for each pasture you have holding the maximum number of animals."],
   cost: {},
   players: "1+",
 })

@@ -8,9 +8,9 @@ export const pottery: MajorCardEffect = {
   extraVp: true,
   description: [
     '[Harvest]',
-    'Clay → 2 food (max 1)',
+    '<CLAY> <ARROW-1X> 2<FOOD>',
     '[Scoring]',
-    '3/5/7 clay → 1/2/3 score',
+    '3/5/7<CLAY> <ARROW-1X> 1/2/3<SCORE>',
   ],
   scoring: {
     resource: 'clay',

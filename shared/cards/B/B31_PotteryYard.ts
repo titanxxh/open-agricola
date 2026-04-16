@@ -51,7 +51,7 @@ export const B31_PotteryYard = new MinorImprovement({
   number: 31,
   category: 'POINTS_PROVIDER',
   desc: [
-    'During the scoring, if there are at least 2 orthogonally adjacent unused spaces in your farm, you get 2 bonus <SCORE>. (You still get the negative points for those unused spaces.)',
+    'During the scoring, if there are at least 2 orthogonally adjacent unused spaces in your farm, you get 2 bonus <SCORE>. (You still get the negative points for those unused spaces.',
   ],
   cost: {},
   vp: 1,

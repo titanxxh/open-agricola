@@ -17,7 +17,9 @@ export const D34_LuxuriousHostel = new MinorImprovement({
   deck: "D",
   number: 34,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 4 bonus <SCORE> if you have a stone house and more rooms than family members."],
+  desc: [
+    'During scoring, if you then have more stone rooms than people, you get 4 bonus <SCORE>. You can only use one card to get bonus points for your stone house.',
+  ],
   cost: { stone: 1, food: 3 },
   prerequisite: "Stone House",
 })

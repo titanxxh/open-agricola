@@ -27,7 +27,7 @@ export const C141_SheepProvider = new Occupation({
   number: 141,
   category: "CROP_PROVIDER",
   desc: [
-    "Each time any player uses the __Sheep Market__, you get 1 <GRAIN>.",
+    'Each time any player (including you) uses the __Sheep Market__ accumulation space, you get 1 <GRAIN>.',
   ],
   cost: {},
   players: "3+",

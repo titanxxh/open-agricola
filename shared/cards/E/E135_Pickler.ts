@@ -21,7 +21,7 @@ export const E135_Pickler = new Occupation({
   deck: "E",
   number: 135,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 3 bonus <SCORE> if you have the most total vegetables (supply + fields, shared)."],
+  desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with the most total <VEGETABLE> gets 3 bonus <SCORE>.'],
   cost: {},
   players: "3+",
 })

@@ -17,6 +17,8 @@ export const D38_MilkingStool = new MinorImprovement({
   deck: "D",
   number: 38,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for every 2 cattle."],
+  desc: [
+    'In the field phase of each harvest, if you have at least 1/3/5 <CATTLE>, you get 1/2/3 <FOOD>. During scoring, you get 1 bonus <SCORE> for every 2 <CATTLE> you have.',
+  ],
   cost: { wood: 1 },
 })

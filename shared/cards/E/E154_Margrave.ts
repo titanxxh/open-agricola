@@ -18,7 +18,7 @@ export const E154_Margrave = new Occupation({
   deck: "E",
   number: 154,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, if you have a stone house, you get 1 bonus <SCORE> per opponent with a wood or clay house."],
+  desc: ['Once you live in a stone house, you get 2 <FOOD> each time any player renovates and, during scoring, 1 bonus <SCORE> for each wood house and clay house.'],
   cost: {},
   players: "3+",
 })

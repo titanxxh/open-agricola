@@ -50,7 +50,7 @@ export const B38_FutureBuildingSite = new MinorImprovement({
   deck: 'B',
   number: 38,
   category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Place 1 <WOOD> on each of the next 4 round spaces. At the start of these rounds, you get the <WOOD>. Remove the <WOOD> promised by this card from future round spaces the next time you build a room.'],
+  desc: ['Up until all other farmyard spaces are used, you cannot use the unused spaces that are orthogonally adjacent to your house (not even to build rooms).'],
   cost: {},
   implemented: true,
 })
