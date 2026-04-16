@@ -845,6 +845,19 @@ import { E49_Twibil } from './E/E49_Twibil'
 import { E144_WaresSalesman } from './E/E144_WaresSalesman'
 import { E156_ClaypitOwner } from './E/E156_ClaypitOwner'
 import { E160_KelpGatherer } from './E/E160_KelpGatherer'
+import { A20_DoubleTurnPlow } from './A/A20_DoubleTurnPlow'
+import { B26_AgrarianFences } from './B/B26_AgrarianFences'
+import { B36_Bottles } from './B/B36_Bottles'
+import { B68_Beanfield } from './B/B68_Beanfield'
+import { C112_Thresher } from './C/C112_Thresher'
+import { C129_SecondSpouse } from './C/C129_SecondSpouse'
+import { C158_ForestCampaigner } from './C/C158_ForestCampaigner'
+import { D17_DrillHarrow } from './D/D17_DrillHarrow'
+import { D18_SteamPlow } from './D/D18_SteamPlow'
+import { D24_BrotherlyLove } from './D/D24_BrotherlyLove'
+import { D50_ForeignAid } from './D/D50_ForeignAid'
+import { E105_Pioneer } from './E/E105_Pioneer'
+import './C/C39_StudioBoat'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -1230,6 +1243,15 @@ export const minorImprovementCards = [
   // Batch 15 — minor improvements (opponent interaction)
   D77_RecycledBrick,
   E49_Twibil,
+  // Batch 16 — minor improvements
+  A20_DoubleTurnPlow,
+  B26_AgrarianFences,
+  B36_Bottles,
+  B68_Beanfield,
+  D17_DrillHarrow,
+  D18_SteamPlow,
+  D24_BrotherlyLove,
+  D50_ForeignAid,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1704,6 +1726,11 @@ export const occupationCards = [
   E144_WaresSalesman,
   E156_ClaypitOwner,
   E160_KelpGatherer,
+  // Batch 16 — occupations
+  C112_Thresher,
+  C129_SecondSpouse,
+  C158_ForestCampaigner,
+  E105_Pioneer,
 ]
 
 // All cards for reference and developer mode
