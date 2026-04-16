@@ -8,15 +8,16 @@
 |---|---|---|---|---|
 | | BGA 总数 | 已实现 Hook | 仅数据 | 无文件 |
 |---|---|---|---|---|
-| A Deck | 180 | 147 | 26 | 7 |
-| B Deck | 180 | 144 | 21 | 15 |
-| C Deck | 182 | 147 | 21 | 14 |
-| D Deck | 181 | 142 | 31 | 8 |
-| E Deck | 169 | 149 | 15 | 5 |
-| **总计** | **892** | **729** | **114** | **49** |
+| A Deck | 180 | 152 | 21 | 7 |
+| B Deck | 180 | 157 | 10 | 13 |
+| C Deck | 182 | 154 | 18 | 10 |
+| D Deck | 181 | 149 | 24 | 8 |
+| E Deck | 169 | 154 | 10 | 5 |
+| **总计** | **892** | **766** | **83** | **43** |
 
 > Major Improvements (10张) 已全部实现，不计入上表。
-> 截至 2026-04-17 更新。1785 tests passing。实现率 85.1%。
+> 截至 2026-04-17 更新。1946 tests passing。实现率 **85.9%**（Hook 实现 + 静态 modifiers + exchanges）。
+> Wave 1-4 (2026-04-17) 完成后：新增 38 张卡 hooks、153 个测试。
 
 > **注意**：A14, A88, A123, B145, C13, C14 通过 `modifiers` 静态字段实现（bonus/trade 类型），无需 registerCardEffect/registerCardListener hooks，属于已实现。
 
@@ -45,9 +46,57 @@
 | 15 | 对手交互 | 23 | 中-高 | ✅ 已完成 |
 | 16 | 流程替换/特殊机制 | ~21 | 高 | 🔧 13/21（跳过 4 需新基础设施, 4 待验证, 2 已完成） |
 
-> 批次 8 跳过的 6 张复杂卡：A27, C95, D95 (onBuy 强制购买 + 费用覆盖), E27, E123 (holder/stack + 费用抵扣), B155 (特殊资源类型)
-> 批次 13 跳过的 8 张卡：C23 (假农民), D22 (未来回合放农民), D27 (大改良交换), D93 (选择+召回农民), D102 (移除马厩), D134 (跳过下一放置), D137 (多选商品菜单), E68 (木头作物类型)
-> 批次 14 跳过的 3 张卡：A3 (多选手牌+随机), B3 (随机+传牌), B146 (手牌选择弃牌)
+> 批次 8 跳过的 6 张复杂卡：~~A27~~ (Wave 3 ✅), ~~C95~~ (Wave 3 ✅), ~~D95~~ (Wave 3 ✅), ~~B155~~ (Wave 3 ✅), E27, E123 (holder/stack + 费用抵扣)。现仅剩 2 张。
+> 批次 13 跳过的 8 张卡：C23 (假农民), D22 (未来回合放农民), D27 (大改良交换), D93 (选择+召回农民), D102 (移除马厩), ~~D134~~ (Wave 1 ✅), D137 (多选商品菜单), E68 (木头作物类型)。现仅剩 7 张。
+> 批次 14 跳过的 3 张卡：A3 (多选手牌+随机), B3 (随机+传牌), B146 (手牌选择弃牌)。均待 card-select 基础设施。
+
+---
+
+## 2026-04-17 Wave 1-4 实现详情
+
+**Wave 1 — LISTENER_SIMPLE (21 张, +84 测试):**
+A42 ForestLakeHut, A43 FarmyardManure, A111 WallBuilder, A124 Knapper,
+B18 GrasslandHarrow, B51 DiggingSpade, B63 Tasting, B120 Sweep, B121 Geologist,
+B122 Mineralogist, B156 StorehouseKeeper, B161 Weakling, C26 Flail,
+C28 TeachersDesk, C117 Legworker, C140 PackagingArtist, C154 TwinResearcher,
+C160 Outrider, D21 Recruitment, D134 OysterEater, E3 TeaTime
+
+**Wave 2 — 静态 modifier/prerequisite/scoring (9 张, +29 测试):**
+A10 WoodenShed, C10 BunkBeds, C32 AbortOriel, D11 LawnFertilizer,
+D37 Sculpture, D85 Reader, E16 BriarHedge, E29 Heirloom, E96 Elder
+
+> 扩展 `PrerequisiteHandler` 签名接受 `GameState` 参数（用于 C32 全局检查）。
+
+**Wave 3 — COMPUTE_COST (5 张, +15 测试):**
+A27 OvenSite, B155 ArtTeacher, C95 BasketWeaver, D95 SiteManager, E109 BraidMaker
+
+**Wave 4 — PLAYER_ACTION_CARD 链式 (3 张, +25 测试):**
+B130 FullPeasant, B150 LargeScaleFarmer, B152 JuniorArtist
+
+## 真正剩余（约 25 张）
+
+### Tier 1: BGA 自身无逻辑（11 张，已匹配 BGA 行为）
+A41 VegetableSlicer, A85 Homekeeper, A87 Conservator, A106 SlurrySpreader,
+A113 HeresyTeacher, D25 WitchesDanceFloor, D103 CanalBoatman,
+D155 Ebonist, D159 ReedSeller, E93 Motivator, E149 MidnightFencer
+
+> 这些卡的 BGA PHP 只有 `getDesc`，无任何 listener/onBuy。保留数据即符合 BGA 行为。
+
+### Tier 2: 需新基础设施（13 张）
+
+**card-select UI (3)**: A3 PaperKnife, B3 Moonshine, B146 Illusionist
+
+**farmer/stable 操作 (4)**: C23 FakeFarmer, D22 WorkPermit,
+D93 SheepInspector (farmer-recall), D102 SampleStableMaker (stable-recall)
+
+**多选/交换 (3)**: D27 Retraining (major swap), D137 TradeTeacher (resource-type multi-select),
+E76 LumberPile (stable recall + farmhand)
+
+**复杂流程 (3)**: C22 BasketChair (PlayerActionCard 移动农民),
+C150 ParrotBreeder (anytime + opponent trigger), E125 DelayedWayfarer (onBuy + extra placement)
+
+### Tier 3: 核心类型扩展 (1)
+E68 CherryOrchard — 需 `Field.crop` 支持 'wood' 作物类型
 
 ### 实现进度
 
@@ -70,6 +119,10 @@
 | 16 (w1) | 2026-04-16 | +13 | 742 | 83.2% |
 | misc | 2026-04-16 | +15 | 757 | 84.9% |
 | A19+A89 future | 2026-04-17 | +2 | 759 | 85.1% |
+| Wave 1 listener | 2026-04-17 | +21 | 780 | 87.4% |
+| Wave 2 modifier | 2026-04-17 | +9 | 789 | 88.5% |
+| Wave 3 compute-cost | 2026-04-17 | +5 | 794 | 89.0% |
+| Wave 4 chain-action | 2026-04-17 | +3 | 797 | 89.4% |
 
 ---
 
