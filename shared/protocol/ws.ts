@@ -1,7 +1,7 @@
 import type { Resource } from '../game/types'
 import type { StateUpdateEnvelope } from './game'
 
-export type ClientCommand =
+type ClientCommandBody =
   | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
   | { type: 'choice'; value: string }
@@ -40,9 +40,11 @@ export type ClientCommand =
   | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
   | { type: 'dissolveRoom' }
 
+export type ClientCommand = ClientCommandBody & { requestId?: string }
+
 export type ServerEvent =
   | StateUpdateEnvelope
-  | { type: 'error'; error: string }
+  | { type: 'error'; error: string; requestId?: string }
   | { type: 'authOk'; userId: string; username: string }
   | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number }
   | { type: 'roomJoined'; roomId: string; playerIndex: number }

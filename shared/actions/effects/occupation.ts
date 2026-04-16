@@ -1,32 +1,51 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
-import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
+import {
+  canAffordCardPreviewCostByProvider,
+  payCardPreviewCostByProvider,
+  payTypedFlatCost,
+} from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
-
-const canAffordWithPaperMaker = (
-  player: PlayerState,
-  cost: Partial<PlayerState['resources']>,
-) => {
-  if (canAffordTypedFlatCost(player, cost, 'occupation')) return true
-  if (!player.occupationPlayed.includes('B109_PaperMaker')) return false
-  if (player.resources.wood < 1) return false
-  const foodNeeded = cost.food ?? 0
-  const generatedFood = player.occupationPlayed.length
-  if (foodNeeded <= 0 || generatedFood <= 0) return false
-  return player.resources.food + generatedFood >= foodNeeded
-}
-
-export const isOccupationPlayable = (
+const buildOccupationCostProvider = (
   player: PlayerState,
   occupationId: string,
   costOverride?: Partial<PlayerState['resources']>,
+) => () => costOverride ?? getOccupationCost(player, occupationId) ?? {}
+
+const canAffordOccupationPreviewCost = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  costOverride?: Partial<PlayerState['resources']>,
+  actionCardId?: string,
+) =>
+  canAffordCardPreviewCostByProvider(
+    state,
+    player,
+    'play-occupation',
+    occupationId,
+    buildOccupationCostProvider(player, occupationId, costOverride),
+    actionCardId,
+    'occupation',
+  )
+
+export const isOccupationPlayable = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  costOverride?: Partial<PlayerState['resources']>,
+  actionCardId?: string,
 ) => {
   const occupation = getOccupation(occupationId)
   if (!occupation || !player.occupationHand.includes(occupation.id)) return false
-  const baseCost =
-    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
-  return canAffordWithPaperMaker(player, baseCost)
+  return canAffordOccupationPreviewCost(
+    state,
+    player,
+    occupationId,
+    costOverride,
+    actionCardId,
+  )
 }
 
 export const playOccupation = (
@@ -34,6 +53,7 @@ export const playOccupation = (
   occupationId: string,
   costOverride?: Partial<PlayerState['resources']>,
   state?: GameState,
+  actionCardId?: string,
 ): ActionExecutionResult => {
   const occupation = getOccupation(occupationId)
   if (!occupation) {
@@ -42,9 +62,22 @@ export const playOccupation = (
   if (!player.occupationHand.includes(occupation.id)) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
-  const baseCost =
-    costOverride ?? getOccupationCost(player, occupationId) ?? occupation.cost ?? {}
-  if (!payTypedFlatCost(player, baseCost, 'occupation')) {
+  const paySucceeded = state
+    ? payCardPreviewCostByProvider(
+        state,
+        player,
+        'play-occupation',
+        occupationId,
+        buildOccupationCostProvider(player, occupationId, costOverride),
+        actionCardId,
+        'occupation',
+      )
+    : payTypedFlatCost(
+        player,
+        buildOccupationCostProvider(player, occupationId, costOverride)(),
+        'occupation',
+      )
+  if (!paySucceeded) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
   player.occupationHand = player.occupationHand.filter(
@@ -97,8 +130,7 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
     : player.occupationPlayed.length === 0
       ? 0
       : 1
-  const discount = player.occupationPlayed.includes('B109_PaperMaker') ? 1 : 0
-  let food = Math.max(0, base - discount)
+  let food = base
   for (const mod of player.activeModifiers ?? []) {
     if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
       if (mod.discount.food && food > 0) {
@@ -112,8 +144,10 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
 export const getOccupationActionCost = getLessonsCost
 
 const buildPlayableOccupationOptions = (
+  state: GameState,
   player: PlayerState,
   cost: Partial<PlayerState['resources']>,
+  actionCardId?: string,
 ): ActionChoiceOption[] =>
   player.occupationHand
     .map((id) => getOccupation(id))
@@ -121,13 +155,34 @@ const buildPlayableOccupationOptions = (
       (occupation): occupation is NonNullable<typeof occupation> =>
         !!occupation,
     )
-    .filter(() => canAffordWithPaperMaker(player, cost))
+    .filter((occupation) =>
+      canAffordOccupationPreviewCost(
+        state,
+        player,
+        occupation.id,
+        cost,
+        actionCardId,
+      ),
+    )
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
     }))
 
-export const canAffordOccupationActionCost = canAffordWithPaperMaker
+export const canAffordOccupationActionCost = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  cost: Partial<PlayerState['resources']>,
+  actionCardId?: string,
+) =>
+  canAffordOccupationPreviewCost(
+    state,
+    player,
+    occupationId,
+    cost,
+    actionCardId,
+  )
 
 export const playOccupationAction: ActionDefinition = {
   id: 'play-occupation',
@@ -136,11 +191,16 @@ export const playOccupationAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, space, params }) => {
+  execute: ({ state, player, space, params }) => {
     const cost =
       (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
       getLessonsCost(player, space.id)
-    const playableOptions = buildPlayableOccupationOptions(player, cost)
+    const playableOptions = buildPlayableOccupationOptions(
+      state,
+      player,
+      cost,
+      space.id,
+    )
     if (playableOptions.length === 0) {
       return { type: 'ok' }
     }
@@ -154,6 +214,6 @@ export const playOccupationAction: ActionDefinition = {
     const cost =
       (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
       getLessonsCost(player, space.id)
-    return playOccupation(player, choice, cost, state)
+    return playOccupation(player, choice, cost, state, space.id)
   },
 }

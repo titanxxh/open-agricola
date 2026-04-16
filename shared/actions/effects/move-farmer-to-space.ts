@@ -1,14 +1,50 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition, ActionExecutionContext, ActionSpace } from '../../game/types'
+import { applyCanUseOccupiedHooks } from '../hooks'
+import {
+  executeCardListener,
+  getMatchingListeners,
+  type CardListenerContext,
+} from '../../cards/card-listeners'
 
 /**
- * Move a farmer from a source action space to an unoccupied action space and execute it.
+ * Move a farmer from a source action space to another selectable action space and execute it.
  * Used by D51_Archway (move from Archway) and E10_StrawHat (move from Farmland).
  *
- * - execute(): lists available unoccupied spaces (excluding params.excludeSpaceId) → returns choice
+ * - execute(): lists selectable spaces (excluding params.excludeSpaceId) → returns choice
  * - resolveChoice(): marks target space as takenBy, executes the space's action
- *
- * Special case: A28_ForestSchool allows moving to occupied Lessons spaces.
  */
+const canUseOccupiedSpace = (
+  context: ActionExecutionContext & { actionId: string },
+) => {
+  let canUseOccupied = applyCanUseOccupiedHooks(context, false)
+  const listenerContext: CardListenerContext = {
+    ...context,
+    phase: 'canUseOccupied',
+    canUseOccupied,
+  }
+  const matched = getMatchingListeners(listenerContext)
+  for (const entry of matched) {
+    const result = executeCardListener(entry.registration, listenerContext, {
+      ownerPlayerId: entry.ownerPlayerId,
+    })
+    if (typeof result?.canUseOccupied === 'boolean') {
+      canUseOccupied = result.canUseOccupied
+    }
+  }
+  return canUseOccupied
+}
+
+const isSelectableSpace = (
+  context: Omit<ActionExecutionContext, 'space'>,
+  space: ActionSpace,
+  excludeId?: string,
+) => {
+  if (space.id === excludeId) return false
+  if (!space.canBeExecutedByPlayer(context.state, context.player)) return false
+  if (!space.takenBy) return true
+  return canUseOccupiedSpace({ ...context, space, actionId: space.id })
+}
+
 export const moveFarmerToSpaceAction: ActionDefinition = {
   id: 'move-farmer-to-space',
   nameKey: 'actions.move-farmer-to-space.name',
@@ -19,18 +55,8 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
   execute: ({ state, player, params }) => {
     const excludeId = params?.excludeSpaceId as string | undefined
     const spaces = state.actionSpaces.filter(
-      (s) => !s.takenBy && s.id !== excludeId && s.canBeExecutedByPlayer(state, player),
+      (space) => isSelectableSpace({ state, player, params }, space, excludeId),
     )
-    // A28_ForestSchool: allow occupied Lessons spaces
-    if (player.occupationPlayed.includes('A28_ForestSchool')) {
-      for (const s of state.actionSpaces) {
-        if (s.takenBy && s.id.startsWith('lessons') && !spaces.includes(s)) {
-          if (s.canBeExecutedByPlayer(state, player)) {
-            spaces.push(s)
-          }
-        }
-      }
-    }
     if (spaces.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
     return {
       type: 'choice',

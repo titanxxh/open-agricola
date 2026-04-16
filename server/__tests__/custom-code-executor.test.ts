@@ -79,7 +79,7 @@ registerCardListener({
     if (!compiled.valid) return
 
     const cardData = makeCardData(compiled.compiledCode, compiled.manifest)
-    registerCustomCard(cardData)
+    registerCustomCard(cardData, { allowGlobal: true })
     registerExecutorBackedCustomCard(cardData)
 
     const state = createInitialState(42)

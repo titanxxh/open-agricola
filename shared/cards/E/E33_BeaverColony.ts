@@ -3,7 +3,8 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerCardEffect } from '../card-effects'
-import { enforceAnimalCapacity } from '../../actions/effects/animals'
+import { enforceAnimalCapacity, getPastureCapacity } from '../../actions/effects/animals'
+import type { AnimalZone } from '../../actions/effects/animals'
 
 const CARD_ID = 'E33_BeaverColony'
 
@@ -11,14 +12,31 @@ const CARD_ID = 'E33_BeaverColony'
 // BGA also checks ActionResourceMarket and specific cards (C104_Collector, E81_AlchemistsLab).
 const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
 
-// BGA: on purchase, trigger animal reorg since a stabled pasture loses capacity.
-// The pasture restriction is enforced via getBlockedPastureId() in animals.ts,
-// which makes getPastureCapacity return 0 for the smallest stabled pasture.
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     enforceAnimalCapacity(player)
+  },
+  onComputeAnimalZones: (player, zones) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return
+    const stabledPastures = zones.filter(
+      (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
+        zone.zoneType === 'pasture' &&
+        typeof zone.pastureIndex === 'number' &&
+        !!player.pastures[zone.pastureIndex] &&
+        player.pastures[zone.pastureIndex]!.stables > 0,
+    )
+    if (stabledPastures.length === 0) return
+    const blocked = stabledPastures.reduce((smallest, zone) => {
+      const smallestPasture = player.pastures[smallest.pastureIndex]!
+      const currentPasture = player.pastures[zone.pastureIndex]!
+      return getPastureCapacity(currentPasture) < getPastureCapacity(smallestPasture)
+        ? zone
+        : smallest
+    })
+    blocked.blocked = true
+    blocked.capacity = 0
   },
 })
 

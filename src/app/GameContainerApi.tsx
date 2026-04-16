@@ -6,7 +6,7 @@ import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../..
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import { positionKey } from '../../shared/game/farm'
-import { emptyResources, resourceKeyList, baseActionOrder } from '../../shared/logic/state'
+import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
@@ -519,17 +519,10 @@ export const GameContainerApi = () => {
     })
   }, [state?.roundActionOrder, actionMap])
   const baseActions = useMemo(() => {
-    const base = baseActionOrder.map((id) => actionMap.get(id)).filter((s): s is ActionSpace => !!s)
-    // Append dynamic PlayerActionCard action spaces not in the predefined list
-    const baseIds = new Set(baseActionOrder)
-    const roundIds = new Set((state?.roundActionOrder ?? []).filter(Boolean))
-    for (const [id, space] of actionMap) {
-      if (!baseIds.has(id) && !roundIds.has(id) && !base.some((s) => s.id === id)) {
-        base.push(space)
-      }
-    }
-    return base
-  }, [actionMap, state?.roundActionOrder])
+    if (!state) return []
+    const roundIds = new Set(state.roundActionOrder.filter(Boolean))
+    return state.actionSpaces.filter((space) => !roundIds.has(space.id))
+  }, [state])
 
   const playedCards = displayPlayer?.playedCards ?? [
     ...(displayPlayer?.improvements ?? []).map((id: string) => `major:${id}`),

@@ -10,6 +10,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
+  Trade,
 } from '../../game/types'
 import {
   applyCostOverride,
@@ -66,6 +67,7 @@ export const resolveCardCostWithModifiers = (
   const matched = getMatchingListeners(context)
   let cost = { ...baseCost }
   const collectedBonuses: Bonus[] = []
+  const collectedTrades: Trade[] = []
 
   for (const entry of matched) {
     const listenerContext: CardListenerContext & {
@@ -85,10 +87,22 @@ export const resolveCardCostWithModifiers = (
     if (result?.bonuses) {
       collectedBonuses.push(...result.bonuses)
     }
+    if (result?.trades) {
+      collectedTrades.push(...result.trades)
+    }
   }
 
-  if (collectedBonuses.length > 0) {
-    return { fee: cost, bonuses: collectedBonuses }
+  if (collectedBonuses.length > 0 || collectedTrades.length > 0) {
+    const complexCost: ComplexCost = {
+      fee: cost,
+    }
+    if (collectedBonuses.length > 0) {
+      complexCost.bonuses = collectedBonuses
+    }
+    if (collectedTrades.length > 0) {
+      complexCost.trades = collectedTrades
+    }
+    return complexCost
   }
 
   return cost
@@ -390,18 +404,23 @@ export const canAffordCardPreviewCost = (
   cardId: string,
   baseCost: Partial<Resource> | ComplexCost | null | undefined,
   actionCardId?: string,
+  costType?: CostModifierType,
 ) =>
-  canAffordCost(
-    player,
-    resolveCardPreviewCost(
+  (() => {
+    const previewCost = resolveCardPreviewCost(
       state,
       player,
       actionId,
       cardId,
       baseCost,
       actionCardId,
-    ) ?? undefined,
-  )
+    )
+    if (!previewCost) return false
+    if (!isComplexCost(previewCost)) {
+      return canAffordTypedFlatCost(player, previewCost, costType)
+    }
+    return canPayCost(player, previewCost, costType)
+  })()
 
 export const canAffordCardPreviewCostByProvider = (
   state: GameState,
@@ -410,6 +429,7 @@ export const canAffordCardPreviewCostByProvider = (
   cardId: string,
   getBaseCost: () => Partial<Resource> | ComplexCost | null | undefined,
   actionCardId?: string,
+  costType?: CostModifierType,
 ) =>
   canAffordCardPreviewCost(
     state,
@@ -418,6 +438,58 @@ export const canAffordCardPreviewCostByProvider = (
     cardId,
     getBaseCost(),
     actionCardId,
+    costType,
+  )
+
+export const payCardPreviewCost = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  cardId: string,
+  baseCost: Partial<Resource> | ComplexCost | null | undefined,
+  actionCardId?: string,
+  costType?: CostModifierType,
+) => {
+  const previewCost = resolveCardPreviewCost(
+    state,
+    player,
+    actionId,
+    cardId,
+    baseCost,
+    actionCardId,
+  )
+  if (previewCost === null) return false
+  if (!isComplexCost(previewCost)) {
+    return payTypedFlatCost(player, previewCost, costType)
+  }
+  const solution = computeAllBuyableCombinations(
+    player,
+    previewCost,
+    undefined,
+    costType,
+  )[0]
+  if (!solution) return false
+  executePaymentSolution(player, solution)
+  return true
+}
+
+export const payCardPreviewCostByProvider = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  cardId: string,
+  getBaseCost: () => Partial<Resource> | ComplexCost | null | undefined,
+  actionCardId?: string,
+  costType?: CostModifierType,
+) =>
+  payCardPreviewCost(
+    state,
+    player,
+    actionId,
+    cardId,
+    getBaseCost(),
+    actionCardId,
+    costType,
   )
 
 const describePaymentSolution = (

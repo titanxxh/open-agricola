@@ -50,6 +50,7 @@ export type ActionHookResult = {
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
+  trades?: import('../game/types').Trade[]
   bonuses?: import('../game/types').Bonus[]
   sourceCard?: string
   logKey?: string

@@ -223,14 +223,14 @@ describe('A128_RiparianBuilder', () => {
 })
 
 describe('B109_PaperMaker', () => {
-  it('registers an isDoable listener for play-occupation', () => {
-    const listener = findListener('B109-paper-maker-isdoable-occupation')
+  it('registers a computeCosts listener for play-occupation', () => {
+    const listener = findListener('B109-paper-maker-compute-costs-occupation')
     expect(listener).toBeDefined()
     expect(listener?.actions).toEqual(['play-occupation'])
   })
 
-  it('returns an optional pay-then-gain flow before playing an occupation', () => {
-    const listener = findListener('B109-paper-maker-before-occupation')
+  it('returns a wood-to-food trade augmentation before playing an occupation', () => {
+    const listener = findListener('B109-paper-maker-compute-costs-occupation')
     expect(listener).toBeDefined()
     const player = createPlayer()
     player.occupationPlayed = ['B109_PaperMaker', 'A123_FrameBuilder']
@@ -241,17 +241,16 @@ describe('B109_PaperMaker', () => {
       player,
       space: createSpace('lessons'),
       actionId: 'play-occupation',
-      phase: 'before',
+      phase: 'computeCosts',
     } as any)
 
-    expect(result?.flow?.type).toBe('seq')
-    if (result?.flow?.type === 'seq') {
-      expect(result.flow.optional).toBe(true)
-      expect(result.flow.children).toEqual([
-        expect.objectContaining({ type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: 'B109_PaperMaker' }),
-        expect.objectContaining({ type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'B109_PaperMaker' }),
-      ])
-    }
+    expect(result?.trades).toEqual([
+      expect.objectContaining({
+        from: { wood: 1 },
+        to: { food: 2 },
+        max: 1,
+      }),
+    ])
   })
 
   it('makes lessons available when wood can be converted into enough food', () => {

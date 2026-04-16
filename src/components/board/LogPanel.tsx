@@ -2,6 +2,7 @@ import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'rea
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { ActionDetailParts } from '../../../shared/protocol/game'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
 
@@ -32,6 +33,19 @@ const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const desc = t(locale, `${prefix}.${ref.id}.description`)
   return desc.includes('.description') ? '' : desc
 }
+
+const joinCardRefs = (locale: Locale, refs: CardRef[]) => (
+  <>
+    {refs.map((ref, index) => (
+      <Fragment key={ref.id}>
+        {index > 0 ? (locale === 'zh' ? '、' : ', ') : null}
+        <LogCardLink locale={locale} cardRef={ref}>
+          {ref.name}
+        </LogCardLink>
+      </Fragment>
+    ))}
+  </>
+)
 
 const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -328,25 +342,8 @@ export const LogPanel = ({ locale, log }: Props) => (
           )
         }
         if (params && params.detailParts && entry.key === 'log.actionDetail') {
-          const detailParts = params.detailParts as {
-            gains?: Resource
-            costs?: Resource
-            effects?: {
-              buildRoom?: number
-              buildStables?: number
-              growFamily?: number
-              plow?: number
-              sowGrain?: number
-              sowVegetable?: number
-              renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
-              fencing?: number
-              improvements?: string[]
-              minorImprovements?: string[]
-              startPlayer?: boolean
-              bakeBread?: { count: number; food: number }
-            }
-          }
-          const effects: string[] = []
+          const detailParts = params.detailParts as ActionDetailParts
+          const effects: ReactNode[] = []
           const effectData = detailParts.effects ?? {}
           if (effectData.buildRoom) {
             effects.push(
@@ -397,27 +394,33 @@ export const LogPanel = ({ locale, log }: Props) => (
             )
           }
           if (effectData.improvements && effectData.improvements.length > 0) {
-            const names = effectData.improvements
-              .map((id) =>
-                t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, ''),
-              )
-              .filter((name) => name)
+            const refs = effectData.improvements
+              .map((id) => resolveCardName(locale, id))
+              .filter((ref): ref is CardRef => ref !== null)
             effects.push(
-              t(locale, 'log.effectImprovement', {
-                improvements: names.join('、'),
-              }),
+              <>
+                {renderRichTemplate(
+                  locale,
+                  'log.effectImprovement',
+                  {},
+                  { improvements: joinCardRefs(locale, refs) },
+                )}
+              </>,
             )
           }
           if (effectData.minorImprovements && effectData.minorImprovements.length > 0) {
-            const names = effectData.minorImprovements
-              .map((id) =>
-                t(locale, `minorImprovements.${id}.name`).replace(/\s*[（(].*$/, ''),
-              )
-              .filter((name) => name)
+            const refs = effectData.minorImprovements
+              .map((id) => resolveCardName(locale, id))
+              .filter((ref): ref is CardRef => ref !== null)
             effects.push(
-              t(locale, 'log.effectMinorImprovement', {
-                improvements: names.join('、'),
-              }),
+              <>
+                {renderRichTemplate(
+                  locale,
+                  'log.effectMinorImprovement',
+                  {},
+                  { improvements: joinCardRefs(locale, refs) },
+                )}
+              </>,
             )
           }
           if (effectData.startPlayer) {
@@ -457,7 +460,25 @@ export const LogPanel = ({ locale, log }: Props) => (
             )
           }
           if (effects.length > 0) {
-            segments.push(t(locale, 'log.effects', { effects: effects.join(' · ') }))
+            segments.push(
+              ...renderRichTemplate(
+                locale,
+                'log.effects',
+                {},
+                {
+                  effects: (
+                    <>
+                      {effects.map((effect, effectIndex) => (
+                        <Fragment key={`effect-${effectIndex}`}>
+                          {effectIndex > 0 ? ' · ' : null}
+                          {effect}
+                        </Fragment>
+                      ))}
+                    </>
+                  ),
+                },
+              ),
+            )
           }
           richParams.detail = segments.length > 0
             ? (
@@ -489,9 +510,9 @@ export const LogPanel = ({ locale, log }: Props) => (
               if (typeof id === 'string') cardIds.push(id.trim())
             })
           }
-          const dp = raw.detailParts as Record<string, unknown> | undefined
-          if (dp?.improvements) (dp.improvements as string[]).forEach((id) => cardIds.push(id))
-          if (dp?.minorImprovements) (dp.minorImprovements as string[]).forEach((id) => cardIds.push(id))
+          const detailParts = raw.detailParts as ActionDetailParts | undefined
+          detailParts?.effects?.improvements?.forEach((id) => cardIds.push(id))
+          detailParts?.effects?.minorImprovements?.forEach((id) => cardIds.push(id))
         }
         const cardRefs = cardIds
           .map((id) => resolveCardName(locale, id))
