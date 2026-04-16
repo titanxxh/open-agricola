@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../game/types'
 import type { CardDefinition } from '../types'
 import { getMajorCardEffect } from '../major'
 import { checkCustomPrerequisite } from './prerequisite-registry'
@@ -37,11 +37,11 @@ const meetsNumericPrerequisite = (
   return true
 }
 
-const meetsTextClause = (player: PlayerState, clause: string) => {
+const meetsTextClause = (player: PlayerState, clause: string, state?: GameState) => {
   const trimmed = clause.trim()
   if (!trimmed) return true
 
-  const custom = checkCustomPrerequisite(trimmed, player)
+  const custom = checkCustomPrerequisite(trimmed, player, state)
   if (custom !== null) return custom
 
   const fieldsMatch = trimmed.match(/^(\d+)\s+Fields?$/i)
@@ -100,17 +100,22 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
   return true
 }
 
-const meetsTextPrerequisite = (player: PlayerState, prerequisite?: string) => {
+const meetsTextPrerequisite = (
+  player: PlayerState,
+  prerequisite?: string,
+  state?: GameState,
+) => {
   if (!prerequisite) return true
   return prerequisite
     .split(/\s+and\s+/i)
-    .every((clause) => meetsTextClause(player, clause))
+    .every((clause) => meetsTextClause(player, clause, state))
 }
 
 export const meetsCardPrerequisites = (
   player: PlayerState,
   card: CardPrerequisiteSource,
   round?: number,
+  state?: GameState,
 ) => {
   if (card.maxRound !== undefined && round !== undefined && round > card.maxRound) {
     return false
@@ -121,5 +126,5 @@ export const meetsCardPrerequisites = (
   if (!meetsNumericPrerequisite(countAllImprovements(player), card.improvementPrerequisites)) {
     return false
   }
-  return meetsTextPrerequisite(player, card.prerequisite)
+  return meetsTextPrerequisite(player, card.prerequisite, state)
 }
