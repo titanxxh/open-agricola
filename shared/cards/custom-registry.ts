@@ -20,6 +20,10 @@ import { getCurrentSessionContext, type CustomCardData } from './session-card-co
 // Re-export for backward compatibility
 export type { CustomCardData } from './session-card-context.ts'
 
+type RegisterCustomCardOptions = {
+  allowGlobal?: boolean
+}
+
 const customMinorImprovements = new Map<string, CardBase>()
 const customOccupations = new Map<string, CardBase>()
 const customArtUrls = new Map<string, string>()
@@ -32,11 +36,21 @@ let nextOccupationNumber = 500
  * Register a custom card (and optionally its DSL effects) into the runtime registry.
  * If a SessionCardContext is active, registers there. Otherwise falls back to global maps.
  */
-export function registerCustomCard(data: CustomCardData): void {
+export function registerCustomCard(
+  data: CustomCardData,
+  options: RegisterCustomCardOptions = {},
+): void {
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {
     sessionCtx.registerCard(data)
     return
+  }
+
+  if (!options.allowGlobal) {
+    console.warn(
+      `[custom-registry] registering ${data.cardJson.id} without an active session context; ` +
+      'this should be limited to explicit legacy/frontend paths',
+    )
   }
 
   // Legacy global path (for tests without session context, and frontend)

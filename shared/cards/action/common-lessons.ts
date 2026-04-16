@@ -14,6 +14,7 @@ const getLessonsCost = (player: PlayerState): Partial<Resource> => {
 }
 
 const buildPlayableOccupationOptions = (
+  state: Parameters<NonNullable<ActionDefinition['canBeExecutedByPlayer']>>[0],
   player: PlayerState,
   cost: Partial<Resource>,
 ): ActionChoiceOption[] =>
@@ -23,7 +24,9 @@ const buildPlayableOccupationOptions = (
       (occupation): occupation is NonNullable<typeof occupation> =>
         !!occupation,
     )
-    .filter(() => canAffordOccupationActionCost(player, cost))
+    .filter((occupation) =>
+      canAffordOccupationActionCost(state, player, occupation.id, cost, 'lessons'),
+    )
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
@@ -36,9 +39,9 @@ export const lessons: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   players: [2, 3, 4],
-  canBeExecutedByPlayer: (_, player) => {
+  canBeExecutedByPlayer: (state, player) => {
     const cost = getLessonsCost(player)
-    return buildPlayableOccupationOptions(player, cost).length > 0
+    return buildPlayableOccupationOptions(state, player, cost).length > 0
   },
   execute: () => ({ type: 'ok' }),
   flow: {

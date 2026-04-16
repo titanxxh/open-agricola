@@ -174,7 +174,7 @@ export class HttpGameTransport implements GameTransport {
 export class WsGameTransport implements GameTransport {
   private ws: WebSocket | null = null
   private listeners = new Set<SnapshotListener>()
-  private pendingResolvers = new Map<number, {
+  private pendingResolvers = new Map<string, {
     resolve: (payload: GameSyncPayload) => void
     reject: (err: Error) => void
   }>()
@@ -244,15 +244,26 @@ export class WsGameTransport implements GameTransport {
         if (msg.type === 'stateUpdate') {
           const envelope = msg as StateUpdateEnvelope
           this.listeners.forEach((cb) => cb(envelope.payload))
-          this.pendingResolvers.forEach(({ resolve: res }) => {
-            res(envelope.payload)
-          })
-          this.pendingResolvers.clear()
+          if (envelope.requestId) {
+            const pending = this.pendingResolvers.get(envelope.requestId)
+            if (pending) {
+              pending.resolve(envelope.payload)
+              this.pendingResolvers.delete(envelope.requestId)
+            }
+          }
         } else if (msg.type === 'error') {
-          this.pendingResolvers.forEach(({ reject: rej }) => {
-            rej(new Error(msg.type === 'error' ? msg.error : 'unknown error'))
-          })
-          this.pendingResolvers.clear()
+          if (msg.requestId) {
+            const pending = this.pendingResolvers.get(msg.requestId)
+            if (pending) {
+              pending.reject(new Error(msg.error))
+              this.pendingResolvers.delete(msg.requestId)
+            }
+          } else {
+            this.pendingResolvers.forEach(({ reject: rej }) => {
+              rej(new Error(msg.error))
+            })
+            this.pendingResolvers.clear()
+          }
         }
       }
     })
@@ -264,9 +275,9 @@ export class WsGameTransport implements GameTransport {
         reject(new Error('WebSocket not connected'))
         return
       }
-      const id = ++this.reqCounter
-      this.pendingResolvers.set(id, { resolve, reject })
-      this.ws.send(JSON.stringify(cmd))
+      const requestId = `req-${++this.reqCounter}`
+      this.pendingResolvers.set(requestId, { resolve, reject })
+      this.ws.send(JSON.stringify({ ...cmd, requestId }))
     })
   }
 

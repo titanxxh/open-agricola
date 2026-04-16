@@ -3,6 +3,7 @@ import { computeAnimalZones, getTotalAnimalCapacity } from '../../actions/effect
 import type { PlayerState, Pasture } from '../../game/types'
 
 import '../A/A12_DrinkingTrough'
+import '../E/E33_BeaverColony'
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
   ({
@@ -54,6 +55,23 @@ describe('computeAnimalZones', () => {
     const zones = computeAnimalZones(player)
     expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(0)
     expect(zones.find((z) => z.id === 'p2')!.capacity).toBe(6)
+  })
+
+  it('keeps the blocked pasture at 0 regardless of E33/A12 card order', () => {
+    const cardOrders = [
+      ['E33_BeaverColony', 'A12_DrinkingTrough'],
+      ['A12_DrinkingTrough', 'E33_BeaverColony'],
+    ] as const
+
+    for (const minorPlayed of cardOrders) {
+      const player = createPlayer({
+        minorPlayed: [...minorPlayed],
+        pastures: [makePasture('p1', 2, 1), makePasture('p2', 3, 0)],
+      })
+      const zones = computeAnimalZones(player)
+      expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(0)
+      expect(zones.find((z) => z.id === 'p2')!.capacity).toBe(8)
+    }
   })
 
   it('sums zone capacities in getTotalAnimalCapacity', () => {

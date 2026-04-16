@@ -11,6 +11,7 @@ import type {
   Resource,
   InteractionAnimalReorgZone,
 } from '../shared/game/types.ts'
+import type { ActionDetailParts } from '../shared/protocol/game.ts'
 import { actionDefinitions } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
 import { clearActionHooks } from '../shared/actions/hooks.ts'
@@ -868,20 +869,7 @@ export class GameSession {
       if (delta > 0) gains[key] = delta
       if (delta < 0) costs[key] = Math.abs(delta)
     })
-    const effects: {
-      buildRoom?: number
-      buildStables?: number
-      growFamily?: number
-      plow?: number
-      sowGrain?: number
-      sowVegetable?: number
-      renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
-      fencing?: number
-      improvements?: string[]
-      minorImprovements?: string[]
-      startPlayer?: boolean
-      bakeBread?: { count: number; food: number }
-    } = {}
+    const effects: NonNullable<ActionDetailParts['effects']> = {}
     if (player.rooms > before.rooms) {
       effects.buildRoom = player.rooms - before.rooms
     }
@@ -937,7 +925,7 @@ export class GameSession {
     if (bakedGrain > 0 && bakedFood > 0) {
       effects.bakeBread = { count: bakedGrain, food: bakedFood }
     }
-    return { gains, costs, effects }
+    return { gains, costs, effects } satisfies ActionDetailParts
   }
 
   private logActionDetail(before: PlayerState, player: PlayerState) {
@@ -1593,19 +1581,25 @@ export class GameSession {
       actionAvailability['major-improvement'] === true ||
       actionAvailability['house-redevelopment'] === true
 
-    const occupationCosts: Partial<Resource>[] = []
+    const occupationCosts: { spaceId: string; cost: Partial<Resource> }[] = []
     if (actionAvailability.lessons === true) {
-      occupationCosts.push(getOccupationActionCost(player, 'lessons'))
+      occupationCosts.push({
+        spaceId: 'lessons',
+        cost: getOccupationActionCost(player, 'lessons'),
+      })
     }
     if (actionAvailability['lessons-4'] === true) {
-      occupationCosts.push(getOccupationActionCost(player, 'lessons-4'))
+      occupationCosts.push({
+        spaceId: 'lessons-4',
+        cost: getOccupationActionCost(player, 'lessons-4'),
+      })
     }
 
     const result: Record<string, boolean> = {}
 
     player.occupationHand.forEach((occupationId) => {
-      result[`occupation:${occupationId}`] = occupationCosts.some((cost) =>
-        isOccupationPlayable(player, occupationId, cost),
+      result[`occupation:${occupationId}`] = occupationCosts.some(({ spaceId, cost }) =>
+        isOccupationPlayable(this.state, player, occupationId, cost, spaceId),
       )
     })
 

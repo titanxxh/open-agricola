@@ -95,6 +95,34 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('restores waiting room version from sqlite rows', () => {
+    const room = restoreRoomFromSqliteRow({
+      id: 'waiting-version',
+      created_by: null,
+      state_json: null,
+      max_players: 2,
+      custom_card_ids: '[]',
+      version: 7,
+    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
+
+    expect(room?.version).toBe(7)
+  })
+
+  it('restores playing room version from sqlite rows', () => {
+    const room = restoreRoomFromSqliteRow({
+      id: 'playing-version',
+      created_by: null,
+      state_json: JSON.stringify({
+        players: [],
+      }),
+      max_players: 2,
+      custom_card_ids: '[]',
+      version: 11,
+    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
+
+    expect(room?.version).toBe(11)
+  })
+
   it('keeps empty non-dev rooms joinable after disconnect', () => {
     const ws = {} as never
     const room = createRoom('abc123', [0]) as {
