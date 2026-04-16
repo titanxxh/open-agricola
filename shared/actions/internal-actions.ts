@@ -27,6 +27,7 @@ import { setCardInfoboxAction } from './effects/set-card-infobox'
 import { clearCardInfoboxAction } from './effects/clear-card-infobox'
 import { noopAction } from './effects/noop'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
+import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
 import { storeOnCardAction } from './effects/store-on-card'
@@ -39,6 +40,7 @@ import { popCardStackAction } from './effects/pop-card-stack'
 import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 import { fieldSelectAction } from './effects/field-select'
+import { discardFromHandAction } from './effects/discard-from-hand'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -71,6 +73,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   clearCardInfoboxAction,
   noopAction,
   returnFirstWorkerHomeAction,
+  recallPlacedWorkerAction,
   reserveFenceBonusAction,
   payGrainAnyAction,
   storeOnCardAction,
@@ -86,4 +89,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   fieldSelectAction,
+  discardFromHandAction,
 ]

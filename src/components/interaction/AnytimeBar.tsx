@@ -7,6 +7,7 @@ type Props = {
   locale: Locale
   isInteractive: boolean
   takeAnytimeAction: (actionId: string) => void
+  variant?: 'standalone' | 'inline'
 }
 
 export const AnytimeBar = ({
@@ -14,9 +15,10 @@ export const AnytimeBar = ({
   locale,
   isInteractive,
   takeAnytimeAction,
+  variant = 'standalone',
 }: Props) =>
   anytimeActions.length > 0 ? (
-    <div className="anytime-bar">
+    <div className={`anytime-bar${variant === 'inline' ? ' anytime-bar--inline' : ''}`}>
       <div className="anytime-title">{t(locale, 'ui.anytimeActions')}</div>
       <div className="anytime-actions">
         {anytimeActions.map((action) => (
