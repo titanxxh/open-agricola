@@ -1,11 +1,113 @@
 import { MinorImprovement } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { positionKey } from '../../game/farm'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import type { ActionFlow } from '../../game/types'
+
+const CARD_ID = 'E71_CowPatty'
+
+/**
+ * E71 Cow Patty (Minor Improvement):
+ * Each time you sow in a field that is orthogonally adjacent to a pasture,
+ * you can place 1 additional good of the planted type in it.
+ *
+ * Prerequisite: 1 Cattle (checked at play time, not at trigger time).
+ *
+ * Implementation: after sow listener. Detect freshly sown fields,
+ * filter to those adjacent to pastures. Add 1 bonus crop to one.
+ * If multiple eligible, player selects.
+ */
+
+/** Initial remaining values for each crop type when freshly sown. */
+const INITIAL_REMAINING: Record<string, number> = { grain: 3, vegetable: 2 }
+
+// Field effect: add 1 crop to the selected field (matching its crop type)
+registerFieldEffect('cow-patty-bonus-crop', ({ player, fields }) => {
+  for (const key of fields) {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find((f) => f.row === r && f.col === c)
+    if (field && field.crop !== null && field.remaining > 0) {
+      field.remaining += 1
+      break // only 1 field
+    }
+  }
+})
+
+/**
+ * Check if a tile is orthogonally adjacent to any pasture tile.
+ */
+const isAdjacentToPasture = (
+  row: number,
+  col: number,
+  context: CardListenerContext,
+): boolean => {
+  const pastureTileKeys = new Set<string>()
+  for (const pasture of context.player.pastures) {
+    for (const tile of pasture.tiles) {
+      pastureTileKeys.add(positionKey(tile))
+    }
+  }
+  const neighbors = [
+    { row: row - 1, col },
+    { row: row + 1, col },
+    { row, col: col - 1 },
+    { row, col: col + 1 },
+  ]
+  return neighbors.some((n) => pastureTileKeys.has(positionKey(n)))
+}
+
+// --- After sow: find freshly sown fields adjacent to pastures, add bonus crop ---
+const afterSowListener: CardListenerRegistration = {
+  id: 'E71-cow-patty-after-sow',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+
+    // Detect freshly sown fields
+    const freshFields = context.player.fields.filter(
+      (f) => f.crop !== null && f.remaining === INITIAL_REMAINING[f.crop],
+    )
+
+    // Filter to those adjacent to a pasture
+    const eligible = freshFields.filter((f) => isAdjacentToPasture(f.row, f.col, context))
+    if (eligible.length === 0) return
+
+    if (eligible.length === 1) {
+      // Auto-add 1 crop
+      eligible[0]!.remaining += 1
+      return
+    }
+
+    // Multiple eligible fields — player selects which one gets the bonus
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'field-select',
+        sourceCard: CARD_ID,
+        actionContext: {
+          fieldFilter: 'has-crop',
+          maxSelections: 1,
+          fieldEffect: 'cow-patty-bonus-crop',
+        },
+      } as ActionFlow,
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+registerCardListener(afterSowListener)
 
 export const E71_CowPatty = new MinorImprovement({
-  id: "E71_CowPatty",
-  name: "Cow Patty",
-  deck: "E",
+  id: 'E71_CowPatty',
+  name: 'Cow Patty',
+  deck: 'E',
   number: 71,
-  desc: ["Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it."],
+  desc: ['Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it.'],
   cost: {},
-  prerequisite: "1 Cattle",
+  prerequisite: '1 Cattle',
+  implemented: true,
 })
