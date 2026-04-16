@@ -886,6 +886,10 @@ import { D95_SiteManager } from './D/D95_SiteManager'
 import { B130_FullPeasant } from './B/B130_FullPeasant'
 import { B150_LargeScaleFarmer } from './B/B150_LargeScaleFarmer'
 import { B152_JuniorArtist } from './B/B152_JuniorArtist'
+// Wave 8: HIGH complexity cards (simplified) (2026-04-17)
+import { C22_BasketChair } from './C/C22_BasketChair'
+import { C150_ParrotBreeder } from './C/C150_ParrotBreeder'
+import { E125_DelayedWayfarer } from './E/E125_DelayedWayfarer'
 import './C/C39_StudioBoat'
 
 export const minorImprovementCards = [
@@ -1292,6 +1296,8 @@ export const minorImprovementCards = [
   D21_Recruitment,
   // Wave 3 (2026-04-17)
   A27_OvenSite,
+  // Wave 8 (2026-04-17)
+  C22_BasketChair,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1791,6 +1797,9 @@ export const occupationCards = [
   B130_FullPeasant,
   B150_LargeScaleFarmer,
   B152_JuniorArtist,
+  // Wave 8 (2026-04-17)
+  C150_ParrotBreeder,
+  E125_DelayedWayfarer,
 ]
 
 // All cards for reference and developer mode
