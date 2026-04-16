@@ -1,602 +1,130 @@
-# 卡牌实现进度追踪
+# 卡牌实现进度
 
-基于 BGA 参考项目 (`../bga-agricola`) 的完整对比。
+基于 BGA 参考项目 (`../bga-agricola`) 的完整对比。实现的权威来源是 `shared/cards/catalog.ts` + 各 `.ts` 文件。本文档只追踪覆盖率与剩余工作。
 
 ## 总览
 
-| | BGA 总数 | 已实现 Hook | 仅数据 | 无文件 |
+| Deck | BGA 总数 | 已实现 | 剩余 (BGA 无逻辑) | 剩余 (需基础设施) |
 |---|---|---|---|---|
-| | BGA 总数 | 已实现 Hook | 仅数据 | 无文件 |
-|---|---|---|---|---|
-| A Deck | 180 | 153 | 20 | 7 |
-| B Deck | 180 | 158 | 9 | 13 |
-| C Deck | 182 | 157 | 15 | 10 |
-| D Deck | 181 | 155 | 18 | 8 |
-| E Deck | 169 | 157 | 7 | 5 |
-| **总计** | **892** | **810** | **49** | **43** |
+| A | 180 | 153 | 5 | 0 |
+| B | 180 | 158 | 0 | 0 |
+| C | 182 | 157 | 0 | 0 |
+| D | 181 | 155 | 4 | 0 |
+| E | 169 | 157 | 2 | 1 |
+| **总计** | **892** | **810** | **11** | **1** |
 
-> Major Improvements (10张) 已全部实现，不计入上表。
-> 截至 2026-04-17 更新。2063 tests passing。实现率 **90.8%**。
-> Wave 1-8 (2026-04-17) 完成后：新增 51 张卡 hooks、~190 个测试。
+**截至 2026-04-17：810/892 = 90.8%，2063 vitest tests passing。**
 
-> **注意**：A14, A88, A123, B145, C13, C14 通过 `modifiers` 静态字段实现（bonus/trade 类型），无需 registerCardEffect/registerCardListener hooks，属于已实现。
+> Major Improvements (10 张) 单独实现，不计入上表。
+> 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
+> 若干卡通过静态 `modifier`/`modifiers`/`exchanges`/`scoreRule` 字段实现，视为已实现（例：A14, A60, A88, A123, B32, B80, B104, B145, C13, C14, D59, E153 等）。
 
-## 未实现卡牌总结（327 张未有 hook）
+## 剩余工作（12 张）
 
-### 按效果模式分类
+### Tier 1：BGA 无逻辑，保留数据即可（11 张）
 
-不区分有无文件，统一按卡牌运行时行为模式分类：
+这些卡 BGA PHP 只有 `getDesc`，无任何 listener/onBuy/args-act。保留数据即符合参考行为。
 
-| 批次 | 效果模式 | 数量 | 难度 | 状态 |
-|---|---|---|---|---|
-| 1 | 纯数据/无逻辑 + 交换/计分 | 29 | 零~极低 | ✅ 已完成 |
-| 2 | 一次性购买效果 (onBuy) | 142 | 低 | ✅ 已完成 |
-| 3 | 单事件监听：PlaceFarmer 触发 | 63 | 低-中 | ✅ 已完成 |
-| 4 | 单事件监听：AfterCollect + After 行动 | 55 | 低-中 | ✅ 已完成 |
-| 5 | 单事件监听：Harvest 各阶段 | 37 | 低-中 | ✅ 已完成 |
-| 6 | 单事件监听：回合/工作阶段触发 | 59 | 低-中 | ✅ 已完成 |
-| 7 | 单事件监听：Compute 修改器 | 17 | 低-中 | ✅ 已完成 |
-| 8 | 费用修改器 (computeCosts) | 25 | 中 | 🔧 19/25（跳过 6 张复杂卡） |
-| 9 | Anytime 动作 | 22 | 中 | ✅ 已完成 |
-| 10 | 动物容量扩展 (computeDropZones) | 10 | 中 | ✅ 已完成 |
-| 11 | 资源存储/释放 (holder/stack) | 18 | 中 | ✅ 已完成 |
-| 12 | 收获阶段特殊 | 15 | 中 | 🔧 15/16（E68 CherryOrchard 需木头作物类型扩展，跳过） |
-| 13 | 多事件监听 | 79 | 中-高 | 🔧 71/79（跳过 8 张需新基础设施） |
-| 14 | 玩家选择交互 (SPECIAL_EFFECT) | 8 | 中-高 | 🔧 5/8（跳过 3 张需 card-select/随机） |
-| 15 | 对手交互 | 23 | 中-高 | ✅ 已完成 |
-| 16 | 流程替换/特殊机制 | ~21 | 高 | 🔧 13/21（跳过 4 需新基础设施, 4 待验证, 2 已完成） |
+A41 VegetableSlicer · A85 Homekeeper · A87 Conservator · A106 SlurrySpreader · A113 HeresyTeacher
+D25 WitchesDanceFloor · D103 CanalBoatman · D155 Ebonist · D159 ReedSeller
+E93 Motivator · E149 MidnightFencer
 
-> 批次 8 跳过的 6 张复杂卡：~~A27~~ (Wave 3 ✅), ~~C95~~ (Wave 3 ✅), ~~D95~~ (Wave 3 ✅), ~~B155~~ (Wave 3 ✅), E27, E123 (holder/stack + 费用抵扣)。现仅剩 2 张。
-> 批次 13 跳过的 8 张卡：C23 (假农民), D22 (未来回合放农民), D27 (大改良交换), D93 (选择+召回农民), D102 (移除马厩), ~~D134~~ (Wave 1 ✅), D137 (多选商品菜单), E68 (木头作物类型)。现仅剩 7 张。
-> 批次 14 跳过的 3 张卡：A3 (多选手牌+随机), B3 (随机+传牌), B146 (手牌选择弃牌)。均待 card-select 基础设施。
+### Tier 3：需核心类型扩展（1 张）
+
+**E68 CherryOrchard** — 需在 `shared/game/types.ts` 给 `Field.crop` 新增 `'wood'` 作物类型，并扩展 sow/reap/field-harvest pipeline。单卡改动过深，暂缓。
 
 ---
 
-## 2026-04-17 Wave 1-4 实现详情
+## 已知简化
 
-**Wave 1 — LISTENER_SIMPLE (21 张, +84 测试):**
-A42 ForestLakeHut, A43 FarmyardManure, A111 WallBuilder, A124 Knapper,
-B18 GrasslandHarrow, B51 DiggingSpade, B63 Tasting, B120 Sweep, B121 Geologist,
-B122 Mineralogist, B156 StorehouseKeeper, B161 Weakling, C26 Flail,
-C28 TeachersDesk, C117 Legworker, C140 PackagingArtist, C154 TwinResearcher,
-C160 Outrider, D21 Recruitment, D134 OysterEater, E3 TeaTime
+部分复杂卡采取了合理简化实现，简化内容记录在各卡文件顶部注释中：
 
-**Wave 2 — 静态 modifier/prerequisite/scoring (9 张, +29 测试):**
-A10 WoodenShed, C10 BunkBeds, C32 AbortOriel, D11 LawnFertilizer,
-D37 Sculpture, D85 Reader, E16 BriarHedge, E29 Heirloom, E96 Elder
+| 卡牌 | 简化内容 | 需要什么才能做到 BGA 完整规则 |
+|---|---|---|
+| A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤，onBuy 直接从整手随机选 1 免费打 | `select-N-from-hand` pending type |
+| B3 Moonshine | XOR 折叠为"买不起则 PASS"（自动抉择） | 同上 + pass-to-opponent action |
+| D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
+| E16 BriarHedge | 围栏前提已加，但"每边免木"未实现 | 重写 `fencing.ts` 支持按边计费 |
+| E96 Elder | 回合 1 StartOfWork 额外打出职业未实现 | 新 `stStartOfTurn allowedCards` hook |
+| C22 BasketChair | 每轮开始提供一次额外 place-farmer，不召回已放农民 | 新 farmer-recall-to-card 机制 |
+| C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷），对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
+| E125 DelayedWayfarer | 额外放置延后到下轮开始（非本轮末） | end-of-placements 信号 hook |
+| D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 
-> 扩展 `PrerequisiteHandler` 签名接受 `GameState` 参数（用于 C32 全局检查）。
+---
 
-**Wave 3 — COMPUTE_COST (5 张, +15 测试):**
-A27 OvenSite, B155 ArtTeacher, C95 BasketWeaver, D95 SiteManager, E109 BraidMaker
+## 基础设施清单
 
-**Wave 4 — PLAYER_ACTION_CARD 链式 (3 张, +25 测试):**
-B130 FullPeasant, B150 LargeScaleFarmer, B152 JuniorArtist
+| 设施 | 状态 | 说明 |
+|---|---|---|
+| PlayerActionCard 行动格 | ✅ | 11 张卡，含 owner 显示、meeple 渲染 |
+| `onComputeAnimalZones` | ✅ | 动物容量修改器 |
+| `CardExchange` + `exchange-registry` | ✅ | 烹饪/交换改良 |
+| `computeBonusScore` | ✅ | 45+ 张计分卡 |
+| Anytime 动作系统 | ✅ | CardListener `phases: ['anytime']` |
+| Holder / Counter / Stack | ✅ | 资源堆叠两种模式 |
+| `queueFutureMeeplesFlow` | ✅ | Future meeples 两种形式 + remove |
+| 对手交互 (`scope: 'opponent'`) | ✅ | 8 张卡覆盖 4 种模式 |
+| `field-select` farm interaction | ✅ | 第 6 种 farm interaction type |
+| PlayerSwitch in ActionFlow | ✅ | `deferredPlayerSwitch` |
+| `resourcesPaid` 追踪 | ✅ | `pay-resources` 返回实际支付 |
+| `computeReplace` + decline | ✅ | day-laborer / A94 / D21 等 |
+| `onGainResource` (after:gain) | ✅ | E103_Wolf 等 |
+| `onEndTurn` 阶段 hook | ✅ | person-action turn 收束点 |
+| `PrerequisiteHandler(player, state?)` | ✅ | 2026-04-17 扩展了 state 参数（C32 全局检查需要） |
+| `stable-removal` helper | ✅ | D102 / E76 |
+| `recall-placed-worker` action | ✅ | D93（通用农民回收） |
+| `discard-from-hand` action | ✅ | B146（通用弃手牌） |
 
-## 2026-04-17 Wave 5-8 新增（13 张 Tier 2 + 简化）
+---
 
-**Wave 5 — Tier 2 LOW (6 张, +37 测试):**
-C23 JobContract, D22 WorkPermit, D27 Retraining, D102 SampleStableMaker,
-E76 LumberPile, B3 Moonshine
+## 实现进度（时间线）
 
-**Wave 6 — Farmer-recall + goods (2 张, +17 测试):**
-D93 SheepInspector (farmer-recall), D137 TradeTeacher (21 枚举 XOR)
-
-**Wave 7 — Card-select (2 张, +20 测试):**
-B146 Illusionist (完整), A3 PaperKnife (简化, 跳过 3-select 中间步骤)
-
-**Wave 8 — High-complexity 简化 (3 张, +15 测试):**
-C22 BasketChair, C150 ParrotBreeder, E125 DelayedWayfarer
-
-### 新增基础设施
-- `shared/cards/helpers/stable-removal.ts` — 移除马厩 (D102, E76)
-- `shared/actions/effects/recall-placed-worker.ts` — 召回放置的农民 (D93)
-- `shared/actions/effects/discard-from-hand.ts` — 从手牌弃卡 (B146)
-
-## 真正剩余（12 张）
-
-### Tier 1: BGA 自身无逻辑（11 张，已匹配 BGA 行为）
-A41 VegetableSlicer, A85 Homekeeper, A87 Conservator, A106 SlurrySpreader,
-A113 HeresyTeacher, D25 WitchesDanceFloor, D103 CanalBoatman,
-D155 Ebonist, D159 ReedSeller, E93 Motivator, E149 MidnightFencer
-
-> 这些卡的 BGA PHP 只有 `getDesc`，无任何 listener/onBuy。保留数据即符合 BGA 行为。
-
-### Tier 3: 核心类型扩展 (1 张)
-E68 CherryOrchard — 需 `Field.crop` 支持 'wood' 作物类型
-
-## 已知简化（记录在卡文件注释中）
-
-| 卡牌 | 简化内容 |
-|---|---|
-| A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤，直接从整手随机选 1 |
-| B3 Moonshine | XOR 折叠为"买不起则 PASS"规则 |
-| D102/E76 | 跳过 FarmHand 分支（我们的 B85 用 rooms+1 建模，无专属马厩） |
-| D95 SiteManager | 贪心策略（短缺时才替换），非 BGA 完整组合选择 |
-| E16 BriarHedge | 每边围栏免木未实现（需重写 fencing.ts） |
-| E96 Elder | 回合 1 StartOfWork 额外放置未实现（需新 hook） |
-| C22 BasketChair | 只提供 round start 额外放置，不召回已放农民 |
-| C150 ParrotBreeder | 仅保留 anytime 激活信号，对手位置追踪未实现 |
-| E125 DelayedWayfarer | 额外放置延后到下轮开始（非本轮末） |
-
-### 实现进度
-
-| 批次 | 完成时间 | 新增 hooks | 累计 hooks | 累计率 |
+| 批次 | 日期 | 新增 hooks | 累计 | 累计率 |
 |---|---|---|---|---|
-| 1+2 | 2026-04-15 | +134 | 325 | 36.4% |
-| 3 | 2026-04-15 | +72 | 397 | 44.5% |
-| 4 | 2026-04-15 | +56 | 453 | 50.8% |
-| 5 | 2026-04-15 | +34 | 487 | 54.6% |
-| 6 | 2026-04-15 | +39 | 526 | 59.0% |
-| 7 | 2026-04-15 | +24 | 550 | 61.7% |
-| 8 (w1+w2) | 2026-04-15 | +15 | 565 | 63.3% |
-| 9 | 2026-04-15 | +22 | 587 | 65.8% |
-| 10 | 2026-04-16 | +10 | 597 | 66.9% |
-| 11 | 2026-04-16 | +18 | 615 | 68.9% |
-| 12 | 2026-04-16 | +15 | 630 | 70.6% |
-| 13 (w1+w2+w3) | 2026-04-16 | +71 | 701 | 78.6% |
-| 14 | 2026-04-16 | +5 | 706 | 79.1% |
-| 15 | 2026-04-16 | +23 | 729 | 81.7% |
-| 16 (w1) | 2026-04-16 | +13 | 742 | 83.2% |
-| misc | 2026-04-16 | +15 | 757 | 84.9% |
-| A19+A89 future | 2026-04-17 | +2 | 759 | 85.1% |
-| Wave 1 listener | 2026-04-17 | +21 | 780 | 87.4% |
-| Wave 2 modifier | 2026-04-17 | +9 | 789 | 88.5% |
-| Wave 3 compute-cost | 2026-04-17 | +5 | 794 | 89.0% |
-| Wave 4 chain-action | 2026-04-17 | +3 | 797 | 89.4% |
-| Wave 5 tier-2 low | 2026-04-17 | +6 | 803 | 90.0% |
-| Wave 6 farmer-recall + goods | 2026-04-17 | +2 | 805 | 90.2% |
-| Wave 7 card-select | 2026-04-17 | +2 | 807 | 90.5% |
-| Wave 8 high-complexity | 2026-04-17 | +3 | 810 | 90.8% |
+| 1+2 | 04-15 | +134 | 325 | 36.4% |
+| 3 | 04-15 | +72 | 397 | 44.5% |
+| 4 | 04-15 | +56 | 453 | 50.8% |
+| 5 | 04-15 | +34 | 487 | 54.6% |
+| 6 | 04-15 | +39 | 526 | 59.0% |
+| 7 | 04-15 | +24 | 550 | 61.7% |
+| 8 | 04-15 | +15 | 565 | 63.3% |
+| 9 | 04-15 | +22 | 587 | 65.8% |
+| 10 | 04-16 | +10 | 597 | 66.9% |
+| 11 | 04-16 | +18 | 615 | 68.9% |
+| 12 | 04-16 | +15 | 630 | 70.6% |
+| 13 | 04-16 | +71 | 701 | 78.6% |
+| 14 | 04-16 | +5 | 706 | 79.1% |
+| 15 | 04-16 | +23 | 729 | 81.7% |
+| 16 w1 | 04-16 | +13 | 742 | 83.2% |
+| misc + A19/A89 | 04-16/17 | +17 | 759 | 85.1% |
+| Wave 1 listener | 04-17 | +21 | 780 | 87.4% |
+| Wave 2 modifier/prereq | 04-17 | +9 | 789 | 88.5% |
+| Wave 3 compute-cost | 04-17 | +5 | 794 | 89.0% |
+| Wave 4 chain-action | 04-17 | +3 | 797 | 89.4% |
+| Wave 5 tier-2 low | 04-17 | +6 | 803 | 90.0% |
+| Wave 6 farmer-recall + goods | 04-17 | +2 | 805 | 90.2% |
+| Wave 7 card-select | 04-17 | +2 | 807 | 90.5% |
+| Wave 8 high-complexity | 04-17 | +3 | 810 | 90.8% |
+
+### 2026-04-17 Wave 1-8 明细
+
+**Wave 1 (+21):** A42 · A43 · A111 · A124 · B18 · B51 · B63 · B120 · B121 · B122 · B156 · B161 · C26 · C28 · C117 · C140 · C154 · C160 · D21 · D134 · E3
+**Wave 2 (+9):** A10 · C10 · C32 · D11 · D37 · D85 · E16 · E29 · E96
+**Wave 3 (+5):** A27 · B155 · C95 · D95 · E109
+**Wave 4 (+3):** B130 · B150 · B152
+**Wave 5 (+6):** C23 · D22 · D27 · D102 · E76 · B3
+**Wave 6 (+2):** D93 · D137
+**Wave 7 (+2):** A3 · B146
+**Wave 8 (+3):** C22 · C150 · E125
 
 ---
 
 ## 状态说明
 
-- ✅ 已实现 — `registerCardEffect` / `registerCardListener` 已注册，核心逻辑可运行
-- 🔧 仅数据 — 有 `.ts` 文件（名称/描述/费用/VP），但未实现 BGA 逻辑
-- ❌ 无文件 — BGA 有此卡但我们尚无 `.ts` 文件
-- ⬜ BGA未实现 — BGA 自身也标记为 `implemented=false`（5+人卡，A169-180, B169-180, C169-180, D169-180）
-
----
-
-## 基础设施状态
-
-所有主要基础设施均已完成：
-
-| 基础设施 | 状态 | 说明 |
-|----------|------|------|
-| PlayerActionCard 行动格 | ✅ | 11 张卡已注册，含 owner 显示、meeple 渲染 |
-| 动物容量修改器 | ✅ | `onComputeAnimalZones` hook，A12 已实现 |
-| 烹饪/交换改良 | ✅ | `CardExchange` + `exchange-registry.ts` |
-| computeBonusScore 计分 | ✅ | 45+ 张卡已实现 |
-| Anytime 动作系统 | ✅ | CardListener `phases: ['anytime']` |
-| Holder Card 资源堆叠 | ✅ | counters + stack 两种模式 |
-| Future Meeples 扩展 | ✅ | 简单/entries 两种形式 + removeFutureMeeples |
-| 对手交互机制 | ✅ | 8 张卡覆盖 4 种模式，gain-trigger-player action |
-| Field Select UI | ✅ | 第 6 种 farm interaction type |
-| PlayerSwitch in ActionFlow | ✅ | 懒确认机制，deferredPlayerSwitch |
-| resourcesPaid 追踪 | ✅ | pay-resources 返回实际支付资源 |
-| computeReplace | ✅ | 替换行动效果（day-laborer 等） |
-| onGainResource (after:gain) | ✅ | 资源获取后触发（E103_Wolf） |
-| onEndTurn 阶段 Hook | ✅ | person-action turn 收束点；D74_RoyalWood 已迁移到该时机 |
-
----
-
-## 未实现卡牌详细分类
-
-统一按效果模式分类，不区分有无 `.ts` 文件。
-
-### 批次 1：纯数据 + 交换/计分（29 张）
-
-**NO_LOGIC（22 张）— BGA 也无逻辑或逻辑在核心路径：**
-A10, A41, A85, A87, A106, B10, C10, D85, E16, A113, A169-A180, B169-B180, C169-C180, D169-D180 (5+人卡构造函数only), B31(scoreOnly), C32, C105, C109, D11, D25, D37, D108, D155, D159, E29, E96, E132
-
-**EXCHANGE_ONLY（6 张）：** E153, B32, B80, B104, C62, D162
-
-**SCORE_ONLY（1 张）：** B31
-
-### 批次 2：一次性购买效果（142 张）
-
-onBuy 触发，一次性获取资源/执行行动。
-
-**A (22):** A1, A2, A4, A5, A6, A7, A8, A9, A13, A19, A33, A36, A44, A47, A57, A69, A89, A117, A125, A135, E155, E159
-**B (32):** B1, B2, B4, B5, B6, B7, B8, B9, B14, B20, B22, B33, B37, B41, B44, B45, B46, B52, B59, B66, B71, B73, B74, B78, B84, B88, B93, B96, B102, B105, B113, B119, B123, B125, B127, B141, B149, B164, B167
-**C (22):** C1, C2, C3, C4, C5, C6, C7, C8, C9, C16, C38, C40, C44, C47, C50, C65, C72, C74, C77, C78, C79, C83, C108, C118, C127, C136, C139, C156, C161, C165, C166
-**D (16):** D1, D2, D3, D4, D6, D9, D40, D41, D43, D44, D45, D47, D57, D62, D67, D69, D78, D91, D120, D131, D145
-**E (25):** E1, E2, E3, E5, E6, E7, E8, E9, E25, E30, E36, E41, E42, E43, E44, E45, E46, E65, E76, E78, E94, E97, E98, E104, E106, E119, E120, E127, E138, E139, E145
-
-### 批次 3-7：单事件监听（241 张）
-
-合并所有单一 listener handler 卡，按事件类型分批。
-
-#### 批次 3：PlaceFarmer 触发（63 张）
-
-包含 222 张无文件 + 19 张有文件的 LISTENER_SIMPLE 卡中 PlaceFarmer 相关的。
-
-| 触发行动格 | 数量 | 卡牌 |
-|---|---|---|
-| Plow/Cultivate | 6 | A18, A24, C20, C91, D90, E17 |
-| Fishing | 7 | A51, A78, A138, B40, B47, B60, E55 |
-| DayLaborer | 7 | B77, B87, B91, C45, C138, D147, E59 |
-| GrainSeeds/VegSeeds | 8 | A67, B62, B142, B166, C90, C131, E67, E121 |
-| GrainUtilization | 1 | D101 |
-| Animal Market | 10 | A46, A66, A147, B92, C15, C147, D16, D164, D165, E166 |
-| BeforeCollect | 7 | A91, A107, A115, A161, C76, D105, D125 |
-| 其他行动格 | 13 | A52, A114, A122, A140, A155, A163, B43, B56, B64, B90, B112, D28, D83, D110, E137, E141 |
-
-##### AfterPlaceFarmer / ImmediatelyAfter（11 张）
-A168, B24, B28, B144, C82, C126, D68, D151, E19, E115, E131
-
-#### 批次 4：AfterCollect + After 行动（55 张）
-
-##### AfterCollect（18 张）
-A15, A23, A56, A95, A103, A146, A164, B17, B131, B147, C36, C58, C102, C114, D19, D73, D140, E15
-
-##### After 行动（after:Plow/Sow/Fencing/Stables/Construct/Renovation/Improvement/Occupation）（31 张）
-
-| 触发事件 | 数量 | 卡牌 |
-|---|---|---|
-| AfterPlow | 2 | D104, E164 |
-| AfterSow | 4 | C73, D58, E50, E79 |
-| AfterFencing | 4 | A34, A68, D89, E108 |
-| AfterStables | 2 | D168, E114 |
-| AfterConstruct | 5 | A21, A93, B111, D94, D123 |
-| AfterRenovation | 3 | A45, B134, D111 |
-| AfterImprovement | 8 | A131, C43, D80, E18, E31, E54, E122, E146 |
-| AfterOccupation | 5 | C68, D42, E89, E157, E163 |
-
-##### AfterExchange / AfterPay / AfterRevealAction / AfterWishChildren（6 张）
-A30, A63, C61 (exchange), B18 (pay), C21 (reveal), E113 (wish children)
-
-#### 批次 5：Harvest 各阶段（37 张）
-
-| 阶段 | 数量 | 卡牌 |
-|---|---|---|
-| StartHarvest | 6 | D61, D153, E61, E117, E147, E149 |
-| BeforeHarvest | 3 | C92, D32, D98 |
-| HarvestFieldPhase | 4 | A104, A118, B50, E107 |
-| EndHarvestFieldPhase | 3 | A61, C54, C110 |
-| HarvestFeedingPhase | 6 | A62, C55, D133, E39, E48, E142 |
-| EndHarvestFeedingPhase | 2 | C41, D76 |
-| AfterReorganize (breeding) | 2 | C71, E90 |
-| AfterHarvest | 3 | B82, C34, C66 |
-| EndHarvest | 3 | A145, C124, E99 |
-| EndOfRound | 3 | B53, D64, D79 |
-
-#### 批次 6：回合/工作阶段触发（59 张）
-
-| 阶段 | 数量 | 卡牌 |
-|---|---|---|
-| StartOfTurn | 12 | A90, B57, B97, B114, B118, B135, C103, C159, E88, E102, E126, E152, E168 |
-| BeforeStartOfTurn | 4 | B106, C111, C157, D48 |
-| StartOfWork | 6 | A76, B81, C123, C125, D54, E100 |
-| StartReturnHome | 9 | A35, A100, A127, A141, A151, A152, A157, C97, E20 |
-| ReturnHome | 2 | B139, D52 |
-| AfterWorkPhase | 1 | B140 |
-| EndWorkPhase | 6 | B158, D130, D142, E23, E26, E158 |
-| Preparation | 1 | A49 |
-| BeforeEndOfGame | 1 | B133 |
-
-#### 批次 7：Compute 修改器 + Anytime 交换（27 张）
-
-##### Compute 修改器（17 张）
-
-| 类型 | 数量 | 卡牌 |
-|---|---|---|
-| ComputeCardCosts | 3 | A75, B95, C27 |
-| ComputeDropZones | 5 | A148, B12, B86, D86, E12 |
-| ComputeArgsPlaceFarmer | 3 | A26, B129, E129 |
-| ComputePlaceFarmerFlow | 4 | D138, E24, E92, E151 |
-| ComputeCostsFencing | 1 | A88 |
-
-##### Anytime 交换/静态（10 张）
-B69, B157, C94, D106, E13, E14, A60, B101, D53, D59, E62
-
-### 批次 8-12：中等复杂度效果模式
-
-#### 批次 8：费用修改器 (computeCosts)（25 张）
-
-修改 construct/renovation/fencing/occupation/card 费用。基础设施已有 `computeCosts` hook。
-
-| 卡牌 | 说明 |
-|---|---|
-| A14 | 一次建 2+ 房时减免建材 |
-| A123 | 木材替代黏土/石头 |
-| C14 | 建造/翻新免芦苇 |
-| E109 | Basket 费用减免 |
-| E123 | 资源栈抵扣建造费用 |
-| E27 | 存食物抵扣大改良 |
-| A16 | 围栏费用减免 |
-| A27 | 烤炉费用减免 |
-| A149 | 自有行动格建房减免 |
-| B13 | 木房建造减免 |
-| B126 | 按材料类型减房费 |
-| B128 | 翻新触发+费用减免 |
-| B145 | 建造/翻新减 1 建材 |
-| B155 | 职业费用减免 |
-| C56 | 马厩食物+免费围栏 |
-| C95 | 条件性卡牌费用减免 |
-| C128 | 早期木房费用减免 |
-| D13 | anytime 翻新减费 |
-| D15 | 黏土房免费黏土 |
-| D81 | 翻新后得石+少芦苇 |
-| D95 | 条件性卡牌费用减免 |
-| D117 | 木材抵扣改良费 |
-| D121 | 黏土翻新/建造减费 |
-| E60 | 职业费用减免 |
-| E87 | 翻新费用减免+犁地 |
-| E150 | 石房建造减费+行动格 |
-
-#### 批次 9：Anytime 动作（22 张）✅ 已完成
-
-使用现有 `phases: ['anytime']` 基础设施。4 波完成，含 field-select 扩展和 exchange 钩子。
-
-A71, C18, C85, C87, C115, D71, E85, E91, A153, B35, B154, C46, C53, C64, C84, C101, C143, D46, D56, D87, D124, D129
-
-新增基础设施：`push-to-card-stack` action, `futureMeeplesNode(request)` 延迟入队, field-select 4 个新 effect, `has-exactly-1-crop` filter。
-
-#### 批次 10：动物容量扩展 (computeDropZones)（10 张）✅ 已完成
-
-使用 `onComputeAnimalZones` 或 `computeDropZones` 扩展动物容量。
-
-A11, A86, B11, B148, C11, C12, C89, D12, D148, E11
-
-#### 批次 11：资源存储/释放 (holder/stack)（18 张）✅ 已完成
-
-卡牌存储资源，按条件释放。使用 `counters` / `stack` 基础设施。
-
-B19, B21, B48, B55, B137, C19, D20, D118, D126, D156, E22, E28, E47, E51, E56, E110, E140, E162
-
-#### 批次 12：收获阶段特殊（15 张）🔧 15/16
-
-修改收获/喂食/繁殖阶段逻辑。E68 CherryOrchard 需木头作物类型扩展，跳过。
-
-A59, B61, C49, C70, C98, D84, D113, D132, E30, E36, E58, E69, E70, E72, E132
-
-### 批次 13-16：高复杂度效果模式
-
-#### 批次 13：多事件监听（79 张原始，71 张已实现）🔧 71/79
-
-监听 2+ 不同事件，有独立 handler。3 波完成（21+21+29=71 张）。
-
-**已实现（71 张）：**
-A22, A40, A50, A54, A77, A80, A82, A92, A96, A116, A120, A121, A129, A130, A139, A142, A167, B16, B25, B29, B49, B54, B58, B79, B89, B107, B108, B110, B116, B117, B124, B160, B162, B168, C42, C57, C80, C93, C106, C107, C113, C116, C119, C121, C130, C132, C145, C148, C155, C163, C164, D39, D63, D65, D96, D97, D109, D112, D141, D143, D144, D146, D166, E66, E77, E111, E116, E118, E143, E165
-
-**跳过（8 张，需新基础设施）：**
-C23 (假农民), D22 (未来回合放农民), D27 (大改良交换), D93 (选择+召回农民), D102 (移除马厩), D134 (跳过下一放置), D137 (多选商品菜单), E68 (木头作物类型)
-
-#### 批次 14：玩家选择交互 (SPECIAL_EFFECT)（8 张独立）🔧 5/8
-
-BGA 使用 `args{X}/act{X}` 方法实现多步选择。
-
-**已实现（5 张）：**
-A58 (AsparagusKnife, r8/10/12 蔬菜田收获), A72 (CalciumFertilizers, 石矿→自动加作物), A137 (RiverineShepherd, 羊市↔芦苇地), B115 (TinsmithMaster, 牧场容量+播种后加作物), E71 (CowPatty, 播种后邻牧场田加作物)
-
-**跳过（3 张，需 card-select/随机基础设施）：**
-A3 (PaperKnife, 多选手牌+随机), B3 (Moonshine, 随机+传牌), B146 (Illusionist, 手牌选择弃牌)
-
-#### SPECIAL_EFFECT 卡牌分析（BGA args/act 交互模式）
-
-BGA 的 SPECIAL_EFFECT 是一种流程节点，卡牌定义 `args{Method}()` 返回 UI 数据 + `act{Method}()` 处理玩家选择。共 ~40 张卡使用交互式 args/act 模式。
-
-##### 按选择类型分组
-
-**1. 田地/作物选择（17 张）— 选择 1+ 个田地进行操作**
-
-我们已有 `field-select` farm interaction 基础设施，可直接复用。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| A58 | 🔧 | 选蔬菜田收 1 菜换 3 食+1 分（ReturnHome r8/10/12） |
-| A70 | ✅ | 选蔬菜田取 1 菜到仓库（EndOfRound） |
-| A71 | ✅ | 选源田(≥2作物)+目标空田，移 1 作物（anytime） |
-| A84 | ✅ | 选谷田吃 1 谷作为繁殖费（ReturnHome） |
-| A112 | ✅ | 选谷田额外收获（HarvestFieldPhase） |
-| B115 | 🔧 | 选已播田放额外 1 作物（AfterSow） |
-| B165 | ✅ | 选谷田吃 1 谷换食物（anytime） |
-| C18 | ✅ | 选种植田弃所有作物+犁 1 田（anytime） |
-| C57 | 🔧 | 选蔬菜田(≥2菜)弃 1 菜→4 食（anytime） |
-| C63 | ✅ | 选谷田吃 1 谷（anytime/harvest） |
-| C69 | ✅ | 选正好 3 谷的田换 1 菜（anytime） |
-| D70 | ✅ | 选 1-2 蔬菜田各加 1 菜（HarvestFieldPhase） |
-| D71 | ✅ | 选收获后仅 1 作物的田弃之+播种（anytime） |
-| D72 | ✅ | 选田额外收获（HarvestFieldPhase） |
-| E4 | ✅ | 选谷田全弃，每谷得 2 木（onBuy） |
-| E71 | 🔧 | 选邻接牧场的已播田加 1 作物（AfterSow） |
-| E73 | ✅ | 选≥2作物的田一次全收（HarvestFieldPhase） |
-| E112 | ✅ | 选谷田跳过正常收获改从仓库拿（HarvestFieldPhase） |
-
-> 其中 10 张已实现(✅)，8 张未实现(🔧)。未实现的可复用 `field-select` 基础设施。
-
-**2. 数量选择（8 张）— 选一个数字 0-N**
-
-需要简单数量选择 UI。可用 XOR flow（每个数量一个选项）或新增 `quantity-select` choice 类型。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| A102 | ✅ | 选购买数量（从卡牌栈，1 食/个） |
-| A136 | ✅ | 选几组建材计分（1-3 组） |
-| B83 | ✅ | 选购买数量（从卡牌栈，1 黏土/个） |
-| C133 | ✅ | 选几组资源计分 |
-| D132 | 🔧 | 选几个空地付食物（避免扣分） |
-| E22 | 🔧 | 选存多少食物到卡上 |
-| E74 | ✅ | 选用几根免费围栏 |
-| E85 | ✅ | 选移多少食物到卡上 |
-
-> 5 张已实现，3 张未实现。
-
-**3. 资源类型多选（4 张）— 选 N 种不同资源**
-
-需要资源类型选择 UI。可用 XOR 或多选 choice。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| C104 | ✅ | 选 6-9 种不同资源各得 1 |
-| D137 | 🔧 | 选至多 2 种货物购买（after Lessons） |
-| E5 | 🔧 | 选 2 种不同建材从累积格取 |
-| E78 | 🔧 | 选至多 4 种建材等量互换 |
-
-> 1 张已实现，3 张未实现。
-
-**4. 马厩/农场位置选择（4 张）— 选农场格子**
-
-需要农场格子选择 UI。可复用 farm interaction 的 stables 模式。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| B85 | ✅ | 选 2×2 格子建 FarmHand 马厩 |
-| D102 | 🔧 | 选哪个马厩回收（得木+谷+食+改良） |
-| E76 | 🔧 | 选至多 3 个马厩回收（每个得 3 木） |
-| E148 | ✅ | 选行动格放马厩 |
-
-> 2 张已实现，2 张未实现。
-
-**5. 行动格选择（2 张）— 选一个行动格执行**
-
-需要行动格选择 UI + 嵌套完整行动流程。实现最复杂。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| D51 | ✅ | 选空行动格移农民过去执行（BeforeReturnHome） |
-| E10 | ✅ | 选空行动格移农民（EndWorkPhase r3/r6） |
-
-> 2 张均已实现。
-
-**6. 手牌选择（2 张）— 从手牌中选卡**
-
-需要手牌选择 UI。
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| A3 | 🔧 | 选 3 张职业，随机 1 张可免费打 |
-| B146 | 🔧 | 弃 1 张手牌得额外建材 |
-
-> 均未实现。
-
-**7. 农民回收（1 张）**
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| D93 | 🔧 | 选已占行动格召回自己农民（付 1 羊+2 食） |
-
-**8. 复合多步（3 张）**
-
-| 卡牌 | 状态 | 操作 |
-|---|---|---|
-| C146 | ✅ | 买时选资源对放卡上 → 对手翻新时选拿哪对 |
-| D161 | ✅ | 翻新后自动报价买菜 |
-| E76 | 🔧 | FarmHand 判断 → 马厩选择（多步） |
-
-##### 与我们现有机制的映射
-
-| BGA SPECIAL_EFFECT 类型 | 我们的实现机制 | 可用性 |
-|---|---|---|
-| 田地选择 | `field-select` farm interaction | ✅ 已有 |
-| 数量选择 | XOR flow (每个数量一个选项) | ✅ 可用 |
-| 资源类型多选 | XOR flow 或 `resolveChoice` | ✅ 可用 |
-| 马厩位置选择 | `stables` farm interaction | ✅ 已有 |
-| 行动格选择 | `resolveChoice` 已有实现 (D51/E10) | ✅ 已有 |
-| 手牌选择 | 需新增 `card-select` choice 类型 | ❌ 未实现 |
-| 农民回收 | 需新增 `farmer-recall` choice 类型 | ❌ 未实现 |
-| 复合多步 | seq + 多个 ChoiceNode | ✅ 可用 |
-
-##### 基础设施缺口
-
-1. **手牌选择 UI**：A3、B146 需要从手牌中选卡。需要新的 `card-select` pending state + 前端列表选择组件。影响 2 张卡。
-2. **农民回收 UI**：D93 需要选择已放置的农民召回。需要在行动格上标注可选择状态。影响 1 张卡。
-3. **数量滑块**：D132、E22、E85 的数量选择用 XOR 可能选项太多（如 E22 可存 0-15 食物）。可考虑新增 `quantity-input` choice 类型，但 XOR 也可凑合。
-
-> 大部分 SPECIAL_EFFECT 卡（~30/40）可用现有机制实现，仅 3 张需要新基础设施。
-
-#### 批次 15：对手交互（23 张）— 按交互模式分组
-
-##### PASSIVE_BENEFIT — 被动收益（11 张）
-
-对手做 X 时，卡主自动获得资源，无需选择。
-
-| 卡牌 | 触发事件 | 效果 |
-|---|---|---|
-| B143 | 对手使用 Hollow | 卡主得 1 黏土 |
-| B159 | 对手犁相邻田 | 卡主得 1 食物 |
-| B163 | 任何人建房（卡主仅 2 房） | 卡主得 3 木 +2 黏土 +1 芦苇 +1 石 |
-| C137 | 任何人建烘焙改良 | 卡主得 1 木 +1 食物 |
-| D77 | 任何人翻新为石 | 卡主每新石房得 1 黏土 |
-| D160 | 对手首次放农民在家庭成长 | 卡主得 1 谷物 |
-| D163 | 对手翻新为石/建石房 | 卡主得 1 石头 |
-| E49 | 任何人建木房 | 卡主得 1 食物 |
-| E144 | 任何人打食物转换卡 | 卡主得对应建材 +1 芦苇 |
-| E156 | 对手打含黏土费用的改良 | 卡主得 1 食物 +1 黏土 |
-| E160 | 对手使用 Fishing | 对手得 1 食物，卡主得 1 蔬菜 |
-
-##### OWNER_OPTIONAL — 卡主可选（9 张）
-
-对手做 X 时，卡主可选择性行动。
-
-| 卡牌 | 触发事件 | 可选效果 |
-|---|---|---|
-| A154 | 对手收取食物累积格 | 付 1 谷物给对手，得 1 分 |
-| A158 | 对手使用 Traveling Players | 交换 1 谷/羊/菜 → 4/5/7 食物 |
-| A159 | 对手使用 Fishing/ReedBank | 付 1 木给对手，得 2-3 食物 |
-| C149 | 对手翻新为石 | 付 2 食物，免费建 1 黏土房 |
-| C152 | 对手使用 Traveling Players | 付 1 食物给对手，免费打 1 职业 |
-| C153 | 对手翻新 | 付 2 木，得 1 谷 +1 食 +1 分 |
-| C167 | 对手使用 Fencing | 买 1 羊/猪/牛，付 1/2/2 食物 |
-| D128 | 对手建房 | 付 1 食物给对手，建 1 房（付全价） |
-| D149 | 对手使用 Quarry | 必选：1 食物 或 建 1 免费马厩 |
-
-##### FORCED_PAYMENT — 强制支付（1 张）
-B138: 对手收取 5+ 木时，必须付 1 食物给卡主
-
-##### GRANT_ACTION — 授予行动（1 张）
-C151: 对手使用 Grain Utilization 时，卡主可选执行播种
-
-##### META_EFFECT — 多阶段效果（1 张）
-A160: 对手使用 Traveling Players → 卡主自动得 1 食 +1 木 + 可选付 2 食买 1 菜
-
-### 批次 16：流程替换/特殊机制（~28 张）
-
-不归入以上类别的复杂卡 + SPECIAL 类型：
-
-**流程替换/假农民等：**
-A20, B26, B160, C23, C112, C129, C140, C150, C158, C160, D17, D18, D21, D24, D50, E105
-
-**SPECIAL 类型：**
-PlayerActionCard (2): C22, C39
-FieldDetails (3): B68, D75, E80
-GetBaseCosts (1): B36
-ComplexBuy (2): A20, E125
-
-**理由**：最大批次。每张需创建文件 + 1 个 listener，逻辑清晰。
-
-**建议按事件类型分子批实现（见上方详细分组）：**
-1. PlaceFarmer 触发（56 张）— 最常见，放农民到特定行动格时触发
-2. AfterCollect（17 张）— 收取后效果
-3. After 行动（31 张）— after:Plow/Sow/Fencing/Construct 等
-4. Harvest 阶段（34 张）— StartHarvest/Feeding/EndHarvest 等
-5. 回合/工作阶段（47 张）— StartOfTurn/ReturnHome/EndWorkPhase 等
-6. Compute 修改器 + Anytime + 静态（19 张）
-
----
-
-## 各 Deck 已实现卡牌列表
-
-### A Deck（147 张已实现）
-
-A1, A2, A4, A5, A6, A7, A8, A9, A11, A12, A13, A15, A16, A17, A18, A21, A22, A23, A24, A25, A26, A28, A29, A30, A31, A32, A33, A34, A35, A36, A37, A38, A39, A40, A44, A45, A46, A47, A48, A49, A50, A51, A52, A53, A54, A55, A56, A57, A58, A59, A61, A62, A63, A64, A65, A66, A67, A68, A69, A70, A71, A72, A73, A74, A75, A76, A77, A78, A79, A80, A81, A82, A83, A84, A86, A90, A91, A92, A93, A94, A95, A96, A97, A98, A99, A100, A101, A102, A103, A104, A105, A107, A108, A109, A110, A112, A114, A115, A116, A117, A118, A119, A120, A121, A122, A125, A126, A128, A129, A130, A131, A132, A133, A134, A135, A136, A137, A138, A139, A140, A141, A142, A143, A144, A145, A146, A147, A148, A149, A150, A152, A153, A154, A155, A156, A157, A158, A159, A160, A161, A162, A163, A164, A165, A166, A167, A168
-
-### B Deck（144 张已实现）
-
-B1, B2, B4, B5, B6, B7, B8, B9, B11, B12, B13, B14, B16, B17, B19, B20, B21, B22, B23, B24, B25, B27, B28, B29, B30, B31, B33, B34, B35, B37, B38, B39, B40, B41, B42, B43, B44, B45, B46, B47, B48, B49, B50, B52, B53, B54, B55, B56, B57, B58, B59, B60, B61, B62, B64, B65, B66, B67, B69, B70, B71, B72, B73, B74, B75, B76, B77, B78, B79, B82, B83, B84, B85, B86, B87, B88, B89, B90, B91, B92, B93, B94, B95, B96, B97, B98, B99, B100, B101, B102, B103, B105, B106, B107, B108, B109, B110, B111, B112, B113, B114, B115, B116, B117, B118, B119, B123, B124, B125, B126, B127, B128, B129, B131, B132, B133, B134, B135, B136, B137, B138, B139, B140, B141, B142, B143, B144, B147, B148, B149, B151, B153, B154, B157, B158, B159, B160, B162, B163, B164, B165, B166, B167, B168
-
-### C Deck（147 张已实现）
-
-C1, C2, C3, C4, C5, C6, C7, C8, C9, C11, C12, C15, C16, C17, C18, C19, C20, C21, C24, C25, C27, C29, C30, C31, C33, C34, C35, C36, C37, C38, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C96, C97, C98, C99, C100, C101, C102, C103, C104, C106, C107, C108, C110, C111, C113, C114, C115, C116, C118, C119, C120, C121, C122, C123, C124, C126, C127, C128, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C152, C153, C155, C156, C157, C159, C161, C162, C163, C164, C165, C166, C167, C168
-
-### D Deck（142 张已实现）
-
-D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D12, D13, D14, D15, D16, D19, D20, D23, D28, D29, D30, D31, D32, D33, D34, D35, D36, D38, D39, D40, D41, D42, D43, D44, D45, D46, D47, D48, D49, D51, D52, D53, D54, D55, D56, D57, D58, D60, D61, D62, D63, D64, D65, D66, D67, D68, D70, D71, D72, D73, D74, D76, D77, D78, D79, D80, D81, D82, D83, D84, D86, D87, D88, D89, D90, D92, D94, D96, D97, D98, D99, D100, D101, D104, D105, D106, D107, D109, D110, D111, D112, D113, D114, D115, D116, D117, D118, D119, D120, D121, D122, D123, D124, D125, D126, D127, D128, D129, D130, D131, D132, D133, D135, D136, D138, D139, D140, D141, D142, D143, D144, D145, D146, D147, D148, D149, D150, D151, D152, D153, D154, D156, D157, D158, D160, D161, D162, D163, D164, D166, D167, D168
-
-### E Deck（149 张已实现）
-
-E1, E2, E4, E6, E7, E8, E9, E10, E11, E12, E13, E14, E15, E17, E18, E19, E20, E21, E22, E23, E24, E25, E26, E28, E30, E31, E32, E33, E34, E35, E36, E37, E38, E39, E40, E41, E42, E43, E44, E45, E46, E47, E48, E49, E50, E51, E52, E53, E54, E55, E56, E57, E58, E59, E60, E61, E62, E63, E64, E65, E66, E67, E69, E70, E71, E72, E73, E74, E75, E77, E79, E81, E82, E83, E84, E85, E86, E87, E88, E89, E90, E91, E92, E94, E95, E97, E98, E99, E100, E101, E102, E103, E104, E106, E107, E108, E110, E111, E112, E113, E114, E115, E116, E117, E118, E119, E120, E121, E122, E124, E126, E128, E129, E130, E131, E132, E133, E134, E135, E136, E137, E138, E139, E140, E141, E142, E143, E144, E145, E146, E147, E148, E149, E150, E151, E152, E154, E155, E156, E157, E158, E160, E161, E162, E163, E164, E165, E166, E167, E168
+- ✅ **已实现** — 注册了 `registerCardEffect` / `registerCardListener`，或 card 定义中含有效的 `modifier/modifiers/exchanges/scoreRule/isBaking/isCookery/counters/stack` 字段
+- 🟡 **已实现但简化** — 核心效果工作，但某些分支/精确规则未实现（见"已知简化"表）
+- ⏸ **数据-only（Tier 1）** — BGA 参考也无逻辑，保留数据即符合行为
+- ⏸ **待核心类型扩展（Tier 3）** — E68 唯一一张，暂缓
+
+实现清单以 `shared/cards/catalog.ts` 的 `minorImprovementCards` / `occupationCards` 数组为准；具体 hook 注册在各 `shared/cards/{Deck}/{CardId}_{Name}.ts` 文件内。
