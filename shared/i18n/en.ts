@@ -96,6 +96,8 @@ export const en = {
     interactionSowVegetableBakeStoneOven:
       'Sow vegetable and bake bread with Stone Oven',
     interactionMoveFarmerToSpace: 'Move your person to an unoccupied action space',
+    interactionRecallPlacedWorker: 'Choose one of your placed workers to return home',
+    interactionTradeTeacherBuy: 'Buy {goods} for {food} food',
     interactionCollectorSelect: 'Select a resource type to gain',
     interactionCollectorCount: 'Selected: {selected} / Required: {needed}',
     interactionForestInn: 'Choose a wood exchange option',
@@ -416,6 +418,7 @@ export const en = {
     'clear-card-infobox': { name: 'Clear Card Infobox', description: 'Remove the infobox text shown on the source card' },
     noop: { name: 'No Effect', description: 'Do nothing' },
     'return-first-worker-home': { name: 'Return First Worker Home', description: 'Return the first worker placed this round back home' },
+    'recall-placed-worker': { name: 'Recall Placed Worker', description: 'Return one of your placed workers back home' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },
     'store-on-card': { name: 'Store On Card', description: 'Place resources on the source card' },
     'gain-other-players': { name: 'Gain Other Players', description: 'Give the specified resources to every other player' },
