@@ -5,6 +5,7 @@ import type {
   ScoreCategoryResult,
   ScoreEntry,
 } from '../../../shared/logic/scoring'
+import { getCardDisplayName } from '../common/cardText'
 
 type Props = {
   locale: Locale
@@ -57,15 +58,8 @@ const getCardLabel = (
   locale: Locale,
   cardType: 'major' | 'minor' | 'occupation',
   cardId: string,
-) => {
-  if (cardType === 'minor') {
-    return t(locale, `minorImprovements.${cardId}.name`)
-  }
-  if (cardType === 'occupation') {
-    return t(locale, `occupations.${cardId}.name`)
-  }
-  return t(locale, `improvements.${cardId}.name`)
-}
+) =>
+  getCardDisplayName(locale, cardType, cardId)
 
 const renderEntryDetail = (locale: Locale, entry: ScoreEntry) => {
   if (entry.type === 'cardBonus') {
@@ -156,7 +150,7 @@ export const ScoringPad = ({ locale, scores, onClose }: Props) => {
                   : row.type === 'card'
                     ? `· ${getCardLabel(locale, row.cardType, row.cardId)}`
                     : row.type === 'cardBonus'
-                      ? `· ${t(locale, `improvements.${row.cardId}.name`)}`
+                      ? `· ${getCardDisplayName(locale, 'major', row.cardId)}`
                       : t(locale, 'ui.scoringTotal')
               return (
                 <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
