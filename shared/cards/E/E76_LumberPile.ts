@@ -1,13 +1,79 @@
 import { MinorImprovement } from '../types'
-// BGA: onBuy uses SPECIAL_EFFECT argsReturnStables — player can return up to 3 stables
-// from their farmyard and gain 3 wood each. Complex stable-return UI not available.
-// TODO: implement optional stable return (up to 3 stables → 3 wood each).
+import { registerCardEffect } from '../card-effects'
+import { addCardResourceGained } from '../helpers/card-state'
+import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { removeStableAtTile } from '../helpers/stable-removal'
+import type { ActionFlow, FarmTilePosition } from '../../game/types'
+
+const CARD_ID = 'E76_LumberPile'
+const FIELD_EFFECT = 'lumber-pile-return-stables'
+
+/**
+ * E76 Lumber Pile (Minor, E, 76):
+ * - onBuy: player may immediately return up to 3 stables from the farmyard to
+ *   their supply. Each returned stable grants 3 WOOD.
+ *
+ * BGA (E76_LumberPile.php): optional returnStables → max 3 normal stables,
+ * then gainNode(WOOD => 3 * count). BGA also has a FarmHand branch but in our
+ * engine FarmHand (B85) is modeled as `rooms + 1` without a distinct stable
+ * tile, so we only implement the normal-stable branch.
+ */
+registerFieldEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
+  let removed = 0
+  for (const field of fields) {
+    const [rowStr, colStr] = field.split(',')
+    const row = Number(rowStr)
+    const col = Number(colStr)
+    if (!Number.isFinite(row) || !Number.isFinite(col)) continue
+    const tile: FarmTilePosition = { row, col }
+    if (removeStableAtTile(player, tile)) removed += 1
+    if (removed >= 3) break
+  }
+  if (removed > 0) {
+    const wood = removed * 3
+    player.resources.wood = (player.resources.wood ?? 0) + wood
+    if (sourceCard) {
+      addCardResourceGained(player, sourceCard, { wood })
+    }
+  }
+})
+
+registerCardEffect({
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (player.stableTiles.length === 0) return
+    const selectableTiles = player.stableTiles.map((t) => ({
+      row: t.row,
+      col: t.col,
+    }))
+    const flow: ActionFlow = {
+      type: 'seq',
+      optional: true,
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'field-select',
+          sourceCard: CARD_ID,
+          actionContext: {
+            fieldEffect: FIELD_EFFECT,
+            maxSelections: Math.min(3, selectableTiles.length),
+            farmType: 'stable',
+            selectableTiles,
+          },
+        },
+      ],
+    }
+    return flow
+  },
+})
 
 export const E76_LumberPile = new MinorImprovement({
-  id: 'E76_LumberPile',
+  id: CARD_ID,
   name: 'Lumber Pile',
   deck: 'E',
   number: 76,
   category: 'RESOURCE_WOOD',
-  desc: ['When you play this card, you can immediately return up to 3 <STABLE> from your farmyard board to your supply and get 3 <WOOD> for each.'],
+  desc: [
+    'When you play this card, you can immediately return up to 3 <STABLE> from your farmyard board to your supply and get 3 <WOOD> for each.',
+  ],
 })
