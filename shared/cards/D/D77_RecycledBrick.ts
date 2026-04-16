@@ -52,9 +52,7 @@ export const D77_RecycledBrick = new MinorImprovement({
   deck: 'D',
   number: 77,
   category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time any player renovates to stone, you get 1 <CLAY> per newly renovated room.',
-  ],
+  desc: ['Each time any player (including you) renovates to stone, you get 1 <CLAY> for each newly renovated room.'],
   cost: { food: 1 },
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },

@@ -76,7 +76,7 @@ export const C129_SecondSpouse = new Occupation({
   number: 129,
   category: 'FAMILY_GROWTH',
   desc: [
-    "You can use the __Urgent Wish for Children__ action space even if it is occupied by another player's person.",
+    'You can use the __Urgent Wish for Children__ action space (from round 12-13) even if it is occupied by the first person another player placed.',
   ],
   cost: {},
   players: '3+',

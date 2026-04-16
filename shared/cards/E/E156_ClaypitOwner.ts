@@ -69,7 +69,7 @@ export const E156_ClaypitOwner = new Occupation({
   number: 156,
   category: 'GOODS_PROVIDER',
   desc: [
-    'Each time another player plays an improvement with a printed <CLAY> cost, you get 1 <FOOD> and 1 <CLAY>.',
+    'Each time another player plays or builds an improvement with a printed <CLAY> cost, you get 1 <FOOD> and 1 <CLAY>.',
   ],
   cost: {},
   players: '4+',

@@ -8,7 +8,7 @@ export const stoneOven: MajorCardEffect = {
   isBaking: true,
   description: [
     '[__Bake Bread__ action:]',
-    '<GRAIN> → 4<FOOD> (max 2)',
+    '<GRAIN> <ARROW-2X> 4<FOOD>',
     '[When you build it, you can Bake immediately]',
   ],
   onBuy: () => ({

@@ -48,6 +48,6 @@ export const D56_FatstockStretcher = new MinorImprovement({
   deck: 'D',
   number: 56,
   category: 'FOOD_PROVIDER',
-  desc: ["Each time you turn a sheep or pig into food using a cooking improvement, you get 1 additional <FOOD>."],
+  desc: ['Each time you turn a <SHEEP> or <PIG> into <FOOD> using a cooking improvement, you get 1 additional <FOOD>.'],
   cost: { wood: 1 },
 })

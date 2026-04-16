@@ -95,7 +95,7 @@ export const E69_MelonPatch = new MinorImprovement({
   number: 69,
   category: 'CROP_PROVIDER',
   desc: [
-    'This card is a field that can only grow <VEGETABLE>. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field.',
+    'This card is a field that can only grow vegetables. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field.',
   ],
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },

@@ -63,7 +63,7 @@ export const C158_ForestCampaigner = new Occupation({
   number: 158,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Before placing a family member, if there are 8 or more <WOOD> on all accumulation spaces combined, you receive 1 <FOOD>.',
+    'Each time before you place a person, if there are at least 8 <WOOD> total on accumulation spaces, you get 1 <FOOD>.',
   ],
   cost: {},
   players: '1+',

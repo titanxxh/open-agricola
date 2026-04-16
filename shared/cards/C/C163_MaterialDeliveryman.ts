@@ -51,7 +51,7 @@ export const C163_MaterialDeliveryman = new Occupation({
   number: 163,
   category: 'BUILDING_RESOURCE_PROVIDER',
   desc: [
-    'Each time any player takes 5+ goods from an accumulation space, you get 1 building resource: 5<ARROW><WOOD>, 6<ARROW><CLAY>, 7<ARROW><REED>, 8+<ARROW><STONE>.',
+    'Each time any player (including you) takes 5/6/7/8+ goods from an accumulation space, you get 1 <WOOD>/<CLAY>/<REED>/<STONE> from the general supply.',
   ],
   cost: {},
   players: '3+',

@@ -8,7 +8,7 @@ export const clayOven: MajorCardEffect = {
   isBaking: true,
   description: [
     '[__Bake Bread__ action:]',
-    '<GRAIN> → 5<FOOD> (max 1)',
+    '<GRAIN> <ARROW-1X> 5<FOOD>',
     '[When you build it, you can Bake immediately]',
   ],
   onBuy: () => ({

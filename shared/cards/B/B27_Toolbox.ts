@@ -64,6 +64,6 @@ export const B27_Toolbox = new MinorImprovement({
   deck: 'B',
   number: 27,
   category: 'ACTIONS_BOOSTER',
-  desc: ['Each time you build rooms or stables, you can also take a __Minor Improvement__ action.'],
+  desc: ["In the work phase, after each turn in which you build at least 1 room, stable, or fence, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement."],
   cost: { wood: 1 },
 })

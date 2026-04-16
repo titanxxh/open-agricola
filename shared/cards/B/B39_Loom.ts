@@ -17,6 +17,6 @@ export const B39_Loom = new MinorImprovement({
   deck: "B",
   number: 39,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for every 3 sheep."],
+  desc: ['In the field phase of each harvest, if you have at least 1/4/7 <SHEEP>, you get 1/2/3 <FOOD>. During scoring, you get 1 bonus <SCORE> for every 3 <SHEEP>.'],
   cost: { wood: 1, reed: 1 },
 })

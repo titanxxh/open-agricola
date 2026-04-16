@@ -17,6 +17,8 @@ export const D29_MuckRake = new MinorImprovement({
   deck: "D",
   number: 29,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each unfenced stable that holds an animal."],
+  desc: [
+    'During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced stable holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced stables.',
+  ],
   cost: {},
 })

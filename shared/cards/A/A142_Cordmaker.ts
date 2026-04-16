@@ -51,7 +51,7 @@ export const A142_Cordmaker = new Occupation({
   number: 142,
   category: 'CROP_PROVIDER',
   desc: [
-    'Each time you or another player collects 2+ <REED> from the __Reed Bank__, you get 1 <GRAIN> or 1 <VEGETABLE>. (When an opponent triggers it, you may decline.)',
+    'Each time any player (including you) takes at least 2 <REED> from the __Reed Bank__ accumulation space, you can choose to take 1 <GRAIN> or buy 1 <VEGETABLE> for 2 <FOOD>.',
   ],
   cost: {},
   players: '3+',

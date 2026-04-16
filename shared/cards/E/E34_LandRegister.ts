@@ -22,7 +22,7 @@ export const E34_LandRegister = new MinorImprovement({
   deck: "E",
   number: 34,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 2 bonus <SCORE> if your farm has no unused spaces."],
+  desc: ['During scoring, if your farm has no unused spaces, you get 2 bonus <SCORE>.'],
   cost: {},
   vp: 0,
 })

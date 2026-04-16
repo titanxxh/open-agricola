@@ -54,7 +54,7 @@ export const D149_CasualWorker = new Occupation({
   number: 149,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Each time another player uses the __Eastern Quarry__ or __Western Quarry__, you can choose to get 1 <FOOD> or build 1 <STABLE> for free.',
+    'Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a stable without paying wood.',
   ],
   cost: {},
   players: '3+',

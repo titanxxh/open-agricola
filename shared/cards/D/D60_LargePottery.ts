@@ -22,6 +22,11 @@ export const D60_LargePottery = new MinorImprovement({
   deck: "D",
   number: 60,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1/2/3/4 bonus <SCORE> for 3-4/5/6/7+ clay."],
+  desc: [
+    '[Anytime]',
+    '<CLAY> <ARROW> 2<FOOD>',
+    '[Scoring]',
+    '3/5/6/7<CLAY> <ARROW-1X> 1/2/3/4<SCORE>',
+  ],
   cost: { clay: 2 },
 })

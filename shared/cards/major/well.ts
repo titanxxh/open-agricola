@@ -6,7 +6,7 @@ export const well: MajorCardEffect = {
   cost: { wood: 1, stone: 3 },
   vp: 4,
   extraVp: false,
-  description: ['At the start of the next 5 rounds, gain 1 food'],
+  description: ['[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]'],
   onBuy: (state, player) => {
     return queueFutureMeeplesFlow(state, {
       cardId: 'Major_Well',

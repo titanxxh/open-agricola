@@ -19,7 +19,7 @@ export const E136_AnimalHusbandryWorker = new Occupation({
   deck: "E",
   number: 136,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 2 bonus <SCORE> if you have the most pastures (shared)."],
+  desc: ['If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD> and a __Build Fences__ action. During scoring, each player with the most pastures gets 2 <SCORE>.'],
   cost: {},
   players: "3+",
 })

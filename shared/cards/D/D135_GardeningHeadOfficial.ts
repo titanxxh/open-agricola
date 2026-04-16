@@ -21,7 +21,9 @@ export const D135_GardeningHeadOfficial = new Occupation({
   deck: "D",
   number: 135,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 2 bonus <SCORE> if you have the most vegetables in fields (shared)."],
+  desc: [
+    'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most vegetables in their fields gets 2 bonus <SCORE>.',
+  ],
   cost: {},
   players: "3+",
 })

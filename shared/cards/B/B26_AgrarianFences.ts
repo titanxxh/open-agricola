@@ -91,7 +91,7 @@ export const B26_AgrarianFences = new MinorImprovement({
   number: 26,
   category: 'ACTIONS_BOOSTER',
   desc: [
-    'When you use the __Grain Utilization__ action space, you can also/instead build fences.',
+    'Each time you use the __Grain Utilization__ action space, you can take a __Build Fences__ action instead of one of the two actions provide by the action space.',
   ],
   cost: { wood: 1 },
 })

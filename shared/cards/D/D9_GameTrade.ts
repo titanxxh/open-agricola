@@ -17,7 +17,7 @@ export const D9_GameTrade = new MinorImprovement({
   deck: 'D',
   number: 9,
   category: 'FOOD_ANIMAL',
-  desc: ['You immediately get 1 <PIG> and 1 <CATTLE>. (Effectively, you are exchanging 2 <SHEEP> for 1 <PIG> and 1 <CATTLE>.)'],
+  desc: ['You immediately get 1 <PIG> and 1 <CATTLE>. (effectively, you are exchanging 2 <SHEEP> for 1 <PIG> and 1 <CATTLE>.)'],
   cost: { sheep: 2 },
   passing: true,
 })

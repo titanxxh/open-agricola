@@ -8,9 +8,9 @@ export const basketmaker: MajorCardEffect = {
   extraVp: true,
   description: [
     '[Harvest]',
-    'Reed → 3 food (max 1)',
+    '<REED> <ARROW-1X> 3<FOOD>',
     '[Scoring]',
-    '2/4/5 reed → 1/2/3 score',
+    '2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>',
   ],
   scoring: {
     resource: 'reed',

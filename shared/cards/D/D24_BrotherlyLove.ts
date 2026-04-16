@@ -87,7 +87,7 @@ export const D24_BrotherlyLove = new MinorImprovement({
   number: 24,
   category: 'ACTIONS_BOOSTER',
   desc: [
-    'If you have exactly 4 family members and 3 are already placed, the 4th can go on the same action space as one of your other family members.',
+    'As long as you have exactly 4 people, in the work phase of each round, you can place your third and fourth person immediately after one another, even on the same action space.',
   ],
   cost: {},
 })

@@ -52,7 +52,9 @@ export const D114_SeedTrader = new Occupation({
   deck: 'D',
   number: 114,
   category: 'CROP_PROVIDER',
-  desc: ['When you play this card, you immediately get 2 <GRAIN> and 2 <VEGETABLE>. At any time, but only once per round, you can buy 1 <GRAIN> for 1 <FOOD>.'],
+  desc: [
+    'Place 2 <GRAIN> and 2 <VEGETABLE> on this card. You can buy them at any time. Each <GRAIN> costs 2 <FOOD>; each <VEGETABLE> costs 3 <FOOD>.',
+  ],
   cost: {},
   players: '1+',
 })

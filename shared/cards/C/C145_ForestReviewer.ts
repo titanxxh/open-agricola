@@ -44,7 +44,7 @@ export const C145_ForestReviewer = new Occupation({
   number: 145,
   category: 'BUILDING_RESOURCE_PROVIDER',
   desc: [
-    'Each time any player uses the __Grove__ or __Forest__ while the other is occupied, you get 1 <REED>.',
+    'Each time after any player (including you) uses the unoccupied __Grove__ or __Forest__ accumulation space while the other of the two is occupied, you get 1 <REED>.',
   ],
   cost: {},
   players: '3+',

@@ -55,6 +55,6 @@ export const C46_Mandoline = new MinorImprovement({
   deck: 'C',
   number: 46,
   category: 'FOOD_PROVIDER',
-  desc: ['Once per round, you can pay 1 <VEGETABLE> to get 1 bonus point. If you do, place 1 <FOOD> on each of the next 2 round spaces.'],
+  desc: ['Once per round, you can pay 1 <VEGETABLE> to get 1 bonus <SCORE>. If you do, place 1 <FOOD> on each of the next 2 round spaces. At the start of these rounds, you get the <FOOD>.'],
   cost: { wood: 1 },
 })

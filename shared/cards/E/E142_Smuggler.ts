@@ -90,7 +90,12 @@ export const E142_Smuggler = new Occupation({
   deck: "E",
   number: 142,
   category: "GOODS_PROVIDER",
-  desc: ["In the feeding phase of each harvest, you can exchange up to 2 goods as follows: [<WOOD> <ARROW> <GRAIN>] or [<GRAIN> <ARROW> <STONE>]"],
+  desc: [
+    'In the feeding phase of each harvest, you can exchange up to 2 goods as follows:',
+    '[<WOOD> <ARROW> <GRAIN>]',
+    'or',
+    '[<GRAIN> <ARROW> <STONE>]',
+  ],
   cost: {},
   players: "3+",
 })

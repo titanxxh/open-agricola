@@ -63,7 +63,7 @@ export const C167_CattleBuyer = new Occupation({
   number: 167,
   category: 'ANIMAL_FARMER',
   desc: [
-    'Each time another player uses the __Fencing__ action space, you can buy 1 <SHEEP> for 1 <FOOD>, 1 <PIG> for 2 <FOOD>, or 1 <CATTLE> for 2 <FOOD>.',
+    'Each time another player uses the __Fencing__ action space, you can buy exactly 1 <SHEEP>/<PIG>/<CATTLE> from the general supply for 1/2/2 <FOOD>.',
   ],
   cost: {},
   players: '4+',

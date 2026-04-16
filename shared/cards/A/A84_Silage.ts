@@ -54,7 +54,7 @@ export const A84_Silage = new MinorImprovement({
   deck: "A",
   number: 84,
   category: "LIVESTOCK_PROVIDER",
-  desc: ["In the returning home phase of each round that does not end with a harvest, you can pay 1 <GRAIN> (from reserve or field) to breed one type of animal."],
+  desc: ["In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a field - to breed exactly one type of animal."],
   cost: {},
   prerequisite: "2 Fields",
 })

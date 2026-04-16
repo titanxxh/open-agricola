@@ -37,7 +37,7 @@ export const A153_PigOwner = new Occupation({
   deck: 'A',
   number: 153,
   category: 'POINTS_PROVIDER',
-  desc: ['The first time you have 5 or more <PIG>, you get 3 bonus <SCORE>.'],
+  desc: ['The first time after you play this card that you have 5 <PIG> on your farm, you immediately get 3 bonus <SCORE>.'],
   cost: {},
   players: '4+',
 })

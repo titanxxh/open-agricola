@@ -19,7 +19,11 @@ export const E63_IronOven = new MinorImprovement({
   deck: "E",
   number: 63,
   category: "FOOD_GRAIN",
-  desc: ["[Bake Bread action:] 1 <GRAIN> → 6 <FOOD>"],
+  desc: [
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW-1X> 6<FOOD>',
+    'When you play this card, you can immediately take a __Bake Bread__ action.',
+  ],
   cost: { stone: 3 },
   vp: 2,
   isBaking: true,

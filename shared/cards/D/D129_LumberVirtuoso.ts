@@ -65,7 +65,9 @@ export const D129_LumberVirtuoso = new Occupation({
   deck: 'D',
   number: 129,
   category: 'ACTIONS_BOOSTER',
-  desc: ['Each harvest in which you have at least 5 <WOOD>, you can discard down to 5 <WOOD> to take a Build Stables or Build Wood Rooms action by paying the usual costs.'],
+  desc: [
+    'Each harvest in which you have at least 5 <WOOD> in your supply, you can discard down to 5 <WOOD> to take a __Build Stables__ or __Build Wood Rooms__ action by paying the usual costs.',
+  ],
   cost: {},
   players: '3+',
 })

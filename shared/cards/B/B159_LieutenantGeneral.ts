@@ -44,7 +44,7 @@ export const B159_LieutenantGeneral = new Occupation({
   number: 159,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Each time another player plows a field adjacent to an existing field, you get 1 <FOOD>.',
+    'For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
   ],
   cost: {},
   players: '4+',

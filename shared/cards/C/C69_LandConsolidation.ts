@@ -50,6 +50,6 @@ export const C69_LandConsolidation = new MinorImprovement({
   deck: 'C',
   number: 69,
   category: 'CROP_PROVIDER',
-  desc: ['At any time, but only once per round, you can exchange 3 <GRAIN> for 1 <VEGETABLE>.'],
+  desc: ['At any time, if you have a grain field with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the field for 1 <VEGETABLE> on the field.'],
   cost: {},
 })

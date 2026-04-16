@@ -57,7 +57,7 @@ export const A159_JoinerOfSea = new Occupation({
   number: 159,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Each time another player uses the __Fishing__ or __Reed Bank__ accumulation space, you can give them 1 <WOOD> to get 2 <FOOD> (Fishing) or 3 <FOOD> (Reed Bank).',
+    'Each time another player uses the __Fishing__/__Reed Bank__ accumulation space, you can give them 1 <WOOD> to get 2 <FOOD>/3 <FOOD> from the general supply.',
   ],
   cost: {},
   players: '4+',
