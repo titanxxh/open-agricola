@@ -1,12 +1,67 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
-// D165 PigStalker: Each time you use an animal accumulation space, get 1 pig if you
+const CARD_ID = 'D165_PigStalker'
+
+// D165 Pig Stalker: Each time you use an animal accumulation space, get 1 pig if you
 // occupy a round space immediately adjacent (left or right) to that animal market.
-// CONCERN: BGA adjacency logic depends on BGA board layout turn numbering which we
-// don't have. Implemented as stub only.
+//
+// BGA adjacency map (by round-space position, 1-indexed):
+//   1->[2], 2->[1,3], 3->[2,4], 4->[3], 8->[9], 9->[8], 10->[11], 11->[10]
+
+const ANIMAL_MARKETS = ['sheep-market', 'pig-market', 'cattle-market']
+
+const ADJACENCY_MAP: Record<number, number[]> = {
+  1: [2],
+  2: [1, 3],
+  3: [2, 4],
+  4: [3],
+  8: [9],
+  9: [8],
+  10: [11],
+  11: [10],
+}
+
+const listener: CardListenerRegistration = {
+  id: 'D165-pig-stalker-after-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const spaceId = context.space?.id
+    if (!spaceId || !ANIMAL_MARKETS.includes(spaceId)) return
+
+    const roundOrder = context.state.roundActionOrder
+    const positionIndex = roundOrder.indexOf(spaceId)
+    if (positionIndex < 0) return
+    const position = positionIndex + 1
+
+    const adjacentPositions = ADJACENCY_MAP[position]
+    if (!adjacentPositions || adjacentPositions.length === 0) return
+
+    const adjacentSpaceIds = adjacentPositions
+      .map((pos) => roundOrder[pos - 1])
+      .filter((id): id is string => id != null)
+
+    const playerOccupiesAdjacent = adjacentSpaceIds.some((adjSpaceId) => {
+      const space = context.state.actionSpaces.find((s) => s.id === adjSpaceId)
+      return space?.takenBy === context.player.id
+    })
+
+    if (!playerOccupiesAdjacent) return
+
+    return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
+  },
+}
+
+registerCardListener(listener)
 
 export const D165_PigStalker = new Occupation({
-  id: 'D165_PigStalker',
+  id: CARD_ID,
   name: 'Pig Stalker',
   deck: 'D',
   number: 165,
@@ -14,4 +69,5 @@ export const D165_PigStalker = new Occupation({
   desc: ['Each time you use an animal accumulation space, you get an additional 1 <PIG> if you occupy a Round 1-14 action space which is immediately to the left or right of that accumulation space.'],
   cost: {},
   players: '4+',
+  evenMoreSet: true,
 })
