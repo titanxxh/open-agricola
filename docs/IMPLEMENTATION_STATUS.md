@@ -147,7 +147,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 - `shared/actions/effects/return-first-worker-home.ts`：支持通过分支 leaf 直接表达 BGA 风格“收回第一个工人”效果
 - `flow` 叶子节点支持自定义 choice label：可直接表达 `xor/or` 分支文案，减少把卡牌选择额外包成 `card-choice`
 
-882 个 A/B/C/D/E 牌文件，797 张已实现 hook 注册（89.4%）。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
+882 个 A/B/C/D/E 牌文件，810 张已实现 hook 注册（90.8%）。详见 `docs/cards_impl.md` 和 `docs/card_progress.md`。
 
 ### 4.3 支付系统
 
@@ -166,7 +166,7 @@ ActivateCardNode 架构：CardListener 在引擎 pipeline 中匹配后创建引�
 
 ### 5.1 单元测试
 
-vitest；当前仓库内 `*.test.ts` 约 320+ 个文件，1946 用例通过（含 Wave 1-4 新增 153 个会话测试）。
+vitest；当前仓库内 `*.test.ts` 约 350+ 个文件，2063 用例通过（含 Wave 1-8 新增约 190 个会话测试）。
 
 | 类别 | 文件 |
 |---|---|
@@ -215,7 +215,7 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 882 个 A/B/C/D/E 牌文件中，当前有 797 张已接入 hook（89.4%）；剩余约 25 张分三层：11 张 BGA 自身无逻辑、13 张需新基础设施（card-select / 农民回收 / major 交换）、1 张（E68）需扩展 Field.crop 支持 wood 作物类型。
+- 882 个 A/B/C/D/E 牌文件中，当前有 810 张已接入 hook（90.8%）；剩余 12 张：11 张 BGA 自身无逻辑（已匹配参考行为）、1 张（E68）需扩展 Field.crop 支持 wood 作物类型。多数 Tier 2 复杂卡通过合理简化完成，简化内容记录在各卡文件注释中（详见 `docs/card_progress.md` 的简化表）。
 - Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。`A88_HedgeKeeper` 使用与 BGA 一致的「空 `from` + `to: { wood: 1 }` + `max: 3`」`TradeModifier` 模拟围栏免木段数，而非单笔 `bonus` −3 Wood。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCosts 折扣）均已实现。

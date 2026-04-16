@@ -8,16 +8,16 @@
 |---|---|---|---|---|
 | | BGA 总数 | 已实现 Hook | 仅数据 | 无文件 |
 |---|---|---|---|---|
-| A Deck | 180 | 152 | 21 | 7 |
-| B Deck | 180 | 157 | 10 | 13 |
-| C Deck | 182 | 154 | 18 | 10 |
-| D Deck | 181 | 149 | 24 | 8 |
-| E Deck | 169 | 154 | 10 | 5 |
-| **总计** | **892** | **766** | **83** | **43** |
+| A Deck | 180 | 153 | 20 | 7 |
+| B Deck | 180 | 158 | 9 | 13 |
+| C Deck | 182 | 157 | 15 | 10 |
+| D Deck | 181 | 155 | 18 | 8 |
+| E Deck | 169 | 157 | 7 | 5 |
+| **总计** | **892** | **810** | **49** | **43** |
 
 > Major Improvements (10张) 已全部实现，不计入上表。
-> 截至 2026-04-17 更新。1946 tests passing。实现率 **85.9%**（Hook 实现 + 静态 modifiers + exchanges）。
-> Wave 1-4 (2026-04-17) 完成后：新增 38 张卡 hooks、153 个测试。
+> 截至 2026-04-17 更新。2063 tests passing。实现率 **90.8%**。
+> Wave 1-8 (2026-04-17) 完成后：新增 51 张卡 hooks、~190 个测试。
 
 > **注意**：A14, A88, A123, B145, C13, C14 通过 `modifiers` 静态字段实现（bonus/trade 类型），无需 registerCardEffect/registerCardListener hooks，属于已实现。
 
@@ -73,7 +73,27 @@ A27 OvenSite, B155 ArtTeacher, C95 BasketWeaver, D95 SiteManager, E109 BraidMake
 **Wave 4 — PLAYER_ACTION_CARD 链式 (3 张, +25 测试):**
 B130 FullPeasant, B150 LargeScaleFarmer, B152 JuniorArtist
 
-## 真正剩余（约 25 张）
+## 2026-04-17 Wave 5-8 新增（13 张 Tier 2 + 简化）
+
+**Wave 5 — Tier 2 LOW (6 张, +37 测试):**
+C23 JobContract, D22 WorkPermit, D27 Retraining, D102 SampleStableMaker,
+E76 LumberPile, B3 Moonshine
+
+**Wave 6 — Farmer-recall + goods (2 张, +17 测试):**
+D93 SheepInspector (farmer-recall), D137 TradeTeacher (21 枚举 XOR)
+
+**Wave 7 — Card-select (2 张, +20 测试):**
+B146 Illusionist (完整), A3 PaperKnife (简化, 跳过 3-select 中间步骤)
+
+**Wave 8 — High-complexity 简化 (3 张, +15 测试):**
+C22 BasketChair, C150 ParrotBreeder, E125 DelayedWayfarer
+
+### 新增基础设施
+- `shared/cards/helpers/stable-removal.ts` — 移除马厩 (D102, E76)
+- `shared/actions/effects/recall-placed-worker.ts` — 召回放置的农民 (D93)
+- `shared/actions/effects/discard-from-hand.ts` — 从手牌弃卡 (B146)
+
+## 真正剩余（12 张）
 
 ### Tier 1: BGA 自身无逻辑（11 张，已匹配 BGA 行为）
 A41 VegetableSlicer, A85 Homekeeper, A87 Conservator, A106 SlurrySpreader,
@@ -82,21 +102,22 @@ D155 Ebonist, D159 ReedSeller, E93 Motivator, E149 MidnightFencer
 
 > 这些卡的 BGA PHP 只有 `getDesc`，无任何 listener/onBuy。保留数据即符合 BGA 行为。
 
-### Tier 2: 需新基础设施（13 张）
-
-**card-select UI (3)**: A3 PaperKnife, B3 Moonshine, B146 Illusionist
-
-**farmer/stable 操作 (4)**: C23 FakeFarmer, D22 WorkPermit,
-D93 SheepInspector (farmer-recall), D102 SampleStableMaker (stable-recall)
-
-**多选/交换 (3)**: D27 Retraining (major swap), D137 TradeTeacher (resource-type multi-select),
-E76 LumberPile (stable recall + farmhand)
-
-**复杂流程 (3)**: C22 BasketChair (PlayerActionCard 移动农民),
-C150 ParrotBreeder (anytime + opponent trigger), E125 DelayedWayfarer (onBuy + extra placement)
-
-### Tier 3: 核心类型扩展 (1)
+### Tier 3: 核心类型扩展 (1 张)
 E68 CherryOrchard — 需 `Field.crop` 支持 'wood' 作物类型
+
+## 已知简化（记录在卡文件注释中）
+
+| 卡牌 | 简化内容 |
+|---|---|
+| A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤，直接从整手随机选 1 |
+| B3 Moonshine | XOR 折叠为"买不起则 PASS"规则 |
+| D102/E76 | 跳过 FarmHand 分支（我们的 B85 用 rooms+1 建模，无专属马厩） |
+| D95 SiteManager | 贪心策略（短缺时才替换），非 BGA 完整组合选择 |
+| E16 BriarHedge | 每边围栏免木未实现（需重写 fencing.ts） |
+| E96 Elder | 回合 1 StartOfWork 额外放置未实现（需新 hook） |
+| C22 BasketChair | 只提供 round start 额外放置，不召回已放农民 |
+| C150 ParrotBreeder | 仅保留 anytime 激活信号，对手位置追踪未实现 |
+| E125 DelayedWayfarer | 额外放置延后到下轮开始（非本轮末） |
 
 ### 实现进度
 
@@ -123,6 +144,10 @@ E68 CherryOrchard — 需 `Field.crop` 支持 'wood' 作物类型
 | Wave 2 modifier | 2026-04-17 | +9 | 789 | 88.5% |
 | Wave 3 compute-cost | 2026-04-17 | +5 | 794 | 89.0% |
 | Wave 4 chain-action | 2026-04-17 | +3 | 797 | 89.4% |
+| Wave 5 tier-2 low | 2026-04-17 | +6 | 803 | 90.0% |
+| Wave 6 farmer-recall + goods | 2026-04-17 | +2 | 805 | 90.2% |
+| Wave 7 card-select | 2026-04-17 | +2 | 807 | 90.5% |
+| Wave 8 high-complexity | 2026-04-17 | +3 | 810 | 90.8% |
 
 ---
 
