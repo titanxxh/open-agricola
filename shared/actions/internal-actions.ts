@@ -27,6 +27,7 @@ import { setCardInfoboxAction } from './effects/set-card-infobox'
 import { clearCardInfoboxAction } from './effects/clear-card-infobox'
 import { noopAction } from './effects/noop'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
+import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
 import { storeOnCardAction } from './effects/store-on-card'
@@ -71,6 +72,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   clearCardInfoboxAction,
   noopAction,
   returnFirstWorkerHomeAction,
+  recallPlacedWorkerAction,
   reserveFenceBonusAction,
   payGrainAnyAction,
   storeOnCardAction,
