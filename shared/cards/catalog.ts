@@ -822,6 +822,29 @@ import { D144_WaterWorker } from './D/D144_WaterWorker'
 import { E77_Mattock } from './E/E77_Mattock'
 import { E118_KindlingGatherer } from './E/E118_KindlingGatherer'
 import { E143_Hewer } from './E/E143_Hewer'
+import { A154_Paymaster } from './A/A154_Paymaster'
+import { A158_CulinaryArtist } from './A/A158_CulinaryArtist'
+import { A159_JoinerOfSea } from './A/A159_JoinerOfSea'
+import { A160_Lutenist } from './A/A160_Lutenist'
+import { B138_ForestGuardian } from './B/B138_ForestGuardian'
+import { B143_ClayWarden } from './B/B143_ClayWarden'
+import { B159_LieutenantGeneral } from './B/B159_LieutenantGeneral'
+import { B163_Pastor } from './B/B163_Pastor'
+import { C137_CharcoalBurner } from './C/C137_CharcoalBurner'
+import { C149_ResourceRecycler } from './C/C149_ResourceRecycler'
+import { C151_SowingDirector } from './C/C151_SowingDirector'
+import { C152_Puppeteer } from './C/C152_Puppeteer'
+import { C153_PatternMaker } from './C/C153_PatternMaker'
+import { C167_CattleBuyer } from './C/C167_CattleBuyer'
+import { D77_RecycledBrick } from './D/D77_RecycledBrick'
+import { D128_BuildingTycoon } from './D/D128_BuildingTycoon'
+import { D149_CasualWorker } from './D/D149_CasualWorker'
+import { D160_Midwife } from './D/D160_Midwife'
+import { D163_JourneymanBricklayer } from './D/D163_JourneymanBricklayer'
+import { E49_Twibil } from './E/E49_Twibil'
+import { E144_WaresSalesman } from './E/E144_WaresSalesman'
+import { E156_ClaypitOwner } from './E/E156_ClaypitOwner'
+import { E160_KelpGatherer } from './E/E160_KelpGatherer'
 
 export const minorImprovementCards = [
   A10_WoodenShed,
@@ -1204,6 +1227,9 @@ export const minorImprovementCards = [
   C42_RavenousHunger,
   C80_RockyTerrain,
   E77_Mattock,
+  // Batch 15 — minor improvements (opponent interaction)
+  D77_RecycledBrick,
+  E49_Twibil,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1656,6 +1682,28 @@ export const occupationCards = [
   D144_WaterWorker,
   E118_KindlingGatherer,
   E143_Hewer,
+  // Batch 15 — occupations (opponent interaction)
+  A154_Paymaster,
+  A158_CulinaryArtist,
+  A159_JoinerOfSea,
+  A160_Lutenist,
+  B138_ForestGuardian,
+  B143_ClayWarden,
+  B159_LieutenantGeneral,
+  B163_Pastor,
+  C137_CharcoalBurner,
+  C149_ResourceRecycler,
+  C151_SowingDirector,
+  C152_Puppeteer,
+  C153_PatternMaker,
+  C167_CattleBuyer,
+  D128_BuildingTycoon,
+  D149_CasualWorker,
+  D160_Midwife,
+  D163_JourneymanBricklayer,
+  E144_WaresSalesman,
+  E156_ClaypitOwner,
+  E160_KelpGatherer,
 ]
 
 // All cards for reference and developer mode
