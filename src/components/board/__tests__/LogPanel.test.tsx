@@ -65,4 +65,29 @@ describe('LogPanel', () => {
     expect(html).toContain('data-resource="bonusVp"')
     expect(html).toContain('data-amount="1"')
   })
+
+  it('linkifies action detail cards from nested effect payload', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Player A',
+          action: 'actions.farm-expansion.name',
+          detailParts: {
+            effects: {
+              improvements: ['Major_ClayOven'],
+              minorImprovements: ['C60_SmallPottersOven'],
+            },
+          },
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="en" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('Clay Oven')
+    expect(text).toContain("Small Potter's Oven")
+    expect(html.match(/log-card-link/g)?.length ?? 0).toBe(2)
+  })
 })

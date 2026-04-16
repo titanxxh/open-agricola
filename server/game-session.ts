@@ -11,6 +11,7 @@ import type {
   Resource,
   InteractionAnimalReorgZone,
 } from '../shared/game/types.ts'
+import type { ActionDetailParts } from '../shared/protocol/game.ts'
 import { actionDefinitions } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
 import { clearActionHooks } from '../shared/actions/hooks.ts'
@@ -117,6 +118,7 @@ type HistoryEntry = {
   engineSnapshot: ReturnType<Engine['snapshot']> | null
   engineSource: EngineSource | null
   stageResume: StageResumeState | null
+  turnOwnerPlayerIndex: number | null
   actionStart: boolean
   undoBoundary?: boolean
 }
@@ -135,6 +137,7 @@ type StageResumeState = {
     | 'onBeforeStartOfTurn'
     | 'onRoundStart'
     | 'onStartHarvestFeedingPhase'
+    | 'onEndTurn'
     | 'onReturnHome'
     | 'onStartReturnHome'
     | 'onAfterRoundEnd'
@@ -202,6 +205,7 @@ export class GameSession {
   private loggedImprovementThisAction = false
   private loggedBakeBreadThisAction = false
   private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
+  private turnOwnerPlayerIndex: number | null = null
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -811,6 +815,7 @@ export class GameSession {
         ? JSON.parse(JSON.stringify(this.engineSource)) as EngineSource
         : null,
       stageResume: this.stageResume ? { ...this.stageResume } : null,
+      turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
       undoBoundary,
     }
@@ -829,6 +834,7 @@ export class GameSession {
       ? JSON.parse(JSON.stringify(entry.engineSource)) as EngineSource
       : null
     this.stageResume = entry.stageResume ? { ...entry.stageResume } : null
+    this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
     if (entry.engineSnapshot && this.engineSource) {
       this.engine = this.createEngineFromSource(this.engineSource)
       this.engine.restore(entry.engineSnapshot)
@@ -863,20 +869,7 @@ export class GameSession {
       if (delta > 0) gains[key] = delta
       if (delta < 0) costs[key] = Math.abs(delta)
     })
-    const effects: {
-      buildRoom?: number
-      buildStables?: number
-      growFamily?: number
-      plow?: number
-      sowGrain?: number
-      sowVegetable?: number
-      renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
-      fencing?: number
-      improvements?: string[]
-      minorImprovements?: string[]
-      startPlayer?: boolean
-      bakeBread?: { count: number; food: number }
-    } = {}
+    const effects: NonNullable<ActionDetailParts['effects']> = {}
     if (player.rooms > before.rooms) {
       effects.buildRoom = player.rooms - before.rooms
     }
@@ -932,7 +925,7 @@ export class GameSession {
     if (bakedGrain > 0 && bakedFood > 0) {
       effects.bakeBread = { count: bakedGrain, food: bakedFood }
     }
-    return { gains, costs, effects }
+    return { gains, costs, effects } satisfies ActionDetailParts
   }
 
   private logActionDetail(before: PlayerState, player: PlayerState) {
@@ -1079,6 +1072,50 @@ export class GameSession {
       }
     }
     return false
+  }
+
+  private continueSinglePlayerStageHook(
+    hook: StageResumeState['hook'],
+    playerIndex: number,
+    cardIndex = 0,
+  ) {
+    const player = this.state.players[playerIndex]
+    if (!player) return false
+    const cards = this.getPlayerEffectCardIds(player)
+    for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
+      const cardId = cards[currentCardIndex]
+      if (!cardId) continue
+      const flow = runCardEffectHook(this.state, player, cardId, hook)
+      if (!flow) continue
+      this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
+      return true
+    }
+    return false
+  }
+
+  private finishCompletedActionTurn(playerIndex: number): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    this.finalizeActionLog(player)
+    this.turnOwnerPlayerIndex = null
+    this.activeSpaceId = null
+    this.activePlayerIndex = null
+    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    if (!allWorkersUsed) {
+      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+    } else {
+      const startIdx = this.state.players.findIndex((p) => p.startPlayer)
+      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
+    }
+    return this.respond()
+  }
+
+  private continueEndTurnHooks(playerIndex: number, cardIndex = 0): SessionResponse {
+    if (this.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.finishCompletedActionTurn(playerIndex)
   }
 
   private continueHarvestFromBeforeHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
@@ -1285,6 +1322,9 @@ export class GameSession {
       case 'onStartHarvestFeedingPhase':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onEndTurn':
+        this.continueEndTurnHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
       case 'onBeforeReturnHome':
         this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
@@ -1346,19 +1386,19 @@ export class GameSession {
         if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
           continue
         }
-        this.finalizeActionLog(player)
         if (this.hasPendingAnimals(player)) {
           this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
           return
         }
-        const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
-        if (!allWorkersUsed) {
-          const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
-        } else {
-          const startIdx = this.state.players.findIndex((p) => p.startPlayer)
-          this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
+        if (this.turnOwnerPlayerIndex !== null) {
+          const ownerIndex = this.turnOwnerPlayerIndex
+          this.pending = { type: 'none' }
+          this.activeSpaceId = null
+          this.activePlayerIndex = null
+          this.continueEndTurnHooks(ownerIndex)
+          return
         }
+        this.finalizeActionLog(player)
         return
       }
 
@@ -1464,6 +1504,7 @@ export class GameSession {
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
         this.usedBakeBreadThisAction = false
+        this.turnOwnerPlayerIndex = null
         return
       }
 
@@ -1540,19 +1581,25 @@ export class GameSession {
       actionAvailability['major-improvement'] === true ||
       actionAvailability['house-redevelopment'] === true
 
-    const occupationCosts: Partial<Resource>[] = []
+    const occupationCosts: { spaceId: string; cost: Partial<Resource> }[] = []
     if (actionAvailability.lessons === true) {
-      occupationCosts.push(getOccupationActionCost(player, 'lessons'))
+      occupationCosts.push({
+        spaceId: 'lessons',
+        cost: getOccupationActionCost(player, 'lessons'),
+      })
     }
     if (actionAvailability['lessons-4'] === true) {
-      occupationCosts.push(getOccupationActionCost(player, 'lessons-4'))
+      occupationCosts.push({
+        spaceId: 'lessons-4',
+        cost: getOccupationActionCost(player, 'lessons-4'),
+      })
     }
 
     const result: Record<string, boolean> = {}
 
     player.occupationHand.forEach((occupationId) => {
-      result[`occupation:${occupationId}`] = occupationCosts.some((cost) =>
-        isOccupationPlayable(player, occupationId, cost),
+      result[`occupation:${occupationId}`] = occupationCosts.some(({ spaceId, cost }) =>
+        isOccupationPlayable(this.state, player, occupationId, cost, spaceId),
       )
     })
 
@@ -1611,6 +1658,7 @@ export class GameSession {
     if (space.takenBy && !canUseOccupied) return this.respond(false, 'space unavailable')
 
     this.pushHistory(true)
+    this.turnOwnerPlayerIndex = playerIndex
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
@@ -1748,6 +1796,7 @@ export class GameSession {
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
       this.usedBakeBreadThisAction = false
+      this.turnOwnerPlayerIndex = null
       return this.respond()
     }
     this.runEngineSteps()
@@ -1845,13 +1894,17 @@ export class GameSession {
     }
     if (this.engine) {
       this.runEngineSteps()
-    } else {
-      this.finalizeActionLog(player)
-      const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
-      if (!allWorkersUsed) {
-        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-        this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
-      }
+      return this.respond()
+    }
+    if (this.turnOwnerPlayerIndex !== null) {
+      this.continueEndTurnHooks(this.turnOwnerPlayerIndex)
+      return this.respond()
+    }
+    this.finalizeActionLog(player)
+    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    if (!allWorkersUsed) {
+      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
     }
     return this.respond()
   }
@@ -1929,6 +1982,7 @@ export class GameSession {
     this.stageResume = null
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
+    this.turnOwnerPlayerIndex = null
 
     // Check if all workers are used (round end condition)
     const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
@@ -2070,6 +2124,7 @@ export class GameSession {
     this.pending = { type: 'none' }
     this.history = []
     this.actionStartIndex = null
+    this.turnOwnerPlayerIndex = null
     return this.respond()
   }
 

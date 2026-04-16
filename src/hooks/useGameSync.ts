@@ -12,7 +12,7 @@ export const useGameSync = () => {
   const [pending, setPending] = useState<SyncedPending>({ type: 'none' })
   const [interaction, setInteraction] = useState<InteractionState>({
     stateId: 'idle',
-    allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+    allowedCommands: [],
     anytimeActions: [],
   })
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
@@ -34,7 +34,10 @@ export const useGameSync = () => {
     // Register custom card definitions so they resolve via getMinorImprovement/getOccupation
     if (payload.customCardDefs) {
       for (const def of payload.customCardDefs) {
-        registerCustomCard({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
+        registerCustomCard(
+          { cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl },
+          { allowGlobal: true },
+        )
       }
     }
     const hydrated = rehydrateState(payload.state)

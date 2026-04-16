@@ -6,30 +6,15 @@ export type AnimalZone = {
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   capacity: number
+  blocked?: boolean
   animalType?: string | null
   animalCount?: number
   cardId?: string
   pastureIndex?: number
 }
 
-/**
- * Returns the pasture ID that E33_BeaverColony blocks (cannot hold animals).
- * Picks the stabled pasture with the smallest normal capacity.
- * Returns undefined if E33 is not in play or no stabled pastures exist.
- */
-export const getBlockedPastureId = (player: PlayerState): string | undefined => {
-  if (!player.minorPlayed.includes('E33_BeaverColony')) return undefined
-  const stabledPastures = player.pastures.filter((p) => p.stables > 0)
-  if (stabledPastures.length === 0) return undefined
-  return stabledPastures.reduce((smallest, p) => {
-    const sCap = smallest.size * 2 * Math.pow(2, smallest.stables)
-    const pCap = p.size * 2 * Math.pow(2, p.stables)
-    return pCap < sCap ? p : smallest
-  }).id
-}
-
-export const getPastureCapacity = (pasture: Pasture, blockedPastureId?: string) =>
-  pasture.id === blockedPastureId ? 0 : pasture.size * 2 * Math.pow(2, pasture.stables)
+export const getPastureCapacity = (pasture: Pasture) =>
+  pasture.size * 2 * Math.pow(2, pasture.stables)
 
 export const getLooseStableKeys = (player: PlayerState) => {
   const pastureTiles = new Set(
@@ -43,12 +28,11 @@ export const getLooseStableKeys = (player: PlayerState) => {
 }
 
 export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
-  const blocked = getBlockedPastureId(player)
   const zones: AnimalZone[] = [
     ...player.pastures.map((pasture, index) => ({
       id: pasture.id,
       zoneType: 'pasture' as const,
-      capacity: getPastureCapacity(pasture, blocked),
+      capacity: getPastureCapacity(pasture),
       animalType: (pasture.animalType as string) ?? null,
       animalCount: pasture.animalCount,
       pastureIndex: index,
@@ -79,6 +63,11 @@ export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
       effect.onComputeAnimalZones(player, zones)
     }
   }
+  zones.forEach((zone) => {
+    if (zone.blocked) {
+      zone.capacity = 0
+    }
+  })
   return zones
 }
 

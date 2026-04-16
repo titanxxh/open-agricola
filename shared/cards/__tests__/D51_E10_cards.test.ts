@@ -8,6 +8,7 @@ import {
 import { moveFarmerToSpaceAction } from '../../actions/effects/move-farmer-to-space'
 
 // Import cards to register effects
+import '../A/A28_ForestSchool'
 import '../D/D51_Archway'
 import '../E/E10_StrawHat'
 
@@ -292,7 +293,7 @@ describe('move-farmer-to-space action', () => {
 
   it('execute includes occupied Lessons with A28_ForestSchool', () => {
     const player = createPlayer()
-    player.occupationPlayed = ['A28_ForestSchool']
+    player.minorPlayed = ['A28_ForestSchool']
     const source = createSpace('D51_Archway', { takenBy: 'p1' })
     const lessons = createSpace('lessons', { takenBy: 'p2' })
     const state = createState([player], [source, lessons])

@@ -1,6 +1,6 @@
-import type { PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../game/types'
 
-type PrerequisiteHandler = (player: PlayerState) => boolean
+type PrerequisiteHandler = (player: PlayerState, state?: GameState) => boolean
 
 const registry = new Map<string, PrerequisiteHandler>()
 
@@ -8,8 +8,12 @@ export const registerPrerequisite = (name: string, handler: PrerequisiteHandler)
   registry.set(name, handler)
 }
 
-export const checkCustomPrerequisite = (name: string, player: PlayerState): boolean | null => {
+export const checkCustomPrerequisite = (
+  name: string,
+  player: PlayerState,
+  state?: GameState,
+): boolean | null => {
   const handler = registry.get(name)
   if (!handler) return null
-  return handler(player)
+  return handler(player, state)
 }

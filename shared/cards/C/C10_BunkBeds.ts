@@ -1,12 +1,26 @@
 import { MinorImprovement } from '../types'
+import { registerCardEffect } from '../card-effects'
+
+const CARD_ID = 'C10_BunkBeds'
+
+// C10 Bunk Beds: once the player has 4+ rooms, the house holds 5 people
+// (1 extra over the normal per-room capacity).
+registerCardEffect({
+  id: CARD_ID,
+  computeExtraRoomCapacity: (player) => {
+    if (!player.minorPlayed.includes(CARD_ID)) return 0
+    return player.rooms >= 4 ? 1 : 0
+  },
+})
 
 export const C10_BunkBeds = new MinorImprovement({
-  id: "C10_BunkBeds",
-  name: "Bunk Beds",
-  deck: "C",
+  id: CARD_ID,
+  name: 'Bunk Beds',
+  deck: 'C',
   number: 10,
-  category: "FARM_PLANNER",
-  desc: ["Once you have 4 rooms, your house can hold 5 people."],
-  cost: {"wood":1},
-  prerequisite: "2 Major Improvements",
+  category: 'FARM_PLANNER',
+  desc: ['Once you have 4 rooms, your house can hold 5 people.'],
+  cost: { wood: 1 },
+  prerequisite: '2 Major Improvements',
+  evenMoreSet: true,
 })

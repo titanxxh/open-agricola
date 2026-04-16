@@ -1,10 +1,9 @@
-import { Occupation } from '../types'
+import { Occupation, getRegisteredMinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCardEffect } from '../major'
-import { getMinorImprovement } from '../../game/minor-improvements'
 
 const CARD_ID = 'C137_CharcoalBurner'
 
@@ -26,7 +25,7 @@ const hasBakeCapability = (cardId: string): boolean => {
   if (major?.isBaking) return true
 
   // Check minor improvements
-  const minor = getMinorImprovement(cardId)
+  const minor = getRegisteredMinorImprovement(cardId)
   if (minor?.isBaking) return true
 
   return false

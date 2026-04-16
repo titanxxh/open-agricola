@@ -5,8 +5,7 @@ import {
 } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import {
-  getPastureCapacity,
-  getBlockedPastureId,
+  computeAnimalZones,
   getTotalAnimalCapacity,
   enforceAnimalCapacity,
 } from '../../actions/effects/animals'
@@ -69,20 +68,51 @@ const findListener = (id: string) =>
 // ─── Pasture blocking ───────────────────────────────────────────────
 
 describe('E33_BeaverColony pasture blocking', () => {
-  it('getBlockedPastureId returns undefined when card not played', () => {
+  it('exposes pasture blocking through onComputeAnimalZones', () => {
+    const effect = getCardEffect(CARD_ID)
+    expect(effect?.onComputeAnimalZones).toBeDefined()
+
     const player = createPlayer()
-    player.pastures = [makePasture('p1', 1, 1)]
-    expect(getBlockedPastureId(player)).toBeUndefined()
+    player.minorPlayed = [CARD_ID]
+    player.pastures = [
+      makePasture('big', 3, 1),
+      makePasture('small', 1, 1),
+      makePasture('medium', 2, 0),
+    ]
+
+    const zones = [
+      { id: 'big', zoneType: 'pasture' as const, capacity: 12, animalType: null, animalCount: 0, pastureIndex: 0 },
+      { id: 'small', zoneType: 'pasture' as const, capacity: 4, animalType: null, animalCount: 0, pastureIndex: 1 },
+      { id: 'medium', zoneType: 'pasture' as const, capacity: 4, animalType: null, animalCount: 0, pastureIndex: 2 },
+    ]
+
+    effect!.onComputeAnimalZones!(player, zones)
+
+    expect(zones.map((zone) => [zone.id, zone.capacity])).toEqual([
+      ['big', 12],
+      ['small', 0],
+      ['medium', 4],
+    ])
   })
 
-  it('getBlockedPastureId returns undefined when no stabled pastures', () => {
+  it('computeAnimalZones keeps normal pasture capacity when card not played', () => {
+    const player = createPlayer()
+    player.pastures = [makePasture('p1', 1, 1)]
+    const pastureZones = computeAnimalZones(player).filter((zone) => zone.zoneType === 'pasture')
+    expect(pastureZones).toHaveLength(1)
+    expect(pastureZones[0]?.capacity).toBe(4)
+  })
+
+  it('computeAnimalZones keeps normal capacity when no stabled pastures exist', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.pastures = [makePasture('p1', 2, 0)]
-    expect(getBlockedPastureId(player)).toBeUndefined()
+    const pastureZones = computeAnimalZones(player).filter((zone) => zone.zoneType === 'pasture')
+    expect(pastureZones).toHaveLength(1)
+    expect(pastureZones[0]?.capacity).toBe(4)
   })
 
-  it('getBlockedPastureId returns the smallest stabled pasture', () => {
+  it('computeAnimalZones blocks the smallest stabled pasture', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.pastures = [
@@ -90,14 +120,12 @@ describe('E33_BeaverColony pasture blocking', () => {
       makePasture('small', 1, 1), // capacity: 1*2*2 = 4
       makePasture('medium', 2, 0), // no stable, ignored
     ]
-    expect(getBlockedPastureId(player)).toBe('small')
-  })
-
-  it('getPastureCapacity returns 0 for blocked pasture', () => {
-    const pasture = makePasture('p1', 2, 1) // normal capacity: 2*2*2 = 8
-    expect(getPastureCapacity(pasture)).toBe(8)
-    expect(getPastureCapacity(pasture, 'p1')).toBe(0)
-    expect(getPastureCapacity(pasture, 'other')).toBe(8)
+    const pastureZones = computeAnimalZones(player).filter((zone) => zone.zoneType === 'pasture')
+    expect(pastureZones.map((zone) => [zone.id, zone.capacity])).toEqual([
+      ['big', 12],
+      ['small', 0],
+      ['medium', 4],
+    ])
   })
 
   it('getTotalAnimalCapacity deducts blocked pasture', () => {

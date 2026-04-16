@@ -116,6 +116,7 @@ type PersistedRoomRow = {
   state_json: string | null
   max_players: number
   custom_card_ids: string | null
+  version: number
 }
 
 const serializeCustomCardDbIds = (room?: Pick<Room, 'customCardDbIds'>) =>
@@ -194,13 +195,6 @@ export const resolveJoinPlayerIndex = (
 
 // ── Persistence helpers ──────────────────────────────────────────────────────
 
-function loadPersistedState(roomId: string): SerializedGameState | null {
-  if (PERSIST_ROOMS === 'sqlite') {
-    return loadPersistedStateSqlite(roomId)
-  }
-  return loadPersistedStateJson(roomId)
-}
-
 function savePersistedState(roomId: string, serialized: SerializedGameState, room?: Room): void {
   if (PERSIST_ROOMS === 'sqlite') {
     savePersistedStateSqlite(roomId, serialized, room)
@@ -236,20 +230,6 @@ function savePersistedStateJson(roomId: string, serialized: SerializedGameState)
     )
   } catch (err) {
     console.warn('[room-manager] persist (json) failed:', err)
-  }
-}
-
-function loadPersistedStateSqlite(roomId: string): SerializedGameState | null {
-  try {
-    const db = getDb()
-    const row = db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(roomId) as
-      | { state_json: string | null }
-      | undefined
-    if (!row?.state_json) return null
-    return JSON.parse(row.state_json) as SerializedGameState
-  } catch (err) {
-    console.warn('[room-manager] persist (sqlite) load failed:', err)
-    return null
   }
 }
 
@@ -318,6 +298,7 @@ function loadRoomFromState(
   maxPlayers = 2,
   createdBy?: string,
   customCardDbIds: string[] = [],
+  version = 0,
 ): Room {
   let session = createSessionForRoom(undefined, customCardDbIds, createdBy)
   try {
@@ -325,7 +306,7 @@ function loadRoomFromState(
   } catch (err) {
     console.warn(`[room-manager] failed to rehydrate room ${roomId}, starting fresh:`, err)
   }
-  return { id: roomId, session, players: [], maxPlayers, version: 0, createdBy, customCardDbIds }
+  return { id: roomId, session, players: [], maxPlayers, version, createdBy, customCardDbIds }
 }
 
 export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
@@ -336,7 +317,7 @@ export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
       session: createSessionForRoom(undefined, customCardDbIds, row.created_by ?? undefined),
       players: [],
       maxPlayers: row.max_players,
-      version: 0,
+      version: row.version,
       createdBy: row.created_by ?? undefined,
       customCardDbIds,
     }
@@ -349,6 +330,7 @@ export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
       row.max_players,
       row.created_by ?? undefined,
       customCardDbIds,
+      row.version,
     )
   } catch (err) {
     console.warn(`[room-manager] failed to restore room ${row.id}:`, err)
@@ -375,7 +357,25 @@ export const removePlayerFromRoom = (
 
 function ensurePersistentRoom(): void {
   if (rooms.has(FIXED_DEV_ROOM_ID)) return
-  const serialized = loadPersistedState(FIXED_DEV_ROOM_ID)
+  if (PERSIST_ROOMS === 'sqlite') {
+    try {
+      const db = getDb()
+      const row = db.prepare(
+        'SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE id = ?',
+      ).get(FIXED_DEV_ROOM_ID) as PersistedRoomRow | undefined
+      if (row) {
+        const restored = restoreRoomFromSqliteRow(row)
+        if (restored) {
+          rooms.set(FIXED_DEV_ROOM_ID, restored)
+          return
+        }
+      }
+    } catch (err) {
+      console.warn('[room-manager] failed to restore persistent room from SQLite:', err)
+    }
+  }
+
+  const serialized = loadPersistedStateJson(FIXED_DEV_ROOM_ID)
   const session = new GameSession()
   if (serialized) {
     try {
@@ -384,14 +384,13 @@ function ensurePersistentRoom(): void {
       console.warn('[room-manager] load persisted state failed, starting fresh:', err)
     }
   }
-  const room: Room = {
+  rooms.set(FIXED_DEV_ROOM_ID, {
     id: FIXED_DEV_ROOM_ID,
     session,
     players: [],
     maxPlayers: 2,
     version: 0,
-  }
-  rooms.set(FIXED_DEV_ROOM_ID, room)
+  })
 }
 
 /**
@@ -403,7 +402,7 @@ function restoreRoomsFromSqlite(): void {
   try {
     const db = getDb()
     const rows = db.prepare(
-      "SELECT id, created_by, state_json, max_players, custom_card_ids FROM rooms WHERE status != 'finished' AND id != ?",
+      "SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE status != 'finished' AND id != ?",
     ).all(FIXED_DEV_ROOM_ID) as PersistedRoomRow[]
     for (const row of rows) {
       if (rooms.has(row.id)) continue
@@ -455,7 +454,12 @@ const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPa
   return payload
 }
 
-const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCause) => {
+const broadcastState = (
+  room: Room,
+  resp: SessionResponse,
+  cause: StateUpdateCause,
+  requestId?: string,
+) => {
   room.version += 1
   const envelope: StateUpdateEnvelope = {
     type: 'stateUpdate',
@@ -463,6 +467,7 @@ const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCau
     version: room.version,
     sync: 'snapshot',
     cause,
+    requestId,
     payload: toSyncPayload(resp, room.session),
     emittedAt: Date.now(),
   }
@@ -480,13 +485,19 @@ const broadcastState = (room: Room, resp: SessionResponse, cause: StateUpdateCau
   }
 }
 
-const sendStateTo = (ws: WebSocket, room: Room, resp: SessionResponse) => {
+const sendStateTo = (
+  ws: WebSocket,
+  room: Room,
+  resp: SessionResponse,
+  requestId?: string,
+) => {
   const envelope: StateUpdateEnvelope = {
     type: 'stateUpdate',
     roomId: room.id,
     version: room.version,
     sync: 'snapshot',
     cause: 'reconnect',
+    requestId,
     payload: toSyncPayload(resp, room.session),
     emittedAt: Date.now(),
   }
@@ -552,12 +563,15 @@ export const createWsServer = (server: import('node:http').Server) => {
     ws.on('message', async (raw: Buffer) => {
       let msg: ClientCommand
       try { msg = JSON.parse(raw.toString()) as ClientCommand } catch { return }
+      const sendCommandError = (error: string) => {
+        sendTo(ws, { type: 'error', error, requestId: msg.requestId })
+      }
 
       // ── Auth handshake ───────────────────────────────────────────────────
       if (msg.type === 'auth') {
         const user = validateSession(msg.token)
         if (!user) {
-          sendTo(ws, { type: 'error', error: 'invalid or expired token' })
+          sendCommandError('invalid or expired token')
           if (!ALLOW_ANONYMOUS_WS) ws.close()
           return
         }
@@ -570,7 +584,7 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       // Gate all non-auth commands behind authentication
       if (!authenticated) {
-        sendTo(ws, { type: 'error', error: 'not authenticated' })
+        sendCommandError('not authenticated')
         return
       }
 
@@ -614,7 +628,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (msg.type === 'joinRoom') {
         const roomId = msg.roomId
         const room = rooms.get(roomId)
-        if (!room) { sendTo(ws, { type: 'error', error: 'room not found' }); return }
+        if (!room) { sendCommandError('room not found'); return }
         // If this userId already has a seat, reconnect to that seat
         let requestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
@@ -631,12 +645,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         if (currentUserId) {
           const existingSeat = room.players.find(p => p.userId === currentUserId)
           if (existingSeat && existingSeat.ws.readyState === existingSeat.ws.OPEN) {
-            sendTo(ws, { type: 'error', error: 'you are already in this room' })
+            sendCommandError('you are already in this room')
             return
           }
         }
         const seat = resolveJoinPlayerIndex(room, requestedPlayerIndex, currentUserId)
-        if (!seat.ok) { sendTo(ws, { type: 'error', error: seat.error }); return }
+        if (!seat.ok) { sendCommandError(seat.error); return }
         currentRoom = room
         currentPlayerIndex = seat.playerIndex
         const name = typeof (msg as Record<string, unknown>).name === 'string'
@@ -681,10 +695,10 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'dissolveRoom') {
-        if (!currentRoom) { sendTo(ws, { type: 'error', error: 'not in a room' }); return }
+        if (!currentRoom) { sendCommandError('not in a room'); return }
         const room = currentRoom
-        if (room.id === FIXED_DEV_ROOM_ID) { sendTo(ws, { type: 'error', error: 'cannot dissolve dev room' }); return }
-        if (room.createdBy !== currentUserId) { sendTo(ws, { type: 'error', error: 'only the room creator can dissolve' }); return }
+        if (room.id === FIXED_DEV_ROOM_ID) { sendCommandError('cannot dissolve dev room'); return }
+        if (room.createdBy !== currentUserId) { sendCommandError('only the room creator can dissolve'); return }
         broadcast(room, { type: 'roomDissolved', roomId: room.id })
         for (const p of room.players) {
           if (p.ws !== ws) {
@@ -702,7 +716,7 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
-      if (!currentRoom) { sendTo(ws, { type: 'error', error: 'not in a room' }); return }
+      if (!currentRoom) { sendCommandError('not in a room'); return }
       const room = currentRoom
 
       // Activate session card context for all game operations
@@ -711,104 +725,104 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       if (msg.type === 'getState') {
         const resp = callRoom(s => s.getState())
-        sendStateTo(ws, room, resp)
+        sendStateTo(ws, room, resp, msg.requestId)
         return
       }
 
       if (msg.type === 'action') {
         const resp = callRoom(s => s.takeAction(currentPlayerIndex, msg.spaceId))
-        broadcastState(room, resp, 'action')
+        broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'choice') {
         const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value))
-        broadcastState(room, resp, 'choice')
+        broadcastState(room, resp, 'choice', msg.requestId)
         return
       }
 
       if (msg.type === 'anytime') {
         const resp = callRoom(s => s.takeAnytimeAction(currentPlayerIndex, msg.actionId))
-        broadcastState(room, resp, 'anytime')
+        broadcastState(room, resp, 'anytime', msg.requestId)
         return
       }
 
       if (msg.type === 'reorg') {
         const resp = callRoom(s => s.confirmAnimalReorg(currentPlayerIndex, msg.zones))
-        broadcastState(room, resp, 'reorg')
+        broadcastState(room, resp, 'reorg', msg.requestId)
         return
       }
 
       if (msg.type === 'feed') {
         const resp = callRoom(s => s.confirmHarvestFeed(currentPlayerIndex, msg.selections))
-        broadcastState(room, resp, 'feed')
+        broadcastState(room, resp, 'feed', msg.requestId)
         return
       }
 
       if (msg.type === 'nextPlayer') {
         const resp = callRoom(s => s.confirmNextPlayer())
-        broadcastState(room, resp, 'action')
+        broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'confirmPlayerSwitch') {
         const resp = callRoom(s => s.confirmPlayerSwitch())
-        broadcastState(room, resp, 'action')
+        broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'roundEnd') {
         const resp = callRoom(s => s.performRoundEnd())
-        broadcastState(room, resp, 'action')
+        broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'commitFarm') {
         const resp = callRoom(s => s.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload))
-        broadcastState(room, resp, 'choice')
+        broadcastState(room, resp, 'choice', msg.requestId)
         return
       }
 
       if (msg.type === 'undoStep') {
         const resp = callRoom(s => s.undoStep())
-        broadcastState(room, resp, 'undo')
+        broadcastState(room, resp, 'undo', msg.requestId)
         return
       }
 
       if (msg.type === 'undoAction') {
         const resp = callRoom(s => s.undoAction())
-        broadcastState(room, resp, 'undo')
+        broadcastState(room, resp, 'undo', msg.requestId)
         return
       }
 
       if (msg.type === 'newGame') {
         room.session = createSessionForRoom(msg.seed, room.customCardDbIds ?? [], room.createdBy)
         const resp = room.session.withCtx(() => room.session.getState())
-        broadcastState(room, resp, 'reconnect')
+        broadcastState(room, resp, 'reconnect', msg.requestId)
         return
       }
 
       if (msg.type === 'loadGame') {
         const resp = callRoom(s => s.loadState(msg.state))
-        broadcastState(room, resp, 'reconnect')
+        broadcastState(room, resp, 'reconnect', msg.requestId)
         return
       }
 
       if (msg.type === 'devDrawCard') {
         const resp = callRoom(s => s.devDrawCard(msg.playerIndex, msg.cardId))
-        broadcastState(room, resp, 'dev')
+        broadcastState(room, resp, 'dev', msg.requestId)
         return
       }
 
       if (msg.type === 'devPlayCard') {
         const resp = callRoom(s => s.devPlayCard(msg.playerIndex, msg.cardId))
-        broadcastState(room, resp, 'dev')
+        broadcastState(room, resp, 'dev', msg.requestId)
         return
       }
 
       if (msg.type === 'devCreatePasture') {
         const resp = callRoom(s => s.startDevFenceSelect(currentPlayerIndex))
-        broadcastState(room, resp, 'action')
+        broadcastState(room, resp, 'action', msg.requestId)
         return
       }
     })

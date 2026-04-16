@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
 import '../../shared/cards/D/D74_RoyalWood'
+import '../../shared/cards/B/B81_Handcart'
+import '../../shared/cards/E/E14_WoodSaw'
 
 const CARD_ID = 'D74_RoyalWood'
 
@@ -19,76 +21,74 @@ const setup = (options?: { wood?: number }) => {
   player.resources.clay = 10
   player.resources.reed = 10
   player.resources.stone = 10
-
   player.minorHand.push(CARD_ID)
+
   session.loadState(state)
   session.devPlayCard(0, CARD_ID)
   return session
 }
 
+const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  const player = state.players[0]!
+  player.workersAvailable = 1
+  const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
+  if (!majorImprovement) throw new Error('major-improvement missing')
+  majorImprovement.takenBy = null
+  if (!player.minorHand.includes(minorId)) {
+    player.minorHand.push(minorId)
+  }
+  session.loadState(state)
+
+  let resp = session.takeAction(0, 'major-improvement')
+  expect(resp.ok).toBe(true)
+  expect(resp.pending.type).toBe('choice')
+
+  resp = session.resolveChoice(0, `minor:${minorId}`)
+  expect(resp.ok).toBe(true)
+  expect(resp.pending.type).toBe('confirmNextPlayer')
+  return resp
+}
+
 describe('D74_RoyalWood session', () => {
-  it('refunds wood after constructing a room (farm-expansion)', () => {
-    const session = setup({ wood: 10 })
+  it('refunds wood before confirmNextPlayer after building Joinery', () => {
+    const session = setup({ wood: 5 })
     const state = session.getState().state
-    state.currentPlayerIndex = 0
-
     const player = state.players[0]!
-    player.workersAvailable = 2
-    // Wood house: costs 5 wood + 2 reed per room
-    player.resources.wood = 6
-    player.resources.reed = 4
-
-    // Ensure farm-expansion is available
-    state.roundActionOrder = state.roundActionOrder.map(() => null)
-    state.roundActionOrder[0] = 'farm-expansion'
+    player.resources.stone = 10
+    if (!state.availableMajorImprovements.includes('Major_Joinery')) {
+      state.availableMajorImprovements.push('Major_Joinery')
+    }
     session.loadState(state)
 
-    // Take farm-expansion action
-    let resp = session.takeAction(0, 'farm-expansion')
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.pending.type).toBe('choice')
+
+    resp = session.resolveChoice(0, 'major:Major_Joinery')
     expect(resp.ok).toBe(true)
-
-    // Choose construct (build room)
-    if (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(0, 'construct')
-    }
-
-    // Select location for room construction
-    if (resp.pending.type === 'choice') {
-      // Pick a valid room location
-      const locationOption = resp.pending.options.find((o) =>
-        o.value.match(/^\d+,\d+$/),
-      )
-      if (locationOption) {
-        resp = session.resolveChoice(0, locationOption.value)
-      }
-    }
-
-    // Handle any remaining choices (animal reorg, etc)
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(0, resp.pending.options[0]!.value)
-    }
-
-    // After the turn ends and return-home triggers, check wood refund
-    // 5 wood spent on room → floor(5/2) = 2 wood refunded
-    const updatedPlayer = resp.state.players[0]!
-    // Started with 6 wood, spent 5 on room = 1, refunded 2 = 3
-    expect(updatedPlayer.resources.wood).toBeGreaterThanOrEqual(1)
+    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
   })
 
-  it('no refund when no wood is spent', () => {
+  it('does not carry separate 1-wood payments across turns', () => {
     const session = setup({ wood: 10 })
-    const state = session.getState().state
-    state.currentPlayerIndex = 0
 
-    const player = state.players[0]!
-    // Use day-laborer (no wood cost)
-    session.loadState(state)
+    let resp = playOneWoodMinorTurn(session, 'B81_Handcart')
+    expect(resp.state.players[0]!.resources.wood).toBe(9)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
 
+    resp = playOneWoodMinorTurn(session, 'E14_WoodSaw')
+    expect(resp.state.players[0]!.resources.wood).toBe(8)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
+  })
+
+  it('does nothing on turns without tracked wood payments', () => {
+    const session = setup({ wood: 10 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-
-    // Wood should be unchanged (no refund)
-    const updatedPlayer = resp.state.players[0]!
-    expect(updatedPlayer.resources.wood).toBe(10)
+    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.state.players[0]!.resources.wood).toBe(10)
   })
 })

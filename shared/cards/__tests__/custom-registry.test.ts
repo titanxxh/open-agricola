@@ -9,6 +9,7 @@ import {
 } from '../custom-registry'
 import { getCardEffect, clearCardEffects } from '../card-effects'
 import type { CardDefinition } from '../types'
+import type { CustomCardData } from '../session-card-context'
 
 const minorJson: CardDefinition = {
   id: 'CUSTOM_TestMinor',
@@ -37,16 +38,24 @@ beforeEach(() => {
   clearCardEffects()
 })
 
+const registerCustomCardWithOptions = registerCustomCard as unknown as (
+  data: CustomCardData,
+  options?: { allowGlobal?: boolean },
+) => void
+
+const registerLegacyGlobalCard = (data: CustomCardData) =>
+  registerCustomCardWithOptions(data, { allowGlobal: true })
+
 describe('registerCustomCard', () => {
   it('registers a minor improvement', () => {
-    registerCustomCard({ cardType: 'minor', cardJson: minorJson })
+    registerLegacyGlobalCard({ cardType: 'minor', cardJson: minorJson })
     const card = getCustomMinorImprovement('CUSTOM_TestMinor')
     expect(card).not.toBeNull()
     expect(card!.id).toBe('CUSTOM_TestMinor')
   })
 
   it('registers an occupation', () => {
-    registerCustomCard({ cardType: 'occupation', cardJson: occupationJson })
+    registerLegacyGlobalCard({ cardType: 'occupation', cardJson: occupationJson })
     const card = getCustomOccupation('CUSTOM_TestOcc')
     expect(card).not.toBeNull()
     expect(card!.id).toBe('CUSTOM_TestOcc')
@@ -58,7 +67,7 @@ describe('registerCustomCard', () => {
   })
 
   it('registers card effect when DSL is provided', () => {
-    registerCustomCard({
+    registerLegacyGlobalCard({
       cardType: 'minor',
       cardJson: minorJson,
       effectDsl: {
@@ -74,7 +83,7 @@ describe('registerCustomCard', () => {
 
   it('warns but does not throw on malformed DSL', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    registerCustomCard({
+    registerLegacyGlobalCard({
       cardType: 'minor',
       cardJson: minorJson,
       effectDsl: {
@@ -90,12 +99,23 @@ describe('registerCustomCard', () => {
     // The try-catch in card-effects.ts handles this at runtime.
     warnSpy.mockRestore()
   })
+
+  it('warns when global fallback is used without explicit allowGlobal', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    registerCustomCard({ cardType: 'minor', cardJson: minorJson })
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('CUSTOM_TestMinor'),
+    )
+    warnSpy.mockRestore()
+  })
 })
 
 describe('clearCustomCards', () => {
   it('clears all registered cards', () => {
-    registerCustomCard({ cardType: 'minor', cardJson: minorJson })
-    registerCustomCard({ cardType: 'occupation', cardJson: occupationJson })
+    registerLegacyGlobalCard({ cardType: 'minor', cardJson: minorJson })
+    registerLegacyGlobalCard({ cardType: 'occupation', cardJson: occupationJson })
     clearCustomCards()
     expect(getCustomMinorImprovement('CUSTOM_TestMinor')).toBeNull()
     expect(getCustomOccupation('CUSTOM_TestOcc')).toBeNull()
@@ -104,12 +124,12 @@ describe('clearCustomCards', () => {
 
 describe('ID list functions', () => {
   it('returns minor improvement IDs', () => {
-    registerCustomCard({ cardType: 'minor', cardJson: minorJson })
+    registerLegacyGlobalCard({ cardType: 'minor', cardJson: minorJson })
     expect(getCustomMinorImprovementIds()).toEqual(['CUSTOM_TestMinor'])
   })
 
   it('returns occupation IDs', () => {
-    registerCustomCard({ cardType: 'occupation', cardJson: occupationJson })
+    registerLegacyGlobalCard({ cardType: 'occupation', cardJson: occupationJson })
     expect(getCustomOccupationIds()).toEqual(['CUSTOM_TestOcc'])
   })
 
