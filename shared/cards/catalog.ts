@@ -882,6 +882,10 @@ import { A27_OvenSite } from './A/A27_OvenSite'
 import { B155_ArtTeacher } from './B/B155_ArtTeacher'
 import { C95_BasketWeaver } from './C/C95_BasketWeaver'
 import { D95_SiteManager } from './D/D95_SiteManager'
+// Wave 4: PLAYER_ACTION_CARD chain cards (2026-04-17)
+import { B130_FullPeasant } from './B/B130_FullPeasant'
+import { B150_LargeScaleFarmer } from './B/B150_LargeScaleFarmer'
+import { B152_JuniorArtist } from './B/B152_JuniorArtist'
 import './C/C39_StudioBoat'
 
 export const minorImprovementCards = [
@@ -1783,6 +1787,10 @@ export const occupationCards = [
   B155_ArtTeacher,
   C95_BasketWeaver,
   D95_SiteManager,
+  // Wave 4 (2026-04-17)
+  B130_FullPeasant,
+  B150_LargeScaleFarmer,
+  B152_JuniorArtist,
 ]
 
 // All cards for reference and developer mode
