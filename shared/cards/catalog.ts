@@ -857,6 +857,26 @@ import { D18_SteamPlow } from './D/D18_SteamPlow'
 import { D24_BrotherlyLove } from './D/D24_BrotherlyLove'
 import { D50_ForeignAid } from './D/D50_ForeignAid'
 import { E105_Pioneer } from './E/E105_Pioneer'
+// Wave 1: LISTENER_SIMPLE cards (2026-04-17)
+import { A42_ForestLakeHut } from './A/A42_ForestLakeHut'
+import { A43_FarmyardManure } from './A/A43_FarmyardManure'
+import { A111_WallBuilder } from './A/A111_WallBuilder'
+import { A124_Knapper } from './A/A124_Knapper'
+import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
+import { B51_DiggingSpade } from './B/B51_DiggingSpade'
+import { B63_Tasting } from './B/B63_Tasting'
+import { B120_Sweep } from './B/B120_Sweep'
+import { B121_Geologist } from './B/B121_Geologist'
+import { B122_Mineralogist } from './B/B122_Mineralogist'
+import { B156_StorehouseKeeper } from './B/B156_StorehouseKeeper'
+import { B161_Weakling } from './B/B161_Weakling'
+import { C26_Flail } from './C/C26_Flail'
+import { C28_TeachersDesk } from './C/C28_TeachersDesk'
+import { C117_Legworker } from './C/C117_Legworker'
+import { C140_PackagingArtist } from './C/C140_PackagingArtist'
+import { C154_TwinResearcher } from './C/C154_TwinResearcher'
+import { C160_Outrider } from './C/C160_Outrider'
+import { D21_Recruitment } from './D/D21_Recruitment'
 import './C/C39_StudioBoat'
 
 export const minorImprovementCards = [
@@ -1252,6 +1272,15 @@ export const minorImprovementCards = [
   D18_SteamPlow,
   D24_BrotherlyLove,
   D50_ForeignAid,
+  // Wave 1 (2026-04-17)
+  A42_ForestLakeHut,
+  A43_FarmyardManure,
+  B18_GrasslandHarrow,
+  B51_DiggingSpade,
+  B63_Tasting,
+  C26_Flail,
+  C28_TeachersDesk,
+  D21_Recruitment,
 ]
 export const occupationCards = [
   A93_BedMaker,
@@ -1731,6 +1760,18 @@ export const occupationCards = [
   C129_SecondSpouse,
   C158_ForestCampaigner,
   E105_Pioneer,
+  // Wave 1 (2026-04-17)
+  A111_WallBuilder,
+  A124_Knapper,
+  B120_Sweep,
+  B121_Geologist,
+  B122_Mineralogist,
+  B156_StorehouseKeeper,
+  B161_Weakling,
+  C117_Legworker,
+  C140_PackagingArtist,
+  C154_TwinResearcher,
+  C160_Outrider,
 ]
 
 // All cards for reference and developer mode
