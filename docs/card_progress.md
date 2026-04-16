@@ -9,11 +9,11 @@
 | A | 180 | 153 | 5 | 0 | 0 |
 | B | 180 | 158 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
-| D | 181 | 155 | 2 | 2 | 0 |
+| D | 181 | 156 | 2 | 1 | 0 |
 | E | 169 | 157 | 0 | 2 | 1 |
-| **总计** | **892** | **810** | **7** | **4** | **1** |
+| **总计** | **892** | **811** | **7** | **3** | **1** |
 
-**截至 2026-04-17：810/892 = 90.8%，2063 vitest tests passing。**
+**截至 2026-04-17：811/892 = 90.9%，2074 vitest tests passing。**
 
 > Major Improvements (10 张) 单独实现，不计入上表。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -83,9 +83,11 @@
 
 ---
 
-### Tier 2 — BGA 有完整实现，我们漏实现（4 张，建议 Wave 9 补上）
+### Tier 2 — BGA 有完整实现，我们漏实现（3 张，建议 Wave 9 补上）
 
 ⚠️ **这部分是之前错误分类为 Tier 1 的卡。** BGA PHP 里有完整的 listener/exchanges 实现，我们的 `.ts` 只有数据定义。下一轮应该补上。
+
+> D155 Ebonist 已于 2026-04-17 补完（添加 `exchanges` 字段）。
 
 ---
 
@@ -98,12 +100,9 @@
 
 ---
 
-#### D155 Ebonist (Occupation)
+#### ~~D155 Ebonist (Occupation)~~ ✅ 已于 2026-04-17 补完
 - **规则文本：** 每次收获可将恰好 1 木头转换为 1 食物 + 1 谷物。
-- **BGA PHP：** 用 `$this->exchanges = [Utils::formatExchange([WOOD => [FOOD => 1, GRAIN => 1], 'max' => 1], $this->name, [HARVEST], $this->id)]`。
-- **我们的 stub：** 仅有 `new Occupation({...})`，**缺 `exchanges` 字段**。
-- **实现方案：** 添加 `exchanges: [{ from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, harvestOnly: true }]`。完全模仿 D108_StoneCarver（已实现）的写法。
-- **工作量：** ~15 分钟。纯数据字段补充。
+- **实现：** 添加了 `exchanges: [{ from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, trigger: 'anytime' }]`。与 E153_StoneSculptor 同样采用 `anytime` 触发器（我们的交换系统无 `harvest` 触发器），由 `max: 1` 近似实现"每次收获仅一次"的限制。
 
 ---
 
@@ -211,6 +210,7 @@
 | Wave 6 farmer-recall + goods | 04-17 | +2 | 805 | 90.2% |
 | Wave 7 card-select | 04-17 | +2 | 807 | 90.5% |
 | Wave 8 high-complexity | 04-17 | +3 | 810 | 90.8% |
+| D155 exchanges fixup | 04-17 | +1 | 811 | 90.9% |
 
 ### 2026-04-17 Wave 1-8 明细
 
