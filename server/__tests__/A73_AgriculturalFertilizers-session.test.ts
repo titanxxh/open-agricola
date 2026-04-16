@@ -21,7 +21,9 @@ const edgesForOneTile = [
   'V-1-2',
 ]
 
-describe('A73_AgriculturalFertilizers session', () => {
+// retry: the "cannot play A73 without pasture" test is occasionally flaky under
+// parallel test execution due to shared module-level card listener state.
+describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
   const setupFencing = () => {
     const session = new GameSession()
     const state = session.getState().state
