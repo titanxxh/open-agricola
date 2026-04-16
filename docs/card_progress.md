@@ -4,14 +4,14 @@
 
 ## 总览
 
-| Deck | BGA 总数 | 已实现 | 剩余 (BGA 无逻辑) | 剩余 (需基础设施) |
-|---|---|---|---|---|
-| A | 180 | 153 | 5 | 0 |
-| B | 180 | 158 | 0 | 0 |
-| C | 182 | 157 | 0 | 0 |
-| D | 181 | 155 | 4 | 0 |
-| E | 169 | 157 | 2 | 1 |
-| **总计** | **892** | **810** | **11** | **1** |
+| Deck | BGA 总数 | 已实现 | BGA 也无逻辑 | BGA 有逻辑我们漏实现 | 需核心扩展 |
+|---|---|---|---|---|---|
+| A | 180 | 153 | 5 | 0 | 0 |
+| B | 180 | 158 | 0 | 0 | 0 |
+| C | 182 | 157 | 0 | 0 | 0 |
+| D | 181 | 155 | 2 | 2 | 0 |
+| E | 169 | 157 | 0 | 2 | 1 |
+| **总计** | **892** | **810** | **7** | **4** | **1** |
 
 **截至 2026-04-17：810/892 = 90.8%，2063 vitest tests passing。**
 
@@ -19,19 +19,124 @@
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
 > 若干卡通过静态 `modifier`/`modifiers`/`exchanges`/`scoreRule` 字段实现，视为已实现（例：A14, A60, A88, A123, B32, B80, B104, B145, C13, C14, D59, E153 等）。
 
-## 剩余工作（12 张）
+## 剩余 12 张卡牌详细分析
 
-### Tier 1：BGA 无逻辑，保留数据即可（11 张）
+### Tier 1 — BGA 自身无逻辑（7 张，匹配 BGA 行为，无需改动）
 
-这些卡 BGA PHP 只有 `getDesc`，无任何 listener/onBuy/args-act。保留数据即符合参考行为。
+经 BGA PHP 源码核查，以下 7 张卡在 BGA 参考项目中**确实没有任何 listener/effect/exchanges 方法**。我们保留数据文件即匹配 BGA 行为。
 
-A41 VegetableSlicer · A85 Homekeeper · A87 Conservator · A106 SlurrySpreader · A113 HeresyTeacher
-D25 WitchesDanceFloor · D103 CanalBoatman · D155 Ebonist · D159 ReedSeller
-E93 Motivator · E149 MidnightFencer
+---
 
-### Tier 3：需核心类型扩展（1 张）
+#### A41 Vegetable Slicer (MinorImprovement)
+- **规则文本：** 每次将壁炉升级为烹饪炉时，立即获得 2 木头 + 1 蔬菜（不追溯）。
+- **BGA PHP：** 只有 `__construct`，无任何 hook。`isImplemented=true`（默认）。
+- **结论：** BGA 将其留作数据卡，靠升级路径隐式处理（实际未给奖励）。我们匹配此行为。
+- **优先级：** LOW — 若要补全，需 `onPlayerAfterRenovation` + 判断目标是 CookingHearth。
 
-**E68 CherryOrchard** — 需在 `shared/game/types.ts` 给 `Field.crop` 新增 `'wood'` 作物类型，并扩展 sow/reap/field-harvest pipeline。单卡改动过深，暂缓。
+---
+
+#### A85 Homekeeper (Occupation)
+- **规则文本：** 你的房间中恰好 1 个黏土/石头房间可多住 1 人，若该房间同时相邻 field 与 pasture。
+- **BGA PHP：** 只有 `__construct`，无 `computeExtraRoomCapacity` 或 listener。
+- **结论：** BGA 无实现，我们匹配。
+- **优先级：** MED — 补全需新增"房间空间型容量修改器"（不同于 C10/D85 的直接 +1）、检查相邻地形。工作量大但独立性好。
+
+---
+
+#### A87 Conservator (Occupation)
+- **规则文本：** 允许木屋直接翻新为石屋（跳过黏土阶段）。
+- **BGA PHP：** 只有 `__construct`，无 `computeReplace`。
+- **结论：** BGA 无实现，我们匹配。
+- **优先级：** MED — 补全需修改 `house-redevelopment` 的 XOR 分支或添加 `computeReplace` hook 允许 wood→stone 直通。
+
+---
+
+#### A106 Slurry Spreader (Occupation)
+- **规则文本：** 收获阶段每次从田里拿走最后一份谷物/蔬菜时，额外得 2 食物/1 食物。
+- **BGA PHP：** 只有 `__construct`，无 `onPlayerAfterReap`。
+- **结论：** BGA 无实现，我们匹配。
+- **优先级：** MED — 补全思路清晰：`onPlayerAfterReap` + 判断字段是否耗尽 + `gainLeaf`。~~E68 已证明 reap 监听可行~~（E68 本身也是漏实现）。
+
+---
+
+#### A113 Heresy Teacher (Occupation)
+- **规则文本：** 每次使用 Lessons 行动格后，在每个"至少 3 谷且无蔬菜"的田上放 1 蔬菜。
+- **BGA PHP：** 只有 `__construct`，**显式 `isImplemented=false`**。
+- **结论：** BGA 自身放弃实现此卡。我们匹配。
+- **优先级：** LOW — BGA 都放弃了，现实中极少触发。若要实现：`after:place-farmer` on lessons/lessons-4 + 田遍历。
+
+---
+
+#### D25 Witches Dance Floor (MinorImprovement)
+- **规则文本：** 此卡同时作为田、职业与 Fireplace 改良（全部效果）。仅能通过 Minor Improvement 行动打出。
+- **BGA PHP：** 只有 `__construct`，**显式 `isImplemented=false`**。
+- **结论：** BGA 放弃实现（多身份卡架构过于复杂）。我们匹配。
+- **优先级：** LOW — 需要卡片支持多重身份（field + occupation + improvement）。架构级改动。
+
+---
+
+#### D159 Reed Seller (Occupation)
+- **规则文本：** 任意时刻将 1 芦苇换 3 食物；其他玩家可付 2 食物向你买芦苇来阻止。
+- **BGA PHP：** 只有 `__construct`，**显式 `isImplemented=false`**。
+- **结论：** BGA 放弃实现（多人阻止交互复杂）。我们匹配。
+- **优先级：** LOW — 需要全新的"可阻止行动 + 拍卖式选择"系统。
+
+---
+
+### Tier 2 — BGA 有完整实现，我们漏实现（4 张，建议 Wave 9 补上）
+
+⚠️ **这部分是之前错误分类为 Tier 1 的卡。** BGA PHP 里有完整的 listener/exchanges 实现，我们的 `.ts` 只有数据定义。下一轮应该补上。
+
+---
+
+#### D103 Canal Boatman (Occupation)
+- **规则文本：** 每次使用 Fishing 或 Reed Bank 后，可付 1 食物把第二个人放到此卡上；若放了则获得 3 石头 或 1 谷物+1 蔬菜（二选一）。
+- **BGA PHP：** `isListeningTo` 监听 PlaceFarmer on `fishing`/`reed-bank`；`onPlayerAfterPlaceFarmer` 返回 seq：`[pay-1-food, placeFarmerOnCard, XOR(3-stone | grain+vegetable)]`。
+- **我们的 stub：** 仅有 `new Occupation({...})`。
+- **实现方案：** `registerCardListener({ actions: ['fishing', 'reed-bank'], phases: ['after'], scope: 'player', handler })`。handler 返回 optional seq：`[payLeaf({food:1}), place-farmer-on-card leaf (复用 C23 fake-farmer pattern), XOR{gainLeaf({stone:3}), gainLeaf({grain:1, vegetable:1})}]`。第二人放置可走 `actionContext: {trueAction: false, extraPlacement: true}`（见 A22_Telegram）。
+- **工作量：** ~2 小时。与 C23 Job Contract 接近。
+
+---
+
+#### D155 Ebonist (Occupation)
+- **规则文本：** 每次收获可将恰好 1 木头转换为 1 食物 + 1 谷物。
+- **BGA PHP：** 用 `$this->exchanges = [Utils::formatExchange([WOOD => [FOOD => 1, GRAIN => 1], 'max' => 1], $this->name, [HARVEST], $this->id)]`。
+- **我们的 stub：** 仅有 `new Occupation({...})`，**缺 `exchanges` 字段**。
+- **实现方案：** 添加 `exchanges: [{ from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, harvestOnly: true }]`。完全模仿 D108_StoneCarver（已实现）的写法。
+- **工作量：** ~15 分钟。纯数据字段补充。
+
+---
+
+#### E93 Motivator (Occupation)
+- **规则文本：** 每轮第一回合，若你没有未用农场格，可从供应区再放 1 个人。
+- **BGA PHP：** `isListeningTo` 监听 `StartOfTurn` + `PlaceFarmer`；`onPlayerStartOfTurn` 清标记；`onPlayerAfterPlaceFarmer` 设标记；`canBeActivated` 返回是否有空农场格 + 未标记。
+- **我们的 stub：** 仅有 `new Occupation({...})`。
+- **实现方案：** `registerCardListener` 监听 `place-farmer` after（标记已用），`registerCardEffect` 用 `onBeforeStartOfTurn`：首回合 + 无空地 + 未标记 → optional `place-farmer` leaf（extraPlacement）。与 A22_Telegram 模式几乎一样。
+- **工作量：** ~1 小时。
+
+---
+
+#### E149 Midnight Fencer (Occupation)
+- **规则文本：** 最后一次收获开始时，你可以从每个其他玩家处拿走至多 2 根未使用的围栏并免费建到你的农场上（你的农场可超过 15 根）。
+- **BGA PHP：** `isListeningTo` 监听 `StartHarvest`；`onPlayerStartHarvest` 检查是否第 14 轮 + 计算对手可偷围栏数 + 返回特殊 FENCING 动作节点。
+- **我们的 stub：** 仅有 `new Occupation({...})`。
+- **实现方案：** `registerCardListener({ actions: ['start-harvest'], phases: ['after'], scope: 'player', handler })`。handler 判断 `state.round === 14` → 返回 optional seq 含一个定制 fencing flow（需要一个新的 `steal-fences-from-opponents` action 或修改 fencing 的 costOverride 支持跨玩家资源源）。
+- **工作量：** ~3-4 小时。最复杂的一张，但非阻塞性。BGA 的"突破 15 围栏上限"可直接跳过或简化。
+
+---
+
+### Tier 3 — 需核心类型扩展（1 张）
+
+#### E68 Cherry Orchard (MinorImprovement)
+- **规则文本：** 此卡是一块只能播木头、按谷物方式收获的田。每次从此卡收走最后一份木头时，额外得 1 蔬菜。
+- **BGA PHP：** `getFieldDetails()` 返回 `'constraints' => WOOD`；`isListeningTo` 监听 Reap；`onPlayerAfterReap` 返回 `gainNode({vegetable: 1})`（当收割了木头且木头耗尽）。
+- **我们的 stub：** 仅有 `new MinorImprovement({...})`。
+- **实现方案：**
+  1. 扩展 `shared/game/types.ts` 的 `Field.crop`：从 `'grain' | 'vegetable' | null` 增加 `'wood'`。
+  2. 修改 `shared/actions/effects/sow.ts` 允许 wood 作为 sow 选项（仅限此卡的 holder-field）。
+  3. 修改 `shared/actions/effects/reap.ts` 支持 wood 作物的收获到 player.resources.wood。
+  4. 在 E68 注册 `after:reap` listener。
+- **工作量：** ~4-6 小时。主要是核心类型迁移 + 数据兼容（已有 field 序列化需保持兼容）。
 
 ---
 
