@@ -231,4 +231,116 @@ describe('InteractionBar', () => {
     expect(html).toContain('E149 Pavernun')
     expect(html).not.toContain('occupations.E149_Pavernun.name')
   })
+
+  it('hides fence/palisade mode toggle when player has not played B30 Wood Palisades', () => {
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'fence-space',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingFieldSelectionsLength={0}
+        maxFieldSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        hasWoodPalisadesCard={false}
+        fencePlacementMode="fence"
+        setFencePlacementMode={noop}
+      />,
+    )
+
+    expect(html).not.toContain('fence-mode-toggle')
+  })
+
+  it('shows fence/palisade mode toggle when player has played B30 Wood Palisades', () => {
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'fence-space',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingFieldSelectionsLength={0}
+        maxFieldSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        hasWoodPalisadesCard={true}
+        fencePlacementMode="fence"
+        setFencePlacementMode={noop}
+      />,
+    )
+
+    expect(html).toContain('fence-mode-toggle')
+    expect(html).toContain('Fence (1 wood)')
+    expect(html).toContain('Palisade (2 wood, +1 VP)')
+  })
 })
