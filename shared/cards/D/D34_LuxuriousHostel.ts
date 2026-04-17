@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
 
 const CARD_ID = 'D34_LuxuriousHostel'
 
@@ -7,7 +8,7 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
-    return player.houseType === 'stone' && player.rooms > player.familySize ? 4 : 0
+    return getStoneHouseBonusScore(player, CARD_ID)
   },
 })
 
