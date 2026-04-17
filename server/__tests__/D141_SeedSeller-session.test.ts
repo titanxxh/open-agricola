@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D141_SeedSeller'
 
 describe('D141_SeedSeller session', () => {
@@ -14,7 +15,7 @@ describe('D141_SeedSeller session', () => {
 
     const player = state.players[0]!
     player.occupationHand.push('D141_SeedSeller')
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.grain = 0
 
     state.players[1]!.workersAvailable = 2

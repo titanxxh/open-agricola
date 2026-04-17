@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 
+import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/game/player'
 import '../../shared/cards/A/A92_AdoptiveParents'
 
 describe('worker-identity: family growth pushes newborn to FG space takenBy', () => {
@@ -16,8 +17,8 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     const player = state.players[0]!
     // 2 initial active workers (ids '1', '2'), worker '3' is inactive
     // rooms=3 > familySize=2 so growth is allowed
-    player.familySize = 2
-    player.workersAvailable = 2
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
     player.rooms = 3
 
     session.loadState(state)
@@ -33,9 +34,9 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     const p1 = state.players[0]!
 
     // familySize legacy field incremented
-    expect(p1.familySize).toBe(3)
+    expect(familySize(p1)).toBe(3)
     // newbornCount legacy field incremented
-    expect(p1.newbornCount).toBe(1)
+    expect(newbornCount(p1)).toBe(1)
 
     // Worker '3' should now be active and marked as newborn
     const worker3 = p1.workers.find((w) => w.id === '3')
@@ -78,7 +79,7 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     const player = state.players[0]!
     // Make rooms equal to familySize so growth is blocked
     player.rooms = 2
-    player.familySize = 2
+    setActiveWorkerCount(player, 2)
     session.loadState(state)
 
     // takeAction still returns ok:true (soft fail — the action fails but the call succeeds),
@@ -88,8 +89,8 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
 
     const p1 = resp.state.players[0]!
     // familySize stays at 2 — growth was blocked
-    expect(p1.familySize).toBe(2)
-    expect(p1.newbornCount).toBe(0)
+    expect(familySize(p1)).toBe(2)
+    expect(newbornCount(p1)).toBe(0)
     // Worker '3' stays inactive
     const worker3 = p1.workers.find((w) => w.id === '3')
     expect(worker3!.isActive).toBe(false)
@@ -103,8 +104,8 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     const player = state.players[0]!
     // Rooms equal to familySize — no room for normal growth
     player.rooms = 2
-    player.familySize = 2
-    player.workersAvailable = 2
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
     session.loadState(state)
 
     const resp = session.takeAction(0, 'urgent-wish-children')
@@ -112,8 +113,8 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
 
     const p1 = resp.state.players[0]!
     // Family grew even without spare room
-    expect(p1.familySize).toBe(3)
-    expect(p1.newbornCount).toBe(1)
+    expect(familySize(p1)).toBe(3)
+    expect(newbornCount(p1)).toBe(1)
 
     const worker3 = p1.workers.find((w) => w.id === '3')
     expect(worker3!.isActive).toBe(true)
@@ -147,8 +148,8 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     const player = state.players[0]!
     // 2 initial active workers (ids '1', '2'), worker '3' is inactive
     // rooms=3 > familySize=2 so growth is allowed
-    player.familySize = 2
-    player.workersAvailable = 2
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
     player.rooms = 3
     player.resources.food = 5 // enough to pay A92's 1 food cost
 
@@ -169,7 +170,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(fgResp.ok).toBe(true)
     // FG space already has 2 refs before we resolve anything
     expect(fgResp.state.actionSpaces.find((s) => s.id === 'wish-children')!.takenBy).toHaveLength(2)
-    expect(fgResp.state.players[0]!.newbornCount).toBe(1)
+    expect(newbornCount(fgResp.state.players[0]!)).toBe(1)
 
     // Step 2: skip the optional minor-improvement offered by wish-children flow.
     //         After skip, A92's after-place-farmer hook fires and offers its optional seq.
@@ -205,7 +206,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(fgSpaceMid!.takenBy[0]!.workerId).toBe('1')
 
     // Legacy fields synced after conversion
-    expect(p1Mid.newbornCount).toBe(0)
+    expect(newbornCount(p1Mid)).toBe(0)
     // Food: started with 5, paid 1 → 4
     expect(p1Mid.resources.food).toBe(4)
 
@@ -246,7 +247,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(fgSpace!.takenBy).toHaveLength(2)
 
     // Legacy fields: newbornCount still 1, no food spent
-    expect(p1.newbornCount).toBe(1)
+    expect(newbornCount(p1)).toBe(1)
     expect(p1.resources.food).toBe(5)
   })
 })

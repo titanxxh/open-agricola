@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A150_Stagehand'
 
 describe('A150_Stagehand session', () => {
@@ -16,8 +17,7 @@ describe('A150_Stagehand session', () => {
     owner.resources = { ...owner.resources, wood: 20, clay: 10, reed: 10, stone: 10 }
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-
+    setWorkersAtHome(state, opponent, 2)
     const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
     if (!travelingPlayers) throw new Error('traveling-players space missing')
     travelingPlayers.resources.food = 3

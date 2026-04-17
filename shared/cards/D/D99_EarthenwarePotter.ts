@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
 import { payGainFlow } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'D99_EarthenwarePotter'
 
@@ -15,7 +16,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!hasCardCounter(player, CARD_ID, 'earlyBuy')) return
     if (state.round < 14) return
-    const n = Math.min(player.resources.clay ?? 0, player.familySize)
+    const n = Math.min(player.resources.clay ?? 0, familySize(player))
     if (n <= 0) return
     return payGainFlow({
       cardId: CARD_ID,

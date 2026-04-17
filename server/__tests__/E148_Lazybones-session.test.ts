@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E148_Lazybones'
 
 describe('E148_Lazybones session', () => {
@@ -25,8 +26,7 @@ describe('E148_Lazybones session', () => {
     updatedState.currentPlayerIndex = 1
 
     const opponent = updatedState.players[1]!
-    opponent.workersAvailable = 2
-
+    setWorkersAtHome(state, opponent, 2)
     session.loadState(updatedState)
     return session
   }

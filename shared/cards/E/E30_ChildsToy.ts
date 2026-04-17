@@ -12,7 +12,6 @@ registerCardEffect({
     for (const w of player.workers) {
       if (w.isActive) w.isNewborn = false
     }
-    player.newbornCount = 0   // legacy sync
   },
 })
 

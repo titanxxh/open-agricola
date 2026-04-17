@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/D/D129_LumberVirtuoso'
 
 describe('D129_LumberVirtuoso session', () => {
@@ -20,7 +21,7 @@ describe('D129_LumberVirtuoso session', () => {
     state.currentPlayerIndex = 0
     state.round = options?.round ?? 4 // round 4 is a harvest round
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
       player.resources.food = options?.food ?? 10
     })
 

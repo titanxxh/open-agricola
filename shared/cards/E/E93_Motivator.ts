@@ -2,16 +2,17 @@ import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { hasNoUnusedFarmyardSpaces } from '../../game/farm'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'E93_Motivator'
 
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
+  onBeforeStartOfTurn: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (getRoundPlacementOrder(player).length !== 0) return
     if (!hasNoUnusedFarmyardSpaces(player)) return
-    if (player.workersAvailable <= 0) return
+    if (workersAvailable(state, player) <= 0) return
     return {
       type: 'seq',
       optional: true,

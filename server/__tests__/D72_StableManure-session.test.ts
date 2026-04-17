@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D72_StableManure'
 
 describe('D72_StableManure session', () => {
@@ -10,8 +11,8 @@ describe('D72_StableManure session', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
-      player.familySize = 1
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 1)
       player.resources.food = 10
     })
 
@@ -135,8 +136,8 @@ describe('D72_StableManure session', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
-      player.familySize = 1
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 1)
       player.resources.food = 10
     })
 

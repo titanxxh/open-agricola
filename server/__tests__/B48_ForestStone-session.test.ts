@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B48_ForestStone'
 
 const CARD_ID = 'B48_ForestStone'
@@ -14,7 +15,7 @@ const setup = () => {
   state.round = 5 // ensure eastern-quarry is available (round 5+)
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 10
   player.resources.wood = 10
   player.resources.stone = 10
@@ -114,8 +115,7 @@ describe('B48_ForestStone session', () => {
     const state2 = session.getState().state
     state2.currentPlayerIndex = 0
     const p0 = state2.players[0]!
-    p0.workersAvailable = 1
-    // Put stone on quarry
+    setWorkersAtHome(state2, p0, 1) // Put stone on quarry
     const quarry = state2.actionSpaces.find((s) => s.id === 'eastern-quarry')
     if (quarry) {
       quarry.resources.stone = 3

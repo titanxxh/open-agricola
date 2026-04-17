@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'B36_Bottles'
 
@@ -23,7 +24,7 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['minor-improvement', 'improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== CARD_ID) return
-    const farmers = context.player.familySize
+    const farmers = familySize(context.player)
     return { costs: { clay: farmers, food: farmers } }
   },
 }

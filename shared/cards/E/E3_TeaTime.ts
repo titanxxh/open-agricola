@@ -24,7 +24,6 @@ registerCardEffect({
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find(e => e.spaceId === 'grain-utilization')
     removeWorkerRef(space, player.id, entry?.workerId)
-    player.workersAvailable += 1
   },
 })
 

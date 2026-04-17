@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/E/E3_TeaTime'
 
 const CARD_ID = 'E3_TeaTime'
@@ -37,7 +38,7 @@ describe('E3_TeaTime session', () => {
     const after = session.getState().state
     const space = after.actionSpaces.find((s) => s.id === 'grain-utilization')!
     expect(space.takenBy).toEqual([])
-    expect(after.players[0]!.workersAvailable).toBe(workersBefore + 1)
+    expect(workersAvailable(after.state ? after.state : after, after.players[0]!)).toBe(workersBefore + 1)
     expect(after.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
@@ -59,6 +60,6 @@ describe('E3_TeaTime session', () => {
     // Opponent's worker should remain
     expect(space.takenBy.some((t) => t.playerId === state.players[1]!.id)).toBe(true)
     // No extra worker returned to owner
-    expect(after.players[0]!.workersAvailable).toBe(workersBefore)
+    expect(workersAvailable(after.state ? after.state : after, after.players[0]!)).toBe(workersBefore)
   })
 })

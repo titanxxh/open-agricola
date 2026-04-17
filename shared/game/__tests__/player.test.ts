@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Worker } from '../types'
+import { markAllWorkersUsed } from '../../game/player'
+import { familySize, workersAvailable, newbornCount } from '../../game/player'
 import {
   activateSmallestInactive,
   activeWorkers,
@@ -17,8 +19,7 @@ const makeWorker = (id: string, isActive = true, isNewborn = false): Worker => (
 const makePlayer = (workers: Worker[]): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
   resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 },
-  familySize: workers.filter(w => w.isActive).length, workersAvailable: 0, newbornCount: 0,
-  rooms: 2, houseType: 'wood', fields: [], pastures: [],
+  familySize: workers.filter(w => w.isActive).length, rooms: 2, houseType: 'wood', fields: [], pastures: [],
   occupationPlayed: [], minorPlayed: [], majorPlayed: [], handMinor: [], handOccupation: [],
   cardStates: {}, startPlayer: true, hasBegged: false, begCount: 0,
   workers,

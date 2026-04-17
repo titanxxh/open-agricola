@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B117_Informant'
 
 const CARD_ID = 'B117_Informant'
@@ -90,7 +91,7 @@ describe('B117_Informant session', () => {
     state.round = 1
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 

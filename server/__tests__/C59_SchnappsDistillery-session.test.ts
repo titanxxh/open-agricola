@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/C/C59_SchnappsDistillery'
 
 describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
@@ -9,8 +10,8 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
-      player.familySize = 1
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 1)
       player.resources.food = 0
     })
 
@@ -27,7 +28,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     playerA.resources.vegetable = 2
 
     // PlayerB: skip feeding complications
-    playerB.familySize = 0 // avoid pending feed
+    setActiveWorkerCount(playerB, 0) // avoid pending feed
 
     session.loadState(state)
     return session

@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'A127_Lodger'
 
@@ -29,10 +30,20 @@ registerCardEffect({
     if (!hasRoom) return
     // Check if rooms without Lodger extra capacity < familySize
     const roomsWithoutLodger = player.rooms
-    if (roomsWithoutLodger < player.familySize) {
-      player.familySize -= 1
-      if (player.workersAvailable > 0) {
-        player.workersAvailable -= 1
+    if (roomsWithoutLodger < familySize(player)) {
+      // Deactivate the highest-id active worker (the most recently added).
+      // Prefer a worker currently at home so we don't strand a placed WorkerRef.
+      const active = (player.workers ?? []).filter((w) => w.isActive)
+      const homeActive = active.filter((w) => {
+        return !state.actionSpaces.some((s) =>
+          s.takenBy.some((t) => t.playerId === player.id && t.workerId === w.id),
+        )
+      })
+      const pool = homeActive.length > 0 ? homeActive : active
+      const victim = [...pool].sort((a, b) => Number(b.id) - Number(a.id))[0]
+      if (victim) {
+        victim.isActive = false
+        victim.isNewborn = false
       }
     }
     writeCardExtraData(player, CARD_ID, 'hasRoom', false)

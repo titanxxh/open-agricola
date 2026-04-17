@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B70_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'
 import '../../shared/cards/A/A64_BarleyMill'
@@ -26,7 +27,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 3
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -64,7 +65,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -110,7 +111,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 14
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -146,7 +147,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -185,7 +186,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -226,7 +227,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -301,7 +302,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!
@@ -383,7 +384,7 @@ describe('stage hook flows', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4
     state.players.forEach((player) => {
-      player.workersAvailable = 0
+      markAllWorkersUsed(state, player)
     })
 
     const player = state.players[0]!

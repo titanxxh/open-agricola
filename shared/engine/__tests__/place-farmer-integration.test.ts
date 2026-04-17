@@ -7,6 +7,8 @@ import { clearCardListeners, registerCardListener, executeCardListener } from '.
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
+import { markAllWorkersUsed } from '../../game/player'
+import { setWorkersAtHome } from '../../game/player'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -40,8 +42,13 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
     cattle: 0,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
+  workers: [
+    { id: '1', isActive: true, isNewborn: false },
+    { id: '2', isActive: true, isNewborn: false },
+    { id: '3', isActive: false, isNewborn: false },
+    { id: '4', isActive: false, isNewborn: false },
+    { id: '5', isActive: false, isNewborn: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -57,7 +64,6 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -173,8 +179,7 @@ describe('PlaceFarmer card integration', () => {
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
       space.gainPerRound = { wood: 3 }
-      player.workersAvailable = 0
-
+      markAllWorkersUsed(state, player)
       const phase = dispatcher.immediatelyAfter({ state, player, space }, { type: 'ok' })
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
@@ -200,8 +205,7 @@ describe('PlaceFarmer card integration', () => {
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
       space.gainPerRound = { wood: 3 }
-      player.workersAvailable = 1
-
+      setWorkersAtHome(state, player, 1)
       const phase = dispatcher.immediatelyAfter({ state, player, space }, { type: 'ok' })
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)

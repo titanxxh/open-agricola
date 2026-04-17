@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E92_FieldDoctor'
 
@@ -43,7 +44,7 @@ const computeReplaceListener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!checkRoomsSurroundedByFields(context)) return
     // Only activate if player actually needs the "without room" bypass
-    if (context.player.rooms > context.player.familySize) return
+    if (context.player.rooms > familySize(context.player)) return
     return {
       actionId: 'grow-family-without-room',
       flow: {

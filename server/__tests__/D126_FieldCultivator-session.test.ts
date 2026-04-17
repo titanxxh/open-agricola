@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D126_FieldCultivator'
 
 const CARD_ID = 'D126_FieldCultivator'
@@ -29,8 +30,8 @@ describe('D126_FieldCultivator session', () => {
 
     // Set workers to 0 for round end
     state.players.forEach((p) => {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
       p.resources.food = 10 // enough to feed
     })
 

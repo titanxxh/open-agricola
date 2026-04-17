@@ -6,6 +6,7 @@ import { breedAnimals } from '../../../shared/actions/effects/breed-animals'
 import { reap } from '../../../shared/actions/effects/reap'
 import { emptyResources } from '../../../shared/logic/state'
 import { formatResources } from '../../../shared/logic/format'
+import { familySize, newbornCount } from '../../../shared/game/player'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
@@ -292,8 +293,10 @@ export const startHarvestCore = (nextState: GameState) => {
   const feedSummary: HarvestSummary['feed'] = []
   const pending: HarvestFeedPending[] = []
   nextState.players.forEach((player, index) => {
-    const newbornPenalty = Math.min(player.newbornCount, player.familySize)
-    let required = Math.max(0, player.familySize * 2 - newbornPenalty)
+    const size = familySize(player)
+    const newborns = newbornCount(player)
+    const newbornPenalty = Math.min(newborns, size)
+    let required = Math.max(0, size * 2 - newbornPenalty)
     const useFood = Math.min(player.resources.food, required)
     player.resources.food -= useFood
     required -= useFood

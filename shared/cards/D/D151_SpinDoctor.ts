@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'D151_SpinDoctor'
 
@@ -15,7 +16,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'traveling-players') return
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     // Collect all visible action spaces except Meeting Place
     const addedSpaces = context.state.actionSpaces
       .filter((s) => s.id !== 'meeting-place' && context.state.round >= (s.roundAvailable ?? 1))

@@ -215,7 +215,7 @@ player.resources.food   // 食物
 // ... clay, reed, stone, grain, vegetable, sheep, boar, cattle
 
 // 玩家状态
-player.familySize       // 家庭成员数 (2-5)
+familySize(player)      // 家庭成员数 (2-5)，来自 '../../shared/game/player'
 player.fields.length    // 田地数
 player.pastures.length  // 牧场数
 player.rooms            // 房间数
@@ -490,7 +490,7 @@ registerCardEffect({
   id: CARD_ID,
   onHarvest: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    const foodGain = player.familySize  // 按家庭成员数计算
+    const foodGain = familySize(player)  // 按家庭成员数计算（从 shared/game/player 导入）
     return {
       type: 'leaf',
       actionId: 'gain',

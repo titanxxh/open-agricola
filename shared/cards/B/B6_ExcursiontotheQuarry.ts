@@ -1,13 +1,14 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'B6_ExcursiontotheQuarry'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const farmers = player.familySize
+    const farmers = familySize(player)
     if (farmers <= 0) return
     return gainLeaf(CARD_ID, { stone: farmers })
   },

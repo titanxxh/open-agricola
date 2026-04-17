@@ -4,7 +4,6 @@ import type { GameState, PlayerState } from '../../game/types'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',
-  familySize: 2,
   resources: { wood: 3, clay: 2, reed: 1, stone: 0, food: 5, grain: 2, vegetable: 1 },
   improvements: [],
   minorPlayed: ['CUSTOM_TestCard'],
@@ -182,7 +181,16 @@ describe('conditions', () => {
       },
     }
     const effect = dslToCardEffect('CUSTOM_TestCard', dsl)
-    const result = effect.onReturnHome!(makeState(), makePlayer({ familySize: 3 }))
+    const result = effect.onReturnHome!(
+      makeState(),
+      makePlayer({
+        workers: [
+          { id: '1', isActive: true, isNewborn: false },
+          { id: '2', isActive: true, isNewborn: false },
+          { id: '3', isActive: true, isNewborn: false },
+        ],
+      }),
+    )
     expect(result).toBeDefined()
   })
 

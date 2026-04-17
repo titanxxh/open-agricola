@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { A28_ForestSchool as A28Card } from '../../shared/cards/A/A28_ForestSchool'
 
+import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/A/A28_ForestSchool'
 import '../../shared/cards/A/A123_FrameBuilder'
 
@@ -14,7 +15,7 @@ const setup = (withForestSchool: boolean) => {
   state.currentPlayerIndex = 0
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources = {
     ...player.resources,
     wood: withForestSchool ? 1 : 0,
@@ -60,7 +61,7 @@ describe('A28_ForestSchool session', () => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     // D152_Patron grants 2 food before playing an occupation
     expect(resp.state.players[0]!.resources.food).toBe(2)

@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
+import { workersAvailable } from '../../game/player'
 
 const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean => {
   return Object.keys(space.gainPerRound).length > 0
@@ -12,14 +13,14 @@ const steamMachineListener: CardListenerRegistration = {
   id: 'C25-steam-machine-immediately-after',
   phases: ['immediatelyAfter' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { player, space } = context
-    
+    const { player, space, state } = context
+
     // Check if player has this card
     if (!player.minorPlayed.includes('C25_SteamMachine')) {
       return
     }
-    
-    if (player.workersAvailable > 0) {
+
+    if (workersAvailable(state, player) > 0) {
       return
     }
 

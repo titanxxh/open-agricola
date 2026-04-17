@@ -72,6 +72,7 @@ import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
+import { familySize, newbornCount, workersAvailable } from '../shared/game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../shared/cards/types.ts'
 import {
   normalizePlayerFarm,
@@ -456,7 +457,8 @@ export class GameSession {
   private nextPlayerIdx(players: PlayerState[], current: number) {
     for (let off = 1; off <= players.length; off++) {
       const idx = (current + off) % players.length
-      if (players[idx] && players[idx].workersAvailable > 0) return idx
+      const candidate = players[idx]
+      if (candidate && workersAvailable(this.state, candidate) > 0) return idx
     }
     return current
   }
@@ -871,7 +873,7 @@ export class GameSession {
 
   private buildRoundSnapshot(state: GameState): GameState {
     const snapshot = cloneState(state)
-    snapshot.players.forEach((p) => { p.workersAvailable = p.familySize })
+    // workers return home at round start — just clear action space occupancy.
     snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
     snapshot.roundStartSnapshot = null
     return snapshot
@@ -889,8 +891,10 @@ export class GameSession {
     if (player.rooms > before.rooms) {
       effects.buildRoom = player.rooms - before.rooms
     }
-    if (player.familySize > before.familySize) {
-      effects.growFamily = player.familySize - before.familySize
+    const beforeSize = familySize(before)
+    const afterSize = familySize(player)
+    if (afterSize > beforeSize) {
+      effects.growFamily = afterSize - beforeSize
     }
     if (player.fields.length > before.fields.length) {
       effects.plow = player.fields.length - before.fields.length
@@ -1116,7 +1120,7 @@ export class GameSession {
     this.turnOwnerPlayerIndex = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
       this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
@@ -1228,8 +1232,9 @@ export class GameSession {
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
-      const newborn = Math.min(player.newbornCount, player.familySize)
-      const required = Math.max(0, player.familySize * 2 - newborn)
+      const size = familySize(player)
+      const newborn = Math.min(newbornCount(player), size)
+      const required = Math.max(0, size * 2 - newborn)
       const useFood = Math.min(player.resources.food, required)
       player.resources.food -= useFood
       const remaining = required - useFood
@@ -1512,7 +1517,6 @@ export class GameSession {
       if (step.type === 'ok' && step.result.type === 'fail') {
         if (!this.stageResume) {
           removeWorkerRef(space, player.id)
-          player.workersAvailable += 1
         }
         this.engine = null
         this.engineSource = null
@@ -1546,7 +1550,7 @@ export class GameSession {
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
     const openRound = roundOpen.get(space.id) ?? space.roundAvailable
     if (this.state.round < openRound) return false
-    if (player.workersAvailable <= 0) return false
+    if (workersAvailable(this.state, player) <= 0) return false
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
     if (isSpaceOccupied(space) && !canUseOccupied) return false
     return this.hookDispatcher.applyIsDoable(
@@ -1667,7 +1671,7 @@ export class GameSession {
     if (this.pending.type !== 'none') return this.respond(false, 'interaction in progress')
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
-    if (!player || player.workersAvailable <= 0) return this.respond(false, 'no workers available')
+    if (!player || workersAvailable(this.state, player) <= 0) return this.respond(false, 'no workers available')
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space unavailable')
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
@@ -1682,7 +1686,6 @@ export class GameSession {
     if (worker) {
       addWorkerRef(space, player.id, worker.id)
     }
-    player.workersAvailable -= 1
     recordRoundPlacement(player, spaceId, worker?.id ?? '?')
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
@@ -1918,7 +1921,7 @@ export class GameSession {
       return this.respond()
     }
     this.finalizeActionLog(player)
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
       this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
@@ -2032,7 +2035,7 @@ export class GameSession {
     this.turnOwnerPlayerIndex = null
 
     // Check if all workers are used (round end condition)
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (allWorkersUsed) {
       return this.performRoundEnd()
     }
@@ -2041,7 +2044,7 @@ export class GameSession {
   }
 
   performRoundEnd(): SessionResponse {
-    const allUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allUsed) return this.respond(false, 'not all workers used')
     if (this.pending.type !== 'none') return this.respond(false, 'pending action exists')
 
@@ -2075,7 +2078,7 @@ export class GameSession {
       return this.respond()
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
+    // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
@@ -2150,7 +2153,6 @@ export class GameSession {
       for (const w of p.workers) {
         if (w.isActive) w.isNewborn = false
       }
-      p.newbornCount = 0   // legacy sync; Task 10 removes
     })
     this.state.round += 1
     if (this.state.round > 14) {

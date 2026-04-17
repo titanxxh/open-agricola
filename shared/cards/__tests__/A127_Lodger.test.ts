@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState } from '../../game/types'
 
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../game/player'
 import '../A/A127_Lodger'
 
 const CARD_ID = 'A127_Lodger'
@@ -13,12 +14,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [CARD_ID], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as unknown as PlayerState
@@ -67,44 +75,44 @@ describe('A127_Lodger', () => {
 
   it('onStartReturnHome at round 9 removes a farmer when rooms < familySize', () => {
     const player = createPlayer()
-    player.familySize = 3
-    player.workersAvailable = 3
+    setActiveWorkerCount(player, 3)
     player.rooms = 2
     player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
     const state = createState(player)
+    setWorkersAtHome(state, player, 3)
     state.round = 9
 
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(player.familySize).toBe(2)
-    expect(player.workersAvailable).toBe(2)
+    expect(familySize(player)).toBe(2)
+    expect(workersAvailable(state, player)).toBe(2)
     expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(false)
   })
 
   it('onStartReturnHome at round 9 does not remove farmer when rooms >= familySize', () => {
     const player = createPlayer()
-    player.familySize = 2
-    player.workersAvailable = 2
+    setActiveWorkerCount(player, 2)
     player.rooms = 3
     player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
     const state = createState(player)
+    setWorkersAtHome(state, player, 2)
     state.round = 9
 
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(player.familySize).toBe(2)
-    expect(player.workersAvailable).toBe(2)
+    expect(familySize(player)).toBe(2)
+    expect(workersAvailable(state, player)).toBe(2)
     expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(false)
   })
 
   it('onStartReturnHome does nothing at round != 9', () => {
     const player = createPlayer()
-    player.familySize = 3
+    setActiveWorkerCount(player, 3)
     player.rooms = 2
     player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
     const state = createState(player)
     state.round = 8
 
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(player.familySize).toBe(3)
+    expect(familySize(player)).toBe(3)
     expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(true)
   })
 })

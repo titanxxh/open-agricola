@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E95_Miller'
 
 describe('E95_Miller session', () => {
@@ -25,8 +26,7 @@ describe('E95_Miller session', () => {
     owner.resources = { ...owner.resources, grain: 3, food: 0 }
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-
+    setWorkersAtHome(state, opponent, 2)
     session.loadState(state)
     return session
   }
@@ -145,8 +145,7 @@ describe('E95_Miller session', () => {
     state.currentPlayerIndex = 0
 
     const owner = state.players[0]!
-    owner.workersAvailable = 2
-    // Give enough resources to buy an occupation (food: 1 for second occ) and a Fireplace (clay: 2)
+    setWorkersAtHome(state, owner, 2) // Give enough resources to buy an occupation (food: 1 for second occ) and a Fireplace (clay: 2)
     owner.resources = { ...owner.resources, food: 5, clay: 5 }
     // Put Miller in occupation hand — add a second occupation so auto-select doesn't skip the choice
     owner.occupationHand = ['E95_Miller', 'A85_Homekeeper']
@@ -196,7 +195,7 @@ describe('E95_Miller session', () => {
     state.currentPlayerIndex = 0
 
     const owner = state.players[0]!
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources = { ...owner.resources, food: 5, clay: 5 }
     // Add a second occupation so the choice isn't auto-resolved
     owner.occupationHand = ['E95_Miller', 'A85_Homekeeper']

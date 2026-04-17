@@ -4,6 +4,7 @@ import { GameSession } from '../game-session'
 import { B155_ArtTeacher } from '../../shared/cards/B/B155_ArtTeacher'
 import { occupations } from '../../shared/game/occupations'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 const CARD_ID = 'B155_ArtTeacher'
 
 // Catalog registration is handled by the parent agent; for local testing we
@@ -41,7 +42,7 @@ describe('B155_ArtTeacher session', () => {
     const session = makeSession()
     const state = session.getState().state
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID]
     player.resources = { ...player.resources, food: 0 }
     session.loadState(state)
@@ -88,7 +89,7 @@ describe('B155_ArtTeacher session', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationPlayed.push(CARD_ID)
     player.playedCards.push(`occupation:${CARD_ID}`)
     // Put another occupation in hand to trigger the second-occupation food cost.
@@ -133,7 +134,7 @@ describe('B155_ArtTeacher session', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationHand = ['A85_Homekeeper']
     player.resources = { ...player.resources, food: 2 }
 

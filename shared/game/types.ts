@@ -93,8 +93,6 @@ export type PlayerState = {
   color: 'red' | 'yellow' | 'blue' | 'black'
   resources: Resource
   workers: Worker[]
-  familySize: number
-  workersAvailable: number
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: Field[]
@@ -110,7 +108,6 @@ export type PlayerState = {
   houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
   houseAnimalCount: number
   stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>
-  newbornCount: number
   pastures: Pasture[]
   fenceSegments: string[]
   majorEffects: MajorEffectState

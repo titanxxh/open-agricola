@@ -43,3 +43,98 @@ export const activateSmallestInactive = (p: PlayerState): Worker | null => {
   next.isNewborn = true
   return next
 }
+
+const TEST_SINK_SPACE_ID = '__test-worker-sink__'
+
+const ensureTestSink = (state: GameState): import('./types').ActionSpace => {
+  let sink = state.actionSpaces.find(s => s.id === TEST_SINK_SPACE_ID)
+  if (sink) return sink
+  sink = {
+    id: TEST_SINK_SPACE_ID,
+    nameKey: 'test.sink.name',
+    descriptionKey: 'test.sink.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => false,
+    execute: () => ({ type: 'ok' }),
+    resources: {
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    },
+    takenBy: [],
+  } as import('./types').ActionSpace
+  state.actionSpaces.push(sink)
+  return sink
+}
+
+/**
+ * Test helper: mark all active workers as "used" by placing WorkerRefs onto
+ * a dedicated test-sink action space. This makes
+ * `workersAvailable(state, p) === 0` for fixture setups that previously wrote
+ * `p.workersAvailable = 0`. Uses a synthetic sink space so tests that manually
+ * write to real action spaces (e.g. `forest.takenBy = 'p1'`) don't clobber it.
+ */
+export const markAllWorkersUsed = (state: GameState, p: PlayerState): void => {
+  const sink = ensureTestSink(state)
+  for (const w of p.workers ?? []) {
+    if (!w.isActive) continue
+    const onAny = state.actionSpaces.some(s =>
+      s.takenBy.some(t => t.playerId === p.id && t.workerId === w.id),
+    )
+    if (!onAny) {
+      sink.takenBy.push({ playerId: p.id, workerId: w.id })
+    }
+  }
+}
+
+/**
+ * Test helper: set exactly N active workers on player `p`.
+ * Activates the first N workers (by id) and deactivates the rest.
+ */
+export const setActiveWorkerCount = (p: PlayerState, n: number): void => {
+  const ws = (p.workers ?? []).slice().sort((a, b) => Number(a.id) - Number(b.id))
+  for (let i = 0; i < ws.length; i += 1) {
+    const w = ws[i]!
+    w.isActive = i < n
+    if (!w.isActive) w.isNewborn = false
+  }
+}
+
+/**
+ * Test helper: configure player `p` so `workersAvailable(state, p) === n`.
+ * If the player has more active workers than `n`, places the excess onto the
+ * first action space. If fewer, does nothing (would need activation).
+ */
+export const setWorkersAtHome = (
+  state: GameState,
+  p: PlayerState,
+  n: number,
+): void => {
+  const active = (p.workers ?? []).filter(w => w.isActive)
+  const toPlace = Math.max(0, active.length - n)
+  if (toPlace <= 0) return
+  const sink = ensureTestSink(state)
+  let placed = 0
+  for (const w of active) {
+    if (placed >= toPlace) break
+    const already = state.actionSpaces.some(s =>
+      s.takenBy.some(t => t.playerId === p.id && t.workerId === w.id),
+    )
+    if (already) continue
+    sink.takenBy.push({ playerId: p.id, workerId: w.id })
+    placed += 1
+  }
+}
+
+/**
+ * Test helper: set exactly N newborn workers among the player's active workers.
+ * Marks the first N active workers (by id) as newborn, the rest as adult.
+ */
+export const setNewbornCount = (p: PlayerState, n: number): void => {
+  const active = (p.workers ?? [])
+    .filter(w => w.isActive)
+    .sort((a, b) => Number(a.id) - Number(b.id))
+  for (let i = 0; i < active.length; i += 1) {
+    active[i]!.isNewborn = i < n
+  }
+}

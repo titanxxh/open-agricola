@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
+import { setActiveWorkerCount, familySize } from '../../shared/game/player'
 import '../../shared/cards/B/B85_FarmHand'
 
 describe('B85_FarmHand session', () => {
@@ -101,7 +102,7 @@ describe('B85_FarmHand session', () => {
     const player = state.players[0]!
     // Set family size equal to rooms so growth is blocked
     player.rooms = 2
-    player.familySize = 2
+    setActiveWorkerCount(player, 2)
     session.loadState(state)
 
     enterActiveInteraction(session)
@@ -112,9 +113,9 @@ describe('B85_FarmHand session', () => {
 
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.rooms).toBe(3)
-    expect(updatedPlayer.familySize).toBe(2)
+    expect(familySize(updatedPlayer)).toBe(2)
     // Now rooms (3) > familySize (2), so family growth should be possible
-    expect(updatedPlayer.rooms > updatedPlayer.familySize).toBe(true)
+    expect(familySize(updatedPlayer.rooms > updatedPlayer)).toBe(true)
   })
 
   it('2x2 detection works with non-adjacent fields', () => {

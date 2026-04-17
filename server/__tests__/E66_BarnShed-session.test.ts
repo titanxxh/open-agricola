@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E66_BarnShed'
 
 describe('E66_BarnShed session', () => {
@@ -14,13 +15,11 @@ describe('E66_BarnShed session', () => {
     const owner = state.players[0]!
     owner.minorPlayed.push('E66_BarnShed')
     owner.playedCards.push('minor:E66_BarnShed')
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources.grain = 0
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-
-    // Ensure forest has accumulated resources
+    setWorkersAtHome(state, opponent, 2) // Ensure forest has accumulated resources
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     if (forest) forest.resources.wood = 3
 

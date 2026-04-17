@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A139_HollowWarden'
 
 const CARD_ID = 'A139_HollowWarden'
@@ -15,7 +16,7 @@ describe('A139_HollowWarden session', () => {
 
     const player = state.players[0]!
     player.occupationHand.push(CARD_ID)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.food = 5
 
     // Ensure hollow-4 space exists with accumulated clay

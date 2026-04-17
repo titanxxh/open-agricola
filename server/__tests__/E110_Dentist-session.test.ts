@@ -4,6 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E110_Dentist'
 
 const CARD_ID = 'E110_Dentist'
@@ -98,7 +99,7 @@ describe('E110_Dentist session', () => {
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 

@@ -1,4 +1,5 @@
 import type { PlayerState } from '../../game/types'
+import { familySize } from '../../game/player'
 
 /**
  * BGA's bonusStoneRoom exclusivity: when a player plays multiple cards that
@@ -18,7 +19,7 @@ const computeC30 = (player: PlayerState): number =>
   player.houseType === 'stone' ? player.rooms : 0
 
 const computeD34 = (player: PlayerState): number =>
-  player.houseType === 'stone' && player.rooms > player.familySize ? 4 : 0
+  player.houseType === 'stone' && player.rooms > familySize(player) ? 4 : 0
 
 const BONUS_CARDS = [
   { id: 'C30_HalfTimberedHouse', compute: computeC30 },

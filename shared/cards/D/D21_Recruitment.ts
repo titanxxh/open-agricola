@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getExtraRoomCapacity } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'D21_Recruitment'
 
@@ -33,7 +34,7 @@ const effectiveRooms = (player: CardListenerContext['player']) =>
   player.rooms + getExtraRoomCapacity(player)
 
 const hasHouseRoom = (player: CardListenerContext['player']) =>
-  effectiveRooms(player) > player.familySize
+  effectiveRooms(player) > familySize(player)
 
 const shouldOfferReplace = (context: CardListenerContext) => {
   if (!context.player.minorPlayed.includes(CARD_ID)) return false

@@ -214,6 +214,16 @@ export const normalizeState = (raw: GameState): GameState => {
     }
     actionSpaces.push(pas)
   }
+  // Preserve caller-added spaces not produced by createActionSpaces / PlayerActionCard.
+  // (e.g. `__test-worker-sink__` and `card-worker:...` pseudo-spaces.)
+  const knownIds = new Set(actionSpaces.map((s) => s.id))
+  for (const stored of raw.actionSpaces ?? []) {
+    if (knownIds.has(stored.id)) continue
+    actionSpaces.push({
+      ...stored,
+      takenBy: normalizeTakenBy(stored.takenBy),
+    } as ActionSpace)
+  }
   const needsHands = raw.players.some(
     (player) =>
       (player.minorHand?.length ?? 0) === 0 ||
@@ -264,7 +274,6 @@ export const normalizeState = (raw: GameState): GameState => {
             { id: '5', isActive: false, isNewborn: false },
           ],
       stableAnimals: player.stableAnimals ?? {},
-      newbornCount: player.newbornCount ?? 0,
       pastures: player.pastures ?? [],
       fenceSegments: player.fenceSegments ?? [],
       roomTiles:
@@ -355,11 +364,6 @@ export const normalizeState = (raw: GameState): GameState => {
     } else {
       normalized.houseAnimalCount = Math.min(1, normalized.houseAnimalCount)
     }
-    if (!Number.isFinite(normalized.newbornCount) || normalized.newbornCount < 0) {
-      normalized.newbornCount = 0
-    } else {
-      normalized.newbornCount = Math.floor(normalized.newbornCount)
-    }
     const expectedPlayedCards = [
       ...normalized.improvements.map((id) => `major:${id}`),
       ...normalized.minorPlayed.map((id) => `minor:${id}`),
@@ -443,8 +447,6 @@ export const createInitialPlayers = (
       { id: '4', isActive: false, isNewborn: false },
       { id: '5', isActive: false, isNewborn: false },
     ],
-    familySize: 2,
-    workersAvailable: 2,
     rooms: 2,
     houseType: 'wood',
     fields: [],
@@ -460,7 +462,6 @@ export const createInitialPlayers = (
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
-    newbornCount: 0,
     pastures: [],
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },

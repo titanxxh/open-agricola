@@ -3,6 +3,7 @@ import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
 import { collectBonusScores, getCardEffect } from '../cards/card-effects'
+import { familySize } from '../game/player'
 
 type ScoreCategoryKey =
   | 'fields'
@@ -245,13 +246,14 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       ],
     })
 
-    const farmerScore = player.familySize * 3
+    const playerFamilySize = familySize(player)
+    const farmerScore = playerFamilySize * 3
     categories.push({
       key: 'farmers',
       total: farmerScore,
-      quantity: player.familySize,
+      quantity: playerFamilySize,
       entries: [
-        { type: 'quantity', quantity: player.familySize, score: farmerScore },
+        { type: 'quantity', quantity: playerFamilySize, score: farmerScore },
       ],
     })
 

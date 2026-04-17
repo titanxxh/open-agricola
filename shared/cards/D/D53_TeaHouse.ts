@@ -6,6 +6,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'D53_TeaHouse'
 
@@ -42,7 +43,7 @@ const anytimeListener: CardListenerRegistration = {
     const roundPlacements = getRoundPlacementOrder(context.player).length
     if (roundPlacements !== 1) return
     // Must still have workers available to place later
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     return {
       flow: {
         type: 'seq',

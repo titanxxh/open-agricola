@@ -4,6 +4,7 @@ import { GameSession } from '../game-session'
 import { C95_BasketWeaver } from '../../shared/cards/C/C95_BasketWeaver'
 import { occupations } from '../../shared/game/occupations'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 const CARD_ID = 'C95_BasketWeaver'
 
 // Catalog registration is handled by the parent agent; for local testing we
@@ -21,8 +22,7 @@ describe('C95_BasketWeaver session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 2
-    // Add a second occupation to avoid auto-selection
+    setWorkersAtHome(state, player, 2) // Add a second occupation to avoid auto-selection
     player.occupationHand = [CARD_ID, 'A85_Homekeeper']
     player.resources = { ...player.resources, food: 5, reed: 2, stone: 2 }
 

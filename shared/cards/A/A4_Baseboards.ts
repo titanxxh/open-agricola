@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'A4_Baseboards'
 
@@ -7,7 +8,7 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
     const rooms = player.rooms
-    const farmers = player.familySize
+    const farmers = familySize(player)
     const amount = rooms + (rooms > farmers ? 1 : 0)
     if (amount <= 0) return
     return {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B108_OvenFiringBoy'
 
 describe('B108_OvenFiringBoy session', () => {
@@ -16,7 +17,7 @@ describe('B108_OvenFiringBoy session', () => {
     player.resources.grain = 3
     player.resources.food = 0
     player.resources.wood = 0
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
 
     // Ensure wood space has accumulated resources

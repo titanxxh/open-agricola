@@ -52,7 +52,6 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       const placements = getRoundPlacementDetails(player)
       const entry = placements.find(e => e.spaceId === only.id)
       removeWorkerRef(only, player.id, entry?.workerId)
-      player.workersAvailable += 1
       return { type: 'ok', logKey: 'log.cardEffectTrigger' }
     }
 
@@ -73,7 +72,6 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find(e => e.spaceId === target.id)
     removeWorkerRef(target, player.id, entry?.workerId)
-    player.workersAvailable += 1
     return { type: 'ok', logKey: 'log.cardEffectTrigger' }
   },
 }

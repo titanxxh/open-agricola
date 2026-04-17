@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B25_BreadPaddle'
 
 const CARD_ID = 'B25_BreadPaddle'
@@ -31,8 +32,8 @@ describe('B25_BreadPaddle session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 1
-    player.familySize = 1
+    setWorkersAtHome(state, player, 1)
+    setActiveWorkerCount(player, 1)
     player.resources.food = 10
     player.resources.wood = 10
 
@@ -80,8 +81,8 @@ describe('B25_BreadPaddle session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 1
-    player.familySize = 1
+    setWorkersAtHome(state, player, 1)
+    setActiveWorkerCount(player, 1)
     player.resources.food = 10
 
     state.players[1]!.workersAvailable = 0

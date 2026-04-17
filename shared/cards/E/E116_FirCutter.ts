@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { familySize, workersAvailable } from '../../game/player'
 
 const CARD_ID = 'E116_FirCutter'
 
@@ -47,7 +48,7 @@ const animalMarketListener: CardListenerRegistration = {
 
     // Number of placed farmers = familySize - workersAvailable
     // At this point the current farmer has already been placed, so workersAvailable is decremented
-    const placedFarmers = context.player.familySize - context.player.workersAvailable
+    const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
     const woodAmount = WOOD_BY_PLACEMENT[placedFarmers] ?? WOOD_BY_PLACEMENT[WOOD_BY_PLACEMENT.length - 1]!
     if (!woodAmount || woodAmount <= 0) return
 
