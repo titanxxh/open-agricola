@@ -7,9 +7,12 @@ registerCardEffect({
   id: CARD_ID,
   onBeforeFeed: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    // Remove newborn discount by setting newbornCount to 0
+    // Remove newborn discount by treating newborns as adults
     // This makes newborns cost 2 food like adults
-    player.newbornCount = 0
+    for (const w of player.workers) {
+      if (w.isActive) w.isNewborn = false
+    }
+    player.newbornCount = 0   // legacy sync
   },
 })
 
