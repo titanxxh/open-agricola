@@ -1,7 +1,59 @@
 import { Occupation } from '../types'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
+
+const CARD_ID = 'A87_Conservator'
+
+/**
+ * A87 Conservator (Occupation, A, 87)
+ * You can renovate your wooden house directly to stone without renovating it
+ * to clay first. (Optional — you may decline.)
+ *
+ * BGA: Cards/A/A87_Conservator.php — flavor only on the PHP side; the actual
+ * direct-stone option is provided by the engine's renovate-house action.
+ *
+ * Implementation:
+ *  - computeReplace listener on `renovate-house`: when the owner is on a
+ *    wooden house, declines the standard branch and offers a same-actionId
+ *    leaf with `params.skipClayTier=true`. The engine wraps the original
+ *    branch and the alternative into an XOR for the player to pick.
+ *  - isDoable listener on `renovate-house`: rescues entry visibility for
+ *    wooden owners who can only afford the stone path (and would otherwise
+ *    be hidden by the default cost preview that checks the clay path).
+ *  - Reusing `renovate-house` as the alternative actionId means every
+ *    existing renovate-house cost-discount hook (D154 ChimneySweep,
+ *    B33 Mantlepiece, A143 Stonecutter, A123 FrameBuilder, etc.) keeps
+ *    firing on the Conservator branch.
+ */
+
+const computeReplaceListener: CardListenerRegistration = {
+  id: 'A87-conservator-replace-renovate-house',
+  cardIds: [CARD_ID],
+  phases: ['computeReplace' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context) => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'wood') return
+    if (context.actionContext?.checkedReplaceAction === true) return
+    return {
+      decline: true,
+      sourceCard: CARD_ID,
+      alternativeFlow: {
+        type: 'leaf',
+        actionId: 'renovate-house',
+        params: { skipClayTier: true },
+        sourceCard: CARD_ID,
+        choiceLabelKey: 'ui.interactionConservatorDirectStone',
+      },
+    }
+  },
+}
+
+registerCardListener(computeReplaceListener)
 
 export const A87_Conservator = new Occupation({
-  id: "A87_Conservator",
+  id: CARD_ID,
   name: "Conservator",
   deck: "A",
   number: 87,
