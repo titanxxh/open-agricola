@@ -10,23 +10,24 @@ Open Agricola — an online implementation of the Agricola board game using Reac
 
 ```bash
 # Install dependencies (canvas requires native libs: libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev)
-npm install
+# This project uses pnpm (version pinned via packageManager in package.json)
+pnpm install
 
 # Start both frontend (5173) and backend (5175)
 ./restart-intranet.sh
 
 # Or start separately
-npm run server   # Backend on port 5175
-npm run dev      # Frontend on port 5173
+pnpm run server  # Backend on port 5175
+pnpm run dev     # Frontend on port 5173
 
 # Tests
-npm test                # Vitest unit tests (~642 cases, excludes e2e and scripts/)
-npm run test:e2e        # Playwright E2E tests (requires running server + frontend)
-npx vitest run tests/path/to/file.spec.ts   # Run a single test file
+pnpm test                # Vitest unit tests (excludes e2e and scripts/)
+pnpm run test:e2e        # Playwright E2E tests (requires running server + frontend)
+pnpm exec vitest run tests/path/to/file.spec.ts   # Run a single test file
 
 # Lint & build
-npm run lint            # ESLint (~340 pre-existing any-type warnings, not blocking)
-npm run build           # tsc + vite build (warnings about /bga-img/* are cosmetic)
+pnpm run lint            # ESLint (~340 pre-existing any-type warnings, not blocking)
+pnpm run build           # tsc + vite build (warnings about /bga-img/* are cosmetic)
 ```
 
 ## Architecture
@@ -141,7 +142,7 @@ Rule correctness tests should use session tests (tier 2). Assert on `state`, `pe
 - **Tests drive through backend boundary**: Use `GameSession`, HTTP API, or WS commands. Assert on `state`, `pending`, `log`, `scores` — not DOM elements.
 - **Default to 2-player games** in tests.
 - **Commit messages**: `feat:`, `fix:`, `refactor:` prefixes. English only.
-- **After code changes**: Run `npm test` to verify. Update relevant docs (`docs/IMPLEMENTATION_STATUS.md`, `docs/ENGINE_ARCHITECTURE.md`, `docs/cards_impl.md`, `docs/card_progress.md`).
+- **After code changes**: Run `pnpm test` to verify. Update relevant docs (`docs/IMPLEMENTATION_STATUS.md`, `docs/ENGINE_ARCHITECTURE.md`, `docs/cards_impl.md`, `docs/card_progress.md`).
 - **After git push**: Check GitHub Actions at https://github.com/titanxxh/open-agricola/actions to verify CI passes. If the action fails, fix the issue immediately before continuing other work.
 - **BGA reference**: For uncertain implementations, consult `output/bga-agricola` (the upstream BGA Agricola reference, gitignored) unless `docs/ENGINE_ARCHITECTURE.md` specifies a different design.
 

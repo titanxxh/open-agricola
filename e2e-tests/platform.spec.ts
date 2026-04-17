@@ -2,7 +2,7 @@
  * Platform E2E tests — auth, lobby, workshop, sandbox.
  *
  * Requires the dev server to be running:
- *   npm run verify -- e2e-tests/platform.spec.ts
+ *   pnpm run verify -- e2e-tests/platform.spec.ts
  *
  * Tests use unique usernames per run to avoid conflicts.
  */

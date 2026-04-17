@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: npm run verify [-- playwright args]
+# Usage: pnpm run verify -- [playwright args]
 # Starts fresh servers, runs Playwright E2E tests, cleans up.
 set -e
 
@@ -27,12 +27,12 @@ sleep 1
 
 # Start backend (disable rate limiting for test runs)
 echo ">>> Starting backend on port $BACKEND_PORT..."
-DISABLE_RATE_LIMIT=1 npm run server > /dev/null 2>&1 &
+DISABLE_RATE_LIMIT=1 pnpm run server > /dev/null 2>&1 &
 BACKEND_PID=$!
 
 # Start frontend
 echo ">>> Starting frontend on port $FRONTEND_PORT..."
-npx vite > /dev/null 2>&1 &
+pnpm exec vite > /dev/null 2>&1 &
 FRONTEND_PID=$!
 
 # Health check: backend
@@ -67,7 +67,7 @@ done
 # Disable set -e so we can capture the exit code
 echo ">>> Running Playwright tests..."
 set +e
-npx playwright test "$@"
+pnpm exec playwright test "$@"
 TEST_EXIT=$?
 set -e
 

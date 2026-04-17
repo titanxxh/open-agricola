@@ -202,8 +202,8 @@ Playwright，`playwright.config.ts`（testDir `./e2e-tests`）。
 - 其他 E2E：`round-end-flow.spec.ts`、卡牌效果 E2E。
 
 ```bash
-npm test       # 单元测试
-npm run test:e2e  # E2E 测试
+pnpm test       # 单元测试
+pnpm run test:e2e  # E2E 测试
 ```
 
 ## 6. 已删除的遗留代码
@@ -227,4 +227,4 @@ npm run test:e2e  # E2E 测试
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCosts 折扣）均已实现。
 - 断线重连未实现（WS 断开后需刷新页面重连）。
 - BGA sprite 图片依赖 `../bga-agricola/img` 目录，缺失时降级为纯色/文字。
-- `npm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。
+- `pnpm run build` 存在测试文件的 TypeScript 严格模式报错，不影响 dev 模式。
