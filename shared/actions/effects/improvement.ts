@@ -350,6 +350,17 @@ const finalizeMinorImprovementPurchase = (
   player.playedCards = player.playedCards ?? []
   player.playedCards.push(`minor:${improvement.id}`)
 
+  // D25 multi-identity: providesOccupation → also count as an occupation.
+  if (improvement.providesOccupation) {
+    player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
+    if (!player.extraOccupationsFromCards.includes(improvement.id)) {
+      player.extraOccupationsFromCards.push(improvement.id)
+    }
+  }
+  // fireplaceIdentity: no existing "major gained" emitter/listener exists in the codebase; skipping (YAGNI).
+  // play-occupation listeners (e.g. E95_Miller) fire at action-hook level only; there is no
+  // standalone emitter to call here. D25's own onBuy hook fires via activateCard below.
+
   getCardModifiers(improvement.id).forEach((modifier) => {
     if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
       player.activeModifiers.push(modifier)
