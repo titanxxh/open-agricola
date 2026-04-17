@@ -114,6 +114,7 @@ export const C70_LettucePatch = new MinorImprovement({
   deck: 'C',
   number: 70,
   category: 'CROP_PROVIDER',
+  providesField: true,
   vp: 1,
   cost: {},
   prerequisite: '3 Occupations',
