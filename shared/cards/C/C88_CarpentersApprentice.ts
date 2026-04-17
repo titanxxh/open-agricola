@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { canStartFencing } from '../../actions/effects/fencing'
+import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
 import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
 
 const CARD_ID = 'C88_CarpentersApprentice'
@@ -41,7 +41,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.doable) return
-    const freeFences = Math.max(0, 15 - context.player.fences)
+    const freeFences = Math.max(0, 15 - getFenceCount(context.player))
     if (freeFences <= 0) return
     const previewPlayer = {
       ...context.player,
@@ -62,7 +62,7 @@ const fenceBeforeListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    const freeFences = Math.max(0, 15 - context.player.fences)
+    const freeFences = Math.max(0, 15 - getFenceCount(context.player))
     if (freeFences <= 0) return
     return {
       flow: {
