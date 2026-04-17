@@ -1,3 +1,5 @@
+import type { FenceSegment } from '../shared/game/types'
+
 export type FarmTilePosition = {
   row: number
   col: number
@@ -40,8 +42,7 @@ export type PlayerFarmState = {
   fields: FarmField[]
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
-  fenceSegments: string[]
-  fences: number
+  fenceSegments: FenceSegment[]
   pastures: Pasture[]
 }
 
@@ -54,12 +55,23 @@ export type FenceValidationError = {
     | 'FENCE_NOT_CONNECTED'
     | 'NO_ENCLOSED_AREA'
     | 'ENCLOSED_TILE_OCCUPIED'
+    | 'EDGE_TYPE_CONFLICT'
+    | 'PALISADES_REQUIRE_B30'
   edges: string[]
-  newEdges: string[]
+  palisadeEdges: string[]
+  newFenceEdges: string[]
+  newPalisadeEdges: string[]
 }
 
 export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
-  | { ok: true; player: T; newEdges: string[]; newPastures: Pasture[]; payableWoodCost: number }
+  | {
+      ok: true
+      player: T
+      newFenceEdges: string[]
+      newPalisadeEdges: string[]
+      newPastures: Pasture[]
+      payableWoodCost: number
+    }
   | { ok: false; error: FenceValidationError }
 
 type FenceValidationOptions = {
@@ -334,6 +346,7 @@ const enforceAnimalCapacity = (player: PlayerFarmState) => {
 export const validateFenceSelection = <T extends PlayerFarmState>(
   player: T,
   edges: string[],
+  palisadeEdges: string[] = [],
   extraWood = 0,
   freeFences = 0,
   options: FenceValidationOptions = {},
@@ -341,42 +354,73 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const extraCost = Number.isFinite(extraWood) ? Math.max(0, extraWood) : 0
   const freeFenceCount = Number.isFinite(freeFences) ? Math.max(0, freeFences) : 0
   const normalized = normalizePlayerFarm(player)
-  const parsedEdges = edges.map((edge) => parseEdgeId(edge))
+
+  const allInputEdges = [...edges, ...palisadeEdges]
+  const parsedEdges = allInputEdges.map((edge) => parseEdgeId(edge))
   if (parsedEdges.some((edge) => edge === null)) {
     return {
       ok: false,
-      error: { code: 'INVALID_EDGE', edges, newEdges: [] },
+      error: { code: 'INVALID_EDGE', edges, palisadeEdges, newFenceEdges: [], newPalisadeEdges: [] },
     }
   }
-  const existingEdges = new Set(normalized.fenceSegments ?? [])
-  const newEdges = edges.filter((edge) => !existingEdges.has(edge))
-  if (newEdges.length === 0) {
+
+  const fenceSet = new Set(edges)
+  const conflictEdge = palisadeEdges.find((e) => fenceSet.has(e))
+  if (conflictEdge) {
     return {
       ok: false,
-      error: { code: 'NO_NEW_FENCES', edges, newEdges },
+      error: { code: 'EDGE_TYPE_CONFLICT', edges, palisadeEdges, newFenceEdges: [], newPalisadeEdges: [] },
     }
   }
-  const payableFenceCount = Math.max(0, newEdges.length - freeFenceCount)
-  const payableWoodCost = payableFenceCount + extraCost
+
+  if (
+    palisadeEdges.length > 0 &&
+    !(normalized as unknown as { minorPlayed?: string[] }).minorPlayed?.includes('B30_WoodPalisades')
+  ) {
+    return {
+      ok: false,
+      error: { code: 'PALISADES_REQUIRE_B30', edges, palisadeEdges, newFenceEdges: [], newPalisadeEdges: [] },
+    }
+  }
+
+  const existingEdgeIds = new Set((normalized.fenceSegments ?? []).map((s) => s.edge))
+  const newFenceEdges = edges.filter((e) => !existingEdgeIds.has(e))
+  const newPalisadeEdges = palisadeEdges.filter((e) => !existingEdgeIds.has(e))
+
+  if (newFenceEdges.length === 0 && newPalisadeEdges.length === 0) {
+    return {
+      ok: false,
+      error: { code: 'NO_NEW_FENCES', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
+    }
+  }
+
+  const payableFenceCount = Math.max(0, newFenceEdges.length - freeFenceCount)
+  const payableWoodCost = payableFenceCount + 2 * newPalisadeEdges.length + extraCost
+
   if (!options.skipPayment && (normalized.resources?.wood ?? 0) < payableWoodCost) {
     return {
       ok: false,
-      error: { code: 'NOT_ENOUGH_WOOD', edges, newEdges },
+      error: { code: 'NOT_ENOUGH_WOOD', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
     }
   }
-  if (existingEdges.size + newEdges.length > MAX_FENCES) {
+
+  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) => s.type === 'fence').length
+  if (existingFenceCount + newFenceEdges.length > MAX_FENCES) {
     return {
       ok: false,
-      error: { code: 'MAX_FENCES_EXCEEDED', edges, newEdges },
+      error: { code: 'MAX_FENCES_EXCEEDED', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
     }
   }
+
+  const existingEdges = new Set(existingEdgeIds)
+  const allNewEdges = [...newFenceEdges, ...newPalisadeEdges]
   if (existingEdges.size > 0) {
     const existingVertices = new Set(
       Array.from(existingEdges).flatMap((edge) =>
         getEdgeVertices(edge).map(positionKey),
       ),
     )
-    const connects = newEdges.some((edge) =>
+    const connects = allNewEdges.some((edge) =>
       getEdgeVertices(edge).some((vertex) =>
         existingVertices.has(positionKey(vertex)),
       ),
@@ -384,65 +428,61 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     if (!connects) {
       return {
         ok: false,
-        error: { code: 'FENCE_NOT_CONNECTED', edges, newEdges },
+        error: { code: 'FENCE_NOT_CONNECTED', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
       }
     }
   }
-  const edgeSet = new Set([...existingEdges, ...newEdges])
+
+  const edgeSet = new Set([...existingEdges, ...allNewEdges])
   const regions = computeFencedRegions(edgeSet)
   const fencedRegions = regions.filter((region) => region.fenced)
   if (fencedRegions.length === 0) {
     return {
       ok: false,
-      error: { code: 'NO_ENCLOSED_AREA', edges, newEdges },
+      error: { code: 'NO_ENCLOSED_AREA', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
     }
   }
+
   const roomSet = new Set(normalized.roomTiles.map(positionKey))
   const fieldSet = new Set(
-    normalized.fields.map((field) =>
-      positionKey({ row: field.row, col: field.col }),
-    ),
+    normalized.fields.map((field) => positionKey({ row: field.row, col: field.col })),
   )
   const occupiedRegion = fencedRegions.find((region) =>
     region.tiles.some(
-      (tile) =>
-        roomSet.has(positionKey(tile)) || fieldSet.has(positionKey(tile)),
+      (tile) => roomSet.has(positionKey(tile)) || fieldSet.has(positionKey(tile)),
     ),
   )
   if (occupiedRegion) {
     return {
       ok: false,
-      error: { code: 'ENCLOSED_TILE_OCCUPIED', edges, newEdges },
+      error: { code: 'ENCLOSED_TILE_OCCUPIED', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
     }
   }
-  const stableSet = new Set(
-    normalized.stableTiles.map((tile) => positionKey(tile)),
-  )
+
+  const stableSet = new Set(normalized.stableTiles.map(positionKey))
   const previousPastureKeys = new Set(
     normalized.pastures.map((pasture) =>
-      pasture.tiles
-        .map(positionKey)
-        .sort()
-        .join('|'),
+      pasture.tiles.map(positionKey).sort().join('|'),
     ),
   )
   const pastures: Pasture[] = fencedRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
     size: region.tiles.length,
     tiles: region.tiles,
-    stables: region.tiles.filter((tile) =>
-      stableSet.has(positionKey(tile)),
-    ).length,
+    stables: region.tiles.filter((tile) => stableSet.has(positionKey(tile))).length,
     animalType: null,
     animalCount: 0,
   }))
   const newPastures = pastures.filter((pasture) => {
-    const pastureKey = pasture.tiles
-      .map(positionKey)
-      .sort()
-      .join('|')
+    const pastureKey = pasture.tiles.map(positionKey).sort().join('|')
     return !previousPastureKeys.has(pastureKey)
   })
+
+  const newSegments: FenceSegment[] = [
+    ...newFenceEdges.map((edge) => ({ edge, type: 'fence' as const })),
+    ...newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' as const })),
+  ]
+
   const updated: PlayerFarmState = {
     ...normalized,
     resources: {
@@ -451,10 +491,16 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
         ? (normalized.resources?.wood ?? 0)
         : (normalized.resources?.wood ?? 0) - payableWoodCost,
     },
-    fenceSegments: Array.from(edgeSet),
-    fences: edgeSet.size,
+    fenceSegments: [...(normalized.fenceSegments ?? []), ...newSegments],
     pastures,
   }
   enforceAnimalCapacity(updated)
-  return { ok: true, player: updated as T, newEdges, newPastures, payableWoodCost }
+  return {
+    ok: true,
+    player: updated as T,
+    newFenceEdges,
+    newPalisadeEdges,
+    newPastures,
+    payableWoodCost,
+  }
 }

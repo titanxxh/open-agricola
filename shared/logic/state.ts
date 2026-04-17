@@ -242,7 +242,6 @@ export const normalizeState = (raw: GameState): GameState => {
       color:
         player.color ?? defaultPlayerColors[index % defaultPlayerColors.length],
       houseType: player.houseType ?? 'wood',
-      fences: player.fences ?? 0,
       improvements: improvements.length > 0 ? improvements : [],
       minorHand:
         minorHand.length > 0
@@ -450,7 +449,6 @@ export const createInitialPlayers = (
     rooms: 2,
     houseType: 'wood',
     fields: [],
-    fences: 0,
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],

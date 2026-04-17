@@ -794,7 +794,7 @@ export const GameContainerApi = () => {
     return map
   }, [displayPlayer?.fields])
   const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])
-  const existingFenceSet = useMemo(() => new Set(displayPlayer?.fenceSegments ?? []), [displayPlayer?.fenceSegments])
+  const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
 
   const farmInteraction =

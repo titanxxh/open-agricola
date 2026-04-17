@@ -94,7 +94,7 @@ const getPastureTileKeys = (player: PlayerState) => {
     (pasture) => !pasture.tiles || pasture.tiles.length === 0,
   )
   if (needsFallback && player.fenceSegments.length > 0) {
-    const edgeSet = new Set(player.fenceSegments)
+    const edgeSet = new Set(player.fenceSegments.map((s) => s.edge))
     computeFencedRegions(edgeSet)
       .filter((region) => region.fenced)
       .forEach((region) => {

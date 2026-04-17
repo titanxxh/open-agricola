@@ -24,6 +24,7 @@ import { CARD_ID as SCOPE_OPPONENT_ID } from '../Stub_Scope_Opponent'
 import { CARD_A as ORDER_LOW_ID, CARD_B as ORDER_HIGH_ID } from '../Stub_Order_Priority'
 import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
+import { getFenceCount } from '../../../actions/effects/fencing'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const markCardObservedAction = internalActionDefinitions.find(a => a.id === 'mark-card-observed')!
@@ -55,7 +56,6 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     rooms: 2,
     houseType: 'wood',
     fields: [],
-    fences: 0,
     roomTiles: [],
     stableTiles: [],
     improvements: [],
@@ -600,7 +600,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
       execute: (ctx) => {
         const woodCost = 1 + (ctx.costs?.wood ?? 0)
         ctx.player.resources.wood -= Math.max(0, woodCost)
-        ctx.player.fences += 1
+        ctx.player.fenceSegments.push({ edge: `__hookcov_${ctx.player.fenceSegments.length}`, type: 'fence' })
         return { type: 'ok' }
       },
     }
@@ -620,7 +620,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
 
     expect(player.cardStates[STORAGE_ID]?.counters?.fences).toBe(4)
     expect(player.cardStates[STORAGE_ID]?.counters?.observedCount).toBe(1)
-    expect(player.fences).toBe(1)
+    expect(getFenceCount(player)).toBe(1)
     // Cost was 1 wood, but discount of -1 makes effective cost 0
     expect(player.resources.wood).toBe(10)
   })
@@ -641,7 +641,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
       execute: (ctx) => {
         const woodCost = 1 + (ctx.costs?.wood ?? 0)
         ctx.player.resources.wood -= Math.max(0, woodCost)
-        ctx.player.fences += 1
+        ctx.player.fenceSegments.push({ edge: `__hookcov_${ctx.player.fenceSegments.length}`, type: 'fence' })
         return { type: 'ok' }
       },
     }

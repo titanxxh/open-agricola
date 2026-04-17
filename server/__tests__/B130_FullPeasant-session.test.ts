@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B130_FullPeasant'
@@ -116,7 +117,7 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: true, food: 3, fencingOccupied: false, grainOccupied: false })
     // Make sure round allows fencing and grain-utilization
     const state = session.getState().state
-    state.players[0]!.fences = 5
+    setFencesForTest(state.players[0]!, 5)
     state.players[0]!.resources.wood = 10
     session.loadState(state)
 
