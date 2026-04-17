@@ -1,6 +1,8 @@
 import type { GameState, PlayerState } from '../../game/types'
 import type { CardDefinition } from '../types'
 import { getMajorCardEffect } from '../major'
+import { getRegisteredMinorImprovement } from '../types'
+import { collectCardsAs } from './card-type'
 import { checkCustomPrerequisite } from './prerequisite-registry'
 
 type CardPrerequisiteSource = Pick<
@@ -13,15 +15,26 @@ const countOccupations = (player: PlayerState) => player.occupationPlayed.length
 const countAllImprovements = (player: PlayerState) =>
   player.improvements.length + player.minorPlayed.length
 
-const countMajorImprovements = (player: PlayerState) => player.improvements.length
+const countMajorImprovements = (player: PlayerState) =>
+  collectCardsAs(player, 'major').length
 
 const countFields = (player: PlayerState) => player.fields.length
 
+const cardHasBaking = (cardId: string) =>
+  getMajorCardEffect(cardId)?.isBaking
+  ?? getRegisteredMinorImprovement(cardId)?.isBaking
+  ?? false
+
+const cardHasCookery = (cardId: string) =>
+  getMajorCardEffect(cardId)?.isCookery
+  ?? getRegisteredMinorImprovement(cardId)?.isCookery
+  ?? false
+
 const countBakingImprovements = (player: PlayerState) =>
-  player.improvements.filter((id) => getMajorCardEffect(id)?.isBaking).length
+  collectCardsAs(player, 'major').filter(cardHasBaking).length
 
 const countCookingImprovements = (player: PlayerState) =>
-  player.improvements.filter((id) => getMajorCardEffect(id)?.isCookery).length
+  collectCardsAs(player, 'major').filter(cardHasCookery).length
 
 const meetsNumericPrerequisite = (
   count: number,
