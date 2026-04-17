@@ -299,8 +299,6 @@ export const en = {
     fenceModeToggle: 'Fence placement mode',
     fenceModeFence: 'Fence (1 wood)',
     fenceModePalisade: 'Palisade (2 wood, +1 VP)',
-    fenceEdgeTypeConflict: 'Cannot select fence and palisade on the same segment',
-    palisadesRequireB30: 'Wood Palisades card not played',
     interactionFarmRedevelopmentChoice: 'Renovate and optionally build fences',
     interactionRenovateBuildFences: 'Renovate and build {count} fence(s)',
     houseWood: 'Wooden House',
@@ -982,5 +980,11 @@ export const en = {
     E91_PlowBuilder: { anytime: 'Plow Builder: Pay 1 Food → Plow (harvest + Joinery)' },
     D129_LumberVirtuoso: { anytime: 'Lumber Virtuoso: Discard wood to 5 → Build Stables/Rooms' },
     E85_MasterTanner: { anytime: 'Master Tanner: Place food on card from cooked pig/cattle' },
+  },
+  fence: {
+    error: {
+      EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
+      PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
+    },
   },
 }

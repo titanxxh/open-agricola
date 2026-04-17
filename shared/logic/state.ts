@@ -8,9 +8,25 @@ import {
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
-import type { ActionSpace, GameState, PlayerState, Resource } from '../game/types'
+import type { ActionSpace, FenceSegment, GameState, PlayerState, Resource } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
+
+export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
+  if (!Array.isArray(input)) return []
+  return input
+    .map((entry): FenceSegment | null => {
+      if (typeof entry === 'string') return { edge: entry, type: 'fence' }
+      if (entry && typeof entry === 'object' && 'edge' in entry) {
+        const e = entry as { edge: unknown; type?: unknown }
+        if (typeof e.edge === 'string') {
+          return { edge: e.edge, type: e.type === 'palisade' ? 'palisade' : 'fence' }
+        }
+      }
+      return null
+    })
+    .filter((s): s is FenceSegment => s !== null)
+}
 
 export const emptyResources: Resource = {
   wood: 0,
@@ -274,7 +290,7 @@ export const normalizeState = (raw: GameState): GameState => {
           ],
       stableAnimals: player.stableAnimals ?? {},
       pastures: player.pastures ?? [],
-      fenceSegments: player.fenceSegments ?? [],
+      fenceSegments: normalizeFenceSegments(player.fenceSegments),
       roomTiles:
         player.roomTiles && player.roomTiles.length > 0
           ? [...player.roomTiles]
