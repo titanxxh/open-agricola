@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
+import { getFenceCount } from '../../actions/effects/fencing'
 
 const CARD_ID = 'A22_Telegram'
 
@@ -25,7 +26,7 @@ const CARD_ID = 'A22_Telegram'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    const fencesInSupply = player.fences
+    const fencesInSupply = getFenceCount(player)
     const targetRound = state.round + fencesInSupply
     if (targetRound <= 14) {
       writeCardExtraData(player, CARD_ID, 'triggerRound', targetRound)
