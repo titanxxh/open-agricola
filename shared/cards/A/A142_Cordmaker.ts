@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf } from '../helpers/pay-gain-node'
+import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A142_Cordmaker'
 
@@ -34,7 +34,7 @@ const listener: CardListenerRegistration = {
         optional: !isOwner,
         children: [
           gainLeaf(CARD_ID, { grain: 1 }),
-          gainLeaf(CARD_ID, { vegetable: 1 }),
+          payGainFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { vegetable: 1 } }),
         ],
       },
       sourceCard: CARD_ID,
