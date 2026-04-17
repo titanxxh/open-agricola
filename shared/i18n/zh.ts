@@ -286,8 +286,6 @@ export const zh = {
     fenceModeToggle: '围栏放置模式',
     fenceModeFence: '围栏（1 木）',
     fenceModePalisade: '木桩（2 木，+1 VP）',
-    fenceEdgeTypeConflict: '同一段不能同时选为围栏和木桩',
-    palisadesRequireB30: '尚未打出 Wood Palisades',
     interactionFarmRedevelopmentChoice: '改建并可追加围栏',
     interactionRenovateBuildFences: '改建并建造 {count} 段围栏',
     houseWood: '木屋',
@@ -941,5 +939,11 @@ export const zh = {
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
     B83_MuddyPuddles: { anytime: '泥塘：付1黏土 → 取顶部商品' },
     B154_SheepKeeper: { anytime: '牧羊人：7+羊 → 3 分 + 2 食物' },
+  },
+  fence: {
+    error: {
+      EDGE_TYPE_CONFLICT: '同一段不能同时选为围栏和木桩',
+      PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
+    },
   },
 }
