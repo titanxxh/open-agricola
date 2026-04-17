@@ -267,28 +267,7 @@ describe('E144_WaresSalesman', () => {
     expect(listener!.actions).toContain('improvement-any')
   })
 
-  it('triggers when a player plays a cookery major (Fireplace -> clay + reed)', () => {
-    const listener = findListener('E144-wares-salesman-after-improvement')!
-    const p1 = createPlayer('p1', 'P1')
-    p1.occupationPlayed = ['E144_WaresSalesman']
-    const p2 = createPlayer('p2', 'P2')
-    const state = createState(p1, p2)
-
-    const result = executeCardListener(listener, {
-      state, player: p2, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'after',
-      choice: 'Major_Fireplace1',
-      ownerPlayer: p1,
-    } as any)
-
-    expect(result).toBeDefined()
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.actionId).toBe('gain')
-      expect(result!.flow.params).toEqual({ clay: 1, reed: 1 })
-    }
-  })
-
-  it('does not trigger for non-cookery improvement', () => {
+  it('triggers when a player plays Joinery (wood → food at harvest) → gains wood + reed', () => {
     const listener = findListener('E144-wares-salesman-after-improvement')!
     const p1 = createPlayer('p1', 'P1')
     p1.occupationPlayed = ['E144_WaresSalesman']
@@ -299,6 +278,27 @@ describe('E144_WaresSalesman', () => {
       state, player: p2, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'after',
       choice: 'Major_Joinery',
+      ownerPlayer: p1,
+    } as any)
+
+    expect(result).toBeDefined()
+    if (result!.flow?.type === 'leaf') {
+      expect(result!.flow.actionId).toBe('gain')
+      expect(result!.flow.params).toEqual({ wood: 1, reed: 1 })
+    }
+  })
+
+  it('does not trigger for Fireplace (converts animals, not building resources)', () => {
+    const listener = findListener('E144-wares-salesman-after-improvement')!
+    const p1 = createPlayer('p1', 'P1')
+    p1.occupationPlayed = ['E144_WaresSalesman']
+    const p2 = createPlayer('p2', 'P2')
+    const state = createState(p1, p2)
+
+    const result = executeCardListener(listener, {
+      state, player: p2, space: createSpace('improvement-any'),
+      actionId: 'improvement-any', phase: 'after',
+      choice: 'Major_Fireplace1',
       ownerPlayer: p1,
     } as any)
 
