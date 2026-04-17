@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../../game/types'
 import { meetsCardPrerequisites } from '../prerequisites'
 import { MinorImprovement } from '../../types'
+import { C70_LettucePatch } from '../../C/C70_LettucePatch'
 
 // Register a throwaway field-providing minor for this test file only
 new MinorImprovement({
@@ -97,5 +98,19 @@ describe('prerequisites: extraOccupationsFromCards counts toward occupations', (
     })
     const card = { occupationPrerequisites: { max: 0 } }
     expect(meetsCardPrerequisites(player, card)).toBe(false)
+  })
+})
+
+describe('C70 Lettuce Patch as providesField', () => {
+  it('C70 counts as a field for "2 Fields" prerequisite', () => {
+    // Ensure card is registered
+    expect(C70_LettucePatch.providesField).toBe(true)
+
+    const player = makePlayer({
+      fields: [{ row: 1, col: 1, crop: null } as unknown as PlayerState['fields'][0]],
+      minorPlayed: ['C70_LettucePatch'],
+    })
+    const card = { prerequisite: '2 Fields' }
+    expect(meetsCardPrerequisites(player, card)).toBe(true)
   })
 })
