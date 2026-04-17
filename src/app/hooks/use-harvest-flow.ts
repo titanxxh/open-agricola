@@ -24,6 +24,7 @@ export type HarvestFeedOption = {
   resourceKey: keyof Resource
   food: number
   max?: number
+  sourceId?: string
 }
 
 export type HarvestContext = {
@@ -257,6 +258,7 @@ export const buildHarvestFeedOptions = (
         resourceKey: fromKey,
         food: foodOut,
         max: ex.max,
+        sourceId: cardId,
       })
     }
   }
@@ -278,6 +280,7 @@ export const buildHarvestFeedOptions = (
         resourceKey: fromKey,
         food: foodOut,
         max: ex.max,
+        sourceId: cardId,
       })
     }
   }

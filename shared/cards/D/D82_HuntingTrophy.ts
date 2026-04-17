@@ -2,73 +2,79 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CostModifier } from '../../game/types'
 
 const CARD_ID = 'D82_HuntingTrophy'
-
-const HOUSE_REDEV = 'house-redevelopment'
 const FARM_REDEV = 'farm-redevelopment'
 
-const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
-
 /**
- * D82 Hunting Trophy (MinorImprovement, D, 82)
+ * D82 Hunting Trophy (MinorImprovement)
  *
  * BGA behavior:
- *   - Cost: 1 boar to play (simplification: pay boar — BGA "return or cook" treated
- *     as pay).
- *   - Effect 1: When you build an improvement on the House Redevelopment action
- *     space, the cost is reduced by 1 building resource of the player's choice.
- *     Here: heuristic picks the most-expensive (largest count) building resource
- *     in the current cost map.
- *   - Effect 2: When you build fences on the Farm Redevelopment action space,
- *     the wood cost is reduced by 3 total.
- *   - VP: 1
- *   - Category: BUILDING_RESOURCE_PROVIDER
+ *   1. Improvements built on HouseRedevelopment cost 1 building resource of
+ *      player's choice less.
+ *   2. Fences built on FarmRedevelopment cost 3 wood less total.
  *
- * Detection: The engine keeps `context.space` set to the OUTER action space
- * (house-redevelopment / farm-redevelopment) throughout the nested flow. Thus
- * filtering `context.space?.id === 'house-redevelopment'` inside the
- * computeCosts listener for the inner `improvement-any` / `fence` actions
- * correctly scopes the discount to those spaces only.
+ * Implementation status:
+ *   - Effect 2 (fence discount on farm-redevelopment): implemented via a
+ *     before/after listener pair that temporarily adds a BonusModifier to
+ *     player.activeModifiers while the farm-redevelopment action is executing.
+ *     The fencing cost path (payTypedFlatCost with costType='fencing') applies
+ *     activeModifiers, so this works end-to-end.
+ *   - Effect 1 (improvement discount on house-redevelopment): NOT wired.
+ *     TODO: BGA's -1 building resource discount for improvements on
+ *     HouseRedevelopment requires engine changes to route activeModifiers
+ *     through improvement cost resolution (getMajorImprovementPreviewCost /
+ *     getMinorImprovementPreviewCost currently do not consult activeModifiers).
+ *     Currently not wired; tracked as a follow-up.
  */
 
-const improvementCostListener: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-compute-costs-improvement',
+const isFarmRedev = (context: CardListenerContext): boolean =>
+  context.space?.id === FARM_REDEV
+
+const beforeFarmRedev: CardListenerRegistration = {
+  id: 'D82-hunting-trophy-before-farm-redevelopment',
   cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  phases: ['before' as ActionHookPhase],
+  actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    if (context.space?.id !== HOUSE_REDEV) return
-    const costs = (context.costs ?? {}) as Record<string, number>
-    let maxRes: string | null = null
-    let maxVal = 0
-    for (const res of BUILDING_RESOURCES) {
-      const val = costs[res] ?? 0
-      if (val > maxVal) {
-        maxVal = val
-        maxRes = res
-      }
+    if (!isFarmRedev(context)) return
+    const mod: CostModifier = {
+      type: 'bonus',
+      cardId: CARD_ID,
+      appliesTo: ['fencing'],
+      discount: { wood: 3 },
+      optional: false,
     }
-    if (!maxRes) return
-    return { costs: { [maxRes]: -1 } }
+    if (!context.player.activeModifiers) {
+      ;(context.player as unknown as { activeModifiers: CostModifier[] }).activeModifiers = []
+    }
+    // Avoid duplicate registration on re-entry
+    const existing = context.player.activeModifiers!.some(
+      (m) => m.cardId === CARD_ID,
+    )
+    if (!existing) context.player.activeModifiers!.push(mod)
   },
 }
 
-const fencingCostListener: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-compute-costs-fencing',
+const afterFarmRedev: CardListenerRegistration = {
+  id: 'D82-hunting-trophy-after-farm-redevelopment',
   cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['fencing', 'fence'],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    if (context.space?.id !== FARM_REDEV) return
-    return { costs: { wood: -3 } }
+    if (!isFarmRedev(context)) return
+    if (!context.player.activeModifiers) return
+    context.player.activeModifiers = context.player.activeModifiers.filter(
+      (m) => m.cardId !== CARD_ID,
+    )
   },
 }
 
-registerCardListener(improvementCostListener)
-registerCardListener(fencingCostListener)
+registerCardListener(beforeFarmRedev)
+registerCardListener(afterFarmRedev)
 
 export const D82_HuntingTrophy = new MinorImprovement({
   id: CARD_ID,

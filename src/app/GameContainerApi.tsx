@@ -752,6 +752,7 @@ export const GameContainerApi = () => {
           count: harvestFeedCounts[option.id] ?? 0,
           food: option.food,
           sourceName: option.sourceName,
+          sourceId: option.sourceId,
         }))
         .filter((entry) => entry.count > 0),
     [harvestFeedCounts, harvestFeedOptions],
