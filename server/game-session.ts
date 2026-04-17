@@ -72,7 +72,7 @@ import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
-import { getRegisteredMinorImprovement } from '../shared/cards/types.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../shared/cards/types.ts'
 import {
   normalizePlayerFarm,
 } from './fence-validation.ts'
@@ -1922,7 +1922,7 @@ export class GameSession {
     return this.respond()
   }
 
-  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string }[]): SessionResponse {
+  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string }[]): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
     }
@@ -1930,9 +1930,39 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
+    // Enforce per-card exchange `max` for harvest-trigger exchanges.
+    // Aggregate counts per sourceId to cap against the declared max (e.g. C59
+    // SchnappsDistillery allows converting at most 1 vegetable per harvest).
+    const perSourceUsed = new Map<string, number>()
+    const cappedSelections = selections.map((sel) => {
+      if (!sel.sourceId || sel.count <= 0) return sel
+      const card =
+        player.minorPlayed.includes(sel.sourceId)
+          ? getRegisteredMinorImprovement(sel.sourceId)
+          : player.occupationPlayed.includes(sel.sourceId)
+            ? getRegisteredOccupation(sel.sourceId)
+            : undefined
+      if (!card?.exchanges) return sel
+      const exchange = card.exchanges.find((ex) => {
+        if (ex.trigger !== 'harvest') return false
+        const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+        if (fromKeys.length !== 1) return false
+        const fromKey = fromKeys[0]!
+        if (fromKey !== sel.resourceKey) return false
+        const foodOut = (ex.to as Partial<Resource>).food ?? 0
+        return foodOut === sel.food
+      })
+      if (!exchange || exchange.max === undefined) return sel
+      const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
+      const remaining = Math.max(0, exchange.max - usedSoFar)
+      const capped = Math.min(sel.count, remaining)
+      perSourceUsed.set(sel.sourceId, usedSoFar + capped)
+      return { ...sel, count: capped }
+    })
+
     let totalFood = 0
     const usedResources: Partial<Resource> = { food: this.pending.foodUsed }
-    for (const sel of selections) {
+    for (const sel of cappedSelections) {
       if (sel.count <= 0) continue
       const available = player.resources[sel.resourceKey]
       const used = Math.min(sel.count, available)
