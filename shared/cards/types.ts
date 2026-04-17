@@ -4,7 +4,7 @@ export type CardExchange = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
-  trigger?: 'bake-bread' | 'anytime'
+  trigger?: 'bake-bread' | 'anytime' | 'harvest'
 }
 
 export type CardPrerequisites = {
