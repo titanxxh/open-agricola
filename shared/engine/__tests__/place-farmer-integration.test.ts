@@ -7,8 +7,7 @@ import { clearCardListeners, registerCardListener, executeCardListener } from '.
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
-import { markAllWorkersUsed } from '../../game/player'
-import { setWorkersAtHome } from '../../game/player'
+import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../game/player'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -167,8 +166,8 @@ describe('PlaceFarmer card integration', () => {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
         handler: (context: any) => {
-          const { player, space } = context
-          if (player.workersAvailable > 0) return
+          const { state, player, space } = context
+          if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
           if (!hasAccumulation) return
           return { followUpActions: ['bake-bread'] }
@@ -193,8 +192,8 @@ describe('PlaceFarmer card integration', () => {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
         handler: (context: any) => {
-          const { player, space } = context
-          if (player.workersAvailable > 0) return
+          const { state, player, space } = context
+          if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
           if (!hasAccumulation) return
           return { followUpActions: ['bake-bread'] }

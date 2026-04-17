@@ -74,14 +74,14 @@ describe('D24_BrotherlyLove session', () => {
   })
 
   it('does not activate when familySize != 4', () => {
-    const state = setup({ withCard: true, workersAvailable: 1 }).getState()
+    const state = setup({ withCard: true, familySize: 3, workersAvailable: 1 }).getState()
     expect(state.ok).toBe(true)
     // With familySize 3, the card should not activate
     expect(state.actionAvailability?.forest).toBe(false)
   })
 
   it('does not activate when workersAvailable != 1', () => {
-    const state = setup({ withCard: true, workersAvailable: 2 }).getState()
+    const state = setup({ withCard: true, familySize: 5, workersAvailable: 2 }).getState()
     expect(state.ok).toBe(true)
     // With 2 workers, not all 3 others are placed yet, so card doesn't activate
     expect(state.actionAvailability?.forest).toBe(false)

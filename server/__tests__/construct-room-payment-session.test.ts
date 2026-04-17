@@ -114,7 +114,7 @@ describe('construct room payment session', () => {
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
 
-    const workersAfterTake = resp.state.players[0]!.workersAvailable
+    const workersAfterTake = workersAvailable(resp.state, resp.state.players[0]!)
     const undoStepResp = session.undoStep()
     expect(undoStepResp.ok).toBe(true)
     expect(undoStepResp.pending.type).toBe('choice')

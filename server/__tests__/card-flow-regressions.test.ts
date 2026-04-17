@@ -110,13 +110,13 @@ describe('card flow regressions', () => {
     player.occupationPlayed.push('D150_GodlySpouse')
     player.playedCards.push(playedKey('D150_GodlySpouse', 'occupation'))
     player.rooms = 3
-    setWorkersAtHome(state, player, 1)
     const forest = state.actionSpaces.find((space) => space.id === 'forest')
     const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
     if (!forest || !wishChildren) {
       throw new Error('required action spaces missing')
     }
-    forest.takenBy = player.id
+    // Place worker '1' on forest; remaining active worker is at home.
+    forest.takenBy = [{ playerId: player.id, workerId: '1' }]
     recordRoundPlacement(player, 'forest', '1')
 
     session.loadState(state)

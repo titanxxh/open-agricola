@@ -110,12 +110,14 @@ describe('B48_ForestStone session', () => {
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(1)
+    if (resp.pending.type === 'confirmNextPlayer') {
+      resp = session.confirmNextPlayer()
+      expect(resp.ok).toBe(true)
+    }
 
-    // Switch to player 1 taking a turn, then back to player 0
+    // Reset currentPlayerIndex so player 0 can act again in the same round
     const state2 = session.getState().state
     state2.currentPlayerIndex = 0
-    const p0 = state2.players[0]!
-    setWorkersAtHome(state2, p0, 1) // Put stone on quarry
     const quarry = state2.actionSpaces.find((s) => s.id === 'eastern-quarry')
     if (quarry) {
       quarry.resources.stone = 3

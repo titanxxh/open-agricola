@@ -21,6 +21,13 @@ const createPlayer = (): PlayerState => ({
   name: 'P1',
   color: 'red',
   resources: emptyResources(),
+  workers: [
+    { id: '1', isActive: true, isNewborn: false },
+    { id: '2', isActive: true, isNewborn: false },
+    { id: '3', isActive: false, isNewborn: false },
+    { id: '4', isActive: false, isNewborn: false },
+    { id: '5', isActive: false, isNewborn: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [{ row: 1, col: 1, crop: 'grain', remaining: 1 }],
