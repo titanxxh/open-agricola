@@ -253,6 +253,15 @@ export const normalizeState = (raw: GameState): GameState => {
             ],
       houseAnimalType: player.houseAnimalType ?? null,
       houseAnimalCount: player.houseAnimalCount ?? 0,
+      workers: player.workers && player.workers.length > 0
+        ? player.workers
+        : [
+            { id: '1', isActive: true,  isNewborn: false },
+            { id: '2', isActive: true,  isNewborn: false },
+            { id: '3', isActive: false, isNewborn: false },
+            { id: '4', isActive: false, isNewborn: false },
+            { id: '5', isActive: false, isNewborn: false },
+          ],
       stableAnimals: player.stableAnimals ?? {},
       newbornCount: player.newbornCount ?? 0,
       pastures: player.pastures ?? [],
@@ -426,6 +435,13 @@ export const createInitialPlayers = (
     name: playerNames[index] ?? info.name,
     color: info.color,
     resources: { ...emptyResources, food: 2 },
+    workers: [
+      { id: '1', isActive: true,  isNewborn: false },
+      { id: '2', isActive: true,  isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
     familySize: 2,
     workersAvailable: 2,
     rooms: 2,

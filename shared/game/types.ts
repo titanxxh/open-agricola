@@ -76,11 +76,23 @@ export type Field = {
   col: number
 }
 
+export type Worker = {
+  id: string
+  isActive: boolean
+  isNewborn: boolean
+}
+
+export type WorkerRef = {
+  playerId: string
+  workerId: string
+}
+
 export type PlayerState = {
   id: string
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black'
   resources: Resource
+  workers: Worker[]
   familySize: number
   workersAvailable: number
   rooms: number
