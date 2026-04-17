@@ -22,10 +22,16 @@ const CARD_ID = 'A87_Conservator'
  *  - isDoable listener on `renovate-house`: rescues entry visibility for
  *    wooden owners who can only afford the stone path (and would otherwise
  *    be hidden by the default cost preview that checks the clay path).
- *  - Reusing `renovate-house` as the alternative actionId means every
- *    existing renovate-house cost-discount hook (D154 ChimneySweep,
- *    B33 Mantlepiece, A143 Stonecutter, A123 FrameBuilder, etc.) keeps
- *    firing on the Conservator branch.
+ *  - Renovation discounts keep firing on the Conservator branch via two
+ *    independent mechanisms, so no per-discount wiring is needed:
+ *      - Cost-type modifiers tagged `appliesTo: ['renovation']` (A143
+ *        Stonecutter, A123 FrameBuilder) fire from `payTypedFlatCost`
+ *        regardless of which branch the player picks.
+ *      - actionId-keyed `computeCosts` listeners on `renovate-house`
+ *        (D154 ChimneySweep) would also fire on this branch, but D154
+ *        currently has its own `houseType === 'clay'` guard (tracked as
+ *        a §2.3 bug in `docs/card_progress.md`) that blocks it from
+ *        applying to wood→stone until that guard is removed.
  */
 
 const computeReplaceListener: CardListenerRegistration = {
