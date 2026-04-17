@@ -29,6 +29,7 @@ export const D60_LargePottery = new MinorImprovement({
     '3/5/6/7<CLAY> <ARROW-1X> 1/2/3/4<SCORE>',
   ],
   cost: { clay: 2 },
+  vp: 3,
   exchanges: [
     { from: { clay: 1 }, to: { food: 2 }, trigger: 'anytime' },
   ],
