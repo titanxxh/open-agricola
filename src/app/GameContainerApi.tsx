@@ -247,7 +247,8 @@ export const GameContainerApi = () => {
   }, [state?.currentPlayerIndex, viewPlayerId])
 
   const {
-    pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
+    pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges, setPendingPalisadeEdges,
+    fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
     pendingPlowTile, setPendingPlowTile, plowError, setPlowError,
@@ -382,6 +383,7 @@ export const GameContainerApi = () => {
       if (interaction.farm.farmType === 'fence') {
         void transport.commitFarm(pendingPlayerIndex, 'fence', {
           edges: pendingFenceEdges,
+          palisadeEdges: pendingPalisadeEdges,
           extraWood: interaction.farm.extraWood ?? 0,
         }).catch((e) => console.error(e))
         return
@@ -439,7 +441,7 @@ export const GameContainerApi = () => {
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingFieldSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingFieldSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
