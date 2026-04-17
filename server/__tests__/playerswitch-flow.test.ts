@@ -30,7 +30,7 @@ describe('ActionFlow playerSwitch', () => {
       nameKey: 'test',
       type: 'round',
       roundAvailable: 1,
-      takenBy: null,
+      takenBy: [],
       accumulated: {},
     })
     session.loadState(state)

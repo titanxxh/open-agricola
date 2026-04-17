@@ -31,7 +31,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { ...emptyResources },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 

@@ -36,7 +36,7 @@ describe('E3_TeaTime session', () => {
 
     const after = session.getState().state
     const space = after.actionSpaces.find((s) => s.id === 'grain-utilization')!
-    expect(space.takenBy).toBeNull()
+    expect(space.takenBy).toEqual([])
     expect(after.players[0]!.workersAvailable).toBe(workersBefore + 1)
     expect(after.players[0]!.minorPlayed).toContain(CARD_ID)
   })
@@ -57,7 +57,7 @@ describe('E3_TeaTime session', () => {
     const after = session.getState().state
     const space = after.actionSpaces.find((s) => s.id === 'grain-utilization')!
     // Opponent's worker should remain
-    expect(space.takenBy).toBe(state.players[1]!.id)
+    expect(space.takenBy.some((t) => t.playerId === state.players[1]!.id)).toBe(true)
     // No extra worker returned to owner
     expect(after.players[0]!.workersAvailable).toBe(workersBefore)
   })

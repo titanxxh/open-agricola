@@ -80,7 +80,7 @@ describe('C129_SecondSpouse session', () => {
     const urgentSpace = resp.state.actionSpaces.find(
       (space) => space.id === 'urgent-wish-children',
     )
-    expect(urgentSpace?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(urgentSpace?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
   it('does not allow if occupied by own farmer', () => {

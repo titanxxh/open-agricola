@@ -86,7 +86,7 @@ describe('B76_Ceilings session', () => {
     const houseRedevSpace = state.actionSpaces.find((s) => s.id === 'house-redevelopment')
     if (houseRedevSpace) {
       houseRedevSpace.roundAvailable = 1
-      houseRedevSpace.takenBy = null
+      houseRedevSpace.takenBy = []
     }
     session.loadState(state)
 
@@ -115,7 +115,7 @@ describe('B76_Ceilings session', () => {
     const houseRedevSpace = state.actionSpaces.find((s) => s.id === 'house-redevelopment')
     if (houseRedevSpace) {
       houseRedevSpace.roundAvailable = 1
-      houseRedevSpace.takenBy = null
+      houseRedevSpace.takenBy = []
     }
     session.loadState(state)
 

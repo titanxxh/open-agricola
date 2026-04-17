@@ -92,7 +92,7 @@ const gameState = (): GameState => ({
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: resources(),
-      takenBy: null,
+      takenBy: [],
     },
   ],
   log: [],

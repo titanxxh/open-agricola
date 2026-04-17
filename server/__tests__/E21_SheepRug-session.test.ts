@@ -60,7 +60,7 @@ describe('E21_SheepRug session', () => {
     expect(resp.state.players[0]!.familySize).toBe(3)
     expect(resp.state.players[0]!.newbornCount).toBe(1)
     expect(resp.state.players[0]!.workersAvailable).toBe(1)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
 
     if (resp.pending.type !== 'choice') return
     const skipOption = resp.pending.options.find((option) => option.value === '__skip__')

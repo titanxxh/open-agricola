@@ -156,7 +156,7 @@ describe('E148_Lazybones session', () => {
     state.round += 1
     // Reset action spaces
     for (const space of state.actionSpaces) {
-      space.takenBy = null
+      space.takenBy = []
     }
     state.currentPlayerIndex = 1
     state.players[1]!.workersAvailable = 2

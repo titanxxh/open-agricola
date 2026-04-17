@@ -23,7 +23,7 @@ describe('D166_StableMilker session', () => {
     const farmExpansion = state.actionSpaces.find((s) => s.id === 'farm-expansion')
     if (farmExpansion) {
       farmExpansion.roundAvailable = 1
-      farmExpansion.takenBy = null
+      farmExpansion.takenBy = []
     }
 
     session.loadState(state)

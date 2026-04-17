@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'A100_Curator'
 
@@ -12,7 +13,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     // Count farmers on accumulation spaces (spaces with gainPerRound resources)
     const farmersOnAccumulation = state.actionSpaces.filter(
-      (s) => s.takenBy === player.id && Object.values(s.resources ?? {}).some((v) => v > 0),
+      (s) => spaceHasPlayer(s, player.id) && Object.values(s.resources ?? {}).some((v) => v > 0),
     ).length
     if (farmersOnAccumulation < 3) return
     if ((player.resources.food ?? 0) < 1) return

@@ -136,15 +136,15 @@ describe('stable payment session', () => {
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
     expect(undoStepResp.state.players[0]!.workersAvailable).toBe(workersAfterTake)
-    expect(undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBe(
-      undoStepResp.state.players[0]!.id,
-    )
+    expect(
+      undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy[0]?.playerId,
+    ).toBe(undoStepResp.state.players[0]!.id)
 
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
     expect(secondUndoStepResp.pending.type).toBe('none')
     expect(secondUndoStepResp.state.players[0]!.workersAvailable).toBe(2)
-    expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBeNull()
+    expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
 
   it('undoStep returns to action-space selection when farm-expansion auto-enters stable selection', () => {
@@ -172,6 +172,6 @@ describe('stable payment session', () => {
     expect(undoResp.pending.type).toBe('none')
     expect(undoResp.interaction.stateId).toBe('idle')
     expect(undoResp.state.players[0]!.workersAvailable).toBe(2)
-    expect(undoResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBeNull()
+    expect(undoResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
 })

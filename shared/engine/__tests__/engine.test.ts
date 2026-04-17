@@ -87,7 +87,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
     cattle: 0,
     begging: 0,
   },
-  takenBy: null,
+  takenBy: [],
 })
 
 const buildEngine = (action: ActionDefinition, withChoice: boolean) => {

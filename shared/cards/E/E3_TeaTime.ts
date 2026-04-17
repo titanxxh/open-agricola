@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'E3_TeaTime'
 
@@ -18,8 +19,8 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
-    if (!space || space.takenBy !== player.id) return
-    space.takenBy = null
+    if (!space || !spaceHasPlayer(space, player.id)) return
+    removeWorkerRef(space, player.id)
     player.workersAvailable += 1
   },
 })

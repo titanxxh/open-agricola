@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'E21_SheepRug'
 
@@ -15,7 +16,7 @@ const sheepRugCanUseOccupiedListener: CardListenerRegistration = {
   phases: ['canUseOccupied' as ActionHookPhase],
   actions: ['wish-children', 'urgent-wish-children'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space.takenBy) return
+    if (!isSpaceOccupied(context.space)) return
     return { canUseOccupied: true }
   },
 }

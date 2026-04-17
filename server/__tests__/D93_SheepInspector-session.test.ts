@@ -51,7 +51,7 @@ const createSpace = (id: string, takenBy: string | null = null): ActionSpace =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    takenBy,
+    takenBy: takenBy ? [{ playerId: takenBy, workerId: '1' }] : [],
   }) as unknown as ActionSpace
 
 const createState = (
@@ -300,7 +300,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
 
     // Forest is unoccupied again.
     const forestAfter = resp.state.actionSpaces.find((s) => s.id === 'forest')
-    expect(forestAfter?.takenBy).toBe(null)
+    expect(forestAfter?.takenBy).toEqual([])
 
     // Card flagged (used this work phase).
     expect(isCardFlagged(after, CARD_ID)).toBe(true)
@@ -326,7 +326,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // day-laborer granted +2 food.
     expect(after.resources.food).toBe(foodBefore + 2)
     const forestAfter = resp.state.actionSpaces.find((s) => s.id === 'forest')
-    expect(forestAfter?.takenBy).toBe(after.id)
+    expect(forestAfter?.takenBy.some((t) => t.playerId === after.id)).toBe(true)
     expect(isCardFlagged(after, CARD_ID)).toBe(false)
   })
 })

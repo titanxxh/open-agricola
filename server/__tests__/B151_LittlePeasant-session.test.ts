@@ -74,7 +74,7 @@ describe('B151_LittlePeasant session', () => {
     expect(resp.pending.type).toBe('confirmNextPlayer')
     expect(resp.state.players[0]!.workersAvailable).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBeGreaterThan(0)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
   it('gives 1 stone when the occupation is played', () => {

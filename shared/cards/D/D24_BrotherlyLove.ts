@@ -5,6 +5,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D24_BrotherlyLove'
 
@@ -52,7 +53,7 @@ const computeArgsListener: CardListenerRegistration = {
       const space = context.state.actionSpaces.find((s) => s.id === spaceId)
       if (!space) continue
       // Only add occupied spaces (they should all be occupied since farmer placed there)
-      if (!space.takenBy) continue
+      if (!isSpaceOccupied(space)) continue
       if (!space.canBeExecutedByPlayer(context.state, context.player)) continue
       extraOptions.push({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`,
@@ -70,9 +71,9 @@ const canUseOccupiedListener: CardListenerRegistration = {
   phases: ['canUseOccupied' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isActive(context)) return
-    if (!context.space?.takenBy) return
+    if (!context.space || !isSpaceOccupied(context.space)) return
     // Only allow if the space is occupied by the player's own farmer
-    if (context.space.takenBy !== context.player.id) return
+    if (!spaceHasPlayer(context.space, context.player.id)) return
     return { canUseOccupied: true }
   },
 }

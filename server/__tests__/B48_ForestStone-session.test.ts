@@ -119,7 +119,7 @@ describe('B48_ForestStone session', () => {
     const quarry = state2.actionSpaces.find((s) => s.id === 'eastern-quarry')
     if (quarry) {
       quarry.resources.stone = 3
-      quarry.takenBy = null
+      quarry.takenBy = []
     }
     session.loadState(state2)
 

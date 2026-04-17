@@ -50,7 +50,7 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
         roundAvailable: 1,
         gainPerRound: {},
         resources: { ...emptyResources },
-        takenBy: null,
+        takenBy: [],
       } as ActionSpace)
     }
   }

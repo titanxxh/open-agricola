@@ -7,6 +7,7 @@ import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A130_MummysBoy'
 
@@ -46,7 +47,7 @@ const computeArgsListener: CardListenerRegistration = {
     if (MEETING_PLACE_IDS.has(secondSpaceId)) return
     // Only add if the space is occupied (otherwise it's already available)
     const space = context.state.actionSpaces.find((s) => s.id === secondSpaceId)
-    if (!space || !space.takenBy) return
+    if (!space || !isSpaceOccupied(space)) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${secondSpaceId}`,

@@ -1,21 +1,32 @@
 import type { ActionSpace, WorkerRef } from './types'
 
+/**
+ * Normalize a legacy `takenBy` value to the new `WorkerRef[]` shape.
+ * - `undefined` / `null` → `[]`
+ * - `'playerId'` (legacy string) → `[{ playerId, workerId: '1' }]` (best-effort fallback;
+ *   old snapshots will re-pin a worker on next placement)
+ * - already-array → returned as-is
+ */
+export const normalizeTakenBy = (value: unknown): WorkerRef[] => {
+  if (!value) return []
+  if (Array.isArray(value)) return value as WorkerRef[]
+  if (typeof value === 'string') {
+    return [{ playerId: value, workerId: '1' }]
+  }
+  return []
+}
+
 export const isSpaceOccupied = (s: ActionSpace): boolean =>
-  Array.isArray(s.takenBy) ? s.takenBy.length > 0 : s.takenBy !== null
+  s.takenBy.length > 0
 
 export const spaceOccupantCount = (s: ActionSpace): number =>
-  Array.isArray(s.takenBy) ? s.takenBy.length : s.takenBy ? 1 : 0
+  s.takenBy.length
 
 export const spaceHasPlayer = (s: ActionSpace, playerId: string): boolean =>
-  Array.isArray(s.takenBy)
-    ? s.takenBy.some(t => (t as unknown as WorkerRef).playerId === playerId)
-    : s.takenBy === playerId
+  s.takenBy.some(t => t.playerId === playerId)
 
 export const addWorkerRef = (s: ActionSpace, playerId: string, workerId: string): void => {
-  if (!Array.isArray(s.takenBy)) {
-    ;(s as unknown as { takenBy: WorkerRef[] }).takenBy = []
-  }
-  ;(s.takenBy as unknown as WorkerRef[]).push({ playerId, workerId })
+  s.takenBy.push({ playerId, workerId })
 }
 
 export const removeWorkerRef = (
@@ -23,8 +34,7 @@ export const removeWorkerRef = (
   playerId: string,
   workerId?: string,
 ): WorkerRef | null => {
-  if (!Array.isArray(s.takenBy)) return null
-  const arr = s.takenBy as unknown as WorkerRef[]
+  const arr = s.takenBy
   const idx = workerId
     ? arr.findIndex(t => t.playerId === playerId && t.workerId === workerId)
     : arr.findIndex(t => t.playerId === playerId)

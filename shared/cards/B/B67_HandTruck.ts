@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'B67_HandTruck'
 
@@ -15,7 +16,7 @@ const listener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const accumulationSpaces = context.state.actionSpaces.filter(
       (space) =>
-        space.takenBy === context.player.id &&
+        spaceHasPlayer(space, context.player.id) &&
         Object.values(space.gainPerRound).some(
           (value) => typeof value === 'number' && value > 0,
         ),
@@ -36,7 +37,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.doable) return
     const hasWorkersOnAccumulation = context.state.actionSpaces.some(
       (space) =>
-        space.takenBy === context.player.id &&
+        spaceHasPlayer(space, context.player.id) &&
         Object.values(space.gainPerRound).some(
           (value) => typeof value === 'number' && value > 0,
         ),

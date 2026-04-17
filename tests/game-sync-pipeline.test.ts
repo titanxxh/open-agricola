@@ -105,11 +105,11 @@ describe('game sync pipeline (applySnapshot path)', () => {
   it('preserves action space takenBy through round-trip', () => {
     const modified = createInitialState(42)
     const first = modified.actionSpaces[0]!
-    first.takenBy = 'p1'
+    first.takenBy = [{ playerId: 'p1', workerId: '1' }]
     const payload = buildPayload({ state: serializeState(modified) })
     const restored = rehydrateState(payload.state)
     const restoredSpace = restored.actionSpaces.find((s) => s.id === first.id)
-    expect(restoredSpace?.takenBy).toBe('p1')
+    expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
   })
 
   it('all pending action variants are valid payload values', () => {

@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'E150_RockBeater'
 
@@ -28,7 +29,7 @@ const computeArgsListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const space = context.state.actionSpaces.find((s) => s.id === 'resource-market-4')
     // Only add when occupied by another player
-    if (!space?.takenBy) return
+    if (!space || !isSpaceOccupied(space)) return
     if (!space.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
       {
@@ -48,7 +49,7 @@ const canUseOccupiedListener: CardListenerRegistration = {
   actions: ['resource-market-4'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.space?.takenBy) return
+    if (!context.space || !isSpaceOccupied(context.space)) return
     return { canUseOccupied: true }
   },
 }

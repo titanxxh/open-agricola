@@ -5,6 +5,8 @@ import {
   getMatchingListeners,
   type CardListenerContext,
 } from '../../cards/card-listeners'
+import { addWorkerRef, isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { smallestAvailableWorker } from '../../game/player'
 
 /**
  * Move a farmer from a source action space to another selectable action space and execute it.
@@ -41,7 +43,7 @@ const isSelectableSpace = (
 ) => {
   if (space.id === excludeId) return false
   if (!space.canBeExecutedByPlayer(context.state, context.player)) return false
-  if (!space.takenBy) return true
+  if (!isSpaceOccupied(space)) return true
   return canUseOccupiedSpace({ ...context, space, actionId: space.id })
 }
 
@@ -67,9 +69,13 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
   resolveChoice: ({ state, player }, choice) => {
     const targetSpace = state.actionSpaces.find((s) => s.id === choice)
     if (!targetSpace) return { type: 'fail', logKey: 'log.actionFail' }
-    // Move farmer to target space (mark as taken, but don't decrement workersAvailable)
-    if (!targetSpace.takenBy) {
-      targetSpace.takenBy = player.id
+    // Move farmer to target space (mark as taken, but don't decrement workersAvailable).
+    // If the player isn't already present, add a worker ref. We don't remove the
+    // worker from its source here because the old semantics treated this as a
+    // "visit" rather than a physical relocation.
+    if (!spaceHasPlayer(targetSpace, player.id)) {
+      const worker = smallestAvailableWorker(state, player)
+      addWorkerRef(targetSpace, player.id, worker?.id ?? '1')
     }
     // Execute the target space's action
     return targetSpace.execute({ state, player, space: targetSpace })

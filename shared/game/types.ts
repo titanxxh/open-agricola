@@ -303,7 +303,7 @@ export type ActionDefinition = {
 
 export type ActionSpace = ActionDefinition & {
   resources: Resource
-  takenBy: string | null
+  takenBy: WorkerRef[]
 }
 
 export type PendingAction =

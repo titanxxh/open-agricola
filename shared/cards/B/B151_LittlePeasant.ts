@@ -5,6 +5,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B151_LittlePeasant'
 
@@ -37,7 +38,7 @@ const canUseOccupiedListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['canUseOccupied' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space.takenBy) return
+    if (!isSpaceOccupied(context.space)) return
     if (!canIgnoreOccupiedSpaces(context.player)) return
     if (isMeetingPlace(context.space)) return
     return { canUseOccupied: true }
@@ -55,7 +56,7 @@ const computeArgsListener: CardListenerRegistration = {
       .filter((space) =>
         isOpenSpace(context.state, space) &&
         !isMeetingPlace(space) &&
-        !!space.takenBy &&
+        isSpaceOccupied(space) &&
         space.canBeExecutedByPlayer(context.state, context.player),
       )
       .map((space) => ({

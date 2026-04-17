@@ -7,7 +7,7 @@ export const applyReturnHomePhase = (nextState: GameState) => {
     player.workersAvailable = player.familySize
   })
   nextState.actionSpaces.forEach((space) => {
-    space.takenBy = null
+    space.takenBy = []
   })
 }
 

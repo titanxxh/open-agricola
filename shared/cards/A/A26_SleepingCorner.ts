@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'A26_SleepingCorner'
 
@@ -27,7 +28,7 @@ const computeArgsListener: CardListenerRegistration = {
       (s) => s.id === 'wish-children' || s.id === 'urgent-wish-children',
     )
     const extraOptions: ActionChoiceOption[] = wishChildrenSpaces
-      .filter((s) => !!s.takenBy && s.takenBy !== context.player.id)
+      .filter((s) => isSpaceOccupied(s) && !spaceHasPlayer(s, context.player.id))
       .map((s) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${s.id}`,
         labelKey: s.nameKey,

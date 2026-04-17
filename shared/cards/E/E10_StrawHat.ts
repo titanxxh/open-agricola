@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'E10_StrawHat'
 const TRIGGER_ROUNDS = [3, 6]
@@ -14,10 +15,10 @@ registerCardEffect({
     if (!TRIGGER_ROUNDS.includes(state.round)) return
     // Check if player has a worker on Farmland
     const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)
-    if (!farmland || farmland.takenBy !== player.id) return
+    if (!farmland || !spaceHasPlayer(farmland, player.id)) return
     // Check if unoccupied spaces are available (excluding Farmland)
     const hasAvailable = state.actionSpaces.some(
-      (s) => !s.takenBy && s.id !== FARMLAND_SPACE_ID && s.canBeExecutedByPlayer(state, player),
+      (s) => !isSpaceOccupied(s) && s.id !== FARMLAND_SPACE_ID && s.canBeExecutedByPlayer(state, player),
     )
     const children: ActionFlow[] = []
     if (hasAvailable) {

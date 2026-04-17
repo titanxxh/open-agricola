@@ -83,7 +83,7 @@ describe('D156_RetailDealer session', () => {
     // Reset resource-market-4 for re-use
     const state2 = session.getState().state
     const rm = state2.actionSpaces.find(s => s.id === 'resource-market-4')
-    if (rm) rm.takenBy = null
+    if (rm) rm.takenBy = []
     session.loadState(state2)
 
     // Second use
@@ -104,7 +104,7 @@ describe('D156_RetailDealer session', () => {
     // Reset resource-market-4 again
     const state3 = session.getState().state
     const rm3 = state3.actionSpaces.find(s => s.id === 'resource-market-4')
-    if (rm3) rm3.takenBy = null
+    if (rm3) rm3.takenBy = []
     session.loadState(state3)
 
     // Third use

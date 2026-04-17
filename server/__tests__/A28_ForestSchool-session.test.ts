@@ -66,6 +66,6 @@ describe('A28_ForestSchool session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationHand).not.toContain('A123_FrameBuilder')
-    expect(resp.state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 })

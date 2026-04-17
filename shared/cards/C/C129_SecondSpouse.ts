@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'C129_SecondSpouse'
 
@@ -37,7 +38,7 @@ const computeArgsListener: CardListenerRegistration = {
     const space = context.state.actionSpaces.find((s) => s.id === 'urgent-wish-children')
     if (!space) return
     // Only when occupied by another player
-    if (!space.takenBy || space.takenBy === context.player.id) return
+    if (!isSpaceOccupied(space) || spaceHasPlayer(space, context.player.id)) return
     // Check if the player can actually execute the action
     if (!space.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
@@ -57,9 +58,9 @@ const canUseOccupiedListener: CardListenerRegistration = {
   actions: ['urgent-wish-children'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.space?.takenBy) return
+    if (!context.space || !isSpaceOccupied(context.space)) return
     // Must be occupied by another player, not self
-    if (context.space.takenBy === context.player.id) return
+    if (spaceHasPlayer(context.space, context.player.id)) return
     // Require 3+ players
     if ((context.state.players?.length ?? 0) < 3) return
     return { canUseOccupied: true }

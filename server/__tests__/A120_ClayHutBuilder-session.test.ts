@@ -91,7 +91,7 @@ describe('A120_ClayHutBuilder session', () => {
     const houseRedevSpace = state.actionSpaces.find((s) => s.id === 'house-redevelopment')
     if (houseRedevSpace) {
       houseRedevSpace.roundAvailable = 1
-      houseRedevSpace.takenBy = null
+      houseRedevSpace.takenBy = []
     }
     session.loadState(state)
 
@@ -126,7 +126,7 @@ describe('A120_ClayHutBuilder session', () => {
     const farmRedevSpace = state.actionSpaces.find((s) => s.id === 'farm-redevelopment')
     if (farmRedevSpace) {
       farmRedevSpace.roundAvailable = 1
-      farmRedevSpace.takenBy = null
+      farmRedevSpace.takenBy = []
     }
     session.loadState(state)
 
