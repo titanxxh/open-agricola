@@ -104,7 +104,7 @@ docker compose logs -f app
 
    ```bash
    # 本地构建前端（指向 VPS 公网 IP）
-   VITE_API_BASE=http://YOUR_VPS_IP:5175 npm run build
+   VITE_API_BASE=http://YOUR_VPS_IP:5175 pnpm run build
    ```
 
 3. 把 `dist/` 目录上传到 VPS，然后用简单 HTTP 服务器托管：
@@ -339,8 +339,8 @@ Push 到 `platform` 分支会自动触发 `.github/workflows/deploy-pages.yml`�
 ### 手动构建（不用 GitHub Actions）
 
 ```bash
-VITE_API_BASE=https://api.your-domain.com npm run build
-npx gh-pages -d dist
+VITE_API_BASE=https://api.your-domain.com pnpm run build
+pnpm dlx gh-pages -d dist
 ```
 
 ### BGA 卡牌图片
@@ -453,7 +453,7 @@ docker compose restart app
 ### 本地开发（不需要 Docker）
 
 ```bash
-npm install
+pnpm install
 ./restart-intranet.sh
 ```
 

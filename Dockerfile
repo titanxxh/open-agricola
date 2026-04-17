@@ -8,11 +8,9 @@ RUN apk add --no-cache \
     cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev pixman-dev
 
 WORKDIR /app
-COPY package.json package-lock.json ./
-ENV NPM_CONFIG_AUDIT=false \
-    NPM_CONFIG_FUND=false \
-    NPM_CONFIG_UPDATE_NOTIFIER=false
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY package.json pnpm-lock.yaml .npmrc ./
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+RUN pnpm install --prod --frozen-lockfile
 
 # ── Stage 2: production ──────────────────────────────────────────────────
 FROM node:22-alpine AS production
@@ -22,7 +20,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy server + shared source (tsx runs TS directly)

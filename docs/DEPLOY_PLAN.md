@@ -23,7 +23,7 @@ Docker 单容器 (api.your-domain.com)
 前端需要在构建时注入后端 API 地址：
 
 ```bash
-VITE_API_BASE=https://api.your-domain.com npm run build
+VITE_API_BASE=https://api.your-domain.com pnpm run build
 ```
 
 前端代码中所有 API/WS 调用需要使用这个环境变量：
@@ -49,14 +49,14 @@ VITE_API_BASE=https://api.your-domain.com npm run build
 **Stage 1: build**
 - 基础镜像：Node 22 Alpine
 - 安装 canvas 原生构建依赖：`cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev pixman-dev python3 make g++`
-- `npm ci` 安装全部依赖
+- `pnpm install --frozen-lockfile` 安装全部依赖
 - 编译 TypeScript（仅 server 需要）
 
 **Stage 2: production**
 - 基础镜像：Node 22 Alpine
 - 安装 canvas 运行时库（不含 -dev 包）：`cairo pango jpeg giflib librsvg pixman`
-- `npm ci --omit=dev` 只装生产依赖
-- 从 Stage 1 复制：`shared/`, `server/`, `package.json`, `package-lock.json`, `tsconfig*.json`
+- `pnpm install --prod --frozen-lockfile` 只装生产依赖
+- 从 Stage 1 复制：`shared/`, `server/`, `package.json`, `pnpm-lock.yaml`, `.npmrc`, `tsconfig*.json`
 - 入口：`node --import tsx server/index.ts`
 - 暴露端口 5175
 - 健康检查：`GET /api/health`
@@ -185,11 +185,11 @@ curl http://your-server:5175/api/health
 
 ```bash
 # 1. 构建前端（指向后端地址）
-VITE_API_BASE=https://api.your-domain.com npm run build
+VITE_API_BASE=https://api.your-domain.com pnpm run build
 
 # 2. 部署到 GitHub Pages（手动或 CI）
 # 方式 A：gh-pages 分支
-npx gh-pages -d dist
+pnpm dlx gh-pages -d dist
 
 # 方式 B：GitHub Actions 自动化（见下方 workflow）
 ```
@@ -215,12 +215,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: VITE_API_BASE=${{ vars.API_BASE }} npm run build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: VITE_API_BASE=${{ vars.API_BASE }} pnpm run build
       - run: cp -r path/to/bga-img dist/bga-img  # BGA 图片
       - uses: actions/upload-pages-artifact@v3
         with:

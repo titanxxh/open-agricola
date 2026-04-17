@@ -108,7 +108,7 @@
 
 ## 修改后的验证动作
 
-- 每次修改代码后，自动运行单元测试：`npm test`
+- 每次修改代码后，自动运行单元测试：`pnpm test`
 - 每次修改代码后，自动重启前后端服务。
 - 推荐使用 `./restart-intranet.sh` 重启。
 - 测试时默认使用 2 人游戏。
@@ -127,16 +127,16 @@
 
 ### 服务
 
-- Backend（5175）：`npm run server`
-- Frontend（5173）：`npm run dev`
+- Backend（5175）：`pnpm run server`
+- Frontend（5173）：`pnpm run dev`
 - 同时启动：`./restart-intranet.sh`
 
 ### 常用命令
 
-- `npm test`：vitest 单元测试（不含 e2e）
-- `npm run lint`：ESLint
-- `npm run build`：类型检查 + 构建
-- `npx playwright install`：安装 Playwright 浏览器
+- `pnpm test`：vitest 单元测试（不含 e2e）
+- `pnpm run lint`：ESLint
+- `pnpm run build`：类型检查 + 构建
+- `pnpm exec playwright install`：安装 Playwright 浏览器
 
 ### 运行说明
 
@@ -153,23 +153,23 @@
 
 The `canvas` npm package requires native libraries. These are pre-installed in the VM:
 `libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`.
-If `npm install` fails with canvas build errors, re-install these via apt.
+If `pnpm install` fails with canvas build errors, re-install these via apt.
 
 ### Starting services in Cloud Agent VMs
 
 - Do NOT use `./restart-intranet.sh` — it uses `pkill -f` and relies on LAN IP detection via `eth0`, which may not exist in the VM.
 - Instead, start services separately:
-  - Backend: `npm run server` (port 5175, binds to localhost)
-  - Frontend: `npx vite --host 0.0.0.0` (port 5173)
+  - Backend: `pnpm run server` (port 5175, binds to localhost)
+  - Frontend: `pnpm exec vite --host 0.0.0.0` (port 5173)
 - SQLite database auto-creates at `./data/open-agricola.db` on first backend start; no external DB needed.
 - The backend serves both HTTP API and WebSocket (`/ws`) from port 5175.
 
 ### Testing
 
-- Unit/session tests (`npm test`): ~631 passing cases (15 skipped), no running services needed. These test pure domain logic and `GameSession` directly.
-- E2E tests (`npm run test:e2e`): require both frontend and backend running, plus Playwright browsers (`npx playwright install`).
-- Lint: `npm run lint` — pre-existing lint errors (~340, mostly `@typescript-eslint/no-explicit-any`) are expected and not blocking.
-- Build: `npm run build` — warnings about unresolved `/bga-img/*` are cosmetic (BGA card art proxy).
+- Unit/session tests (`pnpm test`): ~631 passing cases (15 skipped), no running services needed. These test pure domain logic and `GameSession` directly.
+- E2E tests (`pnpm run test:e2e`): require both frontend and backend running, plus Playwright browsers (`pnpm exec playwright install`).
+- Lint: `pnpm run lint` — pre-existing lint errors (~340, mostly `@typescript-eslint/no-explicit-any`) are expected and not blocking.
+- Build: `pnpm run build` — warnings about unresolved `/bga-img/*` are cosmetic (BGA card art proxy).
 
 ### Authentication (platform branch)
 

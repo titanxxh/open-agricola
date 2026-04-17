@@ -204,7 +204,7 @@
 
 ## 运行方式
 
-- `npm test`
+- `pnpm test`
 
 ### shared/actions/effects/__tests__/exchange.test.ts
 

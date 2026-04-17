@@ -109,7 +109,11 @@ export const buildSowFarmInteraction = (
   const excludedKeys = getExcludedFieldKeys(actionContext)
   const allowedKeys = getAllowedSelectedFieldKeys(player, actionContext)
 
-  const selectableFields = normalized.fields.flatMap((field) => {
+  const selectableFields: {
+    tile: FarmTilePosition
+    allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+    sourceCard?: string
+  }[] = normalized.fields.flatMap((field) => {
     if (field.crop !== null) return []
     const key = positionKey({ row: field.row, col: field.col })
     if (excludedKeys.has(key)) return []
