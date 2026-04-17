@@ -1,10 +1,18 @@
-import type { ActionDefinition, ActionExecutionResult, Pasture, PlayerState } from '../../game/types'
-import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
+import type { ActionDefinition, FenceSegment, PlayerState } from '../../game/types'
+import { canAffordTypedFlatCost } from './pay-helpers'
 
 export const maxFences = 15
 export const maxPastureCells = 15
 export const stableWoodCost = 2
 export const minimumFenceSegments = 4
+
+export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
+  p: T,
+): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'fence' ? 1 : 0), 0)
+
+export const getPalisadeCount = <T extends { fenceSegments: FenceSegment[] }>(
+  p: T,
+): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'palisade' ? 1 : 0), 0)
 
 const pastureLayouts = [
   { size: 1, fences: 4 },
@@ -29,7 +37,7 @@ export const getPastureWoodCost = (stables: number, fenceCost: number) =>
   fenceCost + stables * stableWoodCost
 
 export const canStartFencing = (player: PlayerState) => {
-  if (player.fences + minimumFenceSegments > maxFences) return false
+  if (getFenceCount(player) + minimumFenceSegments > maxFences) return false
   if (getTotalPastureCells(player) >= maxPastureCells) return false
   return canAffordTypedFlatCost(player, { wood: minimumFenceSegments }, 'fencing')
 }
@@ -42,37 +50,9 @@ export const canBuildPasture = (
 ) => {
   const totalCells = getTotalPastureCells(player)
   const woodCost = getPastureWoodCost(stables, fenceCost)
-  if (player.fences + fenceCost > maxFences) return false
+  if (getFenceCount(player) + fenceCost > maxFences) return false
   if (totalCells + size > maxPastureCells) return false
   return canAffordTypedFlatCost(player, { wood: woodCost }, 'fencing')
-}
-
-export const buildPasture = (
-  player: PlayerState,
-  params: { size: number; stables: number; fenceCost: number },
-): ActionExecutionResult => {
-  const { size, stables, fenceCost } = params
-  if (!Number.isFinite(size) || size <= 0) {
-    return { type: 'fail', logKey: 'log.fencingFail' }
-  }
-  if (!canBuildPasture(player, size, stables, fenceCost)) {
-    return { type: 'fail', logKey: 'log.fencingFail' }
-  }
-  const woodCost = getPastureWoodCost(stables, fenceCost)
-  if (!payTypedFlatCost(player, { wood: woodCost }, 'fencing')) {
-    return { type: 'fail', logKey: 'log.fencingFail' }
-  }
-  player.fences += fenceCost
-  const pasture: Pasture = {
-    id: `pasture-${player.pastures.length + 1}`,
-    size,
-    tiles: [],
-    stables,
-    animalType: null,
-    animalCount: 0,
-  }
-  player.pastures.push(pasture)
-  return { type: 'ok' }
 }
 
 export const fenceAction: ActionDefinition = {

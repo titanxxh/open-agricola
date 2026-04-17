@@ -29,7 +29,7 @@ import {
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
 type FarmChoicePayloadMap = {
-  fence: { edges: string[]; extraWood?: number }
+  fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
   room: { rooms: FarmTilePosition[] }
   stable: { stables: FarmTilePosition[] }
   plow: { tile: FarmTilePosition }
@@ -54,7 +54,8 @@ export type FarmChoiceApplyResult<T extends PlayerState = PlayerState> =
       meta?: {
         usedFreeFences?: number
         sourceCard?: string
-        newEdges?: string[]
+        newFenceEdges?: string[]
+        newPalisadeEdges?: string[]
         newPastures?: T['pastures']
       }
     }
@@ -112,13 +113,14 @@ export const applyFarmChoice = <T extends PlayerState>(
 
   switch (farmType) {
     case 'fence': {
-      const { edges, extraWood } = payload as FarmChoicePayloadMap['fence']
+      const { edges, palisadeEdges = [], extraWood } = payload as FarmChoicePayloadMap['fence']
       const freeFences = readPendingFenceBonus(normalized)?.freeFences ?? 0
       const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
       const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
       const validated = validateFenceSelection(
         normalized,
         edges,
+        palisadeEdges,
         adjustedExtraWood,
         freeFences,
         { skipPayment: true },
@@ -147,7 +149,7 @@ export const applyFarmChoice = <T extends PlayerState>(
       executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
       const consumed = consumePendingFenceBonus(
         nextPlayer,
-        validated.newEdges.length,
+        validated.newFenceEdges.length,
       )
       return {
         ok: true,
@@ -156,7 +158,8 @@ export const applyFarmChoice = <T extends PlayerState>(
           ...(consumed
             ? { usedFreeFences: consumed.usedFreeFences, sourceCard: consumed.sourceCard }
             : {}),
-          newEdges: validated.newEdges,
+          newFenceEdges: validated.newFenceEdges,
+          newPalisadeEdges: validated.newPalisadeEdges,
           newPastures: validated.newPastures as T['pastures'],
         },
       }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/C/C168_AnimalCatcher'
@@ -36,7 +37,7 @@ const setup = (options?: { round?: number; food?: number }) => {
       animalCount: 0,
     },
   ]
-  player.fences = 8
+  setFencesForTest(player, 8)
 
   session.loadState(state)
   return session

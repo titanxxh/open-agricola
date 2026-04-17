@@ -87,6 +87,9 @@ export type WorkerRef = {
   workerId: string
 }
 
+export type FenceSegmentType = 'fence' | 'palisade'
+export type FenceSegment = { edge: string; type: FenceSegmentType }
+
 export type PlayerState = {
   id: string
   name: string
@@ -96,7 +99,6 @@ export type PlayerState = {
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: Field[]
-  fences: number
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
   improvements: string[]
@@ -109,7 +111,7 @@ export type PlayerState = {
   houseAnimalCount: number
   stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>
   pastures: Pasture[]
-  fenceSegments: string[]
+  fenceSegments: FenceSegment[]
   majorEffects: MajorEffectState
   startPlayer: boolean
   activeModifiers: CostModifier[]

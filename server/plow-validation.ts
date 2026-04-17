@@ -20,7 +20,7 @@ const isWithinFarm = (pos: FarmTilePosition) =>
   pos.row >= 0 && pos.row < FARM_ROWS && pos.col >= 0 && pos.col < FARM_COLS
 
 const getFencedTileKeys = (player: PlayerFarmState) => {
-  const edgeSet = new Set(player.fenceSegments ?? [])
+  const edgeSet = new Set((player.fenceSegments ?? []).map((s) => s.edge))
   if (edgeSet.size === 0) return new Set<string>()
   const regions = computeFencedRegions(edgeSet).filter((region) => region.fenced)
   const fencedKeys = new Set<string>()

@@ -26,7 +26,6 @@ const createPlayer = (): PlayerFarmState => ({
     { row: 1, col: 0 },
   ],
   stableTiles: [],
-  fences: 0,
   fenceSegments: [],
   pastures: [],
 })
@@ -68,7 +67,7 @@ describe('fence validation', () => {
 
   it('requires connection to existing fences', () => {
     const player = createPlayer()
-    player.fenceSegments = ['H-0-0']
+    player.fenceSegments = [{ edge: 'H-0-0', type: 'fence' }]
     const result = validateFenceSelection(player, edgesForTile(1, 3))
     expect(result.ok).toBe(false)
     if (!result.ok) {

@@ -214,7 +214,7 @@ export const buildFenceFarmInteraction = (
   pending: Extract<PendingAction, { type: 'choice' }>,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
-  const existing = new Set(normalized.fenceSegments ?? [])
+  const existing = new Set((normalized.fenceSegments ?? []).map((s) => s.edge))
   const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
   const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0
   return {

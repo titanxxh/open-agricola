@@ -2303,8 +2303,9 @@ export class GameSession {
 
     switch (farmType) {
       case 'fence': {
-        const { edges, extraWood } = payload as { edges?: string[]; extraWood?: number }
+        const { edges, palisadeEdges, extraWood } = payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
         const safeEdges = Array.isArray(edges) ? edges : []
+        const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
         const freeFences =
           readPendingFenceBonus(normalized)?.freeFences ?? 0
         const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
@@ -2312,6 +2313,7 @@ export class GameSession {
         const validated = validateFenceSelection(
           normalized,
           safeEdges,
+          safePalisadeEdges,
           adjustedExtraWood,
           freeFences,
           { skipPayment: true },
