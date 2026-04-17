@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E74_AshTrees'
+import '../../shared/cards/B/B30_WoodPalisades'
 
 const edgesForTile = (row: number, col: number) => [
   `H-${row}-${col}`,
@@ -71,5 +72,51 @@ describe('E74_AshTrees session flow', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.cardStates?.E74_AshTrees?.counters?.fences).toBe(0)
+  })
+
+  it('freeFences only discount fences, palisades still cost full wood (with B30)', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    // 3 fence edges * 1 wood = 3, minus 3 freeFences = 0
+    // 2 palisade edges * 2 wood = 4
+    // total = 4 wood
+    player.resources.wood = 4
+    player.minorPlayed.push('E74_AshTrees', 'B30_WoodPalisades')
+    player.playedCards.push('minor:E74_AshTrees', 'minor:B30_WoodPalisades')
+    player.cardStates = {
+      ...player.cardStates,
+      E74_AshTrees: { counters: { fences: 5 } },
+    }
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+
+    // Select "use 3" to reserve freeFences=3
+    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    const useThree = resp.pending.options.find(
+      (o) => o.labelParams?.count === 3,
+    )
+    expect(useThree).toBeDefined()
+    resp = session.resolveChoice(0, useThree!.value)
+
+    // 3 fences on tile (1,1); 2 palisades on tile (1,2)
+    resp = session.commitFarmChoice(0, 'fence', {
+      edges: ['H-1-1', 'H-2-1', 'V-1-1'],
+      palisadeEdges: ['V-1-2', 'V-1-3'],
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(true)
+    const result = resp.state.players[0]!
+    expect(result.resources.wood).toBe(0)
+    // counter decrements by 3 (newFenceEdges.length), not 5
+    expect(result.cardStates?.E74_AshTrees?.counters?.fences).toBe(2)
   })
 })

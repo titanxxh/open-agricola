@@ -56,8 +56,7 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) => getRegisteredCardListeners().find((listener) => listener.id === id)
 
 describe('E74_AshTrees', () => {
-  // TODO(B30 Phase P4): re-enable once E74_AshTrees reads fence count via getFenceCount()
-  it.skip('stores only available fences on buy', () => {
+  it('stores only available fences on buy', () => {
     const effect = getCardEffect('E74_AshTrees')
     const player = createPlayer()
     setFencesForTest(player, 13)
