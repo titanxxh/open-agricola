@@ -1,6 +1,7 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
+import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
 import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
@@ -12,6 +13,44 @@ import {
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
 } from './pay-helpers'
+
+/** Cards that satisfy a Fireplace return requirement. */
+const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+
+/**
+ * Returns the list of card IDs a player can use to satisfy a cost that requires
+ * returning a Fireplace card. This includes both played major Fireplace cards
+ * AND any minors with `fireplaceIdentity === true`.
+ */
+const getFireplaceReturnPool = (player: PlayerState): string[] => {
+  const majorFireplaces = player.improvements.filter((id) =>
+    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
+  )
+  const minorFireplaces = player.minorPlayed.filter((id) => {
+    const card = getRegisteredMinorImprovement(id)
+    return !!card?.fireplaceIdentity
+  })
+  return [...majorFireplaces, ...minorFireplaces]
+}
+
+/**
+ * Returns the effective `playedCards` pool for cost resolution that may include
+ * a Fireplace return. If the cost requires returning a Fireplace, include both
+ * player.improvements AND any fireplaceIdentity minors.
+ */
+const getPlayedCardsForCost = (
+  player: PlayerState,
+  cost: Partial<PlayerState['resources']> | ComplexCost | null,
+): string[] => {
+  if (!cost || !isComplexCost(cost)) return player.improvements
+  const list = cost.cards?.list
+  if (!Array.isArray(list)) return player.improvements
+  const needsFireplace = list.some((id) =>
+    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
+  )
+  if (!needsFireplace) return player.improvements
+  return getFireplaceReturnPool(player)
+}
 
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
@@ -201,7 +240,7 @@ const canAffordMinorImprovement = (
     return computeAllBuyableCombinations(
       player,
       previewCost,
-      player.improvements,
+      getPlayedCardsForCost(player, previewCost),
     ).length > 0
   }
   return canAffordCost(player, previewCost)
@@ -298,7 +337,11 @@ const finalizeMajorImprovementPurchase = (
 ): ActionExecutionResult => {
   if (returnedMajorId) {
     returnCardToBoard(player, returnedMajorId)
-    state.availableMajorImprovements.push(returnedMajorId)
+    // Only return to the major pool if it is actually a major improvement card.
+    // A fireplaceIdentity minor (e.g. D25) is removed from play entirely.
+    if (getMajorCardEffect(returnedMajorId)) {
+      state.availableMajorImprovements.push(returnedMajorId)
+    }
   }
 
   player.improvements.push(improvementId)
@@ -342,7 +385,11 @@ const finalizeMinorImprovementPurchase = (
 ): ActionExecutionResult => {
   if (returnedCardId) {
     returnCardToBoard(player, returnedCardId)
-    state.availableMajorImprovements.push(returnedCardId)
+    // Only return to the major pool if it is actually a major improvement card.
+    // A fireplaceIdentity minor (e.g. D25) is removed from play entirely.
+    if (getMajorCardEffect(returnedCardId)) {
+      state.availableMajorImprovements.push(returnedCardId)
+    }
   }
 
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
@@ -470,7 +517,7 @@ const playMajorImprovement = (
     `pay:${improvementId}`,
     true,
     { type: 'fail', logKey: 'log.improvementFail' },
-    player.improvements,
+    getPlayedCardsForCost(player, cost),
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
@@ -526,7 +573,7 @@ export const playMinorImprovement = (
     `pay:minor:${improvementId}`,
     !!(isComplexCost(modifiedCost) && modifiedCost.cards?.list?.length),
     { type: 'fail', logKey: 'log.minorImprovementFail' },
-    player.improvements,
+    getPlayedCardsForCost(player, modifiedCost),
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
