@@ -616,6 +616,16 @@ export const returnCardToBoard = (
   const minorPlayedIndex = player.minorPlayed.indexOf(cardId)
   if (minorPlayedIndex > -1) {
     player.minorPlayed.splice(minorPlayedIndex, 1)
+    // Clean up auxiliary state that a minor card may have registered on play
+    // (e.g. providesOccupation extras, per-card state like D25's virtual field).
+    if (player.extraOccupationsFromCards) {
+      player.extraOccupationsFromCards = player.extraOccupationsFromCards.filter(
+        (id) => id !== cardId,
+      )
+    }
+    if (player.cardStates) {
+      delete player.cardStates[cardId]
+    }
   }
 }
 
