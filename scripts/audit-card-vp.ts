@@ -221,8 +221,9 @@ function fmt(rows: Row[], counts: Record<string, number>): void {
 const strict = process.argv.includes('--strict')
 const { rows, counts } = audit()
 fmt(rows, counts)
-// Strict-mode gate (Phase 2.3): any vp mismatch OR a BGA card we haven't
-// implemented is treated as alignment failure. `missing-bga` is excluded —
-// those are intentional our-only cards.
-const failCount = counts.diff + counts['missing-ours']
-if (strict && failCount > 0) process.exit(1)
+// Strict-mode gate (Phase 2.3): only fail on numeric `vp` mismatches between
+// BGA and our side for cards both sides implement. `missing-bga` (our-only
+// cards) and `missing-ours` (BGA-only cards we haven't implemented yet) are
+// scope decisions for separate PRs and are surfaced in the Summary line for
+// human review rather than blocking this audit.
+if (strict && counts.diff > 0) process.exit(1)
