@@ -310,16 +310,8 @@ describe('D25_WitchesDanceFloor session', () => {
   })
 
   // ─── Test 10: CookingHearth accepts D25 as return-Fireplace ────────────────
-  //
-  // BUG (escalation note): The current implementation in pay.ts filters
-  // `cost.cards.list` against `playedCards` (getFireplaceReturnPool), but
-  // since D25 is NOT in `cost.cards.list` (['Major_Fireplace1', 'Major_Fireplace2']),
-  // D25 is never selected as an eligible return card in computeAllBuyableCombinations.
-  // The player can buy CookingHearth1 with clay alone (no Fireplace required=true),
-  // so D25 is NOT removed. This is a bug in the Task 9 implementation that
-  // needs a production-code fix in pay.ts. This test documents the actual behavior.
-  describe('CookingHearth with D25 present — actual behavior (known bug documented)', () => {
-    it('player can buy CookingHearth1 with clay even when D25 is in minorPlayed', () => {
+  describe('CookingHearth with D25 present — D25 returned on purchase', () => {
+    it('D25 is removed from minorPlayed / extraOccupationsFromCards / cardStates when used to buy CookingHearth1', () => {
       const session = setup()
       const state = session.getState().state
       state.currentPlayerIndex = 0
@@ -353,36 +345,31 @@ describe('D25_WitchesDanceFloor session', () => {
       resp = session.resolveChoice(0, cookingHearthOption!.value)
       expect(resp.ok).toBe(true)
 
-      // Resolve any remaining pending choices
+      // Resolve any remaining pending choices (e.g. payment selection, card-return selection)
       let maxSteps = 10
       while (resp.pending.type === 'choice' && maxSteps-- > 0) {
+        // Prefer the D25 return option if present, otherwise pick the first option
+        const d25Option = resp.pending.options.find((o) => o.value.includes(CARD_ID))
         const skipOption = resp.pending.options.find((o) => o.value === '__skip__')
-        if (skipOption) {
-          resp = session.resolveChoice(0, skipOption.value)
-        } else {
-          const first = resp.pending.options[0]
-          if (!first) break
-          resp = session.resolveChoice(0, first.value)
-        }
+        const choiceValue = d25Option?.value ?? skipOption?.value ?? resp.pending.options[0]?.value
+        if (!choiceValue) break
+        resp = session.resolveChoice(0, choiceValue)
       }
 
       expect(resp.ok).toBe(true)
 
       const playerAfter = resp.state.players[0]!
-      // CookingHearth1 IS bought (this part works)
+
+      // CookingHearth1 is bought
       expect(playerAfter.improvements).toContain('Major_CookingHearth1')
 
-      // D25 should NOT appear in availableMajorImprovements (it's a minor)
-      expect(resp.state.availableMajorImprovements).not.toContain(CARD_ID)
+      // D25 is fully removed from the player's state after being returned
+      expect(playerAfter.minorPlayed).not.toContain(CARD_ID)
+      expect(playerAfter.extraOccupationsFromCards ?? []).not.toContain(CARD_ID)
+      expect(playerAfter.cardStates?.[CARD_ID]).toBeUndefined()
 
-      // KNOWN BUG: D25 is NOT removed from minorPlayed because pay.ts's
-      // computeAllBuyableCombinations filters cost.cards.list against
-      // playedCards — but D25 is not in cost.cards.list, so it's never
-      // selected as an eligible return card. The player buys with clay only.
-      // When this bug is fixed, the following assertions should be changed to
-      // `not.toContain` / `toBeUndefined`:
-      expect(playerAfter.minorPlayed).toContain(CARD_ID)
-      expect(playerAfter.extraOccupationsFromCards ?? []).toContain(CARD_ID)
+      // D25 must NOT appear in availableMajorImprovements (it's a minor, not a major)
+      expect(resp.state.availableMajorImprovements).not.toContain(CARD_ID)
     })
   })
 
