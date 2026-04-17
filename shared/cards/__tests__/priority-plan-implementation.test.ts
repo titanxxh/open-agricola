@@ -304,8 +304,7 @@ describe('priority plan implementations', () => {
     expect(canRenovate(player)).toBe(true)
   })
 
-  // TODO(B30 Phase P4): re-enable once C88 CarpentersApprentice reads fence count via getFenceCount()
-  it.skip('C88 Carpenter\'s Apprentice reserves free late fences', () => {
+  it('C88 Carpenter\'s Apprentice reserves free late fences', () => {
     const listener = findListener('C88-carpenters-apprentice-before-fence')
     const player = createPlayer()
     player.occupationPlayed = ['C88_CarpentersApprentice']
