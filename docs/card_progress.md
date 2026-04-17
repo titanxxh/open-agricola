@@ -14,13 +14,13 @@
 | Deck | BGA 总数 | 已实现 | BGA 也无逻辑（数据 only） | BGA 有逻辑我们漏实现 | 需核心扩展 |
 |---|---|---|---|---|---|
 | A | 180 | 157 | 5 | 0 | 0 |
-| B | 180 | 158 | 0 | 0 | 0 |
+| B | 180 | 159 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
 | D | 181 | 157 | 2 | 1 | 0 |
 | E | 169 | 159 | 0 | 2 | 1 |
-| **总计** | **892** | **818** | **7** | **3** | **1** |
+| **总计** | **892** | **819** | **7** | **3** | **1** |
 
-**截至 2026-04-17：818/892 = 91.7%。**
+**截至 2026-04-17：819/892 = 91.8%。**
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -48,14 +48,15 @@
 
 - **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
 - **2026-04-17 — Worker 身份模型基建落地**：13 个子任务分 commit 推进；全仓 grep 替换聚合字段读点；新增 `shared/game/{player,space}.ts` helper。为 A25 Bassinet BGA 对齐打底。详见 `docs/ENGINE_ARCHITECTURE.md § 11.4.1`。
+- **2026-04-17 — B30 Wood Palisades 完整实现**：按 segment 新增替代 fence 类型（2 wood / +1 VP / 不计入 `MAX_FENCES` 15 上限 / 不进入 fence-keyed 卡片统计）。`PlayerState.fences` 数值字段替换为 `FenceSegment[]` + 推导 helper `getFenceCount` / `getPalisadeCount`；`validateFenceSelection` 增加 `allowPalisades?` 选项；`ActionDetailEffects` 的 `fencing` / `palisading` 日志拆分；前端 `useFarmSelection` 增加模式切换。新增错误码 `EDGE_TYPE_CONFLICT`、`PALISADES_NOT_UNLOCKED`。跨卡迁移（A22 / A34 / A47 / A68 / B119 / C54 / C88 / E74 / E108，共 9 张 fence-keyed 卡）仅是数据访问面从 `player.fences` 切到 `getFenceCount(player)`——纯围栏场景下可观察行为未变；只有在 B30 打出后 palisade 才被相应排除。
 - **2026-04-17 — A87 Conservator 完整实现**：`renovate-house` 重构为可参数化（`params.skipClayTier`），删除独立 `renovate-house-to-stone`；A87 加 `computeReplace` + `isDoable` 两个 listener；新增 i18n key `ui.interactionConservatorDirectStone`。renovation 折扣天然复用到 Conservator 分支：cost-type modifier `appliesTo: ['renovation']`（A143 Stonecutter / A123 FrameBuilder）经 `payTypedFlatCost` 与 actionId 无关；actionId-keyed `computeCosts` 监听器（D154 ChimneySweep）也命中该 branch，只是其自带 `houseType === 'clay'` 守卫（§2.3 独立 bug）当前阻止其在 wood→stone 上生效。
 - **2026-04-17 §6 24 张卡逐项复核完成**：原 §6 的 23 张"未复核"全部核对，按 ✅/⚠/❌ 重排进 §2.1–§2.4；C129/C137 卡名从 WetNurse/Baker 修正为 SecondSpouse/CharcoalBurner；E132 VeggieLover 从原 §5 "刻意不同"移除（其实是 3+ 卡且行为已对齐）。
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 14 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 15 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 14 张。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 15 张。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -74,6 +75,7 @@
 | E156 ClaypitOwner | 对手打/造印刷 clay 成本改良 → 1 food + 1 clay | 印刷成本检测覆盖 minor + major（含复合成本 fees） |
 | A25 Bassinet | 首次使用非累积空间且格上恰好 1 人（含新生儿），可 canUseOccupied + family growth；Meeting Place 显式排除 | Worker 身份模型重写；`countPeopleOnSpace` helper + actions 过滤器 bug 已修（2026-04-17） |
 | A87 Conservator | 木屋玩家可在 House Redevelopment 上选直跳 stone（XOR） | computeReplace+isDoable 双 listener；A143/A123 走 `appliesTo:['renovation']` cost-type modifier 自动生效；D154 actionId 监听器也会命中，但其 clay-only 守卫（§2.3）当前屏蔽 wood→stone |
+| B30 WoodPalisades | 按 segment 替代 fence：2 wood、+1 VP、不计入 `MAX_FENCES`、不进入 fence-keyed 卡统计 | `FenceSegment[]` + `getFenceCount`/`getPalisadeCount` helper；`validateFenceSelection({ allowPalisades })`；`ActionDetailEffects.fencing` / `palisading` 拆分；9 张 fence-keyed 卡迁到 helper（见 §2.0 changelog） |
 
 ### 2.2 🟡 简化实现（10 张）
 
@@ -127,7 +129,6 @@
 
 | 卡牌 | BGA 行为 | 我们的行为 | 偏离原因 | 回归 BGA 的代价 |
 |---|---|---|---|---|
-| B30 WoodPalisades | 在围栏 tile 上叠 2 木（替代 1 fence），按 fence-space 计 1 分 | 当前数据 desc 与 BGA 同步，但围栏数据模型仍按"fence count"，未实现"木代替 fence" | 围栏数据结构改造（`PastureFence` 加 token/wood 类型）影响整套 fencing 算法 | 重写 `shared/game/fences.ts` + scoring + UI 渲染 |
 | B38 FutureBuildingSite | 在所有其它格子用完前，禁用紧贴房屋的正交相邻格 | 故意简化：未做"邻接禁用" | 需要 placement 阶段全局可用性裁定，影响 `place-farmer` 的 `isDoable` | `isDoable` 加一个 placement 几何裁定 hook |
 | B132 EstateMaster | "用完所有 farmyard 格"后每个 harvest 蔬菜 +1 VP | 故意简化：长效条件未严格判断 | "无 unused farmyard" 状态需要每回合扫描，且与 D33/B38 类条件需统一抽象 | 抽象 `onFarmyardSaturationChange` hook |
 | D161 CabbageBuyer | 按改良类型 3/2/1 售价 | 固定 2 食物 | 改良分类未对外暴露；BGA 内部走 cardType 字符串匹配 | 暴露 `card.subtype` 给 listener，或加 helper |
@@ -178,6 +179,10 @@
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
 | **Worker 身份模型**（2026-04-17） | ✅ | `PlayerState.workers[]`（5 槽，isActive/isNewborn）+ `ActionSpace.takenBy: WorkerRef[]` + `__roundPlacement__` 升级为 `{spaceId, workerId}[]`。删除聚合字段 familySize / newbornCount / workersAvailable，全部走 `shared/game/player.ts` helper。消费者：A25 Bassinet、B4 WoodPile（TODO 可接）、A92 AdoptiveParents（从盲减升级为精确取回）。 |
 | **`countPeopleOnSpace` helper**（2026-04-17） | ✅ | `shared/cards/helpers/space-occupancy.ts`：返回某行动格上当前物理占位的人数（含新生儿）。依赖 Worker 身份模型——等于 `space.takenBy.length`。消费者：A25 Bassinet；B4 WoodPile 原 TODO 可顺带消化。 |
+| `FenceSegment[]` + `getFenceCount` / `getPalisadeCount` | ✅ | B30：`PlayerState.fences` 由数值字段改为类型化 segment 数组；所有旧 `player.fences` 读取迁到 helper（`shared/game/types.ts` + `shared/actions/effects/fencing.ts`） |
+| `validateFenceSelection({ allowPalisades })` | ✅ | B30：围栏选择校验支持 palisade 模式，新增错误码 `EDGE_TYPE_CONFLICT` / `PALISADES_NOT_UNLOCKED` |
+| `ActionDetailEffects` fencing / palisading 拆分 | ✅ | B30：effects 日志区分围栏与木栅两种建造 |
+| `useFarmSelection` 围栏/木栅模式切换 | ✅ | B30 前端：同一 farm selection 可切换 fence / palisade 目标 |
 
 ---
 
@@ -211,6 +216,8 @@
 | Wave 8 high-complexity | 04-17 | +3 | 810 | 90.8% |
 | D155 exchanges fixup | 04-17 | +1 | 811 | 90.9% |
 | Wave 9 + desc align | 04-17 | +6 | 817 | 91.6% |
+| A87 Conservator | 04-17 | +1 | 818 | 91.7% |
+| B30 Wood Palisades | 04-17 | +1 | 819 | 91.8% |
 
 ### 2026-04-17 Wave 1-9 明细
 
