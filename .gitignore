@@ -8,8 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# Local BGA Agricola reference (clone separately; private org repo)
-bga-agricola/
 dist
 dist-ssr
 *.local
