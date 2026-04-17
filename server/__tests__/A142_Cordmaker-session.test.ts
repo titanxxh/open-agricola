@@ -87,8 +87,13 @@ describe('A142_Cordmaker', () => {
     expect(children).toHaveLength(2)
     expect(children[0].actionId).toBe('gain')
     expect(children[0].params).toEqual({ grain: 1 })
-    expect(children[1].actionId).toBe('gain')
-    expect(children[1].params).toEqual({ vegetable: 1 })
+    // Second branch: pay 2 food, then gain 1 vegetable (BGA: buy 1 vegetable for 2 food)
+    expect(children[1].type).toBe('seq')
+    const payGainChildren = children[1].children
+    const payLeaf = payGainChildren.find((c: any) => c.actionId === 'pay-resources')
+    const gainLeaf = payGainChildren.find((c: any) => c.actionId === 'gain')
+    expect(payLeaf.params).toEqual({ food: 2 })
+    expect(gainLeaf.params).toEqual({ vegetable: 1 })
   })
 
   it('opponent triggers optional xor choice of grain/vegetable for card owner', () => {
