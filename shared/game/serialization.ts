@@ -34,7 +34,7 @@ export const rebuildActiveModifiers = (state: GameState): GameState => {
   state.players.forEach((player) => {
     const existing = player.activeModifiers ?? []
     const next = [...existing]
-    const playedCardIds = [...(player.minorPlayed ?? []), ...(player.occupationPlayed ?? []), ...(player.extraOccupationsFromCards ?? [])]
+    const playedCardIds = [...(player.minorPlayed ?? []), ...(player.occupationPlayed ?? [])]
     playedCardIds.forEach((cardId) => {
       const modifiers = getCardModifiers(cardId)
       modifiers.forEach((modifier) => {
