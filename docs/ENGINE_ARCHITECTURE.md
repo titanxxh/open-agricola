@@ -991,6 +991,16 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 
 如果某些字段只服务于后端恢复，例如 `roundStartSnapshot`，建议不要在每次 `stateUpdate` 中携带，而是保留在服务端。
 
+### 11.4.1 Worker 身份模型（2026-04-17）
+
+- `PlayerState.workers: Worker[]`（固定 5 槽，id `'1'..'5'`）是 worker 身份的唯一真相源；`isActive` / `isNewborn` 两个布尔标记状态。
+- 聚合数字通过 `shared/game/player.ts` 的 helper 按需计算：`familySize(p)`、`newbornCount(p)`、`workersAvailable(state, p)`、`smallestAvailableWorker(state, p)`、`findFirstNewborn(p)`、`activateSmallestInactive(p)`。
+- `ActionSpace.takenBy: WorkerRef[]`，按放置顺序记录；`takenBy.length` 即"格上有几个人"（含新生儿）。
+- Family Growth 会把新生儿的 WorkerRef 也 push 到 FG 格的 takenBy（匹配 BGA "新生儿坐 FG 格" 语义），但不调用 `recordRoundPlacement`。
+- `__roundPlacement__` 现在记录 `{spaceId, workerId}[]`；`getRoundPlacementOrder(p)` 仍返回 `string[]` 保留向后兼容，`getRoundPlacementDetails(p)` 返回结构化列表。
+- A92 AdoptiveParents 精准定位新生儿（`findFirstNewborn`），从所在 space 的 takenBy 移除对应 WorkerRef 并把该 worker 的 `isNewborn` 翻为 false。
+- 送工人回家路径（D150 GodlySpouse / D93 SheepInspector / E3 TeaTime）通过 `removeWorkerRef(space, playerId, workerId)` 按 workerId 精确移除，保留其他占位者。
+
 ### 11.5 `PendingAction` 与结构化日志
 
 除了 `GameState` 本体，前端还依赖两类同步对象：
