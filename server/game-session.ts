@@ -2316,7 +2316,10 @@ export class GameSession {
           safePalisadeEdges,
           adjustedExtraWood,
           freeFences,
-          { skipPayment: true },
+          {
+            skipPayment: true,
+            allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+          },
         )
         if (!validated.ok) return this.respond(false, validated.error?.code ?? 'validation failed')
 
@@ -2340,7 +2343,11 @@ export class GameSession {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
                 farmType: 'fence',
-                payload: { edges: safeEdges, extraWood: extraWood ?? 0 },
+                payload: {
+                  edges: safeEdges,
+                  palisadeEdges: safePalisadeEdges,
+                  extraWood: extraWood ?? 0,
+                },
               },
             },
           }
@@ -2352,6 +2359,7 @@ export class GameSession {
 
         const result = applyFarmChoice(normalized, 'fence', {
           edges: safeEdges,
+          palisadeEdges: safePalisadeEdges,
           extraWood: extraWood ?? 0,
         }, {
           costOverride: override,
