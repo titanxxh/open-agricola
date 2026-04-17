@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
+import { canRenovate } from '../../actions/effects/renovation'
 
 const CARD_ID = 'A87_Conservator'
 
@@ -50,7 +51,25 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'A87-conservator-isdoable-renovate-house',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context) => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'wood') return
+    const stonePlan = {
+      nextType: 'stone' as const,
+      cost: { stone: context.player.rooms, reed: 1 },
+    }
+    if (!canRenovate(context.player, undefined, stonePlan)) return
+    return { doable: true }
+  },
+}
+
 registerCardListener(computeReplaceListener)
+registerCardListener(isDoableListener)
 
 export const A87_Conservator = new Occupation({
   id: CARD_ID,
