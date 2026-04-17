@@ -14,12 +14,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [CARD_ID], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as PlayerState
 
@@ -29,7 +36,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 
@@ -56,7 +63,7 @@ describe('E143_Hewer', () => {
   it('gains stone + food when clay-pit is unoccupied and round >= 3', () => {
     const player = createPlayer()
     const state = createState([player], 3)
-    // clay-pit is unoccupied (takenBy: null)
+    // clay-pit is unoccupied (takenBy: [])
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
@@ -75,7 +82,7 @@ describe('E143_Hewer', () => {
     const player = createPlayer()
     const state = createState([player], 5)
     const clayPit = state.actionSpaces.find(s => s.id === 'clay-pit')!
-    clayPit.takenBy = 'p2'
+    clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
     expect(flow).toBeNull()
   })

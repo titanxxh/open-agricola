@@ -247,7 +247,8 @@ export const GameContainerApi = () => {
   }, [state?.currentPlayerIndex, viewPlayerId])
 
   const {
-    pendingFenceEdges, setPendingFenceEdges, fenceError, setFenceError,
+    pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
+    fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
     pendingPlowTile, setPendingPlowTile, plowError, setPlowError,
@@ -382,6 +383,7 @@ export const GameContainerApi = () => {
       if (interaction.farm.farmType === 'fence') {
         void transport.commitFarm(pendingPlayerIndex, 'fence', {
           edges: pendingFenceEdges,
+          palisadeEdges: pendingPalisadeEdges,
           extraWood: interaction.farm.extraWood ?? 0,
         }).catch((e) => console.error(e))
         return
@@ -439,7 +441,7 @@ export const GameContainerApi = () => {
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingFieldSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingFieldSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -794,8 +796,9 @@ export const GameContainerApi = () => {
     return map
   }, [displayPlayer?.fields])
   const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])
-  const existingFenceSet = useMemo(() => new Set(displayPlayer?.fenceSegments ?? []), [displayPlayer?.fenceSegments])
+  const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
+  const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
 
   const farmInteraction =
     interaction.stateId === 'farmSelect' ? interaction.farm : null
@@ -1524,7 +1527,7 @@ export const GameContainerApi = () => {
                 pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
                 pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
                 existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
                 toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
                 togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
@@ -1566,6 +1569,9 @@ export const GameContainerApi = () => {
         hasActionStartSnapshot={hasActionStartSnapshot}
         anytimeActions={interaction.anytimeActions}
         takeAnytimeAction={takeAnytimeAction}
+        hasWoodPalisadesCard={!!currentPlayer?.minorPlayed?.includes('B30_WoodPalisades')}
+        fencePlacementMode={fencePlacementMode}
+        setFencePlacementMode={setFencePlacementMode}
       />
     </div>
   )

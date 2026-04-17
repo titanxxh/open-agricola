@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 
+import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/game/player'
 import '../../shared/cards/A/A85_Homekeeper'
 
 const CARD_ID = 'A85_Homekeeper'
@@ -25,7 +26,7 @@ describe('A85_Homekeeper session', () => {
 
     const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
     if (!wishChildren) throw new Error('wish-children space missing')
-    wishChildren.takenBy = null
+    wishChildren.takenBy = []
   }
 
   it('grants +1 capacity in a clay house when one room is adjacent to both a field and a pasture', () => {
@@ -150,8 +151,8 @@ describe('A85_Homekeeper session', () => {
     player.houseType = 'clay'
     player.occupationPlayed = [CARD_ID]
     player.rooms = 2
-    player.familySize = 2
-    player.workersAvailable = 2
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
     player.roomTiles = [
       { row: 0, col: 0 },
       { row: 2, col: 2 },
@@ -177,7 +178,7 @@ describe('A85_Homekeeper session', () => {
 
     const resp = session.takeAction(0, 'wish-children')
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.familySize).toBe(3)
-    expect(resp.state.players[0]!.newbornCount).toBe(1)
+    expect(familySize(resp.state.players[0]!)).toBe(3)
+    expect(newbornCount(resp.state.players[0]!)).toBe(1)
   })
 })

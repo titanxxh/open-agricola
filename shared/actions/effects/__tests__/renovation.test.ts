@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PlayerState } from '../../../game/types'
-import { canRenovate, getRenovation, renovateHouse } from '../renovation'
+import {
+  buildRenovationPlan,
+  canRenovate,
+  getRenovation,
+  renovateHouse,
+  renovateHouseAction,
+} from '../renovation'
 
 const createPlayer = (
   overrides: Partial<PlayerState> = {},
@@ -23,8 +29,13 @@ const createPlayer = (
     begging: 0,
     ...(overrides.resources ?? {}),
   },
-  familySize: 2,
-  workersAvailable: 2,
+  workers: [
+    { id: '1', isActive: true, isNewborn: false },
+    { id: '2', isActive: true, isNewborn: false },
+    { id: '3', isActive: false, isNewborn: false },
+    { id: '4', isActive: false, isNewborn: false },
+    { id: '5', isActive: false, isNewborn: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -40,7 +51,6 @@ const createPlayer = (
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -84,5 +94,117 @@ describe('renovation', () => {
     expect(player.houseType).toBe('clay')
     expect(player.resources.clay).toBe(0)
     expect(player.resources.reed).toBe(0)
+  })
+
+  it('builds the wood-to-stone direct plan when target=stone is requested explicitly', () => {
+    const player = createPlayer({ rooms: 3 })
+
+    expect(buildRenovationPlan(player, 'stone')).toEqual({
+      nextType: 'stone',
+      cost: { stone: 3, reed: 1 },
+    })
+  })
+
+  it('returns the standard clay-to-stone plan from buildRenovationPlan(target=stone)', () => {
+    const player = createPlayer({ houseType: 'clay', rooms: 2 })
+
+    expect(buildRenovationPlan(player, 'stone')).toEqual({
+      nextType: 'stone',
+      cost: { stone: 2, reed: 1 },
+    })
+  })
+
+  it('returns null when buildRenovationPlan is asked for an illegal target', () => {
+    const stoneHouse = createPlayer({ houseType: 'stone' })
+    expect(buildRenovationPlan(stoneHouse, 'stone')).toBeNull()
+    expect(buildRenovationPlan(stoneHouse, 'clay')).toBeNull()
+    const clayHouse = createPlayer({ houseType: 'clay' })
+    expect(buildRenovationPlan(clayHouse, 'clay')).toBeNull()
+  })
+
+  it('renovates a wood house directly to stone via buildRenovationPlan(target=stone)', () => {
+    const player = createPlayer({
+      rooms: 2,
+      resources: { stone: 2, reed: 1 },
+    })
+    const stonePlan = buildRenovationPlan(player, 'stone')
+
+    expect(canRenovate(player, undefined, stonePlan)).toBe(true)
+    expect(renovateHouse(player, undefined, stonePlan)).toBe(true)
+    expect(player.houseType).toBe('stone')
+    expect(player.resources.stone).toBe(0)
+    expect(player.resources.reed).toBe(0)
+  })
+
+  it('keeps the default plan from getRenovation(player) (no params)', () => {
+    const player = createPlayer({ rooms: 2 })
+
+    expect(getRenovation(player)).toEqual({
+      nextType: 'clay',
+      cost: { clay: 2, reed: 1 },
+    })
+  })
+})
+
+describe('renovateHouseAction (engine opt-in choice flow)', () => {
+  const buildExecutionContext = (player: PlayerState, params?: Record<string, unknown>) => ({
+    state: { players: [player] } as never,
+    player,
+    space: { id: 'renovate-house' } as never,
+    params,
+  })
+
+  it('exposes a single base option matching the default next material', () => {
+    const wood = createPlayer({ rooms: 2 })
+    expect(renovateHouseAction.getBaseChoiceOptions?.(buildExecutionContext(wood))).toEqual([
+      { value: 'clay', labelKey: 'ui.interactionRenovateToClay' },
+    ])
+
+    const clay = createPlayer({ houseType: 'clay', rooms: 2 })
+    expect(renovateHouseAction.getBaseChoiceOptions?.(buildExecutionContext(clay))).toEqual([
+      { value: 'stone', labelKey: 'ui.interactionRenovateToStone' },
+    ])
+
+    const stone = createPlayer({ houseType: 'stone', rooms: 2 })
+    expect(renovateHouseAction.getBaseChoiceOptions?.(buildExecutionContext(stone))).toEqual([])
+  })
+
+  it('declares a choice prompt key and a renovation-fail log key', () => {
+    expect(renovateHouseAction.choicePromptKey).toBe('ui.interactionChooseRenovationTarget')
+    expect(renovateHouseAction.noChoiceLogKey).toBe('log.renovationFail')
+  })
+
+  it('execute() must never run directly — engine must use getBaseChoiceOptions/resolveChoice', () => {
+    const player = createPlayer({ resources: { clay: 2, reed: 1 } })
+    expect(renovateHouseAction.execute(buildExecutionContext(player))).toEqual({
+      type: 'fail',
+      logKey: 'log.renovationFail',
+    })
+  })
+
+  it('resolveChoice("clay") executes the wood→clay tier and pays the cost', () => {
+    const player = createPlayer({ resources: { clay: 2, reed: 1 } })
+    const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'clay')
+    expect(result).toEqual({ type: 'ok' })
+    expect(player.houseType).toBe('clay')
+    expect(player.resources.clay).toBe(0)
+    expect(player.resources.reed).toBe(0)
+  })
+
+  it('resolveChoice("stone") executes the wood→stone direct tier (Conservator path)', () => {
+    const player = createPlayer({ resources: { stone: 2, reed: 1 } })
+    const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'stone')
+    expect(result).toEqual({ type: 'ok' })
+    expect(player.houseType).toBe('stone')
+    expect(player.resources.stone).toBe(0)
+    expect(player.resources.reed).toBe(0)
+  })
+
+  it('resolveChoice fails when the chosen target is illegal for the current house', () => {
+    const stone = createPlayer({ houseType: 'stone' })
+    expect(renovateHouseAction.resolveChoice!(buildExecutionContext(stone), 'stone')).toEqual({
+      type: 'fail',
+      logKey: 'log.renovationFail',
+    })
   })
 })

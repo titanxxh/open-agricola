@@ -3,6 +3,7 @@ import { GameSession } from '../../../../server/game-session'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as ON_ROUND_END_ID } from '../Stub_OnRoundEnd'
 import { clearActionHooks } from '../../../actions/hooks'
+import { markAllWorkersUsed } from '../../../game/player'
 
 describe('Stub_OnRoundEnd mechanism', () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
 
     const p0 = state.players[0]
     p0.minorPlayed.push(ON_ROUND_END_ID)
-    state.players.forEach(p => { p.workersAvailable = 0 })
+    state.players.forEach(p => markAllWorkersUsed(state, p))
 
     session.loadState(state)
 

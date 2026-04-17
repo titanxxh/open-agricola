@@ -16,12 +16,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [CARD_ID], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as unknown as PlayerState
@@ -32,7 +39,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 
@@ -51,10 +58,10 @@ describe('D165_PigStalker', () => {
       round: 4, phase: 'work', currentPlayerIndex: 0,
       players: [player],
       actionSpaces: [
-        createSpace('sheep-market', { takenBy: 'p1' }),
-        createSpace('grain-utilization', { takenBy: 'p1' }), // adjacent to sheep-market
-        createSpace('fencing', { takenBy: null }),
-        createSpace('major-improvement', { takenBy: null }),
+        createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
+        createSpace('grain-utilization', { takenBy: [{ playerId: 'p1', workerId: '1' }] }), // adjacent to sheep-market
+        createSpace('fencing', { takenBy: [] }),
+        createSpace('major-improvement', { takenBy: [] }),
       ],
       log: [], roundStartSnapshot: null,
       roundActionOrder,
@@ -88,10 +95,10 @@ describe('D165_PigStalker', () => {
       round: 4, phase: 'work', currentPlayerIndex: 0,
       players: [player],
       actionSpaces: [
-        createSpace('sheep-market', { takenBy: 'p1' }),
-        createSpace('grain-utilization', { takenBy: null }), // adjacent but unoccupied
-        createSpace('fencing', { takenBy: null }),
-        createSpace('major-improvement', { takenBy: null }),
+        createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
+        createSpace('grain-utilization', { takenBy: [] }), // adjacent but unoccupied
+        createSpace('fencing', { takenBy: [] }),
+        createSpace('major-improvement', { takenBy: [] }),
       ],
       log: [], roundStartSnapshot: null,
       roundActionOrder,

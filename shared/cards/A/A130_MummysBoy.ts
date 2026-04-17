@@ -7,6 +7,8 @@ import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { isSpaceOccupied } from '../../game/space'
+import { familySize, workersAvailable } from '../../game/player'
 
 const CARD_ID = 'A130_MummysBoy'
 
@@ -39,14 +41,14 @@ const computeArgsListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     // Need at least 2 farmers already placed (placedFarmers = familySize - workersAvailable)
-    const placedFarmers = context.player.familySize - context.player.workersAvailable
+    const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
     if (placedFarmers < 2) return
     const secondSpaceId = getSecondFarmerSpaceId(context)
     if (!secondSpaceId) return
     if (MEETING_PLACE_IDS.has(secondSpaceId)) return
     // Only add if the space is occupied (otherwise it's already available)
     const space = context.state.actionSpaces.find((s) => s.id === secondSpaceId)
-    if (!space || !space.takenBy) return
+    if (!space || !isSpaceOccupied(space)) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${secondSpaceId}`,
@@ -66,7 +68,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    const placedFarmers = context.player.familySize - context.player.workersAvailable
+    const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
     if (placedFarmers < 3) return
     const secondSpaceId = getSecondFarmerSpaceId(context)
     if (!secondSpaceId) return

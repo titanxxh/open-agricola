@@ -61,12 +61,9 @@ const createPlayer = (): PlayerState => ({
     cattle: 0,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
   rooms: 2,
   houseType: 'wood',
   fields: [],
-  fences: 0,
   roomTiles: [
     { row: 2, col: 0 },
     { row: 1, col: 0 },
@@ -81,7 +78,6 @@ const createPlayer = (): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -120,7 +116,7 @@ describe('farm choice', () => {
     expect(result.meta).toMatchObject({
       sourceCard: 'E74_AshTrees',
       usedFreeFences: 4,
-      newEdges: edgesForTile(1, 1),
+      newFenceEdges: edgesForTile(1, 1),
     })
     expect(result.meta?.newPastures).toHaveLength(1)
   })

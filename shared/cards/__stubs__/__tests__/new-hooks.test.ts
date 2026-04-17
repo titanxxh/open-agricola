@@ -9,6 +9,7 @@ import { CARD_ID as HARVEST_FIELD_ID } from '../Stub_HarvestFieldPhase'
 import { CARD_ID as HARVEST_FEEDING_ID } from '../Stub_HarvestFeedingPhase'
 import { CARD_ID as END_HARVEST_ID } from '../Stub_EndHarvest'
 import { clearActionHooks } from '../../../actions/hooks'
+import { markAllWorkersUsed } from '../../../game/player'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -22,7 +23,7 @@ function makeSession(round: number, stubCardIds: string[]) {
   for (const id of stubCardIds) {
     p0.minorPlayed.push(id)
   }
-  state.players.forEach(p => { p.workersAvailable = 0 })
+  state.players.forEach(p => markAllWorkersUsed(state, p))
   session.loadState(state)
   return { session, state }
 }

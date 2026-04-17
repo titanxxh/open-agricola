@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E51_WhaleOil'
 
 const CARD_ID = 'E51_WhaleOil'
@@ -14,7 +15,7 @@ const setup = (options?: { foodCount?: number }) => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 10
   player.resources.wood = 10
 

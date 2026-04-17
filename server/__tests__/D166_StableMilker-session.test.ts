@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D166_StableMilker'
 
 describe('D166_StableMilker session', () => {
@@ -16,14 +17,14 @@ describe('D166_StableMilker session', () => {
     player.resources.wood = 10
     player.resources.food = 10
     player.resources.cattle = 0
-    player.workersAvailable = 3
+    setWorkersAtHome(state, player, 3)
     state.players[1]!.workersAvailable = 3
 
     // Make farm-expansion available for stable building
     const farmExpansion = state.actionSpaces.find((s) => s.id === 'farm-expansion')
     if (farmExpansion) {
       farmExpansion.roundAvailable = 1
-      farmExpansion.takenBy = null
+      farmExpansion.takenBy = []
     }
 
     session.loadState(state)

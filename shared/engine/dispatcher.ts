@@ -182,6 +182,32 @@ export class HookDispatcher {
     return [...actionResults, ...listenerResults]
   }
 
+  computeChoiceCandidates(
+    context: ActionExecutionContext & { actionId: string },
+  ) {
+    const actionResults = runActionHooks({ ...context, phase: 'computeChoiceCandidates' })
+    const listenerContext: CardListenerContext = {
+      ...context,
+      phase: 'computeChoiceCandidates',
+    }
+    const matched = getMatchingListeners(listenerContext)
+    const listenerResults: ActionHookResult[] = []
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, listenerContext, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (result) listenerResults.push(result)
+    }
+    return [...actionResults, ...listenerResults]
+  }
+
+  isOptionAffordable(
+    context: ActionExecutionContext & { actionId: string },
+    action: ActionDefinition,
+  ) {
+    return this.applyCostPreviewDoable(context, action, true)
+  }
+
   before(context: ActionExecutionContext & { actionId: string }): EffectPhaseResult {
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'before' }),

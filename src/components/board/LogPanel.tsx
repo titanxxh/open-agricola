@@ -394,6 +394,13 @@ export const LogPanel = ({ locale, log, variant = 'bottom' }: Props) => (
               t(locale, 'log.effectFencing', { count: effectData.fencing }),
             )
           }
+          if (effectData.palisading) {
+            effects.push(
+              t(locale, 'log.effectPalisading', {
+                count: effectData.palisading,
+              }),
+            )
+          }
           if (effectData.improvements && effectData.improvements.length > 0) {
             const refs = effectData.improvements
               .map((id) => resolveCardName(locale, id))

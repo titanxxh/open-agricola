@@ -18,6 +18,7 @@ export type ActionDetailEffects = {
   sowVegetable?: number
   renovate?: { from: PlayerState['houseType']; to: PlayerState['houseType'] }
   fencing?: number
+  palisading?: number
   improvements?: string[]
   minorImprovements?: string[]
   startPlayer?: boolean

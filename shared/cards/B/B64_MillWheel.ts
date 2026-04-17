@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B64_MillWheel'
 
@@ -15,7 +16,7 @@ const listener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-utilization') return
     const fishing = context.state.actionSpaces.find((s) => s.id === 'fishing')
-    if (!fishing?.takenBy) return
+    if (!fishing || !isSpaceOccupied(fishing)) return
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }

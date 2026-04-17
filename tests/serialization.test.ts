@@ -25,7 +25,7 @@ describe('shared/game/serialization', () => {
         expect(space.id).toBeDefined()
         expect(space.nameKey).toBeDefined()
         expect(space.resources).toBeDefined()
-        expect(space.takenBy).toBeNull()
+        expect(space.takenBy).toEqual([])
       }
     })
 
@@ -67,14 +67,14 @@ describe('shared/game/serialization', () => {
       const space = modified.actionSpaces.find((s) => s.gainPerRound.wood)
       if (space) {
         space.resources.wood = 99
-        space.takenBy = 'p1'
+        space.takenBy = [{ playerId: 'p1', workerId: '1' }]
       }
       const serialized = serializeState(modified)
       const restored = rehydrateState(serialized)
       if (space) {
         const restoredSpace = restored.actionSpaces.find((s) => s.id === space.id)
         expect(restoredSpace?.resources.wood).toBe(99)
-        expect(restoredSpace?.takenBy).toBe('p1')
+        expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
       }
     })
 

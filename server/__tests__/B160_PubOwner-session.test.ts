@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B160_PubOwner'
 
 const CARD_ID = 'B160_PubOwner'
@@ -37,9 +38,9 @@ describe('B160_PubOwner session', () => {
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (forest) forest.takenBy = 'p2'
-    if (clayPit) clayPit.takenBy = 'p1'
-    if (reedBank) reedBank.takenBy = 'p2'
+    if (forest) forest.takenBy = [{ playerId: 'p2', workerId: '1' }]
+    if (clayPit) clayPit.takenBy = [{ playerId: 'p1', workerId: '1' }]
+    if (reedBank) reedBank.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
     session.loadState(state)
 
@@ -64,8 +65,8 @@ describe('B160_PubOwner session', () => {
     // Only clay-pit and reed-bank taken, forest not taken
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (clayPit) clayPit.takenBy = 'p1'
-    if (reedBank) reedBank.takenBy = 'p2'
+    if (clayPit) clayPit.takenBy = [{ playerId: 'p1', workerId: '1' }]
+    if (reedBank) reedBank.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
     session.loadState(state)
 
@@ -99,7 +100,7 @@ describe('B160_PubOwner session', () => {
     state.round = 1
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 

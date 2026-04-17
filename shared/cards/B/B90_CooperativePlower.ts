@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B90_CooperativePlower'
 
@@ -14,7 +15,7 @@ const listener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'farmland') return
     const grainSeeds = context.state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (!grainSeeds?.takenBy) return
+    if (!grainSeeds || !isSpaceOccupied(grainSeeds)) return
     return {
       flow: {
         type: 'leaf',

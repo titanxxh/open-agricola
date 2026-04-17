@@ -8,6 +8,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import '../B/B36_Bottles'
 import { B36_Bottles as B36Card } from '../B/B36_Bottles'
 
+import { setActiveWorkerCount } from '../../game/player'
 const CARD_ID = 'B36_Bottles'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -17,12 +18,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as unknown as PlayerState
@@ -43,7 +51,7 @@ const createSpace = (id: string): ActionSpace =>
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
   }) as ActionSpace
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
@@ -58,7 +66,7 @@ describe('B36_Bottles', () => {
     const listener = findListener('B36-bottles-compute-costs')!
     expect(listener).toBeDefined()
     const player = createPlayer()
-    player.familySize = 2
+    setActiveWorkerCount(player, 2)
     const state = createState(player)
 
     const result = executeCardListener(listener, {
@@ -74,7 +82,7 @@ describe('B36_Bottles', () => {
   it('computeCosts scales with 3 farmers', () => {
     const listener = findListener('B36-bottles-compute-costs')!
     const player = createPlayer()
-    player.familySize = 3
+    setActiveWorkerCount(player, 3)
     const state = createState(player)
 
     const result = executeCardListener(listener, {
@@ -90,7 +98,7 @@ describe('B36_Bottles', () => {
   it('computeCosts scales with 5 farmers', () => {
     const listener = findListener('B36-bottles-compute-costs')!
     const player = createPlayer()
-    player.familySize = 5
+    setActiveWorkerCount(player, 5)
     const state = createState(player)
 
     const result = executeCardListener(listener, {

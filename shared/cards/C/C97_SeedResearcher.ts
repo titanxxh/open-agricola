@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'C97_SeedResearcher'
 
@@ -12,7 +13,8 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     const vegSeeds = state.actionSpaces.find((s) => s.id === 'vegetable-seeds')
-    if (!grainSeeds?.takenBy || !vegSeeds?.takenBy) return
+    if (!grainSeeds || !vegSeeds) return
+    if (!isSpaceOccupied(grainSeeds) || !isSpaceOccupied(vegSeeds)) return
 
     if (player.occupationHand.length === 0) {
       return gainLeaf(CARD_ID, { food: 2 })

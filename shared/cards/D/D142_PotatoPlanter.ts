@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D142_PotatoPlanter'
 
@@ -14,10 +15,10 @@ registerCardEffect({
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
 
-    const onClayPit = clayPit?.takenBy === player.id
-    const onReedBank = reedBank?.takenBy === player.id
-    const clayPitOccupied = !!clayPit?.takenBy
-    const reedBankOccupied = !!reedBank?.takenBy
+    const onClayPit = !!clayPit && spaceHasPlayer(clayPit, player.id)
+    const onReedBank = !!reedBank && spaceHasPlayer(reedBank, player.id)
+    const clayPitOccupied = !!clayPit && isSpaceOccupied(clayPit)
+    const reedBankOccupied = !!reedBank && isSpaceOccupied(reedBank)
 
     if (
       (onClayPit && !reedBankOccupied) ||

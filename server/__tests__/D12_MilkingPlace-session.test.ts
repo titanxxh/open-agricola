@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D12_MilkingPlace'
 
 describe('D12_MilkingPlace session', () => {
@@ -57,8 +58,8 @@ describe('D12_MilkingPlace session', () => {
     // Set up for harvest round 4
     state.round = 4
     for (const p of state.players) {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
       p.resources.food = 10 // enough food so no begging
     }
     // Player 0 starts with exactly 1 food (needs 2 to feed family of 1)
@@ -95,8 +96,8 @@ describe('D12_MilkingPlace session', () => {
     state.round = 4
 
     for (const p of state.players) {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
       p.resources.food = 10
     }
     // Player 0 has only 1 food, needs 2 for family of 1, no card

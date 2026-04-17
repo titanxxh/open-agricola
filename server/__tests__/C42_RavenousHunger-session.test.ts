@@ -6,6 +6,7 @@ import {
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C42_RavenousHunger'
 
 const CARD_ID = 'C42_RavenousHunger'
@@ -17,12 +18,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 5,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [CARD_ID],
     occupationHand: [], occupationPlayed: [], playedCards: [`minor:${CARD_ID}`],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as PlayerState
@@ -43,7 +51,7 @@ const createSpace = (id: string, gainPerRound: Partial<Record<string, number>> =
     roundAvailable: 1, gainPerRound,
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
   }) as ActionSpace
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
@@ -90,8 +98,8 @@ describe('C42_RavenousHunger', () => {
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    player.workersAvailable = 0
     const state = createState(player)
+    markAllWorkersUsed(state, player)
 
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),

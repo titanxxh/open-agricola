@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 
 import '../../shared/cards/A/A94_LazySowman'
 
@@ -19,7 +20,7 @@ const setup = (options?: {
   state.roundActionOrder[0] = options?.actionId ?? 'grain-utilization'
 
   const player = state.players[0]!
-  player.workersAvailable = options?.workersAvailable ?? 2
+  setWorkersAtHome(state, player, options?.workersAvailable ?? 2)
   player.resources.grain = options?.grain ?? 0
   player.resources.vegetable = options?.vegetable ?? 0
   player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
@@ -55,9 +56,9 @@ describe('A94_LazySowman session', () => {
     resp = session.resolveChoice(0, 'allow-occupied:day-laborer')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
-    expect(resp.state.players[0]!.workersAvailable).toBe(0)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(4)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
   it('does not trigger the extra placement when no worker remains after taking the action', () => {
@@ -66,7 +67,7 @@ describe('A94_LazySowman session', () => {
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
-    expect(resp.state.players[0]!.workersAvailable).toBe(0)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
   })
 

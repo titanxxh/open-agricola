@@ -1,6 +1,7 @@
 import { PlayerActionCard } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D51_Archway'
 
@@ -39,10 +40,10 @@ registerCardEffect({
   onBeforeReturnHome: (state, player) => {
     // Only the player whose worker is on D51 gets the move effect
     const d51Space = state.actionSpaces.find((s) => s.id === CARD_ID)
-    if (!d51Space || d51Space.takenBy !== player.id) return
+    if (!d51Space || !spaceHasPlayer(d51Space, player.id)) return
     // Check if there are unoccupied action spaces the player can use
     const hasAvailable = state.actionSpaces.some(
-      (s) => !s.takenBy && s.id !== CARD_ID && s.canBeExecutedByPlayer(state, player),
+      (s) => !isSpaceOccupied(s) && s.id !== CARD_ID && s.canBeExecutedByPlayer(state, player),
     )
     if (!hasAvailable) return
     return {

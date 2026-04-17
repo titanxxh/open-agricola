@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E56_RomanPot'
 
 const CARD_ID = 'E56_RomanPot'
@@ -16,7 +17,7 @@ const setup = (options?: { playerCount?: number; foodCount?: number }) => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 5
   player.resources.clay = 5
 

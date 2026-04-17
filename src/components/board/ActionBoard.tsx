@@ -353,16 +353,21 @@ export const ActionBoard = ({
 
   const renderFarmerHolder = (space: ActionSpace) => {
     const markers = farmerMarkersBySpace.get(space.id)
-    const fallbackPlayer = space.takenBy ? players.find((pl) => pl.id === space.takenBy) : null
-    const entries = markers && markers.length > 0
-      ? markers
-      : fallbackPlayer
-        ? [{
-            player: fallbackPlayer,
-            key: `${fallbackPlayer.id}-${space.id}-fallback`,
-            hasOffspring: false,
-          }]
-        : []
+    // Fallback: if there are no custom markers for this space, synthesize one
+    // per occupant from `takenBy` (one marker per placed worker).
+    const fallbackEntries = space.takenBy
+      .map((ref) => {
+        const player = players.find((pl) => pl.id === ref.playerId)
+        return player
+          ? {
+              player,
+              key: `${player.id}-${space.id}-${ref.workerId}-fallback`,
+              hasOffspring: false,
+            }
+          : null
+      })
+      .filter((entry): entry is { player: PlayerState; key: string; hasOffspring: boolean } => entry !== null)
+    const entries = markers && markers.length > 0 ? markers : fallbackEntries
     if (entries.length === 0) return null
     return (
       <div className="farmer-holder" data-n={entries.length}>
@@ -430,7 +435,7 @@ export const ActionBoard = ({
             if (!pos) return null
             const accDir = ACCUMULATE_DIR[space.id]
             const canTake = canTakeAction(space, currentPlayer)
-            const hasFarmer = (farmerMarkersBySpace.get(space.id)?.length ?? 0) > 0 || !!space.takenBy
+            const hasFarmer = (farmerMarkersBySpace.get(space.id)?.length ?? 0) > 0 || space.takenBy.length > 0
             return (
               <div
                 key={space.id}
@@ -475,7 +480,7 @@ export const ActionBoard = ({
             const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
             const canTake = action ? canTakeAction(action, currentPlayer) : false
             const hasFarmer = action
-              ? (farmerMarkersBySpace.get(action.id)?.length ?? 0) > 0 || !!action.takenBy
+              ? (farmerMarkersBySpace.get(action.id)?.length ?? 0) > 0 || action.takenBy.length > 0
               : false
             return (
               <div
@@ -557,8 +562,8 @@ export const ActionBoard = ({
                     cardType={cardType}
                     onClick={() => canTake && takeAction(space)}
                     disabled={!canTake}
-                    usable={canTake && !space.takenBy}
-                    className={space.takenBy ? 'taken' : ''}
+                    usable={canTake && space.takenBy.length === 0}
+                    className={space.takenBy.length > 0 ? 'taken' : ''}
                   />
                   {renderFarmerHolder(space)}
                   {owner && (

@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'A138_Harpooner'
 
@@ -16,7 +17,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || context.space.id !== 'fishing') return
-    const foodGain = context.player.familySize
+    const foodGain = familySize(context.player)
     return {
       flow: {
         type: 'seq',

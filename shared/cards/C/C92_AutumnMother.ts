@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'C92_AutumnMother'
 
@@ -8,7 +9,7 @@ registerCardEffect({
   onBeforeHarvest: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     // Only offer if player has room in house
-    if (player.rooms <= player.familySize) return
+    if (player.rooms <= familySize(player)) return
     if (player.resources.food < 3) return
 
     return {

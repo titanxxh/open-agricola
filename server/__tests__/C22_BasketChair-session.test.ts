@@ -3,6 +3,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C22_BasketChair'
 
 const CARD_ID = 'C22_BasketChair'
@@ -19,8 +20,13 @@ const createPlayer = (
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2,
-    workersAvailable: 2,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
     rooms: 2,
     houseType: 'wood' as const,
     fields: [],
@@ -36,7 +42,6 @@ const createPlayer = (
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
-    newbornCount: 0,
     pastures: [],
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },
@@ -80,8 +85,9 @@ describe('C22_BasketChair session', () => {
   })
 
   it('onBeforeStartOfTurn does nothing when the player has no workers available', () => {
-    const player = createPlayer('p1', { workersAvailable: 0 })
+    const player = createPlayer('p1')
     const state = createState(3, [player])
+    markAllWorkersUsed(state as any, player)
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBeforeStartOfTurn!(state, player)
     expect(flow).toBeUndefined()

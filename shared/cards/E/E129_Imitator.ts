@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'E129_Imitator'
 
@@ -36,12 +37,12 @@ const computeArgsListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Must have a person on Day Laborer
     const dayLaborerSpace = context.state.actionSpaces.find((s) => s.id === 'day-laborer')
-    if (!dayLaborerSpace || dayLaborerSpace.takenBy !== context.player.id) return
+    if (!dayLaborerSpace || !spaceHasPlayer(dayLaborerSpace, context.player.id)) return
     // Find occupied non-accumulating round 1–9 spaces
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
       .filter((s) => {
         if (!NON_ACCUMULATING_ROUND_1_9_SPACES.has(s.id)) return false
-        if (!s.takenBy) return false // free spaces already selectable
+        if (!isSpaceOccupied(s)) return false // free spaces already selectable
         if (s.roundAvailable > 9) return false
         return true
       })

@@ -4,6 +4,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'E62_SourDough'
 
@@ -37,7 +38,7 @@ const anytimeListener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     // All players must still have workers to place
     const allPlayersHaveWorkers = context.state.players.every(
-      (p) => p.workersAvailable > 0,
+      (p) => workersAvailable(context.state, p) > 0,
     )
     if (!allPlayersHaveWorkers) return
     return {

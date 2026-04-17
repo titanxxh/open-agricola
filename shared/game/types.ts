@@ -76,17 +76,29 @@ export type Field = {
   col: number
 }
 
+export type Worker = {
+  id: string
+  isActive: boolean
+  isNewborn: boolean
+}
+
+export type WorkerRef = {
+  playerId: string
+  workerId: string
+}
+
+export type FenceSegmentType = 'fence' | 'palisade'
+export type FenceSegment = { edge: string; type: FenceSegmentType }
+
 export type PlayerState = {
   id: string
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black'
   resources: Resource
-  familySize: number
-  workersAvailable: number
+  workers: Worker[]
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: Field[]
-  fences: number
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
   improvements: string[]
@@ -98,9 +110,8 @@ export type PlayerState = {
   houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
   houseAnimalCount: number
   stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>
-  newbornCount: number
   pastures: Pasture[]
-  fenceSegments: string[]
+  fenceSegments: FenceSegment[]
   majorEffects: MajorEffectState
   startPlayer: boolean
   activeModifiers: CostModifier[]
@@ -286,12 +297,41 @@ export type ActionDefinition = {
     context: ActionExecutionContext,
     choice: string,
   ) => ActionExecutionResult
+  /**
+   * Opt-in: when defined, the engine bypasses `execute()` and instead builds a
+   * choice from `getBaseChoiceOptions(ctx)` merged with hook-injected
+   * `extraOptions` from the `computeChoiceCandidates` phase. The merged list is
+   * filtered for affordability via the action's cost preview (with
+   * `params.selectedOption` injected). The engine then:
+   *   - 0 affordable options → returns a `fail` result with `noChoiceLogKey`.
+   *   - 1 affordable option   → auto-resolves by invoking `resolveChoice(ctx, value)`.
+   *   - ≥2 affordable options → emits a `choice` result with `choicePromptKey`.
+   * The chosen value is also written back into `params.selectedOption` for the
+   * `resolveChoice` call.
+   */
+  getBaseChoiceOptions?: (
+    context: ActionExecutionContext,
+  ) => ActionChoiceOption[]
+  /** Prompt key used when `getBaseChoiceOptions` produces a multi-option choice. */
+  choicePromptKey?: string
+  /** Log key used when no candidate is affordable in the opt-in choice path. */
+  noChoiceLogKey?: string
+  /**
+   * Opt-in: when this action runs as a non-top-level leaf inside a parent
+   * action (e.g. the renovate-house leaf inside `house-redevelopment`'s
+   * SEQ), the session emits a partial `log.actionDetail` immediately on
+   * completion using this action's `nameKey`, then advances the snapshot
+   * baseline so subsequent leaves and the final aggregate don't double-log
+   * the same effect. Leave undefined for actions that should be folded into
+   * the wrapping action's final aggregate detail (default behavior).
+   */
+  emitLeafActionDetail?: boolean
   flow?: ActionFlow
 }
 
 export type ActionSpace = ActionDefinition & {
   resources: Resource
-  takenBy: string | null
+  takenBy: WorkerRef[]
 }
 
 export type PendingAction =

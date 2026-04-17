@@ -4,6 +4,7 @@ import { GameSession } from '../game-session'
 import { D95_SiteManager } from '../../shared/cards/D/D95_SiteManager'
 import { occupations } from '../../shared/game/occupations'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 const CARD_ID = 'D95_SiteManager'
 
 // Catalog registration is handled by the parent agent; for local testing we
@@ -21,7 +22,7 @@ describe('D95_SiteManager session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID, 'A85_Homekeeper']
     // Give 5 clay so Fireplace is affordable (2 clay cost) even without substitution
     player.resources = { ...player.resources, food: 10, wood: 0, clay: 5, stone: 0, reed: 0 }
@@ -78,7 +79,7 @@ describe('D95_SiteManager session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID, 'A85_Homekeeper']
     // 1 clay (lacking 1) + plenty of food. Greedy substitution will replace the
     // second clay unit with 1 food.

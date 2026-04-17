@@ -16,13 +16,20 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood' as const,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood' as const,
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
     cardStates: {},
@@ -33,7 +40,7 @@ const createSpace = (id: string, takenBy: string | null = null): ActionSpace =>
     id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    takenBy,
+    takenBy: takenBy ? [{ playerId: takenBy, workerId: '1' }] : [],
   }) as unknown as ActionSpace
 
 const createState = (
@@ -73,7 +80,7 @@ describe('C23_JobContract listener', () => {
     } as any)
 
     expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toBeNull()
+    expect(lessonsSpace.takenBy).toEqual([])
   })
 
   it('does nothing when the action is not day-laborer', () => {
@@ -90,7 +97,7 @@ describe('C23_JobContract listener', () => {
     } as any)
 
     expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toBeNull()
+    expect(lessonsSpace.takenBy).toEqual([])
   })
 
   it('does nothing when the lessons space is already occupied', () => {
@@ -107,7 +114,7 @@ describe('C23_JobContract listener', () => {
     } as any)
 
     expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toBe('p2')
+    expect(lessonsSpace.takenBy[0]?.playerId).toBe('p2')
   })
 
   it('does nothing when the player has no occupations in hand', () => {
@@ -123,7 +130,7 @@ describe('C23_JobContract listener', () => {
     } as any)
 
     expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toBeNull()
+    expect(lessonsSpace.takenBy).toEqual([])
   })
 
   it('offers optional play-occupation flow and marks lessons as taken', () => {
@@ -147,7 +154,7 @@ describe('C23_JobContract listener', () => {
     expect(flow.children[0].actionId).toBe('play-occupation')
     expect(flow.children[0].sourceCard).toBe(CARD_ID)
     // Lessons space is marked as occupied by this player (fake farmer)
-    expect(lessonsSpace.takenBy).toBe(player.id)
+    expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)
   })
 
   it('passes costOverride with 0 food when the player has no occupations played', () => {

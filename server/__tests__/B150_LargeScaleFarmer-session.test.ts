@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 
 const CARD_ID = 'B150_LargeScaleFarmer'
@@ -18,7 +19,7 @@ const setup = (options?: {
   state.round = 5
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources = {
     ...player.resources,
     food: options?.food ?? 3,

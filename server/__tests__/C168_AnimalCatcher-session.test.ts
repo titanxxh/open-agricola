@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/C/C168_AnimalCatcher'
 
 const CARD_ID = 'C168_AnimalCatcher'
@@ -13,7 +15,7 @@ const setup = (options?: { round?: number; food?: number }) => {
   state.round = options?.round ?? 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = options?.food ?? 10
   player.occupationPlayed.push(CARD_ID)
   player.playedCards.push('occupation:' + CARD_ID)
@@ -35,7 +37,7 @@ const setup = (options?: { round?: number; food?: number }) => {
       animalCount: 0,
     },
   ]
-  player.fences = 8
+  setFencesForTest(player, 8)
 
   session.loadState(state)
   return session

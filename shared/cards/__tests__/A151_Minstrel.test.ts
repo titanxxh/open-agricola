@@ -13,12 +13,19 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [CARD_ID], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as unknown as PlayerState
@@ -29,7 +36,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 
@@ -37,10 +44,10 @@ const createState = (...players: PlayerState[]): GameState =>
   ({
     round: 4, phase: 'work', currentPlayerIndex: 0, players,
     actionSpaces: [
-      createSpace('sheep-market', { takenBy: 'p1', gainPerRound: { sheep: 1 }, resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 3, boar: 0, cattle: 0, begging: 0 } }),
-      createSpace('grain-utilization', { takenBy: 'p1' }),
-      createSpace('fencing', { takenBy: 'p1' }),
-      createSpace('major-improvement', { takenBy: null }),
+      createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }], gainPerRound: { sheep: 1 }, resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 3, boar: 0, cattle: 0, begging: 0 } }),
+      createSpace('grain-utilization', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
+      createSpace('fencing', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
+      createSpace('major-improvement', { takenBy: [] }),
     ],
     log: [], roundStartSnapshot: null,
     // Stage 1 actions in positions 1-4
@@ -70,7 +77,7 @@ describe('A151_Minstrel', () => {
     const state = createState(player)
     // Make fencing also unoccupied
     const fencingSpace = state.actionSpaces.find((s) => s.id === 'fencing')!
-    fencingSpace.takenBy = null
+    fencingSpace.takenBy = []
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).toBeNull()
@@ -81,7 +88,7 @@ describe('A151_Minstrel', () => {
     const state = createState(player)
     // Occupy major-improvement too
     const majorSpace = state.actionSpaces.find((s) => s.id === 'major-improvement')!
-    majorSpace.takenBy = 'p2'
+    majorSpace.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).toBeNull()
@@ -92,9 +99,9 @@ describe('A151_Minstrel', () => {
     const state = createState(player)
     // Make sheep-market unoccupied and major-improvement occupied
     const sheepSpace = state.actionSpaces.find((s) => s.id === 'sheep-market')!
-    sheepSpace.takenBy = null
+    sheepSpace.takenBy = []
     const majorSpace = state.actionSpaces.find((s) => s.id === 'major-improvement')!
-    majorSpace.takenBy = 'p2'
+    majorSpace.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).not.toBeNull()

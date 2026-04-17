@@ -4,6 +4,8 @@ import type { PendingSowCrop } from '../types/ui'
 
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])
+  const [pendingPalisadeEdges, setPendingPalisadeEdges] = useState<string[]>([])
+  const [fencePlacementMode, setFencePlacementMode] = useState<'fence' | 'palisade'>('fence')
   const [fenceError, setFenceError] = useState<{
     code: string
     edges: string[]
@@ -27,11 +29,22 @@ export const useFarmSelection = () => {
   const [pendingFieldSelections, setPendingFieldSelections] = useState<Set<string>>(new Set())
 
   const toggleFenceEdge = (edgeId: string) => {
-    setPendingFenceEdges((prev) =>
-      prev.includes(edgeId)
-        ? prev.filter((edge) => edge !== edgeId)
-        : [...prev, edgeId],
-    )
+    const inFence = pendingFenceEdges.includes(edgeId)
+    const inPalisade = pendingPalisadeEdges.includes(edgeId)
+
+    if (fencePlacementMode === 'fence') {
+      if (inFence) setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))
+      else if (inPalisade) {
+        setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
+        setPendingFenceEdges((prev) => [...prev, edgeId])
+      } else setPendingFenceEdges((prev) => [...prev, edgeId])
+    } else {
+      if (inPalisade) setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
+      else if (inFence) {
+        setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))
+        setPendingPalisadeEdges((prev) => [...prev, edgeId])
+      } else setPendingPalisadeEdges((prev) => [...prev, edgeId])
+    }
   }
 
   const toggleRoomTile = (
@@ -130,6 +143,10 @@ export const useFarmSelection = () => {
   return {
     pendingFenceEdges,
     setPendingFenceEdges,
+    pendingPalisadeEdges,
+    setPendingPalisadeEdges,
+    fencePlacementMode,
+    setFencePlacementMode,
     fenceError,
     setFenceError,
     pendingRoomTiles,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
 
@@ -19,8 +20,7 @@ describe('A128_RiparianBuilder session', () => {
     owner.resources = { ...owner.resources, wood: 5, clay: 10, reed: 6 }
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-
+    setWorkersAtHome(state, opponent, 2)
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
     if (!reedBank) throw new Error('reed-bank space missing')
     reedBank.resources.reed = 3

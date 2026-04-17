@@ -7,6 +7,7 @@ import { clearCardListeners, registerCardListener, executeCardListener } from '.
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
+import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../game/player'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -40,8 +41,13 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
     cattle: 0,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
+  workers: [
+    { id: '1', isActive: true, isNewborn: false },
+    { id: '2', isActive: true, isNewborn: false },
+    { id: '3', isActive: false, isNewborn: false },
+    { id: '4', isActive: false, isNewborn: false },
+    { id: '5', isActive: false, isNewborn: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -57,7 +63,6 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -80,7 +85,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
     cattle: 0,
     begging: 0,
   },
-  takenBy: null,
+  takenBy: [],
 })
 
 const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
@@ -161,8 +166,8 @@ describe('PlaceFarmer card integration', () => {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
         handler: (context: any) => {
-          const { player, space } = context
-          if (player.workersAvailable > 0) return
+          const { state, player, space } = context
+          if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
           if (!hasAccumulation) return
           return { followUpActions: ['bake-bread'] }
@@ -173,8 +178,7 @@ describe('PlaceFarmer card integration', () => {
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
       space.gainPerRound = { wood: 3 }
-      player.workersAvailable = 0
-
+      markAllWorkersUsed(state, player)
       const phase = dispatcher.immediatelyAfter({ state, player, space }, { type: 'ok' })
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
@@ -188,8 +192,8 @@ describe('PlaceFarmer card integration', () => {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
         handler: (context: any) => {
-          const { player, space } = context
-          if (player.workersAvailable > 0) return
+          const { state, player, space } = context
+          if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
           if (!hasAccumulation) return
           return { followUpActions: ['bake-bread'] }
@@ -200,8 +204,7 @@ describe('PlaceFarmer card integration', () => {
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
       space.gainPerRound = { wood: 3 }
-      player.workersAvailable = 1
-
+      setWorkersAtHome(state, player, 1)
       const phase = dispatcher.immediatelyAfter({ state, player, space }, { type: 'ok' })
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)

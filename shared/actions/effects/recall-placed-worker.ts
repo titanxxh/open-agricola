@@ -1,4 +1,6 @@
 import type { ActionDefinition } from '../../game/types'
+import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
+import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 
 /**
  * Generic "recall a worker I placed this round back home" helper.
@@ -37,7 +39,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       (params as { excludeMeetingPlace?: boolean } | undefined)?.excludeMeetingPlace ?? true
 
     const candidates = state.actionSpaces.filter((space) => {
-      if (space.takenBy !== player.id) return false
+      if (!spaceHasPlayer(space, player.id)) return false
       if (excludeSpaceId && space.id === excludeSpaceId) return false
       if (excludeMeetingPlace && isMeetingPlace(space.id)) return false
       return true
@@ -47,8 +49,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
 
     if (candidates.length === 1) {
       const only = candidates[0]!
-      only.takenBy = null
-      player.workersAvailable += 1
+      const placements = getRoundPlacementDetails(player)
+      const entry = placements.find(e => e.spaceId === only.id)
+      removeWorkerRef(only, player.id, entry?.workerId)
       return { type: 'ok', logKey: 'log.cardEffectTrigger' }
     }
 
@@ -63,11 +66,12 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   },
   resolveChoice: ({ state, player }, choice) => {
     const target = state.actionSpaces.find(
-      (space) => space.id === choice && space.takenBy === player.id,
+      (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
     if (!target) return { type: 'fail', logKey: 'log.actionFail' }
-    target.takenBy = null
-    player.workersAvailable += 1
+    const placements = getRoundPlacementDetails(player)
+    const entry = placements.find(e => e.spaceId === target.id)
+    removeWorkerRef(target, player.id, entry?.workerId)
     return { type: 'ok', logKey: 'log.cardEffectTrigger' }
   },
 }

@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E168_AnimalTamersApprentice'
 
@@ -12,7 +13,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     // Occupied rooms = min(familySize, roomCount); unoccupied = rest
-    const occupied = Math.max(0, player.familySize - (player.houseAnimalCount ?? 0))
+    const occupied = Math.max(0, familySize(player) - (player.houseAnimalCount ?? 0))
     const unoccupied = Math.max(0, roomCount - occupied)
     if (unoccupied <= 0) return
 

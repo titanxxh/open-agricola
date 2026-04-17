@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
@@ -13,8 +14,8 @@ describe('A53_Claypipe session flow', () => {
     state.phase = 'work'
     state.currentPlayerIndex = 0
     state.players.forEach((player) => {
-      player.workersAvailable = 0
-      player.familySize = 2
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
       player.resources.food = 10
     })
 
@@ -52,13 +53,12 @@ describe('A53_Claypipe session flow', () => {
     state.round = 7
     state.phase = 'work'
     state.currentPlayerIndex = 0
-    state.players[0]!.workersAvailable = 2
-    state.players[0]!.familySize = 2
+    setActiveWorkerCount(state.players[0]!, 2)
     state.players[0]!.resources.food = 10
     state.players[0]!.resources.clay = 1
     state.players[0]!.minorHand = ['A53_Claypipe']
-    state.players[1]!.workersAvailable = 0
-    state.players[1]!.familySize = 1
+    setActiveWorkerCount(state.players[1]!, 1)
+    markAllWorkersUsed(state, state.players[1]!)
     state.players[1]!.resources.food = 10
 
     const hollow = state.actionSpaces.find((space) => space.id === 'hollow-4')

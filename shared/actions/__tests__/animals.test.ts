@@ -19,8 +19,6 @@ const createPlayer = (): PlayerState => ({
     cattle: 1,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -36,7 +34,6 @@ const createPlayer = (): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [
     {
       id: 'p1',

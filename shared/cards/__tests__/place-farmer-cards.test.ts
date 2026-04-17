@@ -8,6 +8,7 @@ import {
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
+import { markAllWorkersUsed } from '../../game/player'
 describe('PlaceFarmer card listeners', () => {
   beforeEach(() => {
     clearCardListeners()
@@ -96,7 +97,6 @@ describe('PlaceFarmer card listeners', () => {
     const defaultPlayer: PlayerState = {
       id: 'player1',
       name: 'Player 1',
-      workersAvailable: 1,
       familyMembers: [],
       resources: {
         wood: 0,
@@ -136,7 +136,7 @@ describe('PlaceFarmer card listeners', () => {
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-      takenBy: null,
+      takenBy: [],
     }
 
     return {

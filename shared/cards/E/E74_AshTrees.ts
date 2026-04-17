@@ -7,7 +7,7 @@ import { initCardState } from '../__stubs__/helpers'
 import {
   clearPendingFenceBonus,
 } from '../helpers/pending-fence-bonus'
-import { getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
+import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 
 const CARD_ID = 'E74_AshTrees'
 const MAX_FREE_FENCES = 5
@@ -17,7 +17,7 @@ registerCardEffect({
   onBuy: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(player, CARD_ID)
-    counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - player.fences))
+    counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
   },
 })
 
@@ -32,7 +32,7 @@ const isDoableListener: CardListenerRegistration = {
     const stored = counters['fences'] ?? 0
     if (stored <= 0) return
     if ((context.player.resources.wood ?? 0) + stored < minimumFenceSegments) return
-    if (context.player.fences + minimumFenceSegments > maxFences) return
+    if (getFenceCount(context.player) + minimumFenceSegments > maxFences) return
     if (getTotalPastureCells(context.player) >= maxPastureCells) return
     return { doable: true }
   },

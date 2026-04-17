@@ -1,9 +1,18 @@
-import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState, Resource } from '../../game/types'
+import type {
+  ActionChoiceOption,
+  ActionCostPreview,
+  ActionDefinition,
+  ActionExecutionResult,
+  PlayerState,
+  Resource,
+} from '../../game/types'
 import { canExecuteWithCostPreview } from './cost-preview'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 
+type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
+
 type RenovationPlan = {
-  nextType: PlayerState['houseType']
+  nextType: RenovationTarget
   cost: Partial<Resource>
 }
 
@@ -23,20 +32,57 @@ const mergeRenovationCost = (
   }
 }
 
-export const getRenovation = (player: PlayerState): RenovationPlan | null => {
-  if (player.houseType === 'wood') {
-    return {
-      nextType: 'clay',
-      cost: { clay: player.rooms, reed: 1 },
-    }
+/**
+ * Build a renovation plan for an explicit target. Returns `null` when the
+ * target is not a legal next step from the player's current house type.
+ *
+ * Cost model (BGA): N building resources of the target type + 1 reed, where
+ * N is the player's current room count. The wood→stone direct path costs
+ * `{ stone: rooms, reed: 1 }` and is only legal when explicitly requested
+ * (e.g. via A87 Conservator).
+ */
+export const buildRenovationPlan = (
+  player: PlayerState,
+  target: RenovationTarget,
+): RenovationPlan | null => {
+  if (player.houseType === 'wood' && target === 'clay') {
+    return { nextType: 'clay', cost: { clay: player.rooms, reed: 1 } }
   }
-  if (player.houseType === 'clay') {
-    return {
-      nextType: 'stone',
-      cost: { stone: player.rooms, reed: 1 },
-    }
+  if (player.houseType === 'wood' && target === 'stone') {
+    return { nextType: 'stone', cost: { stone: player.rooms, reed: 1 } }
+  }
+  if (player.houseType === 'clay' && target === 'stone') {
+    return { nextType: 'stone', cost: { stone: player.rooms, reed: 1 } }
   }
   return null
+}
+
+/**
+ * Default next-target plan (no card adjustments). Wood→clay, clay→stone.
+ * Kept for backward compatibility with callers that just need to probe
+ * "is renovation possible?" or read the default `nextType`.
+ */
+export const getRenovation = (player: PlayerState): RenovationPlan | null => {
+  if (player.houseType === 'wood') return buildRenovationPlan(player, 'clay')
+  if (player.houseType === 'clay') return buildRenovationPlan(player, 'stone')
+  return null
+}
+
+const readSelectedTarget = (
+  params?: Record<string, unknown>,
+): RenovationTarget | null => {
+  const value = params?.selectedOption
+  if (value === 'clay' || value === 'stone') return value
+  return null
+}
+
+const planForContext = (
+  player: PlayerState,
+  params?: Record<string, unknown>,
+): RenovationPlan | null => {
+  const explicit = readSelectedTarget(params)
+  if (explicit) return buildRenovationPlan(player, explicit)
+  return getRenovation(player)
 }
 
 export const canRenovate = (
@@ -63,86 +109,60 @@ export const renovateHouse = (
   return true
 }
 
+/** Convenience helper for direct (non-engine) renovation, used by tests. */
 export const renovate = (player: PlayerState): ActionExecutionResult => {
-  if (!canRenovate(player)) {
-    return { type: 'fail', logKey: 'log.renovationFail' }
-  }
-  const success = renovateHouse(player)
-  if (!success) {
-    return { type: 'fail', logKey: 'log.renovationFail' }
-  }
+  if (!canRenovate(player)) return { type: 'fail', logKey: 'log.renovationFail' }
+  if (!renovateHouse(player)) return { type: 'fail', logKey: 'log.renovationFail' }
   return { type: 'ok' }
 }
 
 export const renovateHouseCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ player }) => getRenovation(player) !== null,
-  canExecute: ({ player }, costOverride) => canRenovate(player, costOverride),
-  getBaseCost: ({ player }) => getRenovation(player)?.cost ?? {},
+  isStructurallyPossible: ({ player }) =>
+    player.houseType === 'wood' || player.houseType === 'clay',
+  canExecute: ({ player, params }, costOverride) => {
+    const plan = planForContext(player, params)
+    return canRenovate(player, costOverride, plan)
+  },
+  getBaseCost: ({ player, params }) => planForContext(player, params)?.cost ?? {},
+}
+
+const baseRenovationOptions = (player: PlayerState): ActionChoiceOption[] => {
+  if (player.houseType === 'wood') {
+    return [
+      { value: 'clay', labelKey: 'ui.interactionRenovateToClay' },
+    ]
+  }
+  if (player.houseType === 'clay') {
+    return [
+      { value: 'stone', labelKey: 'ui.interactionRenovateToStone' },
+    ]
+  }
+  return []
 }
 
 export const renovateHouseAction: ActionDefinition = {
   id: 'renovate-house',
-  nameKey: 'actions.house-redevelopment.name',
-  descriptionKey: 'actions.house-redevelopment.description',
+  nameKey: 'actions.renovate-house.name',
+  descriptionKey: 'actions.renovate-house.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) =>
     canExecuteWithCostPreview(renovateHouseCostPreview, { state, player }),
   costPreview: renovateHouseCostPreview,
-  execute: ({ player, costs }) => {
-    const renovation = getRenovation(player)
-    if (!renovation) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
-    if (!canRenovate(player, costs)) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
-    if (!renovateHouse(player, costs)) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
-    return { type: 'ok' }
-  },
-}
-
-const getDirectStoneRenovation = (
-  player: PlayerState,
-): RenovationPlan | null => {
-  if (player.houseType !== 'wood') {
-    return null
-  }
-  return {
-    nextType: 'stone',
-    cost: { stone: player.rooms, reed: 1 },
-  }
-}
-
-const renovateHouseToStoneCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ player }) => getDirectStoneRenovation(player) !== null,
-  canExecute: ({ player }, costOverride) =>
-    canRenovate(player, costOverride, getDirectStoneRenovation(player)),
-  getBaseCost: ({ player }) => getDirectStoneRenovation(player)?.cost ?? {},
-}
-
-export const renovateHouseToStoneAction: ActionDefinition = {
-  id: 'renovate-house-to-stone',
-  nameKey: 'actions.house-redevelopment.name',
-  descriptionKey: 'actions.house-redevelopment.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    canExecuteWithCostPreview(renovateHouseToStoneCostPreview, { state, player }),
-  costPreview: renovateHouseToStoneCostPreview,
-  execute: ({ player, costs }) => {
-    const renovation = getDirectStoneRenovation(player)
-    if (!renovation) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
-    if (!canRenovate(player, costs, renovation)) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
-    if (!renovateHouse(player, costs, renovation)) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
-    }
+  getBaseChoiceOptions: ({ player }) => baseRenovationOptions(player),
+  choicePromptKey: 'ui.interactionChooseRenovationTarget',
+  noChoiceLogKey: 'log.renovationFail',
+  emitLeafActionDetail: true,
+  execute: () => ({ type: 'fail', logKey: 'log.renovationFail' }),
+  resolveChoice: ({ player, params, costs }, choice) => {
+    const target = (choice === 'clay' || choice === 'stone')
+      ? choice
+      : readSelectedTarget(params)
+    if (!target) return { type: 'fail', logKey: 'log.renovationFail' }
+    const plan = buildRenovationPlan(player, target)
+    if (!plan) return { type: 'fail', logKey: 'log.renovationFail' }
+    if (!canRenovate(player, costs, plan)) return { type: 'fail', logKey: 'log.renovationFail' }
+    if (!renovateHouse(player, costs, plan)) return { type: 'fail', logKey: 'log.renovationFail' }
     return { type: 'ok' }
   },
 }

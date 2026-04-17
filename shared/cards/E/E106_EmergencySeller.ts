@@ -1,13 +1,14 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E106_EmergencySeller'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const farmers = player.familySize
+    const farmers = familySize(player)
 
     const exchangeChoice: ActionFlow = {
       type: 'xor' as const,

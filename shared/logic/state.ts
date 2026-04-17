@@ -8,8 +8,25 @@ import {
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
-import type { ActionSpace, GameState, PlayerState, Resource } from '../game/types'
+import type { ActionSpace, FenceSegment, GameState, PlayerState, Resource } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
+import { normalizeTakenBy } from '../game/space'
+
+export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
+  if (!Array.isArray(input)) return []
+  return input
+    .map((entry): FenceSegment | null => {
+      if (typeof entry === 'string') return { edge: entry, type: 'fence' }
+      if (entry && typeof entry === 'object' && 'edge' in entry) {
+        const e = entry as { edge: unknown; type?: unknown }
+        if (typeof e.edge === 'string') {
+          return { edge: e.edge, type: e.type === 'palisade' ? 'palisade' : 'fence' }
+        }
+      }
+      return null
+    })
+    .filter((s): s is FenceSegment => s !== null)
+}
 
 export const emptyResources: Resource = {
   wood: 0,
@@ -200,7 +217,7 @@ export const normalizeState = (raw: GameState): GameState => {
     return {
       ...space,
       resources: stored?.resources ?? space.resources,
-      takenBy: stored?.takenBy ?? null,
+      takenBy: normalizeTakenBy(stored?.takenBy),
     }
   })
   // Append PlayerActionCard dynamic spaces
@@ -209,9 +226,19 @@ export const normalizeState = (raw: GameState): GameState => {
     const stored = spaceMap.get(pas.id)
     if (stored) {
       pas.resources = stored.resources ?? pas.resources
-      pas.takenBy = stored.takenBy ?? null
+      pas.takenBy = normalizeTakenBy(stored.takenBy)
     }
     actionSpaces.push(pas)
+  }
+  // Preserve caller-added spaces not produced by createActionSpaces / PlayerActionCard.
+  // (e.g. `__test-worker-sink__` and `card-worker:...` pseudo-spaces.)
+  const knownIds = new Set(actionSpaces.map((s) => s.id))
+  for (const stored of raw.actionSpaces ?? []) {
+    if (knownIds.has(stored.id)) continue
+    actionSpaces.push({
+      ...stored,
+      takenBy: normalizeTakenBy(stored.takenBy),
+    } as ActionSpace)
   }
   const needsHands = raw.players.some(
     (player) =>
@@ -231,7 +258,6 @@ export const normalizeState = (raw: GameState): GameState => {
       color:
         player.color ?? defaultPlayerColors[index % defaultPlayerColors.length],
       houseType: player.houseType ?? 'wood',
-      fences: player.fences ?? 0,
       improvements: improvements.length > 0 ? improvements : [],
       minorHand:
         minorHand.length > 0
@@ -253,10 +279,18 @@ export const normalizeState = (raw: GameState): GameState => {
             ],
       houseAnimalType: player.houseAnimalType ?? null,
       houseAnimalCount: player.houseAnimalCount ?? 0,
+      workers: player.workers && player.workers.length > 0
+        ? player.workers
+        : [
+            { id: '1', isActive: true,  isNewborn: false },
+            { id: '2', isActive: true,  isNewborn: false },
+            { id: '3', isActive: false, isNewborn: false },
+            { id: '4', isActive: false, isNewborn: false },
+            { id: '5', isActive: false, isNewborn: false },
+          ],
       stableAnimals: player.stableAnimals ?? {},
-      newbornCount: player.newbornCount ?? 0,
       pastures: player.pastures ?? [],
-      fenceSegments: player.fenceSegments ?? [],
+      fenceSegments: normalizeFenceSegments(player.fenceSegments),
       roomTiles:
         player.roomTiles && player.roomTiles.length > 0
           ? [...player.roomTiles]
@@ -345,11 +379,6 @@ export const normalizeState = (raw: GameState): GameState => {
     } else {
       normalized.houseAnimalCount = Math.min(1, normalized.houseAnimalCount)
     }
-    if (!Number.isFinite(normalized.newbornCount) || normalized.newbornCount < 0) {
-      normalized.newbornCount = 0
-    } else {
-      normalized.newbornCount = Math.floor(normalized.newbornCount)
-    }
     const expectedPlayedCards = [
       ...normalized.improvements.map((id) => `major:${id}`),
       ...normalized.minorPlayed.map((id) => `minor:${id}`),
@@ -426,12 +455,16 @@ export const createInitialPlayers = (
     name: playerNames[index] ?? info.name,
     color: info.color,
     resources: { ...emptyResources, food: 2 },
-    familySize: 2,
-    workersAvailable: 2,
+    workers: [
+      { id: '1', isActive: true,  isNewborn: false },
+      { id: '2', isActive: true,  isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
     rooms: 2,
     houseType: 'wood',
     fields: [],
-    fences: 0,
     roomTiles: createDefaultRoomTiles(2),
     stableTiles: [],
     improvements: [],
@@ -443,7 +476,6 @@ export const createInitialPlayers = (
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
-    newbornCount: 0,
     pastures: [],
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },

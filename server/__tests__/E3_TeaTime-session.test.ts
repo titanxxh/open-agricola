@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/E/E3_TeaTime'
 
 const CARD_ID = 'E3_TeaTime'
@@ -25,10 +26,11 @@ describe('E3_TeaTime session', () => {
     const state = session.getState().state
     const owner = state.players[0]!
 
-    // Simulate owner has occupied grain-utilization: mark takenBy and drop a worker
+    // Simulate owner has occupied grain-utilization: place one of owner's workers there
     const grainSpace = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
-    grainSpace.takenBy = owner.id
-    const workersBefore = owner.workersAvailable
+    const ownerWorker = owner.workers.find((w) => w.isActive)!
+    grainSpace.takenBy = [{ playerId: owner.id, workerId: ownerWorker.id }]
+    const workersBefore = workersAvailable(state, owner)
 
     session.loadState(state)
     const resp = session.devPlayCard(0, CARD_ID)
@@ -36,8 +38,8 @@ describe('E3_TeaTime session', () => {
 
     const after = session.getState().state
     const space = after.actionSpaces.find((s) => s.id === 'grain-utilization')!
-    expect(space.takenBy).toBeNull()
-    expect(after.players[0]!.workersAvailable).toBe(workersBefore + 1)
+    expect(space.takenBy).toEqual([])
+    expect(workersAvailable(after, after.players[0]!)).toBe(workersBefore + 1)
     expect(after.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
@@ -45,10 +47,12 @@ describe('E3_TeaTime session', () => {
     const session = setup()
     const state = session.getState().state
     const owner = state.players[0]!
-    // Make sure another player's worker (or none) is on the space
+    // Make sure another player's worker is on the space
     const grainSpace = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
-    grainSpace.takenBy = state.players[1]!.id
-    const workersBefore = owner.workersAvailable
+    const other = state.players[1]!
+    const otherWorker = other.workers.find((w) => w.isActive)!
+    grainSpace.takenBy = [{ playerId: other.id, workerId: otherWorker.id }]
+    const workersBefore = workersAvailable(state, owner)
 
     session.loadState(state)
     const resp = session.devPlayCard(0, CARD_ID)
@@ -57,8 +61,8 @@ describe('E3_TeaTime session', () => {
     const after = session.getState().state
     const space = after.actionSpaces.find((s) => s.id === 'grain-utilization')!
     // Opponent's worker should remain
-    expect(space.takenBy).toBe(state.players[1]!.id)
+    expect(space.takenBy.some((t) => t.playerId === state.players[1]!.id)).toBe(true)
     // No extra worker returned to owner
-    expect(after.players[0]!.workersAvailable).toBe(workersBefore)
+    expect(workersAvailable(after, after.players[0]!)).toBe(workersBefore)
   })
 })

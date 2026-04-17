@@ -4,6 +4,7 @@ import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { validateSowSelection } from '../sow-validation'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 const CARD_ID = 'E68_CherryOrchard'
 const VIRTUAL_TILE = { row: -1, col: 68 }
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -50,7 +51,7 @@ const setup = (options?: {
 
   if (options?.round && harvestRounds.includes(options.round)) {
     for (const current of state.players) {
-      current.workersAvailable = 0
+      markAllWorkersUsed(state, current)
       current.resources.food = 10
     }
     state.players[0]!.resources.grain = options?.grain ?? 0

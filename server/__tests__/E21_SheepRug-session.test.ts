@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/game/player'
 import '../../shared/cards/E/E21_SheepRug'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -17,8 +18,8 @@ const setup = (withSheepRug: boolean) => {
   state.roundActionOrder[0] = 'wish-children'
 
   const player = state.players[0]!
-  player.workersAvailable = 2
-  player.familySize = 2
+  setWorkersAtHome(state, player, 2)
+  setActiveWorkerCount(player, 2)
   player.rooms = 3
   player.minorHand = []
 
@@ -57,10 +58,10 @@ describe('E21_SheepRug session', () => {
     let resp = session.takeAction(0, 'wish-children')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
-    expect(resp.state.players[0]!.familySize).toBe(3)
-    expect(resp.state.players[0]!.newbornCount).toBe(1)
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(familySize(resp.state.players[0]!)).toBe(3)
+    expect(newbornCount(resp.state.players[0]!)).toBe(1)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
 
     if (resp.pending.type !== 'choice') return
     const skipOption = resp.pending.options.find((option) => option.value === '__skip__')

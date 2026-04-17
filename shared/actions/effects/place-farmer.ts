@@ -1,18 +1,35 @@
-import type { ActionDefinition, ActionExecutionResult, ActionSpace, PlayerState } from '../../game/types'
+import type {
+  ActionDefinition,
+  ActionExecutionResult,
+  ActionSpace,
+  GameState,
+  PlayerState,
+} from '../../game/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
+import { addWorkerRef, isSpaceOccupied } from '../../game/space'
+import { smallestAvailableWorker } from '../../game/player'
 
 export const OCCUPIED_SPACE_CHOICE_PREFIX = 'allow-occupied:'
 
+/**
+ * Low-level helper: place a worker belonging to `player` onto `space`.
+ *
+ * Picks the smallest-id worker currently at home via `smallestAvailableWorker`.
+ * This helper does NOT guard against already-occupied spaces — callers that
+ * respect the "space free" rule must check `isSpaceOccupied(space)` first.
+ * (canUseOccupied paths bypass that check intentionally.)
+ */
 export const placeFarmer = (
+  state: GameState,
   player: PlayerState,
   space: ActionSpace,
 ): ActionExecutionResult => {
-  if (space.takenBy) {
-    return { type: 'ok' }
+  const worker = smallestAvailableWorker(state, player)
+  if (!worker) {
+    return { type: 'fail', logKey: 'log.placeFarmerFail' }
   }
-  space.takenBy = player.id
-  player.workersAvailable = Math.max(0, player.workersAvailable - 1)
-  recordRoundPlacement(player, space.id)
+  addWorkerRef(space, player.id, worker.id)
+  recordRoundPlacement(player, space.id, worker.id)
   return { type: 'ok' }
 }
 
@@ -22,10 +39,11 @@ export const placeFarmerAction: ActionDefinition = {
   descriptionKey: 'actions.place-farmer.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => player.workersAvailable > 0,
+  canBeExecutedByPlayer: (state, player) =>
+    smallestAvailableWorker(state, player) !== null,
   execute: ({ state, player }) => {
     const available = state.actionSpaces
-      .filter((s) => !s.takenBy && s.canBeExecutedByPlayer(state, player))
+      .filter((s) => !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player))
       .map((s) => ({ value: s.id, labelKey: s.nameKey }))
     if (available.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
     return {
@@ -41,14 +59,11 @@ export const placeFarmerAction: ActionDefinition = {
       : choice
     const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
     if (!targetSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
-    if (targetSpace.takenBy && !allowOccupied) {
+    if (isSpaceOccupied(targetSpace) && !allowOccupied) {
       return { type: 'fail', logKey: 'log.placeFarmerFail' }
     }
-    if (!targetSpace.takenBy) {
-      targetSpace.takenBy = player.id
-    }
-    player.workersAvailable -= 1
-    recordRoundPlacement(player, targetSpace.id)
+    const placeResult = placeFarmer(state, player, targetSpace)
+    if (placeResult.type === 'fail') return placeResult
     const result = targetSpace.execute({ state, player, space: targetSpace })
     if (result.type === 'flow') return result
     return result

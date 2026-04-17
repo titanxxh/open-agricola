@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'D10_StorksNest'
 
@@ -8,7 +9,7 @@ registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    if (player.rooms <= player.familySize) return
+    if (player.rooms <= familySize(player)) return
     if (player.resources.food < 1) return
     return {
       type: 'seq',

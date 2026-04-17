@@ -8,6 +8,9 @@ BACKEND_PORT=5175
 FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
+# Local BGA image directory (sibling repo). Vite + backend will serve
+# /bga-img/* from here first, falling back to the BGA CDN if missing.
+BGA_IMAGE_DIR="${BGA_IMAGE_DIR:-../bga-agricola/img}"
 
 if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
   echo "Error: dependencies are missing. Run: pnpm install"
@@ -18,6 +21,37 @@ if ! command -v lsof >/dev/null 2>&1; then
   echo "Error: lsof is required but not installed."
   exit 1
 fi
+
+usage() {
+  cat <<'EOF'
+Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k] [-h|--help]
+
+Without flags: stop any process on the frontend/backend ports, then start
+fresh backend (tsx) and frontend (vite) bound to the LAN IP.
+
+  --kill-only, --kill_only, -k   Only stop existing listeners; do not start
+                                 backend or frontend. Skips the LAN-IP check.
+  -h, --help                     Show this help.
+EOF
+}
+
+KILL_ONLY=0
+for arg in "$@"; do
+  case "$arg" in
+    --kill-only|--kill_only|-k)
+      KILL_ONLY=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $arg"
+      usage
+      exit 1
+      ;;
+  esac
+done
 
 cd "$SCRIPT_DIR"
 
@@ -37,8 +71,13 @@ get_lan_ip() {
 }
 
 list_listening_pids() {
+  # NOTE: lsof exits non-zero when no match is found. Combined with
+  # `set -o pipefail` at the top of the script, an empty result would
+  # otherwise abort the whole script via `set -e` the first time we
+  # check an idle port. Swallow that with `|| true` and rely on the
+  # caller's empty-string check.
   local port="$1"
-  lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u
+  { lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true; } | sort -u
 }
 
 wait_for_port_state() {
@@ -140,6 +179,14 @@ start_and_wait() {
   return 1
 }
 
+if [ "$KILL_ONLY" -eq 1 ]; then
+  echo "Stopping existing processes (kill-only)..."
+  stop_port_listeners "$FRONTEND_PORT" "frontend"
+  stop_port_listeners "$BACKEND_PORT" "backend"
+  echo "Done. Ports $FRONTEND_PORT / $BACKEND_PORT cleared."
+  exit 0
+fi
+
 LAN_IP=$(get_lan_ip)
 if [ -z "$LAN_IP" ]; then
   echo "Error: could not get LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
@@ -157,11 +204,13 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   ALLOW_ANONYMOUS_WS=true \
   PERSISTENT_ROOM_ID=dev \
   BACKEND_HOST="$LAN_IP" \
+  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
 echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
 start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
   BACKEND_HOST="$LAN_IP" \
+  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 
 echo ""

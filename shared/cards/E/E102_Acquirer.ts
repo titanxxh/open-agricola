@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E102_Acquirer'
 
@@ -10,7 +11,7 @@ registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    const n = player.familySize
+    const n = familySize(player)
     if ((player.resources.food ?? 0) < n) return
 
     const goodChoices = ['vegetable', 'grain', 'cattle', 'sheep', 'boar', 'wood', 'clay', 'reed', 'stone'] as const

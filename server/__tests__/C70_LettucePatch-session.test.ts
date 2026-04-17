@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C70_LettucePatch'
 
 const CARD_ID = 'C70_LettucePatch'
@@ -39,7 +40,7 @@ const setup = (options?: {
   // Set all players' workers to 0 for harvest/round-end tests
   if (options?.round && harvestRounds.includes(options.round)) {
     for (const p of state.players) {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     }
   }

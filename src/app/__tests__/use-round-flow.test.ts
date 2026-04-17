@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import { workersAvailable, newbornCount, familySize } from '../../../shared/game/player'
 import {
   applyReturnHomePhase,
   canPerformRoundEnd,
@@ -22,13 +23,17 @@ const resources = (): Resource => ({
   begging: 0,
 })
 
-const player = (id: string, workers = 0): PlayerState => ({
+const player = (id: string, workersAtHome = 0): PlayerState => ({
   id,
   name: id,
   color: 'red',
   resources: resources(),
-  familySize: 2,
-  workersAvailable: workers,
+  // workers: N active, all at home (no takenBy in this test's default setup)
+  workers: Array.from({ length: 5 }, (_, i) => ({
+    id: String(i + 1),
+    isActive: i < workersAtHome,
+    isNewborn: false,
+  })),
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -44,11 +49,12 @@ const player = (id: string, workers = 0): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 1,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
+  activeModifiers: [],
+  cardStates: {},
 })
 
 const state = (): GameState => ({
@@ -65,7 +71,7 @@ const state = (): GameState => ({
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: resources(),
-      takenBy: 'p1',
+      takenBy: [{ playerId: 'p1', workerId: '1' }],
     },
   ],
   log: [],
@@ -82,8 +88,9 @@ describe('use-round-flow helpers', () => {
   it('applies return-home phase', () => {
     const next = state()
     applyReturnHomePhase(next)
-    expect(next.players[0].workersAvailable).toBe(next.players[0].familySize)
-    expect(next.actionSpaces[0].takenBy).toBeNull()
+    // After return-home, action spaces are cleared so all active workers are at home
+    expect(workersAvailable(next, next.players[0])).toBe(familySize(next.players[0]))
+    expect(next.actionSpaces[0].takenBy).toEqual([])
   })
 
   it('finalizes to next round and sets current player by startPlayer', () => {
@@ -93,7 +100,7 @@ describe('use-round-flow helpers', () => {
     expect(result.type).toBe('nextRound')
     expect(next.round).toBe(2)
     expect(next.currentPlayerIndex).toBe(1)
-    expect(next.players[0].newbornCount).toBe(0)
+    expect(newbornCount(next.players[0])).toBe(0)
   })
 
   it('returns gameOver when round passes 14', () => {

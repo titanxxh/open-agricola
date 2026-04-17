@@ -38,7 +38,7 @@ function conditionToGuard(cond: DslCondition, playerVar: string): string {
     return `if (state.round < ${cond.round_gte}) return`
   }
   if ('family_size_gte' in cond) {
-    return `if (${playerVar}.familySize < ${cond.family_size_gte}) return`
+    return `if (familySize(${playerVar}) < ${cond.family_size_gte}) return`
   }
   if ('player_has_card' in cond) {
     return `if (!${playerVar}.minorPlayed.includes('${cond.player_has_card}') && !${playerVar}.occupationPlayed.includes('${cond.player_has_card}')) return`
@@ -108,6 +108,7 @@ export function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): st
   lines.push(`import { ${classType} } from '../../shared/cards/types'`)
   if (dsl && Object.keys(dsl).length > 0) {
     lines.push(`import { registerCardEffect } from '../../shared/cards/card-effects'`)
+    lines.push(`import { familySize } from '../../shared/game/player'`)
   }
   lines.push('')
 

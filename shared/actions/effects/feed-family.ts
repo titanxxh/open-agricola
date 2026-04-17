@@ -1,8 +1,11 @@
 import type { ActionExecutionResult, PlayerState } from '../../game/types'
+import { familySize, newbornCount } from '../../game/player'
 
 export const feedFamily = (player: PlayerState): ActionExecutionResult => {
-  const newbornPenalty = Math.min(player.newbornCount, player.familySize)
-  let requiredFood = Math.max(0, player.familySize * 2 - newbornPenalty)
+  const size = familySize(player)
+  const newborns = newbornCount(player)
+  const newbornPenalty = Math.min(newborns, size)
+  let requiredFood = Math.max(0, size * 2 - newbornPenalty)
   const useFood = Math.min(player.resources.food, requiredFood)
   player.resources.food -= useFood
   requiredFood -= useFood

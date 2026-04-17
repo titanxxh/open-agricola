@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'C21_HeartofStone'
 
@@ -14,7 +15,7 @@ registerCardEffect({
     const revealedAction = state.roundActionOrder[state.round - 1]
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
     // Check if player has room in house (fewer family members than rooms)
-    if (player.familySize >= player.roomTiles.length) return
+    if (familySize(player) >= player.roomTiles.length) return
     return {
       type: 'leaf',
       actionId: 'wish-children',

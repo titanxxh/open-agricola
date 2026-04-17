@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B25_BreadPaddle'
 
 const CARD_ID = 'B25_BreadPaddle'
@@ -31,13 +32,13 @@ describe('B25_BreadPaddle session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 1
-    player.familySize = 1
+    setActiveWorkerCount(player, 1)
+    setWorkersAtHome(state, player, 1)
     player.resources.food = 10
     player.resources.wood = 10
 
-    state.players[1]!.workersAvailable = 0
-    state.players[1]!.familySize = 1
+    setActiveWorkerCount(state.players[1]!, 1)
+    markAllWorkersUsed(state, state.players[1]!)
 
     // Play B25 as minor improvement
     player.minorPlayed.push(CARD_ID)
@@ -80,12 +81,12 @@ describe('B25_BreadPaddle session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 1
-    player.familySize = 1
+    setActiveWorkerCount(player, 1)
+    setWorkersAtHome(state, player, 1)
     player.resources.food = 10
 
-    state.players[1]!.workersAvailable = 0
-    state.players[1]!.familySize = 1
+    setActiveWorkerCount(state.players[1]!, 1)
+    markAllWorkersUsed(state, state.players[1]!)
 
     // Card NOT in minorPlayed
     const occId = 'A114_SeasonalWorker'

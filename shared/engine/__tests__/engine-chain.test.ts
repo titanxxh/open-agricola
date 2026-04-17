@@ -28,8 +28,6 @@ const createPlayer = (): PlayerState => ({
     cattle: 0,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -45,7 +43,6 @@ const createPlayer = (): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -73,7 +70,7 @@ const createSpace = (id: string): ActionSpace => {
       cattle: 0,
       begging: 0,
     },
-    takenBy: null,
+    takenBy: [],
   }
 }
 

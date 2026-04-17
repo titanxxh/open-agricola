@@ -4,6 +4,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { findFirstNewborn, newbornCount } from '../../game/player'
+import { removeWorkerRef } from '../../game/space'
 
 const CARD_ID = 'A92_AdoptiveParents'
 
@@ -39,7 +41,9 @@ const CARD_ID = 'A92_AdoptiveParents'
  * execute, we first do the newborn→adult conversion.
  */
 
-// Before-hook on place-farmer: if A92 is flagged, convert newborn to adult
+// Before-hook on place-farmer: if A92 is flagged, clear the flag so the
+// extra place-farmer is allowed. Newborn→adult conversion already happened
+// in beforeGainActivation.
 const beforePlaceFarmerListener: CardListenerRegistration = {
   id: 'A92-adoptive-parents-before-place-farmer',
   cardIds: [CARD_ID],
@@ -48,14 +52,6 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isCardFlagged(context.player, CARD_ID)) return
-    // Convert newborn to adult
-    if (context.player.newbornCount > 0) {
-      context.player.newbornCount -= 1
-      // workersAvailable is already incremented since the place-farmer action
-      // is given — it was added as a child in the flow. The player gets an extra
-      // placement because we already incremented workersAvailable during the
-      // afterPlaceFarmer handler when we set the flag.
-    }
     setCardFlag(context.player, CARD_ID, false)
   },
 }
@@ -69,7 +65,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.newbornCount <= 0) return
+    if (newbornCount(context.player) <= 0) return
 
     // Flag the card and increment workersAvailable as part of accepting
     // The pay + flag happens in the flow; the before-place-farmer does conversion
@@ -99,26 +95,34 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-// Before gain with adoptiveParentsActivation: do the newborn→adult conversion
-const beforeGainActivation: CardListenerRegistration = {
+// immediatelyAfter gain sourced by A92: do the newborn→adult conversion.
+// NOTE: 'before' ActivateCardNode events don't carry actionContext; 'immediatelyAfter' events
+// do (engine spreads actionContext + sourceCard into the event via buildListenerEvent).
+// We identify this specific gain by checking sourceCard === CARD_ID.
+const immediatelyAfterGainActivation: CardListenerRegistration = {
   id: 'A92-adoptive-parents-before-gain-activation',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
+  phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.actionContext?.adoptiveParentsActivation) return
-    // Convert newborn → adult worker
-    if (context.player.newbornCount > 0) {
-      context.player.newbornCount -= 1
-      context.player.workersAvailable += 1
+    // Only fire for the A92-triggered gain (sourceCard is spread into the listener context)
+    if (context.sourceCard !== CARD_ID) return
+    // Find the specific newborn worker and flip it to adult
+    const newborn = findFirstNewborn(context.player)
+    if (!newborn) return
+    newborn.isNewborn = false
+    // Remove the newborn's WorkerRef from whichever space it's on
+    for (const space of context.state.actionSpaces) {
+      const removed = removeWorkerRef(space, context.player.id, newborn.id)
+      if (removed) break
     }
     setCardFlag(context.player, CARD_ID, true)
   },
 }
 
 registerCardListener(afterPlaceFarmerListener)
-registerCardListener(beforeGainActivation)
+registerCardListener(immediatelyAfterGainActivation)
 registerCardListener(beforePlaceFarmerListener)
 
 export const A92_AdoptiveParents = new Occupation({

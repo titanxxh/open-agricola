@@ -24,6 +24,7 @@ import { CARD_ID as SCOPE_OPPONENT_ID } from '../Stub_Scope_Opponent'
 import { CARD_A as ORDER_LOW_ID, CARD_B as ORDER_HIGH_ID } from '../Stub_Order_Priority'
 import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
+import { getFenceCount } from '../../../actions/effects/fencing'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const markCardObservedAction = internalActionDefinitions.find(a => a.id === 'mark-card-observed')!
@@ -45,12 +46,16 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
       wood: 5, clay: 5, reed: 5, stone: 5, food: 5,
       grain: 5, vegetable: 5, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2,
-    workersAvailable: 2,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
     rooms: 2,
     houseType: 'wood',
     fields: [],
-    fences: 0,
     roomTiles: [],
     stableTiles: [],
     improvements: [],
@@ -62,7 +67,6 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
-    newbornCount: 0,
     pastures: [],
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },
@@ -158,7 +162,7 @@ const createSpace = (action: ActionDefinition, spaceId?: string): ActionSpace =>
     wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
     grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
   },
-  takenBy: null,
+  takenBy: [],
 })
 
 const createState = (...players: PlayerState[]): GameState =>
@@ -596,7 +600,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
       execute: (ctx) => {
         const woodCost = 1 + (ctx.costs?.wood ?? 0)
         ctx.player.resources.wood -= Math.max(0, woodCost)
-        ctx.player.fences += 1
+        ctx.player.fenceSegments.push({ edge: `__hookcov_${ctx.player.fenceSegments.length}`, type: 'fence' })
         return { type: 'ok' }
       },
     }
@@ -616,7 +620,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
 
     expect(player.cardStates[STORAGE_ID]?.counters?.fences).toBe(4)
     expect(player.cardStates[STORAGE_ID]?.counters?.observedCount).toBe(1)
-    expect(player.fences).toBe(1)
+    expect(getFenceCount(player)).toBe(1)
     // Cost was 1 wood, but discount of -1 makes effective cost 0
     expect(player.resources.wood).toBe(10)
   })
@@ -637,7 +641,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
       execute: (ctx) => {
         const woodCost = 1 + (ctx.costs?.wood ?? 0)
         ctx.player.resources.wood -= Math.max(0, woodCost)
-        ctx.player.fences += 1
+        ctx.player.fenceSegments.push({ edge: `__hookcov_${ctx.player.fenceSegments.length}`, type: 'fence' })
         return { type: 'ok' }
       },
     }

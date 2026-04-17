@@ -2,28 +2,26 @@ import type { PlayerState } from '../../game/types'
 import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'
-const ROUND_PLACEMENT_KEY = 'spaces'
+
+export type RoundPlacementEntry = { spaceId: string; workerId: string }
+
+export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEntry[] =>
+  (player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.placements as RoundPlacementEntry[] | undefined) ?? []
 
 export const getRoundPlacementOrder = (player: PlayerState): string[] =>
-  (player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.[ROUND_PLACEMENT_KEY] as string[] | undefined)
-    ?? []
+  getRoundPlacementDetails(player).map(e => e.spaceId)
 
 export const recordRoundPlacement = (
   player: PlayerState,
   spaceId: string,
-) => {
-  const cardState = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
-  const current = getRoundPlacementOrder(player)
-  cardState.extraData = {
-    ...(cardState.extraData ?? {}),
-    [ROUND_PLACEMENT_KEY]: [...current, spaceId],
-  }
+  workerId: string,
+): void => {
+  const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
+  const current = getRoundPlacementDetails(player)
+  cs.extraData = { ...(cs.extraData ?? {}), placements: [...current, { spaceId, workerId }] }
 }
 
-export const resetRoundPlacements = (player: PlayerState) => {
-  const cardState = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
-  cardState.extraData = {
-    ...(cardState.extraData ?? {}),
-    [ROUND_PLACEMENT_KEY]: [],
-  }
+export const resetRoundPlacements = (player: PlayerState): void => {
+  const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
+  cs.extraData = { ...(cs.extraData ?? {}), placements: [] }
 }

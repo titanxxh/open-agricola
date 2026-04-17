@@ -23,8 +23,6 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   name,
   color,
   resources: { ...resources(), wood: 2 },
-  familySize: 2,
-  workersAvailable: 2,
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -40,7 +38,6 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -127,5 +124,80 @@ describe('FarmBoard', () => {
     expect(html).toContain('extra-sow-tray')
     expect(html).toContain('Cherry Orchard')
     expect(html).toContain('-1-68-sow-choice')
+  })
+
+  it('applies palisade class to fence cells whose edge is in the palisade pending set', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    const edgeId = 'edge-test-palisade'
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        locale="en"
+        players={[player]}
+        currentPlayer={player}
+        displayPlayer={player}
+        devMode={false}
+        currentStartPlayerId=""
+        nextStartPlayerId=""
+        playedCards={[]}
+        farmCells={[
+          { key: 'fh-1', type: 'fence-h', fenceId: edgeId } as never,
+        ]}
+        roomPositions={new Set()}
+        fieldPositions={new Set()}
+        fieldMap={new Map()}
+        stablePositions={new Set()}
+        pendingRoomSet={new Set()}
+        pendingStableSet={new Set()}
+        roomSelectableSet={new Set()}
+        stableSelectableSet={new Set()}
+        maxStableSelections={0}
+        plowSelectableSet={new Set()}
+        pendingPlowTile={null}
+        fieldSelectableSet={new Set()}
+        pendingFieldSelections={new Set()}
+        toggleFieldSelection={() => {}}
+        pendingSowSelections={{}}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 0 }}
+        sowSelectableMap={new Map()}
+        pastureTiles={new Map()}
+        pastureDisplayMap={new Map()}
+        pastureCapacityMap={new Map()}
+        houseDisplay={{ animalType: null, animalCount: 0 }}
+        stableDisplayMap={new Map()}
+        isReorgActive={false}
+        reorgRemaining={null}
+        hasReorgOverflow={false}
+        animalReorg={null}
+        pendingFenceSet={new Set()}
+        pendingPalisadeSet={new Set([edgeId])}
+        existingFenceSet={new Set()}
+        fenceSelectableSet={new Set([edgeId])}
+        toggleRoomTile={() => {}}
+        toggleStableTile={() => {}}
+        togglePlowTile={() => {}}
+        updateSowSelection={() => {}}
+        toggleFenceEdge={() => {}}
+        adjustReorgAnimal={() => {}}
+        confirmAnimalReorg={() => {}}
+        cancelAnimalDiscardPrompt={() => {}}
+        setViewPlayerId={() => {}}
+        isSelectingMinor={false}
+        isSelectingOccupation={false}
+        isSelectingImprovementAny={false}
+        selectableMinorIds={new Set()}
+        selectableOccupationIds={new Set()}
+        cardAvailability={{}}
+        futureCardResources={{}}
+        resolveChoice={() => {}}
+        isInteractive={true}
+        {...({ extraSowTargets: [] } as any)}
+      />,
+    )
+
+    // The farm-fence-h cell for the pending-palisade edge must carry the
+    // `palisade` class marker so CSS can style it distinctly.
+    expect(html).toMatch(/farm-fence-h[^"]*\bpalisade\b/)
+    expect(html).toContain('selected')
   })
 })

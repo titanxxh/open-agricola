@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'C22_BasketChair'
 
@@ -35,9 +36,9 @@ const CARD_ID = 'C22_BasketChair'
  */
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
+  onBeforeStartOfTurn: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
-    if (player.workersAvailable <= 0) return
+    if (workersAvailable(state, player) <= 0) return
     if (isCardFlagged(player, CARD_ID)) {
       // Reset for next round (this fires at the very start of each round).
       setCardFlag(player, CARD_ID, false)

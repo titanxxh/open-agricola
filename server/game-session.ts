@@ -12,7 +12,7 @@ import type {
   InteractionAnimalReorgZone,
 } from '../shared/game/types.ts'
 import type { ActionDetailParts } from '../shared/protocol/game.ts'
-import { actionDefinitions } from '../shared/actions/index.ts'
+import { actionDefinitions, getActionDefinition } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
 import { clearActionHooks } from '../shared/actions/hooks.ts'
 import {
@@ -72,6 +72,7 @@ import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
+import { familySize, newbornCount, workersAvailable } from '../shared/game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../shared/cards/types.ts'
 import {
   normalizePlayerFarm,
@@ -96,7 +97,11 @@ import {
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../shared/actions/effects/room-payment.ts'
-import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
+import {
+  getFenceCount,
+  getPalisadeCount,
+  stableWoodCost,
+} from '../shared/actions/effects/fencing.ts'
 import {
   buildFenceFarmInteraction,
   buildFieldSelectFarmInteraction,
@@ -108,6 +113,8 @@ import {
 } from './farm-interaction.ts'
 import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
+import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
+import { smallestAvailableWorker } from '../shared/game/player.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validateFenceSelection } from './fence-validation.ts'
@@ -202,6 +209,16 @@ export class GameSession {
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
+  /**
+   * Accumulates resource gains/costs already attributed to specific cards via
+   * `log.cardEffectGain` / `log.cardEffectPay` since the last leaf-flush.
+   * `flushLeafActionDetail` subtracts these from the leaf's delta so card
+   * effects don't get double-counted in the action's `log.actionDetail`.
+   */
+  private cardEffectDeltasSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
+    gains: {},
+    costs: {},
+  }
   private usedBakeBreadThisAction = false
   private nextActionToken = 1
   private loggedImprovementThisAction = false
@@ -454,7 +471,8 @@ export class GameSession {
   private nextPlayerIdx(players: PlayerState[], current: number) {
     for (let off = 1; off <= players.length; off++) {
       const idx = (current + off) % players.length
-      if (players[idx] && players[idx].workersAvailable > 0) return idx
+      const candidate = players[idx]
+      if (candidate && workersAvailable(this.state, candidate) > 0) return idx
     }
     return current
   }
@@ -526,7 +544,7 @@ export class GameSession {
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: { ...emptyResources },
-      takenBy: null,
+      takenBy: [],
     }
   }
 
@@ -869,8 +887,8 @@ export class GameSession {
 
   private buildRoundSnapshot(state: GameState): GameState {
     const snapshot = cloneState(state)
-    snapshot.players.forEach((p) => { p.workersAvailable = p.familySize })
-    snapshot.actionSpaces.forEach((space) => { space.takenBy = null })
+    // workers return home at round start — just clear action space occupancy.
+    snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
     snapshot.roundStartSnapshot = null
     return snapshot
   }
@@ -887,8 +905,10 @@ export class GameSession {
     if (player.rooms > before.rooms) {
       effects.buildRoom = player.rooms - before.rooms
     }
-    if (player.familySize > before.familySize) {
-      effects.growFamily = player.familySize - before.familySize
+    const beforeSize = familySize(before)
+    const afterSize = familySize(player)
+    if (afterSize > beforeSize) {
+      effects.growFamily = afterSize - beforeSize
     }
     if (player.fields.length > before.fields.length) {
       effects.plow = player.fields.length - before.fields.length
@@ -911,9 +931,10 @@ export class GameSession {
     if (player.houseType !== before.houseType) {
       effects.renovate = { from: before.houseType, to: player.houseType }
     }
-    if (player.fences > before.fences) {
-      effects.fencing = player.fences - before.fences
-    }
+    const fenceDelta = getFenceCount(player) - getFenceCount(before)
+    const palisadeDelta = getPalisadeCount(player) - getPalisadeCount(before)
+    if (fenceDelta > 0) effects.fencing = fenceDelta
+    if (palisadeDelta > 0) effects.palisading = palisadeDelta
     const stablesBefore = before.stableTiles?.length ?? 0
     const stablesAfter = player.stableTiles?.length ?? 0
     if (stablesAfter > stablesBefore) {
@@ -960,6 +981,70 @@ export class GameSession {
         detailParts,
       },
     })
+  }
+
+  /**
+   * Mid-flow flush: when a leaf ActionNode inside a SEQ/optional flow finishes,
+   * emit a partial `log.actionDetail` for that sub-action and advance the
+   * baseline snapshot. Subsequent leaves and the final aggregate then only see
+   * the residual delta, avoiding duplicate logs.
+   *
+   * Skipped when:
+   *   - no active snapshot (no in-flight action),
+   *   - leaf actionId equals the top-level activeSpaceId (the wrapper itself),
+   *   - the action wrote its own logKey (e.g. `log.sow`, `log.buildStable`),
+   *   - improvement was just played (logImprovementDelta will own the log),
+   *   - bake-bread was just used (logBakeBreadDelta owns the log).
+   */
+  private flushLeafActionDetail(
+    actionId: string | undefined,
+    hasOwnLogKey: boolean,
+  ) {
+    if (!actionId) return
+    if (!this.actionStartPlayerSnapshot) return
+    if (this.activePlayerIndex === null) return
+    if (actionId === this.activeSpaceId) return
+    if (hasOwnLogKey) return
+    if (this.loggedImprovementThisAction) return
+    if (this.usedBakeBreadThisAction) return
+    const def = getActionDefinition(actionId)
+    if (!def?.emitLeafActionDetail) return
+    const player = this.state.players[this.activePlayerIndex]
+    if (!player) return
+    const before = this.actionStartPlayerSnapshot
+    const detailParts = this.buildActionDetailParts(before, player)
+    for (const key of resourceKeyList) {
+      const cardGain = this.cardEffectDeltasSinceFlush.gains[key] ?? 0
+      const cardCost = this.cardEffectDeltasSinceFlush.costs[key] ?? 0
+      if (cardGain > 0) {
+        detailParts.gains[key] = Math.max(0, (detailParts.gains[key] ?? 0) - cardGain)
+      }
+      if (cardCost > 0) {
+        detailParts.costs[key] = Math.max(0, (detailParts.costs[key] ?? 0) - cardCost)
+      }
+    }
+    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
+    const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
+    const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
+    const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
+    if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) {
+      this.actionStartPlayerSnapshot = this.clonePlayer(player)
+      return
+    }
+    if (!hasGains && !hasCosts && !hasEffects) {
+      this.actionStartPlayerSnapshot = this.clonePlayer(player)
+      return
+    }
+    const labelKey = def.nameKey ?? `actions.${actionId}.name`
+    this.state.log.unshift({
+      key: 'log.actionDetail',
+      params: {
+        player: player.name,
+        action: labelKey,
+        detailParts,
+      },
+    })
+    this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
 
   private logImprovementDelta(before: PlayerState, player: PlayerState) {
@@ -1025,10 +1110,31 @@ export class GameSession {
       if (toAdd.some((e) => e.key === 'log.playImprovement' || e.key === 'log.playMinorImprovement')) {
         this.loggedImprovementThisAction = true
       }
+      for (const entry of toAdd) {
+        if (entry.key === 'log.cardEffectGain') {
+          const gain = (entry.params as { gain?: Partial<Resource> } | undefined)?.gain
+          if (gain) this.accumulateCardEffectDelta('gains', gain)
+        } else if (entry.key === 'log.cardEffectPay') {
+          const cost = (entry.params as { cost?: Partial<Resource> } | undefined)?.cost
+          if (cost) this.accumulateCardEffectDelta('costs', cost)
+        }
+      }
       for (let i = toAdd.length - 1; i >= 0; i--) {
         this.state.log.unshift(toAdd[i])
       }
       this.engineLog.clear()
+    }
+  }
+
+  private accumulateCardEffectDelta(
+    bucket: 'gains' | 'costs',
+    delta: Partial<Resource>,
+  ) {
+    const target = this.cardEffectDeltasSinceFlush[bucket]
+    for (const [key, value] of Object.entries(delta)) {
+      if (typeof value !== 'number' || value <= 0) continue
+      const k = key as keyof Resource
+      target[k] = (target[k] ?? 0) + value
     }
   }
 
@@ -1114,7 +1220,7 @@ export class GameSession {
     this.turnOwnerPlayerIndex = null
     this.activeSpaceId = null
     this.activePlayerIndex = null
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
       this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
@@ -1226,8 +1332,9 @@ export class GameSession {
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
-      const newborn = Math.min(player.newbornCount, player.familySize)
-      const required = Math.max(0, player.familySize * 2 - newborn)
+      const size = familySize(player)
+      const newborn = Math.min(newbornCount(player), size)
+      const required = Math.max(0, size * 2 - newborn)
       const useFood = Math.min(player.resources.food, required)
       player.resources.food -= useFood
       const remaining = required - useFood
@@ -1407,6 +1514,7 @@ export class GameSession {
         if (this.turnOwnerPlayerIndex !== null) {
           const ownerIndex = this.turnOwnerPlayerIndex
           this.pending = { type: 'none' }
+          this.finalizeActionLog(player)
           this.activeSpaceId = null
           this.activePlayerIndex = null
           this.continueEndTurnHooks(ownerIndex)
@@ -1446,6 +1554,7 @@ export class GameSession {
           let autoPromptKey = step.choice.promptKey
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
+            const resolvedActionId = this.engine?.snapshot().pendingChoiceActionId ?? undefined
             const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             const isBakeChoice =
@@ -1456,6 +1565,9 @@ export class GameSession {
             }
             if (isBakeChoice) {
               this.logBakeBreadDelta(before, player)
+            }
+            if (result.type === 'ok' && resolvedActionId) {
+              this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
             if (result.type === 'choice') {
               if ((result.options?.length ?? 0) === 1) {
@@ -1509,8 +1621,7 @@ export class GameSession {
 
       if (step.type === 'ok' && step.result.type === 'fail') {
         if (!this.stageResume) {
-          space.takenBy = null
-          player.workersAvailable += 1
+          removeWorkerRef(space, player.id)
         }
         this.engine = null
         this.engineSource = null
@@ -1520,6 +1631,10 @@ export class GameSession {
         this.usedBakeBreadThisAction = false
         this.turnOwnerPlayerIndex = null
         return
+      }
+
+      if (step.type === 'ok' && step.result.type === 'ok') {
+        this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
@@ -1534,7 +1649,7 @@ export class GameSession {
   }
 
   private canUseOccupiedActionSpace(player: PlayerState, space: ActionSpace): boolean {
-    if (!space.takenBy) return false
+    if (!isSpaceOccupied(space)) return false
     return this.hookDispatcher.applyCanUseOccupied(
       { state: this.state, player, space, actionId: space.id },
       false,
@@ -1544,9 +1659,9 @@ export class GameSession {
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
     const openRound = roundOpen.get(space.id) ?? space.roundAvailable
     if (this.state.round < openRound) return false
-    if (player.workersAvailable <= 0) return false
+    if (workersAvailable(this.state, player) <= 0) return false
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (space.takenBy && !canUseOccupied) return false
+    if (isSpaceOccupied(space) && !canUseOccupied) return false
     return this.hookDispatcher.applyIsDoable(
       { state: this.state, player, space, actionId: space.id },
       space,
@@ -1665,22 +1780,23 @@ export class GameSession {
     if (this.pending.type !== 'none') return this.respond(false, 'interaction in progress')
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
-    if (!player || player.workersAvailable <= 0) return this.respond(false, 'no workers available')
+    if (!player || workersAvailable(this.state, player) <= 0) return this.respond(false, 'no workers available')
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space unavailable')
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (space.takenBy && !canUseOccupied) return this.respond(false, 'space unavailable')
+    if (isSpaceOccupied(space) && !canUseOccupied) return this.respond(false, 'space unavailable')
 
     this.pushHistory(true)
     this.turnOwnerPlayerIndex = playerIndex
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
+    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
     this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
-    if (!space.takenBy) {
-      space.takenBy = player.id
+    const worker = smallestAvailableWorker(this.state, player)
+    if (worker) {
+      addWorkerRef(space, player.id, worker.id)
     }
-    player.workersAvailable -= 1
-    recordRoundPlacement(player, spaceId)
+    recordRoundPlacement(player, spaceId, worker?.id ?? '?')
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
     this.engine = this.createEngine(spaceId)
@@ -1779,10 +1895,14 @@ export class GameSession {
     if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
       this.usedBakeBreadThisAction = true
     }
+    const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
     this.flushEngineLog()
     if (isBakeChoice) {
       this.logBakeBreadDelta(before, player)
+    }
+    if (result.type === 'ok' && resolvedActionId) {
+      this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
     if (result.type === 'choice') {
       this.pending = {
@@ -1915,7 +2035,7 @@ export class GameSession {
       return this.respond()
     }
     this.finalizeActionLog(player)
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
       this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
@@ -2029,7 +2149,7 @@ export class GameSession {
     this.turnOwnerPlayerIndex = null
 
     // Check if all workers are used (round end condition)
-    const allWorkersUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (allWorkersUsed) {
       return this.performRoundEnd()
     }
@@ -2038,7 +2158,7 @@ export class GameSession {
   }
 
   performRoundEnd(): SessionResponse {
-    const allUsed = this.state.players.every((p) => p.workersAvailable <= 0)
+    const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allUsed) return this.respond(false, 'not all workers used')
     if (this.pending.type !== 'none') return this.respond(false, 'pending action exists')
 
@@ -2072,8 +2192,8 @@ export class GameSession {
       return this.respond()
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
-    this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
+    // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
+    this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
@@ -2143,7 +2263,11 @@ export class GameSession {
     if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((p) => { p.newbornCount = 0 })
+    this.state.players.forEach((p) => {
+      for (const w of p.workers) {
+        if (w.isActive) w.isNewborn = false
+      }
+    })
     this.state.round += 1
     if (this.state.round > 14) {
       this.state.gameOver = true
@@ -2293,8 +2417,9 @@ export class GameSession {
 
     switch (farmType) {
       case 'fence': {
-        const { edges, extraWood } = payload as { edges?: string[]; extraWood?: number }
+        const { edges, palisadeEdges, extraWood } = payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
         const safeEdges = Array.isArray(edges) ? edges : []
+        const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
         const freeFences =
           readPendingFenceBonus(normalized)?.freeFences ?? 0
         const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
@@ -2302,9 +2427,13 @@ export class GameSession {
         const validated = validateFenceSelection(
           normalized,
           safeEdges,
+          safePalisadeEdges,
           adjustedExtraWood,
           freeFences,
-          { skipPayment: true },
+          {
+            skipPayment: true,
+            allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+          },
         )
         if (!validated.ok) return this.respond(false, validated.error?.code ?? 'validation failed')
 
@@ -2328,7 +2457,11 @@ export class GameSession {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
                 farmType: 'fence',
-                payload: { edges: safeEdges, extraWood: extraWood ?? 0 },
+                payload: {
+                  edges: safeEdges,
+                  palisadeEdges: safePalisadeEdges,
+                  extraWood: extraWood ?? 0,
+                },
               },
             },
           }
@@ -2340,6 +2473,7 @@ export class GameSession {
 
         const result = applyFarmChoice(normalized, 'fence', {
           edges: safeEdges,
+          palisadeEdges: safePalisadeEdges,
           extraWood: extraWood ?? 0,
         }, {
           costOverride: override,
@@ -2664,7 +2798,13 @@ export class GameSession {
   devSetSpaceTaken(spaceId: string, playerId: string | null): SessionResponse {
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space not found')
-    space.takenBy = playerId
+    if (!playerId) {
+      space.takenBy = []
+    } else {
+      const player = this.state.players.find((p) => p.id === playerId)
+      const worker = player ? smallestAvailableWorker(this.state, player) : null
+      space.takenBy = [{ playerId, workerId: worker?.id ?? '1' }]
+    }
     return this.respond()
   }
 

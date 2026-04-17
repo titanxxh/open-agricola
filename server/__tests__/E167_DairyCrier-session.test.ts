@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E167_DairyCrier'
 
 const CARD_ID = 'E167_DairyCrier'
@@ -13,7 +15,7 @@ const setup = () => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 5
   player.occupationHand.push(CARD_ID)
 
@@ -25,7 +27,7 @@ const setup = () => {
     animalType: null,
     animalCount: 0,
   }]
-  player.fences = 6
+  setFencesForTest(player, 6)
 
   session.loadState(state)
   return session

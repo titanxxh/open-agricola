@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'B114_Childless'
 
@@ -11,7 +12,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     if (roomCount < 3) return
-    if (player.familySize !== 2) return
+    if (familySize(player) !== 2) return
     return {
       type: 'xor',
       children: [

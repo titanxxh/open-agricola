@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B21_HayloftBarn'
 
 const CARD_ID = 'B21_HayloftBarn'
@@ -14,7 +15,7 @@ const setup = (options?: { foodCount?: number }) => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 10
   player.resources.wood = 10
   player.resources.grain = 0
@@ -111,7 +112,7 @@ describe('B21_HayloftBarn session', () => {
     state.currentPlayerIndex = 0
     state.players[0]!.workersAvailable = 1
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (grainSeeds) grainSeeds.takenBy = null
+    if (grainSeeds) grainSeeds.takenBy = []
     session.loadState(state)
 
     // Second grain action

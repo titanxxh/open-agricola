@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E151_DeliveryNurse'
 
@@ -29,7 +30,7 @@ const computeReplaceListener: CardListenerRegistration = {
     const { sheep, boar, cattle } = context.player.resources
     if (!((sheep ?? 0) > 0 && (boar ?? 0) > 0 && (cattle ?? 0) > 0)) return
     // Only activate if player has no room for a child (wish-children-growth would fail)
-    if (context.player.rooms > context.player.familySize) return
+    if (context.player.rooms > familySize(context.player)) return
     return {
       actionId: 'grow-family-without-room',
       flow: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E72_ArtichokeField'
 
 const CARD_ID = 'E72_ArtichokeField'
@@ -37,7 +38,7 @@ const setup = (options?: {
 
   if (options?.round && harvestRounds.includes(options.round)) {
     for (const p of state.players) {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
     }
   }
 

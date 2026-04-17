@@ -440,6 +440,65 @@ export class Engine {
     }
   }
 
+  /**
+   * Opt-in choice flow for actions that declare `getBaseChoiceOptions`.
+   * Returns:
+   *   - `null` when the action does not opt in (caller should run `execute()`).
+   *   - a `fail` result when no candidate option is affordable.
+   *   - the result of `action.resolveChoice` when exactly one option is affordable
+   *     (auto short-circuit, no UI choice presented).
+   *   - a `choice` result with the merged & affordability-filtered options when
+   *     two or more options remain (caller hands it to the regular choice flow).
+   * Mutates `executionContext.params.selectedOption` for the auto-resolve case so
+   * downstream `during/after` hooks can read which option was picked.
+   */
+  private maybeBuildChoiceCandidates(
+    executionContext: ActionExecutionContext,
+    action: ActionDefinition,
+    actionId: string,
+  ): ActionExecutionResult | null {
+    if (!action.getBaseChoiceOptions) return null
+    const baseOpts = action.getBaseChoiceOptions(executionContext) ?? []
+    const candidateResults = this.hooks.computeChoiceCandidates({
+      ...executionContext,
+      actionId,
+    })
+    const extraOpts = candidateResults
+      .flatMap((entry) => entry.extraOptions ?? [])
+      .filter((opt): opt is ActionChoiceOption => Boolean(opt))
+    const seen = new Set<string>()
+    const merged: ActionChoiceOption[] = []
+    for (const opt of [...baseOpts, ...extraOpts]) {
+      if (seen.has(opt.value)) continue
+      seen.add(opt.value)
+      merged.push(opt)
+    }
+    const affordable = merged.filter((opt) => {
+      const probeCtx = {
+        ...executionContext,
+        params: { ...(executionContext.params ?? {}), selectedOption: opt.value },
+        actionId,
+      }
+      return this.hooks.isOptionAffordable(probeCtx, action)
+    })
+    if (affordable.length === 0) {
+      return { type: 'fail', logKey: action.noChoiceLogKey ?? 'log.action' }
+    }
+    if (affordable.length === 1 && action.resolveChoice) {
+      const value = affordable[0]!.value
+      executionContext.params = {
+        ...(executionContext.params ?? {}),
+        selectedOption: value,
+      }
+      return action.resolveChoice(executionContext, value)
+    }
+    return {
+      type: 'choice',
+      promptKey: action.choicePromptKey,
+      options: affordable,
+    }
+  }
+
   private buildChoiceExecutionContext(
     context: EngineContext,
     base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null,
@@ -808,13 +867,19 @@ export class Engine {
           return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
         }
       }
-      const result = action.execute(executionContext)
+      const optInChoice = this.maybeBuildChoiceCandidates(
+        executionContext,
+        action,
+        replacedActionId,
+      )
+      const result = optInChoice ?? action.execute(executionContext)
       const duringPhase = this.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
       const duringActivateNodes = this.buildActivateCardNodes(
         duringPhase.matchedListeners, 'during', replacedActionId,
       )
 if (result.type === 'choice') {
 node.resolve(result)
+if (!action.getBaseChoiceOptions) {
 const argResults = this.hooks.computeArgs(
 { ...executionContext, actionId: replacedActionId },
 result,
@@ -824,6 +889,7 @@ const extraOptions = argResults
 .filter((option) => option)
 if (extraOptions.length > 0) {
 result.options = [...result.options, ...extraOptions]
+          }
         }
         const choiceNode = this.findChoiceNode(this.tree.root)
         if (choiceNode) {
@@ -905,7 +971,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         this.tree.insertAfter(node.id, allInsertNodes)
       }
       node.resolve(result)
-      return { type: 'ok', nodeId: node.id, result }
+      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
     return { type: 'blocked', nodeId: node.id }
   }
@@ -1125,6 +1191,10 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       return { type: 'ok' }
     }
     const executionContext = this.buildChoiceExecutionContext(context, this.pendingChoiceContext)
+    executionContext.params = {
+      ...(executionContext.params ?? {}),
+      selectedOption: choice,
+    }
     let result: ActionExecutionResult
     if (resolvedResultOverride) {
       result = resolvedResultOverride

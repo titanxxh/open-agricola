@@ -52,6 +52,8 @@ export type HistorySnapshot = {
   animalReorg: AnimalReorgState | null
   actionStartSnapshot: GameState | null
   pendingFenceEdges: string[]
+  pendingPalisadeEdges: string[]
+  fencePlacementMode: 'fence' | 'palisade'
   fenceError: { code: string; edges: string[]; newEdges: string[] } | null
   pendingRoomTiles: FarmTilePosition[]
   roomError: string | null

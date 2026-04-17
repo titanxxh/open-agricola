@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D74_RoyalWood'
 import '../../shared/cards/B/B81_Handcart'
 import '../../shared/cards/E/E14_WoodSaw'
@@ -15,7 +16,7 @@ const setup = (options?: { wood?: number }) => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 10
   player.resources.wood = options?.wood ?? 10
   player.resources.clay = 10
@@ -32,10 +33,10 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   const state = session.getState().state
   state.currentPlayerIndex = 0
   const player = state.players[0]!
-  player.workersAvailable = 1
+  setWorkersAtHome(state, player, 1)
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
   if (!majorImprovement) throw new Error('major-improvement missing')
-  majorImprovement.takenBy = null
+  majorImprovement.takenBy = []
   if (!player.minorHand.includes(minorId)) {
     player.minorHand.push(minorId)
   }

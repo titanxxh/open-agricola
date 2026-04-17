@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B143_ClayWarden'
 
 describe('B143_ClayWarden session', () => {
@@ -14,13 +15,11 @@ describe('B143_ClayWarden session', () => {
     const owner = state.players[0]!
     owner.occupationPlayed.push('B143_ClayWarden')
     owner.playedCards.push('occupation:B143_ClayWarden')
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources.clay = 0
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-
-    // Ensure hollow-4 exists and has accumulated resources
+    setWorkersAtHome(state, opponent, 2) // Ensure hollow-4 exists and has accumulated resources
     // hollow-4 is a 4-player space, but let's add it manually for testing
     const hollow4 = state.actionSpaces.find((s) => s.id === 'hollow-4')
     if (hollow4) {

@@ -6,6 +6,7 @@ import {
 } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
 import type {
   ActionSpace,
   GameState,
@@ -25,14 +26,21 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 0, rooms: 2, houseType: 'wood' as const,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood' as const,
     fields: [], fences: 0,
     roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
     cardStates: {},
@@ -51,7 +59,7 @@ const createSpace = (id: string, takenBy: string | null = null): ActionSpace =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    takenBy,
+    takenBy: takenBy ? [{ playerId: takenBy, workerId: '1' }] : [],
   }) as unknown as ActionSpace
 
 const createState = (
@@ -239,7 +247,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // Give the player enough resources: 1 sheep + 2 food (plus 1 worker to place).
     player.resources.sheep = 1
     player.resources.food = 2
-    player.workersAvailable = 1
+    setWorkersAtHome(state, player, 1)
     state.players[1]!.workersAvailable = 1
 
     // Pretend the player already placed another worker earlier on 'forest'.
@@ -300,7 +308,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
 
     // Forest is unoccupied again.
     const forestAfter = resp.state.actionSpaces.find((s) => s.id === 'forest')
-    expect(forestAfter?.takenBy).toBe(null)
+    expect(forestAfter?.takenBy).toEqual([])
 
     // Card flagged (used this work phase).
     expect(isCardFlagged(after, CARD_ID)).toBe(true)
@@ -326,7 +334,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // day-laborer granted +2 food.
     expect(after.resources.food).toBe(foodBefore + 2)
     const forestAfter = resp.state.actionSpaces.find((s) => s.id === 'forest')
-    expect(forestAfter?.takenBy).toBe(after.id)
+    expect(forestAfter?.takenBy.some((t) => t.playerId === after.id)).toBe(true)
     expect(isCardFlagged(after, CARD_ID)).toBe(false)
   })
 })

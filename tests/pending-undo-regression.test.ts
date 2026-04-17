@@ -437,14 +437,14 @@ describe('pending choice types + undo regression', () => {
       const undo1 = session.undoStep()
       expect(undo1.ok).toBe(true)
       expect(undo1.pending.type).toBe('confirmNextPlayer')
-      expect(undo1.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toBe(
-        undo1.state.players[0]!.id,
-      )
+      expect(
+        undo1.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy[0]?.playerId,
+      ).toBe(undo1.state.players[0]!.id)
 
       const undo2 = session.undoStep()
       expect(undo2.ok).toBe(true)
       expect(undo2.pending.type).toBe('none')
-      expect(undo2.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toBeNull()
+      expect(undo2.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toEqual([])
     })
   })
 
@@ -469,8 +469,8 @@ describe('pending choice types + undo regression', () => {
       const second = actions[1]!
       const retake = session.takeAction(0, second.spaceId)
       expect(retake.ok).toBe(true)
-      expect(retake.state.actionSpaces.find((s) => s.id === first.spaceId)?.takenBy).toBeNull()
-      expect(retake.state.actionSpaces.find((s) => s.id === second.spaceId)?.takenBy).toBeTruthy()
+      expect(retake.state.actionSpaces.find((s) => s.id === first.spaceId)?.takenBy).toEqual([])
+      expect((retake.state.actionSpaces.find((s) => s.id === second.spaceId)?.takenBy.length ?? 0) > 0).toBe(true)
     })
   })
 

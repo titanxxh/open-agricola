@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B55_MaintenancePremium'
 
 const CARD_ID = 'B55_MaintenancePremium'
@@ -14,7 +15,7 @@ const setup = () => {
   state.round = 1
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.food = 10
   player.resources.wood = 10
   player.resources.clay = 10
@@ -92,7 +93,7 @@ describe('B55_MaintenancePremium session', () => {
     player.rooms = 2
     player.resources.clay = 10
     player.resources.reed = 10
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     session.loadState(state)
 
     // Take house-redevelopment action (renovation + minor improvement)

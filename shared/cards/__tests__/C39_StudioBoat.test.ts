@@ -16,12 +16,19 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
     id, name, color: id === 'p1' ? 'red' : 'blue',
     resources: { ...emptyResources },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [CARD_ID],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as PlayerState
 
@@ -31,7 +38,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { ...emptyResources },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 

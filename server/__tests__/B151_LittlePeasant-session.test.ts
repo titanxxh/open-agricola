@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/B/B151_LittlePeasant'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -16,7 +17,7 @@ const setupOccupiedSpaceSession = (options?: {
   state.currentPlayerIndex = 0
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.houseType = options?.houseType ?? 'wood'
   player.rooms = options?.rooms ?? 2
 
@@ -43,7 +44,7 @@ const setupPlaySession = () => {
   state.currentPlayerIndex = 0
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.occupationHand = ['B151_LittlePeasant']
 
   session.loadState(state)
@@ -72,9 +73,9 @@ describe('B151_LittlePeasant session', () => {
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBeGreaterThan(0)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
   it('gives 1 stone when the occupation is played', () => {

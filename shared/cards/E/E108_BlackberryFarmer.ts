@@ -15,18 +15,13 @@ const listener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    const newPastures =
-      context.result?.type === 'ok'
-        ? (context.result.extraData?.newPastures as { tiles?: unknown[] }[] | undefined)
-        : undefined
-    if (!newPastures || newPastures.length === 0) return
-    // Count fences built: each new pasture contributes fenceCost fences
-    // We approximate by using player.fences delta - BGA uses count of actual fence segments built
-    // Use fencesBuilt from extraData if available, else approximate via pastures
+    // Count fences built from the farm-choice `fence` extraData.
+    // Palisades are tracked separately under `newPalisadeEdges` and must NOT
+    // contribute to future-meeples for this card.
     const fencesBuilt =
-      (context.result?.type === 'ok'
-        ? (context.result.extraData?.fencesBuilt as number | undefined)
-        : undefined) ?? newPastures.length
+      context.result?.type === 'ok'
+        ? ((context.result.extraData?.newFenceEdges as string[] | undefined)?.length ?? 0)
+        : 0
     if (fencesBuilt <= 0) return
     queueFutureMeeples(context.state, {
       cardId: CARD_ID,

@@ -26,7 +26,6 @@ const createPlayer = (): PlayerFarmState => ({
     { row: 1, col: 0 },
   ],
   stableTiles: [],
-  fences: 0,
   fenceSegments: [],
   pastures: [],
 })
@@ -69,7 +68,7 @@ describe('plow validation', () => {
 
   it('rejects fenced tile', () => {
     const player = createPlayer()
-    player.fenceSegments = edgesForTile(1, 1)
+    player.fenceSegments = edgesForTile(1, 1).map((edge) => ({ edge, type: 'fence' }))
     const result = validatePlowSelection(player, { row: 1, col: 1 })
     expect(result.ok).toBe(false)
     if (!result.ok) {

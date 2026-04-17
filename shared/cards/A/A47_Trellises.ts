@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { getFenceCount } from '../../actions/effects/fencing'
 
 const CARD_ID = 'A47_Trellises'
 
@@ -8,7 +9,7 @@ const CARD_ID = 'A47_Trellises'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    const n = player.fences
+    const n = getFenceCount(player)
     if (n <= 0) return
     return queueFutureMeeplesFlow(state, {
       cardId: CARD_ID,

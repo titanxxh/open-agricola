@@ -1,19 +1,19 @@
 import type { GameState, PlayerState } from '../../../shared/game/types'
 import { applyFutureMeeples, applyRoundGrowth, createRoundSnapshot } from '../../../shared/logic/state'
 import { applyMajorEffectsToAllPlayers } from '../../../shared/cards/major'
+import { workersAvailable } from '../../../shared/game/player'
 
 export const applyReturnHomePhase = (nextState: GameState) => {
-  nextState.players.forEach((player) => {
-    player.workersAvailable = player.familySize
-  })
   nextState.actionSpaces.forEach((space) => {
-    space.takenBy = null
+    space.takenBy = []
   })
 }
 
 export const finalizeRoundCore = (nextState: GameState) => {
   nextState.players.forEach((player) => {
-    player.newbornCount = 0
+    for (const w of player.workers) {
+      if (w.isActive) w.isNewborn = false
+    }
   })
   nextState.round += 1
   if (nextState.round > 14) {
@@ -34,13 +34,23 @@ export const finalizeRoundCore = (nextState: GameState) => {
   return { type: 'nextRound' as const, nextState }
 }
 
-export const nextPlayerIndex = (players: PlayerState[], startIndex: number) => {
+export const nextPlayerIndex = (
+  players: PlayerState[],
+  startIndex: number,
+  state?: GameState,
+) => {
   const total = players.length
   for (let offset = 1; offset <= total; offset += 1) {
     const candidate = (startIndex + offset) % total
     const player = players[candidate]
-    if (player && player.workersAvailable > 0) {
-      return candidate
+    if (!player) continue
+    if (state) {
+      if (workersAvailable(state, player) > 0) return candidate
+    } else {
+      // Fallback: use workers[] + simple at-home check via no state.
+      // Since we can't scan spaces, approximate by active workers count > 0.
+      const active = (player.workers ?? []).filter((w) => w.isActive).length
+      if (active > 0) return candidate
     }
   }
   return startIndex

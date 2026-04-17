@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
-import { maxFences } from '../../actions/effects/fencing'
+import { getFenceCount, maxFences } from '../../actions/effects/fencing'
 
 const CARD_ID = 'A34_Loppers'
 
@@ -18,7 +18,7 @@ const listener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    if (context.player.fences >= maxFences) return
+    if (getFenceCount(context.player) >= maxFences) return
     return payGainNode({
       cardId: CARD_ID,
       cost: { wood: 1 },

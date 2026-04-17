@@ -15,12 +15,19 @@ const createPlayer = (): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 3,
       grain: 0, vegetable: 0, sheep: 0, boar: 2, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [CARD_ID],
     occupationHand: [], occupationPlayed: [], playedCards: [`minor:${CARD_ID}`],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as PlayerState
@@ -53,7 +60,7 @@ const createSpace = (id: string): ActionSpace =>
     canBeExecutedByPlayer: () => true,
     execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
   }) as ActionSpace
 
 const findListener = (id: string) =>

@@ -27,8 +27,6 @@ const player = (): PlayerState => ({
   name: 'p1',
   color: 'red',
   resources: resources(),
-  familySize: 2,
-  workersAvailable: 0,
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -44,7 +42,6 @@ const player = (): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [
     {
       id: 'pasture-1',
@@ -92,7 +89,7 @@ const gameState = (): GameState => ({
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: resources(),
-      takenBy: null,
+      takenBy: [],
     },
   ],
   log: [],

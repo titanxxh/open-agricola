@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A141_TurnipFarmer'
 
@@ -12,7 +13,8 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const dayLaborer = state.actionSpaces.find((s) => s.id === 'day-laborer')
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (!dayLaborer?.takenBy || !grainSeeds?.takenBy) return
+    if (!dayLaborer || !grainSeeds) return
+    if (!isSpaceOccupied(dayLaborer) || !isSpaceOccupied(grainSeeds)) return
     return gainLeaf(CARD_ID, { vegetable: 1 })
   },
 })

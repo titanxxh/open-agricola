@@ -9,7 +9,9 @@ import type {
 } from '../../../shared/game/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state'
+import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
+import { getFenceCount } from '../../../shared/actions/effects/fencing'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -203,6 +205,7 @@ type Props = {
   hasReorgOverflow: boolean
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
+  pendingPalisadeSet?: Set<string>
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
   toggleRoomTile: (tile: FarmTilePosition) => void
@@ -482,6 +485,7 @@ export const FarmBoard = ({
   hasReorgOverflow,
   animalReorg,
   pendingFenceSet,
+  pendingPalisadeSet,
   existingFenceSet,
   fenceSelectableSet,
   toggleRoomTile,
@@ -547,10 +551,10 @@ export const FarmBoard = ({
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
-            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{displayPlayer.familySize}</span>
+            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{familySize(displayPlayer)}</span>
             <span className="res-compact-label">{locale === 'zh' ? '屋' : 'R'}</span><span className="res-compact-num">{displayPlayer.rooms}</span>
             <span className="res-icon res-icon-field" /><span className="res-compact-num">{displayPlayer.fields.length}</span>
-            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{displayPlayer.fences}</span>
+            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{getFenceCount(displayPlayer)}</span>
             <span className="res-icon res-icon-barn" /><span className="res-compact-num">{displayPlayer.stableTiles?.length ?? 0}</span>
           </span>
         </div>
@@ -883,16 +887,29 @@ export const FarmBoard = ({
         if (cell.type === 'fence-h' || cell.type === 'fence-v') {
           const edgeId = cell.fenceId ?? ''
           const isExisting = edgeId && existingFenceSet.has(edgeId)
-          const isPending = isInteractive && edgeId && pendingFenceSet.has(edgeId)
+          const isPendingFence = isInteractive && edgeId && pendingFenceSet.has(edgeId)
+          const isPendingPalisade =
+            isInteractive && edgeId && !!pendingPalisadeSet && pendingPalisadeSet.has(edgeId)
+          const isPending = isPendingFence || isPendingPalisade
           const isActive = isExisting || isPending
           const isSelectable =
             isInteractive && !!edgeId && !isExisting && fenceSelectableSet.has(edgeId)
+          const builtSegment = edgeId
+            ? displayPlayer.fenceSegments.find((s) => s.edge === edgeId)
+            : undefined
+          const segmentType: 'fence' | 'palisade' | null = builtSegment
+            ? builtSegment.type
+            : isPendingPalisade
+              ? 'palisade'
+              : isPendingFence
+                ? 'fence'
+                : null
           return (
             <div
               key={cell.key}
               className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
-              }${isSelectable ? ' selectable' : ''}`}
+              }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}`}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

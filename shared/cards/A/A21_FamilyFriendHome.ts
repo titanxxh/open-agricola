@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { familySize as getFamilySize } from '../../game/player'
 
 const CARD_ID = 'A21_FamilyFriendHome'
 
@@ -24,7 +25,7 @@ const listener: CardListenerRegistration = {
     if (roomsBuilt <= 0) return
     // Rooms before action = current rooms - rooms built
     const oldRoomCount = context.player.rooms - roomsBuilt
-    const familySize = context.player.familySize
+    const familySize = getFamilySize(context.player)
     // Only trigger if there were more rooms than people BEFORE building
     if (oldRoomCount <= familySize) return
     if (familySize >= 5) return

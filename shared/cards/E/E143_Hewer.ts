@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'E143_Hewer'
 
@@ -31,7 +32,7 @@ registerCardEffect({
 
     const allUnoccupied = claySpaceIds.every((id) => {
       const space = state.actionSpaces.find((s) => s.id === id)
-      return !space || !space.takenBy
+      return !space || !isSpaceOccupied(space)
     })
 
     if (!allUnoccupied) return

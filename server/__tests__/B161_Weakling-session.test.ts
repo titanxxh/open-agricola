@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B161_Weakling'
 
 const CARD_ID = 'B161_Weakling'
@@ -17,7 +18,7 @@ describe('B161_Weakling session', () => {
     player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`occupation:${CARD_ID}`)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
 
     // Pile 6 wood on the Forest to create a 5+ accumulation space

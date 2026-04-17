@@ -28,7 +28,7 @@ const createState = (): GameState => ({
         cattle: 0,
         begging: 0,
       },
-      takenBy: null,
+      takenBy: [],
     },
   ],
   log: [],

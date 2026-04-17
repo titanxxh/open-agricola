@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'C24_BedintheGrainField'
 
@@ -14,7 +15,7 @@ registerCardEffect({
     const ready = readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')
     if (!ready) return
     writeCardExtraData(player, CARD_ID, 'nextHarvestReady', false)
-    if (player.rooms <= player.familySize) return
+    if (player.rooms <= familySize(player)) return
     return {
       type: 'leaf',
       actionId: 'wish-children-growth',

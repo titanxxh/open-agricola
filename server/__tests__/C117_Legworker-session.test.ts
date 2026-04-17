@@ -24,7 +24,7 @@ describe('C117_Legworker session', () => {
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     if (!farmland || !grainSeeds) return
-    grainSeeds.takenBy = player.id
+    grainSeeds.takenBy = [{ playerId: player.id, workerId: "1" }]
     session.loadState(state)
 
     expect(hasAdjacentWorker(state, player.id, 'farmland')).toBe(true)
@@ -38,7 +38,7 @@ describe('C117_Legworker session', () => {
     const opponent = state.players[1]!
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     if (!grainSeeds) return
-    grainSeeds.takenBy = opponent.id
+    grainSeeds.takenBy = [{ playerId: opponent.id, workerId: "1" }]
     session.loadState(state)
 
     expect(hasAdjacentWorker(state, player.id, 'farmland')).toBe(false)
@@ -62,7 +62,7 @@ describe('C117_Legworker session', () => {
     player.occupationPlayed.push(CARD_ID)
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     if (!grainSeeds) return
-    grainSeeds.takenBy = player.id
+    grainSeeds.takenBy = [{ playerId: player.id, workerId: "1" }]
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
@@ -108,7 +108,7 @@ describe('C117_Legworker session', () => {
     const player = state.players[0]!
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     if (!grainSeeds) return
-    grainSeeds.takenBy = player.id
+    grainSeeds.takenBy = [{ playerId: player.id, workerId: "1" }]
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!

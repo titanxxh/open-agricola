@@ -1,0 +1,49 @@
+# graphify ignore — mirror the relevant parts of .gitignore + global gitignore
+# Graphify does NOT read .gitignore, so keep this in sync manually.
+
+# runtime / build artifacts
+dist
+dist-ssr
+data/
+output/
+artifacts/
+test-results/
+.gstack/
+.persisted-room.json
+
+# tool caches / local state
+.claude/
+.cursor/
+.idea/
+.trae/
+.vscode/
+.understand-anything/
+graphify-out/
+
+# logs
+logs
+*.log
+
+# deps (already built-in, duplicated for clarity)
+node_modules
+
+# secrets
+.env
+*.pem
+*.key
+
+# PDFs / binary noise
+*.pdf
+*.traineddata
+
+# OS / editor noise
+.DS_Store
+*.sw?
+open-agricola.code-workspace
+.oh-my-opencode.json
+
+# planning docs that are point-in-time snapshots, not architecture
+docs/superpowers/
+
+# external reference clones
+bga-agricola/

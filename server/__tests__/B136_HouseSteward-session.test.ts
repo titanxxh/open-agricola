@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { computeScores } from '../../shared/logic/scoring'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B136_HouseSteward'
 
 const CARD_ID = 'B136_HouseSteward'
@@ -14,7 +15,7 @@ const setupSession = (round: number) => {
   state.round = round
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.occupationHand = [CARD_ID, 'A85_Homekeeper']
   player.resources = { ...player.resources, food: 3, wood: 0 }
 

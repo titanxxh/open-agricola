@@ -3,6 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import { getCardEffect } from '../card-effects'
 import { readPendingFenceBonus, storePendingFenceBonus } from '../helpers/pending-fence-bonus'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import { setFencesForTest } from './__fixtures__/fence'
 
 import '../E/E74_AshTrees'
 
@@ -15,13 +16,20 @@ const createPlayer = (): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [{ row: 0, col: 0, crop: 'grain', remaining: 1 }, { row: 0, col: 1, crop: 'grain', remaining: 1 }],
-    fences: 0, roomTiles: [], stableTiles: [],
+    roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: ['E74_AshTrees'],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     cardStates: { E74_AshTrees: { counters: { fences: 4 } } },
   }) as PlayerState
@@ -42,7 +50,7 @@ const createSpace = (id: string): ActionSpace =>
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
   }) as ActionSpace
 
 const findListener = (id: string) => getRegisteredCardListeners().find((listener) => listener.id === id)
@@ -51,7 +59,7 @@ describe('E74_AshTrees', () => {
   it('stores only available fences on buy', () => {
     const effect = getCardEffect('E74_AshTrees')
     const player = createPlayer()
-    player.fences = 13
+    setFencesForTest(player, 13)
 
     effect?.onBuy?.(createState(player), player)
 

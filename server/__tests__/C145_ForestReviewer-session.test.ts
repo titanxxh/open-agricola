@@ -15,12 +15,19 @@ const createPlayer = (id: string): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
   }) as PlayerState
@@ -35,7 +42,7 @@ const createForestSpace = (takenBy: string | null): ActionSpace =>
     canBeExecutedByPlayer: () => true,
     execute: () => ({ type: 'ok' }),
     resources: { wood: 3, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy,
+    takenBy: takenBy ? [{ playerId: takenBy, workerId: '1' }] : [],
   }) as ActionSpace
 
 const createGroveSpace = (takenBy: string | null): ActionSpace =>
@@ -48,7 +55,7 @@ const createGroveSpace = (takenBy: string | null): ActionSpace =>
     canBeExecutedByPlayer: () => true,
     execute: () => ({ type: 'ok' }),
     resources: { wood: 2, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy,
+    takenBy: takenBy ? [{ playerId: takenBy, workerId: '1' }] : [],
   }) as ActionSpace
 
 const createState = (players: PlayerState[], actionSpaces: ActionSpace[]): GameState =>
@@ -173,7 +180,7 @@ describe('C145_ForestReviewer', () => {
     const reedBankSpace = {
       id: 'reed-bank',
       resources: {},
-      takenBy: null,
+      takenBy: [],
     } as any
 
     const result = executeCardListener(listener, {

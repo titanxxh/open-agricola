@@ -5,6 +5,7 @@ import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { buildSowFarmInteraction } from '../farm-interaction'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
 
@@ -47,7 +48,7 @@ const setup = (options?: {
   // Set enough food for all players in harvest rounds
   if (options?.round && harvestRounds.includes(options.round)) {
     for (const p of state.players) {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     }
     // Re-apply player 0 resources after the loop

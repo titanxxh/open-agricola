@@ -28,8 +28,6 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
     cattle: 0,
     begging: 0,
   },
-  familySize: 2,
-  workersAvailable: 2,
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -45,7 +43,6 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
-  newbornCount: 0,
   pastures: [],
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
@@ -75,7 +72,7 @@ const createSpace = (id: string, overrides: Partial<ActionSpace> = {}): ActionSp
       cattle: 0,
       begging: 0,
     },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }
 }
