@@ -260,4 +260,87 @@ describe('C48_Farmstead per-turn used-space gain', () => {
   })
 })
 
+// ===== Task 6: C69 LandConsolidation field-local swap =====
+import '../C/C69_LandConsolidation'
+
+describe('C69_LandConsolidation field swap', () => {
+  it('offers anytime action when player has grain field with remaining=3', () => {
+    const listener = findListener('C69-land-consolidation-anytime')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['C69_LandConsolidation']
+    p.fields = [{ crop: 'grain', remaining: 3, row: 1, col: 0 } as any]
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('trigger'),
+      actionId: 'trigger', phase: 'anytime',
+    } as any)
+    expect(result).toBeDefined()
+    const flow = result!.flow as any
+    expect(flow.actionId).toBe('swap-field-grain-to-veg')
+    expect(flow.params).toEqual({ row: 1, col: 0 })
+  })
+
+  it('not available when grain field has remaining=2', () => {
+    const listener = findListener('C69-land-consolidation-anytime')!
+    const p = createPlayer()
+    p.minorPlayed = ['C69_LandConsolidation']
+    p.fields = [{ crop: 'grain', remaining: 2, row: 1, col: 0 } as any]
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('trigger'),
+      actionId: 'trigger', phase: 'anytime',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('not available when only vegetable fields exist', () => {
+    const listener = findListener('C69-land-consolidation-anytime')!
+    const p = createPlayer()
+    p.minorPlayed = ['C69_LandConsolidation']
+    p.fields = [{ crop: 'vegetable', remaining: 2, row: 1, col: 0 } as any]
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('trigger'),
+      actionId: 'trigger', phase: 'anytime',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('offers xor choice when multiple qualifying grain fields exist', () => {
+    const listener = findListener('C69-land-consolidation-anytime')!
+    const p = createPlayer()
+    p.minorPlayed = ['C69_LandConsolidation']
+    p.fields = [
+      { crop: 'grain', remaining: 3, row: 1, col: 0 } as any,
+      { crop: 'grain', remaining: 3, row: 1, col: 1 } as any,
+    ]
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('trigger'),
+      actionId: 'trigger', phase: 'anytime',
+    } as any)
+    const flow = result!.flow as any
+    expect(flow.type).toBe('xor')
+    expect(flow.children.length).toBe(2)
+    expect(flow.children[0].actionId).toBe('swap-field-grain-to-veg')
+  })
+
+  it('the swap action mutates the field correctly', async () => {
+    // Integration: import the action and call its execute directly
+    const { swapFieldGrainToVegAction } = await import(
+      '../../actions/effects/swap-field-crop'
+    )
+    const p = createPlayer()
+    p.fields = [{ crop: 'grain', remaining: 3, row: 1, col: 0 } as any]
+    const result = swapFieldGrainToVegAction.execute({
+      state: createState(2, p), player: p, space: {} as any,
+      params: { row: 1, col: 0 },
+    } as any)
+    expect(result.type).toBe('ok')
+    expect(p.fields[0]!.crop).toBe('vegetable')
+    expect(p.fields[0]!.remaining).toBe(1)
+  })
+})
+
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
