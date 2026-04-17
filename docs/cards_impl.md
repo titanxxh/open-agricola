@@ -90,7 +90,7 @@
 | onAfterFeed | — | 已接入 | 喂食后触发 |
 | onEndHarvest | [C71_SlurrySpreader](../shared/cards/C/C71_SlurrySpreader.ts)、[D115_FodderPlanter](../shared/cards/D/D115_FodderPlanter.ts)、[E133_ChampionBreeder](../shared/cards/E/E133_ChampionBreeder.ts) | 已接入 | 收获结束/繁殖后；E133 按繁殖新生动物数给 1-2 VP |
 | onAfterHarvest | [D99_EarthenwarePotter](../shared/cards/D/D99_EarthenwarePotter.ts) | 已接入 | 收获阶段结束后触发，支持返回可暂停/恢复的 `ActionFlow` |
-| onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts) | 已接入 | 每回合开始前触发，支持返回可暂停/恢复的 `ActionFlow` |
+| onBeforeStartOfTurn | [B70_NewPurchase](../shared/cards/B/B70_NewPurchase.ts)、[E93_Motivator](../shared/cards/E/E93_Motivator.ts) | 已接入 | 每回合开始前触发，支持返回可暂停/恢复的 `ActionFlow`；E93 用它在“满农场 + 本轮首次放人前”插入一次可选额外放人 |
 | computeBonusScore | [C133_Soldier](../shared/cards/C/C133_Soldier.ts)、[A136_DrudgeryReeve](../shared/cards/A/A136_DrudgeryReeve.ts) | 已接入 | 游戏结束计分时调用；按 `scoringPriority` 排序（小值优先），共享 `ScoringContext.reserved` 避免资源重复计分。Major Joinery/Pottery/Basket 也会扣除 reserved 资源 |
 
 ## 行动卡 Hook 示例
@@ -99,6 +99,7 @@
 |---|---|---|
 | isActionCardEvent | [E82_Profiteering](../shared/cards/E/E82_Profiteering.ts) | 指定行动卡 ID 触发 |
 | isActionCardEvent（多空间） | [D74_RoyalWood](../shared/cards/D/D74_RoyalWood.ts) | 多个行动空间触发 |
+| isActionCardEvent（读取 `result.extraData`） | [A41_VegetableSlicer](../shared/cards/A/A41_VegetableSlicer.ts) | 监听 `improvement-any` 的 `after` 阶段，并通过 `improvementPayment` 区分 Fireplace→CookingHearth 升级 |
 | isActionCardTurnEvent | [D55_NewMarket](../shared/cards/D/D55_NewMarket.ts) | 指定回合区间的行动卡触发 |
 | isActionCardTurnEvent（1-4轮） | [C23_JobContract](../shared/cards/C/C23_JobContract.ts) | 指定轮次范围触发 |
 | isCollectEvent | [E75_StoneAxe](../shared/cards/E/E75_StoneAxe.ts) | 累积格/收取事件触发 |
@@ -553,7 +554,7 @@ const Major_CookingHearth1: MajorCardDefinition = {
 | 阶段 | BGA 卡牌数 | Open 对应 | 差距 | 典型示例 |
 |---|---|---|---|---|
 | onBuy | 100+ | onBuy（已接入） | Major 已覆盖，Minor/Occ 待补 | E53_BoarSpear, E74_AshTrees, Major_Well |
-| BeforeStartOfTurn | 6 | onBeforeStartOfTurn（已接入） | 仅 B70 | B70_NewPurchase, D48_CivicFacade, C157_ResourceAnalyzer |
+| BeforeStartOfTurn | 6 | onBeforeStartOfTurn（已接入） | 已有 `B70`、`E93` 样板 | B70_NewPurchase, E93_Motivator, D48_CivicFacade, C157_ResourceAnalyzer |
 | StartOfTurn | 30+ | onRoundStart（已接入） | 已有 `A81_InterimStorage` 样板，其他多数仍待落卡 | A81_InterimStorage, E126_TaxCollector, D53_TeaHouse |
 | BeforeReturnHome | 1 | onBeforeReturnHome（已接入） | 暂无卡牌注册 | D51_Archway |
 | StartReturnHome | 11 | onStartReturnHome（已接入） | 暂无卡牌注册 | A151_Minstrel, E20_IronHoe, C97_SeedResearcher, A100_Curator |

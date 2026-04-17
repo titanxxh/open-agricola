@@ -106,26 +106,15 @@ export const buildSowFarmInteraction = (
   actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
-  const excludedKeys = new Set(
-    Array.isArray(actionContext?.excludedFields)
-      ? actionContext.excludedFields.flatMap((field) => {
-        const row = Number((field as { row?: unknown }).row)
-        const col = Number((field as { col?: unknown }).col)
-        if (!Number.isFinite(row) || !Number.isFinite(col)) return []
-        return [positionKey({ row, col })]
-      })
-      : [],
-  )
-  const allowedKeys = actionContext?.allowedFields === 'fromSelectedFields' && typeof actionContext?.sourceCard === 'string'
-    ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedFields') ?? [])
-    : null
+  const excludedKeys = getExcludedFieldKeys(actionContext)
+  const allowedKeys = getAllowedSelectedFieldKeys(player, actionContext)
 
   const selectableFields = normalized.fields.flatMap((field) => {
     if (field.crop !== null) return []
     const key = positionKey({ row: field.row, col: field.col })
     if (excludedKeys.has(key)) return []
     if (allowedKeys && !allowedKeys.has(key)) return []
-    const allowedCrops: ('grain' | 'vegetable')[] = []
+    const allowedCrops: ('grain' | 'vegetable' | 'wood')[] = []
     if ((normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
     }
@@ -136,18 +125,21 @@ export const buildSowFarmInteraction = (
     return [{ tile: { row: field.row, col: field.col }, allowedCrops }]
   })
   // Add extra sowable fields from card effects (e.g. B72 pastures)
-  const extraFields = computeExtraSowableFields(player)
+  const extraFields = getPermittedExtraSowableFields(player, actionContext)
   for (const extra of extraFields) {
-    const key = positionKey(extra.tile)
-    if (excludedKeys.has(key)) continue
     // Filter allowed crops by what the player actually has
     const filteredCrops = extra.allowedCrops.filter((crop) => {
       if (crop === 'grain') return (normalized.resources.grain ?? 0) > 0
       if (crop === 'vegetable') return (normalized.resources.vegetable ?? 0) > 0
+      if (crop === 'wood') return (normalized.resources.wood ?? 0) > 0
       return false
     })
     if (filteredCrops.length === 0) continue
-    selectableFields.push({ tile: extra.tile, allowedCrops: filteredCrops })
+    selectableFields.push({
+      tile: extra.tile,
+      allowedCrops: filteredCrops,
+      sourceCard: extra.sourceCard,
+    })
   }
 
   const rawMaxSelections = typeof actionContext?.maxSelections === 'number'
@@ -157,6 +149,40 @@ export const buildSowFarmInteraction = (
     ? undefined
     : Math.min(rawMaxSelections, selectableFields.length)
   return { farmType: 'sow', selectableFields, maxSelections }
+}
+
+const getExcludedFieldKeys = (
+  actionContext?: Record<string, unknown>,
+) => new Set(
+  Array.isArray(actionContext?.excludedFields)
+    ? actionContext.excludedFields.flatMap((field) => {
+      const row = Number((field as { row?: unknown }).row)
+      const col = Number((field as { col?: unknown }).col)
+      if (!Number.isFinite(row) || !Number.isFinite(col)) return []
+      return [positionKey({ row, col })]
+    })
+    : [],
+)
+
+const getAllowedSelectedFieldKeys = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+) => actionContext?.allowedFields === 'fromSelectedFields' && typeof actionContext?.sourceCard === 'string'
+  ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedFields') ?? [])
+  : null
+
+export const getPermittedExtraSowableFields = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+) => {
+  const excludedKeys = getExcludedFieldKeys(actionContext)
+  const allowedKeys = getAllowedSelectedFieldKeys(player, actionContext)
+  return computeExtraSowableFields(player).filter((extra) => {
+    const key = positionKey(extra.tile)
+    if (excludedKeys.has(key)) return false
+    if (allowedKeys && !allowedKeys.has(key)) return false
+    return true
+  })
 }
 
 export const buildFieldSelectFarmInteraction = (

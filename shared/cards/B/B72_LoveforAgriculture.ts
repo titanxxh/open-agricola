@@ -105,6 +105,7 @@ registerCardEffect({
     if (!player.minorPlayed.includes(CARD_ID)) return false
     const pastureId = findPastureByTile(player, tile)
     if (!pastureId) return false
+    if (crop !== 'grain' && crop !== 'vegetable') return false
     const pasture = player.pastures.find((p) => p.id === pastureId)
     if (!pasture || (pasture.size !== 1 && pasture.size !== 2)) return false
 

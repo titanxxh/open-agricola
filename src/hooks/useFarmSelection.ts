@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FarmTilePosition } from '../../shared/game/types'
+import type { PendingSowCrop } from '../types/ui'
 
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])
@@ -20,7 +21,7 @@ export const useFarmSelection = () => {
     useState<FarmTilePosition | null>(null)
   const [plowError, setPlowError] = useState<string | null>(null)
   const [pendingSowSelections, setPendingSowSelections] = useState<
-    Record<string, 'grain' | 'vegetable'>
+    Record<string, PendingSowCrop>
   >({})
   const [sowError, setSowError] = useState<string | null>(null)
   const [pendingFieldSelections, setPendingFieldSelections] = useState<Set<string>>(new Set())
@@ -94,7 +95,7 @@ export const useFarmSelection = () => {
         delete next[key]
         return next
       }
-      if (value !== 'grain' && value !== 'vegetable') return prev
+      if (value !== 'grain' && value !== 'vegetable' && value !== 'wood') return prev
       const alreadySelected = Object.prototype.hasOwnProperty.call(prev, key)
       if (
         !alreadySelected &&

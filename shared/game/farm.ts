@@ -25,6 +25,34 @@ export const createDefaultRoomTiles = (rooms: number) => {
 
 export const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
 
+export const parsePositionKey = (key: string): FarmTilePosition | null => {
+  const match = /^(-?\d+)-(-?\d+)$/.exec(key)
+  if (!match) return null
+  const row = Number(match[1])
+  const col = Number(match[2])
+  if (!Number.isInteger(row) || !Number.isInteger(col)) return null
+  return { row, col }
+}
+
+export const getUsedFarmyardTileKeys = (player: PlayerState) => {
+  const used = new Set<string>()
+  player.roomTiles.forEach((tile) => used.add(positionKey(tile)))
+  player.fields.forEach((field) =>
+    used.add(positionKey({ row: field.row, col: field.col })),
+  )
+  player.stableTiles.forEach((tile) => used.add(positionKey(tile)))
+  player.pastures.forEach((pasture) =>
+    pasture.tiles.forEach((tile) => used.add(positionKey(tile))),
+  )
+  return used
+}
+
+export const countUnusedFarmyardSpaces = (player: PlayerState) =>
+  FARM_ROWS * FARM_COLS - getUsedFarmyardTileKeys(player).size
+
+export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
+  countUnusedFarmyardSpaces(player) === 0
+
 export const getNextEmptyTile = (
   roomTiles: FarmTilePosition[],
   fields: Field[],

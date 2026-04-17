@@ -4,8 +4,8 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
-import type { AnimalReorgState } from '../types/ui'
-import { positionKey } from '../../shared/game/farm'
+import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
+import { parsePositionKey, positionKey } from '../../shared/game/farm'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
@@ -47,6 +47,9 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
     ? playerIndex
     : undefined
 }
+
+const isOffBoardSowTile = (tile: FarmTilePosition) =>
+  tile.row < 0 || tile.row > 2 || tile.col < 0 || tile.col > 4
 
 type WsStatus =
   | { phase: 'idle' }
@@ -406,10 +409,9 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'field-select') {
-        const fields = [...pendingFieldSelections].map((key) => {
-          const [r, c] = key.split('-').map(Number)
-          return { row: r, col: c }
-        })
+        const fields = [...pendingFieldSelections]
+          .map((key) => parsePositionKey(key))
+          .filter((tile): tile is FarmTilePosition => !!tile)
         void transport.commitFarm(pendingPlayerIndex, 'field-select', { fields })
           .catch((e) => console.error(e))
         return
@@ -417,13 +419,15 @@ export const GameContainerApi = () => {
       if (interaction.farm.farmType === 'sow') {
         const crops = Object.entries(pendingSowSelections)
           .map(([key, crop]) => {
-            const [rowText, colText] = key.split('-')
-            const row = Number(rowText)
-            const col = Number(colText)
-            if (!Number.isFinite(row) || !Number.isFinite(col)) return null
-            return { row, col, crop }
+            const tile = parsePositionKey(key)
+            if (!tile) return null
+            return { row: tile.row, col: tile.col, crop }
           })
-          .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' } => !!entry)
+          .filter(
+            (entry): entry is { row: number; col: number; crop: PendingSowCrop } =>
+              !!entry &&
+              (entry.crop === 'grain' || entry.crop === 'vegetable' || entry.crop === 'wood'),
+          )
         if (crops.length === 0) {
           setSowError('NO_SELECTION')
           return
@@ -951,13 +955,26 @@ export const GameContainerApi = () => {
       ),
     [farmInteraction],
   )
-  const sowSelectableMap = useMemo(() => {
-    const map = new Map<string, ('grain' | 'vegetable')[]>()
-    if (farmInteraction?.farmType !== 'sow') return map
+  const { sowSelectableMap, extraSowTargets } = useMemo(() => {
+    const map = new Map<string, PendingSowCrop[]>()
+    const extraTargets: ExtraSowTarget[] = []
+    if (farmInteraction?.farmType !== 'sow') {
+      return { sowSelectableMap: map, extraSowTargets: extraTargets }
+    }
     farmInteraction.selectableFields.forEach((entry) => {
-      map.set(positionKey(entry.tile), entry.allowedCrops)
+      const key = positionKey(entry.tile)
+      if (isOffBoardSowTile(entry.tile)) {
+        extraTargets.push({
+          key,
+          tile: entry.tile,
+          allowedCrops: entry.allowedCrops,
+          sourceCard: entry.sourceCard,
+        })
+        return
+      }
+      map.set(key, entry.allowedCrops)
     })
-    return map
+    return { sowSelectableMap: map, extraSowTargets: extraTargets }
   }, [farmInteraction])
   const wrappedToggleRoom = (tile: FarmTilePosition) =>
     toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
@@ -1053,6 +1070,7 @@ export const GameContainerApi = () => {
   const sowRemaining = useMemo(() => ({
     grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
     vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),
+    wood: Math.max(0, (displayPlayer?.resources.wood ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'wood').length),
   }), [displayPlayer?.resources, pendingSowSelections])
   const futureCardResources = useMemo(() => {
     if (!state) return {}
@@ -1503,7 +1521,7 @@ export const GameContainerApi = () => {
                 roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
                 maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
                 fieldSelectableSet={fieldSelectableSet} pendingFieldSelections={pendingFieldSelections} toggleFieldSelection={wrappedToggleFieldSelection}
-                pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} pastureTiles={pastureTiles}
+                pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
                 pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
                 hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
