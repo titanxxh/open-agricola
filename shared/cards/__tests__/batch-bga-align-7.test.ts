@@ -343,4 +343,112 @@ describe('C69_LandConsolidation field swap', () => {
   })
 })
 
+// ===== Task 7: D82 HuntingTrophy =====
+import { D82_HuntingTrophy } from '../D/D82_HuntingTrophy'
+
+describe('D82_HuntingTrophy computeCosts', () => {
+  it('card definition: no exchanges, category=BUILDING_RESOURCE_PROVIDER', () => {
+    expect((D82_HuntingTrophy as any).exchanges).toBeUndefined()
+    expect((D82_HuntingTrophy as any).category).toBe('BUILDING_RESOURCE_PROVIDER')
+  })
+
+  it('card no longer has onBuy food gain', () => {
+    const effect = getCardEffect('D82_HuntingTrophy')
+    expect(effect?.onBuy).toBeUndefined()
+  })
+
+  it('discounts 1 building resource on house-redevelopment improvement-any', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-improvement')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('house-redevelopment'),
+      actionId: 'improvement-any', phase: 'computeCosts',
+      costs: { clay: 5, reed: 2 },
+    } as any)
+    expect(result?.costs).toBeDefined()
+    // Should reduce clay by 1 (most expensive)
+    expect(result!.costs).toEqual({ clay: -1 })
+  })
+
+  it('discounts wood by 3 on farm-redevelopment fencing', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-fencing')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('farm-redevelopment'),
+      actionId: 'fence', phase: 'computeCosts',
+    } as any)
+    expect(result?.costs).toEqual({ wood: -3 })
+  })
+
+  it('no discount on non-redevelopment spaces (standalone improvement-any)', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-improvement')!
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('improvement-any'),
+      actionId: 'improvement-any', phase: 'computeCosts',
+      costs: { clay: 3 },
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('no discount on non-redevelopment spaces (standalone fencing)', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-fencing')!
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('fencing'),
+      actionId: 'fence', phase: 'computeCosts',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('does not trigger when card not played', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-improvement')!
+    const p = createPlayer()
+    // minorPlayed stays empty
+    const result = executeCardListener(listener, {
+      state: createState(2, p), player: p, space: createSpace('house-redevelopment'),
+      actionId: 'improvement-any', phase: 'computeCosts',
+      costs: { clay: 5 },
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('picks the most-expensive resource when multiple building resources present', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-improvement')!
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('house-redevelopment'),
+      actionId: 'improvement-any', phase: 'computeCosts',
+      costs: { wood: 1, stone: 3, reed: 2 },
+    } as any)
+    // stone=3 is the max; discount stone by 1
+    expect(result!.costs).toEqual({ stone: -1 })
+  })
+
+  it('returns undefined when cost map has no building resources', () => {
+    const listener = findListener('D82-hunting-trophy-compute-costs-improvement')!
+    const p = createPlayer()
+    p.minorPlayed = ['D82_HuntingTrophy']
+    const state = createState(2, p)
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('house-redevelopment'),
+      actionId: 'improvement-any', phase: 'computeCosts',
+      costs: { food: 2 },
+    } as any)
+    expect(result).toBeUndefined()
+  })
+})
+
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
