@@ -2146,7 +2146,12 @@ export class GameSession {
     if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((p) => { p.newbornCount = 0 })
+    this.state.players.forEach((p) => {
+      for (const w of p.workers) {
+        if (w.isActive) w.isNewborn = false
+      }
+      p.newbornCount = 0   // legacy sync; Task 10 removes
+    })
     this.state.round += 1
     if (this.state.round > 14) {
       this.state.gameOver = true
