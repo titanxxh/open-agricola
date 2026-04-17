@@ -480,17 +480,21 @@ const playMajorImprovement = (
   )
 }
 
-const playMinorImprovement = (
+export const playMinorImprovement = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
   actionCardId?: string,
   paymentChoice?: string,
   suppressOnBuyEffects = false,
+  playContext: 'minorAction' | 'cardEffect' | 'setup' = 'minorAction',
 ): ActionExecutionResult => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
+  if (improvement.mustBePlayedViaMinorAction && playContext !== 'minorAction') {
+    return { type: 'fail', logKey: 'log.minorImprovementRequiresMinorAction' }
   }
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }

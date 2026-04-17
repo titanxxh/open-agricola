@@ -698,6 +698,7 @@ export const zh = {
     wellFood: '{player} 从水井获得 1 食物',
     playImprovement: '{player} 打出改良：{improvements}{cost}{returned}',
     playMinorImprovement: '{player} 打出小改良：{improvements}{cost}{returned}',
+    minorImprovementRequiresMinorAction: '此卡只能通过「次要改良」行动打出',
     bakeBread: '{player} 烤面包: {count} 谷物 → {food} 食物',
     returns: '归还 {cards}',
     cardGrantedAction: '{player} 获得来自 {cardId} 的 {actionId} 行动',
