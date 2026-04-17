@@ -17,6 +17,20 @@ describe('A153_PigOwner session', () => {
     const player = state.players[0]!
     player.occupationHand.push(CARD_ID)
     player.resources.boar = boar
+    // Place the pigs in a pasture so they count as "on the farm" (A153 counts
+    // on-farm pigs, not supply). Pasture covers 2 spaces in row 2 to avoid
+    // colliding with default rooms at row 0.
+    if (boar > 0) {
+      player.pastures = [
+        {
+          id: 'p1',
+          tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }],
+          animalType: 'boar',
+          animalCount: boar,
+          stables: 0,
+        } as any,
+      ]
+    }
     session.loadState(state)
     session.devPlayCard(0, CARD_ID)
     return session

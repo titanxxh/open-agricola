@@ -6,13 +6,25 @@ import { isCardFlagged } from '../helpers/card-state'
 
 const CARD_ID = 'A153_PigOwner'
 
+const countPigsOnFarm = (player: CardListenerContext['player']): number => {
+  let count = 0
+  for (const pasture of player.pastures) {
+    if (pasture.animalType === 'boar') count += pasture.animalCount ?? 0
+  }
+  if (player.houseAnimalType === 'boar') count += player.houseAnimalCount ?? 0
+  for (const animal of Object.values(player.stableAnimals ?? {})) {
+    if (animal === 'boar') count++
+  }
+  return count
+}
+
 const anytimeListener: CardListenerRegistration = {
   id: 'A153-pig-owner-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.resources.boar < 5) return
+    if (countPigsOnFarm(context.player) < 5) return
     return {
       flow: {
         type: 'seq',
