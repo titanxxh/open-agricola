@@ -29,54 +29,54 @@ Compared `desc` field in `shared/cards/**/*.ts` against `$this->desc` in `/data0
 
 These are places where our desc describes a **different effect** than BGA — worth investigating whether our implementation is actually wrong, or only the desc.
 
-| Card | Issue |
-|---|---|
-| A25 Bassinet | Entirely different rule (family-growth food bonus vs shared-action-space placement) |
-| A48 ShavingHorse | Missing 5+ optional / 7+ mandatory threshold clause |
-| A101 CookeryOutfitter | Ours lists specific cards; BGA excludes Ovens |
-| A134 FullFarmer | Missing on-play `1 <WOOD>` + `1 <CLAY>` bonus |
-| A142 Cordmaker | Ours: free vegetable; BGA: buy 1 veg for 2 food |
-| A153 PigOwner | Trigger timing differs ("5 or more" vs "first time you have 5 after play") |
-| A166 | Missing "minimum cost is 0" clarification |
-| B26 AgrarianFences | Completely different text |
-| B27 Toolbox | Completely different effect described |
-| B30 WoodPalisades | Completely different effect described |
-| B38 FutureBuildingSite | Completely different card (intentional divergence, marked in code) |
-| B39 Loom | Missing harvest-food clause (1/4/7 sheep → 1/2/3 food) |
-| B132 EstateMaster | Completely different effect (intentional simplification) |
-| B143 ClayWarden | Missing 3/4-player bonus (+1 clay or food) |
-| B153 Housemaster | Missing "smallest value counts double" rule |
-| B159 LieutenantGeneral | Missing "In round 14, get 1 grain instead" |
-| C35 Diplomat | Missing "cannot discard cards unplayed" rule |
-| C39 Mask | Entirely different wording/structure |
-| C46 SchnappsDistiller | Missing "At the start of these rounds, you get the <FOOD>" |
-| C48 SimpleFireplace | Entirely different effect wording |
-| C59 Distillery | Missing schnapps-exchange sentence |
-| C69 PumpkinField | Entirely different mechanism |
-| C129 WetNurse | Missing "(from round 12-13)" restriction |
-| C137 Baker | Different trigger scope (BAKE-improvement vs "bake capability") |
-| C146 ScrollKeeper | Ours adds "(max 6)" cap not in BGA |
-| D14 SeedTrader | Completely different mechanic text + numeric cost diff |
-| D29 MuckRake | Simplified; drops "exactly 1 per animal type, different stables" rule |
-| D30 ArtisanDistrict | Missing "from bottom row of supply board" qualifier |
-| D31 Storeroom | Numeric mismatch ("1 per pair" vs "½ per pair rounded up") |
-| D33 SummerHouse | Missing "(still lose points for unused spaces)" clarification |
-| D34 LuxuriousHostel | Missing "only one card for stone-house bonus" rule |
-| D35 FodderChamber | Vague vs exact player-count thresholds |
-| D38 MilkingStool | Missing harvest-food clause (1/3/5 cattle → 1/2/3 food) |
-| D60 LargePottery | Missing entire `[Anytime] <CLAY> → 2<FOOD>` exchange |
-| D82 HuntingTrophy | **Suspect wrong card** — ours describes Boar→Food; BGA describes renovation/fence discount |
-| D150 GodlySpouse | Ours "may" (optional); BGA mandatory |
-| D154 ChimneySweep | Missing "Renovating to stone costs 2 stone less" first sentence |
-| D161 CabbageBuyer | Simplified; 2 fixed vs 3/2/1 by improvement type (marked in code) |
-| E3 TeaTime | Missing `__Grain Utilization__` markdown |
-| E63/E64 IronOven/SimpleOven | Missing "When you play, take a Bake Bread action" sentence |
-| E101 Blighter | "full stages still left" vs "complete stages left" |
-| E105 Pioneer | Different structure/trigger |
-| E132 VeggieLover | Completely different formatting |
-| E144 WaresSalesman | Different scope ("cooking improvement" vs "cards that turn resources to food") |
-| E154 Margrave | Missing "2 food each time any player renovates" clause |
-| E156 ClaypitOwner | Missing "or builds" trigger |
+| Card | Issue | Status |
+|---|---|---|
+| A25 Bassinet | Entirely different rule (family-growth food bonus vs shared-action-space placement) | Deferred |
+| A48 ShavingHorse | Missing 5+ optional / 7+ mandatory threshold clause | |
+| A101 CookeryOutfitter | Ours lists specific cards; BGA excludes Ovens | |
+| A134 FullFarmer | Missing on-play `1 <WOOD>` + `1 <CLAY>` bonus | |
+| A142 Cordmaker | Ours: free vegetable; BGA: buy 1 veg for 2 food | |
+| A153 PigOwner | Trigger timing differs ("5 or more" vs "first time you have 5 after play") | |
+| A166 | Missing "minimum cost is 0" clarification | |
+| B26 AgrarianFences | ✅ Bake-replace interaction added; now matches BGA | Fixed |
+| B27 Toolbox | ✅ Joinery/Pottery/Basket offer after construct/stables/fencing; now matches BGA | Fixed |
+| B30 WoodPalisades | Completely different effect described | Deferred |
+| B38 FutureBuildingSite | Completely different card (intentional divergence, marked in code) | |
+| B39 Loom | Missing harvest-food clause (1/4/7 sheep → 1/2/3 food) | |
+| B132 EstateMaster | Completely different effect (intentional simplification) | |
+| B143 ClayWarden | Missing 3/4-player bonus (+1 clay or food) | |
+| B153 Housemaster | Missing "smallest value counts double" rule | |
+| B159 LieutenantGeneral | Missing "In round 14, get 1 grain instead" | |
+| C35 LanternHouse | ✅ Occupation prereq added; now matches BGA | Fixed |
+| C39 Mask | ✅ Verified correct structure vs BGA | Verified |
+| C46 SchnappsDistiller | ✅ Verified correct structure vs BGA | Verified |
+| C48 Farmstead | ✅ Per-turn used-space food gain rewritten; de-dup and interaction logic now matches BGA | Fixed |
+| C59 SchnappsDistillery | ✅ Harvest exchange (1 veg → 5 food) added; partial (max:1 server enforcement is follow-up) | Fixed |
+| C69 LandConsolidation | ✅ Field-local grain-to-veg swap added; now matches BGA | Fixed |
+| C129 WetNurse | Missing "(from round 12-13)" restriction | |
+| C137 Baker | Different trigger scope (BAKE-improvement vs "bake capability") | |
+| C146 ScrollKeeper | Ours adds "(max 6)" cap not in BGA | |
+| D14 SeedTrader | ✅ Verified correct structure vs BGA | Verified |
+| D29 MuckRake | Simplified; drops "exactly 1 per animal type, different stables" rule | |
+| D30 ArtisanDistrict | Missing "from bottom row of supply board" qualifier | |
+| D31 Storeroom | Numeric mismatch ("1 per pair" vs "½ per pair rounded up") | |
+| D33 SummerHouse | Missing "(still lose points for unused spaces)" clarification | |
+| D34 LuxuriousHostel | Missing "only one card for stone-house bonus" rule | |
+| D35 FodderChamber | Vague vs exact player-count thresholds | |
+| D38 MilkingStool | Missing harvest-food clause (1/3/5 cattle → 1/2/3 food) | |
+| D60 LargePottery | Missing entire `[Anytime] <CLAY> → 2<FOOD>` exchange | |
+| D82 HuntingTrophy | ✅ Rewritten to HouseRedev/FarmRedev cost discount; now matches BGA | Fixed |
+| D150 GodlySpouse | Ours "may" (optional); BGA mandatory | |
+| D154 ChimneySweep | Missing "Renovating to stone costs 2 stone less" first sentence | |
+| D161 CabbageBuyer | Simplified; 2 fixed vs 3/2/1 by improvement type (marked in code) | |
+| E3 TeaTime | Missing `__Grain Utilization__` markdown | |
+| E63/E64 IronOven/SimpleOven | Missing "When you play, take a Bake Bread action" sentence | |
+| E101 Blighter | "full stages still left" vs "complete stages left" | |
+| E105 Pioneer | ✅ Verified correct structure vs BGA | Verified |
+| E132 VeggieLover | Completely different formatting | |
+| E144 WaresSalesman | Different scope ("cooking improvement" vs "cards that turn resources to food") | |
+| E154 Margrave | Missing "2 food each time any player renovates" clause | |
+| E156 ClaypitOwner | Missing "or builds" trigger | |
 
 ## Minor / purely cosmetic
 
@@ -89,6 +89,13 @@ These are places where our desc describes a **different effect** than BGA — wo
 ## Majors — structural issue
 
 All 10 majors use a different `description` schema: ours uses prose with `→` + explicit `(max N)`; BGA uses `<ARROW-1X>`/`<ARROW-2X>` icon tokens that encode the "max N" semantics. A systematic rewrite would fix all 10 at once.
+
+## Remaining deferred
+
+These are architectural issues deferred to future work with separate design specs:
+
+- **A25 Bassinet** — Cross-player first-space tracking (separate future spec)
+- **B30 WoodPalisades** — Alternative fence data model (separate future spec)
 
 ## Missing from our codebase
 
