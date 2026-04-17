@@ -32,7 +32,7 @@ const WOOD_REED_CARDS = new Set([
   'C153_PatternMaker',
   'A34_Loppers',
   'A48_ShavingHorse',
-  'A159_JoinerOfSea',
+  'A159_JoineroftheSea',
   'B42_ForestInn',
   'B53_SculptureCourse',
   'B109_PaperMaker',

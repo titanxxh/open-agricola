@@ -4,16 +4,16 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 
-const CARD_ID = 'A159_JoinerOfSea'
+const CARD_ID = 'A159_JoineroftheSea'
 
 /**
- * A159 Joiner of Sea:
+ * A159 Joiner of the Sea:
  * Each time another player uses Fishing or Reed Bank,
  * you can optionally give them 1 wood to get 2 food (Fishing) or 3 food (Reed Bank).
  * Players 4+.
  */
 const listener: CardListenerRegistration = {
-  id: 'A159-joiner-of-sea-opponent-fishing-reed',
+  id: 'A159-joiner-of-the-sea-opponent-fishing-reed',
   cardIds: [CARD_ID],
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
@@ -50,9 +50,9 @@ const listener: CardListenerRegistration = {
 
 registerCardListener(listener)
 
-export const A159_JoinerOfSea = new Occupation({
+export const A159_JoineroftheSea = new Occupation({
   id: CARD_ID,
-  name: 'Joiner of Sea',
+  name: 'Joiner of the Sea',
   deck: 'A',
   number: 159,
   category: 'FOOD_PROVIDER',
