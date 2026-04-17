@@ -187,6 +187,29 @@ describe('B159_LieutenantGeneral', () => {
     const found = matched.find(m => m.registration.id === 'B159-lieutenant-general-opponent-plow')
     expect(found).toBeUndefined()
   })
+
+  it('pays 1 grain instead of 1 food in round 14', () => {
+    const listener = findListener('B159-lieutenant-general-opponent-plow')!
+    const p1 = createPlayer('p1', 'P1')
+    p1.occupationPlayed = ['B159_LieutenantGeneral']
+    const p2 = createPlayer('p2', 'P2')
+    p2.fields = [
+      { crop: null, remaining: 0, row: 1, col: 0 },
+      { crop: null, remaining: 0, row: 1, col: 1 },
+    ] as any
+    const state = createState(p1, p2)
+    state.round = 14
+
+    const result = executeCardListener(listener, {
+      state, player: p2, space: createSpace('plow'),
+      actionId: 'plow', phase: 'after',
+      triggerPlayer: p2,
+    } as any)
+    expect(result?.flow?.type).toBe('leaf')
+    if (result?.flow?.type === 'leaf') {
+      expect(result.flow.params).toEqual({ grain: 1 })
+    }
+  })
 })
 
 // ===== C137 Charcoal Burner =====

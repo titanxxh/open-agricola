@@ -31,7 +31,8 @@ const listener: CardListenerRegistration = {
     // If they have 2+ fields, the newly plowed field was adjacent to an existing one.
     const triggerPlayer = context.triggerPlayer ?? context.player
     if (triggerPlayer.fields.length < 2) return
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    const reward = context.state.round === 14 ? { grain: 1 } : { food: 1 }
+    return { flow: gainLeaf(CARD_ID, reward), sourceCard: CARD_ID }
   },
 }
 
