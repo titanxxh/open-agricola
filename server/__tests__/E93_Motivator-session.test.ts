@@ -66,7 +66,7 @@ describe('E93_Motivator session', () => {
 
   it('does not trigger after the first placement of the round', () => {
     const { state, player } = setup()
-    recordRoundPlacement(player, 'day-laborer')
+    recordRoundPlacement(player, 'day-laborer', '1')
     const effect = getCardEffect(CARD_ID)!
 
     expect(effect.onBeforeStartOfTurn?.(state, player)).toBeUndefined()

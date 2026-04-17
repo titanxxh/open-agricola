@@ -1,6 +1,6 @@
 import type { ActionDefinition } from '../../game/types'
 import { setCardFlag } from '../../cards/helpers/card-state'
-import { getRoundPlacementOrder } from '../../cards/helpers/round-placement'
+import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
 import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 
 const MEETING_PLACE_IDS = new Set(['meeting-place'])
@@ -13,8 +13,8 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params, sourceCard }) => {
-    const [firstSpaceId] = getRoundPlacementOrder(player)
-    if (!firstSpaceId || MEETING_PLACE_IDS.has(firstSpaceId)) {
+    const first = getRoundPlacementDetails(player)[0]
+    if (!first || MEETING_PLACE_IDS.has(first.spaceId)) {
       if (sourceCard && params?.flagSourceCard) {
         setCardFlag(player, sourceCard, true)
       }
@@ -22,7 +22,7 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
         ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
         : { type: 'ok' }
     }
-    const firstSpace = state.actionSpaces.find((space) => space.id === firstSpaceId)
+    const firstSpace = state.actionSpaces.find((space) => space.id === first.spaceId)
     if (!firstSpace || !spaceHasPlayer(firstSpace, player.id)) {
       if (sourceCard && params?.flagSourceCard) {
         setCardFlag(player, sourceCard, true)
@@ -31,7 +31,7 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
         ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
         : { type: 'ok' }
     }
-    removeWorkerRef(firstSpace, player.id)
+    removeWorkerRef(firstSpace, player.id, first.workerId)
     player.workersAvailable += 1
     if (sourceCard && params?.flagSourceCard) {
       setCardFlag(player, sourceCard, true)
