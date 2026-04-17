@@ -139,6 +139,27 @@ describe('A87_Conservator isDoable listener', () => {
     expect(result?.doable).toBe(true)
   })
 
+  it('is silent when the action is already reported doable', () => {
+    const session = setup({
+      houseType: 'wood',
+      rooms: 2,
+      resources: { stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+    const listener = findListener('A87-conservator-isdoable-renovate-house')!
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      actionId: 'renovate-house',
+      phase: 'isDoable',
+      doable: true,
+    } as any)
+
+    expect(result).toBeUndefined()
+  })
+
   it('is silent when the player cannot afford the stone path', () => {
     const session = setup({
       houseType: 'wood',
