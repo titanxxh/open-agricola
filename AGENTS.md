@@ -2,6 +2,8 @@
 
 本仓库的通用协作说明。Claude Code / Cursor / Codex 等 agent 读 `CLAUDE.md`（软链到本文件）。
 
+git 的 worktree都创建到项目的.worktree目录下。
+
 **回答用中文！**
 
 ## 项目概述
