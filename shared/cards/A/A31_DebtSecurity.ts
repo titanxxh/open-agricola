@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { collectCardsAs } from '../helpers/card-type'
 
 const CARD_ID = 'A31_DebtSecurity'
 
@@ -13,7 +14,7 @@ registerCardEffect({
     player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
     player.pastures.flatMap((p) => p.tiles ?? []).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
     const unusedSpaces = 15 - usedTiles.size
-    return Math.min(player.improvements.length, unusedSpaces)
+    return Math.min(collectCardsAs(player, 'major').length, unusedSpaces)
   },
 })
 
