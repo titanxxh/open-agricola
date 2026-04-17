@@ -252,6 +252,7 @@ export const normalizeState = (raw: GameState): GameState => {
     const minorPlayed = player.minorPlayed ?? []
     const occupationHand = player.occupationHand ?? []
     const occupationPlayed = player.occupationPlayed ?? []
+    const extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     const playedCards = player.playedCards ?? []
     const normalized = {
       ...player,
@@ -269,6 +270,7 @@ export const normalizeState = (raw: GameState): GameState => {
           ? occupationHand
           : dealtHands?.occupationHands[index] ?? [],
       occupationPlayed: occupationPlayed.length > 0 ? occupationPlayed : [],
+      extraOccupationsFromCards: extraOccupationsFromCards.length > 0 ? extraOccupationsFromCards : [],
       playedCards:
         playedCards.length > 0
           ? playedCards
@@ -472,6 +474,7 @@ export const createInitialPlayers = (
     minorPlayed: [],
     occupationHand: dealtHands.occupationHands[index] ?? [],
     occupationPlayed: [],
+    extraOccupationsFromCards: [],
     playedCards: [],
     houseAnimalType: null,
     houseAnimalCount: 0,
