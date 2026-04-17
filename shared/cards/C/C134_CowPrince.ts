@@ -21,7 +21,7 @@ export const C134_CowPrince = new Occupation({
   deck: "C",
   number: 134,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> per farmyard space that contains at least 1 cattle."],
+  desc: ["During scoring, you get 1 bonus <SCORE> for each space in your farmyard (including rooms) holding at least 1 <CATTLE>."],
   cost: {},
   players: "1+",
 })

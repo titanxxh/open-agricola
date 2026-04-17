@@ -2,7 +2,28 @@ import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, Player
 import { canExecuteWithCostPreview } from './cost-preview'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
 
-export const getRenovation = (player: PlayerState): { nextType: 'wood' | 'clay' | 'stone'; cost: Partial<Resource> } | null => {
+type RenovationPlan = {
+  nextType: PlayerState['houseType']
+  cost: Partial<Resource>
+}
+
+const mergeRenovationCost = (
+  baseCost: Partial<Resource>,
+  costOverride?: Partial<Resource>,
+) => {
+  if (!costOverride) return baseCost
+  return {
+    ...baseCost,
+    ...Object.fromEntries(
+      Object.entries(costOverride).map(([key, value]) => [
+        key,
+        Math.max(0, (baseCost[key as keyof Resource] ?? 0) + (value ?? 0)),
+      ]),
+    ),
+  }
+}
+
+export const getRenovation = (player: PlayerState): RenovationPlan | null => {
   if (player.houseType === 'wood') {
     return {
       nextType: 'clay',
@@ -21,40 +42,22 @@ export const getRenovation = (player: PlayerState): { nextType: 'wood' | 'clay' 
 export const canRenovate = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  renovationOverride?: RenovationPlan | null,
 ) => {
-  const renovation = getRenovation(player)
+  const renovation = renovationOverride ?? getRenovation(player)
   if (!renovation) return false
-  const cost = costOverride
-    ? {
-        ...renovation.cost,
-        ...Object.fromEntries(
-          Object.entries(costOverride).map(([key, value]) => [
-            key,
-            Math.max(0, (renovation.cost[key as keyof Resource] ?? 0) + (value ?? 0)),
-          ]),
-        ),
-      }
-    : renovation.cost
+  const cost = mergeRenovationCost(renovation.cost, costOverride)
   return canAffordTypedFlatCost(player, cost, 'renovation')
 }
 
 export const renovateHouse = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  renovationOverride?: RenovationPlan | null,
 ) => {
-  const renovation = getRenovation(player)
+  const renovation = renovationOverride ?? getRenovation(player)
   if (!renovation) return false
-  const cost = costOverride
-    ? {
-        ...renovation.cost,
-        ...Object.fromEntries(
-          Object.entries(costOverride).map(([key, value]) => [
-            key,
-            Math.max(0, (renovation.cost[key as keyof Resource] ?? 0) + (value ?? 0)),
-          ]),
-        ),
-      }
-    : renovation.cost
+  const cost = mergeRenovationCost(renovation.cost, costOverride)
   if (!payTypedFlatCost(player, cost, 'renovation')) return false
   player.houseType = renovation.nextType
   return true
@@ -95,6 +98,49 @@ export const renovateHouseAction: ActionDefinition = {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
     if (!renovateHouse(player, costs)) {
+      return { type: 'fail', logKey: 'log.renovationFail' }
+    }
+    return { type: 'ok' }
+  },
+}
+
+const getDirectStoneRenovation = (
+  player: PlayerState,
+): RenovationPlan | null => {
+  if (player.houseType !== 'wood') {
+    return null
+  }
+  return {
+    nextType: 'stone',
+    cost: { stone: player.rooms, reed: 1 },
+  }
+}
+
+const renovateHouseToStoneCostPreview: ActionCostPreview = {
+  isStructurallyPossible: ({ player }) => getDirectStoneRenovation(player) !== null,
+  canExecute: ({ player }, costOverride) =>
+    canRenovate(player, costOverride, getDirectStoneRenovation(player)),
+  getBaseCost: ({ player }) => getDirectStoneRenovation(player)?.cost ?? {},
+}
+
+export const renovateHouseToStoneAction: ActionDefinition = {
+  id: 'renovate-house-to-stone',
+  nameKey: 'actions.house-redevelopment.name',
+  descriptionKey: 'actions.house-redevelopment.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (state, player) =>
+    canExecuteWithCostPreview(renovateHouseToStoneCostPreview, { state, player }),
+  costPreview: renovateHouseToStoneCostPreview,
+  execute: ({ player, costs }) => {
+    const renovation = getDirectStoneRenovation(player)
+    if (!renovation) {
+      return { type: 'fail', logKey: 'log.renovationFail' }
+    }
+    if (!canRenovate(player, costs, renovation)) {
+      return { type: 'fail', logKey: 'log.renovationFail' }
+    }
+    if (!renovateHouse(player, costs, renovation)) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
     return { type: 'ok' }

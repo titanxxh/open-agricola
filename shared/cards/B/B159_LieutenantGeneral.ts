@@ -31,7 +31,8 @@ const listener: CardListenerRegistration = {
     // If they have 2+ fields, the newly plowed field was adjacent to an existing one.
     const triggerPlayer = context.triggerPlayer ?? context.player
     if (triggerPlayer.fields.length < 2) return
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    const reward = context.state.round === 14 ? { grain: 1 } : { food: 1 }
+    return { flow: gainLeaf(CARD_ID, reward), sourceCard: CARD_ID }
   },
 }
 
@@ -44,7 +45,7 @@ export const B159_LieutenantGeneral = new Occupation({
   number: 159,
   category: 'FOOD_PROVIDER',
   desc: [
-    'Each time another player plows a field adjacent to an existing field, you get 1 <FOOD>.',
+    'For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
   ],
   cost: {},
   players: '4+',

@@ -67,7 +67,7 @@ export const A25_Bassinet = new MinorImprovement({
   deck: 'A',
   number: 25,
   category: 'FOOD_PROVIDER',
-  desc: ['Each time you use __Family Growth__ as your first action in a round, you also get 3 <FOOD>.'],
+  desc: ['You can place a(nother) person on the first non-accumulating action space used in each work phase, if there is only 1 person, including newborns, on that space. (There can never be two people on __Meeting Place__.)'],
   cost: {},
   vp: 1,
 })

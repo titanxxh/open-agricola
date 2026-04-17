@@ -8,9 +8,9 @@ registerCardEffect({
   computeBonusScore: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
     const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
-    const thresholds = [0, 7, 7, 5, 4, 3]
-    const threshold = thresholds[state.players.length] ?? 7
-    return Math.max(0, totalAnimals - threshold + 1)
+    const divisors = [7, 5, 4, 3, 3, 3]
+    const divisor = divisors[state.players.length - 1] ?? 3
+    return Math.floor(totalAnimals / divisor)
   },
 })
 
@@ -20,6 +20,6 @@ export const D35_FodderChamber = new MinorImprovement({
   deck: "D",
   number: 35,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each animal beyond a threshold based on the number of players."],
+  desc: ['During scoring in a game with 1/2/3/4+ players, you get 1 bonus <SCORE> for every 7th/5th/4th/3rd animal on your farm.'],
   cost: { wood: 1, clay: 1 },
 })

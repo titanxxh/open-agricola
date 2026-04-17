@@ -44,7 +44,7 @@ export const E40_BeeStatue = new MinorImprovement({
   deck: 'E',
   number: 40,
   category: 'GOODS_PROVIDER',
-  desc: ['Pile the following goods on this card (<VEGETABLE>, <STONE>, <GRAIN>, <STONE>, <GRAIN>). Each time you use the __Day Laborer__ action space, you get the top good.'],
+  desc: ['Pile (from bottom to top) 1 <VEGETABLE>, 1 <STONE>, 1 <GRAIN>, 1 <STONE>, 1 <GRAIN> on this card. Each time you use the __Day Laborer__ action space, you get the top good.'],
   cost: { clay: 2 },
   players: '1+',
 })

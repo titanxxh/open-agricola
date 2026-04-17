@@ -29,7 +29,7 @@ export const E57_CheeseFondue = new MinorImprovement({
   deck: "E",
   number: 57,
   category: "FOOD_PROVIDER",
-  desc: ["Each time you bake at least 1 grain, if you have sheep you get 1 extra <FOOD>, if you have cattle you get 1 extra <FOOD>."],
+  desc: ['Each time you bake at least 1 <GRAIN> into bread, you get 1 additional <FOOD> if you have at least 1\u00a0<SHEEP> and (another) 1 additional <FOOD> if you have at least 1 <CATTLE>.'],
   cost: { clay: 1 },
   vp: 1,
 })

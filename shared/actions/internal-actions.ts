@@ -5,7 +5,7 @@ import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from '
 import { wishChildrenAction, growFamilyWithoutRoomAction } from './effects/wish-children'
 import { minorImprovementAction, improvementAnyAction } from './effects/improvement'
 import { playOccupationAction } from './effects/occupation'
-import { renovateHouseAction } from './effects/renovation'
+import { renovateHouseAction, renovateHouseToStoneAction } from './effects/renovation'
 import { constructAction } from './effects/construct'
 import { fenceAction } from './effects/fencing'
 import { stablesAction } from './effects/stables'
@@ -41,6 +41,8 @@ import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 import { fieldSelectAction } from './effects/field-select'
 import { discardFromHandAction } from './effects/discard-from-hand'
+import { swapFieldGrainToVegAction } from './effects/swap-field-crop'
+import { spendWorkerAction } from './effects/spend-worker'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -55,6 +57,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   growFamilyWithoutRoomAction,
   playOccupationAction,
   renovateHouseAction,
+  renovateHouseToStoneAction,
   fenceAction,
   stablesAction,
   plowAction,
@@ -84,10 +87,12 @@ export const internalActionDefinitions: ActionDefinition[] = [
   moveFarmerToSpaceAction,
   constructAction,
   placeFarmerAction,
+  spendWorkerAction,
   setFirstPlayerAction,
   popCardStackAction,
   pushCardStackAction,
   buildFarmhandRoomAction,
   fieldSelectAction,
   discardFromHandAction,
+  swapFieldGrainToVegAction,
 ]

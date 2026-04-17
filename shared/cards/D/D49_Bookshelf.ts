@@ -37,7 +37,7 @@ export const D49_Bookshelf = new MinorImprovement({
   deck: "D",
   number: 49,
   category: "FOOD_PROVIDER",
-  desc: ["Each time before you play an occupation, you get 3 <FOOD>."],
+  desc: ['Immediately before each time you play an occupation (even before paying the occupation cost), you get 3 <FOOD>.'],
   cost: { wood: 1 },
   vp: 1,
   prerequisite: "3 Occupations",

@@ -61,7 +61,7 @@ export const D161_CabbageBuyer = new Occupation({
   number: 161,
   category: "CROP_PROVIDER",
   desc: [
-    "Each time any player (including you) renovates, you can buy 1 <VEGETABLE> for 2 <FOOD>. (Simplified from BGA: cost is fixed at 2 instead of varying by improvement built after renovation.)",
+    'Each time any player (including you) renovates and then builds no/1 minor/1 major improvement, you can buy 1 <VEGETABLE> for 3/2/1 <FOOD>.',
   ],
   cost: {},
   players: "4+",

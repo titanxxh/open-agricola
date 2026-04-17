@@ -105,8 +105,28 @@ const getPastureTileKeys = (player: PlayerState) => {
 
 const totalTiles = FARM_ROWS * FARM_COLS
 
-export const computeScores = (state: GameState): PlayerScoreSummary[] =>
-  state.players.map((player) => {
+const applyPostScoreAdjustment = (
+  categories: ScoreCategoryResult[],
+  score: number,
+) => {
+  if (score === 0) return
+
+  const bonusCategory = categories.find((c) => c.key === 'cardStateBonusVp')
+  if (bonusCategory) {
+    bonusCategory.total += score
+    bonusCategory.entries.push({ type: 'bonus', score })
+    return
+  }
+
+  categories.push({
+    key: 'cardStateBonusVp',
+    total: score,
+    entries: [{ type: 'bonus', score }],
+  })
+}
+
+export const computeScores = (state: GameState): PlayerScoreSummary[] => {
+  const summaries = state.players.map((player) => {
     const categories: ScoreCategoryResult[] = []
 
     const fieldCount = player.fields.length
@@ -325,20 +345,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
         postScoreVp += effect.computePostScore(state, player, categories)
       }
     }
-    if (postScoreVp !== 0) {
-      // Add/subtract from the cardStateBonusVp category if it exists, or add a new entry
-      const bonusCategory = categories.find((c) => c.key === 'cardStateBonusVp')
-      if (bonusCategory) {
-        bonusCategory.total += postScoreVp
-        bonusCategory.entries.push({ type: 'bonus' as const, score: postScoreVp })
-      } else {
-        categories.push({
-          key: 'cardStateBonusVp',
-          total: postScoreVp,
-          entries: [{ type: 'bonus' as const, score: postScoreVp }],
-        })
-      }
-    }
+    applyPostScoreAdjustment(categories, postScoreVp)
 
     const total = categories.reduce((sum, category) => sum + category.total, 0)
     return {
@@ -348,3 +355,26 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] =>
       total,
     }
   })
+
+  const summariesByPlayerId = new Map(
+    summaries.map((summary) => [summary.playerId, summary] as const),
+  )
+
+  state.players.forEach((owner) => {
+    const allCards = [...owner.improvements, ...owner.minorPlayed, ...owner.occupationPlayed]
+    allCards.forEach((cardId) => {
+      const effect = getCardEffect(cardId)
+      if (!effect?.computeSharedPostScore) return
+
+      const adjustments = effect.computeSharedPostScore(state, owner, summaries)
+      adjustments.forEach(({ playerId, score }) => {
+        const summary = summariesByPlayerId.get(playerId)
+        if (!summary) return
+        applyPostScoreAdjustment(summary.categories, score)
+        summary.total += score
+      })
+    })
+  })
+
+  return summaries
+}

@@ -3,10 +3,13 @@ import { GameSession } from '../game-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { buildSowFarmInteraction } from '../farm-interaction'
 
 import '../../shared/cards/E/E70_CropRotationField'
+import '../../shared/cards/E/E69_MelonPatch'
 
 const CARD_ID = 'E70_CropRotationField'
+const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const setup = (options?: {
@@ -54,6 +57,22 @@ const setup = (options?: {
 
   session.loadState(state)
   return session
+}
+
+const addMinorCard = (
+  session: GameSession,
+  cardId: string,
+) => {
+  const state = session.getState().state
+  const player = state.players[0]!
+  if (!player.minorPlayed.includes(cardId)) {
+    player.minorPlayed.push(cardId)
+  }
+  const playedKey = `minor:${cardId}`
+  if (!player.playedCards.includes(playedKey)) {
+    player.playedCards.push(playedKey)
+  }
+  session.loadState(state)
 }
 
 describe('E70_CropRotationField session', () => {
@@ -139,6 +158,62 @@ describe('E70_CropRotationField session', () => {
       expect(cardCrop).toBeDefined()
       expect(cardCrop!.crop).toBe('vegetable')
       expect(cardCrop!.remaining).toBe(2)
+    })
+
+    it('fromSelectedFields filters out other extra sow fields in interaction', () => {
+      const session = setup({ vegetable: 1 })
+      addMinorCard(session, OTHER_EXTRA_CARD_ID)
+
+      const player = session.getState().state.players[0]!
+      writeCardExtraData(player, CARD_ID, 'selectedFields', ['-1-70'])
+
+      const interaction = buildSowFarmInteraction(player, {
+        allowedFields: 'fromSelectedFields',
+        sourceCard: CARD_ID,
+      })
+
+      expect(interaction.farmType).toBe('sow')
+      if (interaction.farmType !== 'sow') {
+        throw new Error('expected sow interaction')
+      }
+      expect(interaction.selectableFields).toEqual([
+        { tile: { row: -1, col: 70 }, allowedCrops: ['vegetable'], sourceCard: CARD_ID },
+      ])
+    })
+
+    it('fromSelectedFields rejects committing a different extra sow field', () => {
+      const session = setup({ vegetable: 1 })
+      addMinorCard(session, OTHER_EXTRA_CARD_ID)
+
+      const player = session.getState().state.players[0]!
+      writeCardExtraData(player, CARD_ID, 'selectedFields', ['-1-70'])
+
+      ;(session as any).pending = {
+        type: 'choice',
+        playerIndex: 0,
+        spaceId: 'grain-utilization',
+        options: [],
+        promptKey: 'ui.interactionSowSelect',
+        actionContext: {
+          allowedFields: 'fromSelectedFields',
+          sourceCard: CARD_ID,
+        },
+      }
+      ;(session as any).activeSpaceId = 'grain-utilization'
+
+      const resp = session.commitFarmChoice(0, 'sow', {
+        crops: [{ row: -1, col: 69, crop: 'vegetable' }],
+      })
+
+      expect(resp.ok).toBe(false)
+      expect(session.getState().state.players[0]!.resources.vegetable).toBe(1)
+      expect(
+        readCardExtraData<{ crop: string; remaining: number }>(
+          session.getState().state.players[0]!,
+          OTHER_EXTRA_CARD_ID,
+          'cardCrop',
+        ),
+      ).toBeUndefined()
     })
   })
 

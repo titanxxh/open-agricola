@@ -17,7 +17,7 @@ type ClientCommandBody =
     }
   | {
       type: 'feed'
-      selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string }[]
+      selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string }[]
     }
   | {
       type: 'commitFarm'

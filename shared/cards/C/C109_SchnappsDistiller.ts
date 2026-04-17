@@ -6,7 +6,7 @@ export const C109_SchnappsDistiller = new Occupation({
   deck: 'C',
   number: 109,
   category: 'FOOD_PROVIDER',
-  desc: ['In the feeding phase of each harvest, you can use this card to turn exactly 1 vegetable into 5 food.'],
+  desc: ['In the feeding phase of each harvest, you can use this card to turn exactly 1 <VEGETABLE> into 5 <FOOD>.'],
   cost: {},
   players: '1+',
 })

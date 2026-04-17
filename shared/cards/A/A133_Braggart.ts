@@ -24,7 +24,7 @@ export const A133_Braggart = new Occupation({
   deck: "A",
   number: 133,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 2/3/4/5/7/9 bonus <SCORE> for 5/6/7/8/9/10+ total improvements (major + minor)."],
+  desc: ["During the scoring, you get 2/3/4/5/7/9 bonus <SCORE> for having at least 5/6/7/8/9/10 improvements in front of you."],
   cost: {},
   players: "1+",
 })

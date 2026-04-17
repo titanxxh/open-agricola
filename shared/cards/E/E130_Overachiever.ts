@@ -53,7 +53,7 @@ export const E130_Overachiever = new Occupation({
   deck: "E",
   number: 130,
   category: "ACTIONS_BOOSTER",
-  desc: ["Each time you use a Wish for Children action space, you can also take a Major or Minor Improvement action (with a 1 resource discount of your choice)."],
+  desc: ['Each time you use a __Wish for Children__ action space, you can play 1 additional improvement by paying its cost minus 1 resource of your choice.'],
   cost: {},
   players: "3+",
 })

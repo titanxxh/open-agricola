@@ -565,6 +565,7 @@ import { E58_LunchtimeBeer } from './E/E58_LunchtimeBeer'
 import { E59_CombandCutter } from './E/E59_CombandCutter'
 import { E60_WorkingGloves } from './E/E60_WorkingGloves'
 import { E67_GrainBag } from './E/E67_GrainBag'
+import { E68_CherryOrchard } from './E/E68_CherryOrchard'
 import { E115_SeedServant } from './E/E115_SeedServant'
 import { E121_HillCultivator } from './E/E121_HillCultivator'
 import { E131_MarketMaster } from './E/E131_MarketMaster'
@@ -824,7 +825,7 @@ import { E118_KindlingGatherer } from './E/E118_KindlingGatherer'
 import { E143_Hewer } from './E/E143_Hewer'
 import { A154_Paymaster } from './A/A154_Paymaster'
 import { A158_CulinaryArtist } from './A/A158_CulinaryArtist'
-import { A159_JoinerOfSea } from './A/A159_JoinerOfSea'
+import { A159_JoineroftheSea } from './A/A159_JoineroftheSea'
 import { A160_Lutenist } from './A/A160_Lutenist'
 import { B138_ForestGuardian } from './B/B138_ForestGuardian'
 import { B143_ClayWarden } from './B/B143_ClayWarden'
@@ -1170,6 +1171,7 @@ export const minorImprovementCards = [
   E59_CombandCutter,
   E60_WorkingGloves,
   E67_GrainBag,
+  E68_CherryOrchard,
   E21_SheepRug,
   E16_BriarHedge,
   E22_GuestRoom,
@@ -1753,7 +1755,7 @@ export const occupationCards = [
   // Batch 15 — occupations (opponent interaction)
   A154_Paymaster,
   A158_CulinaryArtist,
-  A159_JoinerOfSea,
+  A159_JoineroftheSea,
   A160_Lutenist,
   B138_ForestGuardian,
   B143_ClayWarden,

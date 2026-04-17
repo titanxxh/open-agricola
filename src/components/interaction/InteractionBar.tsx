@@ -5,6 +5,7 @@ import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import type { AnytimeAction, Resource } from '../../../shared/game/types'
 import { AnytimeBar } from './AnytimeBar'
+import { translateCardText } from '../common/cardText'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: Partial<Resource>
@@ -53,7 +54,7 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
               disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
             />
             <span className={`card-res-icon ${option.value}`} />
-            {t(locale, option.labelKey)}
+            {translateCardText(locale, option.labelKey)}
           </label>
         ))}
       </div>
@@ -319,7 +320,9 @@ export const InteractionBar = ({
                           {!!option.labelParams.cardUsed && (
                             <span className="payment-option-card">
                               {' '}
-                              ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_') ? t(locale, `improvements.${option.labelParams.cardUsed as string}.name` as string) : t(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as string)})
+                              ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_')
+                                ? translateCardText(locale, `improvements.${option.labelParams.cardUsed as string}.name` as string)
+                                : translateCardText(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as string)})
                             </span>
                           )}
                         </span>
@@ -355,10 +358,14 @@ export const InteractionBar = ({
                         option.labelParams &&
                         typeof option.labelParams.cardNameKey === 'string' ? (
                         t(locale, option.labelKey, {
-                          card: t(locale, option.labelParams.cardNameKey),
+                          card: translateCardText(locale, option.labelParams.cardNameKey),
                         })
                       ) : (
-                        t(locale, option.labelKey, option.labelParams as Record<string, string | number> | undefined)
+                        translateCardText(
+                          locale,
+                          option.labelKey,
+                          option.labelParams as Record<string, string | number> | undefined,
+                        )
                       )}
                     </button>
                   ))}

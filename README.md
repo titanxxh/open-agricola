@@ -5,7 +5,7 @@
 ## 快速开始
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 启动后端 + 前端
@@ -18,10 +18,10 @@ npm install
 
 ```bash
 # 后端（端口 5175）
-npm run server
+pnpm run server
 
 # 前端（端口 5173）
-npm run dev
+pnpm run dev
 ```
 
 ### 打开游戏
@@ -85,10 +85,10 @@ src/              前端 (React)
 ## 命令
 
 ```bash
-npm test            # 单元测试（vitest，295 用例）
-npm run test:e2e    # E2E 测试（Playwright）
-npm run lint        # ESLint
-npm run build       # TypeScript + Vite 构建
+pnpm test            # 单元测试（vitest）
+pnpm run test:e2e    # E2E 测试（Playwright）
+pnpm run lint        # ESLint
+pnpm run build       # TypeScript + Vite 构建
 ```
 
 ## 架构

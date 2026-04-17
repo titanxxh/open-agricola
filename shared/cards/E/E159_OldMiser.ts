@@ -42,6 +42,6 @@ export const E159_OldMiser = new Occupation({
   deck: 'E',
   number: 159,
   category: 'FOOD_MISC',
-  desc: ['In the feeding phase of each harvest, each of your people requires 1 less <FOOD>. During scoring, your people are worth 2 points each instead of 3.'],
+  desc: ['In the feeding phase of each harvest, each of your people requires 1\u00a0less <FOOD>. During scoring, your people are worth 2 points each instead of 3.'],
   players: '4+',
 })

@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf } from '../helpers/pay-gain-node'
+import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A142_Cordmaker'
 
@@ -34,7 +34,7 @@ const listener: CardListenerRegistration = {
         optional: !isOwner,
         children: [
           gainLeaf(CARD_ID, { grain: 1 }),
-          gainLeaf(CARD_ID, { vegetable: 1 }),
+          payGainFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { vegetable: 1 } }),
         ],
       },
       sourceCard: CARD_ID,
@@ -51,7 +51,7 @@ export const A142_Cordmaker = new Occupation({
   number: 142,
   category: 'CROP_PROVIDER',
   desc: [
-    'Each time you or another player collects 2+ <REED> from the __Reed Bank__, you get 1 <GRAIN> or 1 <VEGETABLE>. (When an opponent triggers it, you may decline.)',
+    'Each time any player (including you) takes at least 2 <REED> from the __Reed Bank__ accumulation space, you can choose to take 1 <GRAIN> or buy 1 <VEGETABLE> for 2 <FOOD>.',
   ],
   cost: {},
   players: '3+',

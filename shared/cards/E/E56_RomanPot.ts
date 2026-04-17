@@ -36,7 +36,7 @@ export const E56_RomanPot = new MinorImprovement({
   deck: 'E',
   number: 56,
   category: 'FOOD_PROVIDER',
-  desc: ['Place 4 <FOOD> on this card. At the start of each work phase, if you are the last player in turn order, move 1 <FOOD> from this card to your supply.'],
+  desc: ['Place 4 <FOOD> from the general supply on this card. At the start of each work phase, if you are the last player in turn order, move 1 <FOOD> from this card to your supply.'],
   cost: { clay: 1 },
   vp: 1,
 })

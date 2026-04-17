@@ -33,7 +33,7 @@ export const E137_FlaxFarmer = new Occupation({
   deck: 'E',
   number: 137,
   category: 'GOODS_PROVIDER',
-  desc: ['Each time you use the __Reed Bank__ accumulation space, you also get 1 <GRAIN>. Each time you use the __Grain Seeds__ action space, you also get 1 <REED>.'],
+  desc: ['Each time you use the __Reed Bank__ accumulation space, you also get 1\u00a0<GRAIN>. Each time you use the __Grain Seeds__ action space, you also get 1 <REED>.'],
   cost: {},
   players: '3+',
 })

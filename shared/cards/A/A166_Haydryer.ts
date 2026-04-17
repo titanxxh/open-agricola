@@ -25,7 +25,7 @@ export const A166_Haydryer = new Occupation({
   deck: "A",
   number: 166,
   category: "LIVESTOCK_PROVIDER",
-  desc: ["Before each harvest, you can pay (4 minus your pasture count) <FOOD> to get 1 <CATTLE>."],
+  desc: ["Immediately before each harvest, you can buy 1 <CATTLE> for 4 <FOOD> minus 1 <FOOD> for each pasture you have. (The minimum cost is 0)."],
   cost: {},
   players: "4+",
 })

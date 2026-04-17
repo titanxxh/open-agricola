@@ -24,7 +24,7 @@ export const E117_PipeSmoker = new Occupation({
   deck: "E",
   number: 117,
   category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["At the start of each harvest, if you have at least 1 grain field, you get 2 <WOOD>."],
+  desc: ['At the start of each harvest, if you have at least 1 grain field, you get 2\u00a0<WOOD>.'],
   cost: {},
   players: "1+",
 })

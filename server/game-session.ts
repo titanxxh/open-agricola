@@ -53,7 +53,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
-import { computeExtraSowableFields, handleSowExtraField } from '../shared/cards/card-effects.ts'
+import { handleSowExtraField } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -72,6 +72,7 @@ import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../shared/cards/types.ts'
 import {
   normalizePlayerFarm,
 } from './fence-validation.ts'
@@ -101,6 +102,7 @@ import {
   buildFieldSelectFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
+  getPermittedExtraSowableFields,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from './farm-interaction.ts'
@@ -484,8 +486,20 @@ export class GameSession {
   }
 
   private hasHarvestCooking(player: PlayerState) {
-    return player.improvements.some((id) =>
-      id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
+    if (
+      player.improvements.some(
+        (id) => id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'),
+      )
+    )
+      return true
+    for (const cardId of player.minorPlayed) {
+      const card = getRegisteredMinorImprovement(cardId)
+      if (!card?.exchanges) continue
+      for (const ex of card.exchanges) {
+        if (ex.trigger === 'harvest') return true
+      }
+    }
+    return false
   }
 
   private findNextHarvestReorgPlayer(afterPlayerIndex: number) {
@@ -1909,7 +1923,7 @@ export class GameSession {
     return this.respond()
   }
 
-  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string }[]): SessionResponse {
+  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string }[]): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
     }
@@ -1917,9 +1931,39 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
+    // Enforce per-card exchange `max` for harvest-trigger exchanges.
+    // Aggregate counts per sourceId to cap against the declared max (e.g. C59
+    // SchnappsDistillery allows converting at most 1 vegetable per harvest).
+    const perSourceUsed = new Map<string, number>()
+    const cappedSelections = selections.map((sel) => {
+      if (!sel.sourceId || sel.count <= 0) return sel
+      const card =
+        player.minorPlayed.includes(sel.sourceId)
+          ? getRegisteredMinorImprovement(sel.sourceId)
+          : player.occupationPlayed.includes(sel.sourceId)
+            ? getRegisteredOccupation(sel.sourceId)
+            : undefined
+      if (!card?.exchanges) return sel
+      const exchange = card.exchanges.find((ex) => {
+        if (ex.trigger !== 'harvest') return false
+        const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+        if (fromKeys.length !== 1) return false
+        const fromKey = fromKeys[0]!
+        if (fromKey !== sel.resourceKey) return false
+        const foodOut = (ex.to as Partial<Resource>).food ?? 0
+        return foodOut === sel.food
+      })
+      if (!exchange || exchange.max === undefined) return sel
+      const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
+      const remaining = Math.max(0, exchange.max - usedSoFar)
+      const capped = Math.min(sel.count, remaining)
+      perSourceUsed.set(sel.sourceId, usedSoFar + capped)
+      return { ...sel, count: capped }
+    })
+
     let totalFood = 0
     const usedResources: Partial<Resource> = { food: this.pending.foodUsed }
-    for (const sel of selections) {
+    for (const sel of cappedSelections) {
       if (sel.count <= 0) continue
       const available = player.resources[sel.resourceKey]
       const used = Math.min(sel.count, available)
@@ -2473,31 +2517,33 @@ export class GameSession {
             typeof (field as { row?: unknown }).row === 'number' &&
             typeof (field as { col?: unknown }).col === 'number')
           : undefined
-        // Compute extra valid positions from card effects (e.g. B72 pasture sowing)
-        const extraFields = computeExtraSowableFields(player)
-        const extraValidPositions = new Set(
-          extraFields.map((f) => positionKey(f.tile)),
+        // Compute extra sowable fields from card effects (e.g. B72 pasture sowing)
+        const extraFields = getPermittedExtraSowableFields(player, this.pending.actionContext)
+        const extraAllowedCrops = new Map(
+          extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
         )
         const result = applyFarmChoice(normalized, 'sow', payload as any, {
           sowOptions: {
             maxSelections,
             excludedFields,
-            extraValidPositions: extraValidPositions.size > 0 ? extraValidPositions : undefined,
+            extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
           },
         })
         if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        const nextPlayer = result.player as unknown as PlayerState
         // Handle extra field sowing via card effects
-        if (extraValidPositions.size > 0) {
-          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
+        if (extraAllowedCrops.size > 0) {
+          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' }[] }
           for (const sel of sowPayload.crops ?? []) {
             const key = positionKey({ row: sel.row, col: sel.col })
-            if (extraValidPositions.has(key)) {
-              handleSowExtraField(this.state.players[playerIndex]!, { row: sel.row, col: sel.col }, sel.crop)
+            if (extraAllowedCrops.has(key)) {
+              const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
+              if (!handled) return this.respond(false, 'invalid extra sow field')
             }
           }
         }
+        this.pushHistory()
+        this.state.players[playerIndex] = nextPlayer
         break
       }
       case 'field-select': {

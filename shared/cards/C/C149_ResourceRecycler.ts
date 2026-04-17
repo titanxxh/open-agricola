@@ -57,7 +57,7 @@ export const C149_ResourceRecycler = new Occupation({
   number: 149,
   category: 'ACTIONS_BOOSTER',
   desc: [
-    'Each time another player renovates to stone, you can pay 2 <FOOD> to build 1 clay room for free. You must currently have a clay house.',
+    'Each time another player renovates to stone, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost.',
   ],
   cost: {},
   players: '4+',

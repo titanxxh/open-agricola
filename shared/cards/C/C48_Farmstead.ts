@@ -1,27 +1,53 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import type { PlayerState } from '../../game/types'
 
 const CARD_ID = 'C48_Farmstead'
 
-/**
- * C48 Farmstead (MinorImprovement, C, 48)
- * When you play this card, place 1 food on each of the next 5 round spaces.
- * At the start of these rounds, you get the food.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    queueFutureMeeples(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: 5,
-      resources: { food: 1 },
-    })
-    return futureMeeplesNode()
+const countUsedTiles = (player: PlayerState): number => {
+  const used = new Set<string>()
+  for (const tile of player.roomTiles) used.add(`${tile.row},${tile.col}`)
+  for (const field of player.fields) used.add(`${field.row},${field.col}`)
+  for (const tile of player.stableTiles) used.add(`${tile.row},${tile.col}`)
+  for (const pasture of player.pastures) {
+    for (const tile of pasture.tiles ?? []) used.add(`${tile.row},${tile.col}`)
+  }
+  return used.size
+}
+
+const beforeListener: CardListenerRegistration = {
+  id: 'C48-farmstead-before-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', countUsedTiles(context.player))
   },
-})
+}
+
+const afterListener: CardListenerRegistration = {
+  id: 'C48-farmstead-after-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const before = readCardExtraData<number>(context.player, CARD_ID, 'usedTilesBefore') ?? 0
+    const after = countUsedTiles(context.player)
+    writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', undefined)
+    if (after > before) {
+      return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    }
+  },
+}
+
+registerCardListener(beforeListener)
+registerCardListener(afterListener)
 
 export const C48_Farmstead = new MinorImprovement({
   id: CARD_ID,
@@ -29,7 +55,10 @@ export const C48_Farmstead = new MinorImprovement({
   deck: 'C',
   number: 48,
   category: 'FOOD_PROVIDER',
-  desc: ['Place 1 <FOOD> on each of the next 5 round spaces. At the start of these rounds, you get the <FOOD>.'],
+  desc: [
+    'After each turn in which you make at least one unused farmyard space used, you get 1 <FOOD>.',
+  ],
   cost: { wood: 1, clay: 1 },
-  implemented: true,
+  prerequisite: '1 Occupation',
+  occupationPrerequisites: { min: 1 },
 })

@@ -30,7 +30,7 @@ export const E100_MuseumCaretaker = new Occupation({
   deck: 'E',
   number: 100,
   category: 'BONUS_POINTS_GET',
-  desc: ['At the start of each work phase, if you have at least 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <GRAIN>, and 1 <VEGETABLE> in your supply, you get 1 bonus <SCORE>.'],
+  desc: ['At the start of each work phase, if you have at least 1 <WOOD>, 1 <CLAY>, 1\u00a0<REED>, 1 <STONE>, 1 <GRAIN>, and 1 <VEGETABLE> in your supply, you get 1\u00a0bonus <SCORE>.'],
   cost: {},
   players: '1+',
 })

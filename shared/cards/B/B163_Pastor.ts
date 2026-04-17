@@ -58,7 +58,7 @@ export const B163_Pastor = new Occupation({
   number: 163,
   category: 'BUILDING_RESOURCE_PROVIDER',
   desc: [
-    'Once this game, after any player builds a room, if you are the only player with exactly 2 rooms, you get 3 <WOOD>, 2 <CLAY>, 1 <REED>, and 1 <STONE>.',
+    'Once you are the only player to live in a house with only 2 rooms, you immediately get 3 <WOOD>, 2 <CLAY>, 1 <REED>, and 1 <STONE> (only once).',
   ],
   cost: {},
   players: '4+',

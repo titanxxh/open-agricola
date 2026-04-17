@@ -9,12 +9,10 @@ export const fireplace1: MajorCardEffect = {
   isBaking: true,
   description: [
     '[Anytime]',
-    'Vegetable → 2 food',
-    'Boar → 2 food',
-    'Sheep → 2 food',
-    'Cattle → 3 food',
-    '[Bake Bread action]',
-    'Grain → 2 food',
+    '<VEGETABLE> <ARROW> 2<FOOD>      <PIG> <ARROW> 2<FOOD>',
+    '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>',
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW> 2<FOOD>',
   ],
 }
 

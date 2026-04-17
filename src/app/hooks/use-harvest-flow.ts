@@ -6,6 +6,10 @@ import { breedAnimals } from '../../../shared/actions/effects/breed-animals'
 import { reap } from '../../../shared/actions/effects/reap'
 import { emptyResources } from '../../../shared/logic/state'
 import { formatResources } from '../../../shared/logic/format'
+import {
+  getRegisteredMinorImprovement,
+  getRegisteredOccupation,
+} from '../../../shared/cards/types'
 
 export type HarvestFeedPending = {
   playerIndex: number
@@ -19,6 +23,8 @@ export type HarvestFeedOption = {
   sourceName: string
   resourceKey: keyof Resource
   food: number
+  max?: number
+  sourceId?: string
 }
 
 export type HarvestContext = {
@@ -233,6 +239,51 @@ export const buildHarvestFeedOptions = (
     addOption(sourceName, 'boar', source.boar, source.id)
     addOption(sourceName, 'cattle', source.cattle, source.id)
   })
+  // Harvest-trigger exchanges from played minors/occupations
+  for (const cardId of player.minorPlayed) {
+    const card = getRegisteredMinorImprovement(cardId)
+    if (!card?.exchanges) continue
+    for (const ex of card.exchanges) {
+      if (ex.trigger !== 'harvest') continue
+      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+      if (fromKeys.length !== 1) continue
+      const fromKey = fromKeys[0]!
+      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
+      const foodOut = (ex.to as Partial<Resource>).food ?? 0
+      if (fromCount !== 1 || foodOut <= 0) continue
+      if (player.resources[fromKey] <= 0) continue
+      options.push({
+        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
+        sourceName: cardLabel(cardId),
+        resourceKey: fromKey,
+        food: foodOut,
+        max: ex.max,
+        sourceId: cardId,
+      })
+    }
+  }
+  for (const cardId of player.occupationPlayed) {
+    const card = getRegisteredOccupation(cardId)
+    if (!card?.exchanges) continue
+    for (const ex of card.exchanges) {
+      if (ex.trigger !== 'harvest') continue
+      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+      if (fromKeys.length !== 1) continue
+      const fromKey = fromKeys[0]!
+      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
+      const foodOut = (ex.to as Partial<Resource>).food ?? 0
+      if (fromCount !== 1 || foodOut <= 0) continue
+      if (player.resources[fromKey] <= 0) continue
+      options.push({
+        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
+        sourceName: cardLabel(cardId),
+        resourceKey: fromKey,
+        food: foodOut,
+        max: ex.max,
+        sourceId: cardId,
+      })
+    }
+  }
   return options
 }
 
@@ -254,6 +305,31 @@ export const startHarvestCore = (nextState: GameState) => {
           id === 'Major_CookingHearth1' ||
           id === 'Major_CookingHearth2',
       )
+      const hasHarvestExchange = (() => {
+        for (const cardId of player.minorPlayed) {
+          const card = getRegisteredMinorImprovement(cardId)
+          if (!card?.exchanges) continue
+          for (const ex of card.exchanges) {
+            if (ex.trigger !== 'harvest') continue
+            const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+            if (fromKeys.length !== 1) continue
+            const fromKey = fromKeys[0]!
+            if (player.resources[fromKey] > 0) return true
+          }
+        }
+        for (const cardId of player.occupationPlayed) {
+          const card = getRegisteredOccupation(cardId)
+          if (!card?.exchanges) continue
+          for (const ex of card.exchanges) {
+            if (ex.trigger !== 'harvest') continue
+            const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+            if (fromKeys.length !== 1) continue
+            const fromKey = fromKeys[0]!
+            if (player.resources[fromKey] > 0) return true
+          }
+        }
+        return false
+      })()
       const canConvert =
         player.resources.grain > 0 ||
         player.resources.vegetable > 0 ||
@@ -261,7 +337,8 @@ export const startHarvestCore = (nextState: GameState) => {
           (player.resources.sheep > 0 ||
             player.resources.boar > 0 ||
             player.resources.cattle > 0 ||
-            player.resources.vegetable > 0))
+            player.resources.vegetable > 0)) ||
+        hasHarvestExchange
       if (canConvert) {
         pending.push({
           playerIndex: index,

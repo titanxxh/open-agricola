@@ -53,7 +53,7 @@ export const E101_Blighter = new Occupation({
   deck: "E",
   number: 101,
   category: "POINTS_PROVIDER",
-  desc: ["When you play this card, you get a number of bonus points equal to the number of full stages still left to play. You may no longer play occupations."],
+  desc: ['When you play this card, you get 1 bonus <SCORE> for each complete stage left to play. You may not play any more occupations.'],
   cost: {},
   players: "1+",
 })

@@ -17,7 +17,7 @@ export const E37_OxSkull = new MinorImprovement({
   deck: "E",
   number: 37,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 3 bonus <SCORE> if you have 0 cattle."],
+  desc: ['During scoring, if you have no <CATTLE>, you get 3 bonus <SCORE>.'],
   cost: {},
   prerequisite: "1 Cattle",
   vp: 0,

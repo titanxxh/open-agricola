@@ -178,4 +178,57 @@ describe('InteractionBar', () => {
     expect(html).toContain('interaction-bar__body')
     expect(html).toContain('Waiting')
   })
+
+  it('falls back to readable card id when card-name i18n key is missing', () => {
+    const choiceWithMissingCardName: PendingChoice = {
+      promptKey: 'ui.interactionChooseOccupation',
+      options: [{ value: 'E149_Pavernun', labelKey: 'occupations.E149_Pavernun.name' }],
+      playerIndex: 0,
+      spaceId: 'lessons',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={choiceWithMissingCardName}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="zh"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingFieldSelectionsLength={0}
+        maxFieldSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('E149 Pavernun')
+    expect(html).not.toContain('occupations.E149_Pavernun.name')
+  })
 })

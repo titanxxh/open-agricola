@@ -38,7 +38,7 @@ export const D97_BeggingStudent = new Occupation({
   number: 97,
   category: 'ACTIONS_BOOSTER',
   desc: [
-    'When you play this card, you get 1 begging marker. At the start of each harvest, you can play 1 occupation without paying an occupation cost.',
+    'When you play this card, you must immediately take 1 <BEGGING> marker. At the start of each harvest, you can play 1 occupation without paying an occupation cost.',
   ],
   cost: {},
   players: '1+',

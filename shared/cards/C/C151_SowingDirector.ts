@@ -46,7 +46,7 @@ export const C151_SowingDirector = new Occupation({
   number: 151,
   category: 'ACTION_SPACE_EXTENDER',
   desc: [
-    'Each time another player uses the __Grain Utilization__ action space, you get a free __Sow__ action.',
+    'Each time after another player uses the __Grain Utilization__ action space, you get a __Sow__ action.',
   ],
   cost: {},
   players: '3+',

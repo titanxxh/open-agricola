@@ -37,7 +37,7 @@ export const D152_Patron = new Occupation({
   deck: "D",
   number: 152,
   category: "FOOD_PROVIDER",
-  desc: ["Each time before you play an occupation, you get 2 <FOOD>."],
+  desc: ['Immediately before each time you play an occupation after this one (even before paying the occupation cost), you get 2 <FOOD>.'],
   cost: {},
   players: "4+",
 })

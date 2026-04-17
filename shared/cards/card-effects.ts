@@ -1,6 +1,6 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
 import type { AnimalZone } from '../actions/effects/animals'
-import type { ScoreCategoryResult } from '../logic/scoring'
+import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
 
@@ -10,9 +10,11 @@ import { getCurrentSessionContext } from './session-card-context'
  */
 export type ExtraSowableField = {
   tile: FarmTilePosition
-  allowedCrops: ('grain' | 'vegetable')[]
+  allowedCrops: ('grain' | 'vegetable' | 'wood')[]
   sourceCard: string
 }
+
+export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
 
 export type PaymentInfo = {
   resourcesPaid: Partial<Resource>
@@ -76,6 +78,11 @@ export type ScoringContext = {
 }
 
 export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: ScoringContext) => number
+export type SharedPostScoreHandler = (
+  state: GameState,
+  owner: PlayerState,
+  summaries: PlayerScoreSummary[],
+) => Array<{ playerId: string; score: number }>
 
 export type CardEffect = {
   id: string
@@ -106,12 +113,13 @@ export type CardEffect = {
   onBeforeStartOfTurn?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
+  computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
   /** Handle sowing into an extra field returned by onComputeSowableFields. */
-  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: 'grain' | 'vegetable') => boolean
+  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -392,7 +400,7 @@ export const computeExtraSowableFields = (player: PlayerState): ExtraSowableFiel
 export const handleSowExtraField = (
   player: PlayerState,
   tile: FarmTilePosition,
-  crop: 'grain' | 'vegetable',
+  crop: ExtraSowableCrop,
 ): boolean => {
   const allCards = [
     ...player.improvements,

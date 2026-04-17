@@ -57,7 +57,7 @@ export const D139_Chairman = new Occupation({
   number: 139,
   category: "FOOD_PROVIDER",
   desc: [
-    "Each time any player uses the __Meeting Place__, you get 1 <FOOD>. When an opponent uses it, they also get 1 <FOOD>.",
+    'Each time another player uses the __Meeting Place__ action space, both they and you get 1 <FOOD> (before taking the actions). If you use it, you get 1 <FOOD>.',
   ],
   cost: {},
   players: "3+",

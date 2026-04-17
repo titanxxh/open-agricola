@@ -51,7 +51,7 @@ export const B83_MuddyPuddles = new MinorImprovement({
   deck: 'B',
   number: 83,
   category: 'LIVESTOCK_PROVIDER',
-  desc: ['Pile the following goods on this card (<BOAR>, <FOOD>, <CATTLE>, <FOOD>, <SHEEP>). At any time, you can pay 1 <CLAY> to take the top good.'],
+  desc: ['Pile (from bottom to top) 1 <PIG>, 1 <FOOD>, 1 <CATTLE>, 1 <FOOD>, and 1 <SHEEP> on this card. At any time, you can pay 1 <CLAY> to take the top good.'],
   cost: { clay: 2 },
   players: '1+',
 })

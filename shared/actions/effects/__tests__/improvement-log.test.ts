@@ -93,6 +93,24 @@ describe('improvement logging', () => {
     })
   })
 
+  it('returns stable improvementPayment for Fireplace upgrade to Cooking Hearth', () => {
+    const state = createState()
+    state.availableMajorImprovements = ['Major_CookingHearth1']
+    const player = createPlayer()
+    player.resources.clay = 0
+    player.improvements = ['Major_Fireplace1']
+
+    const result = playImprovement(state, player, 'major:Major_CookingHearth1', 'any')
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.extraData?.improvementPayment).toEqual({
+      improvementId: 'Major_CookingHearth1',
+      resourcesPaid: {},
+      returnedCardId: 'Major_Fireplace1',
+    })
+  })
+
   it('does not apply Wood Workshop as a direct wood discount', () => {
     const state = createState()
     state.availableMajorImprovements = []
@@ -120,6 +138,11 @@ describe('improvement logging', () => {
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
+    expect(result.extraData?.improvementPayment).toEqual({
+      improvementId: 'C60_SmallPottersOven',
+      resourcesPaid: { clay: 2 },
+      returnedCardId: 'Major_ClayOven',
+    })
     expect(result.flow).toMatchObject({
       type: 'seq',
       children: [

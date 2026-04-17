@@ -36,8 +36,7 @@ export const C144_ReedRoofRenovator = new Occupation({
   number: 144,
   category: "BUILDING_RESOURCE_PROVIDER",
   desc: [
-    "Each time another player renovates, you immediately get 1 <REED> from the general supply.",
-    "When you play this card in a 3-player game, you immediately get 1 <REED>.",
+    "Each time another player renovates, you immediately get 1 <REED> from the general supply. When you play this card in a 3-player game, you immediately get 1 <REED>.",
   ],
   players: "3+",
 })

@@ -17,7 +17,7 @@ export const C100_Butler = new Occupation({
   deck: "C",
   number: 100,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 4 bonus <SCORE> if you have more rooms than family members. Must be played by round 11."],
+  desc: ["If you play this card in round 11 or before, during scoring, you get 4 bonus <SCORE> if you then have more rooms than people."],
   cost: {},
   players: "1+",
   maxRound: 11,

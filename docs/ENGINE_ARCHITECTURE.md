@@ -127,6 +127,7 @@ Phase 2 前端联调已完成：
 - P1（`?player=p1&transport=ws`）自动创建房间并等待，P2（`?player=p2&transport=ws`）通过 `/api/rooms` 自动发现并加入。
 - 房间满员后后端广播 `gameStarted`，前端自动进入游戏。
 - `WsGameTransport` 的 `commitFarm`/`undoStep`/`undoAction`/`newGame`/`loadGame`/`devDrawCard`/`devPlayCard`/`devCreatePasture` 均走 WS，dev 操作不再 HTTP 降级。
+- `GameContainerApi` / `FarmBoard` 现在会把 `sow` 交互拆成“真实农场格”与“off-board extra-sow tray”两类目标；像 `E68_CherryOrchard` 这类虚拟田仍完全由服务端 `interaction.farm.selectableFields` 驱动，前端只负责渲染与提交坐标。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
 - **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时按 `PERSIST_ROOMS` 恢复该房间状态；当前默认后端是 SQLite（`data/open-agricola.db` 中的 `rooms.state_json`），若显式设为 `json` 则读写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）。每次该房间状态变更后都会立刻写回；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
@@ -222,7 +223,7 @@ type StateUpdateEnvelope =
   - `stateId`
   - `allowedCommands`
   - `anytimeActions`
-  - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`
+  - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`（对 `sow`，`selectableFields` 允许包含 off-board 虚拟田位、每格独立 `allowedCrops` 与 `sourceCard`）
 
 协议层规则：
 
@@ -1126,7 +1127,7 @@ type ActionHookResult = {
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
-当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndTurn`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer` 这类“按本次实际收割田地数结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取。
+当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndTurn`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer`、`A106_SlurrySpreader` 这类“按本次实际收割田地数/是否收到最后一份作物结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取；对 `onBeforeStartOfTurn`，`E93_Motivator` 这类“回合开始前插入一次可选额外放人”的效果也复用同一阶段 flow。
 
 #### 11.6.2a ActivateCardNode 架构
 
@@ -1188,7 +1189,7 @@ PlayerSwitchNode(→ p1)
 
 #### 11.6.2d costOverride 机制
 
-引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，传递给 `commitFarmChoice()`。
+引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，传递给 `commitFarmChoice()`。除 `costOverride` 外，`ActionExecutionResult.extraData` 也承担“稳定可供 listener 读取的结算元数据”职责，例如 `improvement-any` 购买完成后的 `improvementPayment`（`A41_VegetableSlicer` 用它区分 Fireplace → Cooking Hearth 升级），以及 `commitFarmChoice()` 返回的若干 farm delta。
 
 在 `commitFarmChoice` 中：
 - `room` 路径：先用 `shared/actions/effects/room-payment.ts` 展开“每间房”的费用变体，再按已选房间数合成为总成本；若存在多个可行支付解，会先转成统一的 `prompt.selectPayment` pending，待玩家选定后再真正落房与扣费

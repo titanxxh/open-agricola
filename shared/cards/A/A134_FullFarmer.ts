@@ -1,11 +1,13 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import { computeAnimalZones } from '../../actions/effects/animals'
 
 const CARD_ID = 'A134_FullFarmer'
 
 registerCardEffect({
   id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const zones = computeAnimalZones(player)
@@ -19,7 +21,7 @@ export const A134_FullFarmer = new Occupation({
   deck: "A",
   number: 134,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> per pasture that is at full capacity."],
+  desc: ["When you play this card, you immediately get 1 <WOOD> and 1 <CLAY>. During scoring, you get 1 bonus <SCORE> for each pasture you have holding the maximum number of animals."],
   cost: {},
   players: "1+",
 })

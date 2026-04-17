@@ -22,7 +22,7 @@ export const B99_Tutor = new Occupation({
   deck: "B",
   number: 99,
   category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each occupation you played after this one."],
+  desc: ['During scoring, you get 1 bonus <SCORE> for each occupation played after this one.'],
   cost: {},
   players: "1+",
 })

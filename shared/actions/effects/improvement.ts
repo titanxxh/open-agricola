@@ -75,6 +75,25 @@ const buildImprovementLogParams = (
   return params
 }
 
+type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
+
+const attachImprovementPayment = (
+  result: SuccessfulImprovementResult,
+  improvementId: string,
+  resourcesPaid: NonNullable<PaymentInfo['resourcesPaid']>,
+  returnedCardId?: string,
+): SuccessfulImprovementResult => {
+  result.extraData = {
+    ...(result.extraData ?? {}),
+    improvementPayment: {
+      improvementId,
+      resourcesPaid: getPositiveResourceLog(resourcesPaid) ?? {},
+      ...(returnedCardId ? { returnedCardId } : {}),
+    },
+  }
+  return result
+}
+
 const attachRequiredReturnCards = (
   cost: Partial<PlayerState['resources']> | ComplexCost | null,
   returnCards?: string[],
@@ -290,17 +309,17 @@ const finalizeMajorImprovementPurchase = (
   )
 
   if (suppressOnBuyEffects) {
-    return {
+    return attachImprovementPayment({
       type: 'ok',
       logKey: 'log.playImprovement',
       logParams: buildImprovementLogParams(improvementId, costResources, {
         returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
       }),
-    }
+    }, improvementId, costResources, returnedMajorId)
   }
 
   const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
-  const result: ActionExecutionResult =
+  const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
 
   if (result.type === 'ok') {
@@ -309,7 +328,7 @@ const finalizeMajorImprovementPurchase = (
       returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
     })
   }
-  return result
+  return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
 }
 
 const finalizeMinorImprovementPurchase = (
@@ -338,27 +357,32 @@ const finalizeMinorImprovementPurchase = (
   })
 
   if (suppressOnBuyEffects) {
-    return {
+    return attachImprovementPayment({
       type: 'ok',
       logKey: 'log.playMinorImprovement',
       logParams: buildImprovementLogParams(improvement.id, costResources, {
         returnedCards: returnedCardId ? [returnedCardId] : undefined,
       }),
-    }
+    }, improvement.id, costResources, returnedCardId)
   }
 
   const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
-    return activation
+    return attachImprovementPayment(
+      activation,
+      improvement.id,
+      costResources,
+      returnedCardId,
+    )
   }
 
-  return {
+  return attachImprovementPayment({
     type: 'ok',
     logKey: 'log.playMinorImprovement',
     logParams: buildImprovementLogParams(improvement.id, costResources, {
       returnedCards: returnedCardId ? [returnedCardId] : undefined,
     }),
-  }
+  }, improvement.id, costResources, returnedCardId)
 }
 
 const resolveImprovementPayment = (

@@ -20,7 +20,7 @@ export interface GameTransport {
     animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
   }[]): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
-    resourceKey: keyof Resource; count: number; food: number; sourceName?: string
+    resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string
   }[]): Promise<GameSyncPayload>
   confirmNextPlayer(): Promise<GameSyncPayload>
   confirmPlayerSwitch(): Promise<GameSyncPayload>

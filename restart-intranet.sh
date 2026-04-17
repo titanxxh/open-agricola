@@ -10,7 +10,7 @@ BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
 
 if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
-  echo "Error: dependencies are missing. Run: npm install"
+  echo "Error: dependencies are missing. Run: pnpm install"
   exit 1
 fi
 

@@ -26,7 +26,7 @@ export const B70_NewPurchase = new MinorImprovement({
   deck: "B",
   number: 70,
   category: "CROP_PROVIDER",
-  desc: ["Before each harvest round, you can pay 2 <FOOD> to get 1 <GRAIN>, and/or pay 4 <FOOD> to get 1 <VEGETABLE>."],
+  desc: ['Before the start of each round that ends with a harvest, you can buy one of each of the following crops: 2 <FOOD> <ARROW> 1 <GRAIN>; 4 <FOOD> <ARROW> 1 <VEGETABLE>'],
   cost: {},
   players: "1+",
 })

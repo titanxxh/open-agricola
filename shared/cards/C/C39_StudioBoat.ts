@@ -78,8 +78,7 @@ export const C39_StudioBoat = new PlayerActionCard({
   number: 39,
   category: 'FOOD_PROVIDER',
   desc: [
-    'This card is an action space for all. It accumulates 1 <FOOD> per round, like __Traveling Players__.',
-    'Each time a player uses it, the card owner receives 1 bonus <SCORE>.',
+    'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
   ],
   cost: { wood: 2, reed: 1 },
   players: '1-3',
