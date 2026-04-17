@@ -682,6 +682,7 @@ export const en = {
     buildStableFail: '{player} failed to build a stable (no space or resources)',
     familyGrowth: '{player} grows family by 1',
     familyGrowthFail: '{player} failed to grow family (not enough rooms)',
+    familyFull: '{player} failed to grow family (all workers already active)',
     takeAction: '{player} takes {action}',
     placeFarmer: '{player} places a farmer: {action}',
     action: '{player} performs {action}',

@@ -1,23 +1,51 @@
-import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
+import { activateSmallestInactive } from '../../game/player'
+import { addWorkerRef } from '../../game/space'
 
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
 
-export const growFamily = (player: PlayerState): ActionExecutionResult => {
+export const growFamily = (
+  state: GameState,
+  player: PlayerState,
+  fgSpaceId: string,
+): ActionExecutionResult => {
   if (effectiveRooms(player) <= player.familySize) {
     return { type: 'fail', logKey: 'log.familyGrowthFail' }
   }
-  player.familySize += 1
-  player.newbornCount += 1
+  const newborn = activateSmallestInactive(player)
+  if (!newborn) return { type: 'fail', logKey: 'log.familyFull' }
+  player.familySize += 1   // legacy sync (Task 10 removes)
+  player.newbornCount += 1 // legacy sync (Task 10 removes)
+
+  const fgSpace = state.actionSpaces.find(s => s.id === fgSpaceId)
+  if (fgSpace) {
+    // Push newborn WorkerRef onto the FG space.
+    // Deliberately NOT calling recordRoundPlacement — newborns don't count as placements.
+    addWorkerRef(fgSpace, player.id, newborn.id)
+  }
+
   return { type: 'ok', logKey: 'log.familyGrowth' }
 }
 
 export const growFamilyWithoutRoom = (
+  state: GameState,
   player: PlayerState,
+  fgSpaceId: string,
 ): ActionExecutionResult => {
-  player.familySize += 1
-  player.newbornCount += 1
+  const newborn = activateSmallestInactive(player)
+  if (!newborn) return { type: 'fail', logKey: 'log.familyFull' }
+  player.familySize += 1   // legacy sync (Task 10 removes)
+  player.newbornCount += 1 // legacy sync (Task 10 removes)
+
+  const fgSpace = state.actionSpaces.find(s => s.id === fgSpaceId)
+  if (fgSpace) {
+    // Push newborn WorkerRef onto the FG space.
+    // Deliberately NOT calling recordRoundPlacement — newborns don't count as placements.
+    addWorkerRef(fgSpace, player.id, newborn.id)
+  }
+
   return { type: 'ok', logKey: 'log.familyGrowth' }
 }
 
@@ -28,7 +56,7 @@ export const wishChildrenAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => effectiveRooms(player) > player.familySize,
-  execute: ({ player }) => growFamily(player),
+  execute: ({ state, player, space }) => growFamily(state, player, space.id),
 }
 
 export const growFamilyWithoutRoomAction: ActionDefinition = {
@@ -38,5 +66,5 @@ export const growFamilyWithoutRoomAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => growFamilyWithoutRoom(player),
+  execute: ({ state, player, space }) => growFamilyWithoutRoom(state, player, space.id),
 }

@@ -663,6 +663,7 @@ export const zh = {
     buildStableFail: '{player} 建造畜栏失败（资源不足或无空地）',
     familyGrowth: '{player} 家庭成员 +1',
     familyGrowthFail: '{player} 家庭增长失败（房间不足）',
+    familyFull: '{player} 家庭增长失败（所有工人已激活）',
     takeAction: '{player} 选择 {action}',
     placeFarmer: '{player} 放置工人：{action}',
     action: '{player} 执行 {action}',
