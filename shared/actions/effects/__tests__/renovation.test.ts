@@ -85,4 +85,44 @@ describe('renovation', () => {
     expect(player.resources.clay).toBe(0)
     expect(player.resources.reed).toBe(0)
   })
+
+  it('returns the stone-direct plan when skipClayTier is set on a wood house', () => {
+    const player = createPlayer({ rooms: 3 })
+
+    expect(getRenovation(player, { skipClayTier: true })).toEqual({
+      nextType: 'stone',
+      cost: { stone: 3, reed: 1 },
+    })
+  })
+
+  it('ignores skipClayTier on a clay house and returns the standard stone plan', () => {
+    const player = createPlayer({ houseType: 'clay', rooms: 2 })
+
+    expect(getRenovation(player, { skipClayTier: true })).toEqual({
+      nextType: 'stone',
+      cost: { stone: 2, reed: 1 },
+    })
+  })
+
+  it('renovates a wood house directly to stone when skipClayTier is set', () => {
+    const player = createPlayer({
+      rooms: 2,
+      resources: { stone: 2, reed: 1 },
+    })
+
+    expect(canRenovate(player, undefined, getRenovation(player, { skipClayTier: true }))).toBe(true)
+    expect(renovateHouse(player, undefined, getRenovation(player, { skipClayTier: true }))).toBe(true)
+    expect(player.houseType).toBe('stone')
+    expect(player.resources.stone).toBe(0)
+    expect(player.resources.reed).toBe(0)
+  })
+
+  it('keeps the standard wood-to-clay path when no params are supplied', () => {
+    const player = createPlayer({ rooms: 2 })
+
+    expect(getRenovation(player)).toEqual({
+      nextType: 'clay',
+      cost: { clay: 2, reed: 1 },
+    })
+  })
 })

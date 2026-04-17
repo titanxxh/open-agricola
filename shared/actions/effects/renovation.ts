@@ -23,7 +23,17 @@ const mergeRenovationCost = (
   }
 }
 
-export const getRenovation = (player: PlayerState): RenovationPlan | null => {
+export const getRenovation = (
+  player: PlayerState,
+  params?: Record<string, unknown>,
+): RenovationPlan | null => {
+  const skipClayTier = params?.skipClayTier === true
+  if (player.houseType === 'wood' && skipClayTier) {
+    return {
+      nextType: 'stone',
+      cost: { stone: player.rooms, reed: 1 },
+    }
+  }
   if (player.houseType === 'wood') {
     return {
       nextType: 'clay',
@@ -75,9 +85,10 @@ export const renovate = (player: PlayerState): ActionExecutionResult => {
 }
 
 export const renovateHouseCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ player }) => getRenovation(player) !== null,
-  canExecute: ({ player }, costOverride) => canRenovate(player, costOverride),
-  getBaseCost: ({ player }) => getRenovation(player)?.cost ?? {},
+  isStructurallyPossible: ({ player, params }) => getRenovation(player, params) !== null,
+  canExecute: ({ player, params }, costOverride) =>
+    canRenovate(player, costOverride, getRenovation(player, params)),
+  getBaseCost: ({ player, params }) => getRenovation(player, params)?.cost ?? {},
 }
 
 export const renovateHouseAction: ActionDefinition = {
@@ -89,15 +100,15 @@ export const renovateHouseAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     canExecuteWithCostPreview(renovateHouseCostPreview, { state, player }),
   costPreview: renovateHouseCostPreview,
-  execute: ({ player, costs }) => {
-    const renovation = getRenovation(player)
+  execute: ({ player, params, costs }) => {
+    const renovation = getRenovation(player, params)
     if (!renovation) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
-    if (!canRenovate(player, costs)) {
+    if (!canRenovate(player, costs, renovation)) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
-    if (!renovateHouse(player, costs)) {
+    if (!renovateHouse(player, costs, renovation)) {
       return { type: 'fail', logKey: 'log.renovationFail' }
     }
     return { type: 'ok' }
