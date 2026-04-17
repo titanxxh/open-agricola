@@ -95,6 +95,10 @@ baseActionDefinitions.forEach((action) => {
 
 export const actionDefinitions: ActionDefinition[] = baseActionDefinitions
 
+export const getActionDefinition = (
+  actionId: string,
+): ActionDefinition | undefined => actionDefinitionLookup.get(actionId)
+
 export const createActionSpaces = (): ActionSpace[] =>
   actionDefinitions.map((action) => ({
     ...action,

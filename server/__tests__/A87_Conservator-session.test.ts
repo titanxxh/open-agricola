@@ -40,43 +40,37 @@ const setup = (
   return session
 }
 
-describe('A87_Conservator computeReplace listener', () => {
-  it('declines and offers a wood->stone alternative when wooden house owner triggers renovate-house', () => {
+describe('A87_Conservator computeChoiceCandidates listener', () => {
+  it('injects a stone target when wooden house owner takes renovate-house', () => {
     const session = setup({ houseType: 'wood', rooms: 2 })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-replace-renovate-house')
+    const listener = findListener('A87-conservator-add-stone-renovation-target')
     expect(listener).toBeDefined()
 
     const result = executeCardListener(listener!, {
       state,
       player,
       actionId: 'renovate-house',
-      phase: 'computeReplace',
+      phase: 'computeChoiceCandidates',
     } as any)
 
-    expect(result?.decline).toBe(true)
-    expect(result?.sourceCard).toBe(CARD_ID)
-    expect(result?.alternativeFlow).toEqual({
-      type: 'leaf',
-      actionId: 'renovate-house',
-      params: { skipClayTier: true },
-      sourceCard: CARD_ID,
-      choiceLabelKey: 'ui.interactionConservatorDirectStone',
-    })
+    expect(result?.extraOptions).toEqual([
+      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone' },
+    ])
   })
 
-  it('is silent when the house is no longer wooden', () => {
+  it('is silent on a clay house (already past the wood tier)', () => {
     const session = setup({ houseType: 'clay' })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-replace-renovate-house')!
+    const listener = findListener('A87-conservator-add-stone-renovation-target')!
 
     const result = executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
-      phase: 'computeReplace',
+      phase: 'computeChoiceCandidates',
     } as any)
 
     expect(result).toBeUndefined()
@@ -86,38 +80,47 @@ describe('A87_Conservator computeReplace listener', () => {
     const session = setup({ playA87: false })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-replace-renovate-house')!
+    const listener = findListener('A87-conservator-add-stone-renovation-target')!
 
     const result = executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
-      phase: 'computeReplace',
+      phase: 'computeChoiceCandidates',
     } as any)
 
     expect(result).toBeUndefined()
   })
 
-  it('is silent on the second pass to avoid replace loops', () => {
-    const session = setup({ houseType: 'wood' })
+  it('does not filter by affordability — engine decides what is selectable', () => {
+    const session = setup({
+      houseType: 'wood',
+      rooms: 2,
+      resources: { stone: 0, reed: 0 },
+    })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-replace-renovate-house')!
+    const listener = findListener('A87-conservator-add-stone-renovation-target')!
 
     const result = executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
-      phase: 'computeReplace',
-      actionContext: { checkedReplaceAction: true },
+      phase: 'computeChoiceCandidates',
     } as any)
 
-    expect(result).toBeUndefined()
+    expect(result?.extraOptions).toEqual([
+      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone' },
+    ])
+  })
+
+  it('legacy computeReplace listener is gone (no XOR top-level branch)', () => {
+    expect(findListener('A87-conservator-replace-renovate-house')).toBeUndefined()
   })
 })
 
 describe('A87_Conservator isDoable listener', () => {
-  it('reports doable when wooden owner can afford the stone path', () => {
+  it('rescues entry visibility when wooden owner cannot afford clay tier but can afford stone tier', () => {
     const session = setup({
       houseType: 'wood',
       rooms: 2,
@@ -125,7 +128,7 @@ describe('A87_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isdoable-renovate-house')
+    const listener = findListener('A87-conservator-isDoable-renovate-house')
     expect(listener).toBeDefined()
 
     const result = executeCardListener(listener!, {
@@ -147,7 +150,7 @@ describe('A87_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isdoable-renovate-house')!
+    const listener = findListener('A87-conservator-isDoable-renovate-house')!
 
     const result = executeCardListener(listener, {
       state,
@@ -160,7 +163,7 @@ describe('A87_Conservator isDoable listener', () => {
     expect(result).toBeUndefined()
   })
 
-  it('is silent when the player cannot afford the stone path', () => {
+  it('is silent when the player cannot afford the stone path either', () => {
     const session = setup({
       houseType: 'wood',
       rooms: 2,
@@ -168,7 +171,7 @@ describe('A87_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isdoable-renovate-house')!
+    const listener = findListener('A87-conservator-isDoable-renovate-house')!
 
     const result = executeCardListener(listener, {
       state,
@@ -181,7 +184,7 @@ describe('A87_Conservator isDoable listener', () => {
     expect(result).toBeUndefined()
   })
 
-  it('is silent on non-wooden houses', () => {
+  it('is silent on non-wooden houses (no wood→stone shortcut applies)', () => {
     const session = setup({
       houseType: 'clay',
       rooms: 2,
@@ -189,7 +192,7 @@ describe('A87_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isdoable-renovate-house')!
+    const listener = findListener('A87-conservator-isDoable-renovate-house')!
 
     const result = executeCardListener(listener, {
       state,
@@ -211,7 +214,7 @@ describe('A87_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isdoable-renovate-house')!
+    const listener = findListener('A87-conservator-isDoable-renovate-house')!
 
     const result = executeCardListener(listener, {
       state,

@@ -13,6 +13,7 @@ export type ActionHookPhase =
   | 'after'
   | 'computeCosts'
   | 'computeArgs'
+  | 'computeChoiceCandidates'
   | 'computeReplace'
   | 'isDoable'
   | 'canUseOccupied'
@@ -25,6 +26,7 @@ export const actionHookPhases: ActionHookPhase[] = [
   'after',
   'computeCosts',
   'computeArgs',
+  'computeChoiceCandidates',
   'computeReplace',
   'isDoable',
   'canUseOccupied',
