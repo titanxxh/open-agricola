@@ -8,9 +8,9 @@ registerCardEffect({
   computeBonusScore: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
     const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
-    const thresholds = [0, 7, 7, 5, 4, 3]
-    const threshold = thresholds[state.players.length] ?? 7
-    return Math.max(0, totalAnimals - threshold + 1)
+    const divisors = [7, 5, 4, 3, 3, 3]
+    const divisor = divisors[state.players.length - 1] ?? 3
+    return Math.floor(totalAnimals / divisor)
   },
 })
 

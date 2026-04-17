@@ -7,7 +7,12 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
-    return Math.min(player.resources.grain, player.resources.vegetable)
+    const inFields = (crop: 'grain' | 'vegetable') =>
+      player.fields.filter((f) => f.crop === crop).reduce((sum, f) => sum + (f.remaining ?? 0), 0)
+    const grain = player.resources.grain + inFields('grain')
+    const veg = player.resources.vegetable + inFields('vegetable')
+    const pairs = Math.min(grain, veg)
+    return Math.ceil(pairs / 2)
   },
 })
 
