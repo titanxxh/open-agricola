@@ -39,6 +39,7 @@ const afterListener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const before = readCardExtraData<number>(context.player, CARD_ID, 'usedTilesBefore') ?? 0
     const after = countUsedTiles(context.player)
+    writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', undefined)
     if (after > before) {
       return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
     }
@@ -58,4 +59,6 @@ export const C48_Farmstead = new MinorImprovement({
     'After each turn in which you make at least one unused farmyard space used, you get 1 <FOOD>.',
   ],
   cost: { wood: 1, clay: 1 },
+  prerequisite: '1 Occupation',
+  occupationPrerequisites: { min: 1 },
 })
