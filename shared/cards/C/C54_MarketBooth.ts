@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { getFenceCount } from '../../actions/effects/fencing'
 
 const CARD_ID = 'C54_MarketBooth'
 
@@ -8,7 +9,7 @@ registerCardEffect({
   onEndHarvestFieldPhase: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
-    if (player.fences <= 0) return
+    if (getFenceCount(player) === 0) return
 
     return {
       type: 'seq',
