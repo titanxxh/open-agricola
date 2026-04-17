@@ -98,6 +98,34 @@ describe('C59_SchnappsDistillery harvest exchange', () => {
 // ===== Task 4: B27 Toolbox =====
 import '../B/B27_Toolbox'
 
+describe('B27_Toolbox work-phase gate', () => {
+  it('does not trigger outside work phase', () => {
+    const listener = findListener('B27-toolbox-after-construct')!
+    const p = createPlayer()
+    p.minorPlayed = ['B27_Toolbox']
+    const state = createState(2, p)
+    state.phase = 'harvest' as any
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('construct'),
+      actionId: 'construct', phase: 'after',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('triggers in work phase', () => {
+    const listener = findListener('B27-toolbox-after-construct')!
+    const p = createPlayer()
+    p.minorPlayed = ['B27_Toolbox']
+    const state = createState(2, p)
+    state.phase = 'work' as any
+    const result = executeCardListener(listener, {
+      state, player: p, space: createSpace('construct'),
+      actionId: 'construct', phase: 'after',
+    } as any)
+    expect(result?.flow).toBeDefined()
+  })
+})
+
 describe('B27_Toolbox rewrite', () => {
   it('after construct offers improvement-any filtered to Joinery/Pottery/Basket', () => {
     const listener = findListener('B27-toolbox-after-construct')!
@@ -156,6 +184,14 @@ describe('B27_Toolbox rewrite', () => {
 
 // ===== Task 5: C48 Farmstead per-turn used-space gain =====
 import '../C/C48_Farmstead'
+import { C48_Farmstead } from '../C/C48_Farmstead'
+import { readCardExtraData } from '../helpers/card-state'
+
+describe('C48_Farmstead occupation prereq', () => {
+  it('requires at least 1 occupation', () => {
+    expect((C48_Farmstead as any).occupationPrerequisites).toEqual({ min: 1 })
+  })
+})
 
 describe('C48_Farmstead per-turn used-space gain', () => {
   it('no longer has onBuy (no future meeples)', () => {
@@ -257,6 +293,28 @@ describe('C48_Farmstead per-turn used-space gain', () => {
     } as any)
     // Tile (2,0) was already used as a pasture tile. Adding a stable there shouldn't count as new.
     expect(result).toBeUndefined()
+  })
+
+  it('clears usedTilesBefore snapshot after firing', () => {
+    const afterListener = findListener('C48-farmstead-after-place-farmer')!
+    const beforeListener = findListener('C48-farmstead-before-place-farmer')!
+    const p = createPlayer()
+    p.minorPlayed = ['C48_Farmstead']
+    p.roomTiles = [{ row: 0, col: 0 }] as any
+    const state = createState(2, p)
+    beforeListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'before',
+    } as any)
+    expect(readCardExtraData(p, 'C48_Farmstead', 'usedTilesBefore')).toBeDefined()
+    // Plow field, then check after listener
+    p.fields = [{ crop: null, remaining: 0, row: 1, col: 0 } as any]
+    afterListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+    // Snapshot should be cleared
+    expect(readCardExtraData(p, 'C48_Farmstead', 'usedTilesBefore')).toBeUndefined()
   })
 })
 
