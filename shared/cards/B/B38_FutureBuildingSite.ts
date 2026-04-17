@@ -52,5 +52,6 @@ export const B38_FutureBuildingSite = new MinorImprovement({
   category: 'BUILDING_RESOURCE_PROVIDER',
   desc: ['Up until all other farmyard spaces are used, you cannot use the unused spaces that are orthogonally adjacent to your house (not even to build rooms).'],
   cost: {},
+  vp: 3,
   implemented: true,
 })
