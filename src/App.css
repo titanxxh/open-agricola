@@ -1820,6 +1820,17 @@ a:focus-visible,
   background: rgba(255, 255, 255, 0.35);
 }
 
+/* Wood Palisade visual distinction (B30). */
+.farm-fence-h.active.palisade::before,
+.farm-fence-v.active.palisade::before {
+  background: #b07e3a;
+}
+.farm-fence-h.selected.palisade::before,
+.farm-fence-v.selected.palisade::before {
+  background: #d4a05a;
+  box-shadow: 0 0 0 1px gold inset;
+}
+
 .farm-post {
   background: #7b5b32;
   border-radius: 2px;

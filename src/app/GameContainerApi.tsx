@@ -798,6 +798,7 @@ export const GameContainerApi = () => {
   const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])
   const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
+  const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
 
   const farmInteraction =
     interaction.stateId === 'farmSelect' ? interaction.farm : null
@@ -1526,7 +1527,7 @@ export const GameContainerApi = () => {
                 pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
                 pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet}
+                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
                 existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
                 toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
                 togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
