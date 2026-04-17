@@ -698,6 +698,7 @@ export const en = {
     effectSowVegetable: 'Sow vegetable on {count} field(s)',
     effectRenovate: 'Renovate {from} → {to}',
     effectFencing: 'Build {count} fence(s)',
+    effectPalisading: 'Build {count} wood palisade segment(s)',
     effectImprovement: 'Improve: {improvements}',
     effectMinorImprovement: 'Minor improvement: {improvements}',
     effectStartPlayer: 'Become start player',

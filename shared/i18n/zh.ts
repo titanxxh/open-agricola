@@ -679,6 +679,7 @@ export const zh = {
     effectSowVegetable: '播种 {count} 块蔬菜',
     effectRenovate: '改建：{from} → {to}',
     effectFencing: '建造 {count} 段围栏',
+    effectPalisading: '建造 {count} 段木桩',
     effectImprovement: '改良：{improvements}',
     effectMinorImprovement: '小改良：{improvements}',
     effectStartPlayer: '成为起始玩家',

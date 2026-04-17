@@ -97,7 +97,11 @@ import {
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../shared/actions/effects/room-payment.ts'
-import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
+import {
+  getFenceCount,
+  getPalisadeCount,
+  stableWoodCost,
+} from '../shared/actions/effects/fencing.ts'
 import {
   buildFenceFarmInteraction,
   buildFieldSelectFarmInteraction,
@@ -917,9 +921,10 @@ export class GameSession {
     if (player.houseType !== before.houseType) {
       effects.renovate = { from: before.houseType, to: player.houseType }
     }
-    if (player.fences > before.fences) {
-      effects.fencing = player.fences - before.fences
-    }
+    const fenceDelta = getFenceCount(player) - getFenceCount(before)
+    const palisadeDelta = getPalisadeCount(player) - getPalisadeCount(before)
+    if (fenceDelta > 0) effects.fencing = fenceDelta
+    if (palisadeDelta > 0) effects.palisading = palisadeDelta
     const stablesBefore = before.stableTiles?.length ?? 0
     const stablesAfter = player.stableTiles?.length ?? 0
     if (stablesAfter > stablesBefore) {
