@@ -115,7 +115,7 @@ describe('B85_FarmHand session', () => {
     expect(updatedPlayer.rooms).toBe(3)
     expect(familySize(updatedPlayer)).toBe(2)
     // Now rooms (3) > familySize (2), so family growth should be possible
-    expect(familySize(updatedPlayer.rooms > updatedPlayer)).toBe(true)
+    expect(updatedPlayer.rooms > familySize(updatedPlayer)).toBe(true)
   })
 
   it('2x2 detection works with non-adjacent fields', () => {

@@ -156,14 +156,10 @@ describe('E159_OldMiser session', () => {
       state.players = state.players.slice(0, 2)
       state.round = 4
 
-      state.players.forEach((p) => {
-        markAllWorkersUsed(state, p)
-        p.resources.food = 10
-      })
-
       const player = state.players[0]!
       setActiveWorkerCount(player, 3)
       setNewbornCount(player, 1)
+      markAllWorkersUsed(state, player)
       player.resources.food = 2
       player.occupationPlayed.push(CARD_ID)
       player.playedCards = player.playedCards ?? []
@@ -172,6 +168,7 @@ describe('E159_OldMiser session', () => {
       const player2 = state.players[1]!
       setActiveWorkerCount(player2, 2)
       setNewbornCount(player2, 0)
+      markAllWorkersUsed(state, player2)
       player2.resources.food = 10
 
       session.loadState(state)

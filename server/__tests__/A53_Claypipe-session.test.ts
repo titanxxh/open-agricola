@@ -53,13 +53,12 @@ describe('A53_Claypipe session flow', () => {
     state.round = 7
     state.phase = 'work'
     state.currentPlayerIndex = 0
-    state.players[0]!.workersAvailable = 2
-    state.players[0]!.familySize = 2
+    setActiveWorkerCount(state.players[0]!, 2)
     state.players[0]!.resources.food = 10
     state.players[0]!.resources.clay = 1
     state.players[0]!.minorHand = ['A53_Claypipe']
-    state.players[1]!.workersAvailable = 0
-    state.players[1]!.familySize = 1
+    setActiveWorkerCount(state.players[1]!, 1)
+    markAllWorkersUsed(state, state.players[1]!)
     state.players[1]!.resources.food = 10
 
     const hollow = state.actionSpaces.find((space) => space.id === 'hollow-4')

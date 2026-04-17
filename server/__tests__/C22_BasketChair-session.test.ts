@@ -85,8 +85,9 @@ describe('C22_BasketChair session', () => {
   })
 
   it('onBeforeStartOfTurn does nothing when the player has no workers available', () => {
-    const player = createPlayer('p1', { workersAvailable: 0 })
+    const player = createPlayer('p1')
     const state = createState(3, [player])
+    markAllWorkersUsed(state as any, player)
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBeforeStartOfTurn!(state, player)
     expect(flow).toBeUndefined()

@@ -6,7 +6,7 @@ describe('dev create pasture', () => {
   it('does not consume worker and enters fence select pending', () => {
     const session = new GameSession()
     const state = session.getState().state
-    const beforeWorkers = state.players[0].workersAvailable
+    const beforeWorkers = workersAvailable(state, state.players[0])
     const beforeTaken = state.actionSpaces.find((s) => s.id === 'fencing')?.takenBy ?? null
 
     const resp = session.startDevFenceSelect(0)

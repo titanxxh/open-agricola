@@ -79,8 +79,8 @@ describe('C51_FishingNet session', () => {
 
     // Each player has 1 worker
     state.players.forEach((p) => {
-      setWorkersAtHome(state, p, 1)
       setActiveWorkerCount(p, 1)
+      setWorkersAtHome(state, p, 1)
       p.resources.food = 10
     })
 
