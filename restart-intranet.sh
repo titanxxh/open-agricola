@@ -8,6 +8,9 @@ BACKEND_PORT=5175
 FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
+# Local BGA image directory (sibling repo). Vite + backend will serve
+# /bga-img/* from here first, falling back to the BGA CDN if missing.
+BGA_IMAGE_DIR="${BGA_IMAGE_DIR:-../bga-agricola/img}"
 
 if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
   echo "Error: dependencies are missing. Run: pnpm install"
@@ -201,11 +204,13 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   ALLOW_ANONYMOUS_WS=true \
   PERSISTENT_ROOM_ID=dev \
   BACKEND_HOST="$LAN_IP" \
+  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
 echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
 start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
   BACKEND_HOST="$LAN_IP" \
+  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 
 echo ""
