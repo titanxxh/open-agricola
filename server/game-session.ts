@@ -72,6 +72,7 @@ import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
+import { getRegisteredMinorImprovement } from '../shared/cards/types.ts'
 import {
   normalizePlayerFarm,
 } from './fence-validation.ts'
@@ -484,8 +485,20 @@ export class GameSession {
   }
 
   private hasHarvestCooking(player: PlayerState) {
-    return player.improvements.some((id) =>
-      id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'))
+    if (
+      player.improvements.some(
+        (id) => id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'),
+      )
+    )
+      return true
+    for (const cardId of player.minorPlayed) {
+      const card = getRegisteredMinorImprovement(cardId)
+      if (!card?.exchanges) continue
+      for (const ex of card.exchanges) {
+        if (ex.trigger === 'harvest') return true
+      }
+    }
+    return false
   }
 
   private findNextHarvestReorgPlayer(afterPlayerIndex: number) {
