@@ -29,7 +29,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 
@@ -56,7 +56,7 @@ describe('E143_Hewer', () => {
   it('gains stone + food when clay-pit is unoccupied and round >= 3', () => {
     const player = createPlayer()
     const state = createState([player], 3)
-    // clay-pit is unoccupied (takenBy: null)
+    // clay-pit is unoccupied (takenBy: [])
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
@@ -75,7 +75,7 @@ describe('E143_Hewer', () => {
     const player = createPlayer()
     const state = createState([player], 5)
     const clayPit = state.actionSpaces.find(s => s.id === 'clay-pit')!
-    clayPit.takenBy = 'p2'
+    clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
     expect(flow).toBeNull()
   })

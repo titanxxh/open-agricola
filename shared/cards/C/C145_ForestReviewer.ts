@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'C145_ForestReviewer'
 
@@ -30,7 +31,7 @@ const listener: CardListenerRegistration = {
     if (!spaceId || !PAIRED_SPACE[spaceId]) return
     const otherSpaceId = PAIRED_SPACE[spaceId]!
     const otherSpace = context.state.actionSpaces.find((s) => s.id === otherSpaceId)
-    if (!otherSpace || !otherSpace.takenBy) return
+    if (!otherSpace || !isSpaceOccupied(otherSpace)) return
     return { flow: gainLeaf(CARD_ID, { reed: 1 }), sourceCard: CARD_ID }
   },
 }

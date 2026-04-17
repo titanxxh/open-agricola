@@ -89,7 +89,7 @@ describe('D24_BrotherlyLove session', () => {
     expect(resp.state.players[0]!.workersAvailable).toBe(0)
     // The space should still be occupied by the player
     const forest = resp.state.actionSpaces.find((space) => space.id === 'forest')
-    expect(forest?.takenBy).toBe(resp.state.players[0]!.id)
+    expect(forest?.takenBy.some((t) => t.playerId === resp.state.players[0]!.id)).toBe(true)
   })
 
   it('does not allow using spaces occupied by other players', () => {

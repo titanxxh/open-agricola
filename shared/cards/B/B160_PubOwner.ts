@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B160_PubOwner'
 
@@ -21,7 +22,8 @@ registerCardEffect({
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (!forest?.takenBy || !clayPit?.takenBy || !reedBank?.takenBy) return
+    if (!forest || !clayPit || !reedBank) return
+    if (!isSpaceOccupied(forest) || !isSpaceOccupied(clayPit) || !isSpaceOccupied(reedBank)) return
     return gainLeaf(CARD_ID, { grain: 1 })
   },
 })

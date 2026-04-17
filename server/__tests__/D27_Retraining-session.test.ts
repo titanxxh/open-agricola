@@ -44,7 +44,7 @@ const createSpace = (id: string): ActionSpace =>
     id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    takenBy: null,
+    takenBy: [],
   }) as unknown as ActionSpace
 
 const findListener = (id: string) =>

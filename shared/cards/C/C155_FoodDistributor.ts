@@ -3,6 +3,7 @@ import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'C155_FoodDistributor'
 
@@ -33,7 +34,7 @@ registerCardEffect({
     }
     // Count occupied round 1-14 action spaces (non-board action spaces that have a farmer)
     const occupiedCount = state.actionSpaces.filter(
-      (s) => s.takenBy !== null && (s.roundAvailable ?? 1) >= 1 && (s.roundAvailable ?? 1) <= 14,
+      (s) => isSpaceOccupied(s) && (s.roundAvailable ?? 1) >= 1 && (s.roundAvailable ?? 1) <= 14,
     ).length
     // Flag so it doesn't fire again
     setCardFlag(player, CARD_ID, true)

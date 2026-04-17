@@ -122,15 +122,15 @@ describe('construct room payment session', () => {
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
     expect(undoStepResp.state.players[0]!.workersAvailable).toBe(workersAfterTake)
-    expect(undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBe(
-      undoStepResp.state.players[0]!.id,
-    )
+    expect(
+      undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy[0]?.playerId,
+    ).toBe(undoStepResp.state.players[0]!.id)
 
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
     expect(secondUndoStepResp.pending.type).toBe('none')
     expect(secondUndoStepResp.state.players[0]!.workersAvailable).toBe(2)
-    expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toBeNull()
+    expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
 
   it('lets Carpenter\'s Hammer unlock a discounted two-room build', () => {

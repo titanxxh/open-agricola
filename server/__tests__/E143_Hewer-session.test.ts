@@ -26,7 +26,7 @@ describe('E143_Hewer session', () => {
 
     // Ensure clay-pit is unoccupied
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
-    if (clayPit) clayPit.takenBy = null
+    if (clayPit) clayPit.takenBy = []
 
     const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
     expect(flow).not.toBeNull()
@@ -70,7 +70,7 @@ describe('E143_Hewer session', () => {
     const updatedPlayer = updatedState.players[0]!
 
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
-    if (clayPit) clayPit.takenBy = 'p2'
+    if (clayPit) clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
     const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
     expect(flow).toBeNull()

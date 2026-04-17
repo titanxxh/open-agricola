@@ -111,7 +111,7 @@ describe('B21_HayloftBarn session', () => {
     state.currentPlayerIndex = 0
     state.players[0]!.workersAvailable = 1
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (grainSeeds) grainSeeds.takenBy = null
+    if (grainSeeds) grainSeeds.takenBy = []
     session.loadState(state)
 
     // Second grain action

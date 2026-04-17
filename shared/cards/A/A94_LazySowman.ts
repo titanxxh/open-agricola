@@ -5,6 +5,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { canSow } from '../../actions/effects/sow'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A94_LazySowman'
 
@@ -82,7 +83,7 @@ const computeArgsListener: CardListenerRegistration = {
       .filter((space) =>
         isOpenSpace(context.state, space) &&
         !isMeetingPlace(space) &&
-        !!space.takenBy &&
+        isSpaceOccupied(space) &&
         space.canBeExecutedByPlayer(context.state, context.player),
       )
       .map((space) => ({

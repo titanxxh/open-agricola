@@ -73,7 +73,7 @@ const createSpace = (id: string): ActionSpace => {
       cattle: 0,
       begging: 0,
     },
-    takenBy: null,
+    takenBy: [],
   }
 }
 

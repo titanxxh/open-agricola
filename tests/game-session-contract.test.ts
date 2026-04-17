@@ -51,7 +51,7 @@ describe('GameSession contract', () => {
     it('rejects invalid farm type when pending exists', () => {
       const state = session.getStateForRead()
       const available = state.actionSpaces.find(
-        (s) => !s.takenBy && s.roundAvailable <= 1,
+        (s) => s.takenBy.length === 0 && s.roundAvailable <= 1,
       )
       if (!available) return
 
@@ -179,7 +179,7 @@ describe('GameSession contract', () => {
       const resp = session.devSetSpaceTaken(space.id, 'p1')
       expect(resp.ok).toBe(true)
       const updated = resp.state.actionSpaces.find((s) => s.id === space.id)
-      expect(updated?.takenBy).toBe('p1')
+      expect(updated?.takenBy[0]?.playerId).toBe('p1')
     })
 
     it('rejects nonexistent space', () => {

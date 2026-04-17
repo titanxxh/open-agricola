@@ -10,6 +10,7 @@ import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
+import { normalizeTakenBy } from '../game/space'
 
 export const emptyResources: Resource = {
   wood: 0,
@@ -200,7 +201,7 @@ export const normalizeState = (raw: GameState): GameState => {
     return {
       ...space,
       resources: stored?.resources ?? space.resources,
-      takenBy: stored?.takenBy ?? null,
+      takenBy: normalizeTakenBy(stored?.takenBy),
     }
   })
   // Append PlayerActionCard dynamic spaces
@@ -209,7 +210,7 @@ export const normalizeState = (raw: GameState): GameState => {
     const stored = spaceMap.get(pas.id)
     if (stored) {
       pas.resources = stored.resources ?? pas.resources
-      pas.takenBy = stored.takenBy ?? null
+      pas.takenBy = normalizeTakenBy(stored.takenBy)
     }
     actionSpaces.push(pas)
   }

@@ -4,6 +4,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'C117_Legworker'
 
@@ -102,7 +103,7 @@ export const hasAdjacentWorker = (
   if (neighbours.length === 0) return false
   return neighbours.some((adj) => {
     const space = state.actionSpaces.find((s) => s.id === adj)
-    return !!space && space.takenBy === playerId
+    return !!space && spaceHasPlayer(space, playerId)
   })
 }
 

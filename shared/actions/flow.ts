@@ -60,7 +60,7 @@ const asActionSpace = (
   return {
     ...action,
     resources: { ...emptyResources },
-    takenBy: null,
+    takenBy: [],
   }
 }
 

@@ -57,7 +57,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.pending.type).toBe('confirmNextPlayer')
     expect(resp.state.players[0]!.workersAvailable).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(4)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy).toBe(resp.state.players[1]!.id)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
   it('does not trigger the extra placement when no worker remains after taking the action', () => {

@@ -1,6 +1,7 @@
 import type { ActionDefinition } from '../../game/types'
 import { setCardFlag } from '../../cards/helpers/card-state'
 import { getRoundPlacementOrder } from '../../cards/helpers/round-placement'
+import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 
 const MEETING_PLACE_IDS = new Set(['meeting-place'])
 
@@ -22,7 +23,7 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
         : { type: 'ok' }
     }
     const firstSpace = state.actionSpaces.find((space) => space.id === firstSpaceId)
-    if (!firstSpace || firstSpace.takenBy !== player.id) {
+    if (!firstSpace || !spaceHasPlayer(firstSpace, player.id)) {
       if (sourceCard && params?.flagSourceCard) {
         setCardFlag(player, sourceCard, true)
       }
@@ -30,7 +31,7 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
         ? { type: 'ok', logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
         : { type: 'ok' }
     }
-    firstSpace.takenBy = null
+    removeWorkerRef(firstSpace, player.id)
     player.workersAvailable += 1
     if (sourceCard && params?.flagSourceCard) {
       setCardFlag(player, sourceCard, true)

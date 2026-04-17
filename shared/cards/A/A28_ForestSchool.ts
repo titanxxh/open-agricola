@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, TradeModifier } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A28_ForestSchool'
 const FOREST_SCHOOL_MAX_TRADES = 8
@@ -19,7 +20,7 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
       .filter((space) =>
         LESSONS_SPACE_IDS.includes(space.id) &&
-        !!space.takenBy &&
+        isSpaceOccupied(space) &&
         space.canBeExecutedByPlayer(context.state, context.player),
       )
       .map((space) => ({
@@ -37,7 +38,7 @@ const lessonsCanUseOccupiedListener: CardListenerRegistration = {
   phases: ['canUseOccupied' as ActionHookPhase],
   actions: LESSONS_SPACE_IDS,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space.takenBy) return
+    if (!isSpaceOccupied(context.space)) return
     return { canUseOccupied: true }
   },
 }

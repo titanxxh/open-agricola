@@ -75,7 +75,7 @@ const createSpace = (id: string, overrides: Partial<ActionSpace> = {}): ActionSp
       cattle: 0,
       begging: 0,
     },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }
 }

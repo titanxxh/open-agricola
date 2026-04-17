@@ -11,7 +11,7 @@ type TestSocket = WebSocket & {
 }
 
 const countTakenSpaces = (event: StateUpdateEnvelope) =>
-  event.payload.state.actionSpaces.filter((space) => space.takenBy).length
+  event.payload.state.actionSpaces.filter((space) => space.takenBy.length > 0).length
 
 const findTakenBy = (event: StateUpdateEnvelope, spaceId: string) =>
   event.payload.state.actionSpaces.find((space) => space.id === spaceId)?.takenBy ?? null
@@ -125,7 +125,7 @@ describe('room-manager ws sync', () => {
     const initialTaken = countTakenSpaces(initialP1)
     expect(countTakenSpaces(initialP2)).toBe(initialTaken)
 
-    const spaceId = initialP1.payload.state.actionSpaces.find((space) => !space.takenBy)?.id
+    const spaceId = initialP1.payload.state.actionSpaces.find((space) => space.takenBy.length === 0)?.id
     expect(spaceId).toBeTruthy()
 
     p1.send(JSON.stringify({ type: 'action', spaceId, requestId: 'action-1' }))
@@ -142,8 +142,8 @@ describe('room-manager ws sync', () => {
     const takenAfterAction = countTakenSpaces(actionP1)
     expect(takenAfterAction).toBeGreaterThan(initialTaken)
     expect(countTakenSpaces(actionP2)).toBe(takenAfterAction)
-    expect(findTakenBy(actionP1, spaceId!)).toBe(actionP1.payload.state.players[0]?.id)
-    expect(findTakenBy(actionP2, spaceId!)).toBe(actionP2.payload.state.players[0]?.id)
+    expect(findTakenBy(actionP1, spaceId!)?.[0]?.playerId).toBe(actionP1.payload.state.players[0]?.id)
+    expect(findTakenBy(actionP2, spaceId!)?.[0]?.playerId).toBe(actionP2.payload.state.players[0]?.id)
 
     p1.send(JSON.stringify({ type: 'undoStep', requestId: 'undo-1' }))
     const undoP1 = await waitForEvent(
@@ -160,8 +160,8 @@ describe('room-manager ws sync', () => {
     expect(undoP1.version).toBe(undoP2.version)
     expect(countTakenSpaces(undoP1)).toBe(initialTaken)
     expect(countTakenSpaces(undoP2)).toBe(initialTaken)
-    expect(findTakenBy(undoP1, spaceId!)).toBeNull()
-    expect(findTakenBy(undoP2, spaceId!)).toBeNull()
+    expect(findTakenBy(undoP1, spaceId!)).toEqual([])
+    expect(findTakenBy(undoP2, spaceId!)).toEqual([])
 
     p2.send(JSON.stringify({ type: 'getState', requestId: 'state-1' }))
     const resync = await waitForEvent(
@@ -172,6 +172,6 @@ describe('room-manager ws sync', () => {
 
     expect(resync.version).toBe(undoP1.version)
     expect(countTakenSpaces(resync)).toBe(initialTaken)
-    expect(findTakenBy(resync, spaceId!)).toBeNull()
+    expect(findTakenBy(resync, spaceId!)).toEqual([])
   })
 })

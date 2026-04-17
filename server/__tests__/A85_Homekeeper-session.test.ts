@@ -25,7 +25,7 @@ describe('A85_Homekeeper session', () => {
 
     const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
     if (!wishChildren) throw new Error('wish-children space missing')
-    wishChildren.takenBy = null
+    wishChildren.takenBy = []
   }
 
   it('grants +1 capacity in a clay house when one room is adjacent to both a field and a pasture', () => {

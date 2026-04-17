@@ -37,7 +37,7 @@ const createSpace = (id: string): ActionSpace => ({
   roundAvailable: 1,
   gainPerRound: {},
   resources: emptyResources(),
-  takenBy: null,
+  takenBy: [],
   canBeExecutedByPlayer: () => true,
   execute: () => ({ type: 'ok' }),
   resolveChoice: () => ({ type: 'ok' }),

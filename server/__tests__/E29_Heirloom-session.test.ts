@@ -20,7 +20,7 @@ describe('E29_Heirloom session', () => {
     const player = state.players[0]!
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')
     expect(dl).toBeTruthy()
-    dl!.takenBy = null
+    dl!.takenBy = []
     expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(false)
   })
 
@@ -29,7 +29,7 @@ describe('E29_Heirloom session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')!
-    dl.takenBy = player.id
+    dl.takenBy = [{ playerId: player.id, workerId: '1' }]
     expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(true)
   })
 
@@ -39,7 +39,7 @@ describe('E29_Heirloom session', () => {
     const player = state.players[0]!
     const opponent = state.players[1]!
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')!
-    dl.takenBy = opponent.id
+    dl.takenBy = [{ playerId: opponent.id, workerId: '1' }]
     expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(false)
   })
 })

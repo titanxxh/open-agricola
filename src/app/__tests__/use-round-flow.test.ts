@@ -65,7 +65,7 @@ const state = (): GameState => ({
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: resources(),
-      takenBy: 'p1',
+      takenBy: [{ playerId: 'p1', workerId: '1' }],
     },
   ],
   log: [],
@@ -83,7 +83,7 @@ describe('use-round-flow helpers', () => {
     const next = state()
     applyReturnHomePhase(next)
     expect(next.players[0].workersAvailable).toBe(next.players[0].familySize)
-    expect(next.actionSpaces[0].takenBy).toBeNull()
+    expect(next.actionSpaces[0].takenBy).toEqual([])
   })
 
   it('finalizes to next round and sets current player by startPlayer', () => {

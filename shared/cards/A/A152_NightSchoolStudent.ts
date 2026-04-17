@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A152_NightSchoolStudent'
 
@@ -12,9 +13,10 @@ registerCardEffect({
   onStartReturnHome: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     // Check if any lessons space is occupied
-    const lessonsOccupied = LESSONS_SPACES.some(
-      (id) => state.actionSpaces.find((s) => s.id === id)?.takenBy,
-    )
+    const lessonsOccupied = LESSONS_SPACES.some((id) => {
+      const s = state.actionSpaces.find((space) => space.id === id)
+      return !!s && isSpaceOccupied(s)
+    })
     if (lessonsOccupied) return
     if (player.occupationHand.length === 0) return
     return {

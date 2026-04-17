@@ -1,6 +1,7 @@
 import { PlayerActionCard } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A162_ForestTallyman'
 
@@ -15,7 +16,7 @@ registerPlayerActionSpace({
       if (player.id !== ownerId) return false
       const forest = state.actionSpaces.find((s) => s.id === 'forest')
       const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
-      return !!(forest?.takenBy && clayPit?.takenBy)
+      return !!(forest && clayPit && isSpaceOccupied(forest) && isSpaceOccupied(clayPit))
     },
     execute: ({ player }) => {
       player.resources.clay += 2

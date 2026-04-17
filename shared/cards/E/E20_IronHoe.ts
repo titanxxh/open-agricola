@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'E20_IronHoe'
 
@@ -12,7 +13,8 @@ registerCardEffect({
     if (!player.minorPlayed.includes(CARD_ID)) return
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     const vegSeeds = state.actionSpaces.find((s) => s.id === 'vegetable-seeds')
-    if (grainSeeds?.takenBy !== player.id || vegSeeds?.takenBy !== player.id) return
+    if (!grainSeeds || !vegSeeds) return
+    if (!spaceHasPlayer(grainSeeds, player.id) || !spaceHasPlayer(vegSeeds, player.id)) return
     return {
       type: 'seq',
       optional: true,

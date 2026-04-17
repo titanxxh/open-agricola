@@ -1,13 +1,13 @@
 import type { GameState, PlayerState, Worker } from './types'
 
 export const familySize = (p: PlayerState): number =>
-  p.workers.filter(w => w.isActive).length
+  (p.workers ?? []).filter(w => w.isActive).length
 
 export const newbornCount = (p: PlayerState): number =>
-  p.workers.filter(w => w.isActive && w.isNewborn).length
+  (p.workers ?? []).filter(w => w.isActive && w.isNewborn).length
 
 export const activeWorkers = (p: PlayerState): Worker[] =>
-  p.workers.filter(w => w.isActive)
+  (p.workers ?? []).filter(w => w.isActive)
 
 export const isWorkerOnAnySpace = (
   state: GameState,
@@ -15,9 +15,7 @@ export const isWorkerOnAnySpace = (
   workerId: string,
 ): boolean =>
   state.actionSpaces.some(s =>
-    Array.isArray(s.takenBy)
-      ? s.takenBy.some((t: { playerId: string; workerId: string }) => t.playerId === playerId && t.workerId === workerId)
-      : false,
+    s.takenBy.some(t => t.playerId === playerId && t.workerId === workerId),
   )
 
 export const workersAtHome = (state: GameState, p: PlayerState): Worker[] =>
@@ -39,7 +37,7 @@ export const findFirstNewborn = (p: PlayerState): Worker | null =>
   p.workers.find(w => w.isActive && w.isNewborn) ?? null
 
 export const activateSmallestInactive = (p: PlayerState): Worker | null => {
-  const next = p.workers.find(w => !w.isActive)
+  const next = (p.workers ?? []).find(w => !w.isActive)
   if (!next) return null
   next.isActive = true
   next.isNewborn = true

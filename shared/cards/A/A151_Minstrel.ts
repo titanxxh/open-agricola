@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A151_Minstrel'
 
@@ -66,7 +67,7 @@ registerCardEffect({
       const roundOrder = state.roundActionOrder
       const posIndex = roundOrder.indexOf(actionId)
       if (posIndex < 0 || posIndex + 1 > state.round) continue
-      if (!space.takenBy) {
+      if (!isSpaceOccupied(space)) {
         unoccupied.push(actionId)
       }
     }

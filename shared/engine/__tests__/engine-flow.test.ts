@@ -95,7 +95,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
     cattle: 0,
     begging: 0,
   },
-  takenBy: null,
+  takenBy: [],
 })
 
 describe('Engine flow nodes', () => {

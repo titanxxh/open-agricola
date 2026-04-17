@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'C131_PrivateTeacher'
 
@@ -15,9 +16,10 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-seeds') return
-    const lessonsOccupied = LESSONS_SPACES.some(
-      (id) => !!context.state.actionSpaces.find((s) => s.id === id)?.takenBy,
-    )
+    const lessonsOccupied = LESSONS_SPACES.some((id) => {
+      const s = context.state.actionSpaces.find((space) => space.id === id)
+      return !!s && isSpaceOccupied(s)
+    })
     if (!lessonsOccupied) return
     return {
       flow: {

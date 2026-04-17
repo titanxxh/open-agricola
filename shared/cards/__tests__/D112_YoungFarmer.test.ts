@@ -31,7 +31,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
     roundAvailable: 1, gainPerRound: {},
     canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
     resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: null,
+    takenBy: [],
     ...overrides,
   }) as ActionSpace
 
@@ -39,7 +39,7 @@ const createState = (...players: PlayerState[]): GameState =>
   ({
     round: 3, currentPlayerIndex: 0, players,
     actionSpaces: [
-      createSpace('major-improvement', { takenBy: 'p2' }),
+      createSpace('major-improvement', { takenBy: [{ playerId: 'p2', workerId: '1' }] }),
     ],
     log: [], roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
@@ -110,7 +110,7 @@ describe('D112_YoungFarmer', () => {
     const player = createPlayer()
     const state = createState(player)
     const majorSpace = state.actionSpaces.find(s => s.id === 'major-improvement')!
-    majorSpace.takenBy = null
+    majorSpace.takenBy = []
 
     const result = executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),

@@ -35,7 +35,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   player.workersAvailable = 1
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
   if (!majorImprovement) throw new Error('major-improvement missing')
-  majorImprovement.takenBy = null
+  majorImprovement.takenBy = []
   if (!player.minorHand.includes(minorId)) {
     player.minorHand.push(minorId)
   }

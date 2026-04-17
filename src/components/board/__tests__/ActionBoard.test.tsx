@@ -56,7 +56,7 @@ const createAction = (id: string, nameKey: string): ActionSpace => ({
   canBeExecutedByPlayer: () => true,
   execute: () => ({ type: 'ok' }),
   resources: resources(),
-  takenBy: null,
+  takenBy: [],
 })
 
 describe('ActionBoard', () => {

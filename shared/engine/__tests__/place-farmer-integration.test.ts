@@ -80,7 +80,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
     cattle: 0,
     begging: 0,
   },
-  takenBy: null,
+  takenBy: [],
 })
 
 const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']

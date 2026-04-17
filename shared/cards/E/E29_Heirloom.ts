@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'E29_Heirloom'
 
@@ -9,7 +10,7 @@ registerPrerequisite('Your Person on Day Laborer', (player, state) => {
   if (!state) return true
   const dayLaborerSpace = (state.actionSpaces ?? []).find((space) => space.id === 'day-laborer')
   if (!dayLaborerSpace) return false
-  return dayLaborerSpace.takenBy === player.id
+  return spaceHasPlayer(dayLaborerSpace, player.id)
 })
 
 export const E29_Heirloom = new MinorImprovement({

@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'B129_Seatmate'
 
@@ -31,7 +32,7 @@ const computeArgsListener: CardListenerRegistration = {
       (s) => s.roundAvailable === 13 || s.id === context.state.roundActionOrder[12],
     )
     if (!round13Space) return
-    if (!round13Space.takenBy || round13Space.takenBy === context.player.id) return
+    if (!isSpaceOccupied(round13Space) || spaceHasPlayer(round13Space, context.player.id)) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${round13Space.id}`,

@@ -3,6 +3,8 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import { addWorkerRef, isSpaceOccupied } from '../../game/space'
+import { smallestAvailableWorker } from '../../game/player'
 
 const CARD_ID = 'C23_JobContract'
 const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
@@ -34,9 +36,9 @@ const getLessonsSpace = (state: GameState, player: PlayerState) => {
   // Prefer 'lessons' for <=3 players, 'lessons-4' for 4 players.
   const preferred = playerCount >= 4 ? 'lessons-4' : 'lessons'
   const chosen =
-    state.actionSpaces.find((s) => s.id === preferred && !s.takenBy) ??
+    state.actionSpaces.find((s) => s.id === preferred && !isSpaceOccupied(s)) ??
     state.actionSpaces.find(
-      (s) => LESSONS_SPACE_IDS.includes(s.id as typeof LESSONS_SPACE_IDS[number]) && !s.takenBy,
+      (s) => LESSONS_SPACE_IDS.includes(s.id as typeof LESSONS_SPACE_IDS[number]) && !isSpaceOccupied(s),
     )
   if (!chosen) return null
   void player
@@ -60,7 +62,8 @@ const listener: CardListenerRegistration = {
     if (context.player.occupationHand.length === 0) return
 
     // Mark the lessons space as occupied by this player (fake-farmer).
-    lessonsSpace.takenBy = context.player.id
+    const worker = smallestAvailableWorker(context.state, context.player)
+    addWorkerRef(lessonsSpace, context.player.id, worker?.id ?? '1')
 
     const lessonsCost =
       lessonsSpace.id === 'lessons-4'

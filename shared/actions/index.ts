@@ -99,5 +99,5 @@ export const createActionSpaces = (): ActionSpace[] =>
   actionDefinitions.map((action) => ({
     ...action,
     resources: { ...emptyResources },
-    takenBy: null,
+    takenBy: [],
   }))

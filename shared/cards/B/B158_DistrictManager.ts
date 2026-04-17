@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'B158_DistrictManager'
 
@@ -13,7 +14,8 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const grove = state.actionSpaces.find((s) => s.id === 'grove')
-    if (forest?.takenBy !== player.id || grove?.takenBy !== player.id) return
+    if (!forest || !grove) return
+    if (!spaceHasPlayer(forest, player.id) || !spaceHasPlayer(grove, player.id)) return
     return gainLeaf(CARD_ID, { food: 5 })
   },
 })

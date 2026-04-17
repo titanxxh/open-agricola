@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D165_PigStalker'
 
@@ -49,7 +50,7 @@ const listener: CardListenerRegistration = {
 
     const playerOccupiesAdjacent = adjacentSpaceIds.some((adjSpaceId) => {
       const space = context.state.actionSpaces.find((s) => s.id === adjSpaceId)
-      return space?.takenBy === context.player.id
+      return !!space && spaceHasPlayer(space, context.player.id)
     })
 
     if (!playerOccupiesAdjacent) return

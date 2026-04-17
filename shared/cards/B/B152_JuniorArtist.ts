@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState, Resource } from '../../game/types'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B152_JuniorArtist'
 
@@ -42,7 +43,7 @@ const buildChainedOption = (
 ): ActionFlow | null => {
   const space = context.state.actionSpaces.find((s) => s.id === spaceId)
   if (!space) return null
-  if (space.takenBy) return null
+  if (isSpaceOccupied(space)) return null
   if (!space.canBeExecutedByPlayer(context.state, context.player)) return null
 
   if (spaceId === 'lessons' || spaceId === 'lessons-4') {

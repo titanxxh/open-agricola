@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'B130_FullPeasant'
 
@@ -59,7 +60,7 @@ const listener: CardListenerRegistration = {
 
     const otherSpace = context.state.actionSpaces.find((s) => s.id === otherSpaceId)
     if (!otherSpace) return
-    if (otherSpace.takenBy) return
+    if (isSpaceOccupied(otherSpace)) return
     if (!otherSpace.canBeExecutedByPlayer(context.state, context.player)) return
 
     // Must be able to pay food

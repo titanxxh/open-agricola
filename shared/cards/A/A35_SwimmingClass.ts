@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'A35_SwimmingClass'
 
@@ -11,7 +12,7 @@ registerCardEffect({
     if (!player.minorPlayed.includes(CARD_ID)) return
     // Check if this player has a farmer on the Fishing space
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
-    if (!fishingSpace || fishingSpace.takenBy !== player.id) return
+    if (!fishingSpace || !spaceHasPlayer(fishingSpace, player.id)) return
     const newborns = player.newbornCount ?? 0
     if (newborns <= 0) return
     // 2 bonus VP per newborn

@@ -108,6 +108,8 @@ import {
 } from './farm-interaction.ts'
 import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
+import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
+import { smallestAvailableWorker } from '../shared/game/player.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validateFenceSelection } from './fence-validation.ts'
@@ -526,7 +528,7 @@ export class GameSession {
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
       resources: { ...emptyResources },
-      takenBy: null,
+      takenBy: [],
     }
   }
 
@@ -870,7 +872,7 @@ export class GameSession {
   private buildRoundSnapshot(state: GameState): GameState {
     const snapshot = cloneState(state)
     snapshot.players.forEach((p) => { p.workersAvailable = p.familySize })
-    snapshot.actionSpaces.forEach((space) => { space.takenBy = null })
+    snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
     snapshot.roundStartSnapshot = null
     return snapshot
   }
@@ -1509,7 +1511,7 @@ export class GameSession {
 
       if (step.type === 'ok' && step.result.type === 'fail') {
         if (!this.stageResume) {
-          space.takenBy = null
+          removeWorkerRef(space, player.id)
           player.workersAvailable += 1
         }
         this.engine = null
@@ -1534,7 +1536,7 @@ export class GameSession {
   }
 
   private canUseOccupiedActionSpace(player: PlayerState, space: ActionSpace): boolean {
-    if (!space.takenBy) return false
+    if (!isSpaceOccupied(space)) return false
     return this.hookDispatcher.applyCanUseOccupied(
       { state: this.state, player, space, actionId: space.id },
       false,
@@ -1546,7 +1548,7 @@ export class GameSession {
     if (this.state.round < openRound) return false
     if (player.workersAvailable <= 0) return false
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (space.takenBy && !canUseOccupied) return false
+    if (isSpaceOccupied(space) && !canUseOccupied) return false
     return this.hookDispatcher.applyIsDoable(
       { state: this.state, player, space, actionId: space.id },
       space,
@@ -1669,15 +1671,16 @@ export class GameSession {
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space unavailable')
     const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (space.takenBy && !canUseOccupied) return this.respond(false, 'space unavailable')
+    if (isSpaceOccupied(space) && !canUseOccupied) return this.respond(false, 'space unavailable')
 
     this.pushHistory(true)
     this.turnOwnerPlayerIndex = playerIndex
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
-    if (!space.takenBy) {
-      space.takenBy = player.id
+    const worker = smallestAvailableWorker(this.state, player)
+    if (worker) {
+      addWorkerRef(space, player.id, worker.id)
     }
     player.workersAvailable -= 1
     recordRoundPlacement(player, spaceId)
@@ -2073,7 +2076,7 @@ export class GameSession {
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     this.state.players.forEach((p) => { p.workersAvailable = p.familySize })
-    this.state.actionSpaces.forEach((s) => { s.takenBy = null })
+    this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
@@ -2664,7 +2667,13 @@ export class GameSession {
   devSetSpaceTaken(spaceId: string, playerId: string | null): SessionResponse {
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space not found')
-    space.takenBy = playerId
+    if (!playerId) {
+      space.takenBy = []
+    } else {
+      const player = this.state.players.find((p) => p.id === playerId)
+      const worker = player ? smallestAvailableWorker(this.state, player) : null
+      space.takenBy = [{ playerId, workerId: worker?.id ?? '1' }]
+    }
     return this.respond()
   }
 

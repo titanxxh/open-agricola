@@ -5,6 +5,7 @@ import { registerCardEffect } from '../card-effects'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D93_SheepInspector'
 const MEETING_PLACE_PREFIX = 'meeting-place'
@@ -45,7 +46,7 @@ const countCandidateSpaces = (
   excludeSpaceId: string | undefined,
 ): number => {
   return context.state.actionSpaces.filter((space) => {
-    if (space.takenBy !== context.player.id) return false
+    if (!spaceHasPlayer(space, context.player.id)) return false
     if (excludeSpaceId && space.id === excludeSpaceId) return false
     if (isMeetingPlace(space.id)) return false
     return true

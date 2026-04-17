@@ -5,6 +5,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'D112_YoungFarmer'
 
@@ -57,7 +58,7 @@ const computeArgsListener: CardListenerRegistration = {
     const majorSpace = context.state.actionSpaces.find((s) => s.id === 'major-improvement')
     if (!majorSpace) return
     // Only add if the space is occupied (if empty, it's already available normally)
-    if (!majorSpace.takenBy) return
+    if (!isSpaceOccupied(majorSpace)) return
     if (!majorSpace.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
       {

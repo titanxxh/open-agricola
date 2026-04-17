@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'D130_RecreationalCarpenter'
 
@@ -11,7 +12,7 @@ registerCardEffect({
   onBeforeReturnHome: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const meetingPlace = state.actionSpaces.find((s) => s.id === 'meeting-place')
-    if (meetingPlace?.takenBy === player.id) return
+    if (meetingPlace && spaceHasPlayer(meetingPlace, player.id)) return
     return {
       type: 'seq',
       optional: true,
