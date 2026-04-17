@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A121_ClayPuncher'
 
 describe('A121_ClayPuncher session', () => {
@@ -14,7 +15,7 @@ describe('A121_ClayPuncher session', () => {
 
     const player = state.players[0]!
     player.occupationHand.push('A121_ClayPuncher')
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.clay = 0
     player.resources.food = 5
 

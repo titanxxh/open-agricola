@@ -6,6 +6,7 @@ import type { ActionChoiceOption, ActionSpace, GameState } from '../../game/type
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { canSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../game/space'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'A94_LazySowman'
 
@@ -35,7 +36,7 @@ const computeReplaceListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.phase !== 'work') return
     if (!isUnconditionalSow(context)) return
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     return {
       decline: true,
       alternativeFlow: {
@@ -65,7 +66,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.state.phase !== 'work') return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     return { doable: true }
   },
 }

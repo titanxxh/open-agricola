@@ -4,6 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/logic/scoring'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
 import '../../shared/cards/E/E159_OldMiser'
 
 const CARD_ID = 'E159_OldMiser'
@@ -16,14 +17,21 @@ const emptyResources = (): Resource => ({
 const createPlayer = (id = 'p1'): PlayerState => ({
   id, name: id, color: 'red',
   resources: emptyResources(),
-  familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
+  workers: [
+    { id: '1', isActive: true, isNewborn: false },
+    { id: '2', isActive: true, isNewborn: false },
+    { id: '3', isActive: false, isNewborn: false },
+    { id: '4', isActive: false, isNewborn: false },
+    { id: '5', isActive: false, isNewborn: false },
+  ],
+  rooms: 2, houseType: 'wood',
   fields: [], fences: 0,
   roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
   stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [],
   occupationHand: [], occupationPlayed: [], playedCards: [],
   houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-  newbornCount: 0, pastures: [], fenceSegments: [],
+  pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false,
   activeModifiers: [], cardStates: {},
 } as PlayerState)
@@ -46,21 +54,21 @@ describe('E159_OldMiser session', () => {
       state.round = 4 // harvest round
 
       state.players.forEach((p) => {
-        p.workersAvailable = 0
+        markAllWorkersUsed(state, p)
         p.resources.food = 10
       })
 
       const player = state.players[0]!
-      player.familySize = 2
-      player.newbornCount = 0
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
       player.resources.food = 2
       player.occupationPlayed.push(CARD_ID)
       player.playedCards = player.playedCards ?? []
       player.playedCards.push(`occupation:${CARD_ID}`)
 
       const player2 = state.players[1]!
-      player2.familySize = 2
-      player2.newbornCount = 0
+      setActiveWorkerCount(player2, 2)
+      setNewbornCount(player2, 0)
       player2.resources.food = 10
 
       session.loadState(state)
@@ -100,19 +108,19 @@ describe('E159_OldMiser session', () => {
       state.round = 4
 
       state.players.forEach((p) => {
-        p.workersAvailable = 0
+        markAllWorkersUsed(state, p)
         p.resources.food = 10
       })
 
       const player = state.players[0]!
-      player.familySize = 2
-      player.newbornCount = 0
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
       player.resources.food = 2
       // Card NOT played
 
       const player2 = state.players[1]!
-      player2.familySize = 2
-      player2.newbornCount = 0
+      setActiveWorkerCount(player2, 2)
+      setNewbornCount(player2, 0)
       player2.resources.food = 10
 
       session.loadState(state)
@@ -149,21 +157,21 @@ describe('E159_OldMiser session', () => {
       state.round = 4
 
       state.players.forEach((p) => {
-        p.workersAvailable = 0
+        markAllWorkersUsed(state, p)
         p.resources.food = 10
       })
 
       const player = state.players[0]!
-      player.familySize = 3
-      player.newbornCount = 1
+      setActiveWorkerCount(player, 3)
+      setNewbornCount(player, 1)
       player.resources.food = 2
       player.occupationPlayed.push(CARD_ID)
       player.playedCards = player.playedCards ?? []
       player.playedCards.push(`occupation:${CARD_ID}`)
 
       const player2 = state.players[1]!
-      player2.familySize = 2
-      player2.newbornCount = 0
+      setActiveWorkerCount(player2, 2)
+      setNewbornCount(player2, 0)
       player2.resources.food = 10
 
       session.loadState(state)
@@ -199,8 +207,7 @@ describe('E159_OldMiser session', () => {
     it('reduces farmer score by 1 per person (2 people = -2 VP)', () => {
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
-      player.familySize = 2
-
+      setActiveWorkerCount(player, 2)
       const state = createState(player)
       const [result] = computeScores(state)
 
@@ -219,8 +226,7 @@ describe('E159_OldMiser session', () => {
     it('with 5 people, reduces by 5 VP', () => {
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
-      player.familySize = 5
-
+      setActiveWorkerCount(player, 5)
       const state = createState(player)
       const [result] = computeScores(state)
 
@@ -231,8 +237,7 @@ describe('E159_OldMiser session', () => {
 
     it('no penalty when card not played', () => {
       const player = createPlayer()
-      player.familySize = 3
-
+      setActiveWorkerCount(player, 3)
       const state = createState(player)
       const [result] = computeScores(state)
 

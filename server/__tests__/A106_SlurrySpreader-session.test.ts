@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/A/A106_SlurrySpreader'
 
 const CARD_ID = 'A106_SlurrySpreader'
@@ -90,8 +91,8 @@ describe('A106_SlurrySpreader session', () => {
     state.round = 4
 
     state.players.forEach((p, index) => {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
       p.resources.food = index === 0 ? 0 : 10
     })
 

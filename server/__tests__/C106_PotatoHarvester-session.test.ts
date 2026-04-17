@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/C/C106_PotatoHarvester'
 
 const CARD_ID = 'C106_PotatoHarvester'
@@ -28,8 +29,8 @@ describe('C106_PotatoHarvester session', () => {
 
     // Set workers to 0 for round end
     state.players.forEach((p) => {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
       p.resources.food = 10 // enough to feed
     })
 

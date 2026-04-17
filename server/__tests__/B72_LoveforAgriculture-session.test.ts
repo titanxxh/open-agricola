@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
+import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B72_LoveforAgriculture'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -47,7 +48,7 @@ const setup = (options?: {
   // Set all players' workers to 0 for harvest/round-end tests
   if (options?.round && harvestRounds.includes(options.round)) {
     for (const p of state.players) {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
     }
   }
 

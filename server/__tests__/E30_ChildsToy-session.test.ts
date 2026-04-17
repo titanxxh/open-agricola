@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
 import '../../shared/cards/E/E30_ChildsToy'
 
 const CARD_ID = 'E30_ChildsToy'
@@ -13,13 +14,13 @@ describe('E30_ChildsToy session', () => {
     state.round = 4 // harvest round
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 
     const player = state.players[0]!
-    player.familySize = 2
-    player.newbornCount = 1
+    setActiveWorkerCount(player, 2)
+    setNewbornCount(player, 1)
     player.resources.food = 4
     player.minorPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
@@ -27,8 +28,8 @@ describe('E30_ChildsToy session', () => {
 
     // Player 2 has enough food - no complication
     const player2 = state.players[1]!
-    player2.familySize = 2
-    player2.newbornCount = 0
+    setActiveWorkerCount(player2, 2)
+    setNewbornCount(player2, 0)
     player2.resources.food = 10
 
     session.loadState(state)
@@ -68,19 +69,19 @@ describe('E30_ChildsToy session', () => {
     state.round = 4 // harvest round
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 
     const player = state.players[0]!
-    player.familySize = 2
-    player.newbornCount = 1
+    setActiveWorkerCount(player, 2)
+    setNewbornCount(player, 1)
     player.resources.food = 3
     // Card NOT played
 
     const player2 = state.players[1]!
-    player2.familySize = 2
-    player2.newbornCount = 0
+    setActiveWorkerCount(player2, 2)
+    setNewbornCount(player2, 0)
     player2.resources.food = 10
 
     session.loadState(state)
@@ -120,21 +121,21 @@ describe('E30_ChildsToy session', () => {
     state.round = 4
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
+      markAllWorkersUsed(state, p)
       p.resources.food = 10
     })
 
     const player = state.players[0]!
-    player.familySize = 2
-    player.newbornCount = 1
+    setActiveWorkerCount(player, 2)
+    setNewbornCount(player, 1)
     player.resources.food = 3 // Need 4 with card, only have 3
     player.minorPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`minor:${CARD_ID}`)
 
     const player2 = state.players[1]!
-    player2.familySize = 2
-    player2.newbornCount = 0
+    setActiveWorkerCount(player2, 2)
+    setNewbornCount(player2, 0)
     player2.resources.food = 10
 
     session.loadState(state)

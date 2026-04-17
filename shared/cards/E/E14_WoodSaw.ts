@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E14_WoodSaw'
 
@@ -21,13 +22,13 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    const myFamilySize = context.player.familySize
+    const myFamilySize = familySize(context.player)
     // Check if ALL other players have more farmers than current player
     const otherPlayers = context.state.players.filter(
       (p) => p.id !== context.player.id,
     )
     if (otherPlayers.length === 0) return
-    const allOthersHaveMore = otherPlayers.every((p) => p.familySize > myFamilySize)
+    const allOthersHaveMore = otherPlayers.every((p) => familySize(p) > myFamilySize)
     if (!allOthersHaveMore) return
     return {
       flow: {

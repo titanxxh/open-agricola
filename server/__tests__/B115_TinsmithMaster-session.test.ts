@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B115_TinsmithMaster'
 
 const CARD_ID = 'B115_TinsmithMaster'
@@ -31,7 +32,7 @@ describe('B115_TinsmithMaster session', () => {
     state.roundActionOrder[0] = 'grain-utilization'
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.food = 10
     player.resources.grain = options?.grain ?? 0
     player.resources.vegetable = options?.vegetable ?? 0

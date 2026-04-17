@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B156_StorehouseKeeper'
 
 const CARD_ID = 'B156_StorehouseKeeper'
@@ -17,7 +18,7 @@ describe('B156_StorehouseKeeper session', () => {
     player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`occupation:${CARD_ID}`)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
 
     session.loadState(state)

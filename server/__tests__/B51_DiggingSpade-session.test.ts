@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B51_DiggingSpade'
 
 const CARD_ID = 'B51_DiggingSpade'
@@ -17,9 +18,7 @@ describe('B51_DiggingSpade session', () => {
     player.minorPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`minor:${CARD_ID}`)
-    player.workersAvailable = 2
-
-    // Add a pasture with `pigsInPasture` boar
+    setWorkersAtHome(state, player, 2) // Add a pasture with `pigsInPasture` boar
     if (pigsInPasture > 0) {
       player.pastures = [
         {

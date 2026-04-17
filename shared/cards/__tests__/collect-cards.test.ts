@@ -40,7 +40,6 @@ describe('Collect action card listeners', () => {
     const defaultPlayer: PlayerState = {
       id: 'player1',
       name: 'Player 1',
-      workersAvailable: 1,
       familySize: [],
       resources: {
         wood: 0,

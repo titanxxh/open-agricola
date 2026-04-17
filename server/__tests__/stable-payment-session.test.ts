@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import type { PlayerState } from '../../shared/game/types.ts'
 
+import { workersAvailable } from '../../shared/game/player'
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {
     type: 'trade',
@@ -135,7 +136,7 @@ describe('stable payment session', () => {
     if (undoStepResp.pending.type !== 'choice') return
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
-    expect(undoStepResp.state.players[0]!.workersAvailable).toBe(workersAfterTake)
+    expect(workersAvailable(undoStepResp.state, undoStepResp.state.players[0]!)).toBe(workersAfterTake)
     expect(
       undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy[0]?.playerId,
     ).toBe(undoStepResp.state.players[0]!.id)
@@ -143,7 +144,7 @@ describe('stable payment session', () => {
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
     expect(secondUndoStepResp.pending.type).toBe('none')
-    expect(secondUndoStepResp.state.players[0]!.workersAvailable).toBe(2)
+    expect(workersAvailable(secondUndoStepResp.state, secondUndoStepResp.state.players[0]!)).toBe(2)
     expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
 
@@ -171,7 +172,7 @@ describe('stable payment session', () => {
     expect(undoResp.ok).toBe(true)
     expect(undoResp.pending.type).toBe('none')
     expect(undoResp.interaction.stateId).toBe('idle')
-    expect(undoResp.state.players[0]!.workersAvailable).toBe(2)
+    expect(workersAvailable(undoResp.state, undoResp.state.players[0]!)).toBe(2)
     expect(undoResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
 })

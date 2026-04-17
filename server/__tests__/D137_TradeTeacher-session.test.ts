@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
 import {
   getRegisteredCardListeners,
   executeCardListener,
@@ -23,14 +24,21 @@ const createPlayer = (id = 'p1'): PlayerState =>
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
-    familySize: 2, workersAvailable: 0, rooms: 2, houseType: 'wood' as const,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
+    rooms: 2, houseType: 'wood' as const,
     fields: [], fences: 0,
     roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [], playedCards: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    newbornCount: 0, pastures: [], fenceSegments: [],
+    pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
     cardStates: {},
@@ -226,7 +234,7 @@ describe('D137_TradeTeacher end-to-end via GameSession', () => {
     player.playedCards.push(`occupation:${CARD_ID}`)
     // Plenty of food for any combo plus the Lessons cost itself.
     player.resources.food = 10
-    player.workersAvailable = 1
+    setWorkersAtHome(state, player, 1)
     state.players[1]!.workersAvailable = 1
     // Needs at least one occupation in hand to take Lessons (if Lessons requires it).
     player.occupationHand.push('A1_WoodCutter')

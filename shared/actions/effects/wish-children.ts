@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
-import { activateSmallestInactive } from '../../game/player'
+import { activateSmallestInactive, familySize } from '../../game/player'
 import { addWorkerRef } from '../../game/space'
 
 const effectiveRooms = (player: PlayerState) =>
@@ -11,13 +11,11 @@ export const growFamily = (
   player: PlayerState,
   fgSpaceId: string,
 ): ActionExecutionResult => {
-  if (effectiveRooms(player) <= player.familySize) {
+  if (effectiveRooms(player) <= familySize(player)) {
     return { type: 'fail', logKey: 'log.familyGrowthFail' }
   }
   const newborn = activateSmallestInactive(player)
   if (!newborn) return { type: 'fail', logKey: 'log.familyFull' }
-  player.familySize += 1   // legacy sync (Task 10 removes)
-  player.newbornCount += 1 // legacy sync (Task 10 removes)
 
   const fgSpace = state.actionSpaces.find(s => s.id === fgSpaceId)
   if (fgSpace) {
@@ -36,8 +34,6 @@ export const growFamilyWithoutRoom = (
 ): ActionExecutionResult => {
   const newborn = activateSmallestInactive(player)
   if (!newborn) return { type: 'fail', logKey: 'log.familyFull' }
-  player.familySize += 1   // legacy sync (Task 10 removes)
-  player.newbornCount += 1 // legacy sync (Task 10 removes)
 
   const fgSpace = state.actionSpaces.find(s => s.id === fgSpaceId)
   if (fgSpace) {
@@ -55,7 +51,7 @@ export const wishChildrenAction: ActionDefinition = {
   descriptionKey: 'actions.wish-children-growth.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => effectiveRooms(player) > player.familySize,
+  canBeExecutedByPlayer: (_, player) => effectiveRooms(player) > familySize(player),
   execute: ({ state, player, space }) => growFamily(state, player, space.id),
 }
 

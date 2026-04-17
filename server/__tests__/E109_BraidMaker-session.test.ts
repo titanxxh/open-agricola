@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 
 import { E109_BraidMaker } from '../../shared/cards/E/E109_BraidMaker'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 const CARD_ID = 'E109_BraidMaker'
 
 describe('E109_BraidMaker session', () => {
@@ -14,7 +15,7 @@ describe('E109_BraidMaker session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.occupationPlayed.push(CARD_ID)
     player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources = {
@@ -86,7 +87,7 @@ describe('E109_BraidMaker session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources = {
       ...player.resources,
       reed: 2,

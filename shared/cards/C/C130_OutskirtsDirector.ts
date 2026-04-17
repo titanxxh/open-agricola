@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'C130_OutskirtsDirector'
 
@@ -45,7 +46,7 @@ const listener: CardListenerRegistration = {
     otherSpace.resources.reed = (otherSpace.resources.reed ?? 0) + 2
 
     // Offer to place another farmer (requires available workers)
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
 
     return {
       flow: {

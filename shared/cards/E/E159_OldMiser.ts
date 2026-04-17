@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E159_OldMiser'
 
@@ -26,13 +27,13 @@ registerCardEffect({
     // The feeding formula is: required = max(0, familySize * 2 - newborn)
     // With familySize extra food: effective cost = familySize * 2 - newborn - familySize
     //   = familySize - newborn, which is adults * 1 + newborns * 0.
-    player.resources.food += player.familySize
+    player.resources.food += familySize(player)
   },
   computePostScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     // Normal scoring: familySize * 3. With Old Miser: familySize * 2.
     // Difference: -familySize (i.e., -1 per person).
-    return -player.familySize
+    return -familySize(player)
   },
 })
 

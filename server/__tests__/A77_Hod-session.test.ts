@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A77_Hod'
 
 describe('A77_Hod session', () => {
@@ -14,7 +15,7 @@ describe('A77_Hod session', () => {
 
     const owner = state.players[0]!
     owner.minorHand.push('A77_Hod')
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources.clay = 0
     // Give pasture for boar placement
     owner.pastures = [{
@@ -24,7 +25,7 @@ describe('A77_Hod session', () => {
     }]
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
+    setWorkersAtHome(state, opponent, 2)
     opponent.pastures = [{
       id: 'p2', size: 4,
       tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 3, col: 0 }, { row: 3, col: 1 }],

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B122_Mineralogist'
 
 const CARD_ID = 'B122_Mineralogist'
@@ -17,7 +18,7 @@ describe('B122_Mineralogist session', () => {
     player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`occupation:${CARD_ID}`)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
 
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')

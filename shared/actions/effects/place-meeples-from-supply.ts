@@ -1,4 +1,5 @@
 import type { ActionExecutionResult, PlayerState } from '../../game/types'
+import { activateSmallestInactive } from '../../game/player'
 
 export const placeMeeplesFromSupply = (
   player: PlayerState,
@@ -7,7 +8,8 @@ export const placeMeeplesFromSupply = (
   if (count <= 0) {
     return { type: 'ok' }
   }
-  player.familySize += count
-  player.workersAvailable += count
+  for (let i = 0; i < count; i += 1) {
+    if (!activateSmallestInactive(player)) break
+  }
   return { type: 'ok' }
 }

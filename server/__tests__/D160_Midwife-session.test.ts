@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D160_Midwife'
 
 describe('D160_Midwife session', () => {
@@ -28,14 +29,13 @@ describe('D160_Midwife session', () => {
     const owner = state.players[0]!
     owner.occupationPlayed.push('D160_Midwife')
     owner.playedCards.push('occupation:D160_Midwife')
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources.grain = 0
     // Owner needs room for family growth to not block
     owner.rooms = 3
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
-    // Opponent needs room for family growth
+    setWorkersAtHome(state, opponent, 2) // Opponent needs room for family growth
     opponent.rooms = 3
 
     session.loadState(state)

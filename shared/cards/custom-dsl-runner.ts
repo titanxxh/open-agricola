@@ -28,6 +28,7 @@
  */
 
 import type { ActionFlow, GameState, PlayerState } from '../game/types.ts'
+import { familySize } from '../game/player.ts'
 import type { CardEffect, CardEffectHook } from './card-effects.ts'
 
 // ── DSL Types ────────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ function evalCondition(condition: DslCondition, state: GameState, player: Player
     return state.round >= condition.round_gte
   }
   if ('family_size_gte' in condition) {
-    return player.familySize >= condition.family_size_gte
+    return familySize(player) >= condition.family_size_gte
   }
   if ('player_has_card' in condition) {
     const cardId = condition.player_has_card

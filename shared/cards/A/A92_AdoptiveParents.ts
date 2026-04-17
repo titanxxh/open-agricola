@@ -4,7 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { findFirstNewborn } from '../../game/player'
+import { findFirstNewborn, newbornCount } from '../../game/player'
 import { removeWorkerRef } from '../../game/space'
 
 const CARD_ID = 'A92_AdoptiveParents'
@@ -65,7 +65,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.newbornCount <= 0) return
+    if (newbornCount(context.player) <= 0) return
 
     // Flag the card and increment workersAvailable as part of accepting
     // The pay + flag happens in the flow; the before-place-farmer does conversion
@@ -117,9 +117,6 @@ const immediatelyAfterGainActivation: CardListenerRegistration = {
       const removed = removeWorkerRef(space, context.player.id, newborn.id)
       if (removed) break
     }
-    // Keep legacy field syncing (removed by Task 10)
-    context.player.newbornCount -= 1
-    context.player.workersAvailable += 1
     setCardFlag(context.player, CARD_ID, true)
   },
 }

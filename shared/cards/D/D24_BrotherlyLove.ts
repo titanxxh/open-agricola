@@ -6,6 +6,7 @@ import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { familySize, workersAvailable } from '../../game/player'
 
 const CARD_ID = 'D24_BrotherlyLove'
 
@@ -30,7 +31,7 @@ const CARD_ID = 'D24_BrotherlyLove'
 
 const isActive = (context: CardListenerContext): boolean => {
   if (!context.player.minorPlayed.includes(CARD_ID)) return false
-  return context.player.familySize === 4 && context.player.workersAvailable === 1
+  return familySize(context.player) === 4 && workersAvailable(context.state, context.player) === 1
 }
 
 const getOwnFarmerSpaceIds = (context: CardListenerContext): string[] => {

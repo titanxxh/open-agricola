@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A116_WoodCutter'
 
 describe('A116_WoodCutter session', () => {
@@ -13,7 +14,7 @@ describe('A116_WoodCutter session', () => {
 
     const player = state.players[0]!
     player.occupationHand.push('A116_WoodCutter')
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.wood = 0
 
     state.players[1]!.workersAvailable = 2

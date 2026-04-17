@@ -32,7 +32,6 @@ export const returnFirstWorkerHomeAction: ActionDefinition = {
         : { type: 'ok' }
     }
     removeWorkerRef(firstSpace, player.id, first.workerId)
-    player.workersAvailable += 1
     if (sourceCard && params?.flagSourceCard) {
       setCardFlag(player, sourceCard, true)
     }

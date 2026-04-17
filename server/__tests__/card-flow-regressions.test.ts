@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
+import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/game/player'
 import '../../shared/cards/A/A17_ReclamationPlow'
 import '../../shared/cards/D/D150_GodlySpouse'
 
@@ -109,8 +110,7 @@ describe('card flow regressions', () => {
     player.occupationPlayed.push('D150_GodlySpouse')
     player.playedCards.push(playedKey('D150_GodlySpouse', 'occupation'))
     player.rooms = 3
-    player.workersAvailable = 1
-
+    setWorkersAtHome(state, player, 1)
     const forest = state.actionSpaces.find((space) => space.id === 'forest')
     const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
     if (!forest || !wishChildren) {
@@ -133,8 +133,8 @@ describe('card flow regressions', () => {
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)
-    expect(resp.state.players[0]!.familySize).toBe(3)
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
+    expect(familySize(resp.state.players[0]!)).toBe(3)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toEqual([])
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === player.id)).toBe(true)
     expect(resp.state.players[0]!.cardStates?.D150_GodlySpouse?.flagged).toBe(true)

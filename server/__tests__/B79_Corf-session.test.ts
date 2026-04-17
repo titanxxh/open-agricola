@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B79_Corf'
 
 const CARD_ID = 'B79_Corf'
@@ -13,7 +14,7 @@ const setup = () => {
   state.round = 5 // ensure eastern-quarry is available (round 5+)
 
   const player = state.players[0]!
-  player.workersAvailable = 2
+  setWorkersAtHome(state, player, 2)
   player.resources.stone = 0
   player.minorHand.push(CARD_ID)
 

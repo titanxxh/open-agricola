@@ -8,6 +8,7 @@ import {
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/D/D103_CanalBoatman'
 import '../../shared/cards/D/D150_GodlySpouse'
 
@@ -32,8 +33,14 @@ const createPlayer = (workersAvailable = 1): PlayerState =>
       cattle: 0,
       begging: 0,
     },
-    familySize: 2,
     workersAvailable,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false },
+      { id: '4', isActive: false, isNewborn: false },
+      { id: '5', isActive: false, isNewborn: false },
+    ],
     rooms: 2,
     houseType: 'wood',
     fields: [],
@@ -49,7 +56,6 @@ const createPlayer = (workersAvailable = 1): PlayerState =>
     houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
-    newbornCount: 0,
     pastures: [],
     fenceSegments: [],
     majorEffects: { wellRounds: 0 },
@@ -153,8 +159,7 @@ describe('D103_CanalBoatman session', () => {
     player.occupationPlayed.push(CARD_ID)
     player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 1
-    player.workersAvailable = 2
-
+    setWorkersAtHome(state, player, 2)
     const fishing = state.actionSpaces.find((space) => space.id === 'fishing')
     if (!fishing) throw new Error('fishing space missing')
     fishing.resources.food = 2
@@ -168,7 +173,7 @@ describe('D103_CanalBoatman session', () => {
 
     let resp = session.takeAction(0, 'fishing')
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
@@ -183,7 +188,7 @@ describe('D103_CanalBoatman session', () => {
     resp = session.resolveChoice(0, resp.pending.options[0]!.value)
 
     const player = resp.state.players[0]!
-    expect(player.workersAvailable).toBe(0)
+    expect(workersAvailable(resp.state, player)).toBe(0)
     expect(player.resources.food).toBe(2)
     expect(player.resources.stone).toBe(3)
     expect(player.resources.grain).toBe(0)
@@ -221,8 +226,8 @@ describe('D103_CanalBoatman session', () => {
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID, 'D150_GodlySpouse')
     player.playedCards.push(`occupation:${CARD_ID}`, 'occupation:D150_GodlySpouse')
-    player.familySize = 3
-    player.workersAvailable = 3
+    setActiveWorkerCount(player, 3)
+    setWorkersAtHome(state, player, 3)
     player.rooms = 4
     player.resources.food = 1
 

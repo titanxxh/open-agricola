@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A50_MilkJug'
 
 describe('A50_MilkJug session', () => {
@@ -19,7 +20,7 @@ describe('A50_MilkJug session', () => {
     const owner = state.players[0]!
     owner.minorPlayed.push('A50_MilkJug')
     owner.playedCards.push('minor:A50_MilkJug')
-    owner.workersAvailable = 2
+    setWorkersAtHome(state, owner, 2)
     owner.resources.food = 0
     // Give pasture so cattle placement works
     owner.pastures = [{
@@ -29,7 +30,7 @@ describe('A50_MilkJug session', () => {
     }]
 
     const opponent = state.players[1]!
-    opponent.workersAvailable = 2
+    setWorkersAtHome(state, opponent, 2)
     opponent.resources.food = 0
     opponent.pastures = [{
       id: 'p2', size: 4,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
@@ -13,8 +14,8 @@ describe('A53_Claypipe session flow', () => {
     state.phase = 'work'
     state.currentPlayerIndex = 0
     state.players.forEach((player) => {
-      player.workersAvailable = 0
-      player.familySize = 2
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
       player.resources.food = 10
     })
 

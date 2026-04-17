@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E116_FirCutter'
 
 const CARD_ID = 'E116_FirCutter'
@@ -70,8 +71,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 2
-    player.workersAvailable = 1 // 1 farmer placed (familySize - workersAvailable = 1)
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 1) // 1 farmer placed (familySize - workersAvailable = 1)
 
     const result = executeCardListener(listener!, {
       state,
@@ -98,8 +99,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 3
-    player.workersAvailable = 1 // 2 farmers placed
+    setActiveWorkerCount(player, 3)
+    setWorkersAtHome(state, player, 1) // 2 farmers placed
 
     const result = executeCardListener(listener!, {
       state,
@@ -126,8 +127,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 4
-    player.workersAvailable = 1 // 3 farmers placed
+    setActiveWorkerCount(player, 4)
+    setWorkersAtHome(state, player, 1) // 3 farmers placed
 
     const result = executeCardListener(listener!, {
       state,
@@ -154,8 +155,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 5
-    player.workersAvailable = 1 // 4 farmers placed
+    setActiveWorkerCount(player, 5)
+    setWorkersAtHome(state, player, 1) // 4 farmers placed
 
     const result = executeCardListener(listener!, {
       state,
@@ -182,9 +183,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 5
-    player.workersAvailable = 0 // 5 farmers placed
-
+    setActiveWorkerCount(player, 5)
+    markAllWorkersUsed(state, player) // 5 farmers placed
     const result = executeCardListener(listener!, {
       state,
       player,
@@ -210,9 +210,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.familySize = 2
-    player.workersAvailable = 1
-
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 1)
     const result = executeCardListener(listener!, {
       state,
       player,
@@ -234,9 +233,8 @@ describe('E116_FirCutter session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [] // Card not played
-    player.familySize = 2
-    player.workersAvailable = 1
-
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 1)
     const result = executeCardListener(listener!, {
       state,
       player,

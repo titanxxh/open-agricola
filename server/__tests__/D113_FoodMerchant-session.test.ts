@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D113_FoodMerchant'
 
 const CARD_ID = 'D113_FoodMerchant'
@@ -135,8 +136,8 @@ describe('D113_FoodMerchant session', () => {
     ]
 
     state.players.forEach((p) => {
-      p.workersAvailable = 0
-      p.familySize = 1
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 1)
     })
 
     session.loadState(state)

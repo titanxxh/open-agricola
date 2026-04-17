@@ -9,6 +9,7 @@ import type {
 } from '../../../shared/game/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state'
+import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
@@ -547,7 +548,7 @@ export const FarmBoard = ({
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
-            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{displayPlayer.familySize}</span>
+            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{familySize(displayPlayer)}</span>
             <span className="res-compact-label">{locale === 'zh' ? '屋' : 'R'}</span><span className="res-compact-num">{displayPlayer.rooms}</span>
             <span className="res-icon res-icon-field" /><span className="res-compact-num">{displayPlayer.fields.length}</span>
             <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{displayPlayer.fences}</span>

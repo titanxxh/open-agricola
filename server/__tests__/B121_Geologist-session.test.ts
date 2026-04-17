@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B121_Geologist'
 
 const CARD_ID = 'B121_Geologist'
@@ -17,7 +18,7 @@ describe('B121_Geologist session', () => {
     player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`occupation:${CARD_ID}`)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     state.players.forEach((p) => (p.workersAvailable = 2))
 
     // Pre-seed accumulation on relevant spaces

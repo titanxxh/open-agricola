@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'C3_CarriageTrip'
 
@@ -7,8 +8,8 @@ const CARD_ID = 'C3_CarriageTrip'
 // immediately place another person. Simplified: grant an optional place-farmer action.
 registerCardEffect({
   id: CARD_ID,
-  onBuy: (_state, player) => {
-    if (player.workersAvailable <= 0) return
+  onBuy: (state, player) => {
+    if (workersAvailable(state, player) <= 0) return
     return {
       type: 'seq' as const,
       optional: true,

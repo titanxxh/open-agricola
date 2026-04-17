@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { familySize } from '../../game/player'
 
 const CARD_ID = 'E35_Misanthropy'
 
@@ -7,9 +8,10 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
-    if (player.familySize === 2) return 5
-    if (player.familySize === 3) return 3
-    if (player.familySize === 4) return 2
+    const size = familySize(player)
+    if (size === 2) return 5
+    if (size === 3) return 3
+    if (size === 4) return 2
     return 0
   },
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B63_Tasting'
 
 const CARD_ID = 'B63_Tasting'
@@ -17,7 +18,7 @@ describe('B63_Tasting session', () => {
     player.minorPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`minor:${CARD_ID}`)
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.resources.grain = grain
     // Need an occupation in hand to make lessons usable (free for first occupation)
     player.occupationHand.push('A93_BedMaker')

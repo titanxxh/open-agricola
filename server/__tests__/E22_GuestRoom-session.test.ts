@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
+import { familySize } from '../../shared/game/player'
 import '../../shared/cards/E/E22_GuestRoom'
 
 const CARD_ID = 'E22_GuestRoom'
@@ -64,7 +65,7 @@ describe('E22_GuestRoom session', () => {
 
     const player = anytimeResp.state.players[0]!
     // Family should grow
-    expect(player.familySize).toBe(3) // started with 2
+    expect(familySize(player)).toBe(3) // started with 2
     // Food on card should decrease (stack: 3 → 2)
     const stack = getCardStack(player, CARD_ID)
     expect(stack.length).toBe(2)

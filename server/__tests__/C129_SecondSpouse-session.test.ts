@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/game/player'
 import '../../shared/cards/C/C129_SecondSpouse'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -23,8 +24,8 @@ const setup = (options?: {
   state.roundActionOrder[0] = 'urgent-wish-children'
 
   const player = state.players[0]!
-  player.workersAvailable = 2
-  player.familySize = 2
+  setWorkersAtHome(state, player, 2)
+  setActiveWorkerCount(player, 2)
   player.rooms = 3
 
   if (options?.withCard ?? true) {
@@ -73,9 +74,9 @@ describe('C129_SecondSpouse session', () => {
 
     const resp = session.takeAction(0, 'urgent-wish-children')
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.familySize).toBe(3)
-    expect(resp.state.players[0]!.newbornCount).toBe(1)
-    expect(resp.state.players[0]!.workersAvailable).toBe(1)
+    expect(familySize(resp.state.players[0]!)).toBe(3)
+    expect(newbornCount(resp.state.players[0]!)).toBe(1)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     // Occupant should not change
     const urgentSpace = resp.state.actionSpaces.find(
       (space) => space.id === 'urgent-wish-children',

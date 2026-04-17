@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/C/C51_FishingNet'
 
 describe('C51_FishingNet session', () => {
@@ -78,8 +79,8 @@ describe('C51_FishingNet session', () => {
 
     // Each player has 1 worker
     state.players.forEach((p) => {
-      p.workersAvailable = 1
-      p.familySize = 1
+      setWorkersAtHome(state, p, 1)
+      setActiveWorkerCount(p, 1)
       p.resources.food = 10
     })
 
@@ -164,8 +165,8 @@ describe('C51_FishingNet session', () => {
 
     // All workers used, ready for round end
     state.players.forEach((p) => {
-      p.workersAvailable = 0
-      p.familySize = 2
+      markAllWorkersUsed(state, p)
+      setActiveWorkerCount(p, 2)
       p.resources.food = 10
     })
 

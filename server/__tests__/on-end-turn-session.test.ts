@@ -3,6 +3,7 @@ import { GameSession } from '../game-session'
 import { clearActionHooks } from '../../shared/actions/hooks'
 import { registerCardEffect } from '../../shared/cards/card-effects'
 import { incCounter } from '../../shared/cards/__stubs__/helpers'
+import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
@@ -30,7 +31,7 @@ describe('onEndTurn session', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.minorPlayed.push(TEST_END_TURN_CARD)
     player.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
@@ -58,7 +59,7 @@ describe('onEndTurn session', () => {
     owner.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
     const actor = state.players[1]!
-    actor.workersAvailable = 2
+    setWorkersAtHome(state, actor, 2)
     actor.minorPlayed.push(TEST_END_TURN_CARD)
     actor.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
@@ -89,7 +90,7 @@ describe('onEndTurn session', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.workersAvailable = 2
+    setWorkersAtHome(state, player, 2)
     player.minorPlayed.push(TEST_END_TURN_CARD)
     player.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 

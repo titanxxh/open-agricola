@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'D103_CanalBoatman'
 const TRIGGER_SPACE_IDS = new Set(['fishing', 'reed-bank'])
@@ -15,7 +16,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || !TRIGGER_SPACE_IDS.has(context.space.id)) return
-    if (context.player.workersAvailable <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     if (context.player.resources.food < 1) return
 
     return {
