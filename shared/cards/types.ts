@@ -1,5 +1,7 @@
 import type { Resource, CostModifier } from '../game/types'
 
+export type CardType = 'major' | 'minor' | 'occupation'
+
 export type CardExchange = {
   from: Partial<Resource>
   to: Partial<Resource>
@@ -38,6 +40,7 @@ export type CardDefinition = {
   implemented?: boolean
   evenMoreSet?: boolean
   extraVp?: boolean
+  alsoCountsAs?: CardType[]
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -70,6 +73,7 @@ export class CardBase {
   implemented?: boolean
   evenMoreSet?: boolean
   extraVp?: boolean
+  alsoCountsAs?: CardType[]
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {
@@ -111,6 +115,7 @@ export class CardBase {
     if (this.implemented !== undefined) def.implemented = this.implemented
     if (this.evenMoreSet) def.evenMoreSet = this.evenMoreSet
     if (this.extraVp) def.extraVp = this.extraVp
+    if (this.alsoCountsAs) def.alsoCountsAs = this.alsoCountsAs
     if (this.locales) def.locales = this.locales
     return def
   }
