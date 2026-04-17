@@ -52,7 +52,6 @@ const canUseOccupiedListener: CardListenerRegistration = {
   id: 'A25-bassinet-can-use-occupied',
   cardIds: [CARD_ID],
   phases: ['canUseOccupied' as ActionHookPhase],
-  actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.ownerPlayer) return
     if (!context.ownerPlayer.minorPlayed.includes(CARD_ID)) return
