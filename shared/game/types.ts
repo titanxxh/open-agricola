@@ -106,6 +106,7 @@ export type PlayerState = {
   minorPlayed: string[]
   occupationHand: string[]
   occupationPlayed: string[]
+  extraOccupationsFromCards: string[]
   playedCards: string[]
   houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
   houseAnimalCount: number
