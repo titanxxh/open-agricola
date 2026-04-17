@@ -1,5 +1,8 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'D154_ChimneySweep'
 
@@ -10,6 +13,20 @@ registerCardEffect({
     return state.players.filter((p) => p.id !== player.id && p.houseType === 'stone').length
   },
 })
+
+const renovateCostListener: CardListenerRegistration = {
+  id: 'D154-chimney-sweep-compute-costs-renovation',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (context.player.houseType !== 'clay') return
+    return { costs: { stone: -2 } }
+  },
+}
+
+registerCardListener(renovateCostListener)
 
 export const D154_ChimneySweep = new Occupation({
   id: CARD_ID,

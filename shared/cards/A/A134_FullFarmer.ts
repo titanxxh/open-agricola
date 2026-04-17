@@ -1,11 +1,13 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import { computeAnimalZones } from '../../actions/effects/animals'
 
 const CARD_ID = 'A134_FullFarmer'
 
 registerCardEffect({
   id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const zones = computeAnimalZones(player)
