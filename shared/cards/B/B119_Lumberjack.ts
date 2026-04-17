@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { getFenceCount } from '../../actions/effects/fencing'
 
 const CARD_ID = 'B119_Lumberjack'
 
@@ -9,7 +10,7 @@ const CARD_ID = 'B119_Lumberjack'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    const fencesBuilt = player.fences
+    const fencesBuilt = getFenceCount(player)
     const children = [gainLeaf(CARD_ID, { wood: 1 })]
     if (fencesBuilt > 0) {
       children.push(
