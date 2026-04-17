@@ -38,6 +38,10 @@ export type CardDefinition = {
   implemented?: boolean
   evenMoreSet?: boolean
   extraVp?: boolean
+  providesField?: boolean
+  providesOccupation?: boolean
+  fireplaceIdentity?: boolean
+  mustBePlayedViaMinorAction?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -70,6 +74,10 @@ export class CardBase {
   implemented?: boolean
   evenMoreSet?: boolean
   extraVp?: boolean
+  providesField?: boolean
+  providesOccupation?: boolean
+  fireplaceIdentity?: boolean
+  mustBePlayedViaMinorAction?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {
@@ -111,6 +119,10 @@ export class CardBase {
     if (this.implemented !== undefined) def.implemented = this.implemented
     if (this.evenMoreSet) def.evenMoreSet = this.evenMoreSet
     if (this.extraVp) def.extraVp = this.extraVp
+    if (this.providesField) def.providesField = this.providesField
+    if (this.providesOccupation) def.providesOccupation = this.providesOccupation
+    if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
+    if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
     if (this.locales) def.locales = this.locales
     return def
   }
