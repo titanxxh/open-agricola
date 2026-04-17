@@ -9,18 +9,14 @@ import type { PlayerState } from '../../game/types'
 const CARD_ID = 'C48_Farmstead'
 
 const countUsedTiles = (player: PlayerState): number => {
-  const tilesInPastures = new Set<string>()
+  const used = new Set<string>()
+  for (const tile of player.roomTiles) used.add(`${tile.row},${tile.col}`)
+  for (const field of player.fields) used.add(`${field.row},${field.col}`)
+  for (const tile of player.stableTiles) used.add(`${tile.row},${tile.col}`)
   for (const pasture of player.pastures) {
-    for (const tile of pasture.tiles ?? []) {
-      tilesInPastures.add(`${tile.row},${tile.col}`)
-    }
+    for (const tile of pasture.tiles ?? []) used.add(`${tile.row},${tile.col}`)
   }
-  return (
-    player.roomTiles.length +
-    player.fields.length +
-    player.stableTiles.length +
-    tilesInPastures.size
-  )
+  return used.size
 }
 
 const beforeListener: CardListenerRegistration = {

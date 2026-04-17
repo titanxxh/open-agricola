@@ -235,6 +235,29 @@ describe('C48_Farmstead per-turn used-space gain', () => {
     // Still only 1 food (per-turn not per-space)
     expect((result!.flow as any).params).toEqual({ food: 1 })
   })
+
+  it('does not double-count a stable inside a pasture (bug fix)', () => {
+    const afterListener = findListener('C48-farmstead-after-place-farmer')!
+    const beforeListener = findListener('C48-farmstead-before-place-farmer')!
+    const p = createPlayer()
+    p.minorPlayed = ['C48_Farmstead']
+    // Start: 1 pasture covering (2,0)
+    p.pastures = [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: null, animalCount: 0, stables: 0 }] as any
+    const state = createState(2, p)
+    beforeListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'before',
+    } as any)
+    // Now add a stable on the SAME tile (2,0). Pasture now has 1 stable inside.
+    p.stableTiles = [{ row: 2, col: 0 }] as any
+    p.pastures[0]!.stables = 1
+    const result = afterListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+    // Tile (2,0) was already used as a pasture tile. Adding a stable there shouldn't count as new.
+    expect(result).toBeUndefined()
+  })
 })
 
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
