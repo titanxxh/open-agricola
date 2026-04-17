@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
-import { canRenovate } from '../../actions/effects/renovation'
+import { canRenovate, getRenovation } from '../../actions/effects/renovation'
 
 const CARD_ID = 'A87_Conservator'
 
@@ -59,10 +59,8 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context) => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
-    const stonePlan = {
-      nextType: 'stone' as const,
-      cost: { stone: context.player.rooms, reed: 1 },
-    }
+    if (context.doable) return
+    const stonePlan = getRenovation(context.player, { skipClayTier: true })
     if (!canRenovate(context.player, undefined, stonePlan)) return
     return { doable: true }
   },
