@@ -38,7 +38,7 @@
 | ✅ 完全对齐 | ~803 + §2.1 列举 20 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 10 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 1 张（仅 D60） | cost / prereq / vp 与 BGA 不同 | 优先修，影响经济 |
+| ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
 | 🔀 刻意偏离 BGA（§2.5） | 4 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-17 (PR3) — D60 LargePottery 完整对齐 + dual-type 基础设施落地**：新增 `CardType = 'major' | 'minor' | 'occupation'` 与 `CardDefinition.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`），新增 helper `cardCountsAs(cardId, asType)` + `collectCardsAs(player, asType)` 替代直接读 `player.improvements.length` / `player.minorPlayed.length`。D60 LargePottery 改 `cost: { clay:2 }→{ clay:1, stone:1 }`、`category: POINTS_PROVIDER→FOOD_PROVIDER`、补 `extraVp: true`、`evenMoreSet: true`、`returnCards: ['Major_Pottery']`（复用现有 complex-cost 基建——买 D60 强制归还 Major_Pottery）、`alsoCountsAs: ['major']`；D59 EarthOven 与 A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`。`prerequisites.ts` 的 `countMajorImprovements` / `countCookingImprovements` / `countBakingImprovements` 切到 `collectCardsAs(player, 'major')`；5 处 caller（A101 CookeryOutfitter、A31 DebtSecurity、D145 RoofExaminer、C5 Remodeling、B133 VillagePeasant）同步迁到 dual-type 计数。前端 `src/components/common/PlayerCard.tsx` 透传 `returnCards` + `alsoCountsAs` 到 `player-card-inner[data-also-counts-as]`，并让 minor 也能走"归还 `<major>` 或 `<cost>`" 渲染分支；`src/styles/card-sprite.css` 按属性选择器 `[data-also-counts-as~="major"]` 为 dual-type minor 切换 `card_frame_major_minor.png` 与 `minor_major_costtext.png`（未来新增 dual-type minor 无需改 CSS）。新增测试：`shared/cards/helpers/__tests__/card-type.test.ts`（9 例 helper 覆盖）、`shared/cards/__tests__/D60_LargePottery.test.ts`（18 例：BGA 卡定义、scoresMap 全档、dual-type 自身、2-Major prereq）、`src/components/common/__tests__/PlayerCard.test.tsx`（5 例 dual-type 渲染）。`pnpm test` 361 files 1981 pass（D95/E109 两例与本 PR 无关的 pollution flake 在隔离运行下全绿）。详见 `docs/superpowers/plans/2026-04-17-PR3-D60-and-dual-type.md`。至此 §2.4 全部清零。
 - **2026-04-17 (PR2) — §2.4 六张卡 cost/prereq 与 BGA 对齐**：B39 Loom `cost: { wood:1, reed:1 }→{ wood:2 }` + 新增 `2 Occupations` prereq；D31 Storeroom `cost: { reed:1 }→{ wood:1, stone:2 }`；D33 SummerHouse `cost: { wood:1, stone:1 }→{ wood:3, stone:1 }`；D34 LuxuriousHostel `cost: { stone:1, food:3 }→{ wood:1, clay:2 }`、删 `Stone House` 购买 prereq（`getStoneHouseBonusScore` 已内部判 `houseType === 'stone'` + `rooms > familySize`，wooden 时返回 0 不会漏给分）、新增 `extraVp: true` + `newSet: true`；D35 FodderChamber `cost: { wood:1, clay:1 }→{ stone:3, grain:3 }`；D38 MilkingStool 补 `2 Occupations` prereq（cost 本来就对齐）。新增 `shared/cards/__tests__/D34_LuxuriousHostel.test.ts`（5 个用例覆盖石屋/木屋、rooms≤family、未打出四种情形）。详见 `docs/superpowers/plans/2026-04-17-PR2-section-24-card-fixes.md`。D60 LargePottery 留给 PR3（需要 `returnCards` + dual-type 机制）。
 - **2026-04-17 (PR1) — minor/occupation 印刷 `vp` 接入计分 + 16 张卡 vp 全量对齐 BGA**：`shared/logic/scoring.ts` 原先把所有 minor improvement 与 occupation 的 `score` 硬编码为 `0`，导致 `$this->vp` 对应的印刷分一直被静默吞掉（影响 ~110 张已实现卡）。现改为读取 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp`；配套 `scripts/audit-card-vp.ts` 本地审计工具（不进 CI）一次性对齐 A25/B38/B39/C35/C59/D30/D31/D35/D60/E32/E38/E49/E52/E62/E71/E84 共 16 张 minor 的 `vp` 值（6+ 个 missing-ours 与 1 个 missing-bga 为 card-set scope 差异，已在 audit summary 里可见，留待后续）。PR1 仅改 `vp:` 字段；D31/D35/D60 的 `cost` 与 `returnCards`、B39/D38 的 `prerequisite` 留给 PR2/PR3。详见 `docs/superpowers/specs/2026-04-17-minor-vp-and-section-24-cards-design.md` PR1 节 + `docs/superpowers/plans/2026-04-17-PR1-minor-vp-scoring.md`。
 - **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
@@ -57,9 +58,9 @@
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 22 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 23 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 22 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张）。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 23 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60）。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -85,6 +86,7 @@
 | D34 LuxuriousHostel | 购买 prereq 从"Stone House" 改为无，新增 extraVp/newSet 标志，但计分依然受石屋限制 | 2026-04-17 PR2：`cost: { wood: 1, clay: 2 }`、删 `prerequisite: 'Stone House'`、加 `extraVp: true` + `newSet: true`；`getStoneHouseBonusScore` 内部 `houseType === 'stone'` + `rooms > familySize` 双守卫负责石屋独占性，wood 局面下返回 0 |
 | D35 FodderChamber | cost + vp 对齐 | 2026-04-17 PR2：`cost: { stone: 3, grain: 3 }`、`vp: 2`；`computeBonusScore` 按人数分档（7/5/4/3 除数）对齐 BGA |
 | D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
+| D60 LargePottery | dual-type（minor + alsoCountsAs major）+ 归还 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`returnCards: ['Major_Pottery']`、`alsoCountsAs: ['major']`；`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 
 ### 2.2 🟡 简化实现（10 张）
 
@@ -113,17 +115,13 @@
 | C129 SecondSpouse | 我们只检查"对方占用"；BGA 还要求"占用者是其本人**第一个**放的 farmer 且占用人数 ≤2" | 我们更宽松——对方第二/三人占的也允许抢；轻微规则违规 | listener handler 加占用者来源判断（需要 `placedFarmers` 顺序信息） |
 | D154 ChimneySweep | 我们限制 `houseType === 'clay'` 才减 2 stone；BGA 不区分 | wood→stone 直接跳级翻新（A87 Conservator 等卡）减免不生效 | 去掉 `houseType` 条件；保持 `costs: { stone: -2 }` 始终返回 |
 
-### 2.4 ❌ 数值/元数据待修（1 张）
+### 2.4 ❌ 数值/元数据待修（0 张）
 
 > 卡牌**入场成本**、**前置条件**或**基础 vp** 与 BGA 不同——直接影响经济与可玩性，优先级最高。
 >
-> PR1 已统一接入印刷 `vp` 计分 + 16 张 minor vp 对齐；PR2 已把 B39/D31/D33/D34/D35/D38 共 6 张的 cost/prereq 对齐（见 §2.1）。本节只剩 D60 LargePottery 这张，因为它还需要 `returnCards` 字段 + return-major-card 通用机制，由 PR3 连同 dual-type（既是 minor 又算 major）一起处理。
-
-| Card | BGA cost / prereq / vp | 我们 cost / prereq / vp | 备注 |
-|---|---|---|---|
-| D60 LargePottery | `clay: 1, stone: 1` + 返还 `Major_Pottery`；vp: 3 | `clay: 2`；vp: 3 ✅；无 return-card 机制 | 缺 `returnCards` 字段 + return-major-card 通用机制（vp PR1 已对齐） |
-
-> 修 D60 之前先扩展 `CardDefinition` / `ComplexCost`，能表达 `returnCards: { majorId: 'Major_Pottery' }` + dual-type（见 PR3 计划）。
+> 2026-04-17：本节已全部清零。PR1 统一接入印刷 `vp` 计分 + 16 张 minor vp 对齐；PR2 把 B39/D31/D33/D34/D35/D38 共 6 张的 cost/prereq 对齐；PR3 完成 D60 LargePottery 的 cost/category/returnCards/alsoCountsAs + dual-type 基建（`CardType`、`alsoCountsAs`、`cardCountsAs`、`collectCardsAs`）。全部迁入 §2.1。
+>
+> 后续若再出现 cost/prereq/vp 偏差，重新在本节登记并走同样流程：`scripts/audit-card-vp.ts` 本地审计 + 对应 caller 迁移。
 
 ### 2.5 🔀 刻意偏离 BGA（5 张）
 
@@ -188,6 +186,7 @@
 | `ActionDetailEffects` fencing / palisading 拆分 | ✅ | B30：effects 日志区分围栏与木栅两种建造 |
 | `useFarmSelection` 围栏/木栅模式切换 | ✅ | B30 前端：同一 farm selection 可切换 fence / palisade 目标 |
 | **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
+| **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
 
 ---
 
