@@ -123,7 +123,10 @@ export const applyFarmChoice = <T extends PlayerState>(
         palisadeEdges,
         adjustedExtraWood,
         freeFences,
-        { skipPayment: true },
+        {
+          skipPayment: true,
+          allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+        },
       )
       if (!validated.ok) {
         return { ok: false, error: validated.error?.code ?? 'validation failed' }

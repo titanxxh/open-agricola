@@ -56,7 +56,7 @@ export type FenceValidationError = {
     | 'NO_ENCLOSED_AREA'
     | 'ENCLOSED_TILE_OCCUPIED'
     | 'EDGE_TYPE_CONFLICT'
-    | 'PALISADES_REQUIRE_B30'
+    | 'PALISADES_NOT_UNLOCKED'
   edges: string[]
   palisadeEdges: string[]
   newFenceEdges: string[]
@@ -76,6 +76,7 @@ export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 
 type FenceValidationOptions = {
   skipPayment?: boolean
+  allowPalisades?: boolean
 }
 
 export const FARM_ROWS = 3
@@ -373,13 +374,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  if (
-    palisadeEdges.length > 0 &&
-    !(normalized as unknown as { minorPlayed?: string[] }).minorPlayed?.includes('B30_WoodPalisades')
-  ) {
+  if (palisadeEdges.length > 0 && !options.allowPalisades) {
     return {
       ok: false,
-      error: { code: 'PALISADES_REQUIRE_B30', edges, palisadeEdges, newFenceEdges: [], newPalisadeEdges: [] },
+      error: { code: 'PALISADES_NOT_UNLOCKED', edges, palisadeEdges, newFenceEdges: [], newPalisadeEdges: [] },
     }
   }
 

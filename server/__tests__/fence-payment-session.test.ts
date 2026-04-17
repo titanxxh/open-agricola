@@ -81,4 +81,52 @@ describe('fence payment session', () => {
     expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
   })
+
+  it('preserves palisade selection across fence payment-choice resolution', () => {
+    // Regression (I2): when a fence commit triggers a payment-choice pending,
+    // the stored farmPayment payload must retain palisadeEdges so the resumed
+    // applyFarmChoice places palisades instead of silently dropping them.
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    // 1 wood forces a payment choice when total cost is 3 (1 fence + 1 palisade*2).
+    player.resources = {
+      ...player.resources,
+      wood: 1,
+      clay: 4,
+      stone: 4,
+    }
+    player.activeModifiers = [...fenceTradeModifiers]
+    player.minorPlayed = [...player.minorPlayed, 'B30_WoodPalisades']
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+
+    // Enclose tile (1,1) using 3 fences + 1 palisade on the top edge.
+    resp = session.commitFarmChoice(0, 'fence', {
+      edges: ['H-2-1', 'V-1-1', 'V-1-2'],
+      palisadeEdges: ['H-1-1'],
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    // Pick any offered option — correctness of the post-resume application
+    // (palisade placed, not dropped) is what we assert.
+    const option = resp.pending.options[0]
+    expect(option).toBeDefined()
+
+    resp = session.resolveChoice(0, option!.value)
+    expect(resp.ok).toBe(true)
+    const segments = resp.state.players[0]!.fenceSegments
+    expect(segments).toHaveLength(4)
+    const palisade = segments.find((s) => s.edge === 'H-1-1')
+    expect(palisade).toBeDefined()
+    expect(palisade?.type).toBe('palisade')
+  })
 })

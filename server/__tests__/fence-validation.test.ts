@@ -74,4 +74,30 @@ describe('fence validation', () => {
       expect(result.error.code).toBe('FENCE_NOT_CONNECTED')
     }
   })
+
+  it('rejects palisades without allowPalisades option', () => {
+    const player = createPlayer()
+    const result = validateFenceSelection(player, [], ['H-0-0'], 0, 0, {})
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('PALISADES_NOT_UNLOCKED')
+    }
+  })
+
+  it('accepts palisades only when allowPalisades is set', () => {
+    const player = createPlayer()
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-0', 'V-0-1'],
+      ['H-0-0'],
+      0,
+      0,
+      { allowPalisades: true },
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newPalisadeEdges).toEqual(['H-0-0'])
+      expect(result.newFenceEdges.sort()).toEqual(['H-1-0', 'V-0-0', 'V-0-1'])
+    }
+  })
 })
