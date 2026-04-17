@@ -39,13 +39,14 @@
 | 🟡 简化实现（§2.2） | 10 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 7 张 | cost / prereq / vp 与 BGA 不同 | 优先修，影响经济 |
-| 🔀 刻意偏离 BGA（§2.5） | 5 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| 🔀 刻意偏离 BGA（§2.5） | 4 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
 - **2026-04-17 — Worker 身份模型基建落地**：13 个子任务分 commit 推进；全仓 grep 替换聚合字段读点；新增 `shared/game/{player,space}.ts` helper。为 A25 Bassinet BGA 对齐打底。详见 `docs/ENGINE_ARCHITECTURE.md § 11.4.1`。
 - **2026-04-17 — A87 Conservator 完整实现**：`renovate-house` 重构为可参数化（`params.skipClayTier`），删除独立 `renovate-house-to-stone`；A87 加 `computeReplace` + `isDoable` 两个 listener；新增 i18n key `ui.interactionConservatorDirectStone`。renovation 折扣天然复用到 Conservator 分支：cost-type modifier `appliesTo: ['renovation']`（A143 Stonecutter / A123 FrameBuilder）经 `payTypedFlatCost` 与 actionId 无关；actionId-keyed `computeCosts` 监听器（D154 ChimneySweep）也命中该 branch，只是其自带 `houseType === 'clay'` 守卫（§2.3 独立 bug）当前阻止其在 wood→stone 上生效。
 - **2026-04-17 §6 24 张卡逐项复核完成**：原 §6 的 23 张"未复核"全部核对，按 ✅/⚠/❌ 重排进 §2.1–§2.4；C129/C137 卡名从 WetNurse/Baker 修正为 SecondSpouse/CharcoalBurner；E132 VeggieLover 从原 §5 "刻意不同"移除（其实是 3+ 卡且行为已对齐）。
@@ -71,6 +72,7 @@
 | E144 WaresSalesman | "可把建材换 food 的卡"列表 | 4 类硬编码列表与 BGA 完全一致 |
 | E154 Margrave | 任意玩家翻新 + 自己住石屋 → 2 food | 触发条件、计分一致 |
 | E156 ClaypitOwner | 对手打/造印刷 clay 成本改良 → 1 food + 1 clay | 印刷成本检测覆盖 minor + major（含复合成本 fees） |
+| A25 Bassinet | 首次使用非累积空间且格上恰好 1 人（含新生儿），可 canUseOccupied + family growth；Meeting Place 显式排除 | Worker 身份模型重写；`countPeopleOnSpace` helper + actions 过滤器 bug 已修（2026-04-17） |
 | A87 Conservator | 木屋玩家可在 House Redevelopment 上选直跳 stone（XOR） | computeReplace+isDoable 双 listener；A143/A123 走 `appliesTo:['renovation']` cost-type modifier 自动生效；D154 actionId 监听器也会命中，但其 clay-only 守卫（§2.3）当前屏蔽 wood→stone |
 
 ### 2.2 🟡 简化实现（10 张）
@@ -125,7 +127,6 @@
 
 | 卡牌 | BGA 行为 | 我们的行为 | 偏离原因 | 回归 BGA 的代价 |
 |---|---|---|---|---|
-| A25 Bassinet | "首次使用非累积空间且空间上只剩 1 个人（含新生儿）"——基于 *space occupancy* 跨玩家追踪 | 转译为"本回合第一个 place-farmer 之后接 family growth"——基于 *自己回合内的 action 计数* | 跨玩家+空间状态追踪需要新 hook 点；当前简化语义在 2P 场景下差异极小 | 新增 `space-empty-after-place` 监听；改 listener 模型 |
 | B30 WoodPalisades | 在围栏 tile 上叠 2 木（替代 1 fence），按 fence-space 计 1 分 | 当前数据 desc 与 BGA 同步，但围栏数据模型仍按"fence count"，未实现"木代替 fence" | 围栏数据结构改造（`PastureFence` 加 token/wood 类型）影响整套 fencing 算法 | 重写 `shared/game/fences.ts` + scoring + UI 渲染 |
 | B38 FutureBuildingSite | 在所有其它格子用完前，禁用紧贴房屋的正交相邻格 | 故意简化：未做"邻接禁用" | 需要 placement 阶段全局可用性裁定，影响 `place-farmer` 的 `isDoable` | `isDoable` 加一个 placement 几何裁定 hook |
 | B132 EstateMaster | "用完所有 farmyard 格"后每个 harvest 蔬菜 +1 VP | 故意简化：长效条件未严格判断 | "无 unused farmyard" 状态需要每回合扫描，且与 D33/B38 类条件需统一抽象 | 抽象 `onFarmyardSaturationChange` hook |
@@ -175,7 +176,8 @@
 | `stable-removal` helper | ✅ | D102 / E76 |
 | `recall-placed-worker` action | ✅ | D93（通用农民回收） |
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
-| **Worker 身份模型**（2026-04-17） | ✅ | `PlayerState.workers[]`（5 槽，isActive/isNewborn）+ `ActionSpace.takenBy: WorkerRef[]` + `__roundPlacement__` 升级为 `{spaceId, workerId}[]`。删除聚合字段 familySize / newbornCount / workersAvailable，全部走 `shared/game/player.ts` helper。消费者：后续 A25 Bassinet（见同日 plan）、B4 WoodPile（TODO 可接）、A92 AdoptiveParents（从盲减升级为精确取回）。 |
+| **Worker 身份模型**（2026-04-17） | ✅ | `PlayerState.workers[]`（5 槽，isActive/isNewborn）+ `ActionSpace.takenBy: WorkerRef[]` + `__roundPlacement__` 升级为 `{spaceId, workerId}[]`。删除聚合字段 familySize / newbornCount / workersAvailable，全部走 `shared/game/player.ts` helper。消费者：A25 Bassinet、B4 WoodPile（TODO 可接）、A92 AdoptiveParents（从盲减升级为精确取回）。 |
+| **`countPeopleOnSpace` helper**（2026-04-17） | ✅ | `shared/cards/helpers/space-occupancy.ts`：返回某行动格上当前物理占位的人数（含新生儿）。依赖 Worker 身份模型——等于 `space.takenBy.length`。消费者：A25 Bassinet；B4 WoodPile 原 TODO 可顺带消化。 |
 
 ---
 
