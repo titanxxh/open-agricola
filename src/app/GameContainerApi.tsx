@@ -247,7 +247,7 @@ export const GameContainerApi = () => {
   }, [state?.currentPlayerIndex, viewPlayerId])
 
   const {
-    pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges, setPendingPalisadeEdges,
+    pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
     fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
@@ -1568,6 +1568,9 @@ export const GameContainerApi = () => {
         hasActionStartSnapshot={hasActionStartSnapshot}
         anytimeActions={interaction.anytimeActions}
         takeAnytimeAction={takeAnytimeAction}
+        hasWoodPalisadesCard={!!currentPlayer?.minorPlayed?.includes('B30_WoodPalisades')}
+        fencePlacementMode={fencePlacementMode}
+        setFencePlacementMode={setFencePlacementMode}
       />
     </div>
   )

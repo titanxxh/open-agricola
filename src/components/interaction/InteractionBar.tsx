@@ -107,6 +107,9 @@ type Props = {
   hasActionStartSnapshot: boolean
   anytimeActions: AnytimeAction[]
   takeAnytimeAction: (actionId: string) => void
+  hasWoodPalisadesCard?: boolean
+  fencePlacementMode?: 'fence' | 'palisade'
+  setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
 }
 
 export const InteractionBar = ({
@@ -147,6 +150,9 @@ export const InteractionBar = ({
   hasActionStartSnapshot,
   anytimeActions,
   takeAnytimeAction,
+  hasWoodPalisadesCard = false,
+  fencePlacementMode = 'fence',
+  setFencePlacementMode,
 }: Props) => {
   const isFarmSelectionPrompt =
     pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
@@ -260,6 +266,32 @@ export const InteractionBar = ({
                     selected: pendingFieldSelectionsLength,
                     max: maxFieldSelections,
                   })}
+                </div>
+              ) : null}
+              {isSelectingFences && hasWoodPalisadesCard && setFencePlacementMode ? (
+                <div
+                  className="fence-mode-toggle"
+                  role="radiogroup"
+                  aria-label={t(locale, 'ui.fenceModeToggle')}
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={fencePlacementMode === 'fence'}
+                    className={fencePlacementMode === 'fence' ? 'active' : ''}
+                    onClick={() => setFencePlacementMode('fence')}
+                  >
+                    {t(locale, 'ui.fenceModeFence')}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={fencePlacementMode === 'palisade'}
+                    className={fencePlacementMode === 'palisade' ? 'active' : ''}
+                    onClick={() => setFencePlacementMode('palisade')}
+                  >
+                    {t(locale, 'ui.fenceModePalisade')}
+                  </button>
                 </div>
               ) : null}
               {isSelectingFences && fenceErrorText ? (
