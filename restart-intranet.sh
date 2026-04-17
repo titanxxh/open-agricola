@@ -19,6 +19,37 @@ if ! command -v lsof >/dev/null 2>&1; then
   exit 1
 fi
 
+usage() {
+  cat <<'EOF'
+Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k] [-h|--help]
+
+Without flags: stop any process on the frontend/backend ports, then start
+fresh backend (tsx) and frontend (vite) bound to the LAN IP.
+
+  --kill-only, --kill_only, -k   Only stop existing listeners; do not start
+                                 backend or frontend. Skips the LAN-IP check.
+  -h, --help                     Show this help.
+EOF
+}
+
+KILL_ONLY=0
+for arg in "$@"; do
+  case "$arg" in
+    --kill-only|--kill_only|-k)
+      KILL_ONLY=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $arg"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 cd "$SCRIPT_DIR"
 
 # LAN IPv4 for binding Vite / backend (macOS: en0; Linux: eth0)
@@ -37,8 +68,13 @@ get_lan_ip() {
 }
 
 list_listening_pids() {
+  # NOTE: lsof exits non-zero when no match is found. Combined with
+  # `set -o pipefail` at the top of the script, an empty result would
+  # otherwise abort the whole script via `set -e` the first time we
+  # check an idle port. Swallow that with `|| true` and rely on the
+  # caller's empty-string check.
   local port="$1"
-  lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u
+  { lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true; } | sort -u
 }
 
 wait_for_port_state() {
@@ -139,6 +175,14 @@ start_and_wait() {
   show_log_tail "$label" "$log_file"
   return 1
 }
+
+if [ "$KILL_ONLY" -eq 1 ]; then
+  echo "Stopping existing processes (kill-only)..."
+  stop_port_listeners "$FRONTEND_PORT" "frontend"
+  stop_port_listeners "$BACKEND_PORT" "backend"
+  echo "Done. Ports $FRONTEND_PORT / $BACKEND_PORT cleared."
+  exit 0
+fi
 
 LAN_IP=$(get_lan_ip)
 if [ -z "$LAN_IP" ]; then
