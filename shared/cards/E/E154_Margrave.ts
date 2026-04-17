@@ -1,5 +1,9 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E154_Margrave'
 
@@ -11,6 +15,20 @@ registerCardEffect({
     return state.players.filter((p) => p.id !== player.id && p.houseType !== 'stone').length
   },
 })
+
+const renovateListener: CardListenerRegistration = {
+  id: 'E154-margrave-opponent-renovate',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['renovate-house'],
+  scope: 'opponent',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.player.houseType !== 'stone') return
+    return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
+  },
+}
+
+registerCardListener(renovateListener)
 
 export const E154_Margrave = new Occupation({
   id: CARD_ID,

@@ -1,10 +1,30 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E136_AnimalHusbandryWorker'
 
+const roundsLeftWoodBonus = (state: { round: number }): number => {
+  const remaining = 14 - state.round
+  if (remaining >= 9) return 4
+  if (remaining >= 6) return 3
+  if (remaining >= 3) return 2
+  return 0
+}
+
 registerCardEffect({
   id: CARD_ID,
+  onBuy: (state) => {
+    const wood = roundsLeftWoodBonus(state)
+    if (wood <= 0) return
+    return {
+      type: 'seq' as const,
+      children: [
+        gainLeaf(CARD_ID, { wood }),
+        { type: 'leaf' as const, actionId: 'fencing', sourceCard: CARD_ID, optional: true },
+      ],
+    }
+  },
   computeBonusScore: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const myPastures = player.pastures.length

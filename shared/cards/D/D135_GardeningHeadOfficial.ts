@@ -1,10 +1,24 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D135_GardeningHeadOfficial'
 
+const roundsLeftWoodBonus = (state: { round: number }): number => {
+  const remaining = 14 - state.round
+  if (remaining >= 9) return 4
+  if (remaining >= 6) return 3
+  if (remaining >= 3) return 2
+  return 0
+}
+
 registerCardEffect({
   id: CARD_ID,
+  onBuy: (state) => {
+    const wood = roundsLeftWoodBonus(state)
+    if (wood <= 0) return
+    return gainLeaf(CARD_ID, { wood })
+  },
   computeBonusScore: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const vegInFields = (p: typeof player) =>
