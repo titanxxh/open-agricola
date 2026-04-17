@@ -6,6 +6,8 @@ import { useFarmSelection } from '../useFarmSelection'
 
 type Captured = ReturnType<typeof useFarmSelection>
 
+type Box = { value: Captured | null }
+
 /**
  * Lightweight hook test harness: render a React component that calls the hook,
  * capture the latest return value via a side channel, then replay actions
@@ -69,20 +71,22 @@ function applyToggle(state: State, edgeId: string): State {
 // return shape matches the reducer's initial state. This guarantees the
 // reducer simulator is an accurate mirror of the real hook's initial
 // contract (types + default values).
-let captured: Captured | null = null
-const Harness = () => {
-  captured = useFarmSelection()
+const Harness = ({ box }: { box: Box }) => {
+  const result = useFarmSelection()
+  // Store result via side-effect on the provided object. This is a testing
+  // hatch and safe here — the harness renders once and is discarded.
+  Object.assign(box, { value: result })
   return null
 }
 
 describe('useFarmSelection — palisade toggle', () => {
   it('starts in fence mode with empty pendings', () => {
-    captured = null
-    renderToStaticMarkup(React.createElement(Harness))
-    expect(captured).not.toBeNull()
-    expect(captured!.pendingFenceEdges).toEqual([])
-    expect(captured!.pendingPalisadeEdges).toEqual([])
-    expect(captured!.fencePlacementMode).toBe('fence')
+    const box: Box = { value: null }
+    renderToStaticMarkup(React.createElement(Harness, { box }))
+    expect(box.value).not.toBeNull()
+    expect(box.value!.pendingFenceEdges).toEqual([])
+    expect(box.value!.pendingPalisadeEdges).toEqual([])
+    expect(box.value!.fencePlacementMode).toBe('fence')
   })
 
   it('toggleFenceEdge in fence mode adds to fence pending', () => {
