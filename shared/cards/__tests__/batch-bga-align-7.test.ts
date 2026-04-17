@@ -61,4 +61,38 @@ describe('harvest trigger exchange infrastructure', () => {
   })
 })
 
+// ===== Task 3: C59 SchnappsDistillery harvest exchange =====
+import { C59_SchnappsDistillery } from '../C/C59_SchnappsDistillery'
+import '../C/C59_SchnappsDistillery'
+
+describe('C59_SchnappsDistillery harvest exchange', () => {
+  it('declares a harvest exchange: 1 vegetable → 5 food, max 1', () => {
+    const exchanges = (C59_SchnappsDistillery as any).exchanges
+    expect(exchanges).toEqual([
+      { from: { vegetable: 1 }, to: { food: 5 }, max: 1, trigger: 'harvest' },
+    ])
+  })
+
+  it('appears in buildHarvestFeedOptions when player has vegetable and C59 played', () => {
+    const p = createPlayer()
+    p.minorPlayed = ['C59_SchnappsDistillery']
+    p.resources.vegetable = 1
+    const options = buildHarvestFeedOptions(p, 'en', (id) => id)
+    const c59opt = options.find((o: any) => o.id.startsWith('C59_SchnappsDistillery-harvest'))
+    expect(c59opt).toBeDefined()
+    expect(c59opt!.food).toBe(5)
+    expect(c59opt!.resourceKey).toBe('vegetable')
+    expect(c59opt!.max).toBe(1)
+  })
+
+  it('does not appear when player has no vegetable', () => {
+    const p = createPlayer()
+    p.minorPlayed = ['C59_SchnappsDistillery']
+    p.resources.vegetable = 0
+    const options = buildHarvestFeedOptions(p, 'en', (id) => id)
+    const c59opt = options.find((o: any) => o.id.startsWith('C59_SchnappsDistillery-harvest'))
+    expect(c59opt).toBeUndefined()
+  })
+})
+
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
