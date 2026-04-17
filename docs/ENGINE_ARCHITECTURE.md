@@ -1050,7 +1050,8 @@ type PendingAction =
 - `isDoable`：改变行动是否可执行
 - `computeReplace`：把一个行动替换成另一个行动
 - `computeCosts`：调整支付成本
-- `computeArgs`：追加选项、额外参数
+- `computeArgs`：追加选项、额外参数（针对 `execute()` 已经返回 `choice` 的传统路径）
+- `computeChoiceCandidates`：针对 opt-in `getBaseChoiceOptions` 的 action，注入额外候选目标（见 §11.6.3）
 - `canUseOccupied`：允许把已占用行动位视为仍可用
 - `before`：主动作执行前
 - `during`：主动作执行中
@@ -1100,7 +1101,57 @@ type ActionHookResult = {
 - 添加跟随动作
 - 注入额外选择
 
-#### 11.6.2 回合/阶段型卡牌 Hook
+#### 11.6.2 `getBaseChoiceOptions` opt-in 选项流（与 `computeChoiceCandidates`）
+
+某些行动天生就是“同一 actionId、不同分支”的形态——典型如 `renovate-house` 既可以走 wood→clay/clay→stone 的标准路径，也可以在 A87 Conservator 在场时多一个 wood→stone 的直跳分支。早期实现把"额外分支"放在 top-level XOR（通过 `computeReplace.decline + alternativeFlow`）里，结果界面上会出现 `House Redevelopment` 与 `Renovate directly to stone (Conservator)` 两个并列的顶层按钮，而不是进入翻修后再选目标。
+
+为此引入 opt-in 的"选项流"：
+
+- `ActionDefinition` 新增 `getBaseChoiceOptions?: (ctx) => ActionChoiceOption[]` 与 `choicePromptKey?: string`、`noChoiceLogKey?: string`。当这些字段存在时，引擎在 `ActionNode` dispatch 阶段会跳过 `execute()`，改走"选项流"：
+  1. `baseOpts = action.getBaseChoiceOptions(ctx)`
+  2. `extraOpts` 来自 `computeChoiceCandidates` phase 上 listener 返回的 `extraOptions`
+  3. 按 `value` 去重（base 优先），得到合并候选列表
+  4. 对每个候选，引擎用 `params.selectedOption = value` 临时探测 `costPreview.canExecute(ctx, override)` 来过滤不可负担项
+  5. 0 候选 → `{ type: 'fail', logKey: action.noChoiceLogKey ?? 'log.action' }`
+  6. 1 候选 → 直接调 `action.resolveChoice(ctx, value)`（UI 不弹 prompt）
+  7. ≥2 候选 → 走标准 `choice` prompt，玩家选完后 `params.selectedOption` 自动注入到 `resolveChoice` 的 `executionContext.params` 里
+
+- 这条路径与传统 `execute() → 'choice' → computeArgs.extraOptions` 是互斥的：当 action 声明了 `getBaseChoiceOptions`，引擎不再合并 `computeArgs.extraOptions` 到结果里，避免重复注入。Action 作者要么用旧路径（`execute()` 自己返回 choice，listener 用 `computeArgs` 追加），要么用新路径（`getBaseChoiceOptions` + `computeChoiceCandidates`），不要混用。
+
+- 选项流让"添加额外目标"成为标准卡牌扩展形式，配套机制比 `computeReplace.decline + alternativeFlow` 更轻：
+  - 不会在顶层多塞 XOR 节点，UI 永远是同一个 action 名 + 一个内部目标 prompt。
+  - listener 只关心"加哪些选项"，affordability 由引擎统一通过 cost preview 过滤。
+  - 1 候选自动短路，避免单选 prompt 干扰（例如非 A87 wood 玩家点 renovate 立即翻修到 clay，而不是被询问"你想翻修到什么？"）。
+
+- 当前使用此机制的卡牌：
+  - `renovate-house`（基础 action）声明 `getBaseChoiceOptions` 输出 `clay` 或 `stone`；
+  - `A87_Conservator` 用 `computeChoiceCandidates` 在 wood 房屋时注入 `stone` 候选，并保留 `isDoable` listener 救回"只买得起 stone、买不起 clay"场景的入口可见性。
+
+##### 子动作 leaf-flush 日志（`emitLeafActionDetail`）
+
+当一个 action 作为 SEQ 子节点出现（例如 `house-redevelopment` 把 `renovate-house` 与可选的 `improvement-any` 包成 SEQ），整段 SEQ 完成才 emit 单条 `log.actionDetail` 会带来两个问题：(a) 玩家在被问"打不打 improvement"时还看不到刚刚翻修的结果与花费；(b) 整段聚合的 detailParts 把多个子动作的资源 delta 揉在一起，难以区分。
+
+为此 `ActionDefinition` 上提供了 opt-in 字段：
+
+```ts
+emitLeafActionDetail?: boolean
+```
+
+声明此字段后，当该 action 作为非顶层 leaf 完成（即 engine 返回 `{ type: 'ok', actionId }` 且 `actionId !== activeSpaceId`）时，`GameSession` 会立刻：
+
+1. 用 `actionStartPlayerSnapshot` 与当前玩家状态的 delta 构造 `detailParts`
+2. 减去自上次 flush 以来已经被 `log.cardEffectGain` / `log.cardEffectPay` 单独记账的资源（避免与卡牌效果日志重复）
+3. 若仍有非空 gains/costs/effects，emit 一条 `log.actionDetail`，`action` 字段使用 leaf 自身的 `nameKey`（例如 `actions.renovate-house.name`）
+4. 把 `actionStartPlayerSnapshot` 推进到当前状态
+
+后续 SEQ 内的其他 leaf 与 finalize 时的最终聚合都基于这个新 baseline 计算 delta，因此不会重复记账。
+
+约束：
+- 触发条件中已自动跳过 `actionId === activeSpaceId`（顶层 wrapper 不应被当成"子 leaf"），以及 `loggedImprovementThisAction` / `usedBakeBreadThisAction`（这些已经有专用 log 路径）。
+- 对带有自身 `logKey` 的 action 结果（如 `{ type: 'ok', logKey: 'log.sow' }`）也跳过 leaf-flush，避免与 action 自带日志重复。
+- 当前使用此机制的 action：`renovate-house`。
+
+#### 11.6.3 回合/阶段型卡牌 Hook
 
 有些卡牌效果不依赖某个 action，而依赖阶段事件。
 这类效果建议用显式生命周期 Hook 表达，例如：

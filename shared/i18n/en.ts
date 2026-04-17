@@ -187,6 +187,9 @@ export const en = {
     interactionGodlySpouseUse: 'Return the first placed person home',
     interactionGodlySpouseSkip: 'Do not use Godly Spouse',
     interactionConservatorDirectStone: 'Renovate directly to stone (Conservator)',
+    interactionChooseRenovationTarget: 'Choose how to renovate your house',
+    interactionRenovateToClay: 'Renovate to clay house',
+    interactionRenovateToStone: 'Renovate to stone house',
     interactionAshTrees: 'Choose how many free fences to use from Ash Trees',
     interactionAshTreesUseCount: 'Use {count} free fences from Ash Trees',
     interactionAshTreesSkip: 'Do not use Ash Trees this time',
@@ -430,6 +433,7 @@ export const en = {
     'gain-other-players': { name: 'Gain Other Players', description: 'Give the specified resources to every other player' },
     'house-redevelopment': { name: 'House Redevelopment', description: 'Renovate and optionally improve' },
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
+    'renovate-house': { name: 'Renovate House', description: 'Upgrade your house to the next material tier' },
     'card-choice': { name: 'Card Choice', description: 'Make a choice from card options' },
   },
   improvements: {

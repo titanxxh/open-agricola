@@ -181,6 +181,9 @@ export const zh = {
     interactionGodlySpouseUse: '收回本轮第一个放置的人',
     interactionGodlySpouseSkip: '不使用敬神配偶',
     interactionConservatorDirectStone: '直接翻修为石屋（保育员）',
+    interactionChooseRenovationTarget: '选择如何翻修住宅',
+    interactionRenovateToClay: '翻修为黏土屋',
+    interactionRenovateToStone: '翻修为石屋',
     interactionAshTrees: '选择本次要从白蜡树上使用几段免费围栏',
     interactionAshTreesUseCount: '使用白蜡树上的 {count} 段免费围栏',
     interactionAshTreesSkip: '这次不使用白蜡树',
@@ -411,6 +414,7 @@ export const zh = {
     'gain-other-players': { name: '给予其他玩家资源', description: '让每位其他玩家获得指定资源' },
     'house-redevelopment': { name: '住宅改建', description: '改建并可追加改良' },
     'farm-redevelopment': { name: '农场改建', description: '改建房屋' },
+    'renovate-house': { name: '住宅翻修', description: '把住宅升级到下一档材质' },
     'card-choice': { name: '卡牌选择', description: '从卡牌选项中选择' },
   },
   improvements: {

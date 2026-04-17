@@ -36,5 +36,5 @@ export type EngineStepResult =
   | { type: 'done' }
   | { type: 'blocked'; nodeId: string }
   | { type: 'choice'; nodeId: string; choice: EngineChoice }
-  | { type: 'ok'; nodeId: string; result: ActionExecutionResult }
+  | { type: 'ok'; nodeId: string; actionId?: string; result: ActionExecutionResult }
   | { type: 'playerSwitch'; nodeId: string; targetPlayerId: string }

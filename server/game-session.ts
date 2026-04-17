@@ -12,7 +12,7 @@ import type {
   InteractionAnimalReorgZone,
 } from '../shared/game/types.ts'
 import type { ActionDetailParts } from '../shared/protocol/game.ts'
-import { actionDefinitions } from '../shared/actions/index.ts'
+import { actionDefinitions, getActionDefinition } from '../shared/actions/index.ts'
 import { internalActionDefinitions } from '../shared/actions/internal-actions.ts'
 import { clearActionHooks } from '../shared/actions/hooks.ts'
 import {
@@ -209,6 +209,16 @@ export class GameSession {
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
+  /**
+   * Accumulates resource gains/costs already attributed to specific cards via
+   * `log.cardEffectGain` / `log.cardEffectPay` since the last leaf-flush.
+   * `flushLeafActionDetail` subtracts these from the leaf's delta so card
+   * effects don't get double-counted in the action's `log.actionDetail`.
+   */
+  private cardEffectDeltasSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
+    gains: {},
+    costs: {},
+  }
   private usedBakeBreadThisAction = false
   private nextActionToken = 1
   private loggedImprovementThisAction = false
@@ -973,6 +983,70 @@ export class GameSession {
     })
   }
 
+  /**
+   * Mid-flow flush: when a leaf ActionNode inside a SEQ/optional flow finishes,
+   * emit a partial `log.actionDetail` for that sub-action and advance the
+   * baseline snapshot. Subsequent leaves and the final aggregate then only see
+   * the residual delta, avoiding duplicate logs.
+   *
+   * Skipped when:
+   *   - no active snapshot (no in-flight action),
+   *   - leaf actionId equals the top-level activeSpaceId (the wrapper itself),
+   *   - the action wrote its own logKey (e.g. `log.sow`, `log.buildStable`),
+   *   - improvement was just played (logImprovementDelta will own the log),
+   *   - bake-bread was just used (logBakeBreadDelta owns the log).
+   */
+  private flushLeafActionDetail(
+    actionId: string | undefined,
+    hasOwnLogKey: boolean,
+  ) {
+    if (!actionId) return
+    if (!this.actionStartPlayerSnapshot) return
+    if (this.activePlayerIndex === null) return
+    if (actionId === this.activeSpaceId) return
+    if (hasOwnLogKey) return
+    if (this.loggedImprovementThisAction) return
+    if (this.usedBakeBreadThisAction) return
+    const def = getActionDefinition(actionId)
+    if (!def?.emitLeafActionDetail) return
+    const player = this.state.players[this.activePlayerIndex]
+    if (!player) return
+    const before = this.actionStartPlayerSnapshot
+    const detailParts = this.buildActionDetailParts(before, player)
+    for (const key of resourceKeyList) {
+      const cardGain = this.cardEffectDeltasSinceFlush.gains[key] ?? 0
+      const cardCost = this.cardEffectDeltasSinceFlush.costs[key] ?? 0
+      if (cardGain > 0) {
+        detailParts.gains[key] = Math.max(0, (detailParts.gains[key] ?? 0) - cardGain)
+      }
+      if (cardCost > 0) {
+        detailParts.costs[key] = Math.max(0, (detailParts.costs[key] ?? 0) - cardCost)
+      }
+    }
+    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
+    const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
+    const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
+    const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
+    if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) {
+      this.actionStartPlayerSnapshot = this.clonePlayer(player)
+      return
+    }
+    if (!hasGains && !hasCosts && !hasEffects) {
+      this.actionStartPlayerSnapshot = this.clonePlayer(player)
+      return
+    }
+    const labelKey = def.nameKey ?? `actions.${actionId}.name`
+    this.state.log.unshift({
+      key: 'log.actionDetail',
+      params: {
+        player: player.name,
+        action: labelKey,
+        detailParts,
+      },
+    })
+    this.actionStartPlayerSnapshot = this.clonePlayer(player)
+  }
+
   private logImprovementDelta(before: PlayerState, player: PlayerState) {
     if (this.loggedImprovementThisAction) return
     const newImprovements = player.improvements.filter(
@@ -1036,10 +1110,31 @@ export class GameSession {
       if (toAdd.some((e) => e.key === 'log.playImprovement' || e.key === 'log.playMinorImprovement')) {
         this.loggedImprovementThisAction = true
       }
+      for (const entry of toAdd) {
+        if (entry.key === 'log.cardEffectGain') {
+          const gain = (entry.params as { gain?: Partial<Resource> } | undefined)?.gain
+          if (gain) this.accumulateCardEffectDelta('gains', gain)
+        } else if (entry.key === 'log.cardEffectPay') {
+          const cost = (entry.params as { cost?: Partial<Resource> } | undefined)?.cost
+          if (cost) this.accumulateCardEffectDelta('costs', cost)
+        }
+      }
       for (let i = toAdd.length - 1; i >= 0; i--) {
         this.state.log.unshift(toAdd[i])
       }
       this.engineLog.clear()
+    }
+  }
+
+  private accumulateCardEffectDelta(
+    bucket: 'gains' | 'costs',
+    delta: Partial<Resource>,
+  ) {
+    const target = this.cardEffectDeltasSinceFlush[bucket]
+    for (const [key, value] of Object.entries(delta)) {
+      if (typeof value !== 'number' || value <= 0) continue
+      const k = key as keyof Resource
+      target[k] = (target[k] ?? 0) + value
     }
   }
 
@@ -1419,6 +1514,7 @@ export class GameSession {
         if (this.turnOwnerPlayerIndex !== null) {
           const ownerIndex = this.turnOwnerPlayerIndex
           this.pending = { type: 'none' }
+          this.finalizeActionLog(player)
           this.activeSpaceId = null
           this.activePlayerIndex = null
           this.continueEndTurnHooks(ownerIndex)
@@ -1458,6 +1554,7 @@ export class GameSession {
           let autoPromptKey = step.choice.promptKey
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
+            const resolvedActionId = this.engine?.snapshot().pendingChoiceActionId ?? undefined
             const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             const isBakeChoice =
@@ -1468,6 +1565,9 @@ export class GameSession {
             }
             if (isBakeChoice) {
               this.logBakeBreadDelta(before, player)
+            }
+            if (result.type === 'ok' && resolvedActionId) {
+              this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
             if (result.type === 'choice') {
               if ((result.options?.length ?? 0) === 1) {
@@ -1531,6 +1631,10 @@ export class GameSession {
         this.usedBakeBreadThisAction = false
         this.turnOwnerPlayerIndex = null
         return
+      }
+
+      if (step.type === 'ok' && step.result.type === 'ok') {
+        this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
@@ -1685,6 +1789,7 @@ export class GameSession {
     this.pushHistory(true)
     this.turnOwnerPlayerIndex = playerIndex
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
+    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
     this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
     const worker = smallestAvailableWorker(this.state, player)
@@ -1790,10 +1895,14 @@ export class GameSession {
     if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
       this.usedBakeBreadThisAction = true
     }
+    const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
     this.flushEngineLog()
     if (isBakeChoice) {
       this.logBakeBreadDelta(before, player)
+    }
+    if (result.type === 'ok' && resolvedActionId) {
+      this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
     if (result.type === 'choice') {
       this.pending = {
