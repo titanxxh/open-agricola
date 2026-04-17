@@ -154,4 +154,87 @@ describe('B27_Toolbox rewrite', () => {
   })
 })
 
+// ===== Task 5: C48 Farmstead per-turn used-space gain =====
+import '../C/C48_Farmstead'
+
+describe('C48_Farmstead per-turn used-space gain', () => {
+  it('no longer has onBuy (no future meeples)', () => {
+    const effect = getCardEffect('C48_Farmstead')
+    expect(effect?.onBuy).toBeUndefined()
+  })
+
+  it('before listener snapshots used-tile count', () => {
+    const listener = findListener('C48-farmstead-before-place-farmer')!
+    expect(listener).toBeDefined()
+  })
+
+  it('after listener grants 1 food when used-tile count increased', () => {
+    const afterListener = findListener('C48-farmstead-after-place-farmer')!
+    const beforeListener = findListener('C48-farmstead-before-place-farmer')!
+    const p = createPlayer()
+    p.minorPlayed = ['C48_Farmstead']
+    p.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }] as any
+    const state = createState(2, p)
+
+    // Run before listener to snapshot current used-tile count (2)
+    beforeListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'before',
+    } as any)
+
+    // Simulate plowing a field — used-tile count grows to 3
+    p.fields = [{ crop: null, remaining: 0, row: 1, col: 0 } as any]
+
+    const result = afterListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+    expect(result?.flow).toBeDefined()
+    const flow = result!.flow as any
+    expect(flow.actionId).toBe('gain')
+    expect(flow.params).toEqual({ food: 1 })
+  })
+
+  it('after listener does nothing when used-tile count did not increase', () => {
+    const afterListener = findListener('C48-farmstead-after-place-farmer')!
+    const beforeListener = findListener('C48-farmstead-before-place-farmer')!
+    const p = createPlayer()
+    p.minorPlayed = ['C48_Farmstead']
+    p.roomTiles = [{ row: 0, col: 0 }] as any
+    const state = createState(2, p)
+    beforeListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'before',
+    } as any)
+    // No changes — used-tile count stays at 1
+    const result = afterListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+
+  it('only fires once per turn even if multiple spaces newly used', () => {
+    const afterListener = findListener('C48-farmstead-after-place-farmer')!
+    const beforeListener = findListener('C48-farmstead-before-place-farmer')!
+    const p = createPlayer()
+    p.minorPlayed = ['C48_Farmstead']
+    p.roomTiles = [{ row: 0, col: 0 }] as any
+    const state = createState(2, p)
+    beforeListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'before',
+    } as any)
+    // Plow + construct — count goes 1 → 3
+    p.fields = [{ crop: null, remaining: 0, row: 1, col: 0 } as any]
+    p.roomTiles.push({ row: 2, col: 0 } as any)
+    const result = afterListener.handler({
+      state, player: p, space: createSpace('place-farmer'),
+      actionId: 'place-farmer', phase: 'after',
+    } as any)
+    // Still only 1 food (per-turn not per-space)
+    expect((result!.flow as any).params).toEqual({ food: 1 })
+  })
+})
+
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
