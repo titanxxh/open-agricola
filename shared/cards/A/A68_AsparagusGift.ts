@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { getFenceCount } from '../../actions/effects/fencing'
 
 const CARD_ID = 'A68_AsparagusGift'
 const FENCES_BEFORE_KEY = 'fencesBefore'
@@ -19,7 +20,7 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    writeCardExtraData(context.player, CARD_ID, FENCES_BEFORE_KEY, context.player.fences)
+    writeCardExtraData(context.player, CARD_ID, FENCES_BEFORE_KEY, getFenceCount(context.player))
   },
 }
 
@@ -31,7 +32,7 @@ const afterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const fencesBefore = readCardExtraData<number>(context.player, CARD_ID, FENCES_BEFORE_KEY) ?? 0
-    const fencesBuilt = context.player.fences - fencesBefore
+    const fencesBuilt = getFenceCount(context.player) - fencesBefore
     if (fencesBuilt < context.state.round) return
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
