@@ -237,7 +237,75 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
   - `fix: ...`
   - `refactor: ...`
 - commit message 描述简洁明了，**英文**。
-- **Push 之后**：检查 GitHub Actions <https://github.com/titanxxh/open-agricola/actions> 确认 CI 通过。如果失败，立刻修，再做其他事。
+
+## Push 后 CI 验证
+
+**硬性要求**：每次 `git push` 之后必须等到相关 GitHub Actions run 结束；**只要有 run 仍在进行或失败，当前任务都不算完成**。失败时立刻定位并修复，再继续其他工作。
+
+Actions 页面：<https://github.com/titanxxh/open-agricola/actions>。
+
+仓库是私有的，匿名 `curl` / WebFetch 会返回 404。要在命令行验证，先拿到 `GH_TOKEN`：
+
+- **已放在 `.env`**：本仓库根目录的 `.env` 有一行 `GH_TOKEN=...`。参考 `scripts/sync-bga-cdn-github-var.ts` 里的 `loadGhTokenFromDotenv()`：读 `.env`，把 `GH_TOKEN` / `GITHUB_TOKEN` 注入 `process.env`。shell 里可直接 `export $(grep '^GH_TOKEN=' .env | xargs)`。
+- **不要**把 `GH_TOKEN` 写到提交里或发到日志。`.env` 已在 `.gitignore`。
+
+取到 token 之后常用命令（任选其一）：
+
+```bash
+# 最近 3 个 workflow run 的状态
+curl -s -H "Authorization: Bearer $GH_TOKEN" \
+  'https://api.github.com/repos/titanxxh/open-agricola/actions/runs?per_page=3' \
+  | jq '.workflow_runs[] | {name, head_sha, status, conclusion, html_url}'
+
+# 查看某个 run 的失败 job 日志
+curl -sL -H "Authorization: Bearer $GH_TOKEN" \
+  "https://api.github.com/repos/titanxxh/open-agricola/actions/runs/<RUN_ID>/logs" \
+  -o /tmp/run.zip && unzip -p /tmp/run.zip
+```
+
+如果已装官方 `gh` CLI（注意本仓库的 Cursor Cloud VM 里装的 `/usr/local/bin/gh` **不是** GitHub CLI，是另一个同名工具，调用会失败）：
+
+```bash
+gh run list --limit 5
+gh run view <RUN_ID> --log-failed
+```
+
+## 部署
+
+### 前端：GitHub Pages（自动）
+
+- Workflow：`.github/workflows/deploy-pages.yml`，触发分支 `main` / `ui`。
+- 触发路径：`src/**`、`shared/**`、`public/**`、`index.html`、`vite.config.ts`、`package.json`、workflow 本身。只改文档不会触发。
+- 必要时用 workflow_dispatch 手动重跑：
+  ```bash
+  curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/dispatches \
+    -d '{"ref":"main"}'
+  ```
+- 部署地址：<https://titanxxh.github.io/open-agricola/>。
+- 构建时 `VITE_API_BASE` / `VITE_WS_BASE` / `BGA_CDN_BASE_URL` 从 GitHub repo variable 注入（见 workflow yml）。
+
+### 后端：自建 Docker 主机（手动）
+
+- 脚本：`./deploy-backend.sh <ssh-host> [branch] [remote-dir]`
+  - 默认 `root@<host>`、分支 `main`、远端目录 `/root/open-agricola`。
+  - 动作：SSH 进远端 → `git fetch + reset --hard origin/<branch>` → `docker compose -f docker-compose.prod.yml up -d --build` → 等 healthcheck。
+- 后端生产域名从 **GitHub repo variable** 取，不要硬编码：
+  ```bash
+  # 一次性查所有 variable
+  curl -s -H "Authorization: Bearer $GH_TOKEN" \
+    https://api.github.com/repos/titanxxh/open-agricola/actions/variables \
+    | jq '.variables[] | {name, value}'
+  # 或单独查
+  curl -s -H "Authorization: Bearer $GH_TOKEN" \
+    https://api.github.com/repos/titanxxh/open-agricola/actions/variables/VITE_API_BASE
+  ```
+  关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
+- 本地仓库 `.env.example` / `.env` 里也有 `VITE_API_BASE` 的默认值，可作为应急参考，但**以 GitHub variable 为准**（CI 构建实际用的就是它）。
+- 后端部署完成后：
+  - 访问 `https://<VITE_API_BASE host>/api/health` 确认 200；
+  - 确认 `CORS_ORIGIN` 覆盖了 Pages 域名（当前 `.env.example` 已含 `https://titanxxh.github.io`）。
 
 ## 启动与环境
 
@@ -274,52 +342,4 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
 ?customCards=id1,id2    创建 WS 房间时加载 workshop 卡 ID
 ?page=login             强制登录页（认证后默认跳 lobby）
 ?page=workshop          打开工坊
-```
-
-## Cursor Cloud 专属说明
-
-### 系统依赖
-
-`canvas` 包需要原生库，VM 里已预装：`libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev`。如果 `pnpm install` 报 canvas 构建错，用 apt 重装。
-
-### 在 Cloud Agent VM 里启动服务
-
-- **不要**用 `./restart-intranet.sh`——它用 `pkill -f` 且依赖 `eth0` 检测 LAN IP，VM 里可能没有。
-- 分开启动：
-  - 后端：`pnpm run server`（5175，绑 localhost）
-  - 前端：`pnpm exec vite --host 0.0.0.0`（5173）
-- SQLite 数据库在后端首次启动时自动创建于 `./data/open-agricola.db`，无需外部 DB。
-- 后端从 5175 同时提供 HTTP API 和 WebSocket（`/ws`）。
-
-### 测试
-
-- Unit / session 测试（`pnpm test`）：~631 通过（15 skipped），不需运行中服务。测试纯领域逻辑和 `GameSession`。
-- E2E 测试（`pnpm run test:e2e`）：需要前后端运行 + Playwright 浏览器（`pnpm exec playwright install`）。
-- Lint（`pnpm run lint`）——pre-existing 错误（~340，多为 `@typescript-eslint/no-explicit-any`）符合预期，不阻塞。
-- Build（`pnpm run build`）——关于未解析 `/bga-img/*` 的警告是 cosmetic（BGA 卡牌美术代理）。
-
-### 认证（platform 分支）
-
-platform 分支在浏览器访问游戏 UI 前需要注册 / 登录。做 GUI 测试时先注册账号（POST `/api/auth/register` 带 `{username, password}`，或用 UI 注册表单）。dev 默认允许匿名 WS（`ALLOW_ANONYMOUS_WS=true`），但前端仍会显示登录页。
-
-### HTTP 单人调试模式
-
-访问 `http://localhost:5173/?player=p1` 进入单人 HTTP 模式。HTTP transport 自动为每个用户创建 `GameSession`。有用的测试 API：
-
-- `GET /api/game/state`——当前游戏状态
-- `POST /api/game/action`——`{ playerIndex, spaceId }`
-- `POST /api/game/next-player`——确认换人
-- `POST /api/game/choice`——解决待决选择
-
-### WebSocket 多人模式
-
-访问 `http://localhost:5173/?player=p1&transport=ws&room=dev`。`dev` 房间是持久化房间，后端重启后存活（状态存到 `output/`）。
-
-### BGA 参考仓库访问
-
-`GH_TOKEN` secret（通过 Cursor Cloud Secrets 设置）提供对私有仓库 `bga-devs/bga-agricola` 的访问，这是 BGA Agricola 上游参考。`gh` CLI 自动从环境读取 `GH_TOKEN`。参考仓库克隆到 `output/bga-agricola`（已通过 `output/` gitignore）：
-
-```bash
-gh repo view bga-devs/bga-agricola
-gh repo clone bga-devs/bga-agricola output/bga-agricola
 ```
