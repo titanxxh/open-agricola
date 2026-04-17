@@ -2,6 +2,8 @@
 
 本仓库的通用协作说明。Claude Code / Cursor / Codex 等 agent 读 `CLAUDE.md`（软链到本文件）。
 
+**回答用中文！**
+
 ## 项目概述
 
 Open Agricola——React + TypeScript + Vite 前端 + Node.js WebSocket/HTTP 后端的 Agricola 桌游在线实现。后端权威状态 + 实时多人同步，附带 LLM 辅助卡牌工坊和用户认证。
