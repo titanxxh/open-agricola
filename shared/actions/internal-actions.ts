@@ -5,7 +5,7 @@ import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from '
 import { wishChildrenAction, growFamilyWithoutRoomAction } from './effects/wish-children'
 import { minorImprovementAction, improvementAnyAction } from './effects/improvement'
 import { playOccupationAction } from './effects/occupation'
-import { renovateHouseAction, renovateHouseToStoneAction } from './effects/renovation'
+import { renovateHouseAction } from './effects/renovation'
 import { constructAction } from './effects/construct'
 import { fenceAction } from './effects/fencing'
 import { stablesAction } from './effects/stables'
@@ -57,7 +57,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   growFamilyWithoutRoomAction,
   playOccupationAction,
   renovateHouseAction,
-  renovateHouseToStoneAction,
   fenceAction,
   stablesAction,
   plowAction,
