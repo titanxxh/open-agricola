@@ -95,4 +95,63 @@ describe('C59_SchnappsDistillery harvest exchange', () => {
   })
 })
 
+// ===== Task 4: B27 Toolbox =====
+import '../B/B27_Toolbox'
+
+describe('B27_Toolbox rewrite', () => {
+  it('after construct offers improvement-any filtered to Joinery/Pottery/Basket', () => {
+    const listener = findListener('B27-toolbox-after-construct')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['B27_Toolbox']
+    const result = executeCardListener(listener, {
+      state: createState(2, p), player: p, space: createSpace('construct'),
+      actionId: 'construct', phase: 'after',
+    } as any)
+    expect(result?.flow).toBeDefined()
+    const flow = result!.flow as any
+    expect(flow.actionId).toBe('improvement-any')
+    expect(flow.actionContext?.allowedPurchases).toEqual(
+      expect.arrayContaining(['Major_Joinery', 'Major_Pottery', 'Major_Basket'])
+    )
+  })
+
+  it('after build-stables also offers the same flow', () => {
+    const listener = findListener('B27-toolbox-after-stables')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['B27_Toolbox']
+    const result = executeCardListener(listener, {
+      state: createState(2, p), player: p, space: createSpace('build-stables'),
+      actionId: 'build-stables', phase: 'after',
+    } as any)
+    expect((result!.flow as any).actionId).toBe('improvement-any')
+  })
+
+  it('after fencing also triggers (new listener)', () => {
+    const listener = findListener('B27-toolbox-after-fencing')!
+    expect(listener).toBeDefined()
+    const p = createPlayer()
+    p.minorPlayed = ['B27_Toolbox']
+    const result = executeCardListener(listener, {
+      state: createState(2, p), player: p, space: createSpace('fencing'),
+      actionId: 'fencing', phase: 'after',
+    } as any)
+    expect((result!.flow as any).actionId).toBe('improvement-any')
+    expect((result!.flow as any).actionContext?.allowedPurchases).toEqual(
+      expect.arrayContaining(['Major_Joinery', 'Major_Pottery', 'Major_Basket'])
+    )
+  })
+
+  it('does not trigger when card not played', () => {
+    const listener = findListener('B27-toolbox-after-construct')!
+    const p = createPlayer()
+    const result = executeCardListener(listener, {
+      state: createState(2, p), player: p, space: createSpace('construct'),
+      actionId: 'construct', phase: 'after',
+    } as any)
+    expect(result).toBeUndefined()
+  })
+})
+
 export { createPlayer, createState, createSpace, findListener, getCardEffect, executeCardListener }
