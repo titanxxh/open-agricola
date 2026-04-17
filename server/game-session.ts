@@ -53,7 +53,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
-import { computeExtraSowableFields, handleSowExtraField } from '../shared/cards/card-effects.ts'
+import { handleSowExtraField } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -102,6 +102,7 @@ import {
   buildFieldSelectFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
+  getPermittedExtraSowableFields,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from './farm-interaction.ts'
@@ -2516,31 +2517,33 @@ export class GameSession {
             typeof (field as { row?: unknown }).row === 'number' &&
             typeof (field as { col?: unknown }).col === 'number')
           : undefined
-        // Compute extra valid positions from card effects (e.g. B72 pasture sowing)
-        const extraFields = computeExtraSowableFields(player)
-        const extraValidPositions = new Set(
-          extraFields.map((f) => positionKey(f.tile)),
+        // Compute extra sowable fields from card effects (e.g. B72 pasture sowing)
+        const extraFields = getPermittedExtraSowableFields(player, this.pending.actionContext)
+        const extraAllowedCrops = new Map(
+          extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
         )
         const result = applyFarmChoice(normalized, 'sow', payload as any, {
           sowOptions: {
             maxSelections,
             excludedFields,
-            extraValidPositions: extraValidPositions.size > 0 ? extraValidPositions : undefined,
+            extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
           },
         })
         if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
+        const nextPlayer = result.player as unknown as PlayerState
         // Handle extra field sowing via card effects
-        if (extraValidPositions.size > 0) {
-          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' }[] }
+        if (extraAllowedCrops.size > 0) {
+          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' }[] }
           for (const sel of sowPayload.crops ?? []) {
             const key = positionKey({ row: sel.row, col: sel.col })
-            if (extraValidPositions.has(key)) {
-              handleSowExtraField(this.state.players[playerIndex]!, { row: sel.row, col: sel.col }, sel.crop)
+            if (extraAllowedCrops.has(key)) {
+              const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
+              if (!handled) return this.respond(false, 'invalid extra sow field')
             }
           }
         }
+        this.pushHistory()
+        this.state.players[playerIndex] = nextPlayer
         break
       }
       case 'field-select': {

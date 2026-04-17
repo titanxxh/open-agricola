@@ -20,6 +20,15 @@ export type AnimalReorgState = {
   confirmDiscard: boolean
 }
 
+export type PendingSowCrop = 'grain' | 'vegetable' | 'wood'
+
+export type ExtraSowTarget = {
+  key: string
+  tile: FarmTilePosition
+  allowedCrops: PendingSowCrop[]
+  sourceCard?: string
+}
+
 export type EngineSnapshot = {
   nodeStates: {
     id: string
@@ -50,7 +59,7 @@ export type HistorySnapshot = {
   stableError: string | null
   pendingPlowTile: FarmTilePosition | null
   plowError: string | null
-  pendingSowSelections: Record<string, 'grain' | 'vegetable'>
+  pendingSowSelections: Record<string, PendingSowCrop>
   sowError: string | null
   engineSnapshot: EngineSnapshot | null
   engineActionId: string | null

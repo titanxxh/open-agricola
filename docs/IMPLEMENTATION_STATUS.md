@@ -14,6 +14,12 @@ WebSocket 房间对局 + 后端权威状态 + 前端被动订阅渲染。
 
 详细架构设计见 `docs/ENGINE_ARCHITECTURE.md`。
 
+### 1.1 2026-04-17 Wave 9 收尾状态
+
+- 本轮已补完：`A41_VegetableSlicer`、`A85_Homekeeper`、`A106_SlurrySpreader`、`D103_CanalBoatman`、`E68_CherryOrchard`、`E93_Motivator`
+- 本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`
+- 当前卡牌覆盖率口径：`817/892 = 91.6%`（详见 `docs/card_progress.md`）
+
 ## 2. 后端
 
 ### 2.1 GameSession
@@ -215,7 +221,7 @@ npm run test:e2e  # E2E 测试
 
 ## 7. 已知边界
 
-- 882 个 A/B/C/D/E 牌文件中，当前有 810 张已接入 hook（90.8%）；剩余 12 张：11 张 BGA 自身无逻辑（已匹配参考行为）、1 张（E68）需扩展 Field.crop 支持 wood 作物类型。多数 Tier 2 复杂卡通过合理简化完成，简化内容记录在各卡文件注释中（详见 `docs/card_progress.md` 的简化表）。
+- Wave 9 收尾后，`A41/A85/A106/D103/E68/E93` 已补完，`A87/E149` 明确延后；整体覆盖率以 `docs/card_progress.md` 的 `817/892` 为准。多数 Tier 2 复杂卡通过合理简化完成，简化内容记录在各卡文件注释中（详见 `docs/card_progress.md` 的简化表）。
 - Modifier 系统已激活：`activeModifiers` 用于 improvement 支付路径；construct/fence 通过 `computeCosts` + `costOverride` 接入成本修改。`A88_HedgeKeeper` 使用与 BGA 一致的「空 `from` + `to: { wood: 1 }` + `max: 3`」`TradeModifier` 模拟围栏免木段数，而非单笔 `bonus` −3 Wood。
 - PlayerSwitchNode 已实现：opponent 卡牌触发的玩家切换，前后插入 `PlayerSwitchNode`，含 `confirmPlayerSwitch` pending 和 undo boundary。
 - D150_GodlySpouse（收回工人）和 E130_Overachiever（computeCosts 折扣）均已实现。

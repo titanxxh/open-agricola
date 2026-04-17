@@ -6,56 +6,45 @@
 
 | Deck | BGA 总数 | 已实现 | BGA 也无逻辑 | BGA 有逻辑我们漏实现 | 需核心扩展 |
 |---|---|---|---|---|---|
-| A | 180 | 153 | 5 | 0 | 0 |
+| A | 180 | 156 | 5 | 0 | 0 |
 | B | 180 | 158 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
-| D | 181 | 156 | 2 | 1 | 0 |
-| E | 169 | 157 | 0 | 2 | 1 |
-| **总计** | **892** | **811** | **7** | **3** | **1** |
+| D | 181 | 157 | 2 | 1 | 0 |
+| E | 169 | 159 | 0 | 2 | 1 |
+| **总计** | **892** | **817** | **7** | **3** | **1** |
 
-**截至 2026-04-17：811/892 = 90.9%，2074 vitest tests passing。**
+**截至 2026-04-17：817/892 = 91.6%。**
 
 > Major Improvements (10 张) 单独实现，不计入上表。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
 > 若干卡通过静态 `modifier`/`modifiers`/`exchanges`/`scoreRule` 字段实现，视为已实现（例：A14, A60, A88, A123, B32, B80, B104, B145, C13, C14, D59, E153 等）。
 
-## 剩余 12 张卡牌详细分析
+## 2026-04-17 Wave 9 已补完（6 张）
 
-### Tier 1 — BGA 自身无逻辑（7 张，匹配 BGA 行为，无需改动）
+本轮已补完并验证：
 
-经 BGA PHP 源码核查，以下 7 张卡在 BGA 参考项目中**确实没有任何 listener/effect/exchanges 方法**。我们保留数据文件即匹配 BGA 行为。
+- `A41_VegetableSlicer`
+- `A85_Homekeeper`
+- `A106_SlurrySpreader`
+- `D103_CanalBoatman`
+- `E68_CherryOrchard`
+- `E93_Motivator`
 
----
+> 本轮明确延后到后续批次：`A87_Conservator`、`E149_MidnightFencer`。
 
-#### A41 Vegetable Slicer (MinorImprovement)
-- **规则文本：** 每次将壁炉升级为烹饪炉时，立即获得 2 木头 + 1 蔬菜（不追溯）。
-- **BGA PHP：** 只有 `__construct`，无任何 hook。`isImplemented=true`（默认）。
-- **结论：** BGA 将其留作数据卡，靠升级路径隐式处理（实际未给奖励）。我们匹配此行为。
-- **优先级：** LOW — 若要补全，需 `onPlayerAfterRenovation` + 判断目标是 CookingHearth。
+## 剩余 5 张卡牌详细分析
 
----
+### Tier 1 — BGA 自身无逻辑，但我们仍未补（4 张）
 
-#### A85 Homekeeper (Occupation)
-- **规则文本：** 你的房间中恰好 1 个黏土/石头房间可多住 1 人，若该房间同时相邻 field 与 pasture。
-- **BGA PHP：** 只有 `__construct`，无 `computeExtraRoomCapacity` 或 listener。
-- **结论：** BGA 无实现，我们匹配。
-- **优先级：** MED — 补全需新增"房间空间型容量修改器"（不同于 C10/D85 的直接 +1）、检查相邻地形。工作量大但独立性好。
+经 BGA PHP 源码核查，以下 4 张卡在 BGA 参考项目中**确实没有任何 listener/effect/exchanges 方法**。当前仍保留数据文件即匹配 BGA 行为。
 
 ---
 
 #### A87 Conservator (Occupation)
 - **规则文本：** 允许木屋直接翻新为石屋（跳过黏土阶段）。
 - **BGA PHP：** 只有 `__construct`，无 `computeReplace`。
-- **结论：** BGA 无实现，我们匹配。
-- **优先级：** MED — 补全需修改 `house-redevelopment` 的 XOR 分支或添加 `computeReplace` hook 允许 wood→stone 直通。
-
----
-
-#### A106 Slurry Spreader (Occupation)
-- **规则文本：** 收获阶段每次从田里拿走最后一份谷物/蔬菜时，额外得 2 食物/1 食物。
-- **BGA PHP：** 只有 `__construct`，无 `onPlayerAfterReap`。
-- **结论：** BGA 无实现，我们匹配。
-- **优先级：** MED — 补全思路清晰：`onPlayerAfterReap` + 判断字段是否耗尽 + `gainLeaf`。~~E68 已证明 reap 监听可行~~（E68 本身也是漏实现）。
+- **当前状态：** 本轮已先落地通用内部动作 `renovate-house-to-stone` 与相关支付/日志基础，但卡牌本身按用户要求延后，尚未接上 `computeReplace` / `computeCosts` 入口。
+- **后续优先级：** MED — 下一批可直接复用已落好的基础设施收口。
 
 ---
 
@@ -63,7 +52,7 @@
 - **规则文本：** 每次使用 Lessons 行动格后，在每个"至少 3 谷且无蔬菜"的田上放 1 蔬菜。
 - **BGA PHP：** 只有 `__construct`，**显式 `isImplemented=false`**。
 - **结论：** BGA 自身放弃实现此卡。我们匹配。
-- **优先级：** LOW — BGA 都放弃了，现实中极少触发。若要实现：`after:place-farmer` on lessons/lessons-4 + 田遍历。
+- **优先级：** LOW — 若要实现：`after:place-farmer` on `lessons`/`lessons-4` + 田遍历。
 
 ---
 
@@ -83,59 +72,17 @@
 
 ---
 
-### Tier 2 — BGA 有完整实现，我们漏实现（3 张，建议 Wave 9 补上）
+### Tier 2 — BGA 有完整实现，我们当前仍缺（1 张）
 
-⚠️ **这部分是之前错误分类为 Tier 1 的卡。** BGA PHP 里有完整的 listener/exchanges 实现，我们的 `.ts` 只有数据定义。下一轮应该补上。
-
-> D155 Ebonist 已于 2026-04-17 补完（添加 `exchanges` 字段）。
-
----
-
-#### D103 Canal Boatman (Occupation)
-- **规则文本：** 每次使用 Fishing 或 Reed Bank 后，可付 1 食物把第二个人放到此卡上；若放了则获得 3 石头 或 1 谷物+1 蔬菜（二选一）。
-- **BGA PHP：** `isListeningTo` 监听 PlaceFarmer on `fishing`/`reed-bank`；`onPlayerAfterPlaceFarmer` 返回 seq：`[pay-1-food, placeFarmerOnCard, XOR(3-stone | grain+vegetable)]`。
-- **我们的 stub：** 仅有 `new Occupation({...})`。
-- **实现方案：** `registerCardListener({ actions: ['fishing', 'reed-bank'], phases: ['after'], scope: 'player', handler })`。handler 返回 optional seq：`[payLeaf({food:1}), place-farmer-on-card leaf (复用 C23 fake-farmer pattern), XOR{gainLeaf({stone:3}), gainLeaf({grain:1, vegetable:1})}]`。第二人放置可走 `actionContext: {trueAction: false, extraPlacement: true}`（见 A22_Telegram）。
-- **工作量：** ~2 小时。与 C23 Job Contract 接近。
-
----
-
-#### ~~D155 Ebonist (Occupation)~~ ✅ 已于 2026-04-17 补完
-- **规则文本：** 每次收获可将恰好 1 木头转换为 1 食物 + 1 谷物。
-- **实现：** 添加了 `exchanges: [{ from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, trigger: 'anytime' }]`。与 E153_StoneSculptor 同样采用 `anytime` 触发器（我们的交换系统无 `harvest` 触发器），由 `max: 1` 近似实现"每次收获仅一次"的限制。
-
----
-
-#### E93 Motivator (Occupation)
-- **规则文本：** 每轮第一回合，若你没有未用农场格，可从供应区再放 1 个人。
-- **BGA PHP：** `isListeningTo` 监听 `StartOfTurn` + `PlaceFarmer`；`onPlayerStartOfTurn` 清标记；`onPlayerAfterPlaceFarmer` 设标记；`canBeActivated` 返回是否有空农场格 + 未标记。
-- **我们的 stub：** 仅有 `new Occupation({...})`。
-- **实现方案：** `registerCardListener` 监听 `place-farmer` after（标记已用），`registerCardEffect` 用 `onBeforeStartOfTurn`：首回合 + 无空地 + 未标记 → optional `place-farmer` leaf（extraPlacement）。与 A22_Telegram 模式几乎一样。
-- **工作量：** ~1 小时。
+> `D155_Ebonist` 已于 2026-04-17 补完；`D103_CanalBoatman`、`E93_Motivator` 也已在本轮收口。
 
 ---
 
 #### E149 Midnight Fencer (Occupation)
 - **规则文本：** 最后一次收获开始时，你可以从每个其他玩家处拿走至多 2 根未使用的围栏并免费建到你的农场上（你的农场可超过 15 根）。
 - **BGA PHP：** `isListeningTo` 监听 `StartHarvest`；`onPlayerStartHarvest` 检查是否第 14 轮 + 计算对手可偷围栏数 + 返回特殊 FENCING 动作节点。
-- **我们的 stub：** 仅有 `new Occupation({...})`。
-- **实现方案：** `registerCardListener({ actions: ['start-harvest'], phases: ['after'], scope: 'player', handler })`。handler 判断 `state.round === 14` → 返回 optional seq 含一个定制 fencing flow（需要一个新的 `steal-fences-from-opponents` action 或修改 fencing 的 costOverride 支持跨玩家资源源）。
-- **工作量：** ~3-4 小时。最复杂的一张，但非阻塞性。BGA 的"突破 15 围栏上限"可直接跳过或简化。
-
----
-
-### Tier 3 — 需核心类型扩展（1 张）
-
-#### E68 Cherry Orchard (MinorImprovement)
-- **规则文本：** 此卡是一块只能播木头、按谷物方式收获的田。每次从此卡收走最后一份木头时，额外得 1 蔬菜。
-- **BGA PHP：** `getFieldDetails()` 返回 `'constraints' => WOOD`；`isListeningTo` 监听 Reap；`onPlayerAfterReap` 返回 `gainNode({vegetable: 1})`（当收割了木头且木头耗尽）。
-- **我们的 stub：** 仅有 `new MinorImprovement({...})`。
-- **实现方案：**
-  1. 扩展 `shared/game/types.ts` 的 `Field.crop`：从 `'grain' | 'vegetable' | null` 增加 `'wood'`。
-  2. 修改 `shared/actions/effects/sow.ts` 允许 wood 作为 sow 选项（仅限此卡的 holder-field）。
-  3. 修改 `shared/actions/effects/reap.ts` 支持 wood 作物的收获到 player.resources.wood。
-  4. 在 E68 注册 `after:reap` listener。
-- **工作量：** ~4-6 小时。主要是核心类型迁移 + 数据兼容（已有 field 序列化需保持兼容）。
+- **当前状态：** 本轮按用户要求延后。前置铺垫未做，仍需专门处理“跨玩家拿围栏 + 超过 15 围栏上限”的规则/校验边界。
+- **后续优先级：** MED-HIGH — 仍是剩余卡里最复杂的一张，但不阻塞当前收尾。
 
 ---
 

@@ -8,7 +8,7 @@ import {
 export type SowSelection = {
   row: number
   col: number
-  crop: 'grain' | 'vegetable'
+  crop: 'grain' | 'vegetable' | 'wood'
 }
 
 export type SowValidationError = {
@@ -22,8 +22,8 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 type SowValidationOptions = {
   maxSelections?: number
   excludedFields?: FarmTilePosition[]
-  /** Extra valid positions (e.g. pasture tiles from B72). These bypass the field check. */
-  extraValidPositions?: Set<string>
+  /** Extra sowable fields keyed by position, with their allowed crops. */
+  extraAllowedCrops?: Map<string, SowSelection['crop'][]>
 }
 
 const positionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
@@ -62,12 +62,19 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     const crop = selection?.crop
-    if (crop !== 'grain' && crop !== 'vegetable') {
+    if (crop !== 'grain' && crop !== 'vegetable' && crop !== 'wood') {
       return { ok: false, error: { code: 'INVALID_CROP' } }
     }
     const pos = { row, col }
     const key = positionKey(pos)
-    const isExtraField = options.extraValidPositions?.has(key) ?? false
+    const extraAllowedCrops = options.extraAllowedCrops?.get(key)
+    const isExtraField = !!extraAllowedCrops
+    if (!isExtraField && crop === 'wood') {
+      return { ok: false, error: { code: 'INVALID_CROP' } }
+    }
+    if (extraAllowedCrops && !extraAllowedCrops.includes(crop)) {
+      return { ok: false, error: { code: 'INVALID_CROP' } }
+    }
     if (!isExtraField && !isWithinFarm(pos)) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
@@ -104,11 +111,14 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     if (!selection) return field
     // Skip extra fields — they are handled by the card
     const key = positionKey({ row: field.row, col: field.col })
-    if (options.extraValidPositions?.has(key)) return field
+    if (options.extraAllowedCrops?.has(key)) return field
     if (selection.crop === 'grain') {
       return { ...field, crop: 'grain', remaining: 3 }
     }
-    return { ...field, crop: 'vegetable', remaining: 2 }
+    if (selection.crop === 'vegetable') {
+      return { ...field, crop: 'vegetable', remaining: 2 }
+    }
+    return field
   })
   const updated = {
     ...normalized,

@@ -565,6 +565,7 @@ import { E58_LunchtimeBeer } from './E/E58_LunchtimeBeer'
 import { E59_CombandCutter } from './E/E59_CombandCutter'
 import { E60_WorkingGloves } from './E/E60_WorkingGloves'
 import { E67_GrainBag } from './E/E67_GrainBag'
+import { E68_CherryOrchard } from './E/E68_CherryOrchard'
 import { E115_SeedServant } from './E/E115_SeedServant'
 import { E121_HillCultivator } from './E/E121_HillCultivator'
 import { E131_MarketMaster } from './E/E131_MarketMaster'
@@ -1170,6 +1171,7 @@ export const minorImprovementCards = [
   E59_CombandCutter,
   E60_WorkingGloves,
   E67_GrainBag,
+  E68_CherryOrchard,
   E21_SheepRug,
   E16_BriarHedge,
   E22_GuestRoom,

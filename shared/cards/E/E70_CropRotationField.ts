@@ -43,6 +43,7 @@ registerCardEffect({
   onSowExtraField: (player, tile, crop): boolean => {
     if (!player.minorPlayed.includes(CARD_ID)) return false
     if (tile.row !== VIRTUAL_TILE.row || tile.col !== VIRTUAL_TILE.col) return false
+    if (crop !== 'grain' && crop !== 'vegetable') return false
 
     // Don't allow sowing if card already has a crop
     const existing = getCardCrop(player)

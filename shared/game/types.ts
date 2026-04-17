@@ -244,7 +244,7 @@ export type ActionExecutionResult =
   | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[] }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
-  | { type: 'flow'; flow: ActionFlow }
+  | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
       type: 'leaf'
@@ -369,7 +369,8 @@ export type InteractionFarmSelection =
       farmType: 'sow'
       selectableFields: {
         tile: FarmTilePosition
-        allowedCrops: ('grain' | 'vegetable')[]
+        allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+        sourceCard?: string
       }[]
       maxSelections?: number
     }

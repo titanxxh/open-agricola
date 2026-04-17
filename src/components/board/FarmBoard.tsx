@@ -10,12 +10,12 @@ import type {
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
-import type { AnimalReorgState } from '../../types/ui'
+import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
-type CropType = 'grain' | 'vegetable'
+type FieldCropType = 'grain' | 'vegetable'
 
 const AnimalCount = ({
   count,
@@ -48,7 +48,7 @@ const CropStack = ({
   remaining,
 }: {
   locale: Locale
-  crop: CropType
+  crop: FieldCropType
   remaining: number
 }) => {
   if (remaining <= 0) return null
@@ -76,16 +76,18 @@ const SowChoiceButtons = ({
   allowedCrops,
   availableGrain,
   availableVegetable,
+  availableWood,
   isInteractive,
   updateSowSelection,
   tile,
 }: {
   locale: Locale
   tileKey: string
-  currentValue: string
-  allowedCrops: CropType[]
+  currentValue: PendingSowCrop | ''
+  allowedCrops: PendingSowCrop[]
   availableGrain: number
   availableVegetable: number
+  availableWood: number
   isInteractive: boolean
   updateSowSelection: (tile: FarmTilePosition, value: string) => void
   tile: FarmTilePosition
@@ -98,6 +100,10 @@ const SowChoiceButtons = ({
     {
       crop: 'vegetable',
       enabled: allowedCrops.includes('vegetable') && availableVegetable > 0,
+    },
+    {
+      crop: 'wood',
+      enabled: allowedCrops.includes('wood') && availableWood > 0,
     },
   ] as const).filter((option) => option.enabled || currentValue === option.crop)
 
@@ -138,7 +144,20 @@ type FarmCell = {
   fenceId?: string
 }
 
-type FieldInfo = { crop: 'grain' | 'vegetable' | null; remaining: number }
+type FieldInfo = { crop: FieldCropType | null; remaining: number }
+
+const humanizeSourceCard = (sourceCard: string) => {
+  const displayId = sourceCard.includes('_')
+    ? sourceCard.split('_').slice(1).join('_')
+    : sourceCard
+  return displayId
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+}
+
+const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
+  sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
 
 type Props = {
   locale: Locale
@@ -164,9 +183,10 @@ type Props = {
   fieldSelectableSet: Set<string>
   pendingFieldSelections: Set<string>
   toggleFieldSelection: (tile: FarmTilePosition) => void
-  pendingSowSelections: Record<string, 'grain' | 'vegetable'>
-  sowRemaining: { grain: number; vegetable: number }
-  sowSelectableMap: Map<string, ('grain' | 'vegetable')[]>
+  pendingSowSelections: Record<string, PendingSowCrop>
+  sowRemaining: Record<PendingSowCrop, number>
+  sowSelectableMap: Map<string, PendingSowCrop[]>
+  extraSowTargets: ExtraSowTarget[]
   pastureTiles: Map<string, { pastureId: string; isCorner: boolean }>
   pastureDisplayMap: Map<
     string,
@@ -451,6 +471,7 @@ export const FarmBoard = ({
   pendingSowSelections,
   sowRemaining,
   sowSelectableMap,
+  extraSowTargets,
   pastureTiles,
   pastureDisplayMap,
   pastureCapacityMap,
@@ -638,6 +659,8 @@ export const FarmBoard = ({
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
           const availableVegetable =
             sowRemaining.vegetable + (currentSowChoice === 'vegetable' ? 1 : 0)
+          const availableWood =
+            sowRemaining.wood + (currentSowChoice === 'wood' ? 1 : 0)
           const pastureInfo = pastureTiles.get(tileKey)
           const pastureDisplay = pastureInfo
             ? pastureDisplayMap.get(pastureInfo.pastureId)
@@ -718,6 +741,7 @@ export const FarmBoard = ({
                   allowedCrops={allowedSowCrops}
                   availableGrain={availableGrain}
                   availableVegetable={availableVegetable}
+                  availableWood={availableWood}
                   isInteractive={isInteractive}
                   updateSowSelection={updateSowSelection}
                   tile={{ row: tileRow, col: tileCol }}
@@ -880,6 +904,40 @@ export const FarmBoard = ({
         return <div key={cell.key} className={`farm-cell farm-${cell.type}`} />
       })}
     </div>
+    {isInteractive && extraSowTargets.length > 0 ? (
+      <div className="extra-sow-tray" aria-label="extra-sow-tray">
+        <div className="extra-sow-targets">
+          {extraSowTargets.map((target) => {
+            const currentSowChoice = isInteractive ? (pendingSowSelections[target.key] ?? '') : ''
+            const availableGrain =
+              sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
+            const availableVegetable =
+              sowRemaining.vegetable + (currentSowChoice === 'vegetable' ? 1 : 0)
+            const availableWood =
+              sowRemaining.wood + (currentSowChoice === 'wood' ? 1 : 0)
+            return (
+              <div key={target.key} className="extra-sow-target">
+                <div className="extra-sow-label">
+                  {getExtraSowTargetLabel(target.sourceCard, target.key)}
+                </div>
+                <SowChoiceButtons
+                  locale={locale}
+                  tileKey={target.key}
+                  currentValue={currentSowChoice}
+                  allowedCrops={target.allowedCrops}
+                  availableGrain={availableGrain}
+                  availableVegetable={availableVegetable}
+                  availableWood={availableWood}
+                  isInteractive={isInteractive}
+                  updateSowSelection={updateSowSelection}
+                  tile={target.tile}
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    ) : null}
     {isReorgActive ? (
       <div className="reorg-panel">
         <div className="reorg-panel-title">{t(locale, 'ui.reorgPendingTitle')}</div>

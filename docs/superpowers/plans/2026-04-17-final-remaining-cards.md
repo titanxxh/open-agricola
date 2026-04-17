@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Raise hook coverage from 811/892 (90.9%) to 819/892 (91.8%) by implementing all 11 remaining non-5+ player cards, with 2 architecturally-hard cards explicitly deferred.
+**Execution outcome:** The original goal was `811/892 → 819/892`, but the accepted 2026-04-17 execution cut stopped at `817/892 (91.6%)` after the user explicitly deferred `A87_Conservator` and `E149_MidnightFencer` in addition to the pre-existing long-tail deferrals.
 
-**Architecture:** 8 cards reuse existing infrastructure (listener / effect / exchange / future-meeples / computeReplace). E68 Cherry Orchard extends the `allowedCrops` union with `'wood'` to leverage the B68_Beanfield holder-field pattern. D25 Witches Dance Floor (multi-identity card) and D159 Reed Seller (multi-player counter-bid auction) require subsystem-level work and are deferred with design notes.
+**Architecture:** The actual shipped cut implemented 6 cards on top of existing infrastructure (`listener` / `effect` / `exchange` / `future-meeples` / `computeReplace` / stage flow). `E68_CherryOrchard` extends sow/reap interaction with off-board extra-sow targets and `'wood'` support; `A87`/`E149` remain deferred for later waves, while `D25`/`D159` stay deferred as subsystem-level work.
 
 **Tech Stack:** TypeScript (Node 18), Vitest, existing card infra: `registerCardEffect`/`registerCardListener`/`exchanges`/`computeReplace`/`computeCosts`/`ExtraSowableField`/`queueFutureMeeplesFlow`.
 
@@ -13,9 +13,11 @@
 - Tests: 2074 passing
 - Hooks: 811/892
 
-**Final target state:**
-- Tests: ~2115 passing (+40 for new cards and their tests)
-- Hooks: 819/892 (91.8%) — remaining: 5 (A113, D25, D159 deferred; E68 done; plus 5+ player cards)
+**Actual final state of this cut:**
+- Implemented in this wave cut: `A41`, `A85`, `A106`, `D103`, `E68`, `E93`
+- Explicitly deferred in this wave cut: `A87`, `E149`
+- Hooks / coverage: 817/892 (91.6%)
+- Remaining deferred cards tracked by this plan: `A87`, `A113`, `D25`, `D159`, `E149`
 
 ---
 
@@ -1282,28 +1284,30 @@ git commit -m "feat: wave 9 — wire remaining cards into catalog"
 Replace the remaining-cards block:
 
 ```markdown
-### 剩余工作（3 张 deferred）
+### 剩余工作（5 张 deferred）
 
+- **A87 Conservator** — 本轮已具备 `renovate-house-to-stone` 基础设施，但卡牌接线按范围调整延后。
 - **A113 Heresy Teacher** — BGA `isImplemented=false`；规则要求在已有谷物的田上叠加蔬菜，我们的 `Field.crop` 是单值联合类型。
 - **D25 Witches Dance Floor** — BGA `isImplemented=false`；同卡同时作为田/职业/改良，需要卡注册架构改动。
 - **D159 Reed Seller** — BGA `isImplemented=false`；需要多人拍卖/阻止行动子系统。
+- **E149 Midnight Fencer** — 本轮按范围调整延后；仍需“跨玩家拿围栏 + 超过 15 围栏上限”规则支持。
 ```
 
 Update 总览 table:
-- 已实现: 811 → 819 (Wave 9 adds A41, A106, A87, A85, D103, E93, E149, E68 = 8)
-- BGA 也无逻辑: 7 → 3 (only A113, D25, D159 deferred)
+- 已实现: 811 → 817 (Wave 9 actual cut adds A41, A85, A106, D103, E68, E93 = 6)
+- BGA 也无逻辑: 7 → 4 (`A87` 也留待后续；其余为 A113, D25, D159)
 - 需核心扩展: 1 → 0 (E68 done)
 
 - [ ] **Step 2: Add Wave 9 timeline row**
 
 ```markdown
-| Wave 9 final | 04-17 | +8 | 819 | 91.8% |
+| Wave 9 wrap | 04-17 | +6 | 817 | 91.6% |
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git commit -am "docs: card_progress.md — Wave 9 final (819/892, 91.8%)"
+git commit -am "docs: wave 9 wrap (817/892, 91.6%)"
 ```
 
 ---
@@ -1341,7 +1345,7 @@ git branch -D worktree-final-cards-plan
 
 ## Deferral notes (for future waves)
 
-Three cards are deferred in this plan. To close the last 3 gaps:
+Five cards remain deferred after the actual 2026-04-17 cut. The original task bodies above for `A87` / `E149` are still usable as future implementation notes; the long-tail gaps remain below:
 
 **A113 Heresy Teacher** — options:
 1. Change `Field.crop` from `'grain' | 'vegetable' | null` to `Array<'grain' | 'vegetable'>` (breaking change, migrations needed for save states).
