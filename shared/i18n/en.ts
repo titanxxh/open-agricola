@@ -717,6 +717,7 @@ export const en = {
     wellFood: '{player} gains 1 food from the Well',
     playImprovement: '{player} plays improvement: {improvements}{cost}{returned}',
     playMinorImprovement: '{player} plays minor improvement: {improvements}{cost}{returned}',
+    minorImprovementRequiresMinorAction: 'This card can only be played via a Minor Improvement action.',
     bakeBread: '{player} bakes bread: {count} grain → {food} food',
     returns: 'Returns {cards}',
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
