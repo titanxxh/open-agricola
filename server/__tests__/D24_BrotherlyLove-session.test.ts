@@ -38,9 +38,9 @@ const setup = (options?: {
   if (farmland) farmland.takenBy = player.id
 
   // Record round placements so the card can find where own farmers are
-  recordRoundPlacement(player, 'forest')
-  recordRoundPlacement(player, 'clay-pit')
-  recordRoundPlacement(player, 'farmland')
+  recordRoundPlacement(player, 'forest', '1')
+  recordRoundPlacement(player, 'clay-pit', '2')
+  recordRoundPlacement(player, 'farmland', '3')
 
   session.loadState(state)
   return session

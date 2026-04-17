@@ -1,4 +1,5 @@
 import type { ActionDefinition } from '../../game/types'
+import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
 import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 
 /**
@@ -48,7 +49,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
 
     if (candidates.length === 1) {
       const only = candidates[0]!
-      removeWorkerRef(only, player.id)
+      const placements = getRoundPlacementDetails(player)
+      const entry = placements.find(e => e.spaceId === only.id)
+      removeWorkerRef(only, player.id, entry?.workerId)
       player.workersAvailable += 1
       return { type: 'ok', logKey: 'log.cardEffectTrigger' }
     }
@@ -67,7 +70,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
     if (!target) return { type: 'fail', logKey: 'log.actionFail' }
-    removeWorkerRef(target, player.id)
+    const placements = getRoundPlacementDetails(player)
+    const entry = placements.find(e => e.spaceId === target.id)
+    removeWorkerRef(target, player.id, entry?.workerId)
     player.workersAvailable += 1
     return { type: 'ok', logKey: 'log.cardEffectTrigger' }
   },

@@ -1683,7 +1683,7 @@ export class GameSession {
       addWorkerRef(space, player.id, worker.id)
     }
     player.workersAvailable -= 1
-    recordRoundPlacement(player, spaceId)
+    recordRoundPlacement(player, spaceId, worker?.id ?? '?')
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
     this.engine = this.createEngine(spaceId)

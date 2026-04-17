@@ -21,7 +21,7 @@ export const spendWorkerAction: ActionDefinition = {
           ? `card:${sourceCard}`
           : undefined
     if (roundPlacementId) {
-      recordRoundPlacement(player, roundPlacementId)
+      recordRoundPlacement(player, roundPlacementId, '?')
     }
     return { type: 'ok' }
   },

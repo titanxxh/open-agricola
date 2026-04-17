@@ -117,7 +117,7 @@ describe('card flow regressions', () => {
       throw new Error('required action spaces missing')
     }
     forest.takenBy = player.id
-    recordRoundPlacement(player, 'forest')
+    recordRoundPlacement(player, 'forest', '1')
 
     session.loadState(state)
 

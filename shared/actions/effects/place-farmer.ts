@@ -31,8 +31,7 @@ export const placeFarmer = (
   addWorkerRef(space, player.id, worker.id)
   // Keep the aggregate counter in sync for now; Task 10 removes this field.
   player.workersAvailable = Math.max(0, player.workersAvailable - 1)
-  // workerId is threaded through in Task 9; keep the existing signature here.
-  recordRoundPlacement(player, space.id)
+  recordRoundPlacement(player, space.id, worker.id)
   return { type: 'ok' }
 }
 

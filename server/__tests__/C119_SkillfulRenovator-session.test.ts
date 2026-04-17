@@ -69,9 +69,9 @@ describe('C119_SkillfulRenovator', () => {
 
     const player = createPlayer()
     // Record 3 placements this round
-    recordRoundPlacement(player, 'forest')
-    recordRoundPlacement(player, 'farmland')
-    recordRoundPlacement(player, 'farm-redevelopment')
+    recordRoundPlacement(player, 'forest', '1')
+    recordRoundPlacement(player, 'farmland', '2')
+    recordRoundPlacement(player, 'farm-redevelopment', '3')
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
@@ -106,7 +106,7 @@ describe('C119_SkillfulRenovator', () => {
 
     const player = createPlayer()
     player.occupationPlayed = []
-    recordRoundPlacement(player, 'forest')
+    recordRoundPlacement(player, 'forest', '1')
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
