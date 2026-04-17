@@ -186,6 +186,7 @@ export const en = {
     interactionGodlySpouse: 'Use Godly Spouse to return your first placed person home?',
     interactionGodlySpouseUse: 'Return the first placed person home',
     interactionGodlySpouseSkip: 'Do not use Godly Spouse',
+    interactionConservatorDirectStone: 'Renovate directly to stone (Conservator)',
     interactionAshTrees: 'Choose how many free fences to use from Ash Trees',
     interactionAshTreesUseCount: 'Use {count} free fences from Ash Trees',
     interactionAshTreesSkip: 'Do not use Ash Trees this time',

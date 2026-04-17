@@ -180,6 +180,7 @@ export const zh = {
     interactionGodlySpouse: '要使用敬神配偶，把本轮第一个放置的人收回家吗？',
     interactionGodlySpouseUse: '收回本轮第一个放置的人',
     interactionGodlySpouseSkip: '不使用敬神配偶',
+    interactionConservatorDirectStone: '直接翻修为石屋（保护工）',
     interactionAshTrees: '选择本次要从白蜡树上使用几段免费围栏',
     interactionAshTreesUseCount: '使用白蜡树上的 {count} 段免费围栏',
     interactionAshTreesSkip: '这次不使用白蜡树',
