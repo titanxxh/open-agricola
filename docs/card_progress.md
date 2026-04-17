@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-17 (PR1) — minor/occupation 印刷 `vp` 接入计分 + 16 张卡 vp 全量对齐 BGA**：`shared/logic/scoring.ts` 原先把所有 minor improvement 与 occupation 的 `score` 硬编码为 `0`，导致 `$this->vp` 对应的印刷分一直被静默吞掉（影响 ~110 张已实现卡）。现改为读取 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp`；配套 `scripts/audit-card-vp.ts` 本地审计工具（不进 CI）一次性对齐 A25/B38/B39/C35/C59/D30/D31/D35/D60/E32/E38/E49/E52/E62/E71/E84 共 16 张 minor 的 `vp` 值（6+ 个 missing-ours 与 1 个 missing-bga 为 card-set scope 差异，已在 audit summary 里可见，留待后续）。PR1 仅改 `vp:` 字段；D31/D35/D60 的 `cost` 与 `returnCards`、B39/D38 的 `prerequisite` 留给 PR2/PR3。详见 `docs/superpowers/specs/2026-04-17-minor-vp-and-section-24-cards-design.md` PR1 节 + `docs/superpowers/plans/2026-04-17-PR1-minor-vp-scoring.md`。
 - **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
 - **2026-04-17 — Worker 身份模型基建落地**：13 个子任务分 commit 推进；全仓 grep 替换聚合字段读点；新增 `shared/game/{player,space}.ts` helper。为 A25 Bassinet BGA 对齐打底。详见 `docs/ENGINE_ARCHITECTURE.md § 11.4.1`。
 - **2026-04-17 — B30 Wood Palisades 完整实现**：按 segment 新增替代 fence 类型（2 wood / +1 VP / 不计入 `MAX_FENCES` 15 上限 / 不进入 fence-keyed 卡片统计）。`PlayerState.fences` 数值字段替换为 `FenceSegment[]` + 推导 helper `getFenceCount` / `getPalisadeCount`；`validateFenceSelection` 增加 `allowPalisades?` 选项；`ActionDetailEffects` 的 `fencing` / `palisading` 日志拆分；前端 `useFarmSelection` 增加模式切换。新增错误码 `EDGE_TYPE_CONFLICT`、`PALISADES_NOT_UNLOCKED`。跨卡迁移（A22 / A34 / A47 / A68 / B119 / C54 / C88 / E74 / E108，共 9 张 fence-keyed 卡）仅是数据访问面从 `player.fences` 切到 `getFenceCount(player)`——纯围栏场景下可观察行为未变；只有在 B30 打出后 palisade 才被相应排除。
@@ -111,16 +112,16 @@
 
 | Card | BGA cost / prereq / vp | 我们 cost / prereq / vp | 备注 |
 |---|---|---|---|
-| B39 Loom | `wood: 2`；prereq `2 Occupations`；vp: 1 | `wood: 1, reed: 1`；无 prereq；vp: 1 | 成本错位 + 缺 prereq |
-| D31 Storeroom | `wood: 1, stone: 2`；vp: 1 | `reed: 1`；无 vp | 整段成本错位 |
+| B39 Loom | `wood: 2`；prereq `2 Occupations`；vp: 1 | `wood: 1, reed: 1`；无 prereq；vp: 1 ✅ | 成本错位 + 缺 prereq（vp PR1 已对齐） |
+| D31 Storeroom | `wood: 1, stone: 2`；vp: 1 | `reed: 1`；vp: 1 ✅ | 整段成本错位（vp PR1 已对齐） |
 | D33 SummerHouse | `wood: 3, stone: 1`；prereq "Still in Wooden House" | `wood: 1, stone: 1`；prereq "Still in Wooden House" | 木材数量错 |
 | D34 LuxuriousHostel | `wood: 1, clay: 2`；无 prereq | `stone: 1, food: 3`；prereq "Stone House" | 整张错；多了一个错的 prereq |
-| D35 FodderChamber | `stone: 3, grain: 3`；vp: 2 | `wood: 1, clay: 1`；无 vp | 整段成本错位 |
+| D35 FodderChamber | `stone: 3, grain: 3`；vp: 2 | `wood: 1, clay: 1`；vp: 2 ✅ | 整段成本错位（vp PR1 已对齐） |
 | D38 MilkingStool | `wood: 1`；prereq `2 Occupations` | `wood: 1`；无 prereq | 行为已对齐，仅缺 prereq 元数据 |
-| D60 LargePottery | `clay: 1, stone: 1` + 返还 `Major_Pottery`；vp: 3 | `clay: 2`；无 return-card 机制 | 缺 `returnCards` 字段 + return-major-card 通用机制 |
+| D60 LargePottery | `clay: 1, stone: 1` + 返还 `Major_Pottery`；vp: 3 | `clay: 2`；vp: 3 ✅；无 return-card 机制 | 缺 `returnCards` 字段 + return-major-card 通用机制（vp PR1 已对齐） |
 
 > 修这些卡之前先确认我们的 cost shape 能否表达 `returnCards`、`vp` 等字段（参见 `shared/cards/types.ts`）。
-> Storeroom / Hostel / FodderChamber / LargePottery 的 `vp` 字段缺失，需扫一遍所有 P 类卡是否系统性遗漏。
+> 印刷 `vp` 系统性缺失问题已在 PR1 统一修正；剩余 cost / prereq / returnCards 差异按 PR2/PR3 处理。
 
 ### 2.5 🔀 刻意偏离 BGA（5 张）
 
@@ -184,6 +185,7 @@
 | `validateFenceSelection({ allowPalisades })` | ✅ | B30：围栏选择校验支持 palisade 模式，新增错误码 `EDGE_TYPE_CONFLICT` / `PALISADES_NOT_UNLOCKED` |
 | `ActionDetailEffects` fencing / palisading 拆分 | ✅ | B30：effects 日志区分围栏与木栅两种建造 |
 | `useFarmSelection` 围栏/木栅模式切换 | ✅ | B30 前端：同一 farm selection 可切换 fence / palisade 目标 |
+| **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
 
 ---
 
