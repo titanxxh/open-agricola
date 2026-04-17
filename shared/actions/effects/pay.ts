@@ -15,6 +15,29 @@ import {
   convertResources,
   hasValidResources,
 } from './exchange'
+import { getRegisteredMinorImprovement } from '../../cards/types'
+
+const FIREPLACE_COST_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+
+/**
+ * Returns true if a card in the player's hand satisfies a slot in the cost
+ * list. Normal cards must appear verbatim in the list. Minor improvements with
+ * `fireplaceIdentity === true` also satisfy any Fireplace-return cost slot.
+ */
+const cardMatchesCostList = (
+  cardId: string,
+  costList: readonly string[],
+): boolean => {
+  if (costList.includes(cardId)) return true
+  const isFireplaceRequest = costList.some(
+    (id) => (FIREPLACE_COST_IDS as readonly string[]).includes(id),
+  )
+  if (isFireplaceRequest) {
+    const minor = getRegisteredMinorImprovement(cardId)
+    if (minor?.fireplaceIdentity) return true
+  }
+  return false
+}
 
 // ============================================================
 // LRU Cache for payment computation (major performance boost)
@@ -545,7 +568,7 @@ export const computeAllBuyableCombinations = (
   // Add or combine card-based payment solutions if cards are specified
   if (cost.cards?.list && cost.cards.list.length > 0) {
     const eligibleCards = playedCards
-      ? cost.cards.list.filter((cardId) => playedCards.includes(cardId))
+      ? playedCards.filter((cardId) => cardMatchesCostList(cardId, cost.cards!.list))
       : []
 
     if (cost.cards.required) {
