@@ -13,14 +13,14 @@
 
 | Deck | BGA 总数 | 已实现 | BGA 也无逻辑（数据 only） | BGA 有逻辑我们漏实现 | 需核心扩展 |
 |---|---|---|---|---|---|
-| A | 180 | 156 | 5 | 0 | 0 |
+| A | 180 | 157 | 5 | 0 | 0 |
 | B | 180 | 158 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
 | D | 181 | 157 | 2 | 1 | 0 |
 | E | 169 | 159 | 0 | 2 | 1 |
-| **总计** | **892** | **817** | **7** | **3** | **1** |
+| **总计** | **892** | **818** | **7** | **3** | **1** |
 
-**截至 2026-04-17：817/892 = 91.6%。**
+**截至 2026-04-17：818/892 = 91.7%。**
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -35,24 +35,25 @@
 
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
-| ✅ 完全对齐 | ~803 + §2.1 列举 13 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
+| ✅ 完全对齐 | ~803 + §2.1 列举 14 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 10 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 7 张 | cost / prereq / vp 与 BGA 不同 | 优先修，影响经济 |
 | 🔀 刻意偏离 BGA（§2.5） | 5 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 5 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
+| ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-17 — A87 Conservator 完整实现**：`renovate-house` 重构为可参数化（`params.skipClayTier`），删除独立 `renovate-house-to-stone`；A87 加 `computeReplace` + `isDoable` 两个 listener；新增 i18n key `ui.interactionConservatorDirectStone`。所有现有 `renovate-house` 折扣 hook（D154 / B33 / A143 / A123 等）在 Conservator 分支上自动复用（注：D154 当前 clay-only 限制是 §2.3 独立 bug，修好后即对 wood→stone 路径生效）。
 - **2026-04-17 §6 24 张卡逐项复核完成**：原 §6 的 23 张"未复核"全部核对，按 ✅/⚠/❌ 重排进 §2.1–§2.4；C129/C137 卡名从 WetNurse/Baker 修正为 SecondSpouse/CharcoalBurner；E132 VeggieLover 从原 §5 "刻意不同"移除（其实是 3+ 卡且行为已对齐）。
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 13 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 14 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 13 张。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 14 张。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -69,6 +70,7 @@
 | E144 WaresSalesman | "可把建材换 food 的卡"列表 | 4 类硬编码列表与 BGA 完全一致 |
 | E154 Margrave | 任意玩家翻新 + 自己住石屋 → 2 food | 触发条件、计分一致 |
 | E156 ClaypitOwner | 对手打/造印刷 clay 成本改良 → 1 food + 1 clay | 印刷成本检测覆盖 minor + major（含复合成本 fees） |
+| A87 Conservator | 木屋玩家可在 House Redevelopment 上选直跳 stone（XOR） | computeReplace+isDoable 双 listener；复用 `renovate-house` actionId 让 D154/B33/A143/A123 折扣 hook 自动适用 |
 
 ### 2.2 🟡 简化实现（10 张）
 
@@ -136,7 +138,6 @@
 
 | Card | 类型 | BGA 状态 | 我们的处理 | 优先级 |
 |---|---|---|---|---|
-| A87 Conservator | Occupation | 仅 `__construct` | 已落地内部动作 `renovate-house-to-stone`；未接 `computeReplace` / `computeCosts` 入口 | MED — 下一批可收口 |
 | A113 Heresy Teacher | Occupation | `isImplemented=false` | 数据-only，匹配 BGA | LOW |
 | D25 Witches Dance Floor | Minor | `isImplemented=false` | 多身份卡（field+occupation+improvement），架构级改动 | LOW |
 | D159 Reed Seller | Occupation | `isImplemented=false` | 需要"可阻止行动 + 拍卖式选择"系统 | LOW |
