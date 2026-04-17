@@ -149,15 +149,31 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
 
 - 不要引入循环依赖。
 - 卡牌相关能力尽可能在卡牌文件内部闭环，不要把单卡逻辑扩散到主路径。
-- 修改后需同步更新文档，至少包括：
-  - `docs/IMPLEMENTATION_STATUS.md`
-  - `docs/ENGINE_ARCHITECTURE.md`
-  - `docs/cards_impl.md`
-  - `docs/card_progress.md`
-- 如果测试策略或卡牌测试写法发生变化，同时更新 `docs/CARD_TEST_TEMPLATE.md`。
 - **后端权威**：规则在 `shared/` + `server/`。不要把规则逻辑放到前端 UI。
 - **不要为单卡改动主路径**（`pay.ts`、`improvement.ts`、`game-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
 - 测试时**默认 2 人游戏**。
+
+## 文档同步（硬性要求）
+
+> 文档分工固定如下，**不要新建并行文档**（之前的 `IMPLEMENTATION_STATUS.md` / `cards_impl.md` 已废弃）。
+
+| 文档 | 作用 | 何时必须更新 |
+|---|---|---|
+| `docs/card_progress.md` | **卡牌实现进度的唯一权威源**：覆盖率总表、当前批次、剩余卡分类、刻意简化、刻意不同（与 BGA 偏离的原因）、BGA 行为复核 TODO、基础设施清单、时间线 | **每次**改卡牌相关代码（实现新卡 / 改 desc / 调 hook / 改简化策略 / 删改测试 / 改通用机制并影响某类卡）都必须同步本文件 |
+| `docs/card_desc_audit.md` | BGA `$this->desc` ↔ 我们 `desc` **文本级**对齐审计（脚本可重跑）；只追踪 desc 字符串，不写实现差异 | 改卡牌 desc 文案 / 改卡牌 ID 命名 / 跑完一轮 desc 重对齐 |
+| `docs/ENGINE_ARCHITECTURE.md` | 引擎、节点树、hook、pending、协议层等架构性约束 | 改通用扩展点（新 hook phase、新 ActionFlow 节点类型、协议层演进） |
+| `docs/CARD_TEST_TEMPLATE.md` | 卡牌测试说明模板 | 测试策略 / 卡牌测试写法变化 |
+| `docs/PLATFORM_DESIGN.md` / `docs/DEPLOY_PLAN.md` / `docs/HOW_TO_DEPLOY.md` | 平台设计 / 部署 | 仅在对应议题改动时更新 |
+
+### `card_progress.md` 同步检查清单
+
+每次卡牌相关 commit 至少检查：
+
+- [ ] §2 当前轮次 — 加一行说明本次变更（日期 + 涉及卡 + 一句话摘要）
+- [ ] §3 / §4 / §5 / §6 — 把对应卡片从待实现 / 简化 / 刻意不同 / 待复核中迁出或更新状态
+- [ ] §1 总览数字 — 实现数 / Tier 数有变化时同步
+- [ ] §7 基础设施 — 新加的通用机制要登记
+- [ ] §8 时间线 — 新批次要加新行
 
 ## 卡牌开发流程
 
