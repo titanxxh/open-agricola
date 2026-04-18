@@ -106,8 +106,6 @@ describe('B160_PubOwner session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.grain = 2
 
     // Mark all three spaces as occupied

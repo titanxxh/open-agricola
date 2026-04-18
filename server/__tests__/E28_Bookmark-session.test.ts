@@ -17,7 +17,6 @@ describe('E28_Bookmark session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Manually trigger onBuy
     runCardEffectHook(state, player, CARD_ID, 'onBuy')

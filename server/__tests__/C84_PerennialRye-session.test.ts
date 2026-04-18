@@ -35,7 +35,6 @@ describe('C84_PerennialRye session', () => {
     ]
     // Directly place card
     player.minorPlayed.push('C84_PerennialRye')
-    player.playedCards.push('minor:C84_PerennialRye')
     session.loadState(state)
     return session
   }

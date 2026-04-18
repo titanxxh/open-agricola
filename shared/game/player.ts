@@ -1,5 +1,13 @@
 import type { GameState, PlayerState, Worker } from './types'
 
+export const getPlayedCardKeys = (
+  p: Pick<PlayerState, 'improvements' | 'minorPlayed' | 'occupationPlayed'>,
+): string[] => [
+  ...p.improvements.map((id) => `major:${id}`),
+  ...p.minorPlayed.map((id) => `minor:${id}`),
+  ...p.occupationPlayed.map((id) => `occupation:${id}`),
+]
+
 export const familySize = (p: PlayerState): number =>
   (p.workers ?? []).filter(w => w.isActive).length
 

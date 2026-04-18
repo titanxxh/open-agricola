@@ -26,8 +26,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [CARD_ID],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as PlayerState

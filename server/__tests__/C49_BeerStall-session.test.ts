@@ -14,8 +14,6 @@ describe('C49_BeerStall session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.grain = 3
     // Add an unfenced stable (not inside any pasture)
     player.stableTiles = [{ row: 2, col: 2 }]

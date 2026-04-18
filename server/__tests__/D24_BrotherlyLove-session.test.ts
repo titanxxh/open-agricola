@@ -26,7 +26,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.minorPlayed.push('D24_BrotherlyLove')
-    player.playedCards.push(playedKey('D24_BrotherlyLove', 'minor'))
   }
 
   // Simulate 3 farmers already placed by marking spaces as taken by the player

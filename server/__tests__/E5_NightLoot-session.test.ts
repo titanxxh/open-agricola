@@ -19,7 +19,6 @@ describe('E5_NightLoot session', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Ensure at least 2 different building resource types on accumulation spaces
     const woodSpace = state.actionSpaces.find(

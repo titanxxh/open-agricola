@@ -2778,12 +2778,6 @@ export class GameSession {
         player.minorPlayed.push(cardId)
       }
     }
-    player.playedCards = player.playedCards ?? []
-    const prefix = isOccupation ? 'occupation' : 'minor'
-    const playedKey = `${prefix}:${cardId}`
-    if (!player.playedCards.includes(playedKey)) {
-      player.playedCards.push(playedKey)
-    }
     getCardModifiers(cardId).forEach((modifier) => {
       if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
         player.activeModifiers.push(modifier)

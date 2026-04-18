@@ -15,7 +15,6 @@ describe('A43_FarmyardManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
     // Give wood so we can afford stables (1 wood each).
     player.resources.wood = 5
 

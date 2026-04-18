@@ -16,7 +16,6 @@ describe('C46_Mandoline session', () => {
     player.resources.food = 0
     // Directly place card (avoids catalog lookup issue in devPlayCard)
     player.minorPlayed.push('C46_Mandoline')
-    player.playedCards.push('minor:C46_Mandoline')
     session.loadState(state)
     return session
   }

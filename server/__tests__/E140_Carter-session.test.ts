@@ -17,7 +17,6 @@ describe('E140_Carter session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     // Manually trigger onBuy
     runCardEffectHook(state, player, CARD_ID, 'onBuy')

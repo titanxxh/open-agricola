@@ -19,7 +19,6 @@ describe('A137_RiverineShepherd session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     // Give player a pasture for sheep accommodation
     player.pastures = [

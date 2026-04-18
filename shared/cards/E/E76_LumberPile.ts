@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { addCardResourceGained } from '../helpers/card-state'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { removeStableAtTile } from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../game/types'
 
@@ -18,7 +18,7 @@ const FIELD_EFFECT = 'lumber-pile-return-stables'
  * engine FarmHand (B85) is modeled as `rooms + 1` without a distinct stable
  * tile, so we only implement the normal-stable branch.
  */
-registerFieldEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
+registerSelectionEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
   let removed = 0
   for (const field of fields) {
     const [rowStr, colStr] = field.split(',')
@@ -55,7 +55,7 @@ registerCardEffect({
           actionId: 'field-select',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldEffect: FIELD_EFFECT,
+            selectionEffect: FIELD_EFFECT,
             maxSelections: Math.min(3, selectableTiles.length),
             farmType: 'stable',
             selectableTiles,

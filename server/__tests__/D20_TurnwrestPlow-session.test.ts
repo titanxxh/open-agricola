@@ -14,8 +14,6 @@ describe('D20_TurnwrestPlow session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D20_TurnwrestPlow')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('minor:D20_TurnwrestPlow')
     if (!player.cardStates) player.cardStates = {}
     player.cardStates['D20_TurnwrestPlow'] = { stack: ['field', 'field'] }
 

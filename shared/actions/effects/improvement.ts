@@ -297,13 +297,10 @@ const finalizeMajorImprovementPurchase = (
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   if (returnedMajorId) {
-    returnCardToBoard(player, returnedMajorId)
-    state.availableMajorImprovements.push(returnedMajorId)
+    returnCardToBoard(player, returnedMajorId, state)
   }
 
   player.improvements.push(improvementId)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`major:${improvementId}`)
   state.availableMajorImprovements = state.availableMajorImprovements.filter(
     (id) => id !== improvementId,
   )
@@ -341,14 +338,11 @@ const finalizeMinorImprovementPurchase = (
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   if (returnedCardId) {
-    returnCardToBoard(player, returnedCardId)
-    state.availableMajorImprovements.push(returnedCardId)
+    returnCardToBoard(player, returnedCardId, state)
   }
 
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
   player.minorPlayed.push(improvement.id)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${improvement.id}`)
 
   getCardModifiers(improvement.id).forEach((modifier) => {
     if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {

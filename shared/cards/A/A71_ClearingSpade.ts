@@ -3,11 +3,11 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 
 const CARD_ID = 'A71_ClearingSpade'
 
-registerFieldEffect('store-source-field', ({ player, fields, sourceCard }) => {
+registerSelectionEffect('store-source-field', ({ player, fields, sourceCard }) => {
   if (sourceCard && fields.length > 0) {
     const [r, c] = fields[0]!.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
@@ -17,7 +17,7 @@ registerFieldEffect('store-source-field', ({ player, fields, sourceCard }) => {
   }
 })
 
-registerFieldEffect('move-crop-from-source', ({ player, fields, sourceCard }) => {
+registerSelectionEffect('move-crop-from-source', ({ player, fields, sourceCard }) => {
   const sourceKey = readCardExtraData<string>(player, sourceCard!, 'moveSourceField')
   if (sourceKey && fields.length > 0) {
     const [tr, tc] = fields[0]!.split('-').map(Number)
@@ -53,7 +53,7 @@ const anytimeListener: CardListenerRegistration = {
             actionContext: {
               fieldFilter: 'has-2-plus-crops',
               maxSelections: 1,
-              fieldEffect: 'store-source-field',
+              selectionEffect: 'store-source-field',
             },
           },
           {
@@ -63,7 +63,7 @@ const anytimeListener: CardListenerRegistration = {
             actionContext: {
               fieldFilter: 'empty-plowed',
               maxSelections: 1,
-              fieldEffect: 'move-crop-from-source',
+              selectionEffect: 'move-crop-from-source',
             },
           },
         ],

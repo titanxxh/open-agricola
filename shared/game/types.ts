@@ -106,7 +106,6 @@ export type PlayerState = {
   minorPlayed: string[]
   occupationHand: string[]
   occupationPlayed: string[]
-  playedCards: string[]
   houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
   houseAnimalCount: number
   stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>

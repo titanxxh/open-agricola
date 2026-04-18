@@ -18,9 +18,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     // total = 6 wood
     player.resources.wood = 6
     player.occupationPlayed.push('C88_CarpentersApprentice')
-    player.playedCards.push('occupation:C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
-    player.playedCards.push('minor:B30_WoodPalisades')
 
     session.loadState(state)
 
@@ -51,9 +49,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     // Only 5 wood — not enough for 6-wood palisade+fence build.
     player.resources.wood = 5
     player.occupationPlayed.push('C88_CarpentersApprentice')
-    player.playedCards.push('occupation:C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
-    player.playedCards.push('minor:B30_WoodPalisades')
 
     session.loadState(state)
 

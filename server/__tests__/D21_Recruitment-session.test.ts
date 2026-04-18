@@ -19,7 +19,6 @@ describe('D21_Recruitment session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push(CARD_ID)
-    owner.playedCards.push(`minor:${CARD_ID}`)
     owner.rooms = rooms
     owner.familySize = familySize
 

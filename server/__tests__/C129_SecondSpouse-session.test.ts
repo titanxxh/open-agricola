@@ -30,7 +30,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('C129_SecondSpouse')
-    player.playedCards.push(playedKey('C129_SecondSpouse', 'occupation'))
   }
 
   if (options?.occupyUrgentWishChildren ?? true) {

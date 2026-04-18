@@ -27,12 +27,14 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-also-counts-as="major"')
   })
 
-  it('renders the "Return <major> or <cost>" UI for D60 (dual-type minor)', () => {
+  it('renders D60 prerequisite separately and keeps the cost area resource-only', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="D60_LargePottery" cardType="minor" />,
     )
-    expect(html).toContain('card-cost-return')
-    expect(html).toContain('Return')
+    expect(html).toContain('Return the Pottery')
+    expect(html).not.toContain('card-cost-return')
+    expect(html).toContain('card-res-icon clay')
+    expect(html).toContain('card-res-icon stone')
   })
 
   it('does not emit data-also-counts-as on plain (non-dual) minors', () => {

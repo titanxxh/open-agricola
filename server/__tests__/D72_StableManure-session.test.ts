@@ -18,7 +18,6 @@ describe('D72_StableManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D72_StableManure')
-    player.playedCards.push('minor:D72_StableManure')
 
     // Fields with crops
     player.fields = [
@@ -143,7 +142,6 @@ describe('D72_StableManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D72_StableManure')
-    player.playedCards.push('minor:D72_StableManure')
     player.fields = []
     player.stableTiles = [{ row: 2, col: 0 }]
     player.pastures = []

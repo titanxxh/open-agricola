@@ -14,8 +14,6 @@ describe('D113_FoodMerchant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 10
 
     // After reap: grain field had remaining=1, so after harvest remaining=0, crop=null
@@ -42,8 +40,6 @@ describe('D113_FoodMerchant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 10
 
     // After reap: grain field still has remaining (e.g. remaining went from 3 to 2)
@@ -127,8 +123,6 @@ describe('D113_FoodMerchant session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 10
     // Grain field with remaining=1 → will be depleted after harvest
     player.fields = [

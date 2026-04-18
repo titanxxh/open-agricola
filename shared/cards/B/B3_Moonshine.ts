@@ -41,7 +41,7 @@ const SELECTED_KEY = 'selectedOccupation'
  *   because our engine lacks a first-class XOR with player choice for
  *   special-effect branches (see shared/engine/dispatcher.ts), we instead
  *   emit a `choice` action with two options. The player picks one, and the
- *   field-effect / noop leaf performs the mutation.
+ *   selection-effect / noop leaf performs the mutation.
  *
  * Simplified behavior (keeping to existing primitives): we auto-choose
  * the PLAY branch if affordable, otherwise the PASS branch. The BGA ruling
@@ -73,8 +73,6 @@ const performPlay = (state: GameState, player: PlayerState, occupationId: string
   player.resources.food = (player.resources.food ?? 0) - 2
   player.occupationHand = player.occupationHand.filter((id) => id !== occupationId)
   player.occupationPlayed.push(occupationId)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`occupation:${occupationId}`)
   // Note: we intentionally do NOT register card modifiers here (to avoid
   // an import cycle via `../card-modifiers` -> catalog -> this file). The
   // normal `play-occupation` action path handles modifier activation — in

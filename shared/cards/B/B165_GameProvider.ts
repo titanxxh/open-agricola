@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 
 const CARD_ID = 'B165_GameProvider'
 
-registerFieldEffect('discard-grain-for-pigs', ({ player, fields }) => {
+registerSelectionEffect('discard-grain-for-pigs', ({ player, fields }) => {
   let grainsRemoved = 0
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
@@ -34,7 +34,7 @@ registerCardEffect({
       actionContext: {
         fieldFilter: 'has-grain',
         maxSelections: 4,
-        fieldEffect: 'discard-grain-for-pigs',
+        selectionEffect: 'discard-grain-for-pigs',
       },
     }
   },

@@ -42,7 +42,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.minorPlayed.push('B72_LoveforAgriculture')
-    player.playedCards.push('minor:B72_LoveforAgriculture')
   }
 
   // Set all players' workers to 0 for harvest/round-end tests

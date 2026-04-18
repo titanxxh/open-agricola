@@ -19,8 +19,6 @@ describe('D118_Bonehead session', () => {
     const player = state.players[0]!
     // Manually add occupation as played (not in catalog)
     player.occupationPlayed.push('D118_Bonehead')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('occ:D118_Bonehead')
     if (!player.cardStates) player.cardStates = {}
     // 5 wood remaining (1 already taken via onBuy flow)
     player.cardStates['D118_Bonehead'] = {

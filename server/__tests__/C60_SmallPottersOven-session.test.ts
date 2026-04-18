@@ -13,7 +13,6 @@ describe('C60_SmallPottersOven server session', () => {
     player.resources.food = 0
     player.minorHand = ['C60_SmallPottersOven']
     player.improvements = ['Major_ClayOven']
-    player.playedCards = ['major:Major_ClayOven']
 
     session.loadState(state)
 

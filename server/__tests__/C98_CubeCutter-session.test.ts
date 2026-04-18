@@ -33,8 +33,6 @@ describe('C98_CubeCutter session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 3
     player.resources.food = 5
 
@@ -66,8 +64,6 @@ describe('C98_CubeCutter session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 0
     player.resources.food = 5
 
@@ -86,8 +82,6 @@ describe('C98_CubeCutter session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 3
     player.resources.food = 0
 

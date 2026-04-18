@@ -32,7 +32,6 @@ describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.wood = 20
     player.resources.grain = 3
     player.resources.vegetable = 1
@@ -88,7 +87,6 @@ describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.wood = 20
     player.resources.grain = 2
     player.resources.vegetable = 1

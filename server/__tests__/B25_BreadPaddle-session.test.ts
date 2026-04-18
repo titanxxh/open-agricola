@@ -42,8 +42,6 @@ describe('B25_BreadPaddle session', () => {
 
     // Play B25 as minor improvement
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Add an occupation to hand to play
     const occId = 'A114_SeasonalWorker'

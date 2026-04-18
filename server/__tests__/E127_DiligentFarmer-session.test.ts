@@ -20,7 +20,6 @@ describe('E127_DiligentFarmer session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     // Set up to score 4 in fields (5+ fields), pastures (4+ pastures), grains (8+ grain)
     player.fields = [
@@ -61,7 +60,6 @@ describe('E127_DiligentFarmer session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     // Only 1 category at max: fields = 5 → 4 points
     player.fields = [

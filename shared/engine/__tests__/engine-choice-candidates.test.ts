@@ -48,8 +48,7 @@ const createPlayer = () =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as PlayerState

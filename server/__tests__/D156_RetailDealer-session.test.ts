@@ -18,8 +18,6 @@ describe('D156_RetailDealer session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D156_RetailDealer')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('occ:D156_RetailDealer')
     if (!player.cardStates) player.cardStates = {}
     player.cardStates['D156_RetailDealer'] = {
       extraData: { remaining: 3 },

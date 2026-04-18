@@ -36,9 +36,7 @@ const createPlayer = (
     minorHand: [],
     minorPlayed: [],
     occupationHand: [],
-    occupationPlayed: [CARD_ID],
-    playedCards: [CARD_ID],
-    houseAnimalType: null,
+    occupationPlayed: [CARD_ID],houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
     pastures: [],
@@ -153,7 +151,7 @@ describe('E125_DelayedWayfarer card effect', () => {
   })
 
   it('onRoundStart does nothing when the card is not played', () => {
-    const player = createPlayer('p1', { occupationPlayed: [], playedCards: [] })
+    const player = createPlayer('p1', { occupationPlayed: [] })
     const state = createState(4, [player])
     state.futureMeeples.push({
       id: `${CARD_ID}-p1-4-0`,

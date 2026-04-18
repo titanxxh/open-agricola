@@ -25,8 +25,7 @@ const createPlayer = (id: string): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -73,7 +72,6 @@ describe('C163_MaterialDeliveryman', () => {
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
-    owner.playedCards.push(`occupation:${CARD_ID}`)
     const trigger = createPlayer('p2')
 
     const result = executeCardListener(listener!, {
