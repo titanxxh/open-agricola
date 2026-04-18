@@ -42,6 +42,7 @@ export type CardDefinition = {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  isMajorImprovement?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -78,6 +79,7 @@ export class CardBase {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  isMajorImprovement?: boolean
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {
@@ -123,6 +125,7 @@ export class CardBase {
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
+    if (this.isMajorImprovement) def.isMajorImprovement = this.isMajorImprovement
     if (this.locales) def.locales = this.locales
     return def
   }
