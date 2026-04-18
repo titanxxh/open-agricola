@@ -219,6 +219,9 @@ describe('D25_WitchesDanceFloor session', () => {
       expect(cardCrop).not.toBeNull()
       expect(cardCrop?.crop).toBe('grain')
       expect(cardCrop?.remaining).toBe(3)
+      // UI mirror: counters should expose the crop for PlayedCardStats to render.
+      expect(player.cardStates?.[CARD_ID]?.counters?.grain).toBe(3)
+      expect(player.cardStates?.[CARD_ID]?.counters?.vegetable).toBeUndefined()
     })
 
     it('onSowExtraField: vegetable sow deducts resource and stores cardCrop with remaining=2', () => {
@@ -306,6 +309,8 @@ describe('D25_WitchesDanceFloor session', () => {
       expect(player.resources.vegetable).toBe(2)
       const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardCrop
       expect(afterSecond).toBeNull()
+      // UI mirror: counters should be cleared once the crop is gone.
+      expect(player.cardStates[CARD_ID]?.counters?.vegetable).toBeUndefined()
     })
   })
 
