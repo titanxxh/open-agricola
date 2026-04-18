@@ -1564,6 +1564,27 @@ a:focus-visible,
   color: #6a4a1f;
 }
 
+.farm-tile.locked {
+  position: relative;
+}
+
+.farm-cell-locked-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 2px;
+}
+
+.farm-cell-lock-icon {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
 .farm-tile-text {
   line-height: 1.1;
 }
