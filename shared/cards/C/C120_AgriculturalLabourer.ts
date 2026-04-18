@@ -4,6 +4,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'C120_AgriculturalLabourer'
 
@@ -69,7 +70,7 @@ registerCardEffect({
   onAfterReap: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter((field) => field.crop === 'grain' && field.remaining > 0).length
+      ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
     if (grainFields <= 0) return
     const availableClay = getStoredResource(player, CARD_ID, 'clay')
     const clayToGain = Math.min(availableClay, grainFields)

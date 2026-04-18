@@ -3,6 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop, fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'A79_GardenHoe'
 
@@ -19,7 +20,7 @@ const listener: CardListenerRegistration = {
     const hasVegetable = context.player.fields.some(
       (field) => {
         const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
-        return field.crop === 'vegetable' && (field.remaining > 0 || legacyAmount > 0)
+        return fieldHasCrop(field, 'vegetable') && (fieldTotalRemaining(field) > 0 || legacyAmount > 0)
       },
     )
     if (!hasVegetable) return

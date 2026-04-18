@@ -1,13 +1,14 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'A7_GardenersKnife'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const grainFields = player.fields.filter((f) => f.crop === 'grain').length
-    const vegFields = player.fields.filter((f) => f.crop === 'vegetable').length
+    const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain')).length
+    const vegFields = player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length
     if (grainFields === 0 && vegFields === 0) return
     const params: Record<string, number> = {}
     if (grainFields > 0) params.food = grainFields

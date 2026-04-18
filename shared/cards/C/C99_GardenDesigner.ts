@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'C99_GardenDesigner'
 
@@ -7,7 +8,7 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player, ctx) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
-    const emptyFields = player.fields.filter(f => f.crop === null).length
+    const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
     if (emptyFields === 0) return 0
 
     const alreadyReserved = ctx.reserved.food ?? 0

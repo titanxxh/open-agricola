@@ -133,8 +133,8 @@ describe('E70_CropRotationField session', () => {
         'cardCrop',
       )
       expect(cardCrop).toBeDefined()
-      expect(cardCrop!.stacks[0]?.kind).toBe('grain')
-      expect(cardCrop!.stacks[0]?.remaining ?? 0).toBe(3)
+      expect(cardCrop!.crop).toBe('grain')
+      expect(cardCrop!.remaining).toBe(3)
     })
 
     it('sowing vegetable works (remaining=2)', () => {
@@ -157,8 +157,8 @@ describe('E70_CropRotationField session', () => {
         'cardCrop',
       )
       expect(cardCrop).toBeDefined()
-      expect(cardCrop!.stacks[0]?.kind).toBe('vegetable')
-      expect(cardCrop!.stacks[0]?.remaining ?? 0).toBe(2)
+      expect(cardCrop!.crop).toBe('vegetable')
+      expect(cardCrop!.remaining).toBe(2)
     })
 
     it('fromSelectedFields filters out other extra sow fields in interaction', () => {
@@ -236,7 +236,7 @@ describe('E70_CropRotationField session', () => {
         'cardCrop',
       )
       expect(cardCrop).toBeDefined()
-      expect(cardCrop!.stacks[0]?.remaining ?? 0).toBe(2)
+      expect(cardCrop!.remaining).toBe(2)
     })
 
     it('crop cleared when remaining reaches 0', () => {

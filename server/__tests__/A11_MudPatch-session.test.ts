@@ -73,8 +73,7 @@ describe('A11_MudPatch session', () => {
     expect(cardZone!.capacity).toBe(2)
 
     // Plant on another field
-    player.fields[0]!.crop = 'vegetable'
-    player.fields[0]!.remaining = 1
+    player.fields[0]!.stacks.push({ kind: 'vegetable', remaining: 1 })
     zones = computeAnimalZones(player)
     cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
     expect(cardZone).toBeDefined()
