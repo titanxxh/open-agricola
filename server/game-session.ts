@@ -54,7 +54,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
-import { handleSowExtraField } from '../shared/cards/card-effects.ts'
+import { handleSowExtraField, collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -2443,6 +2443,7 @@ export class GameSession {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player)
+    const lockedKeys = collectLockedFarmTileKeys(player)
     const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
     let farmChoiceMeta: Record<string, unknown> | undefined
     const requireAtLeastOnePlacement =
@@ -2468,6 +2469,7 @@ export class GameSession {
             skipPayment: true,
             allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
           },
+          lockedKeys,
         )
         if (!validated.ok) return this.respond(false, validated.error?.code ?? 'validation failed')
 
@@ -2529,7 +2531,7 @@ export class GameSession {
           typeof this.pending.actionContext?.maxRooms === 'number'
             ? this.pending.actionContext.maxRooms
             : undefined
-        const selection = validateRoomSelection(normalized, rooms)
+        const selection = validateRoomSelection(normalized, rooms, lockedKeys)
         if (!selection.ok) return this.respond(false, selection.code)
         const maxBuildableRooms = getMaxBuildableRooms(
           normalized,
@@ -2587,7 +2589,7 @@ export class GameSession {
         if (requireAtLeastOnePlacement && stables.length === 0) {
           return this.respond(false, 'farm-expansion requires building at least one stable')
         }
-        const selection = validateStableSelection(normalized, stables)
+        const selection = validateStableSelection(normalized, stables, lockedKeys)
         if (!selection.ok) return this.respond(false, selection.code)
 
         const costPerStable = applyCostOverride(
@@ -2634,7 +2636,7 @@ export class GameSession {
       }
       case 'plow': {
         const tile = (payload as { tile?: FarmTilePosition }).tile
-        const selection = validatePlowSelection(normalized, tile)
+        const selection = validatePlowSelection(normalized, tile, lockedKeys)
         if (!selection.ok) return this.respond(false, selection.error?.code ?? 'validation failed')
         const selectedTile = tile as FarmTilePosition
 
