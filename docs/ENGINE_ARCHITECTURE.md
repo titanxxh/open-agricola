@@ -1191,9 +1191,11 @@ emitLeafActionDetail?: boolean
 
 收获阶段（仅收获轮 4/7/9/11/13/14）:
   onBeforeHarvest → onStartHarvest
-  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap → onAfterReap → onEndHarvestFieldPhase
+  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap' listener] → onAfterReap → onEndHarvestFieldPhase
   → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase → feed → onEndHarvestFeedingPhase → onAfterFeed
   → breed → onEndHarvest → onAfterHarvest
+
+Base reap 和额外 reap 卡（D25、C70、E69、E70、E68、E72）在产出作物后统一调用 `dispatchReapListener(state, player, crop, amount)`，分发 `'reap'` 合成 action 事件。Card listener 可通过 `registerCardListener({actions: ['reap'], phases: ['immediatelyAfter']})` 订阅；`extraData` 包含 `{ crop: 'grain'|'vegetable', amount: number }`。
 
 当前服务端收获结算按起始玩家开始、沿座位顺序推进 `reap / feed / breed` 三个子阶段；`harvestFeed` pending 会额外携带 `foodUsed`，前端据此展示喂养交换中心与进度摘要，并在玩家确认时把实际转换资源提交回权威 `GameSession`。
 ```
