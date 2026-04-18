@@ -49,7 +49,7 @@ describe('D113_FoodMerchant session', () => {
     // After reap: grain field still has remaining (e.g. remaining went from 3 to 2)
     // crop is still 'grain'
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
 
     state.harvestReapSummary = {
@@ -90,7 +90,7 @@ describe('D113_FoodMerchant session', () => {
     // Card NOT in occupationPlayed
     player.resources.food = 10
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
 
     state.harvestReapSummary = {
@@ -132,7 +132,7 @@ describe('D113_FoodMerchant session', () => {
     player.resources.food = 10
     // Grain field with remaining=1 → will be depleted after harvest
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     state.players.forEach((p) => {

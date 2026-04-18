@@ -105,8 +105,7 @@ describe('GameSession contract', () => {
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]?.resources.food).toBe(0)
       expect(resp.state.players[0]?.fields).toContainEqual({
-        crop: null,
-        remaining: 0,
+        stacks: [],
         row: 0,
         col: 1,
       })

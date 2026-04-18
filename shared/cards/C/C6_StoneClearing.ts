@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'C6_StoneClearing'
 
@@ -8,7 +9,7 @@ const CARD_ID = 'C6_StoneClearing'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const emptyFields = player.fields.filter((f) => f.crop === null).length
+    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
     if (emptyFields === 0) return
     return {
       type: 'leaf' as const,

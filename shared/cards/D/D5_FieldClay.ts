@@ -1,13 +1,14 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'D5_FieldClay'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const plantedCount = player.fields.filter((f) => f.crop !== null).length
+    const plantedCount = player.fields.filter((f) => !fieldIsEmpty(f)).length
     if (plantedCount > 0) {
       return { type: 'seq', children: [gainLeaf(CARD_ID, { clay: plantedCount })] }
     }

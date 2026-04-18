@@ -1,12 +1,13 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'C161_PotatoDigger'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const emptyFields = player.fields.filter((f) => f.crop === null).length
+    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
     let n = 0
     if (emptyFields >= 2) n = 1
     if (emptyFields >= 4) n = 2

@@ -114,7 +114,7 @@ export const buildSowFarmInteraction = (
     allowedCrops: ('grain' | 'vegetable' | 'wood')[]
     sourceCard?: string
   }[] = normalized.fields.flatMap((field) => {
-    if (field.crop !== null) return []
+    if (field.stacks.length !== 0) return []
     const key = positionKey({ row: field.row, col: field.col })
     if (excludedKeys.has(key)) return []
     if (allowedKeys && !allowedKeys.has(key)) return []
@@ -198,12 +198,15 @@ export const buildFieldSelectFarmInteraction = (
   const minSelections = (actionContext?.minSelections as number) ?? 0
   const selectableFields: FarmTilePosition[] = player.fields
     .filter((f) => {
-      if (filter === 'has-vegetable') return f.crop === 'vegetable' && f.remaining > 0
-      if (filter === 'has-grain') return f.crop === 'grain' && f.remaining > 0
-      if (filter === 'has-crop') return f.crop !== null && f.remaining > 0
-      if (filter === 'has-exactly-1-crop') return f.crop !== null && f.remaining === 1
-      if (filter === 'empty') return f.crop === null
-      return f.crop !== null && f.remaining > 0
+      const top = f.stacks[f.stacks.length - 1]
+      if (filter === 'has-vegetable') return top?.kind === 'vegetable' && top.remaining > 0
+      if (filter === 'has-grain') return top?.kind === 'grain' && top.remaining > 0
+      if (filter === 'has-crop') return !!top && top.remaining > 0
+      if (filter === 'has-exactly-1-crop') return !!top && top.remaining === 1
+      if (filter === 'has-2-plus-crops') return !!top && top.remaining >= 2
+      if (filter === 'empty-plowed') return f.stacks.length === 0
+      if (filter === 'empty') return f.stacks.length === 0
+      return !!top && top.remaining > 0
     })
     .map((f) => ({ row: f.row, col: f.col }))
   return { farmType: 'field-select', selectableFields, maxSelections, minSelections }

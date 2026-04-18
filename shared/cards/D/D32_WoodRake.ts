@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'D32_WoodRake'
 
@@ -12,9 +13,7 @@ registerCardEffect({
     // Count all crop tokens in all fields before final harvest
     let totalCrops = 0
     for (const field of player.fields) {
-      if (field.crop && field.remaining > 0) {
-        totalCrops += field.remaining
-      }
+      totalCrops += fieldTotalRemaining(field)
     }
     if (totalCrops < 7) return
 

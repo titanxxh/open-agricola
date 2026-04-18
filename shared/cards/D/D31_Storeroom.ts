@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D31_Storeroom'
 
@@ -8,7 +9,9 @@ registerCardEffect({
   computeBonusScore: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return 0
     const inFields = (crop: 'grain' | 'vegetable') =>
-      player.fields.filter((f) => f.crop === crop).reduce((sum, f) => sum + (f.remaining ?? 0), 0)
+      player.fields
+        .filter((f) => fieldHasCrop(f, crop))
+        .reduce((sum, f) => sum + (fieldFindStackOfKind(f, crop)?.remaining ?? 0), 0)
     const grain = player.resources.grain + inFields('grain')
     const veg = player.resources.vegetable + inFields('vegetable')
     const pairs = Math.min(grain, veg)

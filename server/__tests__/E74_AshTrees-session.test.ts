@@ -22,8 +22,8 @@ describe('E74_AshTrees session flow', () => {
     const player = state.players[0]!
     player.resources.wood = 0
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 1 },
-      { row: 0, col: 1, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
     player.minorPlayed.push('E74_AshTrees')
     player.playedCards.push('minor:E74_AshTrees')

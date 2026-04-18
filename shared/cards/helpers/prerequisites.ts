@@ -1,21 +1,31 @@
 import type { GameState, PlayerState } from '../../game/types'
 import type { CardDefinition } from '../types'
+import { getRegisteredMinorImprovement } from '../types'
 import { getMajorCardEffect } from '../major'
 import { checkCustomPrerequisite } from './prerequisite-registry'
+import { fieldHasCrop } from '../../game/field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
   'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites' | 'maxRound'
 >
 
-const countOccupations = (player: PlayerState) => player.occupationPlayed.length
+const countOccupations = (player: PlayerState) =>
+  player.occupationPlayed.length + (player.extraOccupationsFromCards?.length ?? 0)
 
 const countAllImprovements = (player: PlayerState) =>
   player.improvements.length + player.minorPlayed.length
 
 const countMajorImprovements = (player: PlayerState) => player.improvements.length
 
-const countFields = (player: PlayerState) => player.fields.length
+const countCardFields = (player: PlayerState) =>
+  player.minorPlayed.filter((id) => {
+    const card = getRegisteredMinorImprovement(id)
+    return !!card?.providesField
+  }).length
+
+const countFields = (player: PlayerState) =>
+  player.fields.length + countCardFields(player)
 
 const countBakingImprovements = (player: PlayerState) =>
   player.improvements.filter((id) => getMajorCardEffect(id)?.isBaking).length
@@ -51,7 +61,7 @@ const meetsTextClause = (player: PlayerState, clause: string, state?: GameState)
 
   const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
   if (grainFieldsMatch) {
-    const grainFields = player.fields.filter((f) => f.crop === 'grain')
+    const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain'))
     return grainFields.length >= Number(grainFieldsMatch[1])
   }
 

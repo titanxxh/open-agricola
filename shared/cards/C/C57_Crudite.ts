@@ -4,6 +4,8 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
+import type { Field } from '../../game/types'
+import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../game/field'
 
 const CARD_ID = 'C57_Crudite'
 
@@ -26,13 +28,20 @@ const CARD_ID = 'C57_Crudite'
  *   from BGA where the field was decremented via a SPECIAL_EFFECT node.
  */
 
-const hasQualifyingVegetableField = (player: { fields: Array<{ crop: string | null; remaining: number }> }): boolean =>
-  player.fields.some((f) => f.crop === 'vegetable' && f.remaining >= 2)
+const hasQualifyingVegetableField = (player: { fields: Field[] }): boolean =>
+  player.fields.some(
+    (f) => fieldHasCrop(f, 'vegetable') && (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0) >= 2,
+  )
 
-const removeVegetableFromField = (player: { fields: Array<{ crop: string | null; remaining: number }> }): boolean => {
-  const field = player.fields.find((f) => f.crop === 'vegetable' && f.remaining >= 2)
+const removeVegetableFromField = (player: { fields: Field[] }): boolean => {
+  const field = player.fields.find(
+    (f) => fieldHasCrop(f, 'vegetable') && (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0) >= 2,
+  )
   if (!field) return false
-  field.remaining -= 1
+  const vegStack = fieldFindStackOfKind(field, 'vegetable')
+  if (!vegStack) return false
+  vegStack.remaining -= 1
+  fieldPopIfDepleted(field)
   return true
 }
 

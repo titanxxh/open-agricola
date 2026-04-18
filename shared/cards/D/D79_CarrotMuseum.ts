@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D79_CarrotMuseum'
 
@@ -10,7 +11,7 @@ registerCardEffect({
     if (![8, 10, 12].includes(state.round)) return
 
     const vegFields = player.fields.filter(
-      (f) => f.crop === 'vegetable' && f.remaining > 0,
+      (f) => fieldHasCrop(f, 'vegetable'),
     ).length
     const veg = player.resources.vegetable ?? 0
 

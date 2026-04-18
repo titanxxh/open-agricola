@@ -69,9 +69,13 @@ export type PaymentSolution = {
 
 export type PaymentSource = 'reserve' | 'field' | 'card'
 
-export type Field = {
-  crop: 'grain' | 'vegetable' | null
+export type CropStack = {
+  kind: 'grain' | 'vegetable'
   remaining: number
+}
+
+export type Field = {
+  stacks: CropStack[]
   row: number
   col: number
 }
@@ -106,6 +110,7 @@ export type PlayerState = {
   minorPlayed: string[]
   occupationHand: string[]
   occupationPlayed: string[]
+  extraOccupationsFromCards: string[]
   playedCards: string[]
   houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
   houseAnimalCount: number

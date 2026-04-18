@@ -103,7 +103,7 @@ describe('B58_CrackWeeder session', () => {
     player.resources.food = 10
     // Vegetable field with remaining=1 — will be harvested
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
 
     session.loadState(state)

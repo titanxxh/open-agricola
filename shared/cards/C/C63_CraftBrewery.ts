@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'C63_CraftBrewery'
 
@@ -8,11 +9,10 @@ registerCardEffect({
   onHarvestFeedingPhase: (_state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
-    const grainField = player.fields.find((f) => f.crop === 'grain' && f.remaining > 0)
+    const grainField = player.fields.find((f) => fieldTopStack(f)?.kind === 'grain')
     if (!grainField) return
-    // Deduct field grain imperatively (undo system handles rollback)
-    grainField.remaining -= 1
-    if (grainField.remaining === 0) grainField.crop = null
+    // Deduct field grain imperatively (undo system handles rollback) — top must be grain
+    fieldDecrementTop(grainField)
     return {
       type: 'seq',
       optional: true,

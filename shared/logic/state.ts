@@ -252,6 +252,7 @@ export const normalizeState = (raw: GameState): GameState => {
     const minorPlayed = player.minorPlayed ?? []
     const occupationHand = player.occupationHand ?? []
     const occupationPlayed = player.occupationPlayed ?? []
+    const extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     const playedCards = player.playedCards ?? []
     const normalized = {
       ...player,
@@ -269,6 +270,7 @@ export const normalizeState = (raw: GameState): GameState => {
           ? occupationHand
           : dealtHands?.occupationHands[index] ?? [],
       occupationPlayed: occupationPlayed.length > 0 ? occupationPlayed : [],
+      extraOccupationsFromCards: extraOccupationsFromCards.length > 0 ? extraOccupationsFromCards : [],
       playedCards:
         playedCards.length > 0
           ? playedCards
@@ -327,7 +329,21 @@ export const normalizeState = (raw: GameState): GameState => {
       },
     )
     normalized.stableTiles = normalizedStableTiles
-    const normalizedFields = (normalized.fields ?? []).flatMap((field) => {
+    const migrateField = (field: any) => {
+      if (field.stacks === undefined) {
+        const legacyCrop = field.crop
+        const legacyRemaining = field.remaining ?? 0
+        field.stacks =
+          legacyCrop && legacyRemaining > 0
+            ? [{ kind: legacyCrop, remaining: legacyRemaining }]
+            : []
+        delete field.crop
+        delete field.remaining
+      }
+      return field
+    }
+    const normalizedFields = (normalized.fields ?? []).flatMap((rawField) => {
+      const field = migrateField(rawField as any)
       const row = Number.isFinite(field.row) ? field.row : -1
       const col = Number.isFinite(field.col) ? field.col : -1
       const validRow = row >= 0 && row < FARM_ROWS
@@ -472,6 +488,7 @@ export const createInitialPlayers = (
     minorPlayed: [],
     occupationHand: dealtHands.occupationHands[index] ?? [],
     occupationPlayed: [],
+    extraOccupationsFromCards: [],
     playedCards: [],
     houseAnimalType: null,
     houseAnimalCount: 0,

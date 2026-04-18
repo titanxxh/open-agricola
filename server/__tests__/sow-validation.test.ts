@@ -21,8 +21,8 @@ const createPlayer = (): PlayerFarmState => ({
   rooms: 2,
   houseType: 'wood',
   fields: [
-    { crop: null, remaining: 0, row: 2, col: 1 },
-    { crop: null, remaining: 0, row: 2, col: 2 },
+    { stacks: [], row: 2, col: 1 },
+    { stacks: [], row: 2, col: 2 },
   ],
   roomTiles: [
     { row: 2, col: 0 },
@@ -62,7 +62,7 @@ describe('sow validation', () => {
 
   it('rejects non-empty field', () => {
     const player = createPlayer()
-    player.fields[0].crop = 'grain'
+    player.fields[0].stacks = [{ kind: 'grain', remaining: 3 }]
     const result = validateSowSelection(player, [
       { row: 2, col: 1, crop: 'vegetable' },
     ])

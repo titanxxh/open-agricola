@@ -41,7 +41,7 @@ describe('D109_SowingMaster session', () => {
     // Grain utilization requires grain in hand and a field to sow
     const player = state.players[0]!
     player.resources.grain = 2
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
 
     const foodBefore = session.getState().state.players[0]!.resources.food

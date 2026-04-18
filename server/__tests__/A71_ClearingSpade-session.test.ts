@@ -20,9 +20,9 @@ describe('A71_ClearingSpade session', () => {
     const s2 = session.getState().state
     const p = s2.players[0]!
     p.fields = fields ?? [
-      { row: 0, col: 2, crop: 'grain', remaining: 3 },   // source: has grain >= 2
-      { row: 0, col: 3, crop: null, remaining: 0 },       // target: empty plowed field
-      { row: 1, col: 2, crop: 'vegetable', remaining: 1 }, // not eligible (only 1)
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },   // source: has grain >= 2
+      { row: 0, col: 3, stacks: [] },       // target: empty plowed field
+      { row: 1, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] }, // not eligible (only 1)
     ]
     session.loadState(s2)
     return session
@@ -72,18 +72,18 @@ describe('A71_ClearingSpade session', () => {
     const targetField = player.fields.find(f => f.row === 0 && f.col === 3)!
 
     // Source: was grain remaining=3, now remaining=2
-    expect(sourceField.crop).toBe('grain')
-    expect(sourceField.remaining).toBe(2)
+    expect(sourceField.stacks[0]?.kind).toBe('grain')
+    expect(sourceField.stacks[0]?.remaining ?? 0).toBe(2)
 
     // Target: was empty, now has grain remaining=1
-    expect(targetField.crop).toBe('grain')
-    expect(targetField.remaining).toBe(1)
+    expect(targetField.stacks[0]?.kind).toBe('grain')
+    expect(targetField.stacks[0]?.remaining ?? 0).toBe(1)
   })
 
   it('NOT available when no field has >= 2 crops', () => {
     const session = setup([
-      { row: 0, col: 2, crop: 'grain', remaining: 1 },   // only 1 crop
-      { row: 0, col: 3, crop: null, remaining: 0 },       // empty field
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },   // only 1 crop
+      { row: 0, col: 3, stacks: [] },       // empty field
     ])
     const resp = enterActiveInteraction(session)
 
@@ -93,8 +93,8 @@ describe('A71_ClearingSpade session', () => {
 
   it('NOT available when no empty plowed fields exist', () => {
     const session = setup([
-      { row: 0, col: 2, crop: 'grain', remaining: 3 },     // source OK
-      { row: 0, col: 3, crop: 'vegetable', remaining: 2 }, // not empty
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },     // source OK
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] }, // not empty
     ])
     const resp = enterActiveInteraction(session)
 
@@ -104,8 +104,8 @@ describe('A71_ClearingSpade session', () => {
 
   it('works with vegetable fields as source', () => {
     const session = setup([
-      { row: 0, col: 2, crop: 'vegetable', remaining: 2 }, // source
-      { row: 0, col: 3, crop: null, remaining: 0 },         // target
+      { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] }, // source
+      { row: 0, col: 3, stacks: [] },         // target
     ])
     enterActiveInteraction(session)
 
@@ -126,9 +126,9 @@ describe('A71_ClearingSpade session', () => {
     const sourceField = player.fields.find(f => f.row === 0 && f.col === 2)!
     const targetField = player.fields.find(f => f.row === 0 && f.col === 3)!
 
-    expect(sourceField.crop).toBe('vegetable')
-    expect(sourceField.remaining).toBe(1)
-    expect(targetField.crop).toBe('vegetable')
-    expect(targetField.remaining).toBe(1)
+    expect(sourceField.stacks[0]?.kind).toBe('vegetable')
+    expect(sourceField.stacks[0]?.remaining ?? 0).toBe(1)
+    expect(targetField.stacks[0]?.kind).toBe('vegetable')
+    expect(targetField.stacks[0]?.remaining ?? 0).toBe(1)
   })
 })

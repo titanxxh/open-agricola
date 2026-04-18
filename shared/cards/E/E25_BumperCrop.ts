@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'E25_BumperCrop'
 
@@ -7,7 +8,7 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
     // Only trigger reap if there are planted fields with crops to harvest
-    const hasCrops = player.fields.some((f) => f.crop !== null && f.remaining > 0)
+    const hasCrops = player.fields.some((f) => !fieldIsEmpty(f))
     if (!hasCrops) return
     return {
       type: 'leaf' as const,

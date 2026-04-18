@@ -82,7 +82,7 @@ describe('C57_Crudite', () => {
 
     const player = createPlayer()
     player.fields = [
-      { crop: 'vegetable', remaining: 3, row: 0, col: 0 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 3 }] },
     ]
     const state = createState(player)
 
@@ -92,7 +92,7 @@ describe('C57_Crudite', () => {
     expect((flow as any).actionId).toBe('gain')
     expect((flow as any).params).toEqual({ food: 4 })
     // Field should have 1 less vegetable
-    expect(player.fields[0]!.remaining).toBe(2)
+    expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('onStartHarvestFieldPhase returns undefined when no qualifying field', () => {
@@ -101,7 +101,7 @@ describe('C57_Crudite', () => {
     const player = createPlayer()
     // Only 1 vegetable (need >= 2)
     player.fields = [
-      { crop: 'vegetable', remaining: 1, row: 0, col: 0 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
     const state = createState(player)
 
@@ -115,7 +115,7 @@ describe('C57_Crudite', () => {
 
     const player = createPlayer()
     player.fields = [
-      { crop: 'vegetable', remaining: 2, row: 0, col: 0 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
     const state = createState(player)
 
@@ -128,7 +128,7 @@ describe('C57_Crudite', () => {
     expect(result!.flow!.type).toBe('leaf')
     expect((result!.flow as any).params).toEqual({ food: 4 })
     // Field is NOT modified by anytime handler (side-effect-free)
-    expect(player.fields[0]!.remaining).toBe(2)
+    expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('anytime listener returns undefined without qualifying field', () => {

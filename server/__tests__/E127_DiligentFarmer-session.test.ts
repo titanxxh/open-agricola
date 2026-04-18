@@ -24,11 +24,11 @@ describe('E127_DiligentFarmer session', () => {
 
     // Set up to score 4 in fields (5+ fields), pastures (4+ pastures), grains (8+ grain)
     player.fields = [
-      { row: 1, col: 0, crop: 'grain', quantity: 1 },
-      { row: 1, col: 1, crop: 'grain', quantity: 1 },
-      { row: 1, col: 2, crop: null, quantity: 0 },
-      { row: 1, col: 3, crop: null, quantity: 0 },
-      { row: 1, col: 4, crop: null, quantity: 0 },
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+      { row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
+      { row: 1, col: 2, stacks: [] },
+      { row: 1, col: 3, stacks: [] },
+      { row: 1, col: 4, stacks: [] },
     ]
     // 5 fields = 4 points
 
@@ -65,11 +65,11 @@ describe('E127_DiligentFarmer session', () => {
 
     // Only 1 category at max: fields = 5 → 4 points
     player.fields = [
-      { row: 1, col: 0, crop: null, quantity: 0 },
-      { row: 1, col: 1, crop: null, quantity: 0 },
-      { row: 1, col: 2, crop: null, quantity: 0 },
-      { row: 1, col: 3, crop: null, quantity: 0 },
-      { row: 1, col: 4, crop: null, quantity: 0 },
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
+      { row: 1, col: 2, stacks: [] },
+      { row: 1, col: 3, stacks: [] },
+      { row: 1, col: 4, stacks: [] },
     ]
     // 5 fields = 4 points, but only 1 category
 

@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { familySize } from '../../game/player'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'E92_FieldDoctor'
 
@@ -31,7 +32,7 @@ const checkRoomsSurroundedByFields = (context: CardListenerContext): boolean => 
   // In our coordinate system fields are tracked as player.fields array.
   // We check by tile position via positionKey or by checking enough planted fields near rooms.
   // Approximation: player must have at least 4 fields.
-  return (player.fields ?? []).filter((f) => f.crop !== null || f !== undefined).length >= 4
+  return (player.fields ?? []).filter((f) => !fieldIsEmpty(f) || f !== undefined).length >= 4
 }
 
 const computeReplaceListener: CardListenerRegistration = {

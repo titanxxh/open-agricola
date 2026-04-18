@@ -5,6 +5,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../game/farm'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 import type { ActionFlow } from '../../game/types'
+import { fieldTopStack } from '../../game/field'
 
 const CARD_ID = 'E71_CowPatty'
 
@@ -28,8 +29,10 @@ registerFieldEffect('cow-patty-bonus-crop', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
-    if (field && field.crop !== null && field.remaining > 0) {
-      field.remaining += 1
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (top) {
+      top.remaining += 1
       break // only 1 field
     }
   }
@@ -67,18 +70,20 @@ const afterSowListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
 
-    // Detect freshly sown fields
-    const freshFields = context.player.fields.filter(
-      (f) => f.crop !== null && f.remaining === INITIAL_REMAINING[f.crop],
-    )
+    // Detect freshly sown fields (top stack at initial remaining)
+    const freshFields = context.player.fields.filter((f) => {
+      const top = fieldTopStack(f)
+      return !!top && top.remaining === INITIAL_REMAINING[top.kind]
+    })
 
     // Filter to those adjacent to a pasture
     const eligible = freshFields.filter((f) => isAdjacentToPasture(f.row, f.col, context))
     if (eligible.length === 0) return
 
     if (eligible.length === 1) {
-      // Auto-add 1 crop
-      eligible[0]!.remaining += 1
+      // Auto-add 1 crop to top stack
+      const top = fieldTopStack(eligible[0]!)
+      if (top) top.remaining += 1
       return
     }
 

@@ -23,8 +23,8 @@ describe('A132_Publican session', () => {
     const opponent = state.players[1]!
     opponent.resources.grain = 2
     opponent.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
     ]
 
     session.loadState(state)
@@ -150,7 +150,7 @@ describe('A132_Publican session', () => {
     // Give owner fields to sow
     const state = session.getState().state
     state.players[0]!.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
     ]
     session.loadState(state)
 

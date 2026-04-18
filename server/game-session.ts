@@ -922,9 +922,10 @@ export class GameSession {
       const beforeField = beforeFieldMap.get(
         positionKey({ row: field.row, col: field.col }),
       )
-      if (beforeField && beforeField.crop) return
-      if (field.crop === 'grain') sowGrain += 1
-      if (field.crop === 'vegetable') sowVegetable += 1
+      if (beforeField && beforeField.stacks.length > 0) return
+      const top = field.stacks[field.stacks.length - 1]
+      if (top?.kind === 'grain') sowGrain += 1
+      if (top?.kind === 'vegetable') sowVegetable += 1
     })
     if (sowGrain > 0) effects.sowGrain = sowGrain
     if (sowVegetable > 0) effects.sowVegetable = sowVegetable
