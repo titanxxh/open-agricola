@@ -26,7 +26,6 @@ describe('A83_ShepherdsCrook session flow', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A83_ShepherdsCrook')
-    player.playedCards.push('minor:A83_ShepherdsCrook')
     player.resources.wood = 10
 
     session.loadState(state)

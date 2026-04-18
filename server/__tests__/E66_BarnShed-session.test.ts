@@ -14,7 +14,6 @@ describe('E66_BarnShed session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push('E66_BarnShed')
-    owner.playedCards.push('minor:E66_BarnShed')
     setWorkersAtHome(state, owner, 2)
     owner.resources.grain = 0
 

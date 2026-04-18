@@ -41,8 +41,6 @@ describe('E71_CowPatty session', () => {
 
     if (options?.withCard ?? true) {
       player.minorPlayed.push(CARD_ID)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`minor:${CARD_ID}`)
     }
 
     session.loadState(state)

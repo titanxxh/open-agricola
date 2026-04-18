@@ -91,7 +91,6 @@ describe('B155_ArtTeacher session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     // Put another occupation in hand to trigger the second-occupation food cost.
     const secondOccupation = 'A85_Homekeeper'
     player.occupationHand = [secondOccupation]

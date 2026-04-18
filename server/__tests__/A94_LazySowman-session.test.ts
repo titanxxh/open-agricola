@@ -27,7 +27,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('A94_LazySowman')
-    player.playedCards.push('occupation:A94_LazySowman')
   }
 
   const opponentId = state.players[1]!.id

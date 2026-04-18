@@ -23,8 +23,6 @@ describe('E30_ChildsToy session', () => {
     setNewbornCount(player, 1)
     player.resources.food = 4
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Player 2 has enough food - no complication
     const player2 = state.players[1]!
@@ -130,8 +128,6 @@ describe('E30_ChildsToy session', () => {
     setNewbornCount(player, 1)
     player.resources.food = 3 // Need 4 with card, only have 3
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     const player2 = state.players[1]!
     setActiveWorkerCount(player2, 2)

@@ -15,7 +15,6 @@ describe('A111_WallBuilder session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     // Enough for a wood room (5 wood + 2 reed).
     player.resources = { ...player.resources, wood: 10, reed: 3, clay: 0, stone: 0 }
     player.houseType = 'wood'

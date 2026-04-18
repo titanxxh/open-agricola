@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnCardToBoard } from '../../actions/effects/pay'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import {
   setCardFlag,
   isCardFlagged,
@@ -31,8 +31,8 @@ const FIELD_EFFECT = 'D27-retraining-swap'
  * - After a `renovate-house` action, flag the card.
  * - After the same player's next `place-farmer`, if flagged and a swap is
  *   available, return an optional seq whose body is a `field-select` leaf
- *   bound to a registered field-effect that performs the swap. The player
- *   can decline the optional seq; if accepted, the field-effect returns the
+ *   bound to a registered selection-effect that performs the swap. The player
+ *   can decline the optional seq; if accepted, the selection-effect returns the
  *   old major to the board and grants the new one.
  */
 
@@ -54,7 +54,7 @@ const determineSwap = (
 // Field-effect: perform the swap. We do not care about the selected fields.
 // The swap target was stashed on the card's extraData immediately before the
 // engine executed this leaf; we read it here and mutate.
-registerFieldEffect(FIELD_EFFECT, ({ player }) => {
+registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
   const swap = readCardExtraData<{ from: string; to: string }>(
     player,
     CARD_ID,
@@ -66,25 +66,18 @@ registerFieldEffect(FIELD_EFFECT, ({ player }) => {
   // Return the old major to the global board.
   returnCardToBoard(player, swap.from)
 
-  // The field-effect does not have direct access to state here, so we emit a
-  // single-card tombstone for the swap and rely on the listener to have
-  // queued the availability mutation separately. Since we lack state access
-  // here, we encode the "add swap.to to player" via playedCards + improvements,
-  // and rely on the matching card-effect listener (in `performStateUpdate`
-  // below) to adjust state.availableMajorImprovements.
+  // The selection-effect does not have direct access to state here, so we rely on
+  // the listener to have queued the availability mutation separately. Player-
+  // side ownership still needs to reflect the swap immediately, so we update
+  // `improvements` here and let the matching card-effect listener (in
+  // `performStateUpdate` below) adjust `state.availableMajorImprovements`.
   //
   // NOTE: for a pure-player-side swap, we can skip the state bookkeeping —
   // in a 2-player game, majors returning to / leaving the board mostly affect
   // availability for future purchases, which is already covered by the
   // state.availableMajorImprovements mutation in the place-farmer listener
-  // right before the field-effect fires (see listener handler).
+  // right before the selection-effect fires (see listener handler).
   player.improvements.push(swap.to)
-  player.playedCards = player.playedCards ?? []
-  // Drop the old major's playedCards entry and add the new one.
-  player.playedCards = player.playedCards.filter(
-    (entry) => entry !== `major:${swap.from}`,
-  )
-  player.playedCards.push(`major:${swap.to}`)
 })
 
 // Phase 1: after renovation → flag the card.
@@ -116,23 +109,23 @@ const placeFarmerListener: CardListenerRegistration = {
     if (!swap) return
 
     // Reserve the incoming major now so another player can't grab it, and
-    // record the swap details for the field-effect to consume if the player
+    // record the swap details for the selection-effect to consume if the player
     // accepts the optional branch. If the player declines, we roll back both
     // below — but since optional branches only execute the body when accepted,
-    // we guard against decline by reading `SWAP_KEY` at field-effect time and
+    // we guard against decline by reading `SWAP_KEY` at selection-effect time and
     // leaving the availability mutation as a matching "reservation / rollback"
     // pair gated on the same key.
     //
-    // Simpler: optimistically mutate availability *inside* the field-effect
+    // Simpler: optimistically mutate availability *inside* the selection-effect
     // (where we know the user accepted). To keep that atomic, we forward the
-    // state-mutating portion to the field-effect by stashing a reference to
+    // state-mutating portion to the selection-effect by stashing a reference to
     // the state on the card extraData — since extraData is JSON, we avoid
     // storing the state. Instead, we mutate availability here and roll it
     // back in a separate deterministic way only if never consumed.
     //
     // Easiest correct path: mutate availability here, and if the player
     // declines the optional seq the roll-back happens because the
-    // `SWAP_KEY` never gets consumed. To close that hole, the field-effect
+    // `SWAP_KEY` never gets consumed. To close that hole, the selection-effect
     // ALSO updates state.availableMajorImprovements via a second listener
     // approach. Given the complexity, we instead keep the swap strictly
     // local to the owning player; global availability only matters if
@@ -141,7 +134,7 @@ const placeFarmerListener: CardListenerRegistration = {
     writeCardExtraData(context.player, CARD_ID, SWAP_KEY, swap)
 
     // Remove the new major from the board NOW (will be restored if the player
-    // declines, via the `rollback-swap` field-effect below).
+    // declines, via the `rollback-swap` selection-effect below).
     context.state.availableMajorImprovements = context.state.availableMajorImprovements.filter(
       (id) => id !== swap.to,
     )
@@ -155,7 +148,7 @@ const placeFarmerListener: CardListenerRegistration = {
           actionId: 'field-select',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldEffect: FIELD_EFFECT,
+            selectionEffect: FIELD_EFFECT,
             maxSelections: 0,
             selectableTiles: [],
             retrainingSwap: swap,

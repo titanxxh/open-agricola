@@ -16,8 +16,6 @@ describe('B51_DiggingSpade session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     setWorkersAtHome(state, player, 2) // Add a pasture with `pigsInPasture` boar
     if (pigsInPasture > 0) {
       player.pastures = [

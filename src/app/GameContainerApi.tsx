@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
+import { getPlayedCardKeys } from '../../shared/game/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
 import { parsePositionKey, positionKey } from '../../shared/game/farm'
@@ -554,11 +555,7 @@ export const GameContainerApi = () => {
     return state.actionSpaces.filter((space) => !roundIds.has(space.id))
   }, [state])
 
-  const playedCards = displayPlayer?.playedCards ?? [
-    ...(displayPlayer?.improvements ?? []).map((id: string) => `major:${id}`),
-    ...(displayPlayer?.minorPlayed ?? []).map((id: string) => `minor:${id}`),
-    ...(displayPlayer?.occupationPlayed ?? []).map((id: string) => `occupation:${id}`),
-  ]
+  const playedCards = displayPlayer ? getPlayedCardKeys(displayPlayer) : []
 
   const isSelectingFences = pendingChoice?.promptKey === 'ui.interactionFenceSelect'
   const isSelectingStables = pendingChoice?.promptKey === 'ui.interactionStableSelect'

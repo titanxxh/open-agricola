@@ -14,7 +14,6 @@ describe('C11_WildlifeReserve session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('C11_WildlifeReserve')
-    player.playedCards.push('minor:C11_WildlifeReserve')
     session.loadState(state)
     return session
   }

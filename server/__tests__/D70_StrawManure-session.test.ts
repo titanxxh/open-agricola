@@ -18,7 +18,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 3
 
     // Two vegetable fields with crops + one grain field
@@ -117,7 +116,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 0
     player.fields = [
       { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
@@ -144,7 +142,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 3
     player.fields = [
       { row: 0, col: 0, crop: 'grain', remaining: 3 },

@@ -1,11 +1,11 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 
 const CARD_ID = 'D70_StrawManure'
 
-registerFieldEffect('add-vegetable', ({ player, fields }) => {
+registerSelectionEffect('add-vegetable', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
@@ -38,7 +38,7 @@ registerCardEffect({
         actionContext: {
           fieldFilter: 'has-vegetable',
           maxSelections: 2,
-          fieldEffect: 'add-vegetable',
+          selectionEffect: 'add-vegetable',
         },
       },
     ]

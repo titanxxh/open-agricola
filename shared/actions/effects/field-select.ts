@@ -1,6 +1,6 @@
 import type { ActionDefinition } from '../../game/types'
 import { writeCardExtraData } from '../../cards/helpers/card-state'
-import { runFieldEffect } from './field-effect-registry'
+import { runSelectionEffect } from './selection-effect-registry'
 
 export const fieldSelectAction: ActionDefinition = {
   id: 'field-select',
@@ -28,9 +28,9 @@ export const fieldSelectAction: ActionDefinition = {
       writeCardExtraData(player, sourceCard, 'selectedFields', fields)
     }
 
-    const effect = actionContext?.fieldEffect as string | undefined
+    const effect = actionContext?.selectionEffect as string | undefined
     if (effect) {
-      runFieldEffect(effect, { player, fields, sourceCard })
+      runSelectionEffect(effect, { player, fields, sourceCard })
     }
 
     return { type: 'ok', extraData: { selectedFields: fields } }

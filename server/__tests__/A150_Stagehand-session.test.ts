@@ -13,7 +13,6 @@ describe('A150_Stagehand session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('A150_Stagehand')
-    owner.playedCards.push('occupation:A150_Stagehand')
     owner.resources = { ...owner.resources, wood: 20, clay: 10, reed: 10, stone: 10 }
 
     const opponent = state.players[1]!

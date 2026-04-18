@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../game/types'
+import { playImprovement } from '../../actions/effects/improvement'
+import { getPlayedCardKeys } from '../../game/player'
 import { getCardEffect } from '../card-effects'
 import { cardCountsAs, collectCardsAs } from '../helpers/card-type'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
@@ -23,7 +25,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
+    occupationHand: [], occupationPlayed: [],
     houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
@@ -41,12 +43,13 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('D60_LargePottery', () => {
-  it('card definition matches BGA (cost, vp, returnCards, extraVp, alsoCountsAs, exchanges)', () => {
+  it('card definition matches BGA (cost, vp, prerequisite, extraVp, alsoCountsAs, exchanges)', () => {
     expect(D60Card.cost).toEqual({ clay: 1, stone: 1 })
     expect(D60Card.vp).toBe(3)
     expect(D60Card.extraVp).toBe(true)
     expect(D60Card.evenMoreSet).toBe(true)
-    expect(D60Card.returnCards).toEqual(['Major_Pottery'])
+    expect(D60Card.prerequisite).toBe('Return the Pottery')
+    expect(D60Card.returnCards).toBeUndefined()
     expect(D60Card.alsoCountsAs).toEqual(['major'])
     expect(D60Card.category).toBe('FOOD_PROVIDER')
     expect(D60Card.exchanges).toEqual([
@@ -90,6 +93,42 @@ describe('D60_LargePottery', () => {
       const player = createPlayer()
       player.minorPlayed = [CARD_ID]
       expect(collectCardsAs(player, 'major')).toContain(CARD_ID)
+    })
+  })
+
+  describe('custom prerequisite + onBuy return flow', () => {
+    it('requires a previously played Pottery to satisfy "Return the Pottery"', () => {
+      const withoutPottery = createPlayer()
+      expect(
+        meetsCardPrerequisites(withoutPottery, { prerequisite: 'Return the Pottery' } as any),
+      ).toBe(false)
+
+      const withPottery = createPlayer()
+      withPottery.improvements = ['Major_Pottery']
+      expect(
+        meetsCardPrerequisites(withPottery, { prerequisite: 'Return the Pottery' } as any),
+      ).toBe(true)
+    })
+
+    it('buying D60 returns Major_Pottery to the board instead of encoding it in returnCards', () => {
+      const player = createPlayer()
+      player.minorHand = [CARD_ID]
+      player.improvements = ['Major_Pottery']
+      player.resources.clay = 1
+      player.resources.stone = 1
+
+      const state = createState(player)
+      const result = playImprovement(state, player, CARD_ID, 'minor')
+
+      expect(result.type).toBe('ok')
+      expect(player.minorPlayed).toContain(CARD_ID)
+      expect(player.minorHand).not.toContain(CARD_ID)
+      expect(player.improvements).not.toContain('Major_Pottery')
+      expect(getPlayedCardKeys(player)).not.toContain('major:Major_Pottery')
+      expect(getPlayedCardKeys(player)).toContain(`minor:${CARD_ID}`)
+      expect(state.availableMajorImprovements).toContain('Major_Pottery')
+      expect(player.resources.clay).toBe(0)
+      expect(player.resources.stone).toBe(0)
     })
   })
 

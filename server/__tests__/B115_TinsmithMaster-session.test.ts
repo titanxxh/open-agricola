@@ -41,8 +41,6 @@ describe('B115_TinsmithMaster session', () => {
 
     if (options?.withCard ?? true) {
       player.occupationPlayed.push(CARD_ID)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`occupation:${CARD_ID}`)
     }
 
     session.loadState(state)

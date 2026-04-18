@@ -13,7 +13,6 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D71_Changeover')
-    player.playedCards.push('minor:D71_Changeover')
 
     // One eligible field (remaining === 1), one not eligible (remaining === 2)
     player.fields = [
@@ -102,7 +101,6 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D71_Changeover')
-    player.playedCards.push('minor:D71_Changeover')
 
     // No field with remaining === 1
     player.fields = [

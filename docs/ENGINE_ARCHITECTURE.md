@@ -948,7 +948,11 @@ type GameState = {
 - 基础经营信息：`resources`、`familySize`、`workersAvailable`、`rooms`、`houseType`
 - 农场版图：`fields`、`roomTiles`、`stableTiles`、`fenceSegments`、`pastures`
 - 动物安置：`houseAnimalType`、`houseAnimalCount`、`stableAnimals`、`newbornCount`
-- 已打出卡牌：`improvements`、`minorPlayed`、`occupationPlayed`、`playedCards`
+- 已打出卡牌：`improvements`、`minorPlayed`、`occupationPlayed`
+
+前端或测试如果需要“带类型前缀的已打出卡牌 key 列表”，应通过
+`getPlayedCardKeys(player)` 从上述 canonical arrays 现算，而不是再维护
+冗余的 `playedCards` 字段。
 - 手牌：`minorHand`、`occupationHand`
 - 持续性效果：`majorEffects`、`activeModifiers`
 - 卡牌局部状态：`cardStates`

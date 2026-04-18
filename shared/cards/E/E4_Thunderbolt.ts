@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 
 const CARD_ID = 'E4_Thunderbolt'
 
-registerFieldEffect('remove-all-grain-for-wood', ({ player, fields }) => {
+registerSelectionEffect('remove-all-grain-for-wood', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain')
@@ -31,7 +31,7 @@ registerCardEffect({
       actionContext: {
         fieldFilter: 'has-grain',
         maxSelections: 1,
-        fieldEffect: 'remove-all-grain-for-wood',
+        selectionEffect: 'remove-all-grain-for-wood',
       },
     }
   },

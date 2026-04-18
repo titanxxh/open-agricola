@@ -15,7 +15,6 @@ describe('A124_Knapper session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     // Reveal the specified action-card space on the given round.
     state.roundActionOrder[round - 1] = revealedSpaceId

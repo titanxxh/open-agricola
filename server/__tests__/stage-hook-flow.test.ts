@@ -32,7 +32,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('B70_NewPurchase')
-    player.playedCards.push('minor:B70_NewPurchase')
     player.resources.food = 6
 
     session.loadState(state)
@@ -70,7 +69,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('A166_Haydryer')
-    player.playedCards.push('occupation:A166_Haydryer')
     player.resources.food = 10
     player.pastures = [
       {
@@ -116,7 +114,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D99_EarthenwarePotter')
-    player.playedCards.push('occupation:D99_EarthenwarePotter')
     player.resources.food = 10
     player.resources.clay = 2
     player.cardStates = {
@@ -152,7 +149,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A64_BarleyMill')
-    player.playedCards.push('minor:A64_BarleyMill')
     player.resources.food = 10
     player.fields = [
       { row: 0, col: 0, crop: 'grain', remaining: 2 },
@@ -191,7 +187,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('C120_AgriculturalLabourer')
-    player.playedCards.push('occupation:C120_AgriculturalLabourer')
     player.resources.food = 10
     player.cardStates = {
       ...player.cardStates,
@@ -232,7 +227,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('C71_SlurrySpreader')
-    player.playedCards.push('minor:C71_SlurrySpreader')
     player.resources.food = 10
     player.resources.grain = 1
     player.resources.sheep = 2
@@ -307,7 +301,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D115_FodderPlanter')
-    player.playedCards.push('occupation:D115_FodderPlanter')
     player.resources.food = 10
     player.resources.grain = 2
     player.resources.sheep = 2
@@ -389,7 +382,6 @@ describe('stage hook flows', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D115_FodderPlanter')
-    player.playedCards.push('occupation:D115_FodderPlanter')
     player.resources.food = 10
     player.resources.grain = 2
     player.resources.sheep = 2

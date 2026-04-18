@@ -18,7 +18,6 @@ const setup = (options?: { round?: number; food?: number }) => {
   setWorkersAtHome(state, player, 2)
   player.resources.food = options?.food ?? 10
   player.occupationPlayed.push(CARD_ID)
-  player.playedCards.push('occupation:' + CARD_ID)
 
   // Add pastures so animals can be housed
   player.pastures = [

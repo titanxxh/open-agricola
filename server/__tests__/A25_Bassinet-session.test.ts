@@ -20,9 +20,6 @@ const CARD_ID = 'A25_Bassinet'
 const giveP2Bassinet = (state: GameState) => {
   const p2 = state.players[1]!
   if (!p2.minorPlayed.includes(CARD_ID)) p2.minorPlayed.push(CARD_ID)
-  if (!p2.playedCards.includes(`minor:${CARD_ID}`)) {
-    p2.playedCards.push(`minor:${CARD_ID}`)
-  }
 }
 
 /**
@@ -168,7 +165,6 @@ describe('A25_Bassinet session', () => {
     setWorkersAtHome(state, p1, 2)
     p1.resources.food = 5
     p1.occupationPlayed.push('A92_AdoptiveParents')
-    p1.playedCards.push('occupation:A92_AdoptiveParents')
     session.loadState(state)
 
     // P1 does FG
@@ -252,13 +248,9 @@ describe('A25_Bassinet session', () => {
     // Give A25 to P1 (the start player) instead
     const p1 = state.players[0]!
     if (!p1.minorPlayed.includes(CARD_ID)) p1.minorPlayed.push(CARD_ID)
-    if (!p1.playedCards.includes(`minor:${CARD_ID}`)) {
-      p1.playedCards.push(`minor:${CARD_ID}`)
-    }
     // Also remove A25 from P2 to isolate
     const p2 = state.players[1]!
     p2.minorPlayed = p2.minorPlayed.filter((id) => id !== CARD_ID)
-    p2.playedCards = p2.playedCards.filter((id) => id !== `minor:${CARD_ID}`)
 
     // P1 places on farmland (first non-accum, own)
     simulatePlacement(state, p1, 'farmland', '1')

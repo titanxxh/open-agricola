@@ -32,7 +32,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('C112_Thresher')
-    player.playedCards.push(playedKey('C112_Thresher', 'occupation'))
   }
 
   session.loadState(state)

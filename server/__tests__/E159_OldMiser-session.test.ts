@@ -29,8 +29,7 @@ const createPlayer = (id = 'p1'): PlayerState => ({
   roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
   stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [],
-  occupationHand: [], occupationPlayed: [], playedCards: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+  occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
   pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false,
   activeModifiers: [], cardStates: {},
@@ -63,8 +62,6 @@ describe('E159_OldMiser session', () => {
       setNewbornCount(player, 0)
       player.resources.food = 2
       player.occupationPlayed.push(CARD_ID)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`occupation:${CARD_ID}`)
 
       const player2 = state.players[1]!
       setActiveWorkerCount(player2, 2)
@@ -162,8 +159,6 @@ describe('E159_OldMiser session', () => {
       markAllWorkersUsed(state, player)
       player.resources.food = 2
       player.occupationPlayed.push(CARD_ID)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`occupation:${CARD_ID}`)
 
       const player2 = state.players[1]!
       setActiveWorkerCount(player2, 2)

@@ -20,7 +20,6 @@ describe('construct room payment session', () => {
     }
     player.houseType = 'stone'
     player.occupationPlayed.push('A123_FrameBuilder')
-    player.playedCards.push('occupation:A123_FrameBuilder')
     player.activeModifiers = [
       ...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
     ]
@@ -146,7 +145,6 @@ describe('construct room payment session', () => {
       reed: 2,
     }
     player.minorPlayed.push('A14_CarpentersHammer')
-    player.playedCards.push('minor:A14_CarpentersHammer')
     player.activeModifiers = [
       ...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
     ]

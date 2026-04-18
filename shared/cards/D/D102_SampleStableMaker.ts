@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { addCardResourceGained } from '../helpers/card-state'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { removeStableAtTile } from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../game/types'
 
@@ -19,7 +19,7 @@ const FIELD_EFFECT = 'sample-stable-maker-return'
  * skips the selection step. Our implementation skips the Farm Hand branch
  * since our B85 FarmHand does not create a dedicated stable tile.
  */
-registerFieldEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
+registerSelectionEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
   if (fields.length === 0) return
   const [rowStr, colStr] = fields[0]!.split(',')
   const row = Number(rowStr)
@@ -58,7 +58,7 @@ registerCardEffect({
           actionId: 'field-select',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldEffect: FIELD_EFFECT,
+            selectionEffect: FIELD_EFFECT,
             maxSelections: 1,
             farmType: 'stable',
             selectableTiles,

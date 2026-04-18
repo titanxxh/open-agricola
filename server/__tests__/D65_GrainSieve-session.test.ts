@@ -20,8 +20,6 @@ describe('D65_GrainSieve session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     player.fields = [
       ...(options.grainFields ?? []),

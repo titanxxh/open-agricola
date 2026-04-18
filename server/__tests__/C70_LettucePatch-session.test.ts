@@ -34,7 +34,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
   }
 
   // Set all players' workers to 0 for harvest/round-end tests
@@ -125,7 +124,6 @@ describe('C70_LettucePatch session', () => {
 
       const player = state.players[0]!
       player.minorPlayed.push(CARD_ID)
-      player.playedCards.push(`minor:${CARD_ID}`)
       player.resources.vegetable = 0
       player.cardStates[CARD_ID] = {
         extraData: {
@@ -223,7 +221,6 @@ describe('C70_LettucePatch session', () => {
 
       const player = state.players[0]!
       player.minorPlayed.push(CARD_ID)
-      player.playedCards.push(`minor:${CARD_ID}`)
       player.resources.vegetable = 0
       player.cardStates[CARD_ID] = {
         extraData: {

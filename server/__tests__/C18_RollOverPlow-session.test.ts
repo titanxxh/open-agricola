@@ -13,7 +13,6 @@ describe('C18_RollOverPlow session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('C18_RollOverPlow')
-    player.playedCards.push('minor:C18_RollOverPlow')
 
     // 3 planted fields
     player.fields = [
@@ -89,7 +88,6 @@ describe('C18_RollOverPlow session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('C18_RollOverPlow')
-    player.playedCards.push('minor:C18_RollOverPlow')
 
     // Only 2 planted fields
     player.fields = [

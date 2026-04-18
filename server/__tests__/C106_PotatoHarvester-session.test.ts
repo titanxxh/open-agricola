@@ -20,7 +20,6 @@ describe('C106_PotatoHarvester session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     player.fields = [
       ...(options.vegetableFields ?? []),

@@ -37,7 +37,6 @@ const setup = (options?: {
   player.resources.vegetable = options?.vegetable ?? 0
   player.fields = options?.fields ?? []
   player.minorPlayed.push(CARD_ID)
-  player.playedCards.push(`minor:${CARD_ID}`)
 
   if (options?.cardCrop !== undefined) {
     if (options.cardCrop !== null) {
@@ -68,10 +67,6 @@ const addMinorCard = (
   const player = state.players[0]!
   if (!player.minorPlayed.includes(cardId)) {
     player.minorPlayed.push(cardId)
-  }
-  const playedKey = `minor:${cardId}`
-  if (!player.playedCards.includes(playedKey)) {
-    player.playedCards.push(playedKey)
   }
   session.loadState(state)
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { checkCustomPrerequisite } from '../../shared/cards/helpers/prerequisite-registry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { getPlayedCardKeys } from '../../shared/game/player'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/A/A3_PaperKnife'
@@ -27,8 +28,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
@@ -102,7 +102,7 @@ describe('A3_PaperKnife onBuy', () => {
     const played = player.occupationPlayed[0]!
     expect(handSnapshot).toContain(played)
     expect(player.occupationHand).not.toContain(played)
-    expect(player.playedCards).toContain(`occupation:${played}`)
+    expect(getPlayedCardKeys(player)).toContain(`occupation:${played}`)
   })
 
   it('does not consume any resources (free play)', () => {

@@ -24,8 +24,6 @@ const setup = () => {
 
   const player = state.players[0]!
   player.minorPlayed.push(CARD_ID)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${CARD_ID}`)
 
   return { state, player }
 }
@@ -98,8 +96,6 @@ describe('A106_SlurrySpreader session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.fields = [{ row: 0, col: 0, crop: 'grain', remaining: 1 }]
 
     session.loadState(state)

@@ -20,8 +20,6 @@ describe('A59_PotatoRidger session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Set up vegetable fields
     if (options.vegetableFields) {

@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 
 const CARD_ID = 'A70_LiftingMachine'
 
-registerFieldEffect('take-vegetable', ({ player, fields }) => {
+registerSelectionEffect('take-vegetable', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'vegetable' && f.remaining > 0)
@@ -33,7 +33,7 @@ registerCardEffect({
       actionContext: {
         fieldFilter: 'has-vegetable',
         maxSelections: 1,
-        fieldEffect: 'take-vegetable',
+        selectionEffect: 'take-vegetable',
       },
     }
   },

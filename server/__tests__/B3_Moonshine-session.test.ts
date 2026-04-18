@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
+import { getPlayedCardKeys } from '../../shared/game/player'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/B/B3_Moonshine'
@@ -24,8 +25,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
@@ -61,7 +61,7 @@ describe('B3_Moonshine card effect', () => {
     effect!.onBuy!(state, player)
     expect(player.occupationHand).toHaveLength(0)
     expect(player.occupationPlayed).toContain('A9_SheepFarmer')
-    expect(player.playedCards).toContain('occupation:A9_SheepFarmer')
+    expect(getPlayedCardKeys(player)).toContain('occupation:A9_SheepFarmer')
     expect(player.resources.food).toBe(0)
   })
 

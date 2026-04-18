@@ -29,8 +29,7 @@ const createPlayer = (id = 'p1', overrides?: Partial<PlayerState>): PlayerState 
   roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
   stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [],
-  occupationHand: [], occupationPlayed: [], playedCards: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+  occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
   pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false,
   activeModifiers: [], cardStates: {},
@@ -58,7 +57,6 @@ describe('E27_PiggyBank session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.food = 5
 
     session.loadState(state)

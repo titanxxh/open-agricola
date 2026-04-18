@@ -12,7 +12,6 @@ describe('D134_OysterEater session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D134_OysterEater')
-    owner.playedCards.push('occupation:D134_OysterEater')
 
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
     if (!fishingSpace) throw new Error('fishing space missing')
