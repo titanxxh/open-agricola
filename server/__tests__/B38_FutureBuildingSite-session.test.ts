@@ -240,7 +240,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Place fields on all non-locked free tiles
     for (const tile of nonLockedFree) {
-      player.fields.push({ row: tile.row, col: tile.col, crop: null, quantity: 0 })
+      player.fields.push({ row: tile.row, col: tile.col, stacks: [] })
     }
 
     session.loadState(state)
