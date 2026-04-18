@@ -52,13 +52,15 @@
 
 | Card | Deck | BGA 状态 | 描述 |
 |---|---|---|---|
-| A113_HeresyTeacher | A | `implemented = false` | "Each time you use a 'Lessons' action space, you get 1 vegetable in each of your fields with at least 3 grain and no vegetable. Place the vegetable below the grain." |
+| A113_HeresyTeacher | A | `implemented = false`（BGA 侧）；我们 `implemented = true` | "Each time you use a 'Lessons' action space, you get 1 vegetable in each of your fields with at least 3 grain and no vegetable. Place the vegetable below the grain." — 2026-04-18 我们借 Field.stacks 多堆模型落地（详见 `docs/card_progress.md` §2.1）。desc 与 BGA 逐字一致。 |
 | C54_MarketStall | C | implemented (legacy 名) | 见 "Naming-only divergences"——我们用的是 `C54_MarketBooth`，desc 一致。 |
 | D75_WoodField | D | implemented | "You can plant `<WOOD>` on this card as though it were 2 fields, but it is considered 1 field. Sow and harvest `<WOOD>` on this card as you would `<GRAIN>`." |
 | E80_RockGarden | E | implemented | "You can only plant `<STONE>` on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest `<STONE>` on this card as you would vegetables." |
 | E132_Shearer | E | `implemented = false` | "In the field phase of each harvest, if you have at least 1/4/7 sheep, you get 1/2/3 food. (Keep the sheep.) During scoring, you get 1 bonus point for every 3 sheep." |
 
-> A113 和 E132 在 BGA 自己也是 `implemented = false`；D75 / E80 是 sowable field 类，与 E68_CherryOrchard 同款套路（用 `onComputeSowableFields` + `onSowExtraField`）可以套着实现。
+> E132 在 BGA 自己是 `implemented = false`；D75 / E80 是 sowable field 类，与 E68_CherryOrchard 同款套路（用 `onComputeSowableFields` + `onSowExtraField`）可以套着实现。
+>
+> A113（BGA 自己仍 `implemented = false`）我们于 2026-04-18 先于 BGA 实现——借 `Field.stacks` 多堆模型，详见 `docs/card_progress.md` §2.1 + §3。
 
 ## Major cards — 已全部对齐 ✅
 
