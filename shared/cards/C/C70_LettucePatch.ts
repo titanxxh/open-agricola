@@ -16,8 +16,18 @@ type CardCrop = { crop: 'vegetable'; remaining: number }
 const getCardCrop = (player: PlayerState): CardCrop | null =>
   readCardExtraData<CardCrop>(player, CARD_ID, 'cardCrop') ?? null
 
-const setCardCrop = (player: PlayerState, crop: CardCrop | null) =>
+const setCardCrop = (player: PlayerState, crop: CardCrop | null) => {
   writeCardExtraData(player, CARD_ID, 'cardCrop', crop)
+  // Mirror remaining into counters so the UI can render the crop stack
+  // via PlayedCardStats's existing resource-chip path.
+  const state = player.cardStates?.[CARD_ID]
+  if (!state) return
+  if (!state.counters) state.counters = {}
+  delete state.counters.vegetable
+  if (crop && crop.remaining > 0) {
+    state.counters[crop.crop] = crop.remaining
+  }
+}
 
 // Virtual tile for this card's extra field
 const VIRTUAL_TILE = { row: -1, col: 70 }
