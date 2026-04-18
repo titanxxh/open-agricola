@@ -121,7 +121,7 @@ describe('D25 scoring', () => {
   it('field scoring is NOT affected by D25 (D25 never writes to player.fields)', () => {
     const player = createPlayer()
     // 1 real field
-    player.fields.push({ row: 1, col: 0, crop: 'grain', amount: 0 })
+    player.fields.push({ row: 1, col: 0, stacks: [] })
     player.minorPlayed.push('D25_WitchesDanceFloor')
     player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
 

@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'A106_SlurrySpreader'
 
@@ -12,8 +13,8 @@ registerCardEffect({
     const summary = state.harvestReapSummary?.[player.id]
     if (!summary) return
 
-    const remainingGrainFields = player.fields.filter((field) => field.crop === 'grain').length
-    const remainingVegetableFields = player.fields.filter((field) => field.crop === 'vegetable').length
+    const remainingGrainFields = player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
+    const remainingVegetableFields = player.fields.filter((field) => fieldHasCrop(field, 'vegetable')).length
 
     const depletedGrainFields = Math.max(0, (summary.grainFields ?? 0) - remainingGrainFields)
     const depletedVegetableFields = Math.max(0, (summary.vegetableFields ?? 0) - remainingVegetableFields)

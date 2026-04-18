@@ -18,7 +18,7 @@ const setup = (options?: {
   grain?: number
   wood?: number
   vegetable?: number
-  fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+  fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   round?: number
   cardCrop?: CardCrop | null
 }) => {
@@ -68,7 +68,7 @@ describe('E68_CherryOrchard session', () => {
     const session = setup({
       withCard: false,
       wood: 1,
-      fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 0, stacks: [] }],
     })
     const player = session.getState().state.players[0]!
 
@@ -101,7 +101,7 @@ describe('E68_CherryOrchard session', () => {
 
     const session = setup({
       wood: 2,
-      fields: [{ row: 0, col: 0, crop: 'grain', remaining: 2 }],
+      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
     const player = session.getState().state.players[0]!
 
@@ -138,7 +138,7 @@ describe('E68_CherryOrchard session', () => {
 
     const session = setup({
       wood: 2,
-      fields: [{ row: 0, col: 0, crop: 'grain', remaining: 2 }],
+      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
 
     let resp = session.takeAction(0, 'grain-utilization')
@@ -165,7 +165,7 @@ describe('E68_CherryOrchard session', () => {
     const session = setup({
       grain: 1,
       wood: 1,
-      fields: [{ row: 0, col: 0, crop: 'grain', remaining: 2 }],
+      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
 
     let resp = session.takeAction(0, 'grain-utilization')

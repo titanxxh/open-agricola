@@ -77,7 +77,7 @@ export const validatePlowSelection = <T extends PlayerFarmState>(
     ...normalized,
     fields: [
       ...normalized.fields,
-      { crop: null, remaining: 0, row: tile.row, col: tile.col },
+      { stacks: [], row: tile.row, col: tile.col },
     ],
   }
   return { ok: true, player: updated as T }

@@ -30,7 +30,7 @@ const createPlayer = (): PlayerState => ({
   ],
   rooms: 2,
   houseType: 'wood',
-  fields: [{ row: 1, col: 1, crop: 'grain', remaining: 1 }],
+  fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
   roomTiles: [
     { row: 0, col: 0 },
     { row: 0, col: 1 },

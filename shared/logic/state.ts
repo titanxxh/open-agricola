@@ -329,7 +329,21 @@ export const normalizeState = (raw: GameState): GameState => {
       },
     )
     normalized.stableTiles = normalizedStableTiles
-    const normalizedFields = (normalized.fields ?? []).flatMap((field) => {
+    const migrateField = (field: any) => {
+      if (field.stacks === undefined) {
+        const legacyCrop = field.crop
+        const legacyRemaining = field.remaining ?? 0
+        field.stacks =
+          legacyCrop && legacyRemaining > 0
+            ? [{ kind: legacyCrop, remaining: legacyRemaining }]
+            : []
+        delete field.crop
+        delete field.remaining
+      }
+      return field
+    }
+    const normalizedFields = (normalized.fields ?? []).flatMap((rawField) => {
+      const field = migrateField(rawField as any)
       const row = Number.isFinite(field.row) ? field.row : -1
       const col = Number.isFinite(field.col) ? field.col : -1
       const validRow = row >= 0 && row < FARM_ROWS

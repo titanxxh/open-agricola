@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
 import { parsePositionKey, positionKey } from '../../shared/game/farm'
@@ -791,8 +791,8 @@ export const GameContainerApi = () => {
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
   const fieldMap = useMemo(() => {
-    const map = new Map<string, { crop: 'grain' | 'vegetable' | null; remaining: number }>()
-    ;(displayPlayer?.fields ?? []).forEach((f) => { map.set(positionKey({ row: f.row, col: f.col }), { crop: f.crop, remaining: f.remaining }) })
+    const map = new Map<string, { stacks: CropStack[] }>()
+    ;(displayPlayer?.fields ?? []).forEach((f) => { map.set(positionKey({ row: f.row, col: f.col }), { stacks: f.stacks }) })
     return map
   }, [displayPlayer?.fields])
   const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])

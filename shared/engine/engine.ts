@@ -1,4 +1,5 @@
 import type {
+  ActionDefinition,
   ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,

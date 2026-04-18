@@ -115,4 +115,24 @@ describe('computeScores', () => {
       ]),
     )
   })
+
+  it('counts mixed-stack field as both grain and vegetable field', () => {
+    const player = createPlayer()
+    player.fields = [
+      {
+        row: 1,
+        col: 1,
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 3 },
+        ],
+      },
+    ]
+    const [result] = computeScores(createState(player))
+    const byKey = new Map(result.categories.map((item) => [item.key, item]))
+    // 1 grain field + 0 grain in reserve = 1 grain count
+    expect(byKey.get('grains')?.quantity).toBe(1)
+    // 1 vegetable field + 0 in reserve = 1 vegetable count
+    expect(byKey.get('vegetables')?.quantity).toBe(1)
+  })
 })

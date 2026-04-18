@@ -1,7 +1,8 @@
 import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import { fieldIsEmpty } from '../../game/field'
 
 export const getEmptyFields = (player: PlayerState) =>
-  player.fields.filter((field) => field.crop === null)
+  player.fields.filter(fieldIsEmpty)
 
 export const canSow = (player: PlayerState) =>
   getEmptyFields(player).length > 0 &&
@@ -11,25 +12,17 @@ export const sowCrop = (
   player: PlayerState,
   crop: 'grain' | 'vegetable',
 ): ActionExecutionResult => {
-  const emptyField = player.fields.find((field) => field.crop === null)
+  const emptyField = player.fields.find(fieldIsEmpty)
   if (!emptyField) {
     return { type: 'fail', logKey: 'log.sowFail' }
   }
-  if (crop === 'grain') {
-    if (player.resources.grain <= 0) {
-      return { type: 'fail', logKey: 'log.sowFail' }
-    }
-    player.resources.grain -= 1
-    emptyField.crop = 'grain'
-    emptyField.remaining = 3
-    return { type: 'ok', logKey: 'log.sow' }
-  }
-  if (player.resources.vegetable <= 0) {
+  const have = player.resources[crop] ?? 0
+  if (have <= 0) {
     return { type: 'fail', logKey: 'log.sowFail' }
   }
-  player.resources.vegetable -= 1
-  emptyField.crop = 'vegetable'
-  emptyField.remaining = 2
+  player.resources[crop] = have - 1
+  const remaining = crop === 'grain' ? 3 : 2
+  emptyField.stacks.push({ kind: crop, remaining })
   return { type: 'ok', logKey: 'log.sow' }
 }
 

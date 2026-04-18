@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldHasCrop, fieldIsEmpty, fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'C8_PlantFertilizer'
 
@@ -8,9 +9,9 @@ const CARD_ID = 'C8_PlantFertilizer'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const eligibleFields = player.fields.filter((f) => f.crop !== null && f.remaining === 1)
-    const grainCount = eligibleFields.filter((f) => f.crop === 'grain').length
-    const vegCount = eligibleFields.filter((f) => f.crop === 'vegetable').length
+    const eligibleFields = player.fields.filter((f) => !fieldIsEmpty(f) && fieldTotalRemaining(f) === 1)
+    const grainCount = eligibleFields.filter((f) => fieldHasCrop(f, 'grain')).length
+    const vegCount = eligibleFields.filter((f) => fieldHasCrop(f, 'vegetable')).length
     if (grainCount === 0 && vegCount === 0) return
     const params: Record<string, number> = {}
     if (grainCount > 0) params.grain = grainCount

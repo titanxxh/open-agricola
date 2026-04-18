@@ -1,5 +1,6 @@
 import type { GameState, PlayerState, Resource } from '../game/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
+import { fieldHasCrop } from '../game/field'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
 import { collectBonusScores, getCardEffect } from '../cards/card-effects'
@@ -150,7 +151,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     const grainCount =
       player.resources.grain +
-      player.fields.filter((field) => field.crop === 'grain').length
+      player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
     const grainScore = scoreByRanges(grainCount, ['0', '1-3', '4-5', '6-7', '8+'])
     categories.push({
       key: 'grains',
@@ -161,7 +162,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     const vegetableCount =
       player.resources.vegetable +
-      player.fields.filter((field) => field.crop === 'vegetable').length
+      player.fields.filter((field) => fieldHasCrop(field, 'vegetable')).length
     const vegetableScore = scoreByRanges(vegetableCount, ['0', '1', '2', '3', '4+'])
     categories.push({
       key: 'vegetables',

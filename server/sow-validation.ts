@@ -83,7 +83,7 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     const field = fieldMap.get(key)
-    if (!isExtraField && (!field || field.crop !== null)) {
+    if (!isExtraField && (!field || field.stacks.length !== 0)) {
       return { ok: false, error: { code: 'NOT_EMPTY' } }
     }
     used.add(key)
@@ -113,10 +113,10 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     const key = positionKey({ row: field.row, col: field.col })
     if (options.extraAllowedCrops?.has(key)) return field
     if (selection.crop === 'grain') {
-      return { ...field, crop: 'grain', remaining: 3 }
+      return { ...field, stacks: [...field.stacks, { kind: 'grain', remaining: 3 }] }
     }
     if (selection.crop === 'vegetable') {
-      return { ...field, crop: 'vegetable', remaining: 2 }
+      return { ...field, stacks: [...field.stacks, { kind: 'vegetable', remaining: 2 }] }
     }
     return field
   })

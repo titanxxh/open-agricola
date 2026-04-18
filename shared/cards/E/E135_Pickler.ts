@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
 
 const CARD_ID = 'E135_Pickler'
 
@@ -23,7 +24,9 @@ registerCardEffect({
   computeBonusScore: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const totalVeg = (p: typeof player) =>
-      (p.resources.vegetable ?? 0) + p.fields.filter((f) => f.crop === 'vegetable').reduce((sum, f) => sum + (f.remaining ?? 0), 0)
+      (p.resources.vegetable ?? 0) + p.fields
+        .filter((f) => fieldHasCrop(f, 'vegetable'))
+        .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)
     const myVeg = totalVeg(player)
     const maxVeg = Math.max(...state.players.map(totalVeg))
     return myVeg === maxVeg && myVeg > 0 ? 3 : 0

@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'C69_LandConsolidation'
 
@@ -17,9 +18,10 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
-    const qualifying = context.player.fields.filter(
-      (f) => f.crop === 'grain' && f.remaining === 3,
-    )
+    const qualifying = context.player.fields.filter((f) => {
+      const top = fieldTopStack(f)
+      return !!top && top.kind === 'grain' && top.remaining === 3 && fieldTotalRemaining(f) === 3
+    })
     if (qualifying.length === 0) return
 
     if (qualifying.length === 1) {
