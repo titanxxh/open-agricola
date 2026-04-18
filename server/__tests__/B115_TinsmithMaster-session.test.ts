@@ -12,7 +12,7 @@ describe('B115_TinsmithMaster session', () => {
     withCard?: boolean
     grain?: number
     vegetable?: number
-    fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+    fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
     pastures?: {
       id: string
       size: number
@@ -157,7 +157,7 @@ describe('B115_TinsmithMaster session', () => {
     it('auto-adds 1 bonus crop when sowing grain in 1 field', () => {
       const session = setupForSow({
         grain: 2,
-        fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+        fields: [{ row: 0, col: 0, stacks: [] }],
       })
 
       let resp = session.takeAction(0, 'grain-utilization')
@@ -185,7 +185,7 @@ describe('B115_TinsmithMaster session', () => {
     it('auto-adds 1 bonus vegetable when sowing vegetable in 1 field', () => {
       const session = setupForSow({
         vegetable: 2,
-        fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+        fields: [{ row: 0, col: 0, stacks: [] }],
       })
 
       let resp = session.takeAction(0, 'grain-utilization')
@@ -211,7 +211,7 @@ describe('B115_TinsmithMaster session', () => {
       const session = setupForSow({
         withCard: false,
         grain: 2,
-        fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+        fields: [{ row: 0, col: 0, stacks: [] }],
       })
 
       let resp = session.takeAction(0, 'grain-utilization')
@@ -236,8 +236,8 @@ describe('B115_TinsmithMaster session', () => {
       const session = setupForSow({
         grain: 3,
         fields: [
-          { row: 0, col: 0, crop: null, remaining: 0 },
-          { row: 0, col: 1, crop: null, remaining: 0 },
+          { row: 0, col: 0, stacks: [] },
+          { row: 0, col: 1, stacks: [] },
         ],
       })
 

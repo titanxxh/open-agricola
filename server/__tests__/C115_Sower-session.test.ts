@@ -141,7 +141,7 @@ describe('C115_Sower session', () => {
     player.resources.reed = 0
     player.resources.grain = 2
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
     ]
     if (!player.cardStates) player.cardStates = {}
     if (!player.cardStates.C115_Sower) player.cardStates.C115_Sower = {}

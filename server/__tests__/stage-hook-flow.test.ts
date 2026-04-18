@@ -155,8 +155,8 @@ describe('stage hook flows', () => {
     player.playedCards.push('minor:A64_BarleyMill')
     player.resources.food = 10
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
-      { row: 0, col: 1, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     session.loadState(state)
@@ -198,8 +198,8 @@ describe('stage hook flows', () => {
       C120_AgriculturalLabourer: { counters: { clay: 3 } },
     }
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
-      { row: 0, col: 1, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     session.loadState(state)
@@ -237,7 +237,7 @@ describe('stage hook flows', () => {
     player.resources.grain = 1
     player.resources.sheep = 2
     player.resources.boar = 2
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
     player.pastures = [
       {
         id: 'p1',
@@ -313,8 +313,8 @@ describe('stage hook flows', () => {
     player.resources.sheep = 2
     player.resources.boar = 2
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
     ]
     player.pastures = [
       {
@@ -373,8 +373,8 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.resources.sheep).toBe(3)
     expect(resp.state.players[0]!.resources.boar).toBe(3)
     expect(resp.state.players[0]!.fields).toEqual([
-      { row: 0, col: 0, crop: 'grain', remaining: 3 },
-      { row: 0, col: 1, crop: 'grain', remaining: 3 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] },
     ])
   })
 
@@ -394,8 +394,8 @@ describe('stage hook flows', () => {
     player.resources.grain = 2
     player.resources.sheep = 2
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
     ]
     player.pastures = [
       {

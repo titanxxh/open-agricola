@@ -107,8 +107,8 @@ describe('D65_GrainSieve session', () => {
   it('integration: harvest with 2 grain fields gains 1 bonus grain', () => {
     const session = setupForHarvest({
       grainFields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
-        { row: 0, col: 1, crop: 'grain', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
       ],
     })
 
@@ -134,7 +134,7 @@ describe('D65_GrainSieve session', () => {
   it('integration: harvest with 1 grain field does not trigger bonus', () => {
     const session = setupForHarvest({
       grainFields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       ],
     })
 

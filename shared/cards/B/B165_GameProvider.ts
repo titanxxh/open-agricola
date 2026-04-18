@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'B165_GameProvider'
 
@@ -8,10 +9,11 @@ registerFieldEffect('discard-grain-for-pigs', ({ player, fields }) => {
   let grainsRemoved = 0
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain' && f.remaining > 0)
-    if (field) {
-      field.remaining -= 1
-      if (field.remaining <= 0) field.crop = null
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (top && top.kind === 'grain' && top.remaining > 0) {
+      fieldDecrementTop(field)
       grainsRemoved++
     }
   }
@@ -23,7 +25,7 @@ registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    const grainFields = player.fields.filter(f => f.crop === 'grain' && f.remaining > 0)
+    const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
     if (grainFields.length === 0) return
 
     return {

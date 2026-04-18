@@ -17,9 +17,9 @@ describe('C18_RollOverPlow session', () => {
 
     // 3 planted fields
     player.fields = [
-      { row: 0, col: 2, crop: 'grain', remaining: 3 },
-      { row: 0, col: 3, crop: 'vegetable', remaining: 2 },
-      { row: 1, col: 2, crop: 'grain', remaining: 1 },
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
+      { row: 1, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     session.loadState(state)
@@ -67,8 +67,8 @@ describe('C18_RollOverPlow session', () => {
     // Verify the field was discarded
     const p = resp.state.players[0]!
     const f = p.fields.find(f => f.row === 0 && f.col === 2)!
-    expect(f.crop).toBeNull()
-    expect(f.remaining).toBe(0)
+    expect(f.stacks[0]?.kind ?? null).toBeNull()
+    expect(f.stacks[0]?.remaining ?? 0).toBe(0)
 
     // Commit the plow choice
     const tile = resp.interaction.farm.selectableTiles[0]
@@ -93,8 +93,8 @@ describe('C18_RollOverPlow session', () => {
 
     // Only 2 planted fields
     player.fields = [
-      { row: 0, col: 2, crop: 'grain', remaining: 3 },
-      { row: 0, col: 3, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     session.loadState(state)

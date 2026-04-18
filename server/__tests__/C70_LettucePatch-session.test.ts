@@ -12,7 +12,7 @@ const setup = (options?: {
   withCard?: boolean
   grain?: number
   vegetable?: number
-  fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+  fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   round?: number
 }) => {
   const session = new GameSession()
