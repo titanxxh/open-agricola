@@ -3,6 +3,7 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
+import { positionKey } from '../game/farm'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
@@ -444,7 +445,7 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
     if (!effect?.computeLockedFarmTiles) continue
     try {
       const tiles = effect.computeLockedFarmTiles(player)
-      tiles.forEach(tile => lockedKeys.add(`${tile.row}-${tile.col}`))
+      tiles.forEach(tile => lockedKeys.add(positionKey(tile)))
     } catch (err) {
       if (cardId.startsWith('CUSTOM_')) {
         console.warn(`[card-effects] custom card ${cardId} computeLockedFarmTiles threw, skipping:`, err)
