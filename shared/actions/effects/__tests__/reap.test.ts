@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { reap } from '../reap'
+import * as cardListeners from '../../../cards/card-listeners'
+
+const mkState = (): any => ({ players: [] })
 
 const mkPlayer = (fields: any[]): any => ({
   fields,
@@ -7,11 +10,16 @@ const mkPlayer = (fields: any[]): any => ({
 })
 
 describe('reap with stacks', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('harvests top stack only, decrements remaining', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       { stacks: [{ kind: 'grain', remaining: 3 }], row: 0, col: 0 },
     ])
-    const res = reap(p)
+    const res = reap(mkState(), p)
     expect(res.type).toBe('ok')
     expect(p.resources.grain).toBe(1)
     expect(p.fields[0].stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -20,6 +28,7 @@ describe('reap with stacks', () => {
   })
 
   it('pops empty top stack, exposes buried stack next round', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
         stacks: [
@@ -30,22 +39,24 @@ describe('reap with stacks', () => {
         col: 0,
       },
     ])
-    reap(p)
+    reap(mkState(), p)
     expect(p.resources.grain).toBe(1)
     expect(p.fields[0].stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
-    reap(p)
+    reap(mkState(), p)
     expect(p.resources.vegetable).toBe(1)
     expect(p.fields[0].stacks).toEqual([])
   })
 
   it('skips empty fields', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([{ stacks: [], row: 0, col: 0 }])
-    const res = reap(p)
+    const res = reap(mkState(), p)
     expect(res.reapSummary.grainFields).toBe(0)
     expect(res.reapSummary.vegetableFields).toBe(0)
   })
 
   it('summary counts fields by TOP stack kind', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
         stacks: [
@@ -61,7 +72,7 @@ describe('reap with stacks', () => {
         col: 1,
       },
     ])
-    const res = reap(p)
+    const res = reap(mkState(), p)
     expect(res.reapSummary.grainFields).toBe(1)
     expect(res.reapSummary.vegetableFields).toBe(1)
   })

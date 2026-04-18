@@ -1277,7 +1277,7 @@ export class GameSession {
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
-      const result = reap(player)
+      const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
       this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
     })
