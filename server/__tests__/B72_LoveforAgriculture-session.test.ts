@@ -106,8 +106,8 @@ describe('B72_LoveforAgriculture session', () => {
       const crops = cardState?.extraData?.pastureCrops as any[]
       expect(crops.length).toBe(1)
       expect(crops[0].pastureId).toBe('p1')
-      expect(crops[0].stacks[0]?.kind).toBe('grain')
-      expect(crops[0].stacks[0]?.remaining ?? 0).toBe(3)
+      expect(crops[0].crop).toBe('grain')
+      expect(crops[0].remaining).toBe(3)
     })
 
     it('allows sowing vegetable in a size-2 pasture', () => {
@@ -138,8 +138,8 @@ describe('B72_LoveforAgriculture session', () => {
 
       const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
       expect(crops.length).toBe(1)
-      expect(crops[0].stacks[0]?.kind).toBe('vegetable')
-      expect(crops[0].stacks[0]?.remaining ?? 0).toBe(2)
+      expect(crops[0].crop).toBe('vegetable')
+      expect(crops[0].remaining).toBe(2)
     })
 
     it('does NOT allow sowing in a size-3+ pasture', () => {
@@ -203,7 +203,7 @@ describe('B72_LoveforAgriculture session', () => {
       // Pasture should have grain in cardStates
       const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
       expect(crops.length).toBe(1)
-      expect(crops[0].stacks[0]?.kind).toBe('grain')
+      expect(crops[0].crop).toBe('grain')
     })
 
     it('makes sow doable when only pastures are available (no empty fields)', () => {
@@ -314,7 +314,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(playerAfter.resources.grain).toBe(1)
       const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
       expect(crops.length).toBe(1)
-      expect(crops[0].stacks[0]?.remaining ?? 0).toBe(2)
+      expect(crops[0].remaining).toBe(2)
     })
 
     it('removes exhausted pasture crops after harvest', () => {

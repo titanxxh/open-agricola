@@ -1,13 +1,14 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'C47_GardenClaw'
 
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    const plantedFields = player.fields.filter((f) => f.crop !== null).length
+    const plantedFields = player.fields.filter((f) => !fieldIsEmpty(f)).length
     if (plantedFields === 0) return
     const count = plantedFields * 3
     queueFutureMeeples(state, {

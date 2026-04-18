@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'E117_PipeSmoker'
 
@@ -10,7 +11,7 @@ registerCardEffect({
     if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const grainFieldCount = player.fields.filter(
-      (f) => f.crop === 'grain' && f.remaining > 0,
+      (f) => fieldHasCrop(f, 'grain'),
     ).length
     if (grainFieldCount < 1) return
 

@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D61_BaleofStraw'
 
@@ -11,7 +12,7 @@ registerCardEffect({
 
     // Count grain fields (fields with grain crop planted)
     const grainFieldCount = player.fields.filter(
-      (f) => f.crop === 'grain' && f.remaining > 0,
+      (f) => fieldHasCrop(f, 'grain'),
     ).length
     if (grainFieldCount < 3) return
 

@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D153_WealthyMan'
 
@@ -21,7 +22,7 @@ registerCardEffect({
     if (threshold === undefined) return
 
     const grainFieldCount = player.fields.filter(
-      (f) => f.crop === 'grain' && f.remaining > 0,
+      (f) => fieldHasCrop(f, 'grain'),
     ).length
     if (grainFieldCount < threshold) return
 

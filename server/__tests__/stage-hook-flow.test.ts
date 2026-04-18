@@ -291,8 +291,7 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.fields).toContainEqual({
       row: 0,
       col: 0,
-      crop: 'grain',
-      remaining: 3,
+      stacks: [{ kind: 'grain', remaining: 3 }],
     })
   })
 
@@ -441,8 +440,7 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.fields).toContainEqual({
       row: 0,
       col: 0,
-      crop: 'grain',
-      remaining: 3,
+      stacks: [{ kind: 'grain', remaining: 3 }],
     })
   })
 })

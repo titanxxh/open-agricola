@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'A84_Silage'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -16,7 +17,7 @@ registerCardEffect({
 
     // Check grain availability (reserve or field)
     const hasGrain = player.resources.grain >= 1 ||
-      player.fields.some((f) => f.crop === 'grain' && f.remaining > 0)
+      player.fields.some((f) => fieldHasCrop(f, 'grain'))
     if (!hasGrain) return
 
     const breedableTypes = BREEDABLE_TYPES.filter(

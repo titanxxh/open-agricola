@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D113_FoodMerchant'
 
@@ -9,7 +10,7 @@ registerCardEffect({
   onAfterReap: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     // Count grain fields that were harvested
-    const grainFields = player.fields.filter(f => f.crop === 'grain')
+    const grainFields = player.fields.filter(f => fieldHasCrop(f, 'grain'))
     // Check harvestReapSummary for grain fields harvested
     const grainHarvested = _state.harvestReapSummary?.[player.id]?.grainFields ?? 0
     if (grainHarvested <= 0) return

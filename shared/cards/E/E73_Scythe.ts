@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import { fieldIsEmpty, fieldTopStack } from '../../game/field'
 
 const CARD_ID = 'E73_Scythe'
 
@@ -10,16 +11,19 @@ registerCardEffect({
     if (!player.minorPlayed.includes(CARD_ID)) return
     const harvestable = player.fields
       .map((f, i) => ({ field: f, index: i }))
-      .filter(({ field }) => field.crop && field.remaining > 0)
+      .filter(({ field }) => !fieldIsEmpty(field))
     if (harvestable.length === 0) return
-    const children: ActionFlow[] = harvestable.map(({ field, index }) => ({
-      type: 'leaf' as const,
-      actionId: 'scythe-harvest-field',
-      params: { fieldIndex: index },
-      sourceCard: CARD_ID,
-      choiceLabelKey: 'ui.interactionScytheField',
-      choiceLabelParams: { crop: field.crop, amount: field.remaining },
-    }))
+    const children: ActionFlow[] = harvestable.map(({ field, index }) => {
+      const top = fieldTopStack(field)
+      return {
+        type: 'leaf' as const,
+        actionId: 'scythe-harvest-field',
+        params: { fieldIndex: index },
+        sourceCard: CARD_ID,
+        choiceLabelKey: 'ui.interactionScytheField',
+        choiceLabelParams: { crop: top?.kind ?? null, amount: top?.remaining ?? 0 },
+      }
+    })
     children.push({ type: 'leaf', actionId: 'noop', choiceLabelKey: 'ui.interactionDecline' })
     return { type: 'xor', children }
   },

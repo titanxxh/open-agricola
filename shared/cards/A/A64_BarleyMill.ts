@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop, fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'A64_BarleyMill'
 
@@ -11,7 +12,7 @@ registerCardEffect({
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
       ?? player.fields.filter((field) => {
         const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
-        return field.crop === 'grain' && (field.remaining > 0 || legacyAmount > 0)
+        return fieldHasCrop(field, 'grain') && (fieldTotalRemaining(field) > 0 || legacyAmount > 0)
       }).length
     if (grainFields <= 0) return
     return {
