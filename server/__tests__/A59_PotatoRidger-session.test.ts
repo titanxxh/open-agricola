@@ -132,9 +132,9 @@ describe('A59_PotatoRidger session', () => {
     // Plus 1 extra in supply → total 4 veg after harvest → mandatory
     const session = setup({
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 1 },
-        { row: 0, col: 1, crop: 'vegetable', remaining: 1 },
-        { row: 0, col: 2, crop: 'vegetable', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       ],
       extraVegetable: 1, // 1 already in supply + 3 harvested = 4 total
     })
@@ -166,7 +166,7 @@ describe('A59_PotatoRidger session', () => {
   it('integration: no trigger with 2 veg after harvest', () => {
     const session = setup({
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       ],
       extraVegetable: 1, // 1 already + 1 harvested = 2 total → no trigger
     })

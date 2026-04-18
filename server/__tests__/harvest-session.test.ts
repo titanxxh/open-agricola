@@ -23,8 +23,8 @@ describe('harvest session flow', () => {
     playerA.name = 'PlayerA'
     playerB.name = 'PlayerB'
 
-    playerA.fields = [{ row: 0, col: 0, crop: 'vegetable', remaining: 1 }]
-    playerB.fields = [{ row: 0, col: 0, crop: 'grain', remaining: 1 }]
+    playerA.fields = [{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
+    playerB.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
 
     playerA.resources.boar = 2
     playerB.resources.sheep = 2

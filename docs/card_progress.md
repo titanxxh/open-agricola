@@ -13,14 +13,14 @@
 
 | Deck | BGA 总数 | 已实现 | BGA 也无逻辑（数据 only） | BGA 有逻辑我们漏实现 | 需核心扩展 |
 |---|---|---|---|---|---|
-| A | 180 | 157 | 5 | 0 | 0 |
+| A | 180 | 158 | 4 | 0 | 0 |
 | B | 180 | 159 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
-| D | 181 | 158 | 2 | 1 | 0 |
+| D | 181 | 159 | 1 | 1 | 0 |
 | E | 169 | 159 | 0 | 2 | 1 |
-| **总计** | **892** | **820** | **7** | **3** | **1** |
+| **总计** | **892** | **821** | **5** | **3** | **1** |
 
-**截至 2026-04-17：820/892 = 92.0%。**
+**截至 2026-04-18：821/892 = 92.0%。**
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -40,12 +40,13 @@
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 7 张 | cost / prereq / vp 与 BGA 不同 | 优先修，影响经济 |
 | 🔀 刻意偏离 BGA（§2.5） | 3 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 3 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
+| ⏳ 待实现 / 待评估（§2.6） | 2 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-18 — A113 Heresy Teacher 实现 + Field.stacks 多堆模型落地**：BGA 自身未实现；我们借机把 `Field.{crop, remaining}` 升级为 `Field.stacks: CropStack[]`（数组顺序 = 底→顶），让谷/菜混合田成为可能。新增 `shared/game/field.ts` 辅助函数统一访问。Sow 仍要求空田；Reap 只收顶堆（`remaining===0` 时 pop，下次收获暴露下一堆）；Scoring / prereq 改走 `fieldHasCrop`——混合田同时算谷田 + 菜田。A113 监听 Lessons 空间使用，对"有 ≥3 谷且无菜"的田 `unshift` 底堆 `{ kind: 'vegetable', remaining: 1 }`（当前唯一底堆插入的卡）。`rehydrateState` 加 legacy 迁移。~22 张 field-相关卡迁到新 helper；FarmBoard 前端按 stack 分段渲染。
 - **2026-04-17 — D25 Witches' Dance Floor 多身份卡基础设施**：新增卡牌可同时提供多类身份（field + occupation + improvement）的能力；新基础设施 `providesField` / `providesOccupation` / `fireplaceIdentity` / `mustBePlayedViaMinorAction` / `extraOccupationsFromCards` 字段；`countFields` / `countOccupations` helper 聚合卡牌提供的虚拟身份；CookingHearth 返还代价扩展接受 `fireplaceIdentity`；新增 `cardMatchesCostList` helper 用于 fireplace 匹配；C70 LettucePatch 前置计数修正（虚拟田不计入终局田数计分，仅计入前置）。
 - **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
 - **2026-04-17 — Worker 身份模型基建落地**：13 个子任务分 commit 推进；全仓 grep 替换聚合字段读点；新增 `shared/game/{player,space}.ts` helper。为 A25 Bassinet BGA 对齐打底。详见 `docs/ENGINE_ARCHITECTURE.md § 11.4.1`。
@@ -56,9 +57,9 @@
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 16 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 17 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 16 张。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 17 张。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -78,6 +79,7 @@
 | A25 Bassinet | 首次使用非累积空间且格上恰好 1 人（含新生儿），可 canUseOccupied + family growth；Meeting Place 显式排除 | Worker 身份模型重写；`countPeopleOnSpace` helper + actions 过滤器 bug 已修（2026-04-17） |
 | A87 Conservator | 木屋玩家进入 House Redevelopment 后，在 `Renovate House` 内部多一个 wood→stone 直跳目标（同 prompt 二选一，1 候选自动短路） | 引擎 `computeChoiceCandidates` opt-in 路径（详见 ENGINE_ARCHITECTURE §11.6.2）；A87 仅注入额外 `stone` 候选 + `isDoable` 救入口；A143/A123 cost-type modifier `appliesTo:['renovation']` 自动生效；D154 clay-only 守卫（§2.3）仍屏蔽 wood→stone |
 | B30 WoodPalisades | 按 segment 替代 fence：2 wood、+1 VP、不计入 `MAX_FENCES`、不进入 fence-keyed 卡统计 | `FenceSegment[]` + `getFenceCount`/`getPalisadeCount` helper；`validateFenceSelection({ allowPalisades })`；`ActionDetailEffects.fencing` / `palisading` 拆分；9 张 fence-keyed 卡迁到 helper（见 §2.0 changelog） |
+| A113 HeresyTeacher | Lessons 空间使用后，对"≥3 谷且无菜"的田底堆 unshift `{kind:'vegetable',remaining:1}` | BGA 自身未实现；借 Field.stacks 多堆模型落地，底堆 veg 在顶堆 grain 收完后才会被 reap（见 §3 新基建） |
 | D25 WitchesDanceFloor | 多身份改良（同时提供 field + occupation + improvement）；虚拟田仅计入前置检查、不计入终局地皮数计分 | 多身份卡基础设施（见 §3）；`countFields` / `countOccupations` helper 聚合虚拟身份；`playMinorImprovement` 守卫 `mustBePlayedViaMinorAction`；`cardMatchesCostList` 用于 fireplace 身份匹配 |
 
 ### 2.2 🟡 简化实现（10 张）
@@ -144,8 +146,10 @@
 
 | Card | 类型 | BGA 状态 | 我们的处理 | 优先级 |
 |---|---|---|---|---|
-| A113 Heresy Teacher | Occupation | `isImplemented=false` | 数据-only，匹配 BGA | LOW |
 | D159 Reed Seller | Occupation | `isImplemented=false` | 需要"可阻止行动 + 拍卖式选择"系统 | LOW |
+
+> **A113 Heresy Teacher**（2026-04-18）已从此处迁出至 §2.1：BGA 自身仍 `isImplemented=false`，我们借 Field.stacks 多堆模型实现。
+> **D25 Witches' Dance Floor**（2026-04-17）已从此处迁出至 §2.1：多身份卡基础设施已落地（见 §3）。
 
 #### Tier 2 — BGA 有完整实现，我们仍缺
 
@@ -185,6 +189,7 @@
 | `validateFenceSelection({ allowPalisades })` | ✅ | B30：围栏选择校验支持 palisade 模式，新增错误码 `EDGE_TYPE_CONFLICT` / `PALISADES_NOT_UNLOCKED` |
 | `ActionDetailEffects` fencing / palisading 拆分 | ✅ | B30：effects 日志区分围栏与木栅两种建造 |
 | `useFarmSelection` 围栏/木栅模式切换 | ✅ | B30 前端：同一 farm selection 可切换 fence / palisade 目标 |
+| **Field.stacks 多堆模型 + `shared/game/field.ts` helper**（2026-04-18） | ✅ | `Field.{crop, remaining}` → `Field.stacks: CropStack[]`（数组顺序 = 底→顶）。Helpers：`fieldIsEmpty` / `fieldTopStack` / `fieldBottomStack` / `fieldHasCrop` / `fieldTotalRemaining` / `fieldPopIfDepleted` / `fieldDecrementTop` / `fieldFindStackOfKind` / `countFieldsWithCrop` / `countEmptyFields`。**口径**：(a) 任一 stack 含作物即算该田含该作物（scoring / prereq 都走 `fieldHasCrop`——混合田同时算谷田+菜田）；(b) reap 只收顶堆，`remaining===0` 时 pop，下次收获暴露下一堆；(c) sow 仍要求空田（`fieldIsEmpty`）；(d) 单卡（当前仅 A113 Heresy Teacher）可 `unshift` 到底堆。`rehydrateState` 加 legacy `{crop, remaining}` → `stacks` 迁移。消费者：~22 张 field-相关卡 + sow/reap/scythe-harvest-field/swap-field-crop/plow/pay-grain-any/grain-thief-protect/scoring/prerequisites；前端 `FarmBoard` 按 stack 分段竖向渲染（底在下、顶在上）。 |
 | **`providesField` 标志 + `countFields` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `providesField: true` 提供虚拟田；`countFields(player)` helper 聚合农民自有田地 + 卡牌虚拟田。虚拟田仅计入前置条件检查（如 `prerequisite: { fields: 2 }`），不计入终局田数计分（计分仅看 `player.fields.length`）。 |
 | **`providesOccupation` 标志 + `extraOccupationsFromCards` 字段 + `countOccupations` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `providesOccupation: true` 提供虚拟职业；`PlayerState.extraOccupationsFromCards` 记录从卡牌获得的额外职业数（打出卡时累加）；`countOccupations(player)` helper 返回已放农民数 + 虚拟职业数的总和。前置条件（如 `prerequisite: { occupations: 2 }`）与终局计分（`E101 Blighter` 等）都走 helper 计数。 |
 | **`fireplaceIdentity` 标志 + `cardMatchesCostList` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `fireplaceIdentity: true` 作为"可返还 Fireplace"代价；`cardMatchesCostList(card, costList)` helper 用于 `CookingHearth` / `A60_OrientalFireplace` 等卡检测代价卡是否匹配（支持 `subtype` / `id` / `providedFields` / `providedOccupations` / `fireplaceIdentity` 等多种匹配模式）。 |
@@ -224,7 +229,8 @@
 | Wave 9 + desc align | 04-17 | +6 | 817 | 91.6% |
 | A87 Conservator | 04-17 | +1 | 818 | 91.7% |
 | B30 Wood Palisades | 04-17 | +1 | 819 | 91.8% |
-| D25 多身份卡基础设施 | 04-17 | +1 | 820 | 92.0% |
+| D25 多身份卡基础设施 | 04-17 | +1 | 820 | 91.9% |
+| A113 Heresy Teacher + Field.stacks | 04-18 | +1 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 

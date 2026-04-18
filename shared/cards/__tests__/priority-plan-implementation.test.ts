@@ -485,8 +485,8 @@ describe('priority plan implementations', () => {
     player.occupationPlayed = ['C120_AgriculturalLabourer']
     player.cardStates = { C120_AgriculturalLabourer: { counters: { clay: 3 } } }
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
-      { row: 0, col: 1, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     const result = getCardEffect('C120_AgriculturalLabourer')?.onAfterReap?.(
@@ -513,8 +513,8 @@ describe('priority plan implementations', () => {
     const player = createPlayer()
     player.minorPlayed = ['A64_BarleyMill']
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 2 },
-      { row: 0, col: 1, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     const result = getCardEffect('A64_BarleyMill')?.onAfterReap?.(
@@ -540,7 +540,7 @@ describe('priority plan implementations', () => {
     const player = createPlayer()
     player.minorPlayed = ['C71_SlurrySpreader']
     player.resources.grain = 1
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
 
     const result = getCardEffect('C71_SlurrySpreader')?.onEndHarvest?.(
       {
@@ -569,7 +569,7 @@ describe('priority plan implementations', () => {
     const player = createPlayer()
     player.minorPlayed = ['C71_SlurrySpreader']
     player.resources.grain = 1
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
 
     const result = getCardEffect('C71_SlurrySpreader')?.onEndHarvest?.(
       {
@@ -593,8 +593,8 @@ describe('priority plan implementations', () => {
     player.occupationPlayed = ['D115_FodderPlanter']
     player.resources.grain = 2
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
     ]
 
     const result = getCardEffect('D115_FodderPlanter')?.onEndHarvest?.(

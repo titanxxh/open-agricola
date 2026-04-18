@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'A112_ScytheWorker'
 
@@ -13,7 +14,7 @@ registerCardEffect({
   onHarvestFieldPhase: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainFieldCount = player.fields.filter(
-      (field) => field.crop === 'grain' && field.remaining > 0,
+      (field) => fieldHasCrop(field, 'grain'),
     ).length
     if (grainFieldCount <= 0) return
     return gainLeaf(CARD_ID, { grain: grainFieldCount })

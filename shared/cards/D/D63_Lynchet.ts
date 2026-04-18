@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'D63_Lynchet'
 
@@ -37,7 +38,7 @@ registerCardEffect({
     let stillSownCount = 0
 
     for (const field of player.fields) {
-      if (field.crop !== null) {
+      if (!fieldIsEmpty(field)) {
         // This field was harvested and still has remaining > 0
         stillSownCount++
         if (roomTiles.some((rt) => isAdjacent(field, rt))) {
@@ -54,7 +55,7 @@ registerCardEffect({
       // some may be just-depleted harvested fields.
       let adjacentEmpty = 0
       for (const field of player.fields) {
-        if (field.crop === null && field.remaining === 0) {
+        if (fieldIsEmpty(field)) {
           if (roomTiles.some((rt) => isAdjacent(field, rt))) {
             adjacentEmpty++
           }

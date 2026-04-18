@@ -105,8 +105,8 @@ describe('C106_PotatoHarvester session', () => {
   it('integration: harvest with 2 vegetable fields gains 2 food', () => {
     const session = setupForHarvest({
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 1 },
-        { row: 0, col: 1, crop: 'vegetable', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       ],
     })
 
@@ -133,8 +133,8 @@ describe('C106_PotatoHarvester session', () => {
   it('integration: harvest with only grain fields does not trigger', () => {
     const session = setupForHarvest({
       grainFields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
-        { row: 0, col: 1, crop: 'grain', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
       ],
     })
 

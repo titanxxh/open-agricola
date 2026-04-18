@@ -3,16 +3,16 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'D71_Changeover'
 
 registerFieldEffect('discard-single-crop', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c && f.remaining === 1)
-    if (field) {
-      field.remaining = 0
-      field.crop = null
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (field && fieldTotalRemaining(field) === 1) {
+      field.stacks.length = 0
     }
   }
 })
@@ -22,7 +22,7 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const eligibleFields = context.player.fields.filter(f => f.crop !== null && f.remaining === 1)
+    const eligibleFields = context.player.fields.filter(f => fieldTotalRemaining(f) === 1)
     if (eligibleFields.length === 0) return
     return {
       flow: {

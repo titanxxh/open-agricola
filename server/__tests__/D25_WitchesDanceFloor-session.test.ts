@@ -56,7 +56,7 @@ describe('D25_WitchesDanceFloor session', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
-      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
       player.minorPlayed.push(CARD_ID)
 
       expect(
@@ -83,7 +83,7 @@ describe('D25_WitchesDanceFloor session', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
-      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
       const lengthBefore = player.fields.length
       player.minorPlayed.push(CARD_ID)
       expect(player.fields.length).toBe(lengthBefore)
@@ -408,8 +408,8 @@ describe('D25_WitchesDanceFloor session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [
-        { row: 0, col: 0, crop: null, remaining: 0 },
-        { row: 0, col: 1, crop: null, remaining: 0 },
+        { row: 0, col: 0, stacks: [] },
+        { row: 0, col: 1, stacks: [] },
       ]
       player.minorPlayed.push(CARD_ID)
       player.playedCards.push(`minor:${CARD_ID}`)

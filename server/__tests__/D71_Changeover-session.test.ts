@@ -17,8 +17,8 @@ describe('D71_Changeover session', () => {
 
     // One eligible field (remaining === 1), one not eligible (remaining === 2)
     player.fields = [
-      { row: 0, col: 2, crop: 'grain', remaining: 1 },    // eligible
-      { row: 0, col: 3, crop: 'vegetable', remaining: 2 }, // not eligible
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },    // eligible
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] }, // not eligible
     ]
     player.resources.grain = 2 // for sow action
 
@@ -60,8 +60,8 @@ describe('D71_Changeover session', () => {
     // After field-select, verify the field was discarded
     const p = resp.state.players[0]!
     const f = p.fields.find(f => f.row === 0 && f.col === 2)!
-    expect(f.crop).toBeNull()
-    expect(f.remaining).toBe(0)
+    expect(f.stacks[0]?.kind ?? null).toBeNull()
+    expect(f.stacks[0]?.remaining ?? 0).toBe(0)
 
     // The sow action is optional. If it produces a choice, we should see sow select.
     // The player has grain=2 and there's an empty field (0-2 was just cleared),
@@ -87,8 +87,8 @@ describe('D71_Changeover session', () => {
         expect(resp.state.players[0]!.resources.grain).toBe(1)
         // Field should now have grain sown
         const sownField = resp.state.players[0]!.fields.find(f => f.row === 0 && f.col === 2)!
-        expect(sownField.crop).toBe('grain')
-        expect(sownField.remaining).toBe(3)
+        expect(sownField.stacks[0]?.kind).toBe('grain')
+        expect(sownField.stacks[0]?.remaining ?? 0).toBe(3)
       }
     }
   })
@@ -106,8 +106,8 @@ describe('D71_Changeover session', () => {
 
     // No field with remaining === 1
     player.fields = [
-      { row: 0, col: 2, crop: 'grain', remaining: 3 },
-      { row: 0, col: 3, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     session.loadState(state)

@@ -164,9 +164,9 @@ describe('farm interaction builders', () => {
     const player = createPlayer()
     player.resources.grain = 3
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
-      { row: 1, col: 0, crop: null, remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
+      { row: 1, col: 0, stacks: [] },
     ]
 
     const interaction = buildSowFarmInteraction(player, {

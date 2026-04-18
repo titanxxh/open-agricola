@@ -91,7 +91,7 @@ describe('D132_HideFarmer session', () => {
         if (row === 0 && col <= 1) {
           player.roomTiles.push({ row, col })
         } else {
-          player.fields.push({ row, col, crop: null, quantity: 0 })
+          player.fields.push({ row, col, stacks: [] })
         }
       }
     }

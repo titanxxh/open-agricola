@@ -10,7 +10,7 @@ const CARD_ID = 'D126_FieldCultivator'
 
 describe('D126_FieldCultivator session', () => {
   const setup = (options?: {
-    fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+    fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -51,8 +51,8 @@ describe('D126_FieldCultivator session', () => {
   it('harvesting 2 fields pops 2 goods from stack', () => {
     const session = setup({
       fields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
-        { row: 0, col: 1, crop: 'vegetable', remaining: 1 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       ],
     })
 
@@ -101,7 +101,7 @@ describe('D126_FieldCultivator session', () => {
   it('no pop when stack is empty', () => {
     const session = setup({
       fields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       ],
     })
 
@@ -126,9 +126,9 @@ describe('D126_FieldCultivator session', () => {
   it('pops only up to stack size when more fields are harvested', () => {
     const session = setup({
       fields: [
-        { row: 0, col: 0, crop: 'grain', remaining: 2 },
-        { row: 0, col: 1, crop: 'vegetable', remaining: 1 },
-        { row: 0, col: 2, crop: 'grain', remaining: 3 },
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },
       ],
     })
 

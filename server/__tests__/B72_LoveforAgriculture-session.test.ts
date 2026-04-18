@@ -11,7 +11,7 @@ const setup = (options?: {
   withCard?: boolean
   grain?: number
   vegetable?: number
-  fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+  fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   pastures?: {
     id: string
     size: number
@@ -167,7 +167,7 @@ describe('B72_LoveforAgriculture session', () => {
     it('allows sowing in field AND pasture simultaneously', () => {
       const session = setup({
         grain: 2,
-        fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+        fields: [{ row: 0, col: 0, stacks: [] }],
         pastures: [
           {
             id: 'p1',
@@ -197,8 +197,8 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Field should have grain
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
-      expect(field?.crop).toBe('grain')
-      expect(field?.remaining).toBe(3)
+      expect(field?.stacks[0]?.kind).toBe('grain')
+      expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
 
       // Pasture should have grain in cardStates
       const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
@@ -209,7 +209,7 @@ describe('B72_LoveforAgriculture session', () => {
     it('makes sow doable when only pastures are available (no empty fields)', () => {
       const session = setup({
         grain: 1,
-        fields: [{ row: 0, col: 0, crop: 'grain', remaining: 2 }], // no empty fields
+        fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }], // no empty fields
         pastures: [
           {
             id: 'p1',
@@ -463,7 +463,7 @@ describe('B72_LoveforAgriculture session', () => {
       const session = setup({
         withCard: false,
         grain: 1,
-        fields: [{ row: 0, col: 0, crop: null, remaining: 0 }],
+        fields: [{ row: 0, col: 0, stacks: [] }],
         pastures: [
           {
             id: 'p1',

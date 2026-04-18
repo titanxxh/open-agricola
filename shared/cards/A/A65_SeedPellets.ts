@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'A65_SeedPellets'
 
@@ -34,7 +35,7 @@ const isDoableListener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
-    if (!context.player.fields.some((field) => field.crop === null)) return
+    if (!context.player.fields.some((field) => fieldIsEmpty(field))) return
     return { doable: true }
   },
 }

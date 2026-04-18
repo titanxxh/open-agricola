@@ -1,4 +1,4 @@
-import type { FenceSegment } from '../shared/game/types'
+import type { CropStack, FenceSegment } from '../shared/game/types'
 
 export type FarmTilePosition = {
   row: number
@@ -6,8 +6,7 @@ export type FarmTilePosition = {
 }
 
 export type FarmField = {
-  crop: 'grain' | 'vegetable' | null
-  remaining: number
+  stacks: CropStack[]
   row: number
   col: number
 }

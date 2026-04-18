@@ -5,6 +5,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'B21_HayloftBarn'
 
@@ -49,7 +50,7 @@ registerCardEffect({
   onAfterReap: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const grainFields = state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter((field) => field.crop === 'grain' && field.remaining > 0).length
+      ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
     if (grainFields <= 0) return
     const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return

@@ -1,12 +1,14 @@
 import type { ActionDefinition } from '../../game/types'
+import { fieldTopStack } from '../../game/field'
 import { readCardExtraData, writeCardExtraData } from '../../cards/helpers/card-state'
 
 const SOURCE_CARD = 'E112_GrainThief'
 const PROTECTED_KEY = 'protectedFields'
 
 /**
- * Protect a grain field from reap — leave grain on field, take 1 grain from supply.
- * Used by E112_GrainThief. Takes { fieldIndex } in params.
+ * Protect a grain field from reap — remove the top grain stack (so reap skips it)
+ * and take 1 grain from supply. After the harvest phase, E112 restores the stack.
+ * Requires the TOP stack of the field to be grain.
  */
 export const grainThiefProtectAction: ActionDefinition = {
   id: 'grain-thief-protect',
@@ -19,20 +21,21 @@ export const grainThiefProtectAction: ActionDefinition = {
     const fieldIndex = params?.fieldIndex as number | undefined
     if (fieldIndex === undefined) return { type: 'fail', logKey: 'log.actionFail' }
     const field = player.fields[fieldIndex]
-    if (!field || field.crop !== 'grain' || field.remaining <= 0) {
+    if (!field) return { type: 'fail', logKey: 'log.actionFail' }
+    const top = fieldTopStack(field)
+    if (!top || top.kind !== 'grain' || top.remaining <= 0) {
       return { type: 'fail', logKey: 'log.actionFail' }
     }
 
-    // Save original state for post-reap restoration
+    // Save original remaining for post-reap restoration (E112 reinserts the stack)
     const protected_ = readCardExtraData<{ index: number; remaining: number }[]>(
       player, SOURCE_CARD, PROTECTED_KEY,
     ) ?? []
-    protected_.push({ index: fieldIndex, remaining: field.remaining })
+    protected_.push({ index: fieldIndex, remaining: top.remaining })
     writeCardExtraData(player, SOURCE_CARD, PROTECTED_KEY, protected_)
 
-    // Zero out field so reap() skips it
-    field.remaining = 0
-    field.crop = null
+    // Pop the top grain stack so reap() skips it
+    field.stacks.pop()
 
     // Give 1 grain from supply
     player.resources.grain += 1

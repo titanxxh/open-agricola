@@ -7,7 +7,7 @@ import '../../shared/cards/A/A11_MudPatch'
 
 describe('A11_MudPatch session', () => {
   const setup = (options?: {
-    fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+    fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -39,9 +39,9 @@ describe('A11_MudPatch session', () => {
   it('zone exists with capacity = empty field count, animalType = boar', () => {
     const session = setup({
       fields: [
-        { row: 1, col: 1, crop: null, remaining: 0 },
-        { row: 1, col: 2, crop: null, remaining: 0 },
-        { row: 2, col: 1, crop: null, remaining: 0 },
+        { row: 1, col: 1, stacks: [] },
+        { row: 1, col: 2, stacks: [] },
+        { row: 2, col: 1, stacks: [] },
       ],
     })
     const state = session.getState().state
@@ -58,9 +58,9 @@ describe('A11_MudPatch session', () => {
   it('zone capacity changes when fields get crops', () => {
     const session = setup({
       fields: [
-        { row: 1, col: 1, crop: null, remaining: 0 },
-        { row: 1, col: 2, crop: null, remaining: 0 },
-        { row: 2, col: 1, crop: 'grain', remaining: 2 },
+        { row: 1, col: 1, stacks: [] },
+        { row: 1, col: 2, stacks: [] },
+        { row: 2, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
       ],
     })
     const state = session.getState().state
@@ -73,8 +73,7 @@ describe('A11_MudPatch session', () => {
     expect(cardZone!.capacity).toBe(2)
 
     // Plant on another field
-    player.fields[0]!.crop = 'vegetable'
-    player.fields[0]!.remaining = 1
+    player.fields[0]!.stacks.push({ kind: 'vegetable', remaining: 1 })
     zones = computeAnimalZones(player)
     cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
     expect(cardZone).toBeDefined()
@@ -84,8 +83,8 @@ describe('A11_MudPatch session', () => {
   it('no zone when all fields are planted', () => {
     const session = setup({
       fields: [
-        { row: 1, col: 1, crop: 'grain', remaining: 3 },
-        { row: 1, col: 2, crop: 'vegetable', remaining: 2 },
+        { row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] },
+        { row: 1, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ],
     })
     const state = session.getState().state

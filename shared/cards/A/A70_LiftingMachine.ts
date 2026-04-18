@@ -1,16 +1,18 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'A70_LiftingMachine'
 
 registerFieldEffect('take-vegetable', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'vegetable' && f.remaining > 0)
-    if (field) {
-      field.remaining -= 1
-      if (field.remaining <= 0) field.crop = null
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (top && top.kind === 'vegetable' && top.remaining > 0) {
+      fieldDecrementTop(field)
       player.resources.vegetable = (player.resources.vegetable ?? 0) + 1
     }
   }
@@ -22,7 +24,7 @@ registerCardEffect({
   onReturnHome: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
-    const vegFields = player.fields.filter(f => f.crop === 'vegetable' && f.remaining > 0)
+    const vegFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'vegetable')
     if (vegFields.length === 0) return
 
     return {

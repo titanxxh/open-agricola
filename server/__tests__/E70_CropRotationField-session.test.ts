@@ -16,7 +16,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 const setup = (options?: {
   grain?: number
   vegetable?: number
-  fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+  fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   round?: number
   cardCrop?: { crop: 'grain' | 'vegetable'; remaining: number } | null
 }) => {

@@ -946,7 +946,7 @@ type GameState = {
 
 - 身份信息：`id`、`name`、`color`
 - 基础经营信息：`resources`、`familySize`、`workersAvailable`、`rooms`、`houseType`
-- 农场版图：`fields`、`roomTiles`、`stableTiles`、`fenceSegments`、`pastures`
+- 农场版图：`fields`（`Field.stacks: CropStack[]`，见下方说明）、`roomTiles`、`stableTiles`、`fenceSegments`、`pastures`
 - 动物安置：`houseAnimalType`、`houseAnimalCount`、`stableAnimals`、`newbornCount`
 - 已打出卡牌：`improvements`、`minorPlayed`、`occupationPlayed`、`playedCards`
 - 手牌：`minorHand`、`occupationHand`
@@ -957,6 +957,17 @@ type GameState = {
 
 - 足够完整，能独立描述一个玩家的完整农场状态
 - 足够稳定，便于广播、补同步、录像和回放
+
+#### 11.3.1 Field 多堆模型（`CropStack`）
+
+每块 `Field` 持有 `stacks: CropStack[]`，数组顺序即视觉从底到顶（`stacks[0]` 是最底堆、`stacks[stacks.length-1]` 是最顶堆）。`CropStack` 形如 `{ kind: 'grain' | 'vegetable', kind-specific remaining: number }`。核心语义：
+
+- **Sow 仍要求空田**（`fieldIsEmpty(f)`，即 `stacks.length === 0`）——播种不会叠加到已有堆上。
+- **Reap 只收顶堆**。每次收获把顶堆 `remaining -= 1`；当 `remaining === 0` 时 pop，下一次收获才会暴露下一堆（底堆）。
+- **Scoring / prereq 用 `fieldHasCrop(f, kind)`**——只要任一 stack 是目标作物即算该田含该作物。混合田（同时含谷和菜）同时计入谷田和菜田。
+- **底堆插入是单卡专属动作**。目前只有 A113 Heresy Teacher 会在触发时对满足条件的田 `unshift` 一个 `{ kind: 'vegetable', remaining: 1 }` 到底堆；因此它的 veg 会等到顶堆 grain 被 reap 清空后才能被收。
+
+所有 Field 访问统一走 `shared/game/field.ts` 里的 helper（`fieldIsEmpty` / `fieldTopStack` / `fieldBottomStack` / `fieldHasCrop` / `fieldTotalRemaining` / `fieldPopIfDepleted` / `fieldDecrementTop` / `fieldFindStackOfKind` / `countFieldsWithCrop` / `countEmptyFields`），避免卡牌直接触碰 `stacks` 原数组。`rehydrateState` 对旧形状 `{ crop, remaining }` 会做一次迁移。
 
 ### 11.4 网络传输状态 `SerializedGameState`
 

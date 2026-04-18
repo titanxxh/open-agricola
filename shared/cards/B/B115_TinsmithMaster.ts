@@ -6,6 +6,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../actions/effects/animals'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
 import type { ActionFlow, PlayerState } from '../../game/types'
+import { fieldTopStack } from '../../game/field'
 
 const CARD_ID = 'B115_TinsmithMaster'
 
@@ -25,19 +26,22 @@ const CARD_ID = 'B115_TinsmithMaster'
 /** Initial remaining values for each crop type when freshly sown. */
 const INITIAL_REMAINING: Record<string, number> = { grain: 3, vegetable: 2 }
 
-/** Detect fields that were freshly sown (have initial remaining value). */
+/** Detect fields that were freshly sown (top stack at full initial remaining). */
 const getFreshlySownFields = (context: CardListenerContext) =>
-  context.player.fields.filter(
-    (f) => f.crop !== null && f.remaining === INITIAL_REMAINING[f.crop],
-  )
+  context.player.fields.filter((f) => {
+    const top = fieldTopStack(f)
+    return !!top && top.remaining === INITIAL_REMAINING[top.kind]
+  })
 
-// Field effect: add 1 crop to the selected field (matching its crop type)
+// Field effect: add 1 crop to the top stack of the selected field
 registerFieldEffect('tinsmith-master-bonus-crop', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
-    if (field && field.crop !== null && field.remaining > 0) {
-      field.remaining += 1
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (top) {
+      top.remaining += 1
       break // only 1 field
     }
   }
@@ -74,8 +78,9 @@ const afterSowListener: CardListenerRegistration = {
     if (freshFields.length === 0) return
 
     if (freshFields.length === 1) {
-      // Auto-add 1 crop to the single field
-      freshFields[0]!.remaining += 1
+      // Auto-add 1 crop to the top stack of the single field
+      const top = fieldTopStack(freshFields[0]!)
+      if (top) top.remaining += 1
       return
     }
 

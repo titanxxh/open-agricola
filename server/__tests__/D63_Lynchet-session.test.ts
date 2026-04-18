@@ -24,8 +24,8 @@ describe('D63_Lynchet session', () => {
     // Field at (1,1) — adjacent to room (0,1)
     // Both still have crop after reap (remaining > 0)
     player.fields = [
-      { row: 1, col: 0, crop: 'grain', remaining: 2 },
-      { row: 1, col: 1, crop: 'vegetable', remaining: 1 },
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 1, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
 
     // Reap summary: 2 fields harvested
@@ -55,8 +55,8 @@ describe('D63_Lynchet session', () => {
     // Field at (1,0) — adjacent to room (0,0)
     // Field at (2,2) — NOT adjacent to any room
     player.fields = [
-      { row: 1, col: 0, crop: 'grain', remaining: 1 },
-      { row: 2, col: 2, crop: 'vegetable', remaining: 1 },
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+      { row: 2, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
 
     state.harvestReapSummary = {
@@ -85,8 +85,8 @@ describe('D63_Lynchet session', () => {
     // Field at (1,0) — adjacent to room, was depleted (crop=null, remaining=0 after reap)
     // Field at (2,2) — NOT adjacent
     player.fields = [
-      { row: 1, col: 0, crop: null, remaining: 0 },
-      { row: 2, col: 2, crop: 'grain', remaining: 2 },
+      { row: 1, col: 0, stacks: [] },
+      { row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
 
     // 2 total harvested (1 grain from field that still has crop + 1 that was depleted)
@@ -133,7 +133,7 @@ describe('D63_Lynchet session', () => {
     // Card NOT in minorPlayed
 
     player.roomTiles = [{ row: 0, col: 0 }]
-    player.fields = [{ row: 1, col: 0, crop: 'grain', remaining: 1 }]
+    player.fields = [{ row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
 
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
@@ -156,7 +156,7 @@ describe('D63_Lynchet session', () => {
     // House at (0,0)
     player.roomTiles = [{ row: 0, col: 0 }]
     // Field at (2,2) — NOT adjacent to room
-    player.fields = [{ row: 2, col: 2, crop: 'grain', remaining: 2 }]
+    player.fields = [{ row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] }]
 
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },

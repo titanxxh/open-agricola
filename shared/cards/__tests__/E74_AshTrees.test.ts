@@ -24,7 +24,7 @@ const createPlayer = (): PlayerState =>
       { id: '5', isActive: false, isNewborn: false },
     ],
     rooms: 2, houseType: 'wood',
-    fields: [{ row: 0, col: 0, crop: 'grain', remaining: 1 }, { row: 0, col: 1, crop: 'grain', remaining: 1 }],
+    fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }, { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
     roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: ['E74_AshTrees'],
     occupationHand: [], occupationPlayed: [], playedCards: [],
