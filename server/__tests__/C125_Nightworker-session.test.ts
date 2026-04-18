@@ -19,7 +19,6 @@ describe('C125_Nightworker session', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 0
     player.resources.clay = 5
     player.resources.reed = 3

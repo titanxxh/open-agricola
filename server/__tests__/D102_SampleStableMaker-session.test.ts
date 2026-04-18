@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { runFieldEffect } from '../../shared/actions/effects/field-effect-registry'
+import { runSelectionEffect } from '../../shared/actions/effects/selection-effect-registry'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/D/D102_SampleStableMaker'
@@ -26,8 +26,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
@@ -48,7 +47,6 @@ describe('D102_SampleStableMaker card effect', () => {
   const createOwner = () => {
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     return player
   }
 
@@ -71,7 +69,7 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onStartReturnHome offers optional field-select + minor improvement', () => {
+  it('onStartReturnHome offers optional selection + minor improvement', () => {
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 1, col: 0 },
@@ -83,16 +81,16 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
-    expect(flow.children[0].actionId).toBe('field-select')
-    expect(flow.children[0].actionContext.fieldEffect).toBe(FIELD_EFFECT)
+    expect(flow.children[0].actionId).toBe('selection')
+    expect(flow.children[0].actionContext.selectionEffect).toBe(FIELD_EFFECT)
+    expect(flow.children[0].actionContext.selectionKind).toBe('farm-position')
     expect(flow.children[0].actionContext.maxSelections).toBe(1)
-    expect(flow.children[0].actionContext.farmType).toBe('stable')
     expect(flow.children[1].actionId).toBe('minor-improvement')
     expect(flow.children[1].optional).toBe(true)
     expect(flow.children[1].sourceCard).toBe(CARD_ID)
   })
 
-  it('field-effect removes exactly 1 stable and grants 1 wood, 1 grain, 1 food', () => {
+  it('selection-effect removes exactly 1 stable and grants 1 wood, 1 grain, 1 food', () => {
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 1, col: 0 },
@@ -102,9 +100,9 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
-    runFieldEffect(FIELD_EFFECT, {
+    runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0'],
+      positions: ['0-0'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
@@ -114,7 +112,7 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(player.resources.food).toBe(initial.food + 1)
   })
 
-  it('field-effect does nothing when no selection is made', () => {
+  it('selection-effect does nothing when no selection is made', () => {
     const player = createOwner()
     player.stableTiles = [{ row: 0, col: 0 }]
     const initial = {
@@ -122,9 +120,9 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
-    runFieldEffect(FIELD_EFFECT, {
+    runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: [],
+      positions: [],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)

@@ -32,8 +32,6 @@ describe('C113_WinterCaretaker session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 5
 
     session.loadState(state)
@@ -64,8 +62,6 @@ describe('C113_WinterCaretaker session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 1
 
     session.loadState(state)

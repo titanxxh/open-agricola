@@ -14,7 +14,6 @@ describe('C53_GypsysCrock session', () => {
     const player = state.players[0]!
     // Place card directly
     player.minorPlayed.push('C53_GypsysCrock')
-    player.playedCards.push('minor:C53_GypsysCrock')
     // Give player a Fireplace for cooking
     player.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(

@@ -84,8 +84,6 @@ export const playOccupation = (
     (id) => id !== occupation.id,
   )
   player.occupationPlayed.push(occupation.id)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`occupation:${occupation.id}`)
   getCardModifiers(occupation.id).forEach((modifier) => {
     if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
       player.activeModifiers.push(modifier)

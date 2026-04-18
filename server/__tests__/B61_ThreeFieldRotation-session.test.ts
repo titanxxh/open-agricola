@@ -15,8 +15,6 @@ describe('B61_ThreeFieldRotation session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
@@ -42,8 +40,6 @@ describe('B61_ThreeFieldRotation session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       { row: 0, col: 1, stacks: [] },
@@ -64,8 +60,6 @@ describe('B61_ThreeFieldRotation session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 1, stacks: [] },
@@ -86,8 +80,6 @@ describe('B61_ThreeFieldRotation session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },

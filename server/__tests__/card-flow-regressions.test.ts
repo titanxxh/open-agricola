@@ -17,7 +17,6 @@ describe('card flow regressions', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A17_ReclamationPlow')
-    player.playedCards.push(playedKey('A17_ReclamationPlow', 'minor'))
 
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')
@@ -55,7 +54,6 @@ describe('card flow regressions', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A17_ReclamationPlow')
-    player.playedCards.push(playedKey('A17_ReclamationPlow', 'minor'))
 
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')
@@ -108,7 +106,6 @@ describe('card flow regressions', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D150_GodlySpouse')
-    player.playedCards.push(playedKey('D150_GodlySpouse', 'occupation'))
     player.rooms = 3
     const forest = state.actionSpaces.find((space) => space.id === 'forest')
     const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')

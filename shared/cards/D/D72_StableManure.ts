@@ -2,13 +2,13 @@ import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'D72_StableManure'
 
-registerFieldEffect('harvest-extra', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('harvest-extra', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (!field) continue
@@ -45,13 +45,14 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-crop',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-crop',
         maxSelections: unfencedCount,
-        fieldEffect: 'harvest-extra',
+        selectionEffect: 'harvest-extra',
       },
     }
   },

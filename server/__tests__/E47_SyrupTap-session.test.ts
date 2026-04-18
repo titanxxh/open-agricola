@@ -16,7 +16,6 @@ describe('E47_SyrupTap session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     session.loadState(state)
     return session

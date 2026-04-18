@@ -14,7 +14,6 @@ describe('A42_ForestLakeHut session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push(CARD_ID)
-    owner.playedCards.push(`minor:${CARD_ID}`)
 
     // Stock the relevant spaces with some resources.
     const fishing = state.actionSpaces.find((s) => s.id === 'fishing')

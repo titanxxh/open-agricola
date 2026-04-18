@@ -12,7 +12,6 @@ describe('C141_SheepProvider session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('C141_SheepProvider')
-    owner.playedCards.push('occupation:C141_SheepProvider')
 
     // Ensure sheep-market is the first round action (opens at round 1)
     state.roundActionOrder = state.roundActionOrder.map((id) =>

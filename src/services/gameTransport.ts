@@ -15,6 +15,9 @@ export interface GameTransport {
   resolveChoice(playerIndex: number, value: string): Promise<GameSyncPayload>
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
   commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload>
+  commitSelection(playerIndex: number, payload: {
+    positions: { row: number; col: number }[]
+  }): Promise<GameSyncPayload>
   confirmReorg(playerIndex: number, zones: {
     id: string; zoneType: 'pasture' | 'house' | 'stable'
     animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
@@ -100,6 +103,13 @@ export class HttpGameTransport implements GameTransport {
 
   commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>) {
     return this.send(() => post('/api/game/commit-farm', { playerIndex, farmType, payload }))
+  }
+
+  commitSelection(
+    playerIndex: number,
+    payload: { positions: { row: number; col: number }[] },
+  ) {
+    return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
   }
 
   confirmReorg(playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]) {
@@ -298,7 +308,14 @@ export class WsGameTransport implements GameTransport {
   }
 
   async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select', payload })
+    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow', payload })
+  }
+
+  async commitSelection(
+    playerIndex: number,
+    payload: { positions: { row: number; col: number }[] },
+  ): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
   }
 
   async confirmReorg(_playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {

@@ -1,4 +1,5 @@
 import type {
+  GameState,
   PlayerState,
   Resource,
   ComplexCost,
@@ -631,10 +632,14 @@ export const executePaymentSolution = (
 export const returnCardToBoard = (
   player: PlayerState,
   cardId: string,
+  state?: Pick<GameState, 'availableMajorImprovements'>,
 ): void => {
   const improvementIndex = player.improvements.indexOf(cardId)
   if (improvementIndex > -1) {
     player.improvements.splice(improvementIndex, 1)
+    if (state && !state.availableMajorImprovements.includes(cardId)) {
+      state.availableMajorImprovements.push(cardId)
+    }
   }
   const minorPlayedIndex = player.minorPlayed.indexOf(cardId)
   if (minorPlayedIndex > -1) {

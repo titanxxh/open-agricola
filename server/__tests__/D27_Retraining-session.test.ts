@@ -28,8 +28,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
@@ -95,7 +94,6 @@ describe('D27_Retraining listeners', () => {
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Joinery')
-    player.playedCards.push('major:Major_Joinery')
     setCardFlag(player, CARD_ID, true)
     const state = createState([player], ['Major_Pottery'])
 
@@ -119,7 +117,6 @@ describe('D27_Retraining listeners', () => {
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Pottery')
-    player.playedCards.push('major:Major_Pottery')
     setCardFlag(player, CARD_ID, true)
     const state = createState([player], ['Major_Basket'])
 

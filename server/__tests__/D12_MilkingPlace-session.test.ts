@@ -20,8 +20,6 @@ describe('D12_MilkingPlace session', () => {
     const player = state.players[0]!
     // Manually add to minorPlayed since devPlayCard can't resolve non-catalog minors
     player.minorPlayed.push('D12_MilkingPlace')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('minor:D12_MilkingPlace')
     session.loadState(state)
     return session
   }

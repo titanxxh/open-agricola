@@ -40,9 +40,7 @@ const createPlayer = (): PlayerState => ({
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],
-  playedCards: [],
-  houseAnimalType: null,
+  occupationPlayed: [],houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: { '2-2': 'boar' },
   pastures: [

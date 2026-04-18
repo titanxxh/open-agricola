@@ -14,8 +14,6 @@ describe('E36_HerbalGarden session', () => {
     const player = state.players[0]!
 
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Set up 2 pastures
     player.pastures = [
@@ -60,8 +58,6 @@ describe('E36_HerbalGarden session', () => {
     const player = state.players[0]!
 
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Pasture 1 has animals, pasture 2 is empty
     player.pastures = [
@@ -144,8 +140,6 @@ describe('E36_HerbalGarden session', () => {
     const player = state.players[0]!
 
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.pastures = []
 
     session.loadState(state)
@@ -163,8 +157,6 @@ describe('E36_HerbalGarden session', () => {
     const player = state.players[0]!
 
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     player.pastures = [
       {

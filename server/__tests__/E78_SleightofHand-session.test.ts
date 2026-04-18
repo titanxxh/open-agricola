@@ -19,7 +19,6 @@ describe('E78_SleightofHand session', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.wood = 3
     player.resources.clay = 1
 

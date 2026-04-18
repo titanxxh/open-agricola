@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { cloneState, createInitialState } from '../state'
+import { getPlayedCardKeys } from '../../game/player'
 
 describe('cloneState', () => {
-  it('preserves round and played cards', () => {
+  it('preserves round and derives played cards from canonical arrays', () => {
     const state = createInitialState(42)
     state.round = 6
     state.players[0].minorPlayed = ['A3_PaperKnife']
-    state.players[0].playedCards = ['minor:A3_PaperKnife']
 
     const cloned = cloneState(state)
 
     expect(cloned.round).toBe(6)
     expect(cloned.players[0]?.minorPlayed).toEqual(['A3_PaperKnife'])
-    expect(cloned.players[0]?.playedCards).toContain('minor:A3_PaperKnife')
+    expect(getPlayedCardKeys(cloned.players[0]!)).toContain('minor:A3_PaperKnife')
+  })
+
+  it('initializes playedCards as empty array on created and cloned players', () => {
+    const state = createInitialState(42)
+    const cloned = cloneState(state)
+
+    expect(state.players[0].playedCards).toEqual([])
+    expect(cloned.players[0].playedCards).toEqual([])
   })
 
   it('does not share nested references', () => {

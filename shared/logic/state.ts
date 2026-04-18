@@ -395,14 +395,6 @@ export const normalizeState = (raw: GameState): GameState => {
     } else {
       normalized.houseAnimalCount = Math.min(1, normalized.houseAnimalCount)
     }
-    const expectedPlayedCards = [
-      ...normalized.improvements.map((id) => `major:${id}`),
-      ...normalized.minorPlayed.map((id) => `minor:${id}`),
-      ...normalized.occupationPlayed.map((id) => `occupation:${id}`),
-    ]
-    const existingSet = new Set(normalized.playedCards ?? [])
-    const missingCards = expectedPlayedCards.filter((id) => !existingSet.has(id))
-    normalized.playedCards = [...(normalized.playedCards ?? []), ...missingCards]
     return normalized
   })
   const takenImprovements = new Set(
@@ -466,40 +458,43 @@ export const createInitialPlayers = (
     { id: 'p3', name: 'PlayerC', color: 'black', startPlayer: false },
     { id: 'p4', name: 'PlayerD', color: 'yellow', startPlayer: false },
   ]
-  return base.slice(0, count).map((info, index) => ({
-    id: info.id,
-    name: playerNames[index] ?? info.name,
-    color: info.color,
-    resources: { ...emptyResources, food: 2 },
-    workers: [
-      { id: '1', isActive: true,  isNewborn: false },
-      { id: '2', isActive: true,  isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2,
-    houseType: 'wood',
-    fields: [],
-    roomTiles: createDefaultRoomTiles(2),
-    stableTiles: [],
-    improvements: [],
-    minorHand: dealtHands.minorHands[index] ?? [],
-    minorPlayed: [],
-    occupationHand: dealtHands.occupationHands[index] ?? [],
-    occupationPlayed: [],
-    extraOccupationsFromCards: [],
-    playedCards: [],
-    houseAnimalType: null,
-    houseAnimalCount: 0,
-    stableAnimals: {},
-    pastures: [],
-    fenceSegments: [],
-    majorEffects: { wellRounds: 0 },
-    startPlayer: info.startPlayer,
-    activeModifiers: [],
-    cardStates: {},
-  }))
+  return base.slice(0, count).map((info, index) => {
+    const player: PlayerState = {
+      id: info.id,
+      name: playerNames[index] ?? info.name,
+      color: info.color,
+      resources: { ...emptyResources, food: 2 },
+      workers: [
+        { id: '1', isActive: true,  isNewborn: false },
+        { id: '2', isActive: true,  isNewborn: false },
+        { id: '3', isActive: false, isNewborn: false },
+        { id: '4', isActive: false, isNewborn: false },
+        { id: '5', isActive: false, isNewborn: false },
+      ],
+      rooms: 2,
+      houseType: 'wood',
+      fields: [],
+      roomTiles: createDefaultRoomTiles(2),
+      stableTiles: [],
+      improvements: [],
+      minorHand: dealtHands.minorHands[index] ?? [],
+      minorPlayed: [],
+      occupationHand: dealtHands.occupationHands[index] ?? [],
+      occupationPlayed: [],
+      extraOccupationsFromCards: [],
+      playedCards: [],
+      houseAnimalType: null,
+      houseAnimalCount: 0,
+      stableAnimals: {},
+      pastures: [],
+      fenceSegments: [],
+      majorEffects: { wellRounds: 0 },
+      startPlayer: info.startPlayer,
+      activeModifiers: [],
+      cardStates: {},
+    }
+    return player
+  })
 }
 
 export const createRoundSnapshot = (state: GameState): GameState => {

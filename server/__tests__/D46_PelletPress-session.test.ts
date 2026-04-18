@@ -16,7 +16,6 @@ describe('D46_PelletPress session', () => {
     player.resources.food = 0
     // Directly place card
     player.minorPlayed.push('D46_PelletPress')
-    player.playedCards.push('minor:D46_PelletPress')
     session.loadState(state)
     return session
   }

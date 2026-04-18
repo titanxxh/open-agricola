@@ -51,9 +51,7 @@ const createPlayer = (workersAvailable = 1): PlayerState =>
     minorHand: [],
     minorPlayed: [],
     occupationHand: [],
-    occupationPlayed: [CARD_ID],
-    playedCards: [`occupation:${CARD_ID}`],
-    houseAnimalType: null,
+    occupationPlayed: [CARD_ID],houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
     pastures: [],
@@ -157,7 +155,6 @@ describe('D103_CanalBoatman session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.food = 1
     setWorkersAtHome(state, player, 2)
     const fishing = state.actionSpaces.find((space) => space.id === 'fishing')
@@ -225,7 +222,6 @@ describe('D103_CanalBoatman session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID, 'D150_GodlySpouse')
-    player.playedCards.push(`occupation:${CARD_ID}`, 'occupation:D150_GodlySpouse')
     setActiveWorkerCount(player, 3)
     setWorkersAtHome(state, player, 3)
     player.rooms = 4

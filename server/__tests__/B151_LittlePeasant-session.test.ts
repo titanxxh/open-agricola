@@ -23,7 +23,6 @@ const setupOccupiedSpaceSession = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('B151_LittlePeasant')
-    player.playedCards.push(playedKey('B151_LittlePeasant', 'occupation'))
   }
 
   const opponentId = state.players[1]!.id

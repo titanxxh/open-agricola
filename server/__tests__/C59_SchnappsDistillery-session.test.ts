@@ -24,7 +24,6 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
 
     // PlayerA needs 2 food (familySize=1 * 2), has C59 + 2 vegetables
     playerA.minorPlayed.push('C59_SchnappsDistillery')
-    playerA.playedCards.push('minor:C59_SchnappsDistillery')
     playerA.resources.vegetable = 2
 
     // PlayerB: skip feeding complications

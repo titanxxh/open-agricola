@@ -13,10 +13,8 @@ describe('B19_MoldboardPlow session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    // Card not in catalog — manually add to minorPlayed + playedCards
+    // Card not in catalog — manually add it to minorPlayed.
     player.minorPlayed.push('B19_MoldboardPlow')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('minor:B19_MoldboardPlow')
     // Initialize stack as onBuy would
     if (!player.cardStates) player.cardStates = {}
     player.cardStates['B19_MoldboardPlow'] = { stack: ['field', 'field'] }

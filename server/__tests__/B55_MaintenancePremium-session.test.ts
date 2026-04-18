@@ -24,8 +24,6 @@ const setup = () => {
 
   // Manually add card
   player.minorPlayed.push(CARD_ID)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${CARD_ID}`)
   if (!player.cardStates) player.cardStates = {}
   player.cardStates[CARD_ID] = {
     extraData: { foodCount: 3 },

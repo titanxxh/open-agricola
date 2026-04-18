@@ -12,7 +12,6 @@ describe('A156_Buyer session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('A156_Buyer')
-    owner.playedCards.push('occupation:A156_Buyer')
     owner.resources.food = 5
 
     // Ensure reed-bank has accumulated resources (base space, always open)

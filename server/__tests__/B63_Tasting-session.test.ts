@@ -16,8 +16,6 @@ describe('B63_Tasting session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     setWorkersAtHome(state, player, 2)
     player.resources.grain = grain
     // Need an occupation in hand to make lessons usable (free for first occupation)

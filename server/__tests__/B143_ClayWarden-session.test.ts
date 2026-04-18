@@ -14,7 +14,6 @@ describe('B143_ClayWarden session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('B143_ClayWarden')
-    owner.playedCards.push('occupation:B143_ClayWarden')
     setWorkersAtHome(state, owner, 2)
     owner.resources.clay = 0
 

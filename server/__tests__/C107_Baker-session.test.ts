@@ -51,8 +51,6 @@ describe('C107_Baker session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.grain = 3
 
     session.loadState(state)
@@ -75,8 +73,6 @@ describe('C107_Baker session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.grain = 0
 
     session.loadState(state)

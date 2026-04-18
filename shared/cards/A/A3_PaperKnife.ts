@@ -89,7 +89,6 @@ registerCardEffect({
     // Synchronous free-play (avoiding import cycles with occupation.ts):
     //   - validate the card is in hand
     //   - remove from occupationHand, push to occupationPlayed
-    //   - append to playedCards log list
     //   - Note: modifiers / onBuy of the played occupation are intentionally
     //     NOT registered here (same simplification B3_Moonshine documents).
     //     A follow-up refactor could route through `playOccupation()` once
@@ -98,8 +97,6 @@ registerCardEffect({
     if (idx >= 0) {
       player.occupationHand.splice(idx, 1)
       player.occupationPlayed.push(selected)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`occupation:${selected}`)
     }
     void state
 

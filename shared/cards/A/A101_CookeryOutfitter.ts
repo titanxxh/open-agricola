@@ -1,6 +1,7 @@
 import { Occupation, getRegisteredMinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { getMajorCardEffect } from '../major'
+import { collectCardsAs } from '../helpers/card-type'
 
 const CARD_ID = 'A101_CookeryOutfitter'
 
@@ -15,9 +16,7 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
-    const cookingMajors = player.improvements.filter(isCookeryCard)
-    const cookingMinors = player.minorPlayed.filter(isCookeryCard)
-    return cookingMajors.length + cookingMinors.length
+    return collectCardsAs(player, 'major').filter(isCookeryCard).length
   },
 })
 

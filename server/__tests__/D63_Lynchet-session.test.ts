@@ -14,8 +14,6 @@ describe('D63_Lynchet session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.food = 5
 
     // House at (0,0) and (0,1)

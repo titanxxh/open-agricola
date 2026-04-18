@@ -39,7 +39,7 @@ import { moveFarmerToSpaceAction } from './effects/move-farmer-to-space'
 import { popCardStackAction } from './effects/pop-card-stack'
 import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
-import { fieldSelectAction } from './effects/field-select'
+import { selectionAction } from './effects/selection'
 import { discardFromHandAction } from './effects/discard-from-hand'
 import { swapFieldGrainToVegAction } from './effects/swap-field-crop'
 import { spendWorkerAction } from './effects/spend-worker'
@@ -91,7 +91,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   popCardStackAction,
   pushCardStackAction,
   buildFarmhandRoomAction,
-  fieldSelectAction,
+  selectionAction,
   discardFromHandAction,
   swapFieldGrainToVegAction,
 ]

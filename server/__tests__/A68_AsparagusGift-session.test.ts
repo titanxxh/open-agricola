@@ -21,10 +21,9 @@ const setup = (opts: { withB30?: boolean; wood: number; round?: number }) => {
   const player = state.players[0]!
   player.resources = { ...player.resources, wood: opts.wood }
   player.minorPlayed = [...player.minorPlayed, CARD_ID]
-  player.playedCards = [...player.playedCards, `minor:${CARD_ID}`]
+  player.minorPlayed.push(CARD_ID)
   if (opts.withB30) {
     player.minorPlayed.push(B30)
-    player.playedCards.push(`minor:${B30}`)
   }
 
   session.loadState(state)

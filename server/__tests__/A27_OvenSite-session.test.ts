@@ -21,10 +21,6 @@ describe('A27_OvenSite session', () => {
     // Prereq (Fireplace + CookingHearth); not enforced server-side by our engine
     // (prerequisite is a display field only), but give them to match intent.
     player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']
-    player.playedCards = [
-      'major:Major_Fireplace1',
-      'major:Major_CookingHearth1',
-    ]
     player.minorHand = [CARD_ID]
     player.resources = {
       ...player.resources,

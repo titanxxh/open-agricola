@@ -13,7 +13,6 @@ describe('C51_FishingNet session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push('C51_FishingNet')
-    owner.playedCards.push('minor:C51_FishingNet')
 
     // Ensure fishing space has some accumulated food
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
@@ -75,7 +74,6 @@ describe('C51_FishingNet session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push('C51_FishingNet')
-    owner.playedCards.push('minor:C51_FishingNet')
 
     // Each player has 1 worker
     state.players.forEach((p) => {
@@ -161,7 +159,6 @@ describe('C51_FishingNet session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push('C51_FishingNet')
-    owner.playedCards.push('minor:C51_FishingNet')
 
     // All workers used, ready for round end
     state.players.forEach((p) => {

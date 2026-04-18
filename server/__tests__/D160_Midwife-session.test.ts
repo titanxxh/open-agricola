@@ -28,7 +28,6 @@ describe('D160_Midwife session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D160_Midwife')
-    owner.playedCards.push('occupation:D160_Midwife')
     setWorkersAtHome(state, owner, 2)
     owner.resources.grain = 0
     // Owner needs room for family growth to not block

@@ -35,22 +35,28 @@
 
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
-| ✅ 完全对齐 | ~803 + §2.1 列举 16 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
+| ✅ 完全对齐 | ~803 + §2.1 列举 23 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 10 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 7 张 | cost / prereq / vp 与 BGA 不同 | 优先修，影响经济 |
-| 🔀 刻意偏离 BGA（§2.5） | 2 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 2 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
+| ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
+| 🔀 刻意偏离 BGA（§2.5） | 4 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-04-18 — D161 Cabbage Buyer 重实现 + isMajorImprovement 统一标志**：消除"固定 2 食物"偏离，改为 3/2/1 按实际打出改良的卡牌属性判定（`isEffectivelyMajor` helper）。新增基础设施 `isMajorImprovement` flag 标记 A60/D59/C60/D25 四张 minor-that-is-major 卡。D161 仅在 house-redevelopment 生效（farm-redev / standalone renovate 不触发），通过 tracker + `after:place-farmer` drain 延迟结算。
+- **2026-04-18 — D161 Cabbage Buyer 重实现 + isMajorImprovement 统一标志**：消除”固定 2 食物”偏离，改为 3/2/1 按实际打出改良的卡牌属性判定（`isEffectivelyMajor` helper）。新增基础设施 `isMajorImprovement` flag 标记 A60/D59/C60/D25 四张 minor-that-is-major 卡。D161 仅在 house-redevelopment 生效（farm-redev / standalone renovate 不触发），通过 tracker + `after:place-farmer` drain 延迟结算。
 - **2026-04-18 — B132 EstateMaster 重实现 + 'reap' listener 基础设施**：用 `registerCardListener({actions:['reap']})` 替换原简化公式（每 3 格 +1 VP），对齐 BGA 规则——满格后每 harvest 的蔬菜 reap +1 VP。新增 `dispatchReapListener(state, player, crop, amount)` helper（`shared/actions/effects/reap.ts`）和 `'reap'` 合成 action；`reap()` 签名从 `(player)` 改为 `(state, player)`；D25/C70/E69/E70/E68/E72 六张额外 reap 卡各加一行 dispatch 调用。§2.5 移除 B132。
-- **2026-04-18 — D161 CabbageBuyer 重实现 + session 测试**：从固定 2 food 简化改为 3-listener 追踪器（after:renovate-house 开 tracker、after:improvement-any 打标、after:place-farmer 清算报价）+ `isEffectivelyMajor` helper；已知限制：improvement-any OptionalNode 在 house-redevelopment 流程中始终 auto-skip，导致 hasMajor/hasMinor 无法被 tag，cost 实际恒为 3；8 个 session 测试全通过，T2/T3/T4 文档化此限制。§2.5 将 D161 改为"进行中/已知偏差"状态。
-- **2026-04-18 — A113 Heresy Teacher 实现 + Field.stacks 多堆模型落地**：BGA 自身未实现；我们借机把 `Field.{crop, remaining}` 升级为 `Field.stacks: CropStack[]`（数组顺序 = 底→顶），让谷/菜混合田成为可能。新增 `shared/game/field.ts` 辅助函数统一访问。Sow 仍要求空田；Reap 只收顶堆（`remaining===0` 时 pop，下次收获暴露下一堆）；Scoring / prereq 改走 `fieldHasCrop`——混合田同时算谷田 + 菜田。A113 监听 Lessons 空间使用，对"有 ≥3 谷且无菜"的田 `unshift` 底堆 `{ kind: 'vegetable', remaining: 1 }`（当前唯一底堆插入的卡）。`rehydrateState` 加 legacy 迁移。~22 张 field-相关卡迁到新 helper；FarmBoard 前端按 stack 分段渲染。
+- **2026-04-18 — D161 CabbageBuyer 重实现 + session 测试**：从固定 2 food 简化改为 3-listener 追踪器（after:renovate-house 开 tracker、after:improvement-any 打标、after:place-farmer 清算报价）+ `isEffectivelyMajor` helper；已知限制：improvement-any OptionalNode 在 house-redevelopment 流程中始终 auto-skip，导致 hasMajor/hasMinor 无法被 tag，cost 实际恒为 3；8 个 session 测试全通过，T2/T3/T4 文档化此限制。§2.5 将 D161 改为”进行中/已知偏差”状态。
+- **2026-04-18 — A113 Heresy Teacher 实现 + Field.stacks 多堆模型落地**：BGA 自身未实现；我们借机把 `Field.{crop, remaining}` 升级为 `Field.stacks: CropStack[]`（数组顺序 = 底→顶），让谷/菜混合田成为可能。新增 `shared/game/field.ts` 辅助函数统一访问。Sow 仍要求空田；Reap 只收顶堆（`remaining===0` 时 pop，下次收获暴露下一堆）；Scoring / prereq 改走 `fieldHasCrop`——混合田同时算谷田 + 菜田。A113 监听 Lessons 空间使用，对”有 ≥3 谷且无菜”的田 `unshift` 底堆 `{ kind: 'vegetable', remaining: 1 }`（当前唯一底堆插入的卡）。`rehydrateState` 加 legacy 迁移。~22 张 field-相关卡迁到新 helper；FarmBoard 前端按 stack 分段渲染。
+- **2026-04-18 — `selection` / `farm-position` 抽象一步到位落地**：原先那条”提交一组选中农场位置后执行回调”的链路，已经从专用 `field-select` 动作彻底提升为通用 `selection` 动作族：`shared/actions/effects/selection.ts` 取代旧 `field-select.ts`，server / protocol / transport / UI 全链路改用 `ui.interactionSelection`、`InteractionSelection`、`commitSelection()`，卡牌 actionContext 统一改成 `selectionKind: 'farm-position'` + `positionFilter` / `selectableTiles`，持久化 key 统一从 `selectedFields` 改为 `selectedPositions`。这也让 D27 Retraining、D102 SampleStableMaker、E76 LumberPile 这类”并不真的只选田地”的交互终于有了语义正确的通道。
+- **2026-04-18 — D60 / major return helper 收口到 `returnCardToBoard(player, cardId, state?)`**：`shared/actions/effects/pay.ts` 的 `returnCardToBoard` 现在可选接收 `state`，当归还的是玩家区里的 major improvement 时，会统一负责把该卡放回 `state.availableMajorImprovements` 且避免重复追加。`shared/actions/effects/improvement.ts` 的 major/minor 购买路径与 `shared/cards/D/D60_LargePottery.ts` 都改为复用这条 helper，不再各自手写 `availableMajorImprovements.push(...)`。`shared/actions/effects/__tests__/pay.test.ts` 新增”回板追加 / 不重复追加”覆盖。
+- **2026-04-18 — D60 LargePottery 改回正确建模（删除 `returnCards`，走自定义 prerequisite + onBuy）**：上一版把 D60 建成 `returnCards: ['Major_Pottery']`，再靠 `PlayerCard.tsx` 特判把 UI 改成 prerequisite+cost 分离；这会把 BGA 的”Return the Pottery 是前置条件”误建模成”卡牌支付系统里的归还卡成本”。现改为：`shared/cards/D/D60_LargePottery.ts` 删除 `returnCards`，保留印刷 `prerequisite: 'Return the Pottery'`，并通过 `registerPrerequisite('Return the Pottery', ...)` 检查玩家是否已打出 `Major_Pottery`；购买后由 D60 自己的 `onBuy` 把 `Major_Pottery` 从玩家区退回到 `state.availableMajorImprovements`。`src/components/common/PlayerCard.tsx` 同步撤回上一版 UI 特判，恢复成只按真实 card data 渲染；`shared/cards/__tests__/D60_LargePottery.test.ts` 新增”无 Pottery 不能买 / 有 Pottery 才能买 / 买后 Pottery 被退回公牌区”覆盖。
 - **2026-04-17 — D25 Witches' Dance Floor 多身份卡基础设施**：新增卡牌可同时提供多类身份（field + occupation + improvement）的能力；新基础设施 `providesField` / `providesOccupation` / `fireplaceIdentity` / `mustBePlayedViaMinorAction` / `extraOccupationsFromCards` 字段；`countFields` / `countOccupations` helper 聚合卡牌提供的虚拟身份；CookingHearth 返还代价扩展接受 `fireplaceIdentity`；新增 `cardMatchesCostList` helper 用于 fireplace 匹配；C70 LettucePatch 前置计数修正（虚拟田不计入终局田数计分，仅计入前置）。
+- **2026-04-17 (PR3) — D60 LargePottery 完整对齐 + dual-type 基础设施落地**：新增 `CardType = 'major' | 'minor' | 'occupation'` 与 `CardDefinition.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`），新增 helper `cardCountsAs(cardId, asType)` + `collectCardsAs(player, asType)` 替代直接读 `player.improvements.length` / `player.minorPlayed.length`。D60 LargePottery 改 `cost: { clay:2 }→{ clay:1, stone:1 }`、`category: POINTS_PROVIDER→FOOD_PROVIDER`、补 `extraVp: true`、`evenMoreSet: true`、`returnCards: ['Major_Pottery']`（复用现有 complex-cost 基建——买 D60 强制归还 Major_Pottery）、`alsoCountsAs: ['major']`；D59 EarthOven 与 A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`。`prerequisites.ts` 的 `countMajorImprovements` / `countCookingImprovements` / `countBakingImprovements` 切到 `collectCardsAs(player, 'major')`；5 处 caller（A101 CookeryOutfitter、A31 DebtSecurity、D145 RoofExaminer、C5 Remodeling、B133 VillagePeasant）同步迁到 dual-type 计数。前端 `src/components/common/PlayerCard.tsx` 透传 `returnCards` + `alsoCountsAs` 到 `player-card-inner[data-also-counts-as]`，并让 minor 也能走”归还 `<major>` 或 `<cost>`” 渲染分支；`src/styles/card-sprite.css` 按属性选择器 `[data-also-counts-as~=”major”]` 为 dual-type minor 切换 `card_frame_major_minor.png` 与 `minor_major_costtext.png`（未来新增 dual-type minor 无需改 CSS）。新增测试：`shared/cards/helpers/__tests__/card-type.test.ts`（9 例 helper 覆盖）、`shared/cards/__tests__/D60_LargePottery.test.ts`（18 例：BGA 卡定义、scoresMap 全档、dual-type 自身、2-Major prereq）、`src/components/common/__tests__/PlayerCard.test.tsx`（5 例 dual-type 渲染）。`pnpm test` 361 files 1981 pass（D95/E109 两例与本 PR 无关的 pollution flake 在隔离运行下全绿）。详见 `docs/superpowers/plans/2026-04-17-PR3-D60-and-dual-type.md`。至此 §2.4 全部清零。
+- **2026-04-17 (PR2) — §2.4 六张卡 cost/prereq 与 BGA 对齐**：B39 Loom `cost: { wood:1, reed:1 }→{ wood:2 }` + 新增 `2 Occupations` prereq；D31 Storeroom `cost: { reed:1 }→{ wood:1, stone:2 }`；D33 SummerHouse `cost: { wood:1, stone:1 }→{ wood:3, stone:1 }`；D34 LuxuriousHostel `cost: { stone:1, food:3 }→{ wood:1, clay:2 }`、删 `Stone House` 购买 prereq（`getStoneHouseBonusScore` 已内部判 `houseType === 'stone'` + `rooms > familySize`，wooden 时返回 0 不会漏给分）、新增 `extraVp: true` + `newSet: true`；D35 FodderChamber `cost: { wood:1, clay:1 }→{ stone:3, grain:3 }`；D38 MilkingStool 补 `2 Occupations` prereq（cost 本来就对齐）。新增 `shared/cards/__tests__/D34_LuxuriousHostel.test.ts`（5 个用例覆盖石屋/木屋、rooms≤family、未打出四种情形）。详见 `docs/superpowers/plans/2026-04-17-PR2-section-24-card-fixes.md`。D60 LargePottery 留给 PR3（需要 `returnCards` + dual-type 机制）。
+- **2026-04-17 (PR1) — minor/occupation 印刷 `vp` 接入计分 + 16 张卡 vp 全量对齐 BGA**：`shared/logic/scoring.ts` 原先把所有 minor improvement 与 occupation 的 `score` 硬编码为 `0`，导致 `$this->vp` 对应的印刷分一直被静默吞掉（影响 ~110 张已实现卡）。现改为读取 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp`；配套 `scripts/audit-card-vp.ts` 本地审计工具（不进 CI）一次性对齐 A25/B38/B39/C35/C59/D30/D31/D35/D60/E32/E38/E49/E52/E62/E71/E84 共 16 张 minor 的 `vp` 值（6+ 个 missing-ours 与 1 个 missing-bga 为 card-set scope 差异，已在 audit summary 里可见，留待后续）。PR1 仅改 `vp:` 字段；D31/D35/D60 的 `cost` 与 `returnCards`、B39/D38 的 `prerequisite` 留给 PR2/PR3。详见 `docs/superpowers/specs/2026-04-17-minor-vp-and-section-24-cards-design.md` PR1 节 + `docs/superpowers/plans/2026-04-17-PR1-minor-vp-scoring.md`。
 - **2026-04-17 — A25 Bassinet 依照 Worker 身份模型重写**：完全对齐 BGA 的 canUseOccupied 语义（第一个非累积格 + 恰好 1 人，Meeting Place 显式排除）。新增 `countPeopleOnSpace` helper；修复 A25 listener 的 actions 过滤器 bug（与 canUseOccupied 的 actionId=space.id 分发约定不匹配，导致 handler 从未被触发）。
 - **2026-04-17 — Worker 身份模型基建落地**：13 个子任务分 commit 推进；全仓 grep 替换聚合字段读点；新增 `shared/game/{player,space}.ts` helper。为 A25 Bassinet BGA 对齐打底。详见 `docs/ENGINE_ARCHITECTURE.md § 11.4.1`。
 - **2026-04-17 — B30 Wood Palisades 完整实现**：按 segment 新增替代 fence 类型（2 wood / +1 VP / 不计入 `MAX_FENCES` 15 上限 / 不进入 fence-keyed 卡片统计）。`PlayerState.fences` 数值字段替换为 `FenceSegment[]` + 推导 helper `getFenceCount` / `getPalisadeCount`；`validateFenceSelection` 增加 `allowPalisades?` 选项；`ActionDetailEffects` 的 `fencing` / `palisading` 日志拆分；前端 `useFarmSelection` 增加模式切换。新增错误码 `EDGE_TYPE_CONFLICT`、`PALISADES_NOT_UNLOCKED`。跨卡迁移（A22 / A34 / A47 / A68 / B119 / C54 / C88 / E74 / E108，共 9 张 fence-keyed 卡）仅是数据访问面从 `player.fences` 切到 `getFenceCount(player)`——纯围栏场景下可观察行为未变；只有在 B30 打出后 palisade 才被相应排除。
@@ -60,9 +66,9 @@
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 17 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 25 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐张核对过、明确标 ✅ 的 17 张。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 25 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25）。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -84,6 +90,13 @@
 | B30 WoodPalisades | 按 segment 替代 fence：2 wood、+1 VP、不计入 `MAX_FENCES`、不进入 fence-keyed 卡统计 | `FenceSegment[]` + `getFenceCount`/`getPalisadeCount` helper；`validateFenceSelection({ allowPalisades })`；`ActionDetailEffects.fencing` / `palisading` 拆分；9 张 fence-keyed 卡迁到 helper（见 §2.0 changelog） |
 | A113 HeresyTeacher | Lessons 空间使用后，对"≥3 谷且无菜"的田底堆 unshift `{kind:'vegetable',remaining:1}` | BGA 自身未实现；借 Field.stacks 多堆模型落地，底堆 veg 在顶堆 grain 收完后才会被 reap（见 §3 新基建） |
 | D25 WitchesDanceFloor | 多身份改良（同时提供 field + occupation + improvement）；虚拟田仅计入前置检查、不计入终局地皮数计分 | 多身份卡基础设施（见 §3）；`countFields` / `countOccupations` helper 聚合虚拟身份；`playMinorImprovement` 守卫 `mustBePlayedViaMinorAction`；`cardMatchesCostList` 用于 fireplace 身份匹配 |
+| B39 Loom | cost/prereq 与 BGA 完全一致 | 2026-04-17 PR2：`cost: { wood: 2 }`、`prerequisite: '2 Occupations'`、`occupationPrerequisites: { min: 2 }`、`vp: 1` |
+| D31 Storeroom | cost + vp 对齐 | 2026-04-17 PR2：`cost: { wood: 1, stone: 2 }`、`vp: 1`；`computeBonusScore` 原先已算 grain+veg 配对 |
+| D33 SummerHouse | cost 对齐 | 2026-04-17 PR2：`cost: { wood: 3, stone: 1 }`、`prerequisite: 'Still in Wooden House'` 保留 |
+| D34 LuxuriousHostel | 购买 prereq 从"Stone House" 改为无，新增 extraVp/newSet 标志，但计分依然受石屋限制 | 2026-04-17 PR2：`cost: { wood: 1, clay: 2 }`、删 `prerequisite: 'Stone House'`、加 `extraVp: true` + `newSet: true`；`getStoneHouseBonusScore` 内部 `houseType === 'stone'` + `rooms > familySize` 双守卫负责石屋独占性，wood 局面下返回 0 |
+| D35 FodderChamber | cost + vp 对齐 | 2026-04-17 PR2：`cost: { stone: 3, grain: 3 }`、`vp: 2`；`computeBonusScore` 按人数分档（7/5/4/3 除数）对齐 BGA |
+| D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
+| D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 
 ### 2.2 🟡 简化实现（10 张）
 
@@ -112,22 +125,13 @@
 | C129 SecondSpouse | 我们只检查"对方占用"；BGA 还要求"占用者是其本人**第一个**放的 farmer 且占用人数 ≤2" | 我们更宽松——对方第二/三人占的也允许抢；轻微规则违规 | listener handler 加占用者来源判断（需要 `placedFarmers` 顺序信息） |
 | D154 ChimneySweep | 我们限制 `houseType === 'clay'` 才减 2 stone；BGA 不区分 | wood→stone 直接跳级翻新（A87 Conservator 等卡）减免不生效 | 去掉 `houseType` 条件；保持 `costs: { stone: -2 }` 始终返回 |
 
-### 2.4 ❌ 数值/元数据待修（7 张）
+### 2.4 ❌ 数值/元数据待修（0 张）
 
 > 卡牌**入场成本**、**前置条件**或**基础 vp** 与 BGA 不同——直接影响经济与可玩性，优先级最高。
-
-| Card | BGA cost / prereq / vp | 我们 cost / prereq / vp | 备注 |
-|---|---|---|---|
-| B39 Loom | `wood: 2`；prereq `2 Occupations`；vp: 1 | `wood: 1, reed: 1`；无 prereq；vp: 1 | 成本错位 + 缺 prereq |
-| D31 Storeroom | `wood: 1, stone: 2`；vp: 1 | `reed: 1`；无 vp | 整段成本错位 |
-| D33 SummerHouse | `wood: 3, stone: 1`；prereq "Still in Wooden House" | `wood: 1, stone: 1`；prereq "Still in Wooden House" | 木材数量错 |
-| D34 LuxuriousHostel | `wood: 1, clay: 2`；无 prereq | `stone: 1, food: 3`；prereq "Stone House" | 整张错；多了一个错的 prereq |
-| D35 FodderChamber | `stone: 3, grain: 3`；vp: 2 | `wood: 1, clay: 1`；无 vp | 整段成本错位 |
-| D38 MilkingStool | `wood: 1`；prereq `2 Occupations` | `wood: 1`；无 prereq | 行为已对齐，仅缺 prereq 元数据 |
-| D60 LargePottery | `clay: 1, stone: 1` + 返还 `Major_Pottery`；vp: 3 | `clay: 2`；无 return-card 机制 | 缺 `returnCards` 字段 + return-major-card 通用机制 |
-
-> 修这些卡之前先确认我们的 cost shape 能否表达 `returnCards`、`vp` 等字段（参见 `shared/cards/types.ts`）。
-> Storeroom / Hostel / FodderChamber / LargePottery 的 `vp` 字段缺失，需扫一遍所有 P 类卡是否系统性遗漏。
+>
+> 2026-04-17：本节已全部清零。PR1 统一接入印刷 `vp` 计分 + 16 张 minor vp 对齐；PR2 把 B39/D31/D33/D34/D35/D38 共 6 张的 cost/prereq 对齐；PR3 完成 D60 LargePottery 的 cost/category/alsoCountsAs + dual-type 基建（`CardType`、`alsoCountsAs`、`cardCountsAs`、`collectCardsAs`）。2026-04-18 再把 D60 的“返还 Pottery”从 `returnCards` 建模修正为 custom prerequisite + `onBuy` return。全部迁入 §2.1。
+>
+> 后续若再出现 cost/prereq/vp 偏差，重新在本节登记并走同样流程：`scripts/audit-card-vp.ts` 本地审计 + 对应 caller 迁移。
 
 ### 2.5 🔀 刻意偏离 BGA（3 张）
 
@@ -176,13 +180,15 @@
 | Holder / Counter / Stack | ✅ | 资源堆叠两种模式 |
 | `queueFutureMeeplesFlow` | ✅ | Future meeples 两种形式 + remove |
 | 对手交互 (`scope: 'opponent'`) | ✅ | 8 张卡覆盖 4 种模式 |
-| `field-select` farm interaction | ✅ | 第 6 种 farm interaction type |
+| `selection` / `InteractionSelection` | ✅ | 2026-04-18：原先专用于“选位置后回调”的 `field-select` 链路已独立成通用 `selection` interaction；当前 concrete subtype 为 `farm-position`，支持 `positionFilter` 与显式 `selectableTiles` 两种来源。 |
 | PlayerSwitch in ActionFlow | ✅ | `deferredPlayerSwitch` |
 | `resourcesPaid` 追踪 | ✅ | `pay-resources` 返回实际支付 |
 | `computeReplace` + decline | ✅ | day-laborer / A94 / D21 等 |
 | `onGainResource` (after:gain) | ✅ | E103_Wolf 等 |
 | `onEndTurn` 阶段 hook | ✅ | person-action turn 收束点 |
 | `PrerequisiteHandler(player, state?)` | ✅ | 2026-04-17 扩展了 state 参数（C32 全局检查需要） |
+| `returnCardToBoard(player, cardId, state?)` | ✅ | 2026-04-18：helper 现在可选接收 `state`，统一负责“从 `player.improvements` / `player.minorPlayed` 移除卡”以及“若归还的是 major，则回收到 `state.availableMajorImprovements` 且不重复追加”。消费者：major/minor improvement 支付路径、D60 LargePottery。 |
+| `selectionEffect` / `selection-effect-registry` | ✅ | 2026-04-18：原 `fieldEffect` / `field-effect-registry` 更名，并在同日完成与 `selection` action 对齐。语义是“selection 提交后执行一个注册回调”，不再把这类“选择提交后的副作用”误称为 field effect。消费者：A58/A70/A71/B115/B165/C18/D27/D70/D71/D72/D102/E4/E71/E76。 |
 | `stable-removal` helper | ✅ | D102 / E76 |
 | `recall-placed-worker` action | ✅ | D93（通用农民回收） |
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
@@ -198,6 +204,8 @@
 | **`fireplaceIdentity` 标志 + `cardMatchesCostList` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `fireplaceIdentity: true` 作为"可返还 Fireplace"代价；`cardMatchesCostList(card, costList)` helper 用于 `CookingHearth` / `A60_OrientalFireplace` 等卡检测代价卡是否匹配（支持 `subtype` / `id` / `providedFields` / `providedOccupations` / `fireplaceIdentity` 等多种匹配模式）。 |
 | **`mustBePlayedViaMinorAction` 标志**（2026-04-17） | ✅ | D25：次要改良卡可标记 `mustBePlayedViaMinorAction: true` 强制仅能通过"次要改良"行动打出；`playMinorImprovement` action 的 `isDoable` listener 检查此标志，防止其他路径打出。 |
 | **`isMajorImprovement` flag + `isEffectivelyMajor` helper**（2026-04-18） | ✅ | `CardDefinition.isMajorImprovement?: boolean` 标记"本质是 major 的 minor"（A60/D59/C60/D25 四张）。`shared/cards/helpers/card-identity.ts` 导出 `isEffectivelyMajor(cardId)` 统一判定入口（先查 major pool，再查 minor 的 flag）。消费者：D161 CabbageBuyer。 |
+| **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
+| **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
 
 ---
 

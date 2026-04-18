@@ -19,8 +19,6 @@ describe('B137_Wholesaler session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('B137_Wholesaler')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('occ:B137_Wholesaler')
     if (!player.cardStates) player.cardStates = {}
     player.cardStates['B137_Wholesaler'] = {
       extraData: {

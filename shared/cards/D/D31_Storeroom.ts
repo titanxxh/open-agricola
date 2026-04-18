@@ -28,5 +28,6 @@ export const D31_Storeroom = new MinorImprovement({
   desc: [
     'During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and fields), rounded up.',
   ],
-  cost: { reed: 1 },
+  cost: { wood: 1, stone: 2 },
+  vp: 1,
 })
