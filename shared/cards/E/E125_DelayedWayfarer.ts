@@ -1,11 +1,13 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { registerCardListener } from '../card-listeners'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { ActionHookPhase } from '../../actions/hooks'
 
 const CARD_ID = 'E125_DelayedWayfarer'
+const PLAYED_ROUND_KEY = 'playedRound'
 
 /**
  * E125 Delayed Wayfarer (Occupation):
@@ -15,24 +17,13 @@ const CARD_ID = 'E125_DelayedWayfarer'
  *   choice and, once all people have been placed this round, you can place a
  *   person from your supply.
  *
- *   The "once all people have been placed" trigger in BGA is a deferred hook
- *   (canBeActivated + getExtraPlacementNode) that polls every player for
- *   remaining placements and fires when all placements are exhausted.
- *
- * SIMPLIFICATION:
- *   - onBuy: XOR choice of 1 building resource (wood/clay/reed/stone) —
- *     exactly mirrors the BGA gainNode XOR (lines 37-44).
- *   - Skip the "end of placements this round" deferred trigger. Instead,
- *     queue a future-meeple entry for the NEXT round so the player gets the
- *     extra placement opportunity at the start of that round (via
- *     onRoundStart), matching the D22 Work Permit pattern. This changes the
- *     timing from "end of this round's work phase" to "start of next round's
- *     work phase" but preserves the net "one extra farmer placement" reward.
- *
- *   Drops:
- *     - the within-same-round timing semantic
- *     - the "still in same turn" canBeActivated check (our placement fires
- *       on the subsequent round start regardless of activity)
+ * Implementation:
+ *   - onBuy: Record current round + XOR choice of 1 building resource.
+ *   - onAllWorkersPlaced: When all players' workers are placed and it's the
+ *     same round this card was played, offer an optional place-farmer with
+ *     fromSupply: true. Clears the round flag regardless of player choice.
+ *   - isDoable listener: Overrides place-farmer doability when fromSupply is
+ *     set and the player has an inactive worker in supply.
  */
 
 const buildingChoiceFlow = (): ActionFlow => ({
@@ -48,37 +39,16 @@ const buildingChoiceFlow = (): ActionFlow => ({
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    const nextRound = state.round + 1
-    if (nextRound > 14) {
-      // No further rounds — only the building-resource gain applies.
-      return buildingChoiceFlow()
-    }
-    // Queue an empty-resource future-meeple entry so onRoundStart fires next round.
-    return {
-      type: 'seq',
-      children: [
-        buildingChoiceFlow(),
-        queueFutureMeeplesFlow(state, {
-          cardId: CARD_ID,
-          playerId: player.id,
-          entries: [{ round: nextRound, resources: {} }],
-        }),
-      ],
-    }
+    writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, state.round)
+    return buildingChoiceFlow()
   },
-  onRoundStart: (state, player) => {
+  onAllWorkersPlaced: (state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
-    // Only fire on the one round after the card was played; guard with flag
-    // so it never repeats.
-    if (isCardFlagged(player, CARD_ID)) return
-    const matches = state.futureMeeples.some(
-      (entry) =>
-        entry.playerId === player.id &&
-        entry.cardId === CARD_ID &&
-        entry.round === state.round,
-    )
-    if (!matches) return
-    setCardFlag(player, CARD_ID, true)
+    const playedRound = readCardExtraData<number>(player, CARD_ID, PLAYED_ROUND_KEY)
+    if (playedRound !== state.round) return
+    if (!(player.workers ?? []).some((w) => !w.isActive)) return
+    // Clear flag so card cannot trigger again this round
+    writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, -1)
     return {
       type: 'seq',
       optional: true,
@@ -87,10 +57,23 @@ registerCardEffect({
           type: 'leaf',
           actionId: 'place-farmer',
           sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true },
+          actionContext: { trueAction: false, extraPlacement: true, fromSupply: true },
         },
       ],
     }
+  },
+})
+
+registerCardListener({
+  id: 'E125-isDoable-place-farmer-from-supply',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context) => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (!context.actionContext?.fromSupply) return
+    const hasSupply = (context.player.workers ?? []).some((w) => !w.isActive)
+    if (hasSupply) return { doable: true }
   },
 })
 
