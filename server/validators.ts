@@ -14,6 +14,7 @@ export type RoomSelectionResult =
 export const validateRoomSelection = (
   player: PlayerFarmState,
   rooms: { row: number; col: number }[],
+  lockedKeys?: Set<string>,
 ): RoomSelectionResult => {
   if (rooms.length === 0) {
     return { ok: false, code: 'NO_SELECTION' }
@@ -39,6 +40,9 @@ export const validateRoomSelection = (
     if (selectedSet.has(key)) continue
     if (roomSet.has(key) || fieldSet.has(key) || stableSet.has(key) || pastureSet.has(key)) {
       return { ok: false, code: 'OCCUPIED' }
+    }
+    if (lockedKeys?.has(key)) {
+      return { ok: false, code: 'LOCKED' }
     }
     selectedSet.add(key)
   }
@@ -81,6 +85,7 @@ export type StableSelectionResult =
 export const validateStableSelection = (
   player: PlayerFarmState,
   stables: { row: number; col: number }[],
+  lockedKeys?: Set<string>,
 ): StableSelectionResult => {
   if (stables.length === 0) {
     return { ok: false, code: 'NO_SELECTION' }
@@ -101,6 +106,9 @@ export const validateStableSelection = (
     if (selectedSet.has(key)) continue
     if (roomSet.has(key) || fieldSet.has(key) || stableSet.has(key)) {
       return { ok: false, code: 'OCCUPIED' }
+    }
+    if (lockedKeys?.has(key)) {
+      return { ok: false, code: 'LOCKED' }
     }
     selectedSet.add(key)
   }
