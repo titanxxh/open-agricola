@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerCardListener } from '../card-listeners'
+import { incCounter } from '../__stubs__/helpers'
 import type { PlayerState } from '../../game/types'
 
 const CARD_ID = 'B132_EstateMaster'
@@ -28,8 +29,7 @@ registerCardListener({
     const amount = ctx.extraData?.amount
     if (crop !== 'vegetable' || typeof amount !== 'number' || amount <= 0) return
     if (!isFarmSaturated(player)) return
-    const cs = (player.cardStates[CARD_ID] ??= {})
-    cs.bonusVp = ((cs.bonusVp as number) ?? 0) + amount
+    incCounter(player, CARD_ID, 'bonusVp', amount)
   },
 })
 
@@ -37,7 +37,7 @@ registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
-    return (player.cardStates[CARD_ID]?.bonusVp as number) ?? 0
+    return player.cardStates[CARD_ID]?.counters?.bonusVp ?? 0
   },
 })
 
