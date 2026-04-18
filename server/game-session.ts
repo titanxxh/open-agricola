@@ -158,6 +158,7 @@ type StageResumeState = {
     | 'onHarvestFeedingPhase'
     | 'onEndHarvestFeedingPhase'
     | 'onBeforeReturnHome'
+    | 'onAllWorkersPlaced'
   playerIndex: number
   cardIndex: number
 }
@@ -1499,6 +1500,9 @@ export class GameSession {
       case 'onEndHarvestFeedingPhase':
         this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onAllWorkersPlaced':
+        this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
     }
   }
 
@@ -2174,10 +2178,17 @@ export class GameSession {
     // Check if all workers are used (round end condition)
     const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (allWorkersUsed) {
-      return this.performRoundEnd()
+      return this.continueAllWorkersPlacedHooks()
     }
 
     return this.respond()
+  }
+
+  private continueAllWorkersPlacedHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.performRoundEnd()
   }
 
   performRoundEnd(): SessionResponse {

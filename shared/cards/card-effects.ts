@@ -32,6 +32,7 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onBeforeFeed' | 'onAfterFeed'
   | 'onEndHarvest' | 'onAfterHarvest'
   | 'onBeforeStartOfTurn'
+  | 'onAllWorkersPlaced'
 
 export const cardEffectHooks: CardEffectHook[] = [
   'onBuy',
@@ -57,6 +58,7 @@ export const cardEffectHooks: CardEffectHook[] = [
   'onEndHarvest',
   'onAfterHarvest',
   'onBeforeStartOfTurn',
+  'onAllWorkersPlaced',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -111,6 +113,7 @@ export type CardEffect = {
   onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
+  onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
   computeSharedPostScore?: SharedPostScoreHandler
