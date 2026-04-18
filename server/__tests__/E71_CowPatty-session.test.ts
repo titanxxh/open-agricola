@@ -83,8 +83,8 @@ describe('E71_CowPatty session', () => {
 
     // Field should have 4 grain (3 normal + 1 bonus)
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(field?.crop).toBe('grain')
-    expect(field?.remaining).toBe(4)
+    expect(field?.stacks[0]?.kind).toBe('grain')
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(4)
   })
 
   it('does NOT add bonus crop when field is NOT adjacent to a pasture', () => {
@@ -120,7 +120,7 @@ describe('E71_CowPatty session', () => {
 
     // Field should have 3 grain (normal, no bonus)
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(field?.remaining).toBe(3)
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
   it('does NOT add bonus crop without the card', () => {
@@ -155,7 +155,7 @@ describe('E71_CowPatty session', () => {
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(field?.remaining).toBe(3) // no bonus
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // no bonus
   })
 
   it('does NOT add bonus when player has no pastures', () => {
@@ -180,7 +180,7 @@ describe('E71_CowPatty session', () => {
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(field?.remaining).toBe(3) // no bonus
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // no bonus
   })
 
   it('adds bonus to vegetable sow adjacent to pasture', () => {
@@ -215,8 +215,8 @@ describe('E71_CowPatty session', () => {
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(field?.crop).toBe('vegetable')
-    expect(field?.remaining).toBe(3) // 2 normal + 1 bonus
+    expect(field?.stacks[0]?.kind).toBe('vegetable')
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // 2 normal + 1 bonus
   })
 
   it('handles sowing in 2 fields — only adjacent one gets bonus', () => {
@@ -261,11 +261,11 @@ describe('E71_CowPatty session', () => {
     const player = resp.state.players[0]!
     // Adjacent field gets +1 bonus
     const f0 = player.fields.find((f) => f.row === 0 && f.col === 2)
-    expect(f0?.remaining).toBe(4) // 3 + 1 bonus
+    expect(f0?.stacks[0]?.remaining ?? 0).toBe(4) // 3 + 1 bonus
 
     // Non-adjacent field stays normal
     const f1 = player.fields.find((f) => f.row === 2 && f.col === 4)
-    expect(f1?.remaining).toBe(3) // no bonus
+    expect(f1?.stacks[0]?.remaining ?? 0).toBe(3) // no bonus
   })
 
   it('handles sowing in 2 fields both adjacent to pastures — presents choice', () => {
@@ -318,7 +318,7 @@ describe('E71_CowPatty session', () => {
     const f0 = player.fields.find((f) => f.row === 0 && f.col === 2)
     const f4 = player.fields.find((f) => f.row === 0 && f.col === 4)
     // Total should be 7 (3 + 3 + 1 bonus on selected field)
-    const total = (f0?.remaining ?? 0) + (f4?.remaining ?? 0)
+    const total = (f0?.stacks[0]?.remaining ?? 0 ?? 0) + (f4?.stacks[0]?.remaining ?? 0 ?? 0)
     expect(total).toBe(7)
   })
 })

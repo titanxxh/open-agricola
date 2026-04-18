@@ -3,16 +3,18 @@ import { registerCardEffect } from '../card-effects'
 import { positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTopStack, fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'D72_StableManure'
 
 registerFieldEffect('harvest-extra', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c && f.crop && f.remaining > 0)
-    if (field && field.crop) {
-      player.resources[field.crop] = (player.resources[field.crop] ?? 0) + 1
-    }
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (!top) continue
+    player.resources[top.kind] = (player.resources[top.kind] ?? 0) + 1
   }
 })
 
@@ -38,7 +40,7 @@ registerCardEffect({
     if (unfencedCount === 0) return
 
     // Fields with crops that have remaining > 0 (harvestable)
-    const croppedFields = player.fields.filter(f => f.crop && f.remaining > 0)
+    const croppedFields = player.fields.filter(f => !fieldIsEmpty(f))
     if (croppedFields.length === 0) return
 
     return {

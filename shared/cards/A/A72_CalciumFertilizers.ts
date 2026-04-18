@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { fieldTopStack, fieldIsEmpty } from '../../game/field'
 
 const CARD_ID = 'A72_CalciumFertilizers'
 
@@ -30,14 +31,13 @@ const listener: CardListenerRegistration = {
     if (context.space.id !== 'eastern-quarry' && context.space.id !== 'western-quarry') return
 
     // Find planted fields with crops remaining
-    const plantedFields = context.player.fields.filter(
-      (f) => f.crop !== null && f.remaining > 0,
-    )
+    const plantedFields = context.player.fields.filter((f) => !fieldIsEmpty(f))
     if (plantedFields.length === 0) return
 
-    // Fully automatic: add 1 crop to each planted field
+    // Fully automatic: add 1 crop to top stack of each planted field
     for (const field of plantedFields) {
-      field.remaining += 1
+      const top = fieldTopStack(field)
+      if (top) top.remaining += 1
     }
 
     return {
