@@ -123,6 +123,8 @@ export type CardEffect = {
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
   /** Handle sowing into an extra field returned by onComputeSowableFields. */
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
+  /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
+  computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -424,4 +426,32 @@ export const handleSowExtraField = (
     }
   }
   return false
+}
+
+/**
+ * Collect all locked farmyard tile keys from cards that implement computeLockedFarmTiles.
+ * Returns a Set of position keys ("row-col") that are currently locked.
+ */
+export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const lockedKeys = new Set<string>()
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.computeLockedFarmTiles) continue
+    try {
+      const tiles = effect.computeLockedFarmTiles(player)
+      tiles.forEach(tile => lockedKeys.add(`${tile.row}-${tile.col}`))
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[card-effects] custom card ${cardId} computeLockedFarmTiles threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return lockedKeys
 }
