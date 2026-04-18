@@ -48,7 +48,7 @@ describe('A71_ClearingSpade session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    // Step 1: take anytime action — first field-select choice
+    // Step 1: take anytime action — first selection choice
     let resp = session.takeAnytimeAction(0, 'A71-clearing-spade-anytime')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
@@ -58,7 +58,7 @@ describe('A71_ClearingSpade session', () => {
     resp = session.resolveChoice(0, '0-2')
     expect(resp.ok).toBe(true)
 
-    // Step 2: second field-select choice for target
+    // Step 2: second selection choice for target
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected choice')
 

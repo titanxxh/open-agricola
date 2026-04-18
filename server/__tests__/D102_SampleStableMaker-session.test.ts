@@ -69,7 +69,7 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onStartReturnHome offers optional field-select + minor improvement', () => {
+  it('onStartReturnHome offers optional selection + minor improvement', () => {
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 1, col: 0 },
@@ -81,10 +81,10 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
-    expect(flow.children[0].actionId).toBe('field-select')
+    expect(flow.children[0].actionId).toBe('selection')
     expect(flow.children[0].actionContext.selectionEffect).toBe(FIELD_EFFECT)
+    expect(flow.children[0].actionContext.selectionKind).toBe('farm-position')
     expect(flow.children[0].actionContext.maxSelections).toBe(1)
-    expect(flow.children[0].actionContext.farmType).toBe('stable')
     expect(flow.children[1].actionId).toBe('minor-improvement')
     expect(flow.children[1].optional).toBe(true)
     expect(flow.children[1].sourceCard).toBe(CARD_ID)
@@ -102,7 +102,7 @@ describe('D102_SampleStableMaker card effect', () => {
     }
     runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0'],
+      positions: ['0-0'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
@@ -122,7 +122,7 @@ describe('D102_SampleStableMaker card effect', () => {
     }
     runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: [],
+      positions: [],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)

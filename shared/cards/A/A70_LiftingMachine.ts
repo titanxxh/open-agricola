@@ -4,8 +4,8 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'A70_LiftingMachine'
 
-registerSelectionEffect('take-vegetable', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('take-vegetable', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'vegetable' && f.remaining > 0)
     if (field) {
@@ -27,11 +27,12 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-vegetable',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-vegetable',
         maxSelections: 1,
         selectionEffect: 'take-vegetable',
       },

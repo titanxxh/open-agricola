@@ -360,6 +360,7 @@ export type InteractionCommand =
   | 'takeAction'
   | 'resolveChoice'
   | 'commitFarm'
+  | 'commitSelection'
   | 'takeAnytimeAction'
   | 'confirmReorg'
   | 'confirmFeed'
@@ -413,9 +414,11 @@ export type InteractionFarmSelection =
       }[]
       maxSelections?: number
     }
+
+export type InteractionSelection =
   | {
-      farmType: 'field-select'
-      selectableFields: FarmTilePosition[]
+      kind: 'farm-position'
+      selectablePositions: FarmTilePosition[]
       maxSelections: number
       minSelections?: number
     }
@@ -445,6 +448,16 @@ export type InteractionState =
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
       farm: InteractionFarmSelection
+    })
+  | (InteractionBase & {
+      stateId: 'selection'
+      playerIndex: number
+      spaceId: string
+      promptKey?: string
+      promptParams?: Record<string, unknown>
+      options: ActionChoiceOption[]
+      costOverride?: Partial<Resource>
+      selection: InteractionSelection
     })
   | (InteractionBase & {
       stateId: 'animalReorg'

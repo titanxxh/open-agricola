@@ -48,15 +48,15 @@ describe('C18_RollOverPlow session', () => {
     let resp = session.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')
     expect(resp.ok).toBe(true)
 
-    // Should be in field-select choice
+    // Should be in selection choice
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     // Select field 0-2 (grain with remaining 3)
     resp = session.resolveChoice(0, '0-2')
     expect(resp.ok).toBe(true)
 
-    // After field-select resolves, plow action should start
+    // After selection resolves, plow action should start
     // Plow shows a farm interaction for tile selection
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected plow choice')

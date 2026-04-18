@@ -22,8 +22,15 @@ type ClientCommandBody =
   | {
       type: 'commitFarm'
       playerIndex: number
-      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select'
+      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
       payload: Record<string, unknown>
+    }
+  | {
+      type: 'commitSelection'
+      playerIndex: number
+      payload: {
+        positions: { row: number; col: number }[]
+      }
     }
   | { type: 'nextPlayer' }
   | { type: 'confirmPlayerSwitch' }

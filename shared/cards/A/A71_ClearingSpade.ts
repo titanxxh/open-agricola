@@ -7,20 +7,20 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'A71_ClearingSpade'
 
-registerSelectionEffect('store-source-field', ({ player, fields, sourceCard }) => {
-  if (sourceCard && fields.length > 0) {
-    const [r, c] = fields[0]!.split('-').map(Number)
+registerSelectionEffect('store-source-field', ({ player, positions, sourceCard }) => {
+  if (sourceCard && positions.length > 0) {
+    const [r, c] = positions[0]!.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (field && field.crop && field.remaining >= 2) {
-      writeCardExtraData(player, sourceCard, 'moveSourceField', fields[0])
+      writeCardExtraData(player, sourceCard, 'moveSourceField', positions[0])
     }
   }
 })
 
-registerSelectionEffect('move-crop-from-source', ({ player, fields, sourceCard }) => {
+registerSelectionEffect('move-crop-from-source', ({ player, positions, sourceCard }) => {
   const sourceKey = readCardExtraData<string>(player, sourceCard!, 'moveSourceField')
-  if (sourceKey && fields.length > 0) {
-    const [tr, tc] = fields[0]!.split('-').map(Number)
+  if (sourceKey && positions.length > 0) {
+    const [tr, tc] = positions[0]!.split('-').map(Number)
     const targetField = player.fields.find(f => f.row === tr && f.col === tc)
     if (!targetField || targetField.crop !== null) return
     const [sr, sc] = sourceKey.split('-').map(Number)
@@ -48,20 +48,22 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'field-select',
+            actionId: 'selection',
             sourceCard: CARD_ID,
             actionContext: {
-              fieldFilter: 'has-2-plus-crops',
+              selectionKind: 'farm-position',
+              positionFilter: 'has-2-plus-crops',
               maxSelections: 1,
               selectionEffect: 'store-source-field',
             },
           },
           {
             type: 'leaf',
-            actionId: 'field-select',
+            actionId: 'selection',
             sourceCard: CARD_ID,
             actionContext: {
-              fieldFilter: 'empty-plowed',
+              selectionKind: 'farm-position',
+              positionFilter: 'empty-plowed',
               maxSelections: 1,
               selectionEffect: 'move-crop-from-source',
             },

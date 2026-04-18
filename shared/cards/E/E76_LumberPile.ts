@@ -18,10 +18,10 @@ const FIELD_EFFECT = 'lumber-pile-return-stables'
  * engine FarmHand (B85) is modeled as `rooms + 1` without a distinct stable
  * tile, so we only implement the normal-stable branch.
  */
-registerSelectionEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
+registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   let removed = 0
-  for (const field of fields) {
-    const [rowStr, colStr] = field.split(',')
+  for (const position of positions) {
+    const [rowStr, colStr] = position.split('-')
     const row = Number(rowStr)
     const col = Number(colStr)
     if (!Number.isFinite(row) || !Number.isFinite(col)) continue
@@ -52,12 +52,12 @@ registerCardEffect({
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
+            selectionKind: 'farm-position',
             selectionEffect: FIELD_EFFECT,
             maxSelections: Math.min(3, selectableTiles.length),
-            farmType: 'stable',
             selectableTiles,
           },
         },

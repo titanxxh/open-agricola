@@ -1,6 +1,7 @@
 import type {
   FarmTilePosition,
   InteractionFarmSelection,
+  InteractionSelection,
   PendingAction,
   PlayerState,
   Resource,
@@ -172,7 +173,7 @@ const getAllowedSelectedFieldKeys = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
 ) => actionContext?.allowedFields === 'fromSelectedFields' && typeof actionContext?.sourceCard === 'string'
-  ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedFields') ?? [])
+  ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedPositions') ?? [])
   : null
 
 export const getPermittedExtraSowableFields = (
@@ -189,24 +190,42 @@ export const getPermittedExtraSowableFields = (
   })
 }
 
-export const buildFieldSelectFarmInteraction = (
+export const buildFarmPositionSelectionInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
-): InteractionFarmSelection => {
-  const filter = actionContext?.fieldFilter as string | undefined
+): InteractionSelection => {
+  const selectableTiles = Array.isArray(actionContext?.selectableTiles)
+    ? actionContext.selectableTiles
+        .flatMap((tile) => {
+          const row = Number((tile as { row?: unknown }).row)
+          const col = Number((tile as { col?: unknown }).col)
+          if (!Number.isFinite(row) || !Number.isFinite(col)) return []
+          return [{ row, col }]
+        })
+    : null
+  const filter = actionContext?.positionFilter as string | undefined
   const maxSelections = (actionContext?.maxSelections as number) ?? 1
   const minSelections = (actionContext?.minSelections as number) ?? 0
-  const selectableFields: FarmTilePosition[] = player.fields
+  const selectablePositions: FarmTilePosition[] = selectableTiles ?? player.fields
     .filter((f) => {
+      if (!filter) return true
       if (filter === 'has-vegetable') return f.crop === 'vegetable' && f.remaining > 0
       if (filter === 'has-grain') return f.crop === 'grain' && f.remaining > 0
       if (filter === 'has-crop') return f.crop !== null && f.remaining > 0
       if (filter === 'has-exactly-1-crop') return f.crop !== null && f.remaining === 1
+      if (filter === 'has-2-plus-crops') return f.crop !== null && f.remaining >= 2
       if (filter === 'empty') return f.crop === null
+      if (filter === 'empty-plowed') return f.crop === null
       return f.crop !== null && f.remaining > 0
     })
-    .map((f) => ({ row: f.row, col: f.col }))
-  return { farmType: 'field-select', selectableFields, maxSelections, minSelections }
+    .map((f) => ('crop' in f ? { row: f.row, col: f.col } : f))
+
+  return {
+    kind: 'farm-position',
+    selectablePositions,
+    maxSelections,
+    minSelections,
+  }
 }
 
 export const buildFenceFarmInteraction = (

@@ -259,8 +259,8 @@ export const GameContainerApi = () => {
     toggleStableTile: toggleStableTileInternal,
     togglePlowTile: togglePlowTileInternal,
     updateSowSelection: updateSowSelectionInternal,
-    pendingFieldSelections, setPendingFieldSelections,
-    toggleFieldSelection: toggleFieldSelectionInternal,
+    pendingPositionSelections, setPendingPositionSelections,
+    togglePositionSelection: togglePositionSelectionInternal,
   } = useFarmSelection()
 
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
@@ -290,9 +290,9 @@ export const GameContainerApi = () => {
       setPlowError(null)
       setPendingSowSelections({})
       setSowError(null)
-      setPendingFieldSelections(new Set())
+      setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingFieldSelections])
+  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return
@@ -375,6 +375,18 @@ export const GameContainerApi = () => {
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
+    if (interaction.stateId === 'selection') {
+      const pendingPlayerIndex = interaction.playerIndex
+      if (value === 'cancel') {
+        void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
+        return
+      }
+      const positions = [...pendingPositionSelections]
+        .map((key) => parsePositionKey(key))
+        .filter((tile): tile is FarmTilePosition => !!tile)
+      void transport.commitSelection(pendingPlayerIndex, { positions }).catch((e) => console.error(e))
+      return
+    }
     if (interaction.stateId === 'farmSelect') {
       const pendingPlayerIndex = interaction.playerIndex
       if (value === 'cancel') {
@@ -411,14 +423,6 @@ export const GameContainerApi = () => {
         }).catch((e) => console.error(e))
         return
       }
-      if (interaction.farm.farmType === 'field-select') {
-        const fields = [...pendingFieldSelections]
-          .map((key) => parsePositionKey(key))
-          .filter((tile): tile is FarmTilePosition => !!tile)
-        void transport.commitFarm(pendingPlayerIndex, 'field-select', { fields })
-          .catch((e) => console.error(e))
-        return
-      }
       if (interaction.farm.farmType === 'sow') {
         const crops = Object.entries(pendingSowSelections)
           .map(([key, crop]) => {
@@ -442,7 +446,7 @@ export const GameContainerApi = () => {
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingFieldSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -494,7 +498,7 @@ export const GameContainerApi = () => {
   }, [transport, isInteractive, resetSeedInput])
 
   const pendingChoice =
-    interaction.stateId === 'choice' || interaction.stateId === 'farmSelect'
+    interaction.stateId === 'choice' || interaction.stateId === 'farmSelect' || interaction.stateId === 'selection'
       ? {
           promptKey: interaction.promptKey,
           promptParams: interaction.promptParams,
@@ -799,6 +803,8 @@ export const GameContainerApi = () => {
 
   const farmInteraction =
     interaction.stateId === 'farmSelect' ? interaction.farm : null
+  const selectionInteraction =
+    interaction.stateId === 'selection' ? interaction.selection : null
 
   const maxRoomSelections = useMemo(
     () => (farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0),
@@ -821,9 +827,12 @@ export const GameContainerApi = () => {
     () => (farmInteraction?.farmType === 'sow' ? farmInteraction.maxSelections : undefined),
     [farmInteraction],
   )
-  const maxFieldSelections = useMemo(
-    () => (farmInteraction?.farmType === 'field-select' ? farmInteraction.maxSelections : 0),
-    [farmInteraction],
+  const maxPositionSelections = useMemo(
+    () =>
+      selectionInteraction?.kind === 'farm-position'
+        ? selectionInteraction.maxSelections
+        : 0,
+    [selectionInteraction],
   )
   const sowSelectedCount = Object.keys(pendingSowSelections).length
   const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
@@ -946,14 +955,14 @@ export const GameContainerApi = () => {
       ),
     [farmInteraction],
   )
-  const fieldSelectableSet = useMemo(
+  const positionSelectableSet = useMemo(
     () =>
       new Set(
-        farmInteraction?.farmType === 'field-select'
-          ? farmInteraction.selectableFields.map((tile) => positionKey(tile))
+        selectionInteraction?.kind === 'farm-position'
+          ? selectionInteraction.selectablePositions.map((tile) => positionKey(tile))
           : [],
       ),
-    [farmInteraction],
+    [selectionInteraction],
   )
   const { sowSelectableMap, extraSowTargets } = useMemo(() => {
     const map = new Map<string, PendingSowCrop[]>()
@@ -984,8 +993,8 @@ export const GameContainerApi = () => {
     togglePlowTileInternal(tile, positionKey)
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey)
-  const wrappedToggleFieldSelection = (tile: FarmTilePosition) =>
-    toggleFieldSelectionInternal(tile, maxFieldSelections, positionKey)
+  const wrappedTogglePositionSelection = (tile: FarmTilePosition) =>
+    togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
   const setViewPlayerIdSafe = useCallback((value: string) => {
     setViewPlayerId(value)
   }, [])
@@ -1520,7 +1529,7 @@ export const GameContainerApi = () => {
                 pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
                 roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
                 maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-                fieldSelectableSet={fieldSelectableSet} pendingFieldSelections={pendingFieldSelections} toggleFieldSelection={wrappedToggleFieldSelection}
+                positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
                 pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
                 pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
@@ -1551,7 +1560,7 @@ export const GameContainerApi = () => {
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingSowSelectionsLength={sowSelectedCount}
         hasPendingPlowSelection={pendingPlowTile !== null}
-        pendingFieldSelectionsLength={pendingFieldSelections.size} maxFieldSelections={maxFieldSelections}
+        pendingPositionSelectionsLength={pendingPositionSelections.size} maxPositionSelections={maxPositionSelections}
         fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
         stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
         isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
