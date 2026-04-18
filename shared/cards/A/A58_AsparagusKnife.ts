@@ -15,12 +15,12 @@ const TRIGGER_ROUNDS = [8, 10, 12]
  * and 1 bonus VP.
  *
  * The vegetable is removed from the field (remaining decremented by 1).
- * Player selects via field-select (auto-selected if only 1 field eligible).
+ * Player selects via selection (auto-selected if only 1 field eligible).
  */
 
 // Field effect: decrement 1 vegetable from the selected field
-registerSelectionEffect('asparagus-knife-harvest', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('asparagus-knife-harvest', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
     if (field && field.crop === 'vegetable' && field.remaining > 0) {
@@ -51,10 +51,11 @@ registerCardEffect({
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldFilter: 'has-vegetable',
+            selectionKind: 'farm-position',
+            positionFilter: 'has-vegetable',
             maxSelections: 1,
             minSelections: 1,
             selectionEffect: 'asparagus-knife-harvest',

@@ -6,8 +6,8 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'C18_RollOverPlow'
 
-registerSelectionEffect('discard-all-crops', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('discard-all-crops', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop)
     if (field) {
@@ -30,10 +30,11 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'field-select',
+            actionId: 'selection',
             sourceCard: CARD_ID,
             actionContext: {
-              fieldFilter: 'has-crop',
+              selectionKind: 'farm-position',
+              positionFilter: 'has-crop',
               maxSelections: 1,
               selectionEffect: 'discard-all-crops',
             },

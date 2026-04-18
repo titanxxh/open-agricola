@@ -44,9 +44,9 @@ describe('D70_StrawManure session', () => {
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    // Second choice: field-select for vegetable fields
+    // Second choice: selection for vegetable fields
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     // Select both vegetable fields: 0-0 and 0-1
     resp = session.resolveChoice(0, '0-0,0-1')

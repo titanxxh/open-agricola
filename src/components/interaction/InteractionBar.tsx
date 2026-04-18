@@ -81,8 +81,8 @@ type Props = {
   pendingStableTilesLength: number
   maxStableSelections: number
   pendingSowSelectionsLength?: number
-  pendingFieldSelectionsLength: number
-  maxFieldSelections: number
+  pendingPositionSelectionsLength: number
+  maxPositionSelections: number
   hasPendingPlowSelection: boolean
   fenceErrorText: string
   roomErrorText: string
@@ -124,8 +124,8 @@ export const InteractionBar = ({
   pendingStableTilesLength,
   maxStableSelections,
   pendingSowSelectionsLength,
-  pendingFieldSelectionsLength,
-  maxFieldSelections,
+  pendingPositionSelectionsLength,
+  maxPositionSelections,
   hasPendingPlowSelection,
   fenceErrorText,
   roomErrorText,
@@ -160,7 +160,7 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionStableSelect' ||
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' ||
     pendingChoice?.promptKey === 'ui.interactionSowSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionFieldSelect'
+    pendingChoice?.promptKey === 'ui.interactionSelection'
   const visibleOptions =
     pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
       ? pendingChoice.options.filter((option) => option.value === 'confirm')
@@ -173,9 +173,9 @@ export const InteractionBar = ({
   const isStableConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
     pendingStableTilesLength === 0
-  const isFieldSelectConfirmDisabled =
-    pendingChoice?.promptKey === 'ui.interactionFieldSelect' &&
-    pendingFieldSelectionsLength === 0
+  const isSelectionConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionSelection' &&
+    pendingPositionSelectionsLength === 0
   const hasBodyContent = !!(
     pendingAnimalReorg ||
     harvestFeedPlayerName ||
@@ -260,11 +260,11 @@ export const InteractionBar = ({
                   })}
                 </div>
               ) : null}
-              {pendingChoice.promptKey === 'ui.interactionFieldSelect' ? (
+              {pendingChoice.promptKey === 'ui.interactionSelection' ? (
                 <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionFieldSelectSubtitle', {
-                    selected: pendingFieldSelectionsLength,
-                    max: maxFieldSelections,
+                  {t(locale, 'ui.interactionSelectionSubtitle', {
+                    selected: pendingPositionSelectionsLength,
+                    max: maxPositionSelections,
                   })}
                 </div>
               ) : null}
@@ -337,9 +337,9 @@ export const InteractionBar = ({
                         (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
                           option.value === 'confirm' &&
                           (pendingSowSelectionsLength ?? 0) === 0) ||
-                        (pendingChoice.promptKey === 'ui.interactionFieldSelect' &&
+                        (pendingChoice.promptKey === 'ui.interactionSelection' &&
                           option.value === 'confirm' &&
-                          isFieldSelectConfirmDisabled)
+                          isSelectionConfirmDisabled)
                       }
                     >
                       {option.labelKey === 'prompt.selectPaymentOption' && option.labelParams && typeof option.labelParams === 'object' && 'resourcesPaid' in option.labelParams ? (

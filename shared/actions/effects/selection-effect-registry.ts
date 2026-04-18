@@ -2,7 +2,7 @@ import type { PlayerState } from '../../game/types'
 
 export type SelectionEffectContext = {
   player: PlayerState
-  fields: string[]
+  positions: string[]
   sourceCard: string | undefined
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { readCardExtraData } from '../../../cards/helpers/card-state'
 import { registerSelectionEffect } from '../selection-effect-registry'
-import { fieldSelectAction } from '../field-select'
+import { selectionAction } from '../selection'
 import type { PlayerState } from '../../../game/types'
 
 const createMockPlayer = (): PlayerState => ({
@@ -42,28 +43,34 @@ const createMockPlayer = (): PlayerState => ({
   cardStates: {},
 })
 
-describe('fieldSelectAction', () => {
-  it('runs the registered selection effect from actionContext.selectionEffect', () => {
+describe('selectionAction', () => {
+  it('persists selectedPositions and passes positions to selectionEffect', () => {
     const player = createMockPlayer()
     let received: string[] | null = null
-    const effectName = 'test-selection-effect'
 
-    registerSelectionEffect(effectName, ({ fields }) => {
-      received = fields
+    registerSelectionEffect('test-selection', ({ positions }) => {
+      received = positions
     })
 
-    const result = fieldSelectAction.resolveChoice!(
+    const result = selectionAction.resolveChoice!(
       {
         player,
         sourceCard: 'Test_Card',
         actionContext: {
-          selectionEffect: effectName,
+          selectionKind: 'farm-position',
+          selectionEffect: 'test-selection',
         },
       } as never,
       '0-0,1-1',
     )
 
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'ok',
+      extraData: { selectedPositions: ['0-0', '1-1'] },
+    })
     expect(received).toEqual(['0-0', '1-1'])
+    expect(
+      readCardExtraData<string[]>(player, 'Test_Card', 'selectedPositions'),
+    ).toEqual(['0-0', '1-1'])
   })
 })

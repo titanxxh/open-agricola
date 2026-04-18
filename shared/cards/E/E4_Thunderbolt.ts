@@ -4,8 +4,8 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'E4_Thunderbolt'
 
-registerSelectionEffect('remove-all-grain-for-wood', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain')
     if (field) {
@@ -25,11 +25,12 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-grain',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-grain',
         maxSelections: 1,
         selectionEffect: 'remove-all-grain-for-wood',
       },

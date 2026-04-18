@@ -62,9 +62,9 @@ describe('D72_StableManure session', () => {
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    // Second: field-select choice
+    // Second: selection choice
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     // Select grain at 0-0 and vegetable at 0-1
     resp = session.resolveChoice(0, '0-0,0-1')
@@ -97,9 +97,9 @@ describe('D72_StableManure session', () => {
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    // field-select with maxSelections: 1
+    // selection with maxSelections: 1
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     resp = session.resolveChoice(0, '0-0')
     expect(resp.ok).toBe(true)

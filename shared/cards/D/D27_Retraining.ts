@@ -30,7 +30,7 @@ const FIELD_EFFECT = 'D27-retraining-swap'
  * Implementation:
  * - After a `renovate-house` action, flag the card.
  * - After the same player's next `place-farmer`, if flagged and a swap is
- *   available, return an optional seq whose body is a `field-select` leaf
+ *   available, return an optional seq whose body is a `selection` leaf
  *   bound to a registered selection-effect that performs the swap. The player
  *   can decline the optional seq; if accepted, the selection-effect returns the
  *   old major to the board and grants the new one.
@@ -51,7 +51,7 @@ const determineSwap = (
   return null
 }
 
-// Field-effect: perform the swap. We do not care about the selected fields.
+// Selection-effect: perform the swap. We do not care about the selected positions.
 // The swap target was stashed on the card's extraData immediately before the
 // engine executed this leaf; we read it here and mutate.
 registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
@@ -76,7 +76,7 @@ registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
   // in a 2-player game, majors returning to / leaving the board mostly affect
   // availability for future purchases, which is already covered by the
   // state.availableMajorImprovements mutation in the place-farmer listener
-  // right before the selection-effect fires (see listener handler).
+  // right before the field-effect fires (see listener handler).
   player.improvements.push(swap.to)
 })
 
@@ -109,23 +109,23 @@ const placeFarmerListener: CardListenerRegistration = {
     if (!swap) return
 
     // Reserve the incoming major now so another player can't grab it, and
-    // record the swap details for the selection-effect to consume if the player
+    // record the swap details for the field-effect to consume if the player
     // accepts the optional branch. If the player declines, we roll back both
     // below — but since optional branches only execute the body when accepted,
-    // we guard against decline by reading `SWAP_KEY` at selection-effect time and
+    // we guard against decline by reading `SWAP_KEY` at field-effect time and
     // leaving the availability mutation as a matching "reservation / rollback"
     // pair gated on the same key.
     //
-    // Simpler: optimistically mutate availability *inside* the selection-effect
+    // Simpler: optimistically mutate availability *inside* the field-effect
     // (where we know the user accepted). To keep that atomic, we forward the
-    // state-mutating portion to the selection-effect by stashing a reference to
+    // state-mutating portion to the field-effect by stashing a reference to
     // the state on the card extraData — since extraData is JSON, we avoid
     // storing the state. Instead, we mutate availability here and roll it
     // back in a separate deterministic way only if never consumed.
     //
     // Easiest correct path: mutate availability here, and if the player
     // declines the optional seq the roll-back happens because the
-    // `SWAP_KEY` never gets consumed. To close that hole, the selection-effect
+  // `SWAP_KEY` never gets consumed. To close that hole, the selection-effect
     // ALSO updates state.availableMajorImprovements via a second listener
     // approach. Given the complexity, we instead keep the swap strictly
     // local to the owning player; global availability only matters if
@@ -134,7 +134,7 @@ const placeFarmerListener: CardListenerRegistration = {
     writeCardExtraData(context.player, CARD_ID, SWAP_KEY, swap)
 
     // Remove the new major from the board NOW (will be restored if the player
-    // declines, via the `rollback-swap` selection-effect below).
+    // declines, via the `rollback-swap` field-effect below).
     context.state.availableMajorImprovements = context.state.availableMajorImprovements.filter(
       (id) => id !== swap.to,
     )
@@ -145,9 +145,10 @@ const placeFarmerListener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
+            selectionKind: 'farm-position',
             selectionEffect: FIELD_EFFECT,
             maxSelections: 0,
             selectableTiles: [],

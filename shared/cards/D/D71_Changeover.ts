@@ -6,8 +6,8 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'D71_Changeover'
 
-registerSelectionEffect('discard-single-crop', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('discard-single-crop', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.remaining === 1)
     if (field) {
@@ -30,10 +30,11 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'field-select',
+            actionId: 'selection',
             sourceCard: CARD_ID,
             actionContext: {
-              fieldFilter: 'has-exactly-1-crop',
+              selectionKind: 'farm-position',
+              positionFilter: 'has-exactly-1-crop',
               maxSelections: 1,
               selectionEffect: 'discard-single-crop',
             },

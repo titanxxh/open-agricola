@@ -19,9 +19,9 @@ const FIELD_EFFECT = 'sample-stable-maker-return'
  * skips the selection step. Our implementation skips the Farm Hand branch
  * since our B85 FarmHand does not create a dedicated stable tile.
  */
-registerSelectionEffect(FIELD_EFFECT, ({ player, fields, sourceCard }) => {
-  if (fields.length === 0) return
-  const [rowStr, colStr] = fields[0]!.split(',')
+registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
+  if (positions.length === 0) return
+  const [rowStr, colStr] = positions[0]!.split('-')
   const row = Number(rowStr)
   const col = Number(colStr)
   if (!Number.isFinite(row) || !Number.isFinite(col)) return
@@ -55,12 +55,12 @@ registerCardEffect({
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
+            selectionKind: 'farm-position',
             selectionEffect: FIELD_EFFECT,
             maxSelections: 1,
-            farmType: 'stable',
             selectableTiles,
           },
         },

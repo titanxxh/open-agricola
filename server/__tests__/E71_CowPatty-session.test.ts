@@ -301,7 +301,7 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    // Should get a field-select choice for which field gets the bonus
+    // Should get a selection choice for which field gets the bonus
     if (resp.pending.type === 'choice') {
       resp = session.resolveChoice(0, '0-2')
       expect(resp.ok).toBe(true)

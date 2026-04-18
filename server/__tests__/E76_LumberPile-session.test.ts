@@ -54,7 +54,7 @@ describe('E76_LumberPile card effect', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onBuy offers an optional field-select with max 3 stables', () => {
+  it('onBuy offers an optional selection with max 3 stables', () => {
     const player = createPlayer('p1')
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 },
@@ -67,10 +67,10 @@ describe('E76_LumberPile card effect', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     const leaf = flow.children[0]
-    expect(leaf.actionId).toBe('field-select')
+    expect(leaf.actionId).toBe('selection')
     expect(leaf.actionContext.selectionEffect).toBe(FIELD_EFFECT)
+    expect(leaf.actionContext.selectionKind).toBe('farm-position')
     expect(leaf.actionContext.maxSelections).toBe(3)
-    expect(leaf.actionContext.farmType).toBe('stable')
     expect(leaf.actionContext.selectableTiles.length).toBe(4)
   })
 
@@ -83,7 +83,7 @@ describe('E76_LumberPile card effect', () => {
     const initialWood = player.resources.wood
     runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0', '0,1', '1,0'],
+      positions: ['0-0', '0-1', '1-0'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
@@ -100,7 +100,7 @@ describe('E76_LumberPile card effect', () => {
     const initialWood = player.resources.wood
     runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0', '0,1', '1,0', '1,1'],
+      positions: ['0-0', '0-1', '1-0', '1-1'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
@@ -113,7 +113,7 @@ describe('E76_LumberPile card effect', () => {
     const initialWood = player.resources.wood
     runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: [],
+      positions: [],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)

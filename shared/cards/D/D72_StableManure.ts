@@ -6,8 +6,8 @@ import { registerSelectionEffect } from '../../actions/effects/selection-effect-
 
 const CARD_ID = 'D72_StableManure'
 
-registerSelectionEffect('harvest-extra', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('harvest-extra', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c && f.crop && f.remaining > 0)
     if (field && field.crop) {
@@ -43,11 +43,12 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-crop',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-crop',
         maxSelections: unfencedCount,
         selectionEffect: 'harvest-extra',
       },

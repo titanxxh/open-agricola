@@ -70,9 +70,9 @@ describe('FarmBoard', () => {
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
-        fieldSelectableSet={new Set()}
-        pendingFieldSelections={new Set()}
-        toggleFieldSelection={() => {}}
+        positionSelectableSet={new Set()}
+        pendingPositionSelections={new Set()}
+        togglePositionSelection={() => {}}
         pendingSowSelections={{}}
         sowRemaining={{ grain: 0, vegetable: 0, wood: 2 }}
         sowSelectableMap={new Map()}
@@ -152,9 +152,9 @@ describe('FarmBoard', () => {
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
-        fieldSelectableSet={new Set()}
-        pendingFieldSelections={new Set()}
-        toggleFieldSelection={() => {}}
+        positionSelectableSet={new Set()}
+        pendingPositionSelections={new Set()}
+        togglePositionSelection={() => {}}
         pendingSowSelections={{}}
         sowRemaining={{ grain: 0, vegetable: 0, wood: 0 }}
         sowSelectableMap={new Map()}
