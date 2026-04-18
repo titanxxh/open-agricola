@@ -5,7 +5,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      exclude: [...defaultExclude, '**/.claude/**'],
+      exclude: [...defaultExclude, '**/.claude/**', '**/.worktree/**', '**/.claire/**'],
     },
   }),
 )

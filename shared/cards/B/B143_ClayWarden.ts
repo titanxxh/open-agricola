@@ -27,7 +27,7 @@ const listener: CardListenerRegistration = {
     const playerCount = context.state.players?.length ?? 2
     const gain: { clay: number; food?: number } = { clay: 1 }
     if (playerCount === 3) gain.clay = 2
-    if (playerCount >= 4) gain.food = 1
+    if (playerCount === 4) gain.food = 1
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
