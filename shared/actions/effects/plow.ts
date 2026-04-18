@@ -5,7 +5,7 @@ import { canExecuteWithCostPreview } from './cost-preview'
 export const addField = (player: PlayerState) => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) return
-  player.fields.push({ crop: null, remaining: 0, row: next.row, col: next.col })
+  player.fields.push({ stacks: [], row: next.row, col: next.col })
 }
 
 const getOccupiedKeys = (player: PlayerState) => {

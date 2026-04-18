@@ -1,8 +1,10 @@
 import type { ActionDefinition } from '../../game/types'
+import { fieldTopStack, fieldPopIfDepleted } from '../../game/field'
 
 /**
  * Pays 1 grain from player reserve, or if none available, takes 1 grain from a sown field.
  * Used by cards like Silage that accept grain "from reserve or field".
+ * Requires the TOP stack of the field to be grain (not a buried grain stack).
  */
 export const payGrainAnyAction: ActionDefinition = {
   id: 'pay-grain-any',
@@ -16,13 +18,15 @@ export const payGrainAnyAction: ActionDefinition = {
       player.resources.grain -= 1
       return { type: 'ok' }
     }
-    const grainField = player.fields.find(
-      (f) => f.crop === 'grain' && f.remaining > 0,
-    )
+    const grainField = player.fields.find((f) => {
+      const top = fieldTopStack(f)
+      return top?.kind === 'grain' && top.remaining > 0
+    })
     if (grainField) {
-      grainField.remaining -= 1
-      if (grainField.remaining === 0) {
-        grainField.crop = null
+      const top = fieldTopStack(grainField)
+      if (top) {
+        top.remaining -= 1
+        fieldPopIfDepleted(grainField)
       }
       return { type: 'ok' }
     }

@@ -1,8 +1,9 @@
 import type { ActionDefinition } from '../../game/types'
 
 /**
- * Swap a grain field (remaining=3) to a vegetable field (remaining=1).
+ * Swap a grain field (single grain stack, remaining=3) to a vegetable field (remaining=1).
  * Used by C69 Land Consolidation. Takes { row, col } in params identifying the field.
+ * Refuses multi-stack fields (would destroy buried stack state).
  */
 export const swapFieldGrainToVegAction: ActionDefinition = {
   id: 'swap-field-grain-to-veg',
@@ -18,11 +19,15 @@ export const swapFieldGrainToVegAction: ActionDefinition = {
       return { type: 'fail', logKey: 'log.actionFail' }
     }
     const field = player.fields.find((f) => f.row === row && f.col === col)
-    if (!field || field.crop !== 'grain' || field.remaining !== 3) {
+    if (!field || field.stacks.length !== 1) {
       return { type: 'fail', logKey: 'log.actionFail' }
     }
-    field.crop = 'vegetable'
-    field.remaining = 1
+    const stack = field.stacks[0]
+    if (!stack || stack.kind !== 'grain' || stack.remaining !== 3) {
+      return { type: 'fail', logKey: 'log.actionFail' }
+    }
+    stack.kind = 'vegetable'
+    stack.remaining = 1
     return {
       type: 'ok',
       logKey: 'log.cardEffectGain',
