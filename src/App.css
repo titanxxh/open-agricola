@@ -1666,6 +1666,18 @@ a:focus-visible,
   z-index: 1;
 }
 
+.field-crop-segment {
+  display: flex;
+  flex-flow: column-reverse;
+  align-items: center;
+}
+
+.field-crop-segment + .field-crop-segment {
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+  margin-top: 1px;
+  padding-top: 1px;
+}
+
 .field-crop-icon {
   font-size: 21px;
   margin: 0 auto -5px;

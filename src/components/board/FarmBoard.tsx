@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
   CardResourceStats,
+  CropStack,
   FarmTilePosition,
   PlayerState,
   Resource,
@@ -17,7 +18,6 @@ import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
-type FieldCropType = 'grain' | 'vegetable'
 
 const AnimalCount = ({
   count,
@@ -44,28 +44,39 @@ const AnimalCount = ({
   )
 }
 
-const CropStack = ({
+const FieldCropStack = ({
   locale,
-  crop,
-  remaining,
+  stacks,
 }: {
   locale: Locale
-  crop: FieldCropType
-  remaining: number
+  stacks: CropStack[]
 }) => {
-  if (remaining <= 0) return null
+  if (stacks.length === 0) return null
+  const tooltip = stacks
+    .map((s) => `${t(locale, `resources.${s.kind}`)} ${s.remaining}`)
+    .join(' · ')
+  // Dominant kind = top stack (used for backward-compat class on the outer span
+  // so legacy single-stack visuals stay identical).
+  const topKind = stacks[stacks.length - 1].kind
   return (
     <div
-      className={`field-crop field-crop-${crop}`}
-      title={`${t(locale, `resources.${crop}`)} ${remaining}`}
-      aria-label={`${t(locale, `resources.${crop}`)} ${remaining}`}
+      className={`field-crop field-crop-${topKind}`}
+      title={tooltip}
+      aria-label={tooltip}
     >
-      {Array.from({ length: remaining }, (_, index) => (
+      {stacks.map((stack, stackIdx) => (
         <span
-          key={`${crop}-${index}`}
-          className={`res-icon res-icon-${crop} field-crop-icon`}
-          aria-hidden="true"
-        />
+          key={`stack-${stackIdx}-${stack.kind}`}
+          className={`field-crop-segment field-crop-${stack.kind}`}
+        >
+          {Array.from({ length: stack.remaining }, (_, index) => (
+            <span
+              key={`${stack.kind}-${stackIdx}-${index}`}
+              className={`res-icon res-icon-${stack.kind} field-crop-icon`}
+              aria-hidden="true"
+            />
+          ))}
+        </span>
       ))}
     </div>
   )
@@ -146,7 +157,7 @@ type FarmCell = {
   fenceId?: string
 }
 
-type FieldInfo = { crop: FieldCropType | null; remaining: number }
+type FieldInfo = { stacks: CropStack[] }
 
 const humanizeSourceCard = (sourceCard: string) => {
   const displayId = sourceCard.includes('_')
@@ -644,14 +655,13 @@ export const FarmBoard = ({
           const isTileSelected =
             isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
           const fieldInfo = fieldMap.get(tileKey)
-          const isEmptyField = !!fieldInfo && fieldInfo.crop === null
+          const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
           const cropStack =
-            fieldInfo?.crop && fieldInfo.remaining > 0
+            fieldInfo && fieldInfo.stacks.length > 0
               ? (
-                  <CropStack
+                  <FieldCropStack
                     locale={locale}
-                    crop={fieldInfo.crop}
-                    remaining={fieldInfo.remaining}
+                    stacks={fieldInfo.stacks}
                   />
                 )
               : null
