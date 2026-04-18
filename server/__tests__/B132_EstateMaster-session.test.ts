@@ -69,7 +69,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBeUndefined()
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 
   it('scores 1 VP when farm is saturated and 1 vegetable field is reaped', () => {
@@ -82,7 +82,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBe(1)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
   it('scores 2 VP when farm is saturated and 2 vegetable fields are reaped', () => {
@@ -96,7 +96,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBe(2)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
   })
 
   it('accumulates VP across multiple harvests', () => {
@@ -108,10 +108,10 @@ describe('B132_EstateMaster session', () => {
     session.loadState(state)
 
     reap(state, player)
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBe(1)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
 
     reap(state, player)
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBe(2)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
   })
 
   it('does not score for grain fields', () => {
@@ -124,7 +124,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBeUndefined()
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 
   it('does not score when card is not played', () => {
@@ -136,7 +136,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBeUndefined()
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 
   it('does not score when vegetable fields have amount=0', () => {
@@ -148,7 +148,7 @@ describe('B132_EstateMaster session', () => {
 
     reap(state, player)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBeUndefined()
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 
   it('scores for extra reap via dispatchReapListener', () => {
@@ -160,7 +160,7 @@ describe('B132_EstateMaster session', () => {
 
     dispatchReapListener(state, player, 'vegetable', 1)
 
-    expect(player.cardStates[CARD_ID]?.bonusVp).toBe(1)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
   it('computeBonusScore returns accumulated bonusVp', () => {
@@ -168,7 +168,7 @@ describe('B132_EstateMaster session', () => {
     const player = state.players[0]!
     addCardToPlayer(player)
     fillFarm(player)
-    player.cardStates[CARD_ID] = { bonusVp: 3 }
+    player.cardStates[CARD_ID] = { counters: { bonusVp: 3 } }
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
