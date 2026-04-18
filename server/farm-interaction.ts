@@ -14,7 +14,7 @@ import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
 import { validatePlowSelection } from './plow-validation.ts'
-import { computeExtraSowableFields } from '../shared/cards/card-effects.ts'
+import { computeExtraSowableFields, collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 
 const sanitizePayableCost = (
   costOverride?: Partial<Resource>,
@@ -49,7 +49,11 @@ export const buildRoomFarmInteraction = (
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
-  const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+  const lockedKeys = collectLockedFarmTileKeys(player)
+  const selectableTiles = getAllTilePositions().filter((tile) => {
+    const key = positionKey(tile)
+    return !occupied.has(key) && !lockedKeys.has(key)
+  })
   const maxSelections = Math.min(
     selectableTiles.length,
     getMaxBuildableRooms(player, costOverride, actionContext),
@@ -69,7 +73,11 @@ export const buildStableFarmInteraction = (
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
-  const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+  const lockedKeys = collectLockedFarmTileKeys(player)
+  const selectableTiles = getAllTilePositions().filter((tile) => {
+    const key = positionKey(tile)
+    return !occupied.has(key) && !lockedKeys.has(key)
+  })
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
   const structuralMax = Math.min(
     selectableTiles.length,
@@ -94,9 +102,10 @@ export const buildPlowFarmInteraction = (
   const normalized = normalizePlayerFarm(player)
   const payableCost = sanitizePayableCost(costOverride)
   const canAffordPlow = canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
+  const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
     ? getAllTilePositions().filter(
-        (tile) => validatePlowSelection(normalized, tile).ok,
+        (tile) => validatePlowSelection(normalized, tile, lockedKeys).ok,
       )
     : []
   return { farmType: 'plow', selectableTiles }
