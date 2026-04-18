@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { runFieldEffect } from '../../shared/actions/effects/field-effect-registry'
+import { runSelectionEffect } from '../../shared/actions/effects/selection-effect-registry'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/E/E76_LumberPile'
@@ -26,8 +26,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [], playedCards: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
@@ -55,7 +54,7 @@ describe('E76_LumberPile card effect', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onBuy offers an optional field-select with max 3 stables', () => {
+  it('onBuy offers an optional selection with max 3 stables', () => {
     const player = createPlayer('p1')
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 },
@@ -68,23 +67,23 @@ describe('E76_LumberPile card effect', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     const leaf = flow.children[0]
-    expect(leaf.actionId).toBe('field-select')
-    expect(leaf.actionContext.fieldEffect).toBe(FIELD_EFFECT)
+    expect(leaf.actionId).toBe('selection')
+    expect(leaf.actionContext.selectionEffect).toBe(FIELD_EFFECT)
+    expect(leaf.actionContext.selectionKind).toBe('farm-position')
     expect(leaf.actionContext.maxSelections).toBe(3)
-    expect(leaf.actionContext.farmType).toBe('stable')
     expect(leaf.actionContext.selectableTiles.length).toBe(4)
   })
 
-  it('field-effect removes up to 3 stables and grants 3 wood each', () => {
+  it('selection-effect removes up to 3 stables and grants 3 wood each', () => {
     const player = createPlayer('p1')
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 },
       { row: 1, col: 0 }, { row: 1, col: 1 },
     ]
     const initialWood = player.resources.wood
-    runFieldEffect(FIELD_EFFECT, {
+    runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0', '0,1', '1,0'],
+      positions: ['0-0', '0-1', '1-0'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
@@ -92,29 +91,29 @@ describe('E76_LumberPile card effect', () => {
     expect(player.resources.wood).toBe(initialWood + 9)
   })
 
-  it('field-effect caps at 3 stables even if more are selected', () => {
+  it('selection-effect caps at 3 stables even if more are selected', () => {
     const player = createPlayer('p1')
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 },
       { row: 1, col: 0 }, { row: 1, col: 1 },
     ]
     const initialWood = player.resources.wood
-    runFieldEffect(FIELD_EFFECT, {
+    runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: ['0,0', '0,1', '1,0', '1,1'],
+      positions: ['0-0', '0-1', '1-0', '1-1'],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)
     expect(player.resources.wood).toBe(initialWood + 9)
   })
 
-  it('field-effect awards nothing when no stables are selected', () => {
+  it('selection-effect awards nothing when no stables are selected', () => {
     const player = createPlayer('p1')
     player.stableTiles = [{ row: 0, col: 0 }]
     const initialWood = player.resources.wood
-    runFieldEffect(FIELD_EFFECT, {
+    runSelectionEffect(FIELD_EFFECT, {
       player,
-      fields: [],
+      positions: [],
       sourceCard: CARD_ID,
     })
     expect(player.stableTiles).toHaveLength(1)

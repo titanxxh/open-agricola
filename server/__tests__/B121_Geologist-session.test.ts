@@ -16,8 +16,6 @@ describe('B121_Geologist session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     setWorkersAtHome(state, player, 2)
     state.players.forEach((p) => (p.workersAvailable = 2))
 

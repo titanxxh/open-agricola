@@ -31,7 +31,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
   }
 
   const grain = state.actionSpaces.find((s) => s.id === 'grain-utilization')

@@ -41,8 +41,6 @@ describe('B115_TinsmithMaster session', () => {
 
     if (options?.withCard ?? true) {
       player.occupationPlayed.push(CARD_ID)
-      player.playedCards = player.playedCards ?? []
-      player.playedCards.push(`occupation:${CARD_ID}`)
     }
 
     session.loadState(state)
@@ -232,7 +230,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // normal grain sow, no bonus
     })
 
-    it('presents field-select when sowing in 2 fields', () => {
+    it('presents selection when sowing in 2 fields', () => {
       const session = setupForSow({
         grain: 3,
         fields: [
@@ -255,7 +253,7 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      // Should get a field-select choice for which field gets the bonus
+      // Should get a selection choice for which field gets the bonus
       if (resp.pending.type === 'choice') {
         // Choose the first field
         resp = session.resolveChoice(0, '0-0')

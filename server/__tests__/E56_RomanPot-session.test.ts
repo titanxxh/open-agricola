@@ -23,8 +23,6 @@ const setup = (options?: { playerCount?: number; foodCount?: number }) => {
 
   // Manually add card since it's not in catalog.ts
   player.minorPlayed.push(CARD_ID)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${CARD_ID}`)
   if (!player.cardStates) player.cardStates = {}
   player.cardStates[CARD_ID] = {
     extraData: { foodCount: options?.foodCount ?? 4 },
@@ -59,8 +57,6 @@ describe('E56_RomanPot session', () => {
     // Put card on last player (index 1)
     const lastPlayer = state.players[1]!
     lastPlayer.minorPlayed.push(CARD_ID)
-    lastPlayer.playedCards = lastPlayer.playedCards ?? []
-    lastPlayer.playedCards.push(`minor:${CARD_ID}`)
     if (!lastPlayer.cardStates) lastPlayer.cardStates = {}
     lastPlayer.cardStates[CARD_ID] = {
       extraData: { foodCount: 4 },
@@ -86,8 +82,6 @@ describe('E56_RomanPot session', () => {
     // Put card on first player (index 0) - NOT the last
     const firstPlayer = state.players[0]!
     firstPlayer.minorPlayed.push(CARD_ID)
-    firstPlayer.playedCards = firstPlayer.playedCards ?? []
-    firstPlayer.playedCards.push(`minor:${CARD_ID}`)
     if (!firstPlayer.cardStates) firstPlayer.cardStates = {}
     firstPlayer.cardStates[CARD_ID] = {
       extraData: { foodCount: 4 },

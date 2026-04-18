@@ -20,7 +20,6 @@ describe('D126_FieldCultivator session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     // Simulate onBuy: push stack
     runCardEffectHook(state, player, CARD_ID, 'onBuy')
 

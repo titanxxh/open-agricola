@@ -203,7 +203,7 @@
 - `state.players[n].minorPlayed`
 - `state.players[n].occupationPlayed`
 - `state.players[n].improvements`
-- `state.players[n].playedCards`
+- `getPlayedCardKeys(state.players[n])`
 - `state.players[n].cardStates`
 - `state.players[n].workersAvailable`
 - `state.players[n].fields`

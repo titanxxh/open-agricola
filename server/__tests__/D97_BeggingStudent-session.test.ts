@@ -32,8 +32,6 @@ describe('D97_BeggingStudent session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.occupationHand = ['A114_SeasonalWorker']
 
     session.loadState(state)
@@ -59,8 +57,6 @@ describe('D97_BeggingStudent session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.occupationHand = []
 
     session.loadState(state)

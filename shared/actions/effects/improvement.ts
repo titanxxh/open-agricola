@@ -340,17 +340,10 @@ const finalizeMajorImprovementPurchase = (
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   if (returnedMajorId) {
-    returnCardToBoard(player, returnedMajorId)
-    // Only return to the major pool if it is actually a major improvement card.
-    // A fireplaceIdentity minor (e.g. D25) is removed from play entirely.
-    if (getMajorCardEffect(returnedMajorId)) {
-      state.availableMajorImprovements.push(returnedMajorId)
-    }
+    returnCardToBoard(player, returnedMajorId, state)
   }
 
   player.improvements.push(improvementId)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`major:${improvementId}`)
   state.availableMajorImprovements = state.availableMajorImprovements.filter(
     (id) => id !== improvementId,
   )
@@ -388,18 +381,11 @@ const finalizeMinorImprovementPurchase = (
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   if (returnedCardId) {
-    returnCardToBoard(player, returnedCardId)
-    // Only return to the major pool if it is actually a major improvement card.
-    // A fireplaceIdentity minor (e.g. D25) is removed from play entirely.
-    if (getMajorCardEffect(returnedCardId)) {
-      state.availableMajorImprovements.push(returnedCardId)
-    }
+    returnCardToBoard(player, returnedCardId, state)
   }
 
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
   player.minorPlayed.push(improvement.id)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${improvement.id}`)
 
   // D25 multi-identity: providesOccupation → also count as an occupation.
   if (improvement.providesOccupation) {

@@ -19,7 +19,6 @@ describe('E22_GuestRoom session', () => {
     const player = state.players[0]!
     player.resources.food = food
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Manually trigger onBuy
     runCardEffectHook(state, player, CARD_ID, 'onBuy')

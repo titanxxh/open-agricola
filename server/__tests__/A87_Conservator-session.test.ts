@@ -28,7 +28,6 @@ const setup = (
   const owner = state.players[0]!
   if (overrides.playA87 !== false) {
     owner.occupationPlayed.push(CARD_ID)
-    owner.playedCards.push(`occupation:${CARD_ID}`)
   }
   owner.houseType = overrides.houseType ?? 'wood'
   owner.rooms = overrides.rooms ?? 2

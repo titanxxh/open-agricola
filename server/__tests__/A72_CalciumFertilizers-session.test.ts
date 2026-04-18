@@ -19,7 +19,6 @@ describe('A72_CalciumFertilizers session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Eastern quarry available from round 4, western quarry from round 2
     const easternQuarry = state.actionSpaces.find((s) => s.id === 'eastern-quarry')
@@ -197,7 +196,6 @@ describe('A72_CalciumFertilizers session', () => {
     // Player has NO fields — prerequisite should pass
     player.fields = []
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     // Give the player quarry resources to verify the card works when played
     const easternQuarry = state.actionSpaces.find((s) => s.id === 'eastern-quarry')

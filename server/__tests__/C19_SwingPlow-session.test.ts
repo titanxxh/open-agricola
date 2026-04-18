@@ -14,8 +14,6 @@ describe('C19_SwingPlow session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('C19_SwingPlow')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('minor:C19_SwingPlow')
     if (!player.cardStates) player.cardStates = {}
     player.cardStates['C19_SwingPlow'] = {
       stack: Array(stackSize).fill('field'),

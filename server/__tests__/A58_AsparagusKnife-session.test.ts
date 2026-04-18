@@ -21,8 +21,6 @@ describe('A58_AsparagusKnife session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
 
     player.fields = [
       ...(options.vegetableFields ?? []),
@@ -152,7 +150,7 @@ describe('A58_AsparagusKnife session', () => {
     expect(flow).toBeNull()
   })
 
-  it('returns seq flow with field-select for multiple vegetable fields', () => {
+  it('returns seq flow with selection for multiple vegetable fields', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -207,7 +205,7 @@ describe('A58_AsparagusKnife session', () => {
       if (skipOption && acceptOption) {
         // This is the optional choice — accept it
         resp = session.resolveChoice(resp.pending.playerIndex, acceptOption.value)
-      } else if (resp.pending.promptKey === 'ui.interactionFieldSelect') {
+      } else if (resp.pending.promptKey === 'ui.interactionSelection') {
         // Select the vegetable field
         resp = session.resolveChoice(resp.pending.playerIndex, '0-0')
       } else {

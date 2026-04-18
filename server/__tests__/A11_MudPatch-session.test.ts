@@ -17,7 +17,6 @@ describe('A11_MudPatch session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A11_MudPatch')
-    player.playedCards.push('minor:A11_MudPatch')
     if (options?.fields) {
       player.fields = options.fields
     }

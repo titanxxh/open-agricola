@@ -2,13 +2,13 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTotalRemaining } from '../../game/field'
 
 const CARD_ID = 'D71_Changeover'
 
-registerFieldEffect('discard-single-crop', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('discard-single-crop', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (field && fieldTotalRemaining(field) === 1) {
@@ -30,12 +30,13 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'field-select',
+            actionId: 'selection',
             sourceCard: CARD_ID,
             actionContext: {
-              fieldFilter: 'has-exactly-1-crop',
+              selectionKind: 'farm-position',
+              positionFilter: 'has-exactly-1-crop',
               maxSelections: 1,
-              fieldEffect: 'discard-single-crop',
+              selectionEffect: 'discard-single-crop',
             },
           },
           {

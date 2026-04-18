@@ -17,7 +17,6 @@ describe('E109_BraidMaker session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources = {
       ...player.resources,
       reed: 2,

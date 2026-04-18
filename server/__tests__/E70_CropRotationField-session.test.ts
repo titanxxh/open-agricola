@@ -37,7 +37,6 @@ const setup = (options?: {
   player.resources.vegetable = options?.vegetable ?? 0
   player.fields = options?.fields ?? []
   player.minorPlayed.push(CARD_ID)
-  player.playedCards.push(`minor:${CARD_ID}`)
 
   if (options?.cardCrop !== undefined) {
     if (options.cardCrop !== null) {
@@ -68,10 +67,6 @@ const addMinorCard = (
   const player = state.players[0]!
   if (!player.minorPlayed.includes(cardId)) {
     player.minorPlayed.push(cardId)
-  }
-  const playedKey = `minor:${cardId}`
-  if (!player.playedCards.includes(playedKey)) {
-    player.playedCards.push(playedKey)
   }
   session.loadState(state)
 }
@@ -166,7 +161,7 @@ describe('E70_CropRotationField session', () => {
       addMinorCard(session, OTHER_EXTRA_CARD_ID)
 
       const player = session.getState().state.players[0]!
-      writeCardExtraData(player, CARD_ID, 'selectedFields', ['-1-70'])
+      writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
 
       const interaction = buildSowFarmInteraction(player, {
         allowedFields: 'fromSelectedFields',
@@ -187,7 +182,7 @@ describe('E70_CropRotationField session', () => {
       addMinorCard(session, OTHER_EXTRA_CARD_ID)
 
       const player = session.getState().state.players[0]!
-      writeCardExtraData(player, CARD_ID, 'selectedFields', ['-1-70'])
+      writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
 
       ;(session as any).pending = {
         type: 'choice',
@@ -293,9 +288,9 @@ describe('E70_CropRotationField session', () => {
       )
       expect(cardCrop).toBeNull() // cleared
 
-      // Verify selectedFields was set
-      const selectedFields = readCardExtraData<string[]>(player, CARD_ID, 'selectedFields')
-      expect(selectedFields).toEqual(['-1-70'])
+      // Verify selectedPositions was set
+      const selectedPositions = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions')
+      expect(selectedPositions).toEqual(['-1-70'])
     })
 
     it('last vegetable harvested with grain available -> optional sow flow returned', () => {

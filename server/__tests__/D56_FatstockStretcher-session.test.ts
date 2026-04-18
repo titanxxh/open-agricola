@@ -14,7 +14,6 @@ describe('D56_FatstockStretcher session', () => {
     const player = state.players[0]!
     // Place card directly
     player.minorPlayed.push('D56_FatstockStretcher')
-    player.playedCards.push('minor:D56_FatstockStretcher')
     // Give player a Fireplace for cooking
     player.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(

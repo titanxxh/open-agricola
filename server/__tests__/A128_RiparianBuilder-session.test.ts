@@ -14,7 +14,6 @@ describe('A128_RiparianBuilder session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('A128_RiparianBuilder')
-    owner.playedCards.push('occupation:A128_RiparianBuilder')
     owner.houseType = 'clay'
     owner.rooms = 2
     owner.resources = { ...owner.resources, wood: 5, clay: 10, reed: 6 }

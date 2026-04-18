@@ -1,12 +1,12 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack } from '../../game/field'
 
 const CARD_ID = 'E4_Thunderbolt'
 
-registerFieldEffect('remove-all-grain-for-wood', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (!field) continue
@@ -27,13 +27,14 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-grain',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-grain',
         maxSelections: 1,
-        fieldEffect: 'remove-all-grain-for-wood',
+        selectionEffect: 'remove-all-grain-for-wood',
       },
     }
   },

@@ -5,6 +5,7 @@ import type {
   FarmTilePosition,
   GameState,
   InteractionFarmSelection,
+  InteractionSelection,
   InteractionState,
   PendingAction,
   PlayerState,
@@ -103,8 +104,8 @@ import {
   stableWoodCost,
 } from '../shared/actions/effects/fencing.ts'
 import {
+  buildFarmPositionSelectionInteraction,
   buildFenceFarmInteraction,
-  buildFieldSelectFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
   getPermittedExtraSowableFields,
@@ -578,8 +579,15 @@ export class GameSession {
         return 'plow' as const
       case 'ui.interactionSowSelect':
         return 'sow' as const
-      case 'ui.interactionFieldSelect':
-        return 'field-select' as const
+      default:
+        return null
+    }
+  }
+
+  private isSelectionPromptKey(promptKey?: string) {
+    switch (promptKey) {
+      case 'ui.interactionSelection':
+        return 'farm-position' as const
       default:
         return null
     }
@@ -610,9 +618,9 @@ export class GameSession {
     return buildFenceFarmInteraction(this.state.players[pending.playerIndex]!, pending)
   }
 
-  private buildFieldSelectInteraction(player: PlayerState): InteractionFarmSelection {
+  private buildSelectionInteraction(player: PlayerState): InteractionSelection {
     const actionContext = this.pending.type === 'choice' ? this.pending.actionContext : undefined
-    return buildFieldSelectFarmInteraction(player, actionContext)
+    return buildFarmPositionSelectionInteraction(player, actionContext)
   }
 
   private buildFarmInteraction(
@@ -632,8 +640,6 @@ export class GameSession {
         return this.buildPlowInteraction(player, pending.costOverride)
       case 'sow':
         return this.buildSowInteraction(player)
-      case 'field-select':
-        return this.buildFieldSelectInteraction(player)
       default:
         return null
     }
@@ -770,6 +776,22 @@ export class GameSession {
     }
     // Choice state: compute both anytime and farm interaction
     const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+    const selectionKind = this.isSelectionPromptKey(this.pending.promptKey)
+    const selectionPlayer = this.state.players[this.pending.playerIndex]
+    if (selectionKind && selectionPlayer) {
+      return {
+        stateId: 'selection',
+        playerIndex: this.pending.playerIndex,
+        spaceId: this.pending.spaceId,
+        promptKey: this.pending.promptKey,
+        promptParams: this.pending.promptParams,
+        options: this.pending.options,
+        costOverride: this.pending.costOverride,
+        selection: this.buildSelectionInteraction(selectionPlayer),
+        allowedCommands: ['resolveChoice', 'commitSelection', 'takeAnytimeAction', 'undoStep', 'undoAction'],
+        anytimeActions,
+      }
+    }
     const farm = this.buildFarmInteraction(this.pending)
     const allowedCommands = farm
       ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
@@ -2400,7 +2422,7 @@ export class GameSession {
 
   commitFarmChoice(
     playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow' | 'field-select',
+    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
     payload: Record<string, unknown>,
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
@@ -2681,36 +2703,43 @@ export class GameSession {
         this.state.players[playerIndex] = nextPlayer
         break
       }
-      case 'field-select': {
-        const selectedFields = (payload as { fields?: { row: number; col: number }[] }).fields ?? []
-        const maxSel = (this.pending.actionContext?.maxSelections as number) ?? 1
-        if (selectedFields.length > maxSel) {
-          return this.respond(false, 'too many field selections')
-        }
-        // Validate each field exists in the player's fields
-        for (const sel of selectedFields) {
-          const exists = player.fields.some(f => f.row === sel.row && f.col === sel.col)
-          if (!exists) return this.respond(false, 'invalid field position')
-        }
-        this.pushHistory()
-        // Resolve the choice with position keys
-        const choiceValue = selectedFields.length > 0
-          ? selectedFields.map(f => `${f.row}-${f.col}`).join(',')
-          : 'cancel'
-        // Use the engine to resolve the pending choice
-        const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('field-select')
-        this.engine?.resolveChoice(choiceValue, {
-          state: this.state,
-          player: this.state.players[playerIndex]!,
-          space,
-        })
-        this.flushEngineLog()
-        this.runEngineSteps()
-        break
-      }
     }
 
     return this.continueAfterResolvedFarmChoice(playerIndex, farmChoiceMeta)
+  }
+
+  commitSelectionChoice(
+    playerIndex: number,
+    payload: { positions?: FarmTilePosition[] },
+  ): SessionResponse {
+    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection choice for this player')
+    }
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+
+    const positions = payload.positions ?? []
+    const maxSelections = (this.pending.actionContext?.maxSelections as number) ?? 1
+    if (positions.length > maxSelections) {
+      return this.respond(false, 'too many selection positions')
+    }
+    for (const pos of positions) {
+      const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
+      if (!exists) return this.respond(false, 'invalid field position')
+    }
+
+    this.pushHistory()
+    const choiceValue =
+      positions.length > 0 ? positions.map((p) => `${p.row}-${p.col}`).join(',') : 'cancel'
+    const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
+    this.engine?.resolveChoice(choiceValue, {
+      state: this.state,
+      player: this.state.players[playerIndex]!,
+      space,
+    })
+    this.flushEngineLog()
+    this.runEngineSteps()
+    return this.continueAfterResolvedFarmChoice(playerIndex)
   }
 
   devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
@@ -2778,12 +2807,6 @@ export class GameSession {
       if (!player.minorPlayed.includes(cardId)) {
         player.minorPlayed.push(cardId)
       }
-    }
-    player.playedCards = player.playedCards ?? []
-    const prefix = isOccupation ? 'occupation' : 'minor'
-    const playedKey = `${prefix}:${cardId}`
-    if (!player.playedCards.includes(playedKey)) {
-      player.playedCards.push(playedKey)
     }
     getCardModifiers(cardId).forEach((modifier) => {
       if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {

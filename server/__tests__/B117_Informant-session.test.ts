@@ -97,8 +97,6 @@ describe('B117_Informant session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.stone = 4
     player.resources.clay = 1
     player.resources.wood = 3

@@ -19,8 +19,7 @@ const setup = (overrides: { withCard?: boolean; wood?: number } = {}) => {
   const player = state.players[0]!
   player.resources = { ...player.resources, wood: overrides.wood ?? 8 }
   if (overrides.withCard !== false) {
-    player.minorPlayed = [...player.minorPlayed, CARD_ID]
-    player.playedCards = [...player.playedCards, `minor:${CARD_ID}`]
+    player.minorPlayed.push(CARD_ID)
   }
 
   session.loadState(state)

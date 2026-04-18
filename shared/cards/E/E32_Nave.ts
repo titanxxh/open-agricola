@@ -20,5 +20,5 @@ export const E32_Nave = new MinorImprovement({
   category: "POINTS_PROVIDER",
   desc: ['During scoring, you get 1 bonus <SCORE> for each of the 5 columns of your farmyard board containing at least one room.'],
   cost: { clay: 2, reed: 1 },
-  vp: 1,
+  vp: 0,
 })

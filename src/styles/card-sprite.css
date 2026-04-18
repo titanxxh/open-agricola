@@ -97,6 +97,26 @@
   background-position-x: 100%;
 }
 
+/* Dual-type cards (minor that also counts as major, e.g. D60 Large Pottery,
+ * D59 Earth Oven, A60 Oriental Fireplace). BGA renders these with a dedicated
+ * frame that blends the minor and major chrome. */
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-frame {
+  background-image: url('/bga-img/card_frame_major_minor.png');
+  background-size: 104%;
+  background-position: 0% 0%;
+}
+/* Hide the minor-only leaf chrome on the left; right leaf is re-sourced from
+ * the dual-type frame atlas to match BGA. */
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-frame-left-leaves {
+  display: none;
+}
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-frame-right-leaves {
+  background-image: url('/bga-img/card_frame_major_minor.png');
+  background-position: 99.5% 32.5%;
+  background-size: 430%;
+  right: 1px;
+}
+
 /* Card icon layer */
 .card-icon {
   position: absolute;
@@ -386,6 +406,18 @@
   height: auto;
   padding: 0;
   background-image: none !important;
+}
+
+/* Dual-type cards get a tinted cost background (split minor/major look). */
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-cost {
+  height: 100px;
+}
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-cost-return,
+.player-card.minor .player-card-inner[data-also-counts-as~="major"] .card-cost-text {
+  background-image: url('/bga-img/minor_major_costtext.png');
+  background-position: 34% 0%;
+  background-size: 144% auto;
+  background-repeat: no-repeat;
 }
 
 /* Prerequisite area */

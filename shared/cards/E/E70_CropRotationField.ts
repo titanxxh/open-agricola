@@ -78,7 +78,7 @@ registerCardEffect({
       if (player.resources[oppositeCrop] < 1) return // No seeds for opposite
 
       // Store virtual tile as allowed sow target
-      writeCardExtraData(player, CARD_ID, 'selectedFields', [VIRTUAL_KEY])
+      writeCardExtraData(player, CARD_ID, 'selectedPositions', [VIRTUAL_KEY])
 
       return {
         type: 'leaf',

@@ -17,7 +17,6 @@ describe('C64_CornSchnappsDistillery session', () => {
     player.resources.food = 0
     // Directly place card
     player.minorPlayed.push('C64_CornSchnappsDistillery')
-    player.playedCards.push('minor:C64_CornSchnappsDistillery')
     session.loadState(state)
     return session
   }

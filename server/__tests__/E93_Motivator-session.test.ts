@@ -14,7 +14,6 @@ describe('E93_Motivator session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.roomTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }]
     player.fields = [
       { row: 0, col: 0, crop: null, remaining: 0 },

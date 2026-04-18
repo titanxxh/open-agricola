@@ -17,7 +17,6 @@ describe('E162_Entrepreneur session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
 
     session.loadState(state)
     return session

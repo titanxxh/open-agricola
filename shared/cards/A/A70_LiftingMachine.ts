@@ -1,12 +1,12 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'A70_LiftingMachine'
 
-registerFieldEffect('take-vegetable', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('take-vegetable', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (!field) continue
@@ -29,13 +29,14 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-vegetable',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-vegetable',
         maxSelections: 1,
-        fieldEffect: 'take-vegetable',
+        selectionEffect: 'take-vegetable',
       },
     }
   },

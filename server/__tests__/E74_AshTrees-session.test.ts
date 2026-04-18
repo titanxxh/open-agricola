@@ -26,7 +26,6 @@ describe('E74_AshTrees session flow', () => {
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
     player.minorPlayed.push('E74_AshTrees')
-    player.playedCards.push('minor:E74_AshTrees')
     player.cardStates = {
       ...player.cardStates,
       E74_AshTrees: { counters: { fences: 4 } },
@@ -86,7 +85,6 @@ describe('E74_AshTrees session flow', () => {
     // total = 4 wood
     player.resources.wood = 4
     player.minorPlayed.push('E74_AshTrees', 'B30_WoodPalisades')
-    player.playedCards.push('minor:E74_AshTrees', 'minor:B30_WoodPalisades')
     player.cardStates = {
       ...player.cardStates,
       E74_AshTrees: { counters: { fences: 5 } },

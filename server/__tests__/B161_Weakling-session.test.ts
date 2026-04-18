@@ -16,8 +16,6 @@ describe('B161_Weakling session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
 

@@ -37,9 +37,7 @@ const createPlayer = (
     minorHand: [],
     minorPlayed: [CARD_ID],
     occupationHand: [],
-    occupationPlayed: [],
-    playedCards: [CARD_ID],
-    houseAnimalType: null,
+    occupationPlayed: [],houseAnimalType: null,
     houseAnimalCount: 0,
     stableAnimals: {},
     pastures: [],
@@ -94,7 +92,7 @@ describe('C22_BasketChair session', () => {
   })
 
   it('onBeforeStartOfTurn does nothing when the card is not in play', () => {
-    const player = createPlayer('p1', { minorPlayed: [], playedCards: [] })
+    const player = createPlayer('p1', { minorPlayed: [] })
     const state = createState(3, [player])
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBeforeStartOfTurn!(state, player)

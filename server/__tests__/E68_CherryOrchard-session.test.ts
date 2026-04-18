@@ -42,7 +42,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.minorPlayed.push(CARD_ID)
-    player.playedCards.push(`minor:${CARD_ID}`)
   }
 
   if (options?.cardCrop !== undefined) {

@@ -23,11 +23,9 @@ const setup = (withForestSchool: boolean) => {
   }
   player.occupationHand = ['A123_FrameBuilder']
   player.occupationPlayed = ['D152_Patron']
-  player.playedCards = [playedKey('D152_Patron', 'occupation')]
 
   if (withForestSchool) {
     player.minorPlayed.push('A28_ForestSchool')
-    player.playedCards.push(playedKey('A28_ForestSchool', 'minor'))
     player.activeModifiers.push({ ...((A28Card as any).modifier ?? {}) })
   }
 

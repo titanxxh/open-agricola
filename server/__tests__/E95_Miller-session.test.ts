@@ -17,7 +17,6 @@ describe('E95_Miller session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('E95_Miller')
-    owner.playedCards.push('occupation:E95_Miller')
     // Give owner a Fireplace for baking
     owner.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(

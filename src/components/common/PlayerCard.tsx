@@ -154,6 +154,8 @@ export const PlayerCard = ({
         isCookery: minor.isCookery,
         isBaking: minor.isBaking,
         passing: minor.passing,
+        returnCards: minor.returnCards,
+        alsoCountsAs: minor.alsoCountsAs,
       }
     } else {
       const occupation = getOccupation(cardId)
@@ -245,6 +247,11 @@ export const PlayerCard = ({
         data-numbering={numbering}
         data-cook={cardData.isCookery ? 'true' : undefined}
         data-bread={cardData.isBaking ? 'true' : undefined}
+        data-also-counts-as={
+          'alsoCountsAs' in cardData && cardData.alsoCountsAs && cardData.alsoCountsAs.length > 0
+            ? cardData.alsoCountsAs.join(' ')
+            : undefined
+        }
       >
         <div className="card-frame" />
         {cardType === 'minor' && !('passing' in cardData && cardData.passing) && (
