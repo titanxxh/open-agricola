@@ -709,6 +709,9 @@ export class Engine {
         state: context.state,
         player: context.player,
         space: context.space,
+        params: actionNode.params,
+        sourceCard: actionNode.sourceCard,
+        actionContext: actionNode.actionContext,
       }
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: actionNode.actionId },
