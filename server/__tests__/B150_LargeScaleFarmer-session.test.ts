@@ -32,7 +32,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards.push(`occupation:${CARD_ID}`)
   }
 
   const farmExp = state.actionSpaces.find((s) => s.id === 'farm-expansion')

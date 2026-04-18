@@ -7,6 +7,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
+import { dispatchReapListener } from '../../actions/effects/reap'
 
 const CARD_ID = 'E68_CherryOrchard'
 const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 68 }
@@ -51,7 +52,7 @@ registerCardEffect({
     return true
   },
 
-  onHarvestFieldPhase: (_state, player) => {
+  onHarvestFieldPhase: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const cardCrop = getCardCrop(player)
     if (!cardCrop || cardCrop.remaining <= 0) return
@@ -61,6 +62,7 @@ registerCardEffect({
 
     if (cardCrop.remaining <= 0) {
       player.resources.vegetable += 1
+      dispatchReapListener(state, player, 'vegetable', 1)
       setCardCrop(player, null)
       return
     }

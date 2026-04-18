@@ -17,7 +17,6 @@ const setup = () => {
     food: 0,
   }
   player.occupationPlayed = ['B109_PaperMaker']
-  player.playedCards = ['occupation:B109_PaperMaker']
   player.occupationHand = ['A123_FrameBuilder']
 
   session.loadState(state)

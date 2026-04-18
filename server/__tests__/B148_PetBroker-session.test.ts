@@ -39,8 +39,6 @@ describe('B148_PetBroker session', () => {
 
     // Add another occupation
     player.occupationPlayed.push('SomeOtherOccupation')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('occupation:SomeOtherOccupation')
     session.loadState(state)
 
     const updatedState = session.getState().state

@@ -1,13 +1,13 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D70_StrawManure'
 
-registerFieldEffect('add-vegetable', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('add-vegetable', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (field) {
@@ -35,12 +35,13 @@ registerCardEffect({
       },
       {
         type: 'leaf',
-        actionId: 'field-select',
+        actionId: 'selection',
         sourceCard: CARD_ID,
         actionContext: {
-          fieldFilter: 'has-vegetable',
+          selectionKind: 'farm-position',
+          positionFilter: 'has-vegetable',
           maxSelections: 2,
-          fieldEffect: 'add-vegetable',
+          selectionEffect: 'add-vegetable',
         },
       },
     ]

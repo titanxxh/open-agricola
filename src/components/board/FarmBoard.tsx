@@ -13,6 +13,7 @@ import { emptyResources } from '../../../shared/logic/state'
 import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getFenceCount } from '../../../shared/actions/effects/fencing'
+import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -193,9 +194,9 @@ type Props = {
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
-  fieldSelectableSet: Set<string>
-  pendingFieldSelections: Set<string>
-  toggleFieldSelection: (tile: FarmTilePosition) => void
+  positionSelectableSet: Set<string>
+  pendingPositionSelections: Set<string>
+  togglePositionSelection: (tile: FarmTilePosition) => void
   pendingSowSelections: Record<string, PendingSowCrop>
   sowRemaining: Record<PendingSowCrop, number>
   sowSelectableMap: Map<string, PendingSowCrop[]>
@@ -485,9 +486,9 @@ export const FarmBoard = ({
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
-  fieldSelectableSet,
-  pendingFieldSelections,
-  toggleFieldSelection,
+  positionSelectableSet,
+  pendingPositionSelections,
+  togglePositionSelection,
   pendingSowSelections,
   sowRemaining,
   sowSelectableMap,
@@ -526,6 +527,7 @@ export const FarmBoard = ({
   isInteractive,
 }: Props) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+  const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -654,12 +656,13 @@ export const FarmBoard = ({
             isInteractive && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
             : false
-          const isFieldSelectable = isInteractive && fieldSelectableSet.has(tileKey)
-          const isFieldSelected = isInteractive && pendingFieldSelections.has(tileKey)
+          const isFieldSelectable = isInteractive && positionSelectableSet.has(tileKey)
+          const isFieldSelected = isInteractive && pendingPositionSelections.has(tileKey)
           const isTileSelectable =
             isRoomSelectable || isPlowSelectable || isStableSelectable || isFieldSelectable
           const isTileSelected =
             isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
+          const isTileLocked = lockedTileKeys.has(tileKey)
           const fieldInfo = fieldMap.get(tileKey)
           const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
           const cropStack =
@@ -719,7 +722,7 @@ export const FarmBoard = ({
                     : isStable
                       ? ' stable'
                       : ''
-              }${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
+              }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
               }${isStableSelected ? ' stable-selected' : ''}`}
               onClick={() => {
@@ -732,7 +735,7 @@ export const FarmBoard = ({
                   return
                 }
                 if (isFieldSelectable) {
-                  toggleFieldSelection({ row: tileRow, col: tileCol })
+                  togglePositionSelection({ row: tileRow, col: tileCol })
                   return
                 }
                 if (isPlowSelectable) {
@@ -897,6 +900,11 @@ export const FarmBoard = ({
                   ) : null}
                 </div>
               ) : null}
+              {isTileLocked && (
+                <div className="farm-cell-locked-overlay">
+                  <span className="farm-cell-lock-icon">🔒</span>
+                </div>
+              )}
             </div>
           )
         }

@@ -30,8 +30,6 @@ describe('B58_CrackWeeder session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.food = 5
 
     // Simulate 2 vegetable fields harvested
@@ -98,8 +96,6 @@ describe('B58_CrackWeeder session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
     player.resources.food = 10
     // Vegetable field with remaining=1 — will be harvested
     player.fields = [

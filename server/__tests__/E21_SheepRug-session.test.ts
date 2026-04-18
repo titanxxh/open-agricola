@@ -25,7 +25,6 @@ const setup = (withSheepRug: boolean) => {
 
   if (withSheepRug) {
     player.minorPlayed.push('E21_SheepRug')
-    player.playedCards.push(playedKey('E21_SheepRug', 'minor'))
   }
 
   const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')

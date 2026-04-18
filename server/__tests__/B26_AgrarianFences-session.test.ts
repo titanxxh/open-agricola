@@ -36,7 +36,6 @@ const setup = (options?: {
 
   if (options?.withCard ?? true) {
     player.minorPlayed.push('B26_AgrarianFences')
-    player.playedCards.push(playedKey('B26_AgrarianFences', 'minor'))
   }
 
   session.loadState(state)

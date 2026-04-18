@@ -13,7 +13,6 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D71_Changeover')
-    player.playedCards.push('minor:D71_Changeover')
 
     // One eligible field (remaining === 1), one not eligible (remaining === 2)
     player.fields = [
@@ -49,15 +48,15 @@ describe('D71_Changeover session', () => {
     let resp = session.takeAnytimeAction(0, 'D71-changeover-anytime')
     expect(resp.ok).toBe(true)
 
-    // Should be in field-select choice
+    // Should be in selection choice
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     // Select field 0-2 (grain with remaining 1)
     resp = session.resolveChoice(0, '0-2')
     expect(resp.ok).toBe(true)
 
-    // After field-select, verify the field was discarded
+    // After selection, verify the field was discarded
     const p = resp.state.players[0]!
     const f = p.fields.find(f => f.row === 0 && f.col === 2)!
     expect(f.stacks[0]?.kind ?? null).toBeNull()
@@ -102,7 +101,6 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D71_Changeover')
-    player.playedCards.push('minor:D71_Changeover')
 
     // No field with remaining === 1
     player.fields = [

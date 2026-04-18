@@ -16,7 +16,6 @@ describe('A132_Publican session', () => {
     // P0 is the Publican owner
     const owner = state.players[0]!
     owner.occupationPlayed.push('A132_Publican')
-    owner.playedCards.push('occupation:A132_Publican')
     owner.resources.grain = 3
 
     // P1 (opponent) needs plowed fields and grain to sow

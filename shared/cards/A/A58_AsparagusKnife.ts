@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'A58_AsparagusKnife'
@@ -16,12 +16,12 @@ const TRIGGER_ROUNDS = [8, 10, 12]
  * and 1 bonus VP.
  *
  * The vegetable is removed from the field (remaining decremented by 1).
- * Player selects via field-select (auto-selected if only 1 field eligible).
+ * Player selects via selection (auto-selected if only 1 field eligible).
  */
 
 // Field effect: decrement 1 vegetable from the selected field
-registerFieldEffect('asparagus-knife-harvest', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('asparagus-knife-harvest', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
     if (!field) continue
@@ -50,13 +50,14 @@ registerCardEffect({
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldFilter: 'has-vegetable',
+            selectionKind: 'farm-position',
+            positionFilter: 'has-vegetable',
             maxSelections: 1,
             minSelections: 1,
-            fieldEffect: 'asparagus-knife-harvest',
+            selectionEffect: 'asparagus-knife-harvest',
           },
         } as ActionFlow,
         gainLeaf(CARD_ID, { food: 3 }),

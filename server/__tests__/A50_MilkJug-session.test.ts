@@ -19,7 +19,6 @@ describe('A50_MilkJug session', () => {
 
     const owner = state.players[0]!
     owner.minorPlayed.push('A50_MilkJug')
-    owner.playedCards.push('minor:A50_MilkJug')
     setWorkersAtHome(state, owner, 2)
     owner.resources.food = 0
     // Give pasture so cattle placement works

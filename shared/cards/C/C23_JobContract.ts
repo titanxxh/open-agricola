@@ -23,7 +23,7 @@ const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
  * Implementation:
  * - On place-farmer at `day-laborer`, if any lessons space is unoccupied,
  *   return an optional seq whose body is a `play-occupation` leaf for the
- *   lessons action cost, plus a field-effect leaf that marks the lessons
+ *   lessons action cost, plus a selection-effect leaf that marks the lessons
  *   space as taken (so other players cannot use it this round).
  * - The fake-farmer return at end-of-round is implicit: our engine resets
  *   `actionSpace.takenBy` between rounds via the standard cleanup (see

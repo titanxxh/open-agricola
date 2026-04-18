@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { collectCardsAs } from '../helpers/card-type'
 
 const CARD_ID = 'C5_Remodeling'
 
@@ -7,7 +8,7 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
     const clayRooms = player.houseType === 'clay' ? player.rooms : 0
-    const majorCount = player.improvements.length
+    const majorCount = collectCardsAs(player, 'major').length
     const total = clayRooms + majorCount
     if (total === 0) return
     return {

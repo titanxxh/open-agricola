@@ -90,7 +90,6 @@ describe('shared/game/serialization', () => {
       const modified = createInitialState(42)
       const player = modified.players[0]!
       player.minorPlayed.push('A14_CarpentersHammer')
-      player.playedCards.push('minor:A14_CarpentersHammer')
       player.activeModifiers = []
 
       const serialized = serializeState(modified)
@@ -112,7 +111,6 @@ describe('shared/game/serialization', () => {
         reed: 2,
       }
       player.minorPlayed.push('A14_CarpentersHammer')
-      player.playedCards.push('minor:A14_CarpentersHammer')
       player.activeModifiers = []
 
       const serialized = serializeState(modified)

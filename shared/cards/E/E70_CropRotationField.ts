@@ -7,6 +7,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
+import { dispatchReapListener } from '../../actions/effects/reap'
 
 const CARD_ID = 'E70_CropRotationField'
 
@@ -60,13 +61,14 @@ registerCardEffect({
   },
 
   // Harvest from the card's field during harvest field phase
-  onHarvestFieldPhase: (_state, player) => {
+  onHarvestFieldPhase: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const cardCrop = getCardCrop(player)
     if (!cardCrop || cardCrop.remaining <= 0) return
 
     const harvestedCrop = cardCrop.crop
     player.resources[harvestedCrop] += 1
+    dispatchReapListener(state, player, harvestedCrop, 1)
     cardCrop.remaining -= 1
 
     if (cardCrop.remaining <= 0) {
@@ -76,7 +78,7 @@ registerCardEffect({
       if (player.resources[oppositeCrop] < 1) return // No seeds for opposite
 
       // Store virtual tile as allowed sow target
-      writeCardExtraData(player, CARD_ID, 'selectedFields', [VIRTUAL_KEY])
+      writeCardExtraData(player, CARD_ID, 'selectedPositions', [VIRTUAL_KEY])
 
       return {
         type: 'leaf',

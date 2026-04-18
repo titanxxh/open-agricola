@@ -1,56 +1,59 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/future-meeples'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { FarmTilePosition } from '../../game/types'
+import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../game/farm'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'B38_FutureBuildingSite'
 
-/**
- * B38 Future Building Site (MinorImprovement, B, 38)
- * Place 1 wood on each of the next 4 round spaces. At the start of these rounds, you get the wood.
- * Remove promised wood when you build a room.
- */
+const DELTAS = [
+  { dr: -1, dc: 0 },
+  { dr: 1, dc: 0 },
+  { dr: 0, dc: -1 },
+  { dr: 0, dc: 1 },
+]
+
 registerCardEffect({
   id: CARD_ID,
-  onBuy: (state, player) => {
-    queueFutureMeeples(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: 4,
-      resources: { wood: 1 },
+  onBuy: (_state, player) => {
+    const usedKeys = getUsedFarmyardTileKeys(player)
+    const roomKeys = new Set(player.roomTiles.map(positionKey))
+    const lockedTiles: FarmTilePosition[] = []
+    for (const tile of getAllTilePositions()) {
+      const key = positionKey(tile)
+      if (usedKeys.has(key)) continue
+      const adjacentToRoom = DELTAS.some((d) =>
+        roomKeys.has(positionKey({ row: tile.row + d.dr, col: tile.col + d.dc })),
+      )
+      if (adjacentToRoom) lockedTiles.push(tile)
+    }
+    writeCardExtraData(player, CARD_ID, 'locked', lockedTiles)
+  },
+  computeLockedFarmTiles: (player) => {
+    const locked = readCardExtraData<FarmTilePosition[]>(player, CARD_ID, 'locked')
+    if (!locked || locked.length === 0) return []
+    const usedKeys = getUsedFarmyardTileKeys(player)
+    const lockedKeys = new Set(locked.map(positionKey))
+    const hasNonLockedFree = getAllTilePositions().some((tile) => {
+      const key = positionKey(tile)
+      return !usedKeys.has(key) && !lockedKeys.has(key)
     })
-    return futureMeeplesNode()
+    return hasNonLockedFree ? locked : []
   },
 })
-
-const afterConstructListener: CardListenerRegistration = {
-  id: 'B38-future-building-site-after-construct',
-  cardIds: [CARD_ID],
-  actions: ['construct'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    removeFutureMeeples(context.state, {
-      playerId: context.player.id,
-      cardId: CARD_ID,
-    })
-    setCardFlag(context.player, CARD_ID, true)
-  },
-}
-
-registerCardListener(afterConstructListener)
 
 export const B38_FutureBuildingSite = new MinorImprovement({
   id: CARD_ID,
   name: 'Future Building Site',
   deck: 'B',
   number: 38,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Up until all other farmyard spaces are used, you cannot use the unused spaces that are orthogonally adjacent to your house (not even to build rooms).'],
+  category: 'POINTS_PROVIDER',
+  desc: [
+    'Up until all other farmyard spaces are used, you cannot use the unused spaces that are orthogonally adjacent to your house (not even to build rooms).',
+  ],
   cost: {},
+  vp: 3,
+  maxRound: 4,
+  prerequisite: 'Play in Round 4 or Before',
   implemented: true,
 })

@@ -15,8 +15,6 @@ describe('C12_CattleFarm session', () => {
     const player = state.players[0]!
     // Manually add to minorPlayed (card is not in catalog, so devPlayCard misidentifies it)
     player.minorPlayed.push('C12_CattleFarm')
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push('minor:C12_CattleFarm')
 
     // Set up pastures
     player.pastures = []

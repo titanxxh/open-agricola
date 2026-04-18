@@ -12,7 +12,6 @@ describe('D139_Chairman session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D139_Chairman')
-    owner.playedCards.push('occupation:D139_Chairman')
 
     session.loadState(state)
     return session

@@ -33,7 +33,6 @@ describe('onEndTurn session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.minorPlayed.push(TEST_END_TURN_CARD)
-    player.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
     session.loadState(state)
     const resp = session.takeAction(0, 'day-laborer')
@@ -51,17 +50,14 @@ describe('onEndTurn session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('A128_RiparianBuilder')
-    owner.playedCards.push('occupation:A128_RiparianBuilder')
     owner.houseType = 'clay'
     owner.rooms = 2
     owner.resources = { ...owner.resources, wood: 5, clay: 10, reed: 6 }
     owner.minorPlayed.push(TEST_END_TURN_CARD)
-    owner.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
     const actor = state.players[1]!
     setWorkersAtHome(state, actor, 2)
     actor.minorPlayed.push(TEST_END_TURN_CARD)
-    actor.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
     if (!reedBank) throw new Error('reed-bank space missing')
@@ -92,7 +88,6 @@ describe('onEndTurn session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.minorPlayed.push(TEST_END_TURN_CARD)
-    player.playedCards.push(`minor:${TEST_END_TURN_CARD}`)
 
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')

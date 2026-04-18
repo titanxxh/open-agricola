@@ -45,7 +45,7 @@ export const applyReapPhase = (nextState: GameState) => {
   nextState.players.forEach((player) => {
     const beforeGrain = player.resources.grain
     const beforeVegetable = player.resources.vegetable
-    reap(player)
+    reap(nextState, player)
     const grain = player.resources.grain - beforeGrain
     const vegetable = player.resources.vegetable - beforeVegetable
     if (grain > 0 || vegetable > 0) {

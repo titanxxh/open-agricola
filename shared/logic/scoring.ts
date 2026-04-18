@@ -3,6 +3,7 @@ import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { fieldHasCrop } from '../game/field'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types'
 import { collectBonusScores, getCardEffect } from '../cards/card-effects'
 import { familySize } from '../game/player'
 
@@ -286,10 +287,12 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       }
     })
     player.minorPlayed.forEach((cardId) => {
-      cardEntries.push({ type: 'card', cardId, cardType: 'minor', score: 0 })
+      const vp = getRegisteredMinorImprovement(cardId)?.vp ?? 0
+      cardEntries.push({ type: 'card', cardId, cardType: 'minor', score: vp })
     })
     player.occupationPlayed.forEach((cardId) => {
-      cardEntries.push({ type: 'card', cardId, cardType: 'occupation', score: 0 })
+      const vp = getRegisteredOccupation(cardId)?.vp ?? 0
+      cardEntries.push({ type: 'card', cardId, cardType: 'occupation', score: vp })
     })
     const cardsTotal = cardEntries.reduce((sum, entry) => sum + entry.score, 0)
     const cardsBonusTotal = cardBonusEntries.reduce(

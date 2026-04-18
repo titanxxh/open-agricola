@@ -27,7 +27,6 @@ describe('D129_LumberVirtuoso session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('D129_LumberVirtuoso')
-    player.playedCards.push('occupation:D129_LumberVirtuoso')
     player.houseType = options?.houseType ?? 'wood'
     player.resources.wood = options?.wood ?? 8
 

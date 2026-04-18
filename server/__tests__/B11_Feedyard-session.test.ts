@@ -23,7 +23,6 @@ describe('B11_Feedyard session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('B11_Feedyard')
-    player.playedCards.push('minor:B11_Feedyard')
     if (options?.pastures) {
       player.pastures = options.pastures
     }

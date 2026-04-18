@@ -1,6 +1,7 @@
 import type {
   FarmTilePosition,
   InteractionFarmSelection,
+  InteractionSelection,
   PendingAction,
   PlayerState,
   Resource,
@@ -13,7 +14,7 @@ import { stableWoodCost } from '../shared/actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../shared/game/farm.ts'
 import { normalizePlayerFarm, getAllEdgeIds } from './fence-validation.ts'
 import { validatePlowSelection } from './plow-validation.ts'
-import { computeExtraSowableFields } from '../shared/cards/card-effects.ts'
+import { computeExtraSowableFields, collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 
 const sanitizePayableCost = (
   costOverride?: Partial<Resource>,
@@ -48,7 +49,11 @@ export const buildRoomFarmInteraction = (
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.pastures.flatMap((pasture) => pasture.tiles).forEach((tile) => occupied.add(positionKey(tile)))
-  const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+  const lockedKeys = collectLockedFarmTileKeys(player)
+  const selectableTiles = getAllTilePositions().filter((tile) => {
+    const key = positionKey(tile)
+    return !occupied.has(key) && !lockedKeys.has(key)
+  })
   const maxSelections = Math.min(
     selectableTiles.length,
     getMaxBuildableRooms(player, costOverride, actionContext),
@@ -68,7 +73,11 @@ export const buildStableFarmInteraction = (
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
-  const selectableTiles = getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile)))
+  const lockedKeys = collectLockedFarmTileKeys(player)
+  const selectableTiles = getAllTilePositions().filter((tile) => {
+    const key = positionKey(tile)
+    return !occupied.has(key) && !lockedKeys.has(key)
+  })
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
   const structuralMax = Math.min(
     selectableTiles.length,
@@ -93,9 +102,10 @@ export const buildPlowFarmInteraction = (
   const normalized = normalizePlayerFarm(player)
   const payableCost = sanitizePayableCost(costOverride)
   const canAffordPlow = canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
+  const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
     ? getAllTilePositions().filter(
-        (tile) => validatePlowSelection(normalized, tile).ok,
+        (tile) => validatePlowSelection(normalized, tile, lockedKeys).ok,
       )
     : []
   return { farmType: 'plow', selectableTiles }
@@ -172,7 +182,7 @@ const getAllowedSelectedFieldKeys = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
 ) => actionContext?.allowedFields === 'fromSelectedFields' && typeof actionContext?.sourceCard === 'string'
-  ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedFields') ?? [])
+  ? new Set(readCardExtraData<string[]>(player, actionContext.sourceCard as string, 'selectedPositions') ?? [])
   : null
 
 export const getPermittedExtraSowableFields = (
@@ -189,16 +199,26 @@ export const getPermittedExtraSowableFields = (
   })
 }
 
-export const buildFieldSelectFarmInteraction = (
+export const buildFarmPositionSelectionInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
-): InteractionFarmSelection => {
-  const filter = actionContext?.fieldFilter as string | undefined
+): InteractionSelection => {
+  const selectableTiles = Array.isArray(actionContext?.selectableTiles)
+    ? actionContext.selectableTiles
+        .flatMap((tile) => {
+          const row = Number((tile as { row?: unknown }).row)
+          const col = Number((tile as { col?: unknown }).col)
+          if (!Number.isFinite(row) || !Number.isFinite(col)) return []
+          return [{ row, col }]
+        })
+    : null
+  const filter = actionContext?.positionFilter as string | undefined
   const maxSelections = (actionContext?.maxSelections as number) ?? 1
   const minSelections = (actionContext?.minSelections as number) ?? 0
-  const selectableFields: FarmTilePosition[] = player.fields
+  const selectablePositions: FarmTilePosition[] = selectableTiles ?? player.fields
     .filter((f) => {
       const top = f.stacks[f.stacks.length - 1]
+      if (!filter) return true
       if (filter === 'has-vegetable') return top?.kind === 'vegetable' && top.remaining > 0
       if (filter === 'has-grain') return top?.kind === 'grain' && top.remaining > 0
       if (filter === 'has-crop') return !!top && top.remaining > 0
@@ -209,7 +229,13 @@ export const buildFieldSelectFarmInteraction = (
       return !!top && top.remaining > 0
     })
     .map((f) => ({ row: f.row, col: f.col }))
-  return { farmType: 'field-select', selectableFields, maxSelections, minSelections }
+
+  return {
+    kind: 'farm-position',
+    selectablePositions,
+    maxSelections,
+    minSelections,
+  }
 }
 
 export const buildFenceFarmInteraction = (

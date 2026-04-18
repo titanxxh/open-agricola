@@ -160,14 +160,14 @@ describe('A113 Heresy Teacher session', () => {
     p1.resources.vegetable = 0
 
     // Three reaps drain the grain stack.
-    reap(p1)
-    reap(p1)
-    reap(p1)
+    reap(state, p1)
+    reap(state, p1)
+    reap(state, p1)
     expect(p1.resources.grain).toBe(3)
     expect(p1.fields[0]!.stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
 
     // Fourth reap harvests the exposed vegetable.
-    reap(p1)
+    reap(state, p1)
     expect(p1.resources.vegetable).toBe(1)
     expect(p1.fields[0]!.stacks).toEqual([])
   })

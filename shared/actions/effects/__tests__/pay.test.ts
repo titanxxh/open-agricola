@@ -17,6 +17,7 @@ beforeEach(() => {
   clearPaymentCache()
 })
 import type {
+  GameState,
   PlayerState,
   Resource,
   ComplexCost,
@@ -43,9 +44,7 @@ const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],
-  playedCards: [],
-  houseAnimalType: null,
+  occupationPlayed: [],houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
   pastures: [],
@@ -608,6 +607,35 @@ describe('returnCardToBoard', () => {
     player.improvements = ['Major_Fireplace1']
     returnCardToBoard(player, 'Major_NonExistent')
     expect(player.improvements).toEqual(['Major_Fireplace1'])
+  })
+
+  it('returns removed major improvement to the board when state is provided', () => {
+    const player = createMockPlayer({})
+    player.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    const state = {
+      availableMajorImprovements: ['Major_Pottery'],
+    } as unknown as GameState
+
+    returnCardToBoard(player, 'Major_Fireplace1', state)
+
+    expect(player.improvements).toEqual(['Major_Joinery'])
+    expect(state.availableMajorImprovements).toEqual([
+      'Major_Pottery',
+      'Major_Fireplace1',
+    ])
+  })
+
+  it('does not duplicate returned majors already on the board', () => {
+    const player = createMockPlayer({})
+    player.improvements = ['Major_Fireplace1']
+    const state = {
+      availableMajorImprovements: ['Major_Fireplace1'],
+    } as unknown as GameState
+
+    returnCardToBoard(player, 'Major_Fireplace1', state)
+
+    expect(player.improvements).toEqual([])
+    expect(state.availableMajorImprovements).toEqual(['Major_Fireplace1'])
   })
 })
 

@@ -7,6 +7,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
+import { dispatchReapListener } from '../../actions/effects/reap'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'C70_LettucePatch'
@@ -61,13 +62,14 @@ registerCardEffect({
   },
 
   // Harvest from card field during field phase
-  onHarvestFieldPhase: (_state, player) => {
+  onHarvestFieldPhase: (state, player) => {
     if (!player.minorPlayed.includes(CARD_ID)) return
     const cardCrop = getCardCrop(player)
     if (!cardCrop || cardCrop.remaining <= 0) return
 
     // Harvest 1 vegetable
     player.resources.vegetable += 1
+    dispatchReapListener(state, player, 'vegetable', 1)
     cardCrop.remaining -= 1
     if (cardCrop.remaining <= 0) {
       setCardCrop(player, null)

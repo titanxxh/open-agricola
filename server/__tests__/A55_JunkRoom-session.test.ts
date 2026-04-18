@@ -18,7 +18,7 @@ describe('A55_JunkRoom session log dedupe', () => {
 
     const player = state.players[0]!
     player.minorPlayed = ['A55_JunkRoom']
-    player.playedCards.push('minor:A55_JunkRoom')
+    player.minorPlayed.push('A55_JunkRoom')
     player.minorHand = ['A37_Bucksaw']
     player.resources.wood = 1
     player.resources.food = 0

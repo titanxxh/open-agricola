@@ -49,7 +49,7 @@ export const performHarvest = (state: GameState): HarvestSummary => {
 
   state.players.forEach((player) => {
     const beforeReap = snapshotResources(player.resources)
-    reap(player)
+    reap(state, player)
     const reapGrain = player.resources.grain - beforeReap.grain
     const reapVegetable = player.resources.vegetable - beforeReap.vegetable
     if (reapGrain > 0 || reapVegetable > 0) {

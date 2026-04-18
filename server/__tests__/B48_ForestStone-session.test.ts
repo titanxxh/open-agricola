@@ -22,8 +22,6 @@ const setup = () => {
 
   // Manually add card to played list and trigger onBuy
   player.minorPlayed.push(CARD_ID)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`minor:${CARD_ID}`)
 
   // Set up initial foodCount (simulating onBuy)
   if (!player.cardStates) player.cardStates = {}

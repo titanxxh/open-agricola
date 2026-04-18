@@ -14,7 +14,6 @@ describe('C164_GermanHeathKeeper session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push(CARD_ID)
-    owner.playedCards.push(`occupation:${CARD_ID}`)
 
     // Ensure pig-market is open and has resources
     const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')

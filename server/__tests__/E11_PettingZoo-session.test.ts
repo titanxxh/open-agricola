@@ -25,7 +25,6 @@ describe('E11_PettingZoo session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('E11_PettingZoo')
-    player.playedCards.push('minor:E11_PettingZoo')
     if (options?.pastures) {
       player.pastures = options.pastures
     }

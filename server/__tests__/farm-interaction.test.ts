@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../shared/game/types.ts'
 import {
+  buildFarmPositionSelectionInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
@@ -58,9 +59,7 @@ const createPlayer = (): PlayerState => ({
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],
-  playedCards: [],
-  houseAnimalType: null,
+  occupationPlayed: [],houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
   pastures: [],
@@ -186,5 +185,25 @@ describe('farm interaction builders', () => {
       tile: { row: 0, col: 1 },
       allowedCrops: ['grain'],
     })
+  })
+
+  it('builds farm-position selection interaction with positionFilter', () => {
+    const player = createPlayer()
+    player.fields = [
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+    ] as typeof player.fields
+
+    const interaction = buildFarmPositionSelectionInteraction(player, {
+      selectionKind: 'farm-position',
+      positionFilter: 'has-grain',
+      maxSelections: 1,
+      minSelections: 0,
+    })
+
+    expect(interaction.kind).toBe('farm-position')
+    expect(interaction.selectablePositions).toEqual([{ row: 0, col: 0 }])
+    expect(interaction.maxSelections).toBe(1)
+    expect(interaction.minSelections).toBe(0)
   })
 })

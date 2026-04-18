@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../game/farm'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import type { ActionFlow } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
 
@@ -25,8 +25,8 @@ const CARD_ID = 'E71_CowPatty'
 const INITIAL_REMAINING: Record<string, number> = { grain: 3, vegetable: 2 }
 
 // Field effect: add 1 crop to the selected field (matching its crop type)
-registerFieldEffect('cow-patty-bonus-crop', ({ player, fields }) => {
-  for (const key of fields) {
+registerSelectionEffect('cow-patty-bonus-crop', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
     if (!field) continue
@@ -91,12 +91,13 @@ const afterSowListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'field-select',
+        actionId: 'selection',
         sourceCard: CARD_ID,
         actionContext: {
-          fieldFilter: 'has-crop',
+          selectionKind: 'farm-position',
+          positionFilter: 'has-crop',
           maxSelections: 1,
-          fieldEffect: 'cow-patty-bonus-crop',
+          selectionEffect: 'cow-patty-bonus-crop',
         },
       } as ActionFlow,
       sourceCard: CARD_ID,
@@ -113,6 +114,7 @@ export const E71_CowPatty = new MinorImprovement({
   number: 71,
   desc: ['Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it.'],
   cost: {},
+  vp: 1,
   prerequisite: '1 Cattle',
   implemented: true,
 })

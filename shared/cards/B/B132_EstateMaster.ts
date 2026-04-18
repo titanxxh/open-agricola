@@ -1,29 +1,43 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
+import { registerCardListener } from '../card-listeners'
+import { incCounter } from '../__stubs__/helpers'
+import type { PlayerState } from '../../game/types'
 
 const CARD_ID = 'B132_EstateMaster'
 
-/**
- * B132 Estate Master (Occupation, B, 132)
- * Bonus scoring: 1 VP per farmyard tile that is used (rooms, fields, pastures, stables).
- * In BGA, this scores based on the number of used farmyard tiles.
- * Also, each time you harvest vegetables, you get 1 bonus VP per vegetable field harvested.
- *
- * Simplified: Score 1 bonus VP for every 2 used farmyard spaces (excluding rooms,
- * which already score). Based on typical BGA behavior for EstateMaster.
- */
+const FARM_TOTAL = 15
+
+const isFarmSaturated = (player: PlayerState): boolean => {
+  const used = new Set<string>()
+  player.roomTiles.forEach((t) => used.add(`${t.row},${t.col}`))
+  player.fields.forEach((f) => used.add(`${f.row},${f.col}`))
+  player.stableTiles.forEach((t) => used.add(`${t.row},${t.col}`))
+  player.pastures.flatMap((p) => p.tiles).forEach((t) => used.add(`${t.row},${t.col}`))
+  return used.size >= FARM_TOTAL
+}
+
+registerCardListener({
+  id: CARD_ID,
+  cardIds: [CARD_ID],
+  actions: ['reap'],
+  phases: ['immediatelyAfter'],
+  handler: (ctx) => {
+    const player = ctx.player
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    const crop = ctx.extraData?.crop
+    const amount = ctx.extraData?.amount
+    if (crop !== 'vegetable' || typeof amount !== 'number' || amount <= 0) return
+    if (!isFarmSaturated(player)) return
+    incCounter(player, CARD_ID, 'bonusVp', amount)
+  },
+})
+
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return 0
-    // Count used farmyard tiles (rooms + fields + pasture tiles + stables not in pastures)
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.fields.forEach((f) => usedTiles.add(`${f.row},${f.col}`))
-    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.pastures.flatMap((p) => p.tiles).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    // Score 1 bonus VP per 3 used farmyard spaces
-    return Math.floor(usedTiles.size / 3)
+    return player.cardStates[CARD_ID]?.counters?.bonusVp ?? 0
   },
 })
 

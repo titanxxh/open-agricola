@@ -11,10 +11,8 @@ describe('C52_HuntsmansHat server session', () => {
     const player = state.players[0]
     player.resources.food = 0
     player.resources.boar = 0
-    player.minorPlayed.push('C52_HuntsmansHat')
-    player.playedCards = player.playedCards ?? []
-    if (!player.playedCards.includes('minor:C52_HuntsmansHat')) {
-      player.playedCards.push('minor:C52_HuntsmansHat')
+    if (!player.minorPlayed.includes('C52_HuntsmansHat')) {
+      player.minorPlayed.push('C52_HuntsmansHat')
     }
 
     const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')

@@ -18,8 +18,6 @@ describe('E110_Dentist session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 5
     player.resources.food = 10
 
@@ -105,8 +103,6 @@ describe('E110_Dentist session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`occupation:${CARD_ID}`)
     player.resources.wood = 3
 
     // Pre-place some wood on card from a prior harvest

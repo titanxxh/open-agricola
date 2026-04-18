@@ -18,7 +18,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 3
 
     // Two vegetable fields with crops + one grain field
@@ -45,9 +44,9 @@ describe('D70_StrawManure session', () => {
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    // Second choice: field-select for vegetable fields
+    // Second choice: selection for vegetable fields
     expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected field-select choice')
+    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
 
     // Select both vegetable fields: 0-0 and 0-1
     resp = session.resolveChoice(0, '0-0,0-1')
@@ -117,7 +116,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 0
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
@@ -144,7 +142,6 @@ describe('D70_StrawManure session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('D70_StrawManure')
-    player.playedCards.push('minor:D70_StrawManure')
     player.resources.grain = 3
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },

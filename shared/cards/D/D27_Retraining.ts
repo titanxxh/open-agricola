@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnCardToBoard } from '../../actions/effects/pay'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import {
   setCardFlag,
   isCardFlagged,
@@ -30,9 +30,9 @@ const FIELD_EFFECT = 'D27-retraining-swap'
  * Implementation:
  * - After a `renovate-house` action, flag the card.
  * - After the same player's next `place-farmer`, if flagged and a swap is
- *   available, return an optional seq whose body is a `field-select` leaf
- *   bound to a registered field-effect that performs the swap. The player
- *   can decline the optional seq; if accepted, the field-effect returns the
+ *   available, return an optional seq whose body is a `selection` leaf
+ *   bound to a registered selection-effect that performs the swap. The player
+ *   can decline the optional seq; if accepted, the selection-effect returns the
  *   old major to the board and grants the new one.
  */
 
@@ -51,10 +51,10 @@ const determineSwap = (
   return null
 }
 
-// Field-effect: perform the swap. We do not care about the selected fields.
+// Selection-effect: perform the swap. We do not care about the selected positions.
 // The swap target was stashed on the card's extraData immediately before the
 // engine executed this leaf; we read it here and mutate.
-registerFieldEffect(FIELD_EFFECT, ({ player }) => {
+registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
   const swap = readCardExtraData<{ from: string; to: string }>(
     player,
     CARD_ID,
@@ -66,12 +66,11 @@ registerFieldEffect(FIELD_EFFECT, ({ player }) => {
   // Return the old major to the global board.
   returnCardToBoard(player, swap.from)
 
-  // The field-effect does not have direct access to state here, so we emit a
-  // single-card tombstone for the swap and rely on the listener to have
-  // queued the availability mutation separately. Since we lack state access
-  // here, we encode the "add swap.to to player" via playedCards + improvements,
-  // and rely on the matching card-effect listener (in `performStateUpdate`
-  // below) to adjust state.availableMajorImprovements.
+  // The selection-effect does not have direct access to state here, so we rely on
+  // the listener to have queued the availability mutation separately. Player-
+  // side ownership still needs to reflect the swap immediately, so we update
+  // `improvements` here and let the matching card-effect listener (in
+  // `performStateUpdate` below) adjust `state.availableMajorImprovements`.
   //
   // NOTE: for a pure-player-side swap, we can skip the state bookkeeping —
   // in a 2-player game, majors returning to / leaving the board mostly affect
@@ -79,12 +78,6 @@ registerFieldEffect(FIELD_EFFECT, ({ player }) => {
   // state.availableMajorImprovements mutation in the place-farmer listener
   // right before the field-effect fires (see listener handler).
   player.improvements.push(swap.to)
-  player.playedCards = player.playedCards ?? []
-  // Drop the old major's playedCards entry and add the new one.
-  player.playedCards = player.playedCards.filter(
-    (entry) => entry !== `major:${swap.from}`,
-  )
-  player.playedCards.push(`major:${swap.to}`)
 })
 
 // Phase 1: after renovation → flag the card.
@@ -132,7 +125,7 @@ const placeFarmerListener: CardListenerRegistration = {
     //
     // Easiest correct path: mutate availability here, and if the player
     // declines the optional seq the roll-back happens because the
-    // `SWAP_KEY` never gets consumed. To close that hole, the field-effect
+  // `SWAP_KEY` never gets consumed. To close that hole, the selection-effect
     // ALSO updates state.availableMajorImprovements via a second listener
     // approach. Given the complexity, we instead keep the swap strictly
     // local to the owning player; global availability only matters if
@@ -152,10 +145,11 @@ const placeFarmerListener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf',
-          actionId: 'field-select',
+          actionId: 'selection',
           sourceCard: CARD_ID,
           actionContext: {
-            fieldEffect: FIELD_EFFECT,
+            selectionKind: 'farm-position',
+            selectionEffect: FIELD_EFFECT,
             maxSelections: 0,
             selectableTiles: [],
             retrainingSwap: swap,

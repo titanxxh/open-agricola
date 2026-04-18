@@ -43,6 +43,6 @@ export const D33_SummerHouse = new MinorImprovement({
   desc: [
     'During scoring, if you live in a stone house, you get 2 bonus <SCORE> for each unused farmyard space orthogonally adjacent to your house. (You still lose the points for these unused spaces.)',
   ],
-  cost: { wood: 1, stone: 1 },
+  cost: { wood: 3, stone: 1 },
   prerequisite: "Still in Wooden House",
 })

@@ -20,7 +20,6 @@ describe('A54_Credit session', () => {
     const player = state.players[0]!
     // Manually add card (devPlayCard fails for non-catalog cards)
     player.minorPlayed.push('A54_Credit')
-    player.playedCards.push('minor:A54_Credit')
     player.resources.food = 10
     session.loadState(state)
     return session
@@ -46,7 +45,6 @@ describe('A96_TaskArtisan session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('A96_TaskArtisan')
-    player.playedCards.push('occupation:A96_TaskArtisan')
     player.resources.food = 10
     player.resources.wood = 0
     session.loadState(state)
@@ -71,7 +69,6 @@ describe('B16_MiningHammer session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('B16_MiningHammer')
-    player.playedCards.push('minor:B16_MiningHammer')
     player.houseType = 'clay'
     player.resources.food = 10
     player.resources.wood = 5
@@ -99,7 +96,6 @@ describe('A129_Swagman session', () => {
 
     const player = state.players[0]!
     player.occupationPlayed.push('A129_Swagman')
-    player.playedCards.push('occupation:A129_Swagman')
     player.resources.food = 10
     player.resources.wood = 10
     session.loadState(state)
@@ -168,7 +164,6 @@ describe('A82_WorkCertificate session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('A82_WorkCertificate')
-    player.playedCards.push('minor:A82_WorkCertificate')
     player.occupationPlayed = ['occ1', 'occ2', 'occ3']
     player.resources.food = 10
 

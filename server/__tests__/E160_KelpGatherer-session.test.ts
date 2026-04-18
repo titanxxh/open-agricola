@@ -14,7 +14,6 @@ describe('E160_KelpGatherer session', () => {
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('E160_KelpGatherer')
-    owner.playedCards.push('occupation:E160_KelpGatherer')
     setWorkersAtHome(state, owner, 2)
     owner.resources.vegetable = 0
 

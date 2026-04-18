@@ -1,13 +1,13 @@
 import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'B165_GameProvider'
 
-registerFieldEffect('discard-grain-for-pigs', ({ player, fields }) => {
+registerSelectionEffect('discard-grain-for-pigs', ({ player, positions }) => {
   let grainsRemoved = 0
-  for (const key of fields) {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
     if (!field) continue
@@ -30,13 +30,14 @@ registerCardEffect({
 
     return {
       type: 'leaf',
-      actionId: 'field-select',
+      actionId: 'selection',
       sourceCard: CARD_ID,
       optional: true,
       actionContext: {
-        fieldFilter: 'has-grain',
+        selectionKind: 'farm-position',
+        positionFilter: 'has-grain',
         maxSelections: 4,
-        fieldEffect: 'discard-grain-for-pigs',
+        selectionEffect: 'discard-grain-for-pigs',
       },
     }
   },

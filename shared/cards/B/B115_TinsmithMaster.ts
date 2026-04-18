@@ -4,7 +4,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../actions/effects/animals'
-import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import type { ActionFlow, PlayerState } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
 
@@ -33,9 +33,9 @@ const getFreshlySownFields = (context: CardListenerContext) =>
     return !!top && top.remaining === INITIAL_REMAINING[top.kind]
   })
 
-// Field effect: add 1 crop to the top stack of the selected field
-registerFieldEffect('tinsmith-master-bonus-crop', ({ player, fields }) => {
-  for (const key of fields) {
+// Field effect: add 1 crop to the selected field (matching its crop type)
+registerSelectionEffect('tinsmith-master-bonus-crop', ({ player, positions }) => {
+  for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find((f) => f.row === r && f.col === c)
     if (!field) continue
@@ -88,12 +88,13 @@ const afterSowListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'field-select',
+        actionId: 'selection',
         sourceCard: CARD_ID,
         actionContext: {
-          fieldFilter: 'has-crop',
+          selectionKind: 'farm-position',
+          positionFilter: 'has-crop',
           maxSelections: 1,
-          fieldEffect: 'tinsmith-master-bonus-crop',
+          selectionEffect: 'tinsmith-master-bonus-crop',
         },
       } as ActionFlow,
       sourceCard: CARD_ID,

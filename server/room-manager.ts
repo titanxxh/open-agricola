@@ -783,6 +783,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
+      if (msg.type === 'commitSelection') {
+        const resp = callRoom(s => s.commitSelectionChoice(currentPlayerIndex, msg.payload))
+        broadcastState(room, resp, 'choice', msg.requestId)
+        return
+      }
+
       if (msg.type === 'undoStep') {
         const resp = callRoom(s => s.undoStep())
         broadcastState(room, resp, 'undo', msg.requestId)

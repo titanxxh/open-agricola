@@ -16,9 +16,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
     // 2 fences × 1 wood + 2 palisades × 2 wood = 6
     player.resources.wood = 6
     player.occupationPlayed.push('E108_BlackberryFarmer')
-    player.playedCards.push('occupation:E108_BlackberryFarmer')
     player.minorPlayed.push('B30_WoodPalisades')
-    player.playedCards.push('minor:B30_WoodPalisades')
 
     session.loadState(state)
 

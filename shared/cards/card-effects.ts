@@ -3,6 +3,7 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
+import { positionKey } from '../game/farm'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
@@ -32,6 +33,7 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onBeforeFeed' | 'onAfterFeed'
   | 'onEndHarvest' | 'onAfterHarvest'
   | 'onBeforeStartOfTurn'
+  | 'onAllWorkersPlaced'
 
 export const cardEffectHooks: CardEffectHook[] = [
   'onBuy',
@@ -57,6 +59,7 @@ export const cardEffectHooks: CardEffectHook[] = [
   'onEndHarvest',
   'onAfterHarvest',
   'onBeforeStartOfTurn',
+  'onAllWorkersPlaced',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -111,6 +114,7 @@ export type CardEffect = {
   onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
+  onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
   computeSharedPostScore?: SharedPostScoreHandler
@@ -120,6 +124,8 @@ export type CardEffect = {
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
   /** Handle sowing into an extra field returned by onComputeSowableFields. */
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
+  /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
+  computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -421,4 +427,32 @@ export const handleSowExtraField = (
     }
   }
   return false
+}
+
+/**
+ * Collect all locked farmyard tile keys from cards that implement computeLockedFarmTiles.
+ * Returns a Set of position keys ("row-col") that are currently locked.
+ */
+export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const lockedKeys = new Set<string>()
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.computeLockedFarmTiles) continue
+    try {
+      const tiles = effect.computeLockedFarmTiles(player)
+      tiles.forEach(tile => lockedKeys.add(positionKey(tile)))
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[card-effects] custom card ${cardId} computeLockedFarmTiles threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return lockedKeys
 }

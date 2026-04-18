@@ -25,6 +25,7 @@ import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
 } from '../shared/cards/helpers/pending-fence-bonus.ts'
+import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
@@ -110,6 +111,7 @@ export const applyFarmChoice = <T extends PlayerState>(
   options: FarmChoiceOptions = {},
 ): FarmChoiceApplyResult<T> => {
   const normalized = normalizePlayerFarm(player)
+  const lockedKeys = collectLockedFarmTileKeys(player)
 
   switch (farmType) {
     case 'fence': {
@@ -127,6 +129,7 @@ export const applyFarmChoice = <T extends PlayerState>(
           skipPayment: true,
           allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
         },
+        lockedKeys,
       )
       if (!validated.ok) {
         return { ok: false, error: validated.error?.code ?? 'validation failed' }
@@ -169,7 +172,7 @@ export const applyFarmChoice = <T extends PlayerState>(
     }
     case 'room': {
       const { rooms } = payload as FarmChoicePayloadMap['room']
-      const selection = validateRoomSelection(normalized, rooms)
+      const selection = validateRoomSelection(normalized, rooms, lockedKeys)
       if (!selection.ok) return { ok: false, error: selection.code }
       const maxBuildableRooms = getMaxBuildableRooms(
         normalized,
@@ -219,7 +222,7 @@ export const applyFarmChoice = <T extends PlayerState>(
     }
     case 'stable': {
       const { stables } = payload as FarmChoicePayloadMap['stable']
-      const selection = validateStableSelection(normalized, stables)
+      const selection = validateStableSelection(normalized, stables, lockedKeys)
       if (!selection.ok) return { ok: false, error: selection.code }
       const costPerStable = applyCostOverride(
         { wood: stableWoodCost },
@@ -255,7 +258,7 @@ export const applyFarmChoice = <T extends PlayerState>(
     }
     case 'plow': {
       const { tile } = payload as FarmChoicePayloadMap['plow']
-      const result = validatePlowSelection(normalized, tile)
+      const result = validatePlowSelection(normalized, tile, lockedKeys)
       if (!result.ok) return { ok: false, error: result.error?.code ?? 'validation failed' }
       const plowCost = sanitizePayableCost(options.costOverride)
       const resolvedPayment = resolveTypedFlatPaymentSelection(

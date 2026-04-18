@@ -54,6 +54,7 @@ export type FenceValidationError = {
     | 'FENCE_NOT_CONNECTED'
     | 'NO_ENCLOSED_AREA'
     | 'ENCLOSED_TILE_OCCUPIED'
+    | 'LOCKED'
     | 'EDGE_TYPE_CONFLICT'
     | 'PALISADES_NOT_UNLOCKED'
   edges: string[]
@@ -350,6 +351,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   extraWood = 0,
   freeFences = 0,
   options: FenceValidationOptions = {},
+  lockedKeys?: Set<string>,
 ): FenceValidationResult<T> => {
   const extraCost = Number.isFinite(extraWood) ? Math.max(0, extraWood) : 0
   const freeFenceCount = Number.isFinite(freeFences) ? Math.max(0, freeFences) : 0
@@ -453,6 +455,18 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     return {
       ok: false,
       error: { code: 'ENCLOSED_TILE_OCCUPIED', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
+    }
+  }
+
+  if (lockedKeys && lockedKeys.size > 0) {
+    const lockedRegion = fencedRegions.find((region) =>
+      region.tiles.some((tile) => lockedKeys.has(positionKey(tile))),
+    )
+    if (lockedRegion) {
+      return {
+        ok: false,
+        error: { code: 'LOCKED', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
+      }
     }
   }
 
