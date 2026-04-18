@@ -7,7 +7,7 @@ import {
 } from './fence-validation.ts'
 
 export type PlowValidationError = {
-  code: 'NO_SELECTION' | 'INVALID_POSITION' | 'OCCUPIED' | 'NOT_ADJACENT' | 'FENCED'
+  code: 'NO_SELECTION' | 'INVALID_POSITION' | 'OCCUPIED' | 'NOT_ADJACENT' | 'FENCED' | 'LOCKED'
 }
 
 export type PlowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
@@ -33,6 +33,7 @@ const getFencedTileKeys = (player: PlayerFarmState) => {
 export const validatePlowSelection = <T extends PlayerFarmState>(
   player: T,
   tile?: FarmTilePosition,
+  lockedKeys?: Set<string>,
 ): PlowValidationResult<T> => {
   if (!tile) {
     return { ok: false, error: { code: 'NO_SELECTION' } }
@@ -53,6 +54,9 @@ export const validatePlowSelection = <T extends PlayerFarmState>(
   const fencedKeys = getFencedTileKeys(normalized)
   if (fencedKeys.has(targetKey)) {
     return { ok: false, error: { code: 'FENCED' } }
+  }
+  if (lockedKeys?.has(targetKey)) {
+    return { ok: false, error: { code: 'LOCKED' } }
   }
   if (normalized.fields.length > 0) {
     const fieldKeys = new Set(
