@@ -373,6 +373,27 @@ describe('D25_WitchesDanceFloor session', () => {
     })
   })
 
+  // ─── Test 10b: isMajorImprovementPlayable with D25 but zero clay ───────────
+  describe('CookingHearth affordance — D25 counts as Fireplace even with 0 clay', () => {
+    it('isMajorImprovementPlayable(Major_CookingHearth1) is true when D25 is in play and fee resources are absent', async () => {
+      const { isMajorImprovementPlayable } = await import(
+        '../../shared/actions/effects/improvement'
+      )
+      const session = setup()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.resources.clay = 0
+      player.minorPlayed.push(CARD_ID)
+      player.playedCards.push(`minor:${CARD_ID}`)
+      player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
+      player.extraOccupationsFromCards.push(CARD_ID)
+      if (!state.availableMajorImprovements.includes('Major_CookingHearth1')) {
+        state.availableMajorImprovements.push('Major_CookingHearth1')
+      }
+      expect(isMajorImprovementPlayable(state, player, 'Major_CookingHearth1')).toBe(true)
+    })
+  })
+
   // ─── Test 11: mustBePlayedViaMinorAction guard (smoke) ─────────────────────
   describe('mustBePlayedViaMinorAction guard (smoke)', () => {
     it('D25 has mustBePlayedViaMinorAction=true', () => {
