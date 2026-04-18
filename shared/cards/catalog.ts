@@ -9,6 +9,7 @@ import { A108_MushroomCollector } from './A/A108_MushroomCollector'
 import { A109_SmallTrader } from './A/A109_SmallTrader'
 import { A110_Roughcaster } from './A/A110_Roughcaster'
 import { A112_ScytheWorker } from './A/A112_ScytheWorker'
+import { A113_HeresyTeacher } from './A/A113_HeresyTeacher'
 import { A119_FirewoodCollector } from './A/A119_FirewoodCollector'
 import { A123_FrameBuilder } from './A/A123_FrameBuilder'
 import { A126_MasterWorkman } from './A/A126_MasterWorkman'
@@ -1314,6 +1315,7 @@ export const occupationCards = [
   A109_SmallTrader,
   A110_Roughcaster,
   A112_ScytheWorker,
+  A113_HeresyTeacher,
   A119_FirewoodCollector,
   A123_FrameBuilder,
   A126_MasterWorkman,
