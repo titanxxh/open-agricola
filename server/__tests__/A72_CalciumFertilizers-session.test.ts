@@ -48,8 +48,8 @@ describe('A72_CalciumFertilizers session', () => {
 
     const p = resp.state.players[0]!
     // Each grain field should have +1 remaining
-    expect(p.fields[0]!.remaining).toBe(3)
-    expect(p.fields[1]!.remaining).toBe(2)
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(3)
+    expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('adds 1 crop to each planted vegetable field when using western quarry', () => {
@@ -66,8 +66,8 @@ describe('A72_CalciumFertilizers session', () => {
     expect(resp.ok).toBe(true)
 
     const p = resp.state.players[0]!
-    expect(p.fields[0]!.remaining).toBe(2)
-    expect(p.fields[1]!.remaining).toBe(3)
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
+    expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
   it('adds 1 crop to mixed fields (some grain, some vegetable)', () => {
@@ -85,10 +85,10 @@ describe('A72_CalciumFertilizers session', () => {
     expect(resp.ok).toBe(true)
 
     const p = resp.state.players[0]!
-    expect(p.fields[0]!.remaining).toBe(4) // grain +1
-    expect(p.fields[1]!.remaining).toBe(2) // vegetable +1
-    expect(p.fields[2]!.remaining).toBe(0) // empty stays 0
-    expect(p.fields[2]!.crop).toBeNull()
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(4) // grain +1
+    expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(2) // vegetable +1
+    expect(p.fields[2]!.stacks[0]?.remaining ?? 0).toBe(0) // empty stays 0
+    expect(p.fields[2]!.stacks[0]?.kind ?? null).toBeNull()
   })
 
   it('does NOT add crops when there are no planted fields', () => {
@@ -109,8 +109,8 @@ describe('A72_CalciumFertilizers session', () => {
     // Still gets stone from the quarry
     expect(p.resources.stone).toBeGreaterThan(initialStone)
     // Empty field unchanged
-    expect(p.fields[0]!.remaining).toBe(0)
-    expect(p.fields[0]!.crop).toBeNull()
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(0)
+    expect(p.fields[0]!.stacks[0]?.kind ?? null).toBeNull()
   })
 
   it('does NOT trigger on non-quarry spaces', () => {
@@ -128,7 +128,7 @@ describe('A72_CalciumFertilizers session', () => {
 
     const p = resp.state.players[0]!
     // Field should not have changed from the card effect
-    expect(p.fields[0]!.remaining).toBe(2)
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('does NOT trigger if player does not have the card', () => {
@@ -147,7 +147,7 @@ describe('A72_CalciumFertilizers session', () => {
 
     const p = resp.state.players[0]!
     // Field should not have changed
-    expect(p.fields[0]!.remaining).toBe(2)
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('prerequisite: cannot buy if player has fields', () => {
@@ -213,6 +213,6 @@ describe('A72_CalciumFertilizers session', () => {
     const resp = session.takeAction(0, 'eastern-quarry')
     expect(resp.ok).toBe(true)
     // Card should work — field gets +1
-    expect(resp.state.players[0]!.fields[0]!.remaining).toBe(3)
+    expect(resp.state.players[0]!.fields[0]!.stacks[0]?.remaining ?? 0).toBe(3)
   })
 })

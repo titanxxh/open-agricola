@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
 
 const CARD_ID = 'D70_StrawManure'
 
@@ -9,8 +10,9 @@ registerFieldEffect('add-vegetable', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
-    if (field && field.crop === 'vegetable') {
-      field.remaining += 1
+    if (field) {
+      const vegStack = fieldFindStackOfKind(field, 'vegetable')
+      if (vegStack) vegStack.remaining += 1
     }
   }
 })
@@ -21,7 +23,7 @@ registerCardEffect({
     if (!player.minorPlayed.includes(CARD_ID)) return
     // Need grain to pay and at least one vegetable field with crops
     if ((player.resources.grain ?? 0) < 1) return
-    const vegFields = player.fields.filter(f => f.crop === 'vegetable' && f.remaining >= 1)
+    const vegFields = player.fields.filter(f => fieldHasCrop(f, 'vegetable'))
     if (vegFields.length === 0) return
 
     const children: ActionFlow[] = [

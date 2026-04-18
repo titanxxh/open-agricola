@@ -178,8 +178,8 @@ describe('B115_TinsmithMaster session', () => {
 
       // Field should have 4 grain (3 normal + 1 bonus from card)
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
-      expect(field?.crop).toBe('grain')
-      expect(field?.remaining).toBe(4)
+      expect(field?.stacks[0]?.kind).toBe('grain')
+      expect(field?.stacks[0]?.remaining ?? 0).toBe(4)
     })
 
     it('auto-adds 1 bonus vegetable when sowing vegetable in 1 field', () => {
@@ -203,8 +203,8 @@ describe('B115_TinsmithMaster session', () => {
       }
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
-      expect(field?.crop).toBe('vegetable')
-      expect(field?.remaining).toBe(3) // 2 normal + 1 bonus
+      expect(field?.stacks[0]?.kind).toBe('vegetable')
+      expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // 2 normal + 1 bonus
     })
 
     it('does NOT add bonus crop without the card', () => {
@@ -229,7 +229,7 @@ describe('B115_TinsmithMaster session', () => {
       }
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
-      expect(field?.remaining).toBe(3) // normal grain sow, no bonus
+      expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // normal grain sow, no bonus
     })
 
     it('presents field-select when sowing in 2 fields', () => {
@@ -271,7 +271,7 @@ describe('B115_TinsmithMaster session', () => {
       const f0 = player.fields.find((f) => f.row === 0 && f.col === 0)
       const f1 = player.fields.find((f) => f.row === 0 && f.col === 1)
       // One field should have 4 (3+1 bonus), the other 3
-      const totalRemaining = (f0?.remaining ?? 0) + (f1?.remaining ?? 0)
+      const totalRemaining = (f0?.stacks[0]?.remaining ?? 0 ?? 0) + (f1?.stacks[0]?.remaining ?? 0 ?? 0)
       expect(totalRemaining).toBe(7) // 3 + 3 + 1 bonus = 7
     })
   })

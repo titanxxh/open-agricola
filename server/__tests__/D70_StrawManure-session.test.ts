@@ -67,18 +67,18 @@ describe('D70_StrawManure session', () => {
 
     // After card effect: field 0-0 remaining 2→3, then normal harvest reaps 1 → 2
     const f0 = p.fields.find(f => f.row === 0 && f.col === 0)!
-    expect(f0.remaining).toBe(2)
+    expect(f0.stacks[0]?.remaining ?? 0).toBe(2)
 
     // After card effect: field 0-1 remaining 1→2, then normal harvest reaps 1 → 1
     const f1 = p.fields.find(f => f.row === 0 && f.col === 1)!
-    expect(f1.remaining).toBe(1)
+    expect(f1.stacks[0]?.remaining ?? 0).toBe(1)
 
     // Player gained vegetables from harvest: 2 (normal) from 2 veg fields
     expect(p.resources.vegetable).toBeGreaterThanOrEqual(2)
 
     // Grain field: was 3, harvested 1 → remaining 2
     const f2 = p.fields.find(f => f.row === 0 && f.col === 2)!
-    expect(f2.remaining).toBe(2)
+    expect(f2.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('player can decline the optional effect', () => {
