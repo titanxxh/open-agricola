@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../game/field'
 
 const CARD_ID = 'A71_ClearingSpade'
 
@@ -11,7 +12,8 @@ registerFieldEffect('store-source-field', ({ player, fields, sourceCard }) => {
   if (sourceCard && fields.length > 0) {
     const [r, c] = fields[0]!.split('-').map(Number)
     const field = player.fields.find(f => f.row === r && f.col === c)
-    if (field && field.crop && field.remaining >= 2) {
+    const top = field ? fieldTopStack(field) : undefined
+    if (top && top.remaining >= 2) {
       writeCardExtraData(player, sourceCard, 'moveSourceField', fields[0])
     }
   }
@@ -22,13 +24,15 @@ registerFieldEffect('move-crop-from-source', ({ player, fields, sourceCard }) =>
   if (sourceKey && fields.length > 0) {
     const [tr, tc] = fields[0]!.split('-').map(Number)
     const targetField = player.fields.find(f => f.row === tr && f.col === tc)
-    if (!targetField || targetField.crop !== null) return
+    if (!targetField || !fieldIsEmpty(targetField)) return
     const [sr, sc] = sourceKey.split('-').map(Number)
     const sourceField = player.fields.find(f => f.row === sr && f.col === sc)
-    if (sourceField && sourceField.remaining >= 2 && sourceField.crop) {
-      sourceField.remaining -= 1
-      targetField.crop = sourceField.crop
-      targetField.remaining = 1
+    if (!sourceField) return
+    const top = fieldTopStack(sourceField)
+    if (top && top.remaining >= 2) {
+      const kind = top.kind
+      fieldDecrementTop(sourceField)
+      targetField.stacks.push({ kind, remaining: 1 })
     }
   }
 })
@@ -38,8 +42,11 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const sourceFields = context.player.fields.filter(f => f.crop && f.remaining >= 2)
-    const emptyFields = context.player.fields.filter(f => f.crop === null)
+    const sourceFields = context.player.fields.filter(f => {
+      const top = fieldTopStack(f)
+      return !!top && top.remaining >= 2
+    })
+    const emptyFields = context.player.fields.filter(f => fieldIsEmpty(f))
     if (sourceFields.length === 0 || emptyFields.length === 0) return
 
     return {

@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
 
 const CARD_ID = 'E112_GrainThief'
 const PROTECTED_KEY = 'protectedFields'
@@ -14,26 +15,29 @@ registerCardEffect({
     writeCardExtraData(player, CARD_ID, PROTECTED_KEY, null)
     const grainFields = player.fields
       .map((f, i) => ({ field: f, index: i }))
-      .filter(({ field }) => field.crop === 'grain' && field.remaining > 0)
+      .filter(({ field }) => fieldHasCrop(field, 'grain'))
     if (grainFields.length === 0) return
-    const children: ActionFlow[] = grainFields.map(({ field, index }) => ({
-      type: 'xor' as const,
-      children: [
-        {
-          type: 'leaf' as const,
-          actionId: 'grain-thief-protect',
-          params: { fieldIndex: index },
-          sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.grainThiefProtect',
-          choiceLabelParams: { remaining: field.remaining },
-        },
-        {
-          type: 'leaf' as const,
-          actionId: 'noop',
-          choiceLabelKey: 'ui.grainThiefNormalHarvest',
-        },
-      ],
-    }))
+    const children: ActionFlow[] = grainFields.map(({ field, index }) => {
+      const grainStack = fieldFindStackOfKind(field, 'grain')
+      return {
+        type: 'xor' as const,
+        children: [
+          {
+            type: 'leaf' as const,
+            actionId: 'grain-thief-protect',
+            params: { fieldIndex: index },
+            sourceCard: CARD_ID,
+            choiceLabelKey: 'ui.grainThiefProtect',
+            choiceLabelParams: { remaining: grainStack?.remaining ?? 0 },
+          },
+          {
+            type: 'leaf' as const,
+            actionId: 'noop',
+            choiceLabelKey: 'ui.grainThiefNormalHarvest',
+          },
+        ],
+      }
+    })
     return { type: 'seq', children }
   },
   onEndHarvestFieldPhase: (_state, player) => {
@@ -45,8 +49,13 @@ registerCardEffect({
     for (const { index, remaining } of protectedFields) {
       const field = player.fields[index]
       if (!field) continue
-      field.crop = 'grain'
-      field.remaining = remaining
+      // Restore the grain stack (protection reverses the reap decrement)
+      const grainStack = fieldFindStackOfKind(field, 'grain')
+      if (grainStack) {
+        grainStack.remaining = remaining
+      } else {
+        field.stacks.push({ kind: 'grain', remaining })
+      }
     }
   },
 })

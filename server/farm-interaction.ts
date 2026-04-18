@@ -203,6 +203,8 @@ export const buildFieldSelectFarmInteraction = (
       if (filter === 'has-grain') return top?.kind === 'grain' && top.remaining > 0
       if (filter === 'has-crop') return !!top && top.remaining > 0
       if (filter === 'has-exactly-1-crop') return !!top && top.remaining === 1
+      if (filter === 'has-2-plus-crops') return !!top && top.remaining >= 2
+      if (filter === 'empty-plowed') return f.stacks.length === 0
       if (filter === 'empty') return f.stacks.length === 0
       return !!top && top.remaining > 0
     })
