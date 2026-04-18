@@ -86,5 +86,6 @@ export const C60_SmallPottersOven = new MinorImprovement({
   vp: 5,
   cost: { clay: 2 },
   prerequisite: "Return the Clay / Stone Oven",
+  isMajorImprovement: true,
   returnCards: ['Major_ClayOven', 'Major_StoneOven'],
 })
