@@ -36,7 +36,7 @@
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
 | ✅ 完全对齐 | ~803 + §2.1 列举 23 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
-| 🟡 简化实现（§2.2） | 10 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
+| 🟡 简化实现（§2.2） | 9 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
 | 🔀 刻意偏离 BGA（§2.5） | 4 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
@@ -65,6 +65,7 @@
 - **2026-04-17 §6 24 张卡逐项复核完成**：原 §6 的 23 张"未复核"全部核对，按 ✅/⚠/❌ 重排进 §2.1–§2.4；C129/C137 卡名从 WetNurse/Baker 修正为 SecondSpouse/CharcoalBurner；E132 VeggieLover 从原 §5 "刻意不同"移除（其实是 3+ 卡且行为已对齐）。
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
+- **2026-04-18 — E125 DelayedWayfarer BGA 对齐**：新增 `onAllWorkersPlaced` hook phase（所有工人放完后、round end 前触发）；`place-farmer` 增加 `fromSupply` 模式（激活 supply worker）；E125 从简化（下轮开始）改为精确时序（本轮所有人放完后）；修复引擎 OptionalNode 路径漏传 `actionContext`/`sourceCard` 的 bug。
 
 ### 2.1 ✅ 完全对齐（已逐项核对的 25 张）
 
@@ -98,7 +99,7 @@
 | D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 
-### 2.2 🟡 简化实现（10 张）
+### 2.2 🟡 简化实现（9 张）
 
 > 简化原因写在各卡 `.ts` 文件顶部注释中。回归 BGA 完整规则需要的基础设施列在最后一列。
 
@@ -113,7 +114,6 @@
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 | E16 BriarHedge | 围栏前提已加，但"每边免木"未实现 | 重写 `fencing.ts` 支持按边计费 |
 | E96 Elder | 回合 1 StartOfWork 额外打出职业未实现 | 新 `stStartOfTurn allowedCards` hook |
-| E125 DelayedWayfarer | 额外放置延后到下轮开始（非本轮末） | end-of-placements 信号 hook |
 
 ### 2.3 ⚠ 行为偏差待修（3 张）
 
