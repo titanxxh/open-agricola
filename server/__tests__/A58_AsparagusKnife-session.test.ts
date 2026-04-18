@@ -50,14 +50,14 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     // Field should NOT be decremented yet (waiting for player interaction)
-    expect(player.fields[0]!.remaining).toBe(2)
+    expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
   it('triggers in round 10', () => {
@@ -68,13 +68,13 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).toBeDefined()
     // Field should NOT be modified yet
-    expect(player.fields[0]!.remaining).toBe(1)
+    expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(1)
   })
 
   it('triggers in round 12', () => {
@@ -85,7 +85,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -100,7 +100,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -115,7 +115,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -130,7 +130,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 3 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -145,7 +145,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     // Card NOT in minorPlayed
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -160,16 +160,16 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
-      { row: 0, col: 1, crop: 'vegetable', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     // Neither field should be decremented yet (waiting for player choice)
-    expect(player.fields[0]!.remaining).toBe(2)
-    expect(player.fields[1]!.remaining).toBe(1)
+    expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
+    expect(player.fields[1]!.stacks[0]?.remaining ?? 0).toBe(1)
   })
 
   it('does NOT trigger when vegetable field has remaining=0', () => {
@@ -180,7 +180,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      { row: 0, col: 0, crop: 'vegetable', remaining: 0 },
+      { row: 0, col: 0, stacks: [] },
     ]
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -193,7 +193,7 @@ describe('A58_AsparagusKnife session', () => {
     const session = setupForReturnHome({
       round: 8, // round 8 is NOT a harvest round, just return home
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ],
     })
 
@@ -225,7 +225,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = resp.state.players[0]!
     // Vegetable field: had remaining=2, 1 taken by card → remaining=1
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
-    expect(vegField?.remaining).toBe(1)
+    expect(vegField?.stacks[0]?.remaining ?? 0).toBe(1)
     // Food: +3 from card effect
     // Round 8 is NOT a harvest round, so no feeding
     expect(player.resources.food).toBeGreaterThanOrEqual(13) // 10 + 3
@@ -237,7 +237,7 @@ describe('A58_AsparagusKnife session', () => {
     const session = setupForReturnHome({
       round: 8,
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ],
     })
 
@@ -262,7 +262,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = resp.state.players[0]!
     // Vegetable field should be untouched (no card effect)
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
-    expect(vegField?.remaining).toBe(2)
+    expect(vegField?.stacks[0]?.remaining ?? 0).toBe(2)
     // No food bonus
     expect(player.resources.food).toBe(10)
   })
@@ -271,7 +271,7 @@ describe('A58_AsparagusKnife session', () => {
     const session = setupForReturnHome({
       round: 7, // harvest round but not a trigger round for this card
       vegetableFields: [
-        { row: 0, col: 0, crop: 'vegetable', remaining: 2 },
+        { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ],
     })
 
@@ -293,7 +293,7 @@ describe('A58_AsparagusKnife session', () => {
     const player = resp.state.players[0]!
     // Vegetable field should have been harvested normally (remaining 2→1)
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
-    expect(vegField?.remaining).toBe(1)
+    expect(vegField?.stacks[0]?.remaining ?? 0).toBe(1)
     // Food: -2 from feeding (1 family member)
     expect(player.resources.food).toBe(foodBefore - 2)
   })

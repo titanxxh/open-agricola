@@ -59,7 +59,7 @@ describe('harvest session flow', () => {
       throw new Error('expected harvestFeed pending')
     }
     expect(resp.pending.playerIndex).toBe(1)
-    expect(resp.pending.remaining).toBe(2)
+    expect(resp.pending.stacks[0]?.remaining ?? 0).toBe(2)
 
     resp = session.confirmHarvestFeed(1, [
       { resourceKey: 'grain', count: 1, food: 1, sourceName: '基础转化' },

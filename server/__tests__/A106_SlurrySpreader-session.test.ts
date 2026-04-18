@@ -34,7 +34,7 @@ describe('A106_SlurrySpreader session', () => {
   it('grain field depleted after reap gives 2 food', () => {
     const { state, player } = setup()
 
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
     }
@@ -47,7 +47,7 @@ describe('A106_SlurrySpreader session', () => {
   it('vegetable field depleted after reap gives 1 food', () => {
     const { state, player } = setup()
 
-    player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
@@ -60,7 +60,7 @@ describe('A106_SlurrySpreader session', () => {
   it('grain field with remaining crop after reap does not trigger', () => {
     const { state, player } = setup()
 
-    player.fields = [{ row: 0, col: 0, crop: 'grain', remaining: 2 }]
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
     }
@@ -73,7 +73,7 @@ describe('A106_SlurrySpreader session', () => {
   it('vegetable field with remaining crop after reap does not trigger', () => {
     const { state, player } = setup()
 
-    player.fields = [{ row: 0, col: 0, crop: 'vegetable', remaining: 1 }]
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
@@ -100,7 +100,7 @@ describe('A106_SlurrySpreader session', () => {
     player.minorPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`minor:${CARD_ID}`)
-    player.fields = [{ row: 0, col: 0, crop: 'grain', remaining: 1 }]
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
 
     session.loadState(state)
 

@@ -12,7 +12,7 @@ describe('E71_CowPatty session', () => {
     withCard?: boolean
     grain?: number
     vegetable?: number
-    fields?: { row: number; col: number; crop: 'grain' | 'vegetable' | null; remaining: number }[]
+    fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
     pastures?: {
       id: string
       size: number
@@ -53,7 +53,7 @@ describe('E71_CowPatty session', () => {
     // Field at (0,2), pasture at (0,3) — orthogonally adjacent
     const session = setup({
       grain: 2,
-      fields: [{ row: 0, col: 2, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 2, stacks: [] }],
       pastures: [
         {
           id: 'p1',
@@ -91,7 +91,7 @@ describe('E71_CowPatty session', () => {
     // Field at (0,2), pasture at (2,4) — not adjacent
     const session = setup({
       grain: 2,
-      fields: [{ row: 0, col: 2, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 2, stacks: [] }],
       pastures: [
         {
           id: 'p1',
@@ -127,7 +127,7 @@ describe('E71_CowPatty session', () => {
     const session = setup({
       withCard: false,
       grain: 2,
-      fields: [{ row: 0, col: 2, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 2, stacks: [] }],
       pastures: [
         {
           id: 'p1',
@@ -161,7 +161,7 @@ describe('E71_CowPatty session', () => {
   it('does NOT add bonus when player has no pastures', () => {
     const session = setup({
       grain: 2,
-      fields: [{ row: 0, col: 2, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 2, stacks: [] }],
       pastures: [], // no pastures
     })
 
@@ -187,7 +187,7 @@ describe('E71_CowPatty session', () => {
     // Field at (0,2), pasture at (0,1) — adjacent
     const session = setup({
       vegetable: 2,
-      fields: [{ row: 0, col: 2, crop: null, remaining: 0 }],
+      fields: [{ row: 0, col: 2, stacks: [] }],
       pastures: [
         {
           id: 'p1',
@@ -225,8 +225,8 @@ describe('E71_CowPatty session', () => {
     const session = setup({
       grain: 3,
       fields: [
-        { row: 0, col: 2, crop: null, remaining: 0 },
-        { row: 2, col: 4, crop: null, remaining: 0 },
+        { row: 0, col: 2, stacks: [] },
+        { row: 2, col: 4, stacks: [] },
       ],
       pastures: [
         {
@@ -275,8 +275,8 @@ describe('E71_CowPatty session', () => {
     const session = setup({
       grain: 3,
       fields: [
-        { row: 0, col: 2, crop: null, remaining: 0 },
-        { row: 0, col: 4, crop: null, remaining: 0 },
+        { row: 0, col: 2, stacks: [] },
+        { row: 0, col: 4, stacks: [] },
       ],
       pastures: [
         {

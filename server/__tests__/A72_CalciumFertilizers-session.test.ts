@@ -38,8 +38,8 @@ describe('A72_CalciumFertilizers session', () => {
     const player = state.players[0]!
     // Set up planted grain fields
     player.fields = [
-      { row: 0, col: 3, crop: 'grain', remaining: 2 },
-      { row: 0, col: 4, crop: 'grain', remaining: 1 },
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 4, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
     session.loadState(state)
 
@@ -57,8 +57,8 @@ describe('A72_CalciumFertilizers session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [
-      { row: 0, col: 3, crop: 'vegetable', remaining: 1 },
-      { row: 1, col: 3, crop: 'vegetable', remaining: 2 },
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+      { row: 1, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ]
     session.loadState(state)
 
@@ -75,9 +75,9 @@ describe('A72_CalciumFertilizers session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [
-      { row: 0, col: 3, crop: 'grain', remaining: 3 },
-      { row: 0, col: 4, crop: 'vegetable', remaining: 1 },
-      { row: 1, col: 3, crop: null, remaining: 0 }, // empty field — should not be affected
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 4, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+      { row: 1, col: 3, stacks: [] }, // empty field — should not be affected
     ]
     session.loadState(state)
 
@@ -97,7 +97,7 @@ describe('A72_CalciumFertilizers session', () => {
     const player = state.players[0]!
     // Only empty fields
     player.fields = [
-      { row: 0, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 3, stacks: [] },
     ]
     session.loadState(state)
 
@@ -118,7 +118,7 @@ describe('A72_CalciumFertilizers session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [
-      { row: 0, col: 3, crop: 'grain', remaining: 2 },
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
     session.loadState(state)
 
@@ -138,7 +138,7 @@ describe('A72_CalciumFertilizers session', () => {
     // Remove the card
     player.minorPlayed = player.minorPlayed.filter((id) => id !== CARD_ID)
     player.fields = [
-      { row: 0, col: 3, crop: 'grain', remaining: 2 },
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
     session.loadState(state)
 
@@ -160,7 +160,7 @@ describe('A72_CalciumFertilizers session', () => {
     const player = state.players[0]!
     // Player has fields — should not be able to play A72
     player.fields = [
-      { row: 0, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 3, stacks: [] },
     ]
     // Ensure ONLY A72 is in hand so the test is deterministic
     player.minorHand = [CARD_ID]
@@ -205,7 +205,7 @@ describe('A72_CalciumFertilizers session', () => {
     state.round = 4
 
     player.fields = [
-      { row: 0, col: 3, crop: 'grain', remaining: 2 },
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] },
     ]
 
     session.loadState(state)

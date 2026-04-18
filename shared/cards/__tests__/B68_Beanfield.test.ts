@@ -197,7 +197,7 @@ describe('B68_Beanfield', () => {
       const player = createPlayer()
       player.resources.vegetable = 1
       // Add a normal empty field so canSow() returns true
-      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }] as any
+      player.fields = [{ row: 0, col: 0, stacks: [] }] as any
       const result = executeCardListener(listener, {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',

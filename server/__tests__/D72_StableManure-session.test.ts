@@ -22,9 +22,9 @@ describe('D72_StableManure session', () => {
 
     // Fields with crops
     player.fields = [
-      { row: 0, col: 0, crop: 'grain', remaining: 3 },
-      { row: 0, col: 1, crop: 'vegetable', remaining: 2 },
-      { row: 0, col: 2, crop: 'grain', remaining: 1 },
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 2 }] },
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
     // One fenced pasture with a stable inside

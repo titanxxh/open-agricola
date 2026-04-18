@@ -1,17 +1,19 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
 import { registerFieldEffect } from '../../actions/effects/field-effect-registry'
+import { fieldTopStack } from '../../game/field'
 
 const CARD_ID = 'E4_Thunderbolt'
 
 registerFieldEffect('remove-all-grain-for-wood', ({ player, fields }) => {
   for (const key of fields) {
     const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c && f.crop === 'grain')
-    if (field) {
-      const grainCount = field.remaining
-      field.remaining = 0
-      field.crop = null
+    const field = player.fields.find(f => f.row === r && f.col === c)
+    if (!field) continue
+    const top = fieldTopStack(field)
+    if (top && top.kind === 'grain') {
+      const grainCount = top.remaining
+      field.stacks.pop()
       player.resources.wood = (player.resources.wood ?? 0) + grainCount * 2
     }
   }
@@ -20,7 +22,7 @@ registerFieldEffect('remove-all-grain-for-wood', ({ player, fields }) => {
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const grainFields = player.fields.filter(f => f.crop === 'grain' && f.remaining > 0)
+    const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
     if (grainFields.length === 0) return
 
     return {
