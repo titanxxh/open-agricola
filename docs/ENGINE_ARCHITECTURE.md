@@ -1176,6 +1176,7 @@ emitLeafActionDetail?: boolean
 - `onHarvest`
 - `onRoundEnd`
 - `onEndTurn`
+- `onAllWorkersPlaced`
 - `onReturnHome`
 
 完整的阶段型 Hook 清单（按触发顺序）：
@@ -1186,6 +1187,7 @@ emitLeafActionDetail?: boolean
 
 工作阶段:
   PlaceFarmer → 各原子行动 → onEndTurn
+  → allWorkersUsed → onAllWorkersPlaced
 
 回家阶段:
   onBeforeReturnHome → onStartReturnHome → onReturnHome

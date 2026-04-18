@@ -41,7 +41,12 @@ export const placeFarmerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) =>
     smallestAvailableWorker(state, player) !== null,
-  execute: ({ state, player }) => {
+  execute: ({ state, player, actionContext }) => {
+    if (actionContext?.fromSupply) {
+      const supply = (player.workers ?? []).find((w) => !w.isActive)
+      if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      supply.isActive = true
+    }
     const available = state.actionSpaces
       .filter((s) => !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player))
       .map((s) => ({ value: s.id, labelKey: s.nameKey }))
