@@ -26,6 +26,7 @@ export const D59_EarthOven = new MinorImprovement({
   vp: 3,
   cost: {},
   isCookery: true,
+  isMajorImprovement: true,
   isBaking: true,
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
   exchanges: [

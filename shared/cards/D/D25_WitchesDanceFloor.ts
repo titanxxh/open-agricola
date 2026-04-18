@@ -100,6 +100,7 @@ export const D25_WitchesDanceFloor = new MinorImprovement({
   providesField: true,
   providesOccupation: true,
   fireplaceIdentity: true,
+  isMajorImprovement: true,
   mustBePlayedViaMinorAction: true,
   isCookery: true,
   isBaking: true,
