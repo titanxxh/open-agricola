@@ -1,4 +1,5 @@
 import type { ActionExecutionResult, HarvestReapSummary, PlayerState } from '../../game/types'
+import { fieldTopStack, fieldPopIfDepleted } from '../../game/field'
 
 export const reap = (
   player: PlayerState,
@@ -9,18 +10,18 @@ export const reap = (
     vegetableFields: 0,
   }
   player.fields.forEach((field) => {
-    if (!field.crop || field.remaining <= 0) return
-    player.resources[field.crop] += 1
-    reapSummary.resources[field.crop] = (reapSummary.resources[field.crop] ?? 0) + 1
-    if (field.crop === 'grain') {
+    const top = fieldTopStack(field)
+    if (!top || top.remaining <= 0) return
+    const kind = top.kind
+    player.resources[kind] = (player.resources[kind] ?? 0) + 1
+    reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + 1
+    if (kind === 'grain') {
       reapSummary.grainFields += 1
-    } else if (field.crop === 'vegetable') {
+    } else {
       reapSummary.vegetableFields += 1
     }
-    field.remaining -= 1
-    if (field.remaining === 0) {
-      field.crop = null
-    }
+    top.remaining -= 1
+    fieldPopIfDepleted(field)
   })
   return { type: 'ok', reapSummary }
 }

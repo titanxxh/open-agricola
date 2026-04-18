@@ -26,7 +26,7 @@ describe('pending choice types + undo regression', () => {
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('grain-utilization')
       player.resources.grain = 1
-      player.fields = [{ row: 0, col: 3, crop: null, remaining: 0 }]
+      player.fields = [{ row: 0, col: 3, stacks: [] }]
 
       const session = new GameSession(state)
       expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
@@ -68,8 +68,7 @@ describe('pending choice types + undo regression', () => {
       player.fields = getAllTilePositions().map((position, index) => ({
         row: position.row,
         col: position.col,
-        crop: index === 0 ? null : 'grain',
-        remaining: index === 0 ? 0 : 1,
+        stacks: index === 0 ? [] : [{ kind: 'grain' as const, remaining: 1 }],
       }))
       player.roomTiles = []
       player.stableTiles = []
@@ -164,12 +163,10 @@ describe('pending choice types + undo regression', () => {
       const state = createInitialState(42)
       state.roundActionOrder = openRoundAction('grain-utilization')
       state.players[0]!.fields.push({
-        id: 'field-a65',
         row: 0,
         col: 0,
-        crop: null,
-        remaining: 0,
-      })
+        stacks: [],
+      } as any)
       state.players[0]!.resources.grain = 0
       state.players[0]!.resources.vegetable = 0
       const session = new GameSession(state)
@@ -181,7 +178,7 @@ describe('pending choice types + undo regression', () => {
     it('Seed Pellets grants grain before grain-utilization sow resolves', () => {
       const state = createInitialState(42)
       state.roundActionOrder = openRoundAction('grain-utilization')
-      state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+      state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
       state.players[0]!.resources.grain = 0
       state.players[0]!.resources.vegetable = 0
       const session = new GameSession(state)
@@ -211,8 +208,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.state.players[0]!.fields).toContainEqual({
         row: 0,
         col: 0,
-        crop: 'grain',
-        remaining: 3,
+        stacks: [{ kind: 'grain', remaining: 3 }],
       })
     })
   })

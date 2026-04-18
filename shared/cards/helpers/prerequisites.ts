@@ -2,6 +2,7 @@ import type { GameState, PlayerState } from '../../game/types'
 import type { CardDefinition } from '../types'
 import { getMajorCardEffect } from '../major'
 import { checkCustomPrerequisite } from './prerequisite-registry'
+import { fieldHasCrop } from '../../game/field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -51,7 +52,7 @@ const meetsTextClause = (player: PlayerState, clause: string, state?: GameState)
 
   const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
   if (grainFieldsMatch) {
-    const grainFields = player.fields.filter((f) => f.crop === 'grain')
+    const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain'))
     return grainFields.length >= Number(grainFieldsMatch[1])
   }
 

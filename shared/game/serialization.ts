@@ -50,6 +50,21 @@ export const rebuildActiveModifiers = (state: GameState): GameState => {
 
 export const rehydrateState = (raw: SerializedGameState): GameState => {
   const templates = createActionSpaces()
+  // Migrate legacy Field shape: {crop, remaining} → {stacks}
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  ;((raw as any).players ?? []).forEach((p: any) => {
+    ;(p.fields ?? []).forEach((f: any) => {
+      if (f.stacks === undefined) {
+        const crop = f.crop
+        const remaining = f.remaining ?? 0
+        f.stacks =
+          crop && remaining > 0 ? [{ kind: crop, remaining }] : []
+        delete f.crop
+        delete f.remaining
+      }
+    })
+  })
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   const restored = rebuildActiveModifiers(normalizeState(raw as unknown as GameState))
   restored.actionSpaces = templates.map((template) => {
     const saved = raw.actionSpaces?.find((s) => s.id === template.id)
