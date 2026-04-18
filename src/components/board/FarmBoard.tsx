@@ -258,6 +258,7 @@ const PlayedCardStats = ({
   displayCounters,
   resourceStats,
   stack,
+  cardCrop,
 }: {
   locale: Locale
   rawId: string
@@ -273,6 +274,7 @@ const PlayedCardStats = ({
   displayCounters: Record<string, number>
   resourceStats?: CardResourceStats
   stack: string[]
+  cardCrop?: { crop: FieldCropType; remaining: number } | null
 }) => {
   const [open, setOpen] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
@@ -282,7 +284,8 @@ const PlayedCardStats = ({
   const visibleCounters = Object.fromEntries(
     Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
   )
-  const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0
+  const hasCardCrop = !!cardCrop && cardCrop.remaining > 0
+  const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0 || hasCardCrop
   const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
   const hasGained = hasAnyResource(resourceStats?.gained ?? {})
   const hasResourceStats = hasPaid || hasGained || bonusVp > 0
@@ -373,6 +376,9 @@ const PlayedCardStats = ({
                 />
               ))}
             </div>
+          )}
+          {hasCardCrop && cardCrop && (
+            <CropStack locale={locale} crop={cardCrop.crop} remaining={cardCrop.remaining} />
           )}
           {futureEntries.map((entry, entryIndex) => {
             const label = formatResources(
@@ -1016,6 +1022,10 @@ export const FarmBoard = ({
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
           const resourceStats = readCardResourceStats(displayPlayer, rawId)
           const cardStack = displayPlayer.cardStates?.[rawId]?.stack ?? []
+          const rawCardCrop = displayPlayer.cardStates?.[rawId]?.extraData?.cardCrop as
+            | { crop: FieldCropType; remaining: number }
+            | undefined
+          const cardCrop = rawCardCrop && rawCardCrop.remaining > 0 ? rawCardCrop : null
           const internalKeys = new Set(['usedRound'])
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
@@ -1033,6 +1043,7 @@ export const FarmBoard = ({
               displayCounters={displayCounters}
               resourceStats={resourceStats}
               stack={cardStack}
+              cardCrop={cardCrop}
             />
           )
         })}

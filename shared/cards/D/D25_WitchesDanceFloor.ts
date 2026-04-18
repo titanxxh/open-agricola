@@ -19,19 +19,8 @@ const VIRTUAL_TILE = { row: -1, col: 25 }
 const getCardCrop = (player: PlayerState): CardCrop | null =>
   readCardExtraData<CardCrop>(player, CARD_ID, 'cardCrop') ?? null
 
-const setCardCrop = (player: PlayerState, crop: CardCrop | null) => {
+const setCardCrop = (player: PlayerState, crop: CardCrop | null) =>
   writeCardExtraData(player, CARD_ID, 'cardCrop', crop)
-  // Mirror remaining into counters so the UI (PlayedCardStats) can render
-  // the crop stack via its existing resource-chip path.
-  const state = player.cardStates?.[CARD_ID]
-  if (!state) return
-  if (!state.counters) state.counters = {}
-  delete state.counters.grain
-  delete state.counters.vegetable
-  if (crop && crop.remaining > 0) {
-    state.counters[crop.crop] = crop.remaining
-  }
-}
 
 registerCardEffect({
   id: CARD_ID,
