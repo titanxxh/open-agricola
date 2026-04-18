@@ -9,7 +9,6 @@ import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
 import {
   canAffordCost,
-  canAffordCardPreviewCostByProvider,
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
 } from './pay-helpers'
@@ -200,15 +199,20 @@ const canAffordMajorImprovement = (
   player: PlayerState,
   improvementId: string,
   actionCardId?: string,
-) =>
-  canAffordCardPreviewCostByProvider(
-    state,
-    player,
-    'improvement-any',
-    improvementId,
-    () => getMajorCardEffect(improvementId)?.cost ?? null,
-    actionCardId,
-  )
+) => {
+  const previewCost = getMajorImprovementPreviewCost(state, player, improvementId, actionCardId)
+  if (!previewCost) return false
+  if (isComplexCost(previewCost)) {
+    return (
+      computeAllBuyableCombinations(
+        player,
+        previewCost,
+        getPlayedCardsForCost(player, previewCost),
+      ).length > 0
+    )
+  }
+  return canAffordCost(player, previewCost)
+}
 
 export const isMajorImprovementPlayable = (
   state: GameState,
