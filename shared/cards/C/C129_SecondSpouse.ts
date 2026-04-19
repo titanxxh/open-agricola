@@ -2,9 +2,10 @@ import { Occupation } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
-import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
+import { spaceOccupantCount } from '../../game/space'
 
 const CARD_ID = 'C129_SecondSpouse'
 
@@ -12,20 +13,31 @@ const CARD_ID = 'C129_SecondSpouse'
  * C129 Second Spouse — Occupation
  *
  * You can use the Urgent Wish for Children action space even if it is
- * occupied by another player's person.
+ * occupied by the first person another player placed.
  *
- * BGA: onPlayerComputeArgsPlaceFarmer — adds Urgent Wish Children as
- * an extra option when it is occupied by exactly 1 other player's farmer.
- * canUseOccupied allows placement. Conditions: 3+ players in the game,
- * space occupied by exactly 1 farmer from another player.
- *
- * Implementation:
- * - computeArgs on place-farmer: add urgent-wish-children as extra option
- *   when occupied by another player
- * - canUseOccupied on urgent-wish-children: allow when occupied by
- *   another player's farmer
- * Players: 3+.
+ * BGA: onPlayerComputeArgsPlaceFarmer → checkCondition:
+ * - space occupant count ≤ 2
+ * - at least one occupant is another player's FIRST placed farmer this round
+ * Players: 3+ (deck configuration, no runtime check).
  */
+
+function canStealUrgentWish(
+  state: GameState,
+  self: PlayerState,
+  space: ActionSpace,
+): boolean {
+  const count = spaceOccupantCount(space)
+  if (count < 1 || count > 2) return false
+  for (const ref of space.takenBy) {
+    if (ref.playerId === self.id) continue
+    const other = state.players.find(p => p.id === ref.playerId)
+    if (!other) continue
+    const firstPlacement = getRoundPlacementDetails(other)[0]
+    if (firstPlacement && firstPlacement.workerId === ref.workerId) return true
+  }
+  return false
+}
+
 const computeArgsListener: CardListenerRegistration = {
   id: 'C129-second-spouse-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -33,13 +45,9 @@ const computeArgsListener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    // Require 3+ players in the game
-    if ((context.state.players?.length ?? 0) < 3) return
     const space = context.state.actionSpaces.find((s) => s.id === 'urgent-wish-children')
     if (!space) return
-    // Only when occupied by another player
-    if (!isSpaceOccupied(space) || spaceHasPlayer(space, context.player.id)) return
-    // Check if the player can actually execute the action
+    if (!canStealUrgentWish(context.state, context.player, space)) return
     if (!space.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
       {
