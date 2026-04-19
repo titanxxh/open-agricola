@@ -7,7 +7,6 @@ const CARD_ID = 'D79_CarrotMuseum'
 registerCardEffect({
   id: CARD_ID,
   onAfterRoundEnd: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (![8, 10, 12].includes(state.round)) return
 
     const vegFields = player.fields.filter(

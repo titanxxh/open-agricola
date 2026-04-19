@@ -66,21 +66,6 @@ describe('C23_JobContract listener', () => {
     expect(listener!.phases).toContain('after')
   })
 
-  it('does nothing if card is not played', () => {
-    const listener = findListener()!
-    const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer']
-    const daySpace = createSpace('day-laborer', player.id)
-    const lessonsSpace = createSpace('lessons')
-    const state = createState([player], [daySpace, lessonsSpace])
-
-    const result = executeCardListener(listener, {
-      state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
-
-    expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toEqual([])
-  })
 
   it('does nothing when the action is not day-laborer', () => {
     const listener = findListener()!

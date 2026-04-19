@@ -23,7 +23,6 @@ const grainGainListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect', 'gain', 'receive'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const grainGained = context.result?.type === 'ok'
       ? (context.result.resourcesGained?.grain ?? 0)
       : 0
@@ -48,7 +47,6 @@ registerCardEffect({
   },
   // Also detect grain from harvest (reap phase)
   onAfterReap: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const grainFields = state.harvestReapSummary?.[player.id]?.grainFields
       ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
     if (grainFields <= 0) return

@@ -7,7 +7,6 @@ const CARD_ID = 'C63_CraftBrewery'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
     const grainField = player.fields.find((f) => fieldTopStack(f)?.kind === 'grain')
     if (!grainField) return

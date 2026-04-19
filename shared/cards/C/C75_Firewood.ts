@@ -47,7 +47,6 @@ const buildTakeWoodFlow = (woodOnCard: number): ActionHookResult | void => {
 const firewoodReturnHomeEffect = {
   id: CARD_ID,
   onReturnHome: (_state: GameState, player: PlayerState): void => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(player, CARD_ID)
     counters['wood'] = (counters['wood'] ?? 0) + 1
   },

@@ -17,7 +17,6 @@ const CARD_ID = 'E12_AnimalBedding'
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Collect pasture IDs that have stables
     const stabledPastureIndices = new Set<number>(
       player.pastures

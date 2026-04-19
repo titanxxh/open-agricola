@@ -91,22 +91,6 @@ describe('D137_TradeTeacher listener', () => {
     expect(listener!.scope).toBe('player')
   })
 
-  it('does nothing if occupation is not played', () => {
-    const listener = findListener()!
-    const player = createPlayer('p1')
-    const lessons = createSpace('lessons', player.id)
-    const state = createState([player], [lessons])
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space: lessons,
-      actionId: 'place-farmer',
-      phase: 'after',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 
   it('does nothing on unrelated spaces (e.g. forest)', () => {
     const listener = findListener()!

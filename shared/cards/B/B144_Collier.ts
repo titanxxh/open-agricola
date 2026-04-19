@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   // Higher order to run after regular place-farmer effects (onPlayerAfterPlaceFarmer)
   order: 10,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const id = context.space?.id
     if (id === 'clay-pit') {
       return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }

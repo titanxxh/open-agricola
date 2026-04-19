@@ -15,7 +15,6 @@ const MAX_FREE_FENCES = 5
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(player, CARD_ID)
     counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
   },
@@ -27,7 +26,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(context.player, CARD_ID)
     const stored = counters['fences'] ?? 0
     if (stored <= 0) return
@@ -44,7 +42,6 @@ const beforeFenceListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(context.player, CARD_ID)
     const stored = counters['fences'] ?? 0
     if (stored <= 0) return
@@ -85,7 +82,6 @@ const afterFenceListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     clearPendingFenceBonus(context.player)
   },
 }

@@ -122,26 +122,6 @@ describe('D63_Lynchet session', () => {
     expect(flow).toBeNull()
   })
 
-  it('does not trigger when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-
-    player.roomTiles = [{ row: 0, col: 0 }]
-    player.fields = [{ row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
-    }
-
-    session.loadState(state)
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('does not trigger when no harvested fields are adjacent to rooms', () => {
     const session = new GameSession()

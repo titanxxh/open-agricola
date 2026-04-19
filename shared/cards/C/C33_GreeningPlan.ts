@@ -7,7 +7,6 @@ const CARD_ID = 'C33_GreeningPlan'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
     if (emptyFields >= 6) return 5
     if (emptyFields >= 5) return 3

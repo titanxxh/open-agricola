@@ -30,20 +30,4 @@ describe('E58_LunchtimeBeer session', () => {
     expect((flow as any).children[0].params).toEqual({ food: 1 })
   })
 
-  it('onStartHarvest returns undefined when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-
-    const player = state.players[0]!
-    // Card not in minorPlayed
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    const flow = effect!.onStartHarvest!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

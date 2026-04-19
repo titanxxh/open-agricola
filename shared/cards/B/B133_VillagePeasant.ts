@@ -13,7 +13,6 @@ const CARD_ID = 'B133_VillagePeasant'
 registerCardEffect({
   id: CARD_ID,
   computePostScore: (_state, player, _categories) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const majors = collectCardsAs(player, 'major').length
     const minors = player.minorPlayed.length
     const occupations = player.occupationPlayed.length

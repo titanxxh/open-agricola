@@ -37,7 +37,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const targetId = findFirstNonAccumSpaceThisRound(context.state)
     if (!targetId) return
     if (targetId === MEETING_PLACE_ID) return

@@ -38,7 +38,6 @@ const beforeFarmRedev: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isFarmRedev(context)) return
     const mod: CostModifier = {
       type: 'bonus',
@@ -64,7 +63,6 @@ const afterFarmRedev: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isFarmRedev(context)) return
     if (!context.player.activeModifiers) return
     context.player.activeModifiers = context.player.activeModifiers.filter(

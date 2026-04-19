@@ -9,7 +9,6 @@ const CARD_ID = 'B118_SmallscaleFarmer'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     if (roomCount !== 2) return
     return gainLeaf(CARD_ID, { wood: 1 })

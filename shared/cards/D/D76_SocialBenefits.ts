@@ -7,7 +7,6 @@ const CARD_ID = 'D76_SocialBenefits'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.food !== 0) return
 
     return gainLeaf(CARD_ID, { wood: 1, clay: 1 })

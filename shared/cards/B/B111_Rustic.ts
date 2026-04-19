@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
     const roomsBuilt = getRoomsBuiltThisAction(context.player)
     if (roomsBuilt <= 0) return

@@ -9,7 +9,6 @@ const CARD_ID = 'D154_ChimneySweep'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return state.players.filter((p) => p.id !== player.id && p.houseType === 'stone').length
   },
 })
@@ -19,8 +18,7 @@ const renovateCostListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { costs: { stone: -2 } }
   },
 }

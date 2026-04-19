@@ -13,7 +13,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { boar: 1 }),
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
     if (emptyFields === 0) return
     zones.push({

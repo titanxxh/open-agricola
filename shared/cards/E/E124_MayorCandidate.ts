@@ -6,7 +6,6 @@ const CARD_ID = 'E124_MayorCandidate'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
   },
 })

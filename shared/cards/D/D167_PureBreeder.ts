@@ -12,7 +12,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
   onAfterRoundEnd: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return // harvest round — skip
     const totalAnimals = BREEDABLE.reduce((sum, t) => sum + player.resources[t], 0)
     const cap = getTotalAnimalCapacity(player)

@@ -100,25 +100,4 @@ describe('C117_Legworker session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C117-legworker-after-place-farmer')!
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (!grainSeeds) return
-    grainSeeds.takenBy = [{ playerId: player.id, workerId: "1" }]
-    session.loadState(state)
-
-    const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space: farmland,
-      actionId: 'place-farmer',
-      phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

@@ -6,7 +6,6 @@ export const CARD_ID = 'Stub_OnReturnHome_Accumulate'
 export const effect: CardEffect = {
   id: CARD_ID,
   onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     incCounter(player, CARD_ID, 'observedCount')
     incCounter(player, CARD_ID, 'grain')
   },

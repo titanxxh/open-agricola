@@ -6,7 +6,6 @@ const CARD_ID = 'E134_Omnifarmer'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const stored = (player.cardStates?.[CARD_ID]?.extraData?.storedTypes as number | undefined)
     if (!stored || stored < 2) return 0
     const vpMap = [0, 0, 3, 5, 7, 9]

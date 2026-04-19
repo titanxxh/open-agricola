@@ -101,19 +101,4 @@ describe('D84_FeedPellets session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('returns undefined when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-
-    const player = state.players[0]!
-    player.resources.vegetable = 3
-    player.resources.sheep = 3
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

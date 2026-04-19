@@ -75,21 +75,6 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
     expect(result).toBeUndefined()
   })
 
-  it('is silent when the player has not played A87', () => {
-    const session = setup({ playA87: false })
-    const state = session.getState().state
-    const player = state.players[0]!
-    const listener = findListener('A87-conservator-add-stone-renovation-target')!
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      actionId: 'renovate-house',
-      phase: 'computeChoiceCandidates',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 
   it('does not filter by affordability — engine decides what is selectable', () => {
     const session = setup({
@@ -204,25 +189,4 @@ describe('A87_Conservator isDoable listener', () => {
     expect(result).toBeUndefined()
   })
 
-  it('is silent when the player has not played A87', () => {
-    const session = setup({
-      playA87: false,
-      houseType: 'wood',
-      rooms: 2,
-      resources: { stone: 2, reed: 1 },
-    })
-    const state = session.getState().state
-    const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')!
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      actionId: 'renovate-house',
-      phase: 'isDoable',
-      doable: false,
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 })

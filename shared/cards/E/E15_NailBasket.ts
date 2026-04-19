@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const gainPerRound = context.space?.gainPerRound ?? {}
     if ((gainPerRound.wood ?? 0) <= 0) return
     return {

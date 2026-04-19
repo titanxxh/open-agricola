@@ -100,24 +100,6 @@ describe('B146_Illusionist listener registration', () => {
 })
 
 describe('B146_Illusionist listener handler', () => {
-  it('does nothing if occupation is not played', () => {
-    const listener = findListener()!
-    const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer']
-    const forest = createSpace('forest', { wood: 3 })
-    forest.takenBy = player.id
-    const state = createState([player], [forest])
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space: forest,
-      actionId: 'collect',
-      phase: 'before',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 
   it('does nothing when hand is empty', () => {
     const listener = findListener()!

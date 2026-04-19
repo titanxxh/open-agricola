@@ -10,7 +10,6 @@ const CARD_ID = 'D130_RecreationalCarpenter'
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const meetingPlace = state.actionSpaces.find((s) => s.id === 'meeting-place')
     if (meetingPlace && spaceHasPlayer(meetingPlace, player.id)) return
     return {

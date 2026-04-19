@@ -15,7 +15,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const extraOptions: ActionChoiceOption[] = []
     for (const spaceId of WISH_SPACE_IDS) {
       const space = context.state.actionSpaces.find((s) => s.id === spaceId)

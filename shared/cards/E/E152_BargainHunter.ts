@@ -11,7 +11,6 @@ const CARD_ID = 'E152_BargainHunter'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if ((player.resources.food ?? 0) < 1) return
     if (player.minorHand.length === 0) return
     return {

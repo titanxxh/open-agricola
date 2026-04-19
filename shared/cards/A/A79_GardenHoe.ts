@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const actionContext = context.actionContext ?? {}
     if (actionContext.checkedReplaceAction === true) return
     if (actionContext.maxSelections !== undefined || actionContext.cropType !== undefined) return

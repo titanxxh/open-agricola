@@ -23,7 +23,6 @@ registerCardEffect({
     return gainLeaf(CARD_ID, { wood: 1 })
   },
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.houseType !== 'stone') return
     if (player.resources.wood < 1) return
 

@@ -21,7 +21,6 @@ const getMissingBuildingResources = (player: { resources: Resource }): (keyof Re
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const missingResources = getMissingBuildingResources(player)
     if (missingResources.length === 0) return

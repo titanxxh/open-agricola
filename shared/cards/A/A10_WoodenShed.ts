@@ -13,7 +13,7 @@ registerPrerequisite('Still in Wooden House', (player) => player.houseType === '
 
 registerCardEffect({
   id: CARD_ID,
-  computeExtraRoomCapacity: (player) => (player.minorPlayed.includes(CARD_ID) ? 1 : 0),
+  computeExtraRoomCapacity: () => 1,
 })
 
 export const A10_WoodenShed = new MinorImprovement({

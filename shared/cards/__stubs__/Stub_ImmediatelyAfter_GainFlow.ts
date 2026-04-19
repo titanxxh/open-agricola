@@ -9,7 +9,6 @@ export const listener: CardListenerRegistration = {
   phases: ['immediatelyAfter'],
   actions: ['collect'],
   handler: (context) => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space.id !== 'common-forest') return
     incCounter(context.player, CARD_ID, 'observedCount')
     return {

@@ -24,7 +24,6 @@ registerSelectionEffect('discard-grain-for-pigs', ({ player, positions }) => {
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
     if (grainFields.length === 0) return
 

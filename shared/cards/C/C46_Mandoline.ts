@@ -12,7 +12,6 @@ const CARD_ID = 'C46_Mandoline'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })

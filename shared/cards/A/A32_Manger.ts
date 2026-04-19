@@ -6,7 +6,6 @@ const CARD_ID = 'A32_Manger'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const totalSize = player.pastures.reduce((sum, p) => sum + p.size, 0)
     if (totalSize >= 10) return 4
     if (totalSize >= 8) return 3

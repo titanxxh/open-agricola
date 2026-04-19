@@ -9,7 +9,6 @@ const CARD_ID = 'E93_Motivator'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (getRoundPlacementOrder(player).length !== 0) return
     if (!hasNoUnusedFarmyardSpaces(player)) return
     if (workersAvailable(state, player) <= 0) return

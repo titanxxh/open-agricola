@@ -64,7 +64,6 @@ const afterExchangeListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     markCookedThisRound(context)
     if (hasUsedLessonsThisRound(context)) {
       return awardBonusVp(context)
@@ -79,7 +78,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !LESSONS_SPACE_IDS.has(context.space.id)) return
     if (hasCookedThisRound(context)) {
       return awardBonusVp(context)
@@ -94,7 +92,6 @@ registerCardListener(afterPlaceFarmerListener)
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(player, CARD_ID, 'cookedThisRound', false)
     writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, -1)
   },

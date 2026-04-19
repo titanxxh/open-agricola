@@ -12,7 +12,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { clay: 2 }),
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })

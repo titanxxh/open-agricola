@@ -50,7 +50,6 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isCardFlagged(context.player, CARD_ID)) return
     setCardFlag(context.player, CARD_ID, false)
   },
@@ -63,7 +62,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (newbornCount(context.player) <= 0) return
 
@@ -105,7 +103,6 @@ const immediatelyAfterGainActivation: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Only fire for the A92-triggered gain (sourceCard is spread into the listener context)
     if (context.sourceCard !== CARD_ID) return
     // Find the specific newborn worker and flip it to adult

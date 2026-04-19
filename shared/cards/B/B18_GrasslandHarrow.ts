@@ -34,7 +34,6 @@ registerCardEffect({
     })
   },
   onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const targetRound = readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY)
     if (targetRound !== state.round) return
     writeCardExtraData(player, CARD_ID, TARGET_ROUND_KEY, undefined)

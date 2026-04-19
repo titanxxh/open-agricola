@@ -11,7 +11,6 @@ const CARD_ID = 'B106_MoralCrusader'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Check if player has any future meeple entries (goods promised for future rounds)
     const upcomingRound = state.round + 1
     const hasFutureGoods = state.futureMeeples.some(

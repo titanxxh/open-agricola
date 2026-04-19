@@ -6,8 +6,7 @@ const CARD_ID = 'A62_BeerKeg'
 
 registerCardEffect({
   id: CARD_ID,
-  onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onHarvestFeedingPhase: (_state, _player) => {
 
     const children: ActionFlow[] = [
       {

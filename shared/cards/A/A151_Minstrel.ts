@@ -57,8 +57,7 @@ const buildFlowForSpace = (
 
 registerCardEffect({
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onStartReturnHome: (state, _player) => {
 
     const unoccupied: string[] = []
     for (const actionId of STAGE_1_ACTIONS) {

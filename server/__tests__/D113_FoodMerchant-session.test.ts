@@ -78,24 +78,6 @@ describe('D113_FoodMerchant session', () => {
     expect(flow).toBeNull()
   })
 
-  it('card not played → no trigger', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    // Card NOT in occupationPlayed
-    player.resources.food = 10
-    player.fields = [
-      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
-    ]
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
-    }
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('not enough food → no trigger', () => {
     const session = new GameSession()

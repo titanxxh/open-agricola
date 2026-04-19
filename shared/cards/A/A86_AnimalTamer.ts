@@ -14,7 +14,6 @@ registerCardEffect({
     ],
   }),
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const houseZone = zones.find(z => z.zoneType === 'house')
     if (houseZone) {
       houseZone.capacity = player.rooms

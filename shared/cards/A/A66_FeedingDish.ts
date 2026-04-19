@@ -33,7 +33,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id ?? ''
     const animal = SPACE_TO_ANIMAL[spaceId]
     if (!animal) return

@@ -43,7 +43,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const spaceId = context.space?.id
     if (spaceId !== FARM_EXPANSION_ID && spaceId !== GRAIN_SEEDS_ID) return
@@ -70,7 +69,6 @@ registerCardListener(afterPlaceFarmerListener)
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(player, CARD_ID)) {
       setCardFlag(player, CARD_ID, false)
     }

@@ -9,7 +9,6 @@ export const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts'],
   actions: ['fence'],
   handler: (context) => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const counters = initCardState(context.player, CARD_ID)
     const stored = counters['fences'] ?? 0
     if (stored <= 0) return

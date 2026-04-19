@@ -7,7 +7,6 @@ const CARD_ID = 'B50_ButterChurn'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     const sheep = player.resources.sheep ?? 0
     const cattle = player.resources.cattle ?? 0

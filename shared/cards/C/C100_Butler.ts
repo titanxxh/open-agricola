@@ -7,7 +7,6 @@ const CARD_ID = 'C100_Butler'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return player.rooms > familySize(player) ? 4 : 0
   },
 })

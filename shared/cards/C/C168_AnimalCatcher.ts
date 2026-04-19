@@ -18,7 +18,6 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['gain'],
   phases: ['computeReplace' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionContext?.checkedReplaceAction) return
     if (context.sourceCard === CARD_ID) return
     if (context.space?.id !== 'day-laborer') return

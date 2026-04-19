@@ -11,8 +11,7 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['during' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }

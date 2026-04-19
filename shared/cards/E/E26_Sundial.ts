@@ -10,7 +10,6 @@ const TRIGGER_ROUNDS = new Set([7, 9])
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!TRIGGER_ROUNDS.has(state.round)) return
     if (player.fields.length === 0) return
     return {

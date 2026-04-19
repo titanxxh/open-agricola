@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const accumulationSpaces = context.state.actionSpaces.filter(
       (space) =>
         spaceHasPlayer(space, context.player.id) &&
@@ -33,7 +32,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.doable) return
     const hasWorkersOnAccumulation = context.state.actionSpaces.some(
       (space) =>

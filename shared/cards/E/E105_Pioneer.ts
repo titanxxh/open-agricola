@@ -48,7 +48,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const lastRevealedId = getMostRecentlyRevealedSpaceId(context.state)
     if (!lastRevealedId) return
     if (context.space?.id !== lastRevealedId) return

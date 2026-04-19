@@ -94,20 +94,4 @@ describe('B15_CarpentersBench', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card is not played', () => {
-    const listener = findListener('B15-carpenters-bench-after-collect')
-    const player = createPlayer()
-    player.minorPlayed = []
-    const state = createState(player)
-    const woodSpace = createSpace('forest', { gainPerRound: { wood: 3 } })
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: woodSpace,
-      actionId: 'collect',
-      phase: 'after',
-    })
-    expect(result).toBeUndefined()
-  })
 })

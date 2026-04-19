@@ -22,7 +22,6 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 registerCardEffect({
   id: CARD_ID,
   onReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
     const vegFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'vegetable')
     if (vegFields.length === 0) return

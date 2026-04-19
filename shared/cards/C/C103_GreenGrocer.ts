@@ -10,7 +10,6 @@ const CARD_ID = 'C103_GreenGrocer'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const options = [
       { cost: { cattle: 1 }, gain: { vegetable: 1 } },

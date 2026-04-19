@@ -8,7 +8,6 @@ const CARD_ID = 'C10_BunkBeds'
 registerCardEffect({
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return player.rooms >= 4 ? 1 : 0
   },
 })

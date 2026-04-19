@@ -5,8 +5,7 @@ const CARD_ID = 'A104_WoodHarvester'
 
 registerCardEffect({
   id: CARD_ID,
-  onHarvestFieldPhase: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onHarvestFieldPhase: (state, _player) => {
 
     // Count wood on each accumulation space
     let wood2Count = 0

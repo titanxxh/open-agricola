@@ -10,7 +10,6 @@ registerCardEffect({
     writeCardExtraData(player, CARD_ID, 'playedAtCount', player.occupationPlayed.length)
   },
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const playedAt = readCardExtraData<number>(player, CARD_ID, 'playedAtCount') ?? 0
     return Math.max(0, player.occupationPlayed.length - playedAt)
   },

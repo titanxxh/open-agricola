@@ -7,12 +7,10 @@ const CARD_ID = 'A112_ScytheWorker'
 
 registerCardEffect({
   id: CARD_ID,
-  onBuy: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onBuy: (_state, _player) => {
     return gainLeaf(CARD_ID, { grain: 1 })
   },
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainFieldCount = player.fields.filter(
       (field) => fieldHasCrop(field, 'grain'),
     ).length

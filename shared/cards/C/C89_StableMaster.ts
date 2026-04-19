@@ -5,8 +5,7 @@ const CARD_ID = 'C89_StableMaster'
 
 registerCardEffect({
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onComputeAnimalZones: (_player, zones) => {
     const stableZone = zones.find(z => z.zoneType === 'stable')
     if (stableZone) {
       stableZone.capacity += 2 // 1 → 3

@@ -51,19 +51,4 @@ describe('C140_PackagingArtist session', () => {
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C140-packaging-artist-before-minor-improvement')!
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    session.loadState(state)
-
-    const result = executeCardListener(listener, {
-      state,
-      player: state.players[0]!,
-      actionId: 'minor-improvement',
-      phase: 'before',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

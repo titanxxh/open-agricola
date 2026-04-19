@@ -6,7 +6,6 @@ const CARD_ID = 'E37_OxSkull'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return player.resources.cattle === 0 ? 3 : 0
   },
 })

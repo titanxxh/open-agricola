@@ -24,7 +24,6 @@ registerCardListener({
   phases: ['immediatelyAfter'],
   handler: (ctx) => {
     const player = ctx.player
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const crop = ctx.extraData?.crop
     const amount = ctx.extraData?.amount
     if (crop !== 'vegetable' || typeof amount !== 'number' || amount <= 0) return
@@ -36,7 +35,6 @@ registerCardListener({
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return player.cardStates[CARD_ID]?.counters?.bonusVp ?? 0
   },
 })

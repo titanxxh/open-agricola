@@ -24,7 +24,6 @@ const collectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'fishing') return
     return { flow: gainLeaf(CARD_ID, { reed: 1 }), sourceCard: CARD_ID }
   },
@@ -36,7 +35,6 @@ const placeFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     if (TRIGGER_SPACE_IDS.has(context.space.id) || isRound4ActionSpace(context)) {
       return { flow: gainLeaf(CARD_ID, { reed: 1 }), sourceCard: CARD_ID }

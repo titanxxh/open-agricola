@@ -162,15 +162,4 @@ describe('D154_ChimneySweep bonus scoring', () => {
     expect(score).toBe(0)
   })
 
-  it('does not score when player has not played D154', () => {
-    const session = setup({
-      occupationsP1: [],
-      p2HouseType: 'stone',
-    })
-    const state = session.getState().state
-    const p1 = state.players[0]!
-
-    const score = getCardEffect(CARD_ID)!.computeBonusScore!(state, p1, scoreContext)
-    expect(score).toBe(0)
-  })
 })

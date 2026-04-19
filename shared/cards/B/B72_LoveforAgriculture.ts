@@ -85,7 +85,6 @@ registerCardEffect({
 
   // Provide extra sowable tiles from eligible pastures
   onComputeSowableFields: (player): ExtraSowableField[] => {
-    if (!player.minorPlayed.includes(CARD_ID)) return []
     const eligible = getEligiblePastures(player)
     const extras: ExtraSowableField[] = []
     for (const pasture of eligible) {
@@ -102,7 +101,6 @@ registerCardEffect({
 
   // Handle sowing into a pasture tile
   onSowExtraField: (player, tile, crop): boolean => {
-    if (!player.minorPlayed.includes(CARD_ID)) return false
     const pastureId = findPastureByTile(player, tile)
     if (!pastureId) return false
     if (crop !== 'grain' && crop !== 'vegetable') return false
@@ -131,7 +129,6 @@ registerCardEffect({
 
   // Harvest from sown pastures during field phase
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const crops = getPastureCrops(player)
     if (crops.length === 0) return
     for (const entry of crops) {
@@ -146,7 +143,6 @@ registerCardEffect({
 
   // Reduce animal capacity of sown pastures
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const crops = getPastureCrops(player)
     if (crops.length === 0) return
     for (const zone of zones) {
@@ -169,7 +165,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // If already doable via normal fields, no need to intervene
     if (canSow(context.player)) return
     // Check if there are seeds AND eligible pastures

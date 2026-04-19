@@ -11,7 +11,6 @@ const CARD_ID = 'C111_SmallAnimalBreeder'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // upcoming round = state.round + 1 (round hasn't been incremented yet at this hook)
     const upcomingRound = state.round + 1
     if ((player.resources.food ?? 0) >= upcomingRound) {

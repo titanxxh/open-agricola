@@ -11,7 +11,6 @@ const CARD_ID = 'D142_PotatoPlanter'
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
 

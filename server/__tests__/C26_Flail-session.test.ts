@@ -97,21 +97,4 @@ describe('C26_Flail session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C26-flail-after-place-farmer')!
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    session.loadState(state)
-
-    const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
-      state,
-      player: state.players[0]!,
-      space: farmland,
-      actionId: 'place-farmer',
-      phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

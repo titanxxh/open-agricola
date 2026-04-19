@@ -8,7 +8,6 @@ const CARD_ID = 'E73_Scythe'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const harvestable = player.fields
       .map((f, i) => ({ field: f, index: i }))
       .filter(({ field }) => !fieldIsEmpty(field))

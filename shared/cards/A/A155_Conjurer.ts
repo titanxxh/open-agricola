@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || context.space.id !== 'traveling-players') return
     return { flow: gainLeaf(CARD_ID, { wood: 1, grain: 1 }), sourceCard: CARD_ID }
   },

@@ -7,7 +7,6 @@ const CARD_ID = 'C110_HomeBrewer'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
 
     const children: ActionFlow[] = [

@@ -111,26 +111,4 @@ describe('E165_MasterHuntsman session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('E165-master-huntsman-after-major')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [] // Card not played
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: { id: 'improvement-any' } as any,
-      actionId: 'improvement-any',
-      phase: 'after',
-      choice: 'major:Major_Well',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
 })

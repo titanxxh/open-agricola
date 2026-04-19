@@ -23,7 +23,6 @@ const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: numb
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     const summary = state.harvestReapSummary?.[player.id]
     if (!summary) return

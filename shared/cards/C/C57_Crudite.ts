@@ -56,7 +56,6 @@ registerCardEffect({
     })
   },
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!hasQualifyingVegetableField(player)) return
     // Remove 1 vegetable from qualifying field and gain 4 food
     if (!removeVegetableFromField(player)) return
@@ -76,7 +75,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!hasQualifyingVegetableField(context.player)) return
     return {
       flow: gainLeaf(CARD_ID, { food: 4 }),

@@ -25,7 +25,6 @@ registerCardEffect({
     })
   },
   onRoundStart: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const targets = readCardExtraData<number[]>(player, CARD_ID, TARGET_ROUNDS_KEY)
     if (!targets || !targets.includes(state.round)) return
     const remaining = targets.filter((r) => r !== state.round)

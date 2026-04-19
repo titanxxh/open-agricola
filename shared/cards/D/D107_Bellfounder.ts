@@ -6,7 +6,6 @@ const CARD_ID = 'D107_Bellfounder'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const allClay = player.resources.clay ?? 0
     if (allClay < 1) return
     return {

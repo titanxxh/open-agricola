@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context)) return
     return { flow: gainLeaf(CARD_ID, { wood: 2 }), sourceCard: CARD_ID }
   },

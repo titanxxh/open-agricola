@@ -76,18 +76,6 @@ describe('D27_Retraining listeners', () => {
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
 
-  it('renovation listener does nothing when owner has not played the card', () => {
-    const listener = findListener('D27-retraining-after-renovation')!
-    const player = createPlayer('p1')
-    const state = createState([player])
-
-    executeCardListener(listener, {
-      state, player, space: createSpace('renovate-house'),
-      actionId: 'renovate-house', phase: 'after',
-    } as any)
-
-    expect(isCardFlagged(player, CARD_ID)).toBe(false)
-  })
 
   it('place-farmer listener offers Joinery→Pottery swap when the player has Joinery', () => {
     const listener = findListener('D27-retraining-after-place-farmer')!

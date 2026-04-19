@@ -166,24 +166,6 @@ describe('B150_LargeScaleFarmer session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not offer chain without the card (direct listener check)', async () => {
-    const { getRegisteredCardListeners, executeCardListener } = await import(
-      '../../shared/cards/card-listeners'
-    )
-    const session = setup({ withCard: false, food: 3 })
-    const s = session.getState().state
-    const listener = getRegisteredCardListeners().find(
-      (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
-    )!
-    const result = executeCardListener(listener, {
-      state: s,
-      player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'major-improvement')!,
-      actionId: 'place-farmer',
-      phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 
   it('emits valid flow with correct sourceCard (direct listener check)', async () => {
     const { getRegisteredCardListeners, executeCardListener } = await import(

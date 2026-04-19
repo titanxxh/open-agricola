@@ -9,7 +9,6 @@ const CARD_ID = 'D48_CivicFacade'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const occs = player.occupationHand.length
     const improvements = player.minorHand.length
     if (occs <= improvements) return

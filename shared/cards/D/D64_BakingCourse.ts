@@ -7,7 +7,6 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 registerCardEffect({
   id: CARD_ID,
   onAfterRoundEnd: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
     if (player.resources.grain < 1) return
 

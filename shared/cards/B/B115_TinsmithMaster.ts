@@ -51,7 +51,6 @@ registerSelectionEffect('tinsmith-master-bonus-crop', ({ player, positions }) =>
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player: PlayerState, zones: AnimalZone[]) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     for (const zone of zones) {
       if (zone.zoneType !== 'pasture') continue
       const pastureIndex = zone.pastureIndex
@@ -72,7 +71,6 @@ const afterSowListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
 
     const freshFields = getFreshlySownFields(context)
     if (freshFields.length === 0) return

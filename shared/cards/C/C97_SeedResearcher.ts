@@ -10,7 +10,6 @@ const CARD_ID = 'C97_SeedResearcher'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     const vegSeeds = state.actionSpaces.find((s) => s.id === 'vegetable-seeds')
     if (!grainSeeds || !vegSeeds) return

@@ -22,7 +22,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: gainLeaf(CARD_ID, { stone: 2 }), sourceCard: CARD_ID }
   },
 }

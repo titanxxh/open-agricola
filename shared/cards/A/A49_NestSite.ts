@@ -12,8 +12,7 @@ const CARD_ID = 'A49_NestSite'
 // We check if reed-bank has >= 1 reed BEFORE the new round's accumulation (onBeforeStartOfTurn).
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onBeforeStartOfTurn: (state, _player) => {
     // Check if reed-bank currently has reed on it (i.e., no one took it last round)
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
     if (!reedBank || (reedBank.resources?.reed ?? 0) <= 0) return

@@ -16,7 +16,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // Check if any vegetable was sown (any field has vegetable crop)
     const vegetableFields = context.player.fields.filter((f) => fieldHasCrop(f, 'vegetable'))
     // We compare to the last result to detect if vegetable was just sown

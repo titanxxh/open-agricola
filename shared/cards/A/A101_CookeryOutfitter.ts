@@ -15,7 +15,6 @@ const isCookeryCard = (cardId: string): boolean => {
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return collectCardsAs(player, 'major').filter(isCookeryCard).length
   },
 })

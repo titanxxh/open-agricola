@@ -44,7 +44,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const space = context.state.actionSpaces.find((s) => s.id === 'urgent-wish-children')
     if (!space) return
     if (!checkCondition(context.state, context.player, space)) return

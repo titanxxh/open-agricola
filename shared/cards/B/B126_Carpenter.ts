@@ -19,7 +19,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const houseType = context.player.houseType
     if (houseType === 'clay') return { costs: { clay: -2 } }
     if (houseType === 'stone') return { costs: { stone: -2 } }

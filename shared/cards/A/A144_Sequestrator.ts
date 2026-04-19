@@ -60,7 +60,6 @@ registerCardListener(plowListener)
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     setStoredResource(player, CARD_ID, 'reed', 3)
     setStoredResource(player, CARD_ID, 'clay', 4)
   },

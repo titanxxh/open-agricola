@@ -20,7 +20,6 @@ const collectListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const storedEntry = Object.entries(COLLECT_MAP).find(
       ([resource]) => (context.space.resources?.[resource as keyof typeof context.space.resources] ?? 0) > 0,
     )
@@ -45,7 +44,6 @@ registerCardListener(collectListener)
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!PAYOUT_ROUNDS.has(state.round)) return
 
     const takeable = (['wood', 'clay', 'reed'] as const)

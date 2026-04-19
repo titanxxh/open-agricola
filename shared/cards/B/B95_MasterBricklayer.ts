@@ -17,7 +17,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Only applies to major improvements
     const cardId = context.cardId
     if (!cardId || !cardId.startsWith('Major_')) return

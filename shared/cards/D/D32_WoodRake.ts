@@ -7,7 +7,6 @@ const CARD_ID = 'D32_WoodRake'
 registerCardEffect({
   id: CARD_ID,
   onBeforeHarvest: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (state.round !== 14) return
 
     // Count all crop tokens in all fields before final harvest

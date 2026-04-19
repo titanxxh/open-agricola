@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!builtId || builtId === CARD_ID) return

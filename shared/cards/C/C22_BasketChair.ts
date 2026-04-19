@@ -37,7 +37,6 @@ const CARD_ID = 'C22_BasketChair'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (workersAvailable(state, player) <= 0) return
     if (isCardFlagged(player, CARD_ID)) {
       // Reset for next round (this fires at the very start of each round).
@@ -58,7 +57,6 @@ registerCardEffect({
     }
   },
   onRoundEnd: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Explicit per-round reset so the flag doesn't leak across rounds.
     setCardFlag(player, CARD_ID, false)
   },

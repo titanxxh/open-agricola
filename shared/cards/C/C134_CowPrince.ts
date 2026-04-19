@@ -6,7 +6,6 @@ const CARD_ID = 'C134_CowPrince'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     let count = 0
     count += player.pastures.filter((p) => p.animalType === 'cattle' && p.animalCount > 0).length
     if (player.houseAnimalType === 'cattle' && player.houseAnimalCount > 0) count += 1

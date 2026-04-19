@@ -79,7 +79,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'day-laborer') return
     if ((context.player.resources.food ?? 0) < 1) return
 
@@ -117,7 +116,6 @@ const zeroSpaceListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionContext?.fromSpace !== 'traveling-players') return
     const space = context.state.actionSpaces.find((s) => s.id === 'traveling-players')
     if (!space) return

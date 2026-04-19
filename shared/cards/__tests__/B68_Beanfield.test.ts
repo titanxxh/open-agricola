@@ -81,13 +81,6 @@ describe('B68_Beanfield', () => {
       expect(fields).toHaveLength(0)
     })
 
-    it('returns empty when card is not played', () => {
-      const effect = getCardEffect(CARD_ID)!
-      const player = createPlayer()
-      player.minorPlayed = []
-      const fields = effect.onComputeSowableFields!(player)
-      expect(fields).toHaveLength(0)
-    })
   })
 
   describe('onSowExtraField', () => {

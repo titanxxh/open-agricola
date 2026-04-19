@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || !TRIGGER_SPACE_IDS.has(context.space.id)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     if (context.player.resources.food < 1) return

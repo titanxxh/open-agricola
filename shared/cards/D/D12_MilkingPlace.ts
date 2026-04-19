@@ -6,12 +6,10 @@ const CARD_ID = 'D12_MilkingPlace'
 
 registerCardEffect({
   id: CARD_ID,
-  onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onHarvestFeedingPhase: (_state, _player) => {
     return gainLeaf(CARD_ID, { food: 1 })
   },
-  onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onComputeAnimalZones: (_player, zones) => {
     const houseIdx = zones.findIndex(z => z.zoneType === 'house')
     if (houseIdx !== -1) zones.splice(houseIdx, 1)
   },

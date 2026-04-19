@@ -16,7 +16,6 @@ registerCardEffect({
     updateInfobox(player, 4)
   },
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Check if this player is the last in turn order
     const playerIndex = state.players.indexOf(player)
     if (playerIndex < 0) return

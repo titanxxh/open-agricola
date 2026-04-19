@@ -7,7 +7,6 @@ const CARD_ID = 'C59_SchnappsDistillery'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const veg = player.resources.vegetable + player.fields
       .filter((f) => fieldHasCrop(f, 'vegetable'))
       .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)

@@ -6,7 +6,6 @@ const CARD_ID = 'E32_Nave'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const cols = new Set(player.roomTiles.map((t) => t.col))
     return cols.size
   },

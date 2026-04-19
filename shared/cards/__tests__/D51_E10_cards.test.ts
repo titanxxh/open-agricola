@@ -256,15 +256,6 @@ describe('E10_StrawHat', () => {
     }
   })
 
-  it('does not trigger without card played', () => {
-    const effect = getCardEffect('E10_StrawHat')!
-    const player = createPlayer()
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const state = createState([player], [farmland])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })
 
 describe('move-farmer-to-space action', () => {

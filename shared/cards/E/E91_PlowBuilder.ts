@@ -17,7 +17,6 @@ const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
 registerCardEffect({
   id: CARD_ID,
   onAfterHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })
@@ -27,7 +26,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!HARVEST_ROUNDS.includes(context.state.round)) return
     // Check if player owns a Joinery-family card

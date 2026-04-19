@@ -14,7 +14,6 @@ const CARD_ID = 'D11_LawnFertilizer'
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const hasA12 = player.minorPlayed.includes('A12_DrinkingTrough')
     for (const zone of zones) {
       if (zone.zoneType !== 'pasture' || zone.pastureIndex === undefined) continue

@@ -193,15 +193,17 @@ export const playOccupationAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, params }) => {
-    const cost =
-      (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
-      getLessonsCost(player, space.id)
-    const playableOptions = buildPlayableOccupationOptions(
+    const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
+    const cost = typed?.costOverride ?? getLessonsCost(player, space.id)
+    let playableOptions = buildPlayableOccupationOptions(
       state,
       player,
       cost,
       space.id,
     )
+    if (typed?.allowedCards) {
+      playableOptions = playableOptions.filter(opt => typed.allowedCards!.includes(opt.value))
+    }
     if (playableOptions.length === 0) {
       return { type: 'ok' }
     }
@@ -212,9 +214,11 @@ export const playOccupationAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, space, params, state }, choice) => {
-    const cost =
-      (params as { costOverride?: Partial<PlayerState['resources']> } | undefined)?.costOverride ??
-      getLessonsCost(player, space.id)
+    const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
+    if (typed?.allowedCards && !typed.allowedCards.includes(choice)) {
+      return { type: 'fail', logKey: 'log.occupationFail' }
+    }
+    const cost = typed?.costOverride ?? getLessonsCost(player, space.id)
     return playOccupation(player, choice, cost, state, space.id)
   },
 }

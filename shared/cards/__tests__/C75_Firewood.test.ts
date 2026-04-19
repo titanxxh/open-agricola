@@ -73,14 +73,6 @@ describe('C75_Firewood', () => {
       expect(player.cardStates[CARD_ID]?.counters?.wood).toBe(2)
     })
 
-    it('should not accumulate if card not played', () => {
-      const effect = getCardEffect(CARD_ID)!
-      const player = createPlayer({ minorPlayed: [] })
-      const state = createState(player)
-
-      effect.onReturnHome!(state, player)
-      expect(player.cardStates[CARD_ID]?.counters?.wood).toBe(0)
-    })
   })
 
   describe('after-build listener (xor flow)', () => {

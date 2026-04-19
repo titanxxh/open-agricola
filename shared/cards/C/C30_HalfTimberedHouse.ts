@@ -7,7 +7,6 @@ const CARD_ID = 'C30_HalfTimberedHouse'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return getStoneHouseBonusScore(player, CARD_ID)
   },
 })

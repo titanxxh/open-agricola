@@ -24,7 +24,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const ownerPlayer = context.ownerPlayer
     if (!ownerPlayer) return
-    if (!ownerPlayer.occupationPlayed.includes(CARD_ID)) return
+
     if (isCardFlagged(ownerPlayer, CARD_ID)) return
 
     // Check: owner must have exactly 2 rooms

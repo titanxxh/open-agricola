@@ -7,7 +7,6 @@ const CARD_ID = 'A31_DebtSecurity'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const usedTiles = new Set<string>()
     player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
     player.fields.forEach((f) => usedTiles.add(`${f.row},${f.col}`))

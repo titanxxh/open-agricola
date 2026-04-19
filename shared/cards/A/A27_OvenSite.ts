@@ -55,7 +55,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     if (!context.cardId) return
     if (!OVEN_IDS.includes(context.cardId as (typeof OVEN_IDS)[number])) return

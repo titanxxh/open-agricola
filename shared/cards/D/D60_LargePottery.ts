@@ -26,7 +26,6 @@ registerCardEffect({
     returnCardToBoard(player, 'Major_Pottery', state)
   },
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const clay = player.resources.clay
     if (clay >= 7) return 4
     if (clay >= 6) return 3

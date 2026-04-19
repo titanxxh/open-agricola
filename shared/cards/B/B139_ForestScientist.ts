@@ -8,8 +8,7 @@ const CARD_ID = 'B139_ForestScientist'
 // left on the game board, you get 1 food — from round 5 on, even 2 food.
 registerCardEffect({
   id: CARD_ID,
-  onReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onReturnHome: (state, _player) => {
     // Check if any action space has wood on it
     const totalWood = state.actionSpaces.reduce(
       (sum, s) => sum + ((s.resources?.wood ?? 0)),

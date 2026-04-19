@@ -17,7 +17,6 @@ const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): n
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomTiles = player.roomTiles ?? []
     const pairs = countAdjacentRoomPairs(roomTiles)
     if (pairs === 0) return

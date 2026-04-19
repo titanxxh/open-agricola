@@ -26,7 +26,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: Array.from(LESSONS_SPACES),
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !LESSONS_SPACES.has(context.space.id)) return
     if ((context.player.resources.grain ?? 0) < 1) return
     return {

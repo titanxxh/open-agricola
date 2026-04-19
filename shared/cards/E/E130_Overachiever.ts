@@ -15,8 +15,7 @@ const beforeWishChildrenListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before'],
   actions: ['wish-children-growth'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
       flow: { type: 'leaf', actionId: 'improvement-any', optional: true, promptKey: 'ui.interactionOverachieverImprovement', sourceCard: CARD_ID },
       logKey: 'log.cardGrantedAction',
@@ -32,7 +31,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts'],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     return {
       bonuses: DISCOUNT_RESOURCES.map((res) => ({

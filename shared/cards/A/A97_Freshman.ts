@@ -12,7 +12,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     return {
       decline: true,
@@ -42,7 +41,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isCardFlagged(context.player, CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID },
@@ -57,7 +55,6 @@ const isDoableBakeListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.occupationHand.length <= 0) return
     return { doable: true }

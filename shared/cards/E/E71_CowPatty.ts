@@ -68,7 +68,6 @@ const afterSowListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
 
     // Detect freshly sown fields (top stack at initial remaining)
     const freshFields = context.player.fields.filter((f) => {

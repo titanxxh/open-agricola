@@ -59,7 +59,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stack = getStack(context.player)
     if (stack.length === 0) return
 
@@ -81,7 +80,6 @@ const afterPayListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stack = getStack(context.player)
     if (stack.length === 0) return
 

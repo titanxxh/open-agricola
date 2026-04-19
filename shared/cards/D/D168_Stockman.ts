@@ -16,7 +16,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const builtThisAction = getStableTilesBuiltThisAction(context.player)
     if (builtThisAction <= 0) return
     const nAfter = context.player.stableTiles.length

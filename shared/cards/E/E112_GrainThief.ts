@@ -10,7 +10,6 @@ const PROTECTED_KEY = 'protectedFields'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Clear stale data
     writeCardExtraData(player, CARD_ID, PROTECTED_KEY, null)
     const grainFields = player.fields
@@ -41,7 +40,6 @@ registerCardEffect({
     return { type: 'seq', children }
   },
   onEndHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const protectedFields = readCardExtraData<{ index: number; remaining: number }[]>(
       player, CARD_ID, PROTECTED_KEY,
     ) ?? []

@@ -60,14 +60,6 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onStartReturnHome returns undefined when occupation not played', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [{ row: 0, col: 0 }]
-    const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartReturnHome!(state, player)
-    expect(flow).toBeUndefined()
-  })
 
   it('onStartReturnHome offers optional selection + minor improvement', () => {
     const player = createOwner()

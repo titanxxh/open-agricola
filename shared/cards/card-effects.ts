@@ -132,6 +132,13 @@ export type CardEffect = {
     player: PlayerState,
     context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
   ) => number
+  /**
+   * Declare which hooks should also fire when the card is still in the player's hand
+   * (not yet played). The framework iterates hand cards separately from played cards,
+   * so there is no overlap — once a card is played it moves out of the hand arrays
+   * and into the played arrays, and only the normal hook path applies.
+   */
+  handHooks?: CardEffectHook[]
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()

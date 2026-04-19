@@ -19,12 +19,10 @@ registerCardEffect({
     }
   },
   computeExtraRoomCapacity: (player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const hasRoom = readCardExtraData<boolean>(player, CARD_ID, 'hasRoom') ?? false
     return hasRoom ? 1 : 0
   },
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (state.round !== 9) return
     const hasRoom = readCardExtraData<boolean>(player, CARD_ID, 'hasRoom') ?? false
     if (!hasRoom) return

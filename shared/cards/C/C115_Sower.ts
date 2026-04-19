@@ -29,7 +29,6 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const choice = context.choice
     if (!choice || !choice.startsWith('major:')) return
     // Add 1 reed to the card stack

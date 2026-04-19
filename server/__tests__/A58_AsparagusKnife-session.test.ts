@@ -135,20 +135,6 @@ describe('A58_AsparagusKnife session', () => {
     expect(flow).toBeNull()
   })
 
-  it('does NOT trigger when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 8
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-    player.fields = [
-      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
-    ]
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(flow).toBeNull()
-  })
 
   it('returns seq flow with selection for multiple vegetable fields', () => {
     const session = new GameSession()

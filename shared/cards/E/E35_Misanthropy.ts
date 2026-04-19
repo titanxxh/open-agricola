@@ -7,7 +7,6 @@ const CARD_ID = 'E35_Misanthropy'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const size = familySize(player)
     if (size === 2) return 5
     if (size === 3) return 3

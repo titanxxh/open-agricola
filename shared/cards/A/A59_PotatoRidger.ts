@@ -7,7 +7,6 @@ const CARD_ID = 'A59_PotatoRidger'
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Only trigger if at least 1 vegetable was harvested
     const vegHarvested = _state.harvestReapSummary?.[player.id]?.vegetableFields ?? 0
     if (vegHarvested <= 0) return

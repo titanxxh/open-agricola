@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const roundAvailable = context.space?.roundAvailable ?? 99
     if (roundAvailable > 8) return
 

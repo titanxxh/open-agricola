@@ -5,8 +5,7 @@ const CARD_ID = 'D100_LordoftheManor'
 
 registerCardEffect({
   id: CARD_ID,
-  computePostScore: (_state, player, categories) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+  computePostScore: (_state, _player, categories) => {
     // 1 VP per standard category where score = 4 (max in standard range)
     const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles']
     return categories.filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length

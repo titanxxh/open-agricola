@@ -88,25 +88,4 @@ describe('C160_Outrider session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C160-outrider-before-place-farmer')!
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 5
-    state.roundActionOrder[4] = 'cultivation'
-    session.loadState(state)
-
-    const cultivation = state.actionSpaces.find((s) => s.id === 'cultivation')
-    if (!cultivation) return
-
-    const result = executeCardListener(listener, {
-      state,
-      player: state.players[0]!,
-      space: cultivation,
-      actionId: 'place-farmer',
-      phase: 'before',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

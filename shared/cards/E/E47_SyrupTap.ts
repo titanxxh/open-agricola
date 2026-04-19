@@ -20,7 +20,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const gained =
       context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     if (!gained || (gained.wood ?? 0) <= 0) return

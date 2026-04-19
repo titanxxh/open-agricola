@@ -23,7 +23,6 @@ registerCardEffect({
     return gainLeaf(CARD_ID, { grain: 1 })
   },
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Only fire once, on the same round as purchase
     if (isCardFlagged(player, CARD_ID)) return
     const purchaseRound = readCardExtraData<number>(player, CARD_ID, 'purchaseRound')
