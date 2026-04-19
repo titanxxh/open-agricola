@@ -6,4 +6,5 @@ export const fishing = createAccumulatingAction({
   descriptionKey: 'actions.fishing.description',
   roundAvailable: 1,
   gainPerRound: { food: 1 },
+  players: [2, 3, 4],
 })
