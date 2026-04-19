@@ -124,4 +124,40 @@ describe('A27_OvenSite session', () => {
     expect(clayBefore - player.resources.clay).toBe(1)
     expect(stoneBefore - player.resources.stone).toBe(1)
   })
+
+  it('preserves sourceCard on the immediate bake prompt after buying Clay Oven', () => {
+    const session = new GameSession()
+    const setupState = session.getState().state
+    setupState.players = setupState.players.slice(0, 2)
+    setupState.players[0]!.resources.grain = 1
+    session.loadState(setupState)
+    let resp = playA27(session)
+    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+
+    const maxSteps = 12
+    let steps = 0
+    while (resp.pending.type === 'choice' && steps < maxSteps) {
+      steps += 1
+      const options = resp.pending.options ?? []
+      const clayOven = options.find(
+        (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
+      )
+      if (clayOven) {
+        resp = session.resolveChoice(0, clayOven.value)
+        break
+      }
+      const progressOption = options.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
+      if (progressOption) {
+        resp = session.resolveChoice(0, progressOption.value)
+        continue
+      }
+      throw new Error('expected Clay Oven offer before immediate bake prompt')
+    }
+
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect((resp.pending as any).sourceCard).toBe('Major_ClayOven')
+    expect((resp.interaction as any).sourceCard).toBe('Major_ClayOven')
+    expect(resp.pending.options.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
+  })
 })

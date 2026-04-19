@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
-import type { AnytimeAction, Resource } from '../../../shared/game/types'
+import type {
+  ActionChoiceOption,
+  AnytimeAction,
+  ChoiceEffectPreview,
+  Resource,
+} from '../../../shared/game/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 
@@ -17,6 +22,174 @@ const isResourceExchangeLabelParams = (
   value: unknown,
 ): value is ResourceExchangeLabelParams =>
   !!value && typeof value === 'object'
+
+const hasPositiveResources = (resources?: Partial<Resource>) =>
+  !!resources && Object.values(resources).some((value) => (value ?? 0) > 0)
+
+const renderReturnedCardName = (locale: Locale, cardId: string) =>
+  cardId.startsWith('Major_')
+    ? translateCardText(locale, `improvements.${cardId}.name`)
+    : translateCardText(locale, `minorImprovements.${cardId}.name`)
+
+const renderEffectPreview = (
+  locale: Locale,
+  effectPreview: ChoiceEffectPreview,
+): ReactNode => {
+  if (effectPreview.kind === 'payment') {
+    return (
+      <span className="payment-option-content">
+        {hasPositiveResources(effectPreview.resourcesPaid) ? (
+          <ResourceLine locale={locale} resources={effectPreview.resourcesPaid ?? {}} hideZero />
+        ) : (
+          <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+        )}
+        {!!effectPreview.cardUsed && (
+          <span className="payment-option-card">
+            {' '}
+            ({t(locale, 'ui.interactionPaymentReturn')} {renderReturnedCardName(locale, effectPreview.cardUsed)})
+          </span>
+        )}
+      </span>
+    )
+  }
+  if (effectPreview.kind === 'resourceExchange') {
+    return (
+      <span className="interaction-resource-exchange">
+        {hasPositiveResources(effectPreview.resourcesPaid) ? (
+          <ResourceLine
+            locale={locale}
+            resources={effectPreview.resourcesPaid ?? {}}
+            hideZero
+          />
+        ) : (
+          <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+        )}
+        <span className="interaction-resource-exchange-arrow" aria-hidden="true">
+          <span className="res-icon res-icon-arrow" />
+        </span>
+        <ResourceLine
+          locale={locale}
+          resources={effectPreview.resourcesGained ?? {}}
+          bonusVp={effectPreview.bonusVp ?? 0}
+          hideZero
+        />
+      </span>
+    )
+  }
+  return effectPreview.text
+}
+
+const getEffectPreviewSubtitle = (
+  locale: Locale,
+  option: ActionChoiceOption,
+): ReactNode => {
+  switch (option.effectPreview?.kind) {
+    case 'payment':
+      return translateCardText(locale, 'actions.pay-resources.name')
+    case 'resourceExchange':
+      return translateCardText(locale, 'ui.interactionResourceExchange')
+    default:
+      return null
+  }
+}
+
+const renderOptionLabel = (
+  locale: Locale,
+  option: ActionChoiceOption,
+): ReactNode => {
+  if (
+    option.labelKey === 'prompt.selectPaymentOption' &&
+    option.labelParams &&
+    typeof option.labelParams === 'object' &&
+    'resourcesPaid' in option.labelParams
+  ) {
+    return (
+      <span className="payment-option-content">
+        {Object.keys(option.labelParams.resourcesPaid as Partial<Resource>).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
+          <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+        ) : (
+          <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
+        )}
+        {!!option.labelParams.cardUsed && (
+          <span className="payment-option-card">
+            {' '}
+            ({t(locale, 'ui.interactionPaymentReturn')} {renderReturnedCardName(locale, option.labelParams.cardUsed as string)})
+          </span>
+        )}
+      </span>
+    )
+  }
+  if (
+    option.labelKey === 'ui.interactionResourceExchange' &&
+    isResourceExchangeLabelParams(option.labelParams)
+  ) {
+    return (
+      <span className="interaction-resource-exchange">
+        {hasPositiveResources(option.labelParams.resourcesPaid) ? (
+          <ResourceLine
+            locale={locale}
+            resources={option.labelParams.resourcesPaid ?? {}}
+            hideZero
+          />
+        ) : (
+          <span>{t(locale, 'ui.interactionPaymentFree')}</span>
+        )}
+        <span className="interaction-resource-exchange-arrow" aria-hidden="true">
+          <span className="res-icon res-icon-arrow" />
+        </span>
+        <ResourceLine
+          locale={locale}
+          resources={option.labelParams.resourcesGained ?? {}}
+          bonusVp={option.labelParams.bonusVp ?? 0}
+          hideZero
+        />
+      </span>
+    )
+  }
+  if (
+    option.labelKey === 'ui.interactionActionOrReplace' &&
+    option.labelParams &&
+    typeof option.labelParams.actionNameKey === 'string'
+  ) {
+    return t(locale, option.labelKey, {
+      action: t(locale, option.labelParams.actionNameKey),
+    })
+  }
+  if (
+    option.labelKey === 'ui.interactionUseCard' &&
+    option.labelParams &&
+    typeof option.labelParams.cardNameKey === 'string'
+  ) {
+    return t(locale, option.labelKey, {
+      card: translateCardText(locale, option.labelParams.cardNameKey),
+    })
+  }
+  return translateCardText(
+    locale,
+    option.labelKey,
+    option.labelParams as Record<string, string | number> | undefined,
+  )
+}
+
+const renderOptionContent = (
+  locale: Locale,
+  option: ActionChoiceOption,
+): ReactNode => {
+  if (!option.effectPreview) {
+    return renderOptionLabel(locale, option)
+  }
+  const subtitle = getEffectPreviewSubtitle(locale, option)
+  return (
+    <span className="interaction-option-stack">
+      <span className="interaction-option-main">
+        {renderEffectPreview(locale, option.effectPreview)}
+      </span>
+      {subtitle ? (
+        <span className="interaction-option-subtitle">{subtitle}</span>
+      ) : null}
+    </span>
+  )
+}
 
 function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
   locale: Locale
@@ -351,63 +524,7 @@ export const InteractionBar = ({
                           isSelectionConfirmDisabled)
                       }
                     >
-                      {option.labelKey === 'prompt.selectPaymentOption' && option.labelParams && typeof option.labelParams === 'object' && 'resourcesPaid' in option.labelParams ? (
-                        <span className="payment-option-content">
-                          {Object.keys(option.labelParams.resourcesPaid as Partial<Resource>).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
-                            <span>{t(locale, 'ui.interactionPaymentFree')}</span>
-                          ) : (
-                            <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
-                          )}
-                          {!!option.labelParams.cardUsed && (
-                            <span className="payment-option-card">
-                              {' '}
-                              ({t(locale, 'ui.interactionPaymentReturn')} {(option.labelParams.cardUsed as string).startsWith('Major_')
-                                ? translateCardText(locale, `improvements.${option.labelParams.cardUsed as string}.name` as string)
-                                : translateCardText(locale, `minorImprovements.${option.labelParams.cardUsed as string}.name` as string)})
-                            </span>
-                          )}
-                        </span>
-                      ) : option.labelKey === 'ui.interactionResourceExchange' &&
-                        isResourceExchangeLabelParams(option.labelParams) ? (
-                        <span className="interaction-resource-exchange">
-                          {(option.labelParams.resourcesPaid && Object.values(option.labelParams.resourcesPaid).some((value) => (value ?? 0) > 0)) ? (
-                            <ResourceLine
-                              locale={locale}
-                              resources={option.labelParams.resourcesPaid}
-                              hideZero
-                            />
-                          ) : (
-                            <span>{t(locale, 'ui.interactionPaymentFree')}</span>
-                          )}
-                          <span className="interaction-resource-exchange-arrow" aria-hidden="true">
-                            <span className="res-icon res-icon-arrow" />
-                          </span>
-                          <ResourceLine
-                            locale={locale}
-                            resources={option.labelParams.resourcesGained ?? {}}
-                            bonusVp={option.labelParams.bonusVp ?? 0}
-                            hideZero
-                          />
-                        </span>
-                      ) : option.labelKey === 'ui.interactionActionOrReplace' &&
-                        option.labelParams &&
-                        typeof option.labelParams.actionNameKey === 'string' ? (
-                        t(locale, option.labelKey, {
-                          action: t(locale, option.labelParams.actionNameKey),
-                        })
-                      ) : option.labelKey === 'ui.interactionUseCard' &&
-                        option.labelParams &&
-                        typeof option.labelParams.cardNameKey === 'string' ? (
-                        t(locale, option.labelKey, {
-                          card: translateCardText(locale, option.labelParams.cardNameKey),
-                        })
-                      ) : (
-                        translateCardText(
-                          locale,
-                          option.labelKey,
-                          option.labelParams as Record<string, string | number> | undefined,
-                        )
-                      )}
+                      {renderOptionContent(locale, option)}
                     </button>
                   ))}
                 </div>

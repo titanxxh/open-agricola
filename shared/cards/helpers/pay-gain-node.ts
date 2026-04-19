@@ -1,4 +1,4 @@
-import type { Resource } from '../../game/types'
+import type { ChoiceEffectPreview, Resource } from '../../game/types'
 import type { ActionFlow } from '../../game/types'
 import type { ActionHookResult } from '../../actions/hooks'
 import { splitCardGain, type CardGain } from './card-gain'
@@ -76,6 +76,25 @@ const resolveChoiceLabelKey = (
   return undefined
 }
 
+const buildEffectPreview = (
+  cost: Partial<Resource>,
+  gain: CardGain | undefined,
+): ChoiceEffectPreview => {
+  const { resources, score } = splitCardGain(gain)
+  if (Object.keys(resources).length > 0 || score > 0) {
+    return {
+      kind: 'resourceExchange',
+      resourcesPaid: cost,
+      resourcesGained: Object.keys(resources).length > 0 ? resources : undefined,
+      bonusVp: score > 0 ? score : undefined,
+    }
+  }
+  return {
+    kind: 'payment',
+    resourcesPaid: cost,
+  }
+}
+
 export const gainLeaf = (
   cardId: string,
   gain: CardGain,
@@ -98,13 +117,17 @@ export const payLeaf = ({
   cost,
   choiceLabelKey,
   choiceLabelParams,
-}: Pick<PayGainNodeOptions, 'cardId' | 'cost' | 'choiceLabelKey' | 'choiceLabelParams'>): ActionFlow => ({
+  effectPreview,
+}: Pick<PayGainNodeOptions, 'cardId' | 'cost' | 'choiceLabelKey' | 'choiceLabelParams'> & {
+  effectPreview?: ChoiceEffectPreview
+}): ActionFlow => ({
   type: 'leaf',
   actionId: 'pay-resources',
   params: cost,
   sourceCard: cardId,
   choiceLabelKey,
   choiceLabelParams,
+  effectPreview,
 })
 
 const bonusVpLeaves = (cardId: string, gain?: CardGain): ActionFlow[] => {
@@ -132,6 +155,7 @@ export const payGainActionFlow = ({
       cost,
       choiceLabelKey: resolvedChoiceLabelKey,
       choiceLabelParams: resolveChoiceLabelParams(cost, gain, resolvedChoiceLabelKey, choiceLabelParams),
+      effectPreview: buildEffectPreview(cost, gain),
     }),
     ...bonusVpLeaves(cardId, gain),
     ...(Object.keys(resources).length > 0 && gain ? [gainLeaf(cardId, gain)] : []),
@@ -177,6 +201,7 @@ export const payThenGainActionFlow = ({
       cost,
       choiceLabelKey: resolvedChoiceLabelKey,
       choiceLabelParams: resolveChoiceLabelParams(cost, gain, resolvedChoiceLabelKey, choiceLabelParams),
+      effectPreview: buildEffectPreview(cost, gain),
     }),
     ...(Object.keys(resources).length > 0 ? [gainLeaf(cardId, resolvedGain)] : []),
     ...(followUp ?? []),
@@ -211,7 +236,13 @@ export const payThenActionActionFlow = ({
   choiceLabelParams,
 }: PayThenActionFlowOptions): SequenceFlow =>
   buildSequenceNode(undefined, [
-    payLeaf({ cardId, cost, choiceLabelKey, choiceLabelParams }),
+    payLeaf({
+      cardId,
+      cost,
+      choiceLabelKey,
+      choiceLabelParams,
+      effectPreview: buildEffectPreview(cost, undefined),
+    }),
     action,
   ])
 

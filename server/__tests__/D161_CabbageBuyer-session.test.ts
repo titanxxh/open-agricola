@@ -223,6 +223,11 @@ describe('D161_CabbageBuyer session', () => {
     // Accept the offer (non-skip option)
     const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
+    expect((acceptOpt as any)?.effectPreview).toEqual({
+      kind: 'resourceExchange',
+      resourcesPaid: { food: 3 },
+      resourcesGained: { vegetable: 1 },
+    })
     resp = session.resolveChoice(0, acceptOpt!.value)
 
     resp = walkPlayerSwitch(session, resp)

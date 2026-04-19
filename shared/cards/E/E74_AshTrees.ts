@@ -47,6 +47,7 @@ const beforeFenceListener: CardListenerRegistration = {
     if (stored <= 0) return
 
     return {
+      sourceCard: CARD_ID,
       flow: {
         type: 'xor',
         promptKey: 'ui.interactionAshTrees',
@@ -68,6 +69,7 @@ const beforeFenceListener: CardListenerRegistration = {
           {
             type: 'leaf',
             actionId: 'noop',
+            sourceCard: CARD_ID,
             choiceLabelKey: 'ui.interactionAshTreesSkip',
           },
         ],

@@ -1,5 +1,6 @@
 import type {
   ActionChoiceOption,
+  ChoiceEffectPreview,
   ActionExecutionContext,
   ActionExecutionResult,
   Resource,
@@ -50,6 +51,7 @@ export class ActionNode extends BaseNode {
   public sourceCard?: string
   public params?: Partial<Resource>
   public actionContext?: Record<string, unknown>
+  public effectPreview?: ChoiceEffectPreview
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
   public beforePhaseResolved = false
@@ -62,6 +64,7 @@ export class ActionNode extends BaseNode {
     choiceLabelKey?: string,
     choiceLabelParams?: Record<string, unknown>,
     actionContext?: Record<string, unknown>,
+    effectPreview?: ChoiceEffectPreview,
   ) {
     super(id, 'action')
     this.actionId = actionId
@@ -70,6 +73,7 @@ export class ActionNode extends BaseNode {
     this.choiceLabelKey = choiceLabelKey
     this.choiceLabelParams = choiceLabelParams
     this.actionContext = actionContext
+    this.effectPreview = effectPreview
   }
 
   execute(

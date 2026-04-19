@@ -4,7 +4,7 @@ import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../game/space'
@@ -38,6 +38,7 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     // Need at least 2 farmers already placed (placedFarmers = familySize - workersAvailable)
     const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
@@ -52,6 +53,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${secondSpaceId}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }
@@ -65,6 +67,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
     if (placedFarmers < 3) return
@@ -76,13 +79,32 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
+// canUseOccupied: allow using 2nd farmer's space when occupied
+const canUseOccupiedListener: CardListenerRegistration = {
+  id: 'A130-mummys-boy-can-use-occupied',
+  cardIds: [CARD_ID],
+  phases: ['canUseOccupied' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    if (isCardFlagged(context.player, CARD_ID)) return
+    const secondSpaceId = getSecondFarmerSpaceId(context)
+    if (!secondSpaceId) return
+    if (context.space?.id === secondSpaceId) {
+      return { canUseOccupied: true }
+    }
+  },
+}
+
 registerCardListener(computeArgsListener)
 registerCardListener(afterPlaceFarmerListener)
+registerCardListener(canUseOccupiedListener)
 
 // Start of turn: unflag
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(player, CARD_ID)) {
       setCardFlag(player, CARD_ID, false)
     }

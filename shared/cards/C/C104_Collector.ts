@@ -32,6 +32,7 @@ registerPlayerActionSpace({
         options: RESOURCE_TYPES.map((r) => ({
           value: r,
           labelKey: `resources.${r}`,
+          sourceCard: CARD_ID,
         })),
       }
     },
@@ -50,6 +51,7 @@ registerPlayerActionSpace({
           options: RESOURCE_TYPES.map((r) => ({
             value: r,
             labelKey: `resources.${r}`,
+            sourceCard: CARD_ID,
           })),
         }
       }

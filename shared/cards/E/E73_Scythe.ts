@@ -23,7 +23,12 @@ registerCardEffect({
         choiceLabelParams: { crop: top?.kind ?? null, amount: top?.remaining ?? 0 },
       }
     })
-    children.push({ type: 'leaf', actionId: 'noop', choiceLabelKey: 'ui.interactionDecline' })
+    children.push({
+      type: 'leaf',
+      actionId: 'noop',
+      sourceCard: CARD_ID,
+      choiceLabelKey: 'ui.interactionDecline',
+    })
     return { type: 'xor', children }
   },
 })
