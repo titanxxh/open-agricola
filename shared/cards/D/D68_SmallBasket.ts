@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'reed-bank') return
     const playerCount = context.state.players.length
     if (playerCount >= 4) {

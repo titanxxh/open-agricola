@@ -19,7 +19,6 @@ export const E84_DollysMother = new MinorImprovement({
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Only help if player has exactly 1 sheep (not enough for normal breeding which requires >= 2)
     if (player.resources.sheep !== 1) return
     // Check animal capacity — need room for the bred offspring
@@ -32,7 +31,6 @@ registerCardEffect({
     writeCardExtraData(player, CARD_ID, 'virtualSheepAdded', true)
   },
   onEndHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!readCardExtraData<boolean>(player, CARD_ID, 'virtualSheepAdded')) return
     // Remove the virtual sheep that was temporarily added
     player.resources.sheep = Math.max(0, player.resources.sheep - 1)

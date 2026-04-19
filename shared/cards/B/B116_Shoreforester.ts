@@ -17,8 +17,7 @@ const CARD_ID = 'B116_Shoreforester'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
-  onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onRoundStart: (_state, _player) => {
     return gainLeaf(CARD_ID, { wood: 1 })
   },
 })

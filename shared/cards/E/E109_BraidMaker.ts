@@ -32,7 +32,6 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement-any', 'minor-improvement'],
   order: -10,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.cardId !== 'Major_Basket') return
     // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.
     return { costs: { stone: -1, reed: -1 } }

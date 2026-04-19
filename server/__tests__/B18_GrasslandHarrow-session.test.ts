@@ -93,14 +93,4 @@ describe('B18_GrasslandHarrow session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onRoundStart returns nothing when card is not played', () => {
-    const { state, player } = setupState(3, {
-      wood: 1, stone: 0, clay: 0, reed: 0,
-    })
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    state.round = 4
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

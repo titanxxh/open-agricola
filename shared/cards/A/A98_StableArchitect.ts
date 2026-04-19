@@ -6,7 +6,6 @@ const CARD_ID = 'A98_StableArchitect'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const pastureStableTiles = new Set(
       player.pastures.flatMap((p) => p.tiles.map((t) => `${t.row},${t.col}`))
     )

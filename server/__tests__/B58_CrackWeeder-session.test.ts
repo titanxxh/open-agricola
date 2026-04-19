@@ -64,23 +64,6 @@ describe('B58_CrackWeeder session', () => {
     expect(flow).toBeNull()
   })
 
-  it('onAfterReap does not trigger when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-    player.resources.food = 5
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
-    }
-
-    session.loadState(state)
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('integration: harvest with vegetable fields gives food bonus', () => {
     const session = new GameSession()

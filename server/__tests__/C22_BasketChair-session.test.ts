@@ -1,110 +1,267 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import {
+  recordRoundPlacement,
+  getRoundPlacementDetails,
+} from '../../shared/cards/helpers/round-placement'
+import {
+  getWorkerHeldOnCard,
+} from '../../shared/cards/helpers/card-held-workers'
+import {
+  setActiveWorkerCount,
+  setWorkersAtHome,
+  workersAvailable,
+} from '../../shared/game/player'
+import { addWorkerRef } from '../../shared/game/space'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C22_BasketChair'
+// Import a second, cheap minor so the minor-selection choice never has exactly
+// one option (which would otherwise auto-resolve past the choice state the
+// tests need to observe).
+import '../../shared/cards/C/C57_Crudite'
 
 const CARD_ID = 'C22_BasketChair'
+const FILLER_MINOR = 'C57_Crudite' // free-cost, no prerequisites
 
-const createPlayer = (
-  id = 'p1',
-  overrides: Partial<PlayerState> = {},
-): PlayerState =>
-  ({
-    id,
-    name: id,
-    color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2,
-    houseType: 'wood' as const,
-    fields: [],
-    fences: 0,
-    roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
-    stableTiles: [],
-    improvements: [],
-    minorHand: [],
-    minorPlayed: [CARD_ID],
-    occupationHand: [],
-    occupationPlayed: [],houseAnimalType: null,
-    houseAnimalCount: 0,
-    stableAnimals: {},
-    pastures: [],
-    fenceSegments: [],
-    majorEffects: { wellRounds: 0 },
-    startPlayer: false,
-    activeModifiers: [],
-    cardStates: {},
-    ...overrides,
-  }) as unknown as PlayerState
+/**
+ * Simulate that `workerId` of player `p` has already been placed on
+ * `spaceId` earlier in the work phase: add the worker ref to the space and
+ * record a matching round-placement entry. Does NOT run the space's action
+ * flow — mirrors A25_Bassinet-session.test.ts / D24_BrotherlyLove-session.test.ts.
+ */
+const simulatePlacement = (
+  session: GameSession,
+  playerIndex: number,
+  spaceId: string,
+  workerId: string,
+) => {
+  const state = session.getState().state
+  const p = state.players[playerIndex]!
+  const space = state.actionSpaces.find((s) => s.id === spaceId)
+  if (!space) throw new Error(`space not found: ${spaceId}`)
+  addWorkerRef(space, p.id, workerId)
+  recordRoundPlacement(p, spaceId, workerId)
+  session.loadState(state)
+}
 
-const createState = (round: number, players: PlayerState[]): GameState =>
-  ({
-    round,
-    currentPlayerIndex: 0,
-    players,
-    actionSpaces: [],
-    log: [],
-    roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1,
-    availableMajorImprovements: [],
-    futureMeeples: [],
-    pendingFutureMeeples: [],
-    gameOver: false,
-    workPhaseObtainedResources: {},
-  }) as unknown as GameState
+/**
+ * Base 2-player setup at round 3 (non-harvest). P1 has C22 + a filler minor
+ * in hand and 1 reed (exact C22 buy cost). `activeWorkers` controls P1's
+ * active worker count (default 3 — enough for a prefab placement on forest +
+ * a placement on meeting-place + one at-home worker for the onBuy-triggered
+ * place-farmer step).
+ */
+const setup = (options?: { activeWorkers?: number }) => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 3
+
+  const p1 = state.players[0]!
+  const active = options?.activeWorkers ?? 3
+  setActiveWorkerCount(p1, active)
+  setWorkersAtHome(state, p1, active)
+  p1.minorHand = [CARD_ID, FILLER_MINOR]
+  p1.resources = { ...p1.resources, reed: 1 }
+
+  session.loadState(state)
+  return session
+}
+
+/**
+ * Drive meeting-place → accept optional minor-improvement → pick C22. Returns
+ * the response after C22 is paid for (i.e. right after onBuy has fired).
+ */
+const buyC22ViaMeetingPlace = (session: GameSession) => {
+  let resp = session.takeAction(0, 'meeting-place')
+  if (resp.pending.type !== 'choice') {
+    throw new Error(`expected optional minor-improvement choice, got ${resp.pending.type}`)
+  }
+  const acceptMinor = resp.pending.options.find((o) => o.value !== '__skip__')
+  if (!acceptMinor) throw new Error('accept-minor-improvement option missing')
+  resp = session.resolveChoice(0, acceptMinor.value)
+  if (resp.pending.type !== 'choice') {
+    throw new Error(`expected minor-selection choice, got ${resp.pending.type}`)
+  }
+  const c22Option = resp.pending.options.find((o) => o.value === CARD_ID)
+  if (!c22Option) throw new Error('C22 option missing from minor selection')
+  return session.resolveChoice(0, c22Option.value)
+}
 
 describe('C22_BasketChair session', () => {
-  it('onBeforeStartOfTurn offers optional extra place-farmer when workers are available', () => {
-    const player = createPlayer('p1', { workersAvailable: 2 })
-    const state = createState(3, [player])
+  it('case 1 — golden path: recall first-placed worker onto C22 + place extra farmer on ClayPit', () => {
+    const session = setup({ activeWorkers: 3 })
+    simulatePlacement(session, 0, 'forest', '1')
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources.reed).toBe(0)
+
+    // onBuy should present an optional accept/skip for the recall+place seq.
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+    expect(resp.pending.options.some((o) => o.value === '__skip__')).toBe(true)
+
+    // Accept → recall worker 1 onto C22 and open place-farmer choice.
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+
+    // Forest is freed of P1; worker 1 is held on C22; one at-home worker (3) left.
+    const forestAfterRecall = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    expect(forestAfterRecall.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
+
+    // Next pending is the place-farmer choice.
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    const clayPitOption = resp.pending.options.find((o) => o.value === 'clay-pit')
+    expect(clayPitOption).toBeDefined()
+    // The freed Forest must also be available as a placement option.
+    expect(resp.pending.options.some((o) => o.value === 'forest')).toBe(true)
+
+    resp = session.resolveChoice(0, clayPitOption!.value)
+    expect(resp.ok).toBe(true)
+
+    const clayPit = resp.state.actionSpaces.find((s) => s.id === 'clay-pit')!
+    // Smallest at-home worker (id '3') takes clay-pit.
+    expect(clayPit.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '3')).toBe(true)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
+    // heldWorkerId persists until return-home.
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
+  })
+
+  it('case 2 — skip path: declining the onBuy seq leaves the first placement untouched', () => {
+    const session = setup({ activeWorkers: 3 })
+    simulatePlacement(session, 0, 'forest', '1')
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    resp = session.resolveChoice(0, '__skip__')
+    expect(resp.ok).toBe(true)
+
+    // Forest still holds worker 1; no heldWorkerId; worker 3 still at home.
+    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    expect(forest.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '1')).toBe(true)
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBeUndefined()
+    // Two workers placed (forest prefab + meeting-place), one at home.
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
+  })
+
+  it('case 3 — no prior placement: onBuy emits no flow (direct effect check)', () => {
+    // Case 3 is expressed at the effect level: with an empty placement history
+    // onBuy must return undefined. Through takeAction → meeting-place the
+    // meeting-place placement itself becomes the first recorded placement, so
+    // this invariant is only cleanly observable on the effect itself.
+    const session = setup({ activeWorkers: 2 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    expect(getRoundPlacementDetails(player)).toHaveLength(0)
+
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()
-    const flow = effect!.onBeforeStartOfTurn!(state, player)
-    expect(flow).toBeDefined()
-    expect((flow as any).type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).children[0].actionId).toBe('place-farmer')
-    expect((flow as any).children[0].sourceCard).toBe(CARD_ID)
-    expect((flow as any).children[0].actionContext?.extraPlacement).toBe(true)
-    expect(isCardFlagged(player, CARD_ID)).toBe(true)
-  })
-
-  it('onBeforeStartOfTurn does nothing when the player has no workers available', () => {
-    const player = createPlayer('p1')
-    const state = createState(3, [player])
-    markAllWorkersUsed(state as any, player)
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBeforeStartOfTurn!(state, player)
+    expect(effect!.onBuy).toBeDefined()
+    const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
   })
 
-  it('onBeforeStartOfTurn does nothing when the card is not in play', () => {
-    const player = createPlayer('p1', { minorPlayed: [] })
-    const state = createState(3, [player])
+  it('case 4 — first placement on Meeting Place: no flow offered (direct effect check)', () => {
+    const session = setup({ activeWorkers: 3 })
+    simulatePlacement(session, 0, 'meeting-place', '1')
+
+    const state = session.getState().state
+    const player = state.players[0]!
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBeforeStartOfTurn!(state, player)
+    const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
   })
 
-  it('onRoundEnd clears the card flag for the next round', () => {
-    const player = createPlayer('p1')
-    setCardFlag(player, CARD_ID, true)
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onRoundEnd!(state, player)
-    expect(isCardFlagged(player, CARD_ID)).toBe(false)
+  it('case 5 — no at-home worker for step 2: onBuy emits no flow', () => {
+    // Setup: 2 active workers, worker 1 prefabbed on forest. After
+    // takeAction('meeting-place') worker 2 goes on meeting-place and
+    // workersAvailable = 0 — the place-farmer step would fail. The onBuy guard
+    // must catch this and offer no seq.
+    const session = setup({ activeWorkers: 2 })
+    simulatePlacement(session, 0, 'forest', '1')
+
+    const resp = buyC22ViaMeetingPlace(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    // Nothing from C22 should still be pending: no accept/skip prompt,
+    // definitely no holdWorkerOnCard mutation.
+    if (resp.pending.type === 'choice') {
+      const c22Accept = resp.pending.options.find(
+        (o) => (o as { sourceCard?: string }).sourceCard === CARD_ID,
+      )
+      expect(c22Accept).toBeUndefined()
+    }
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBeUndefined()
+    // Forest is still occupied by the prefab worker.
+    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    expect(forest.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '1')).toBe(true)
+  })
+
+  it('case 6 — re-placing on freed origin: Forest can be reused by the extra place-farmer', () => {
+    const session = setup({ activeWorkers: 3 })
+    // Seed forest wood so re-occupying it collects a positive gain.
+    const state0 = session.getState().state
+    state0.actionSpaces.find((s) => s.id === 'forest')!.resources.wood = 3
+    session.loadState(state0)
+
+    simulatePlacement(session, 0, 'forest', '1')
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')!
+
+    resp = session.resolveChoice(0, acceptOption.value)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.options.some((o) => o.value === 'forest')).toBe(true)
+
+    const woodBefore = resp.state.players[0]!.resources.wood
+    resp = session.resolveChoice(0, 'forest')
+    expect(resp.ok).toBe(true)
+
+    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    // Smallest at-home worker (id '3' — worker 1 is held, worker 2 is on
+    // meeting-place) takes the re-opened forest space.
+    expect(forest.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '3')).toBe(true)
+    expect(forest.takenBy.some((t) => t.workerId === '1')).toBe(false)
+    expect(resp.state.players[0]!.resources.wood).toBeGreaterThan(woodBefore)
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
+  })
+
+  it('case 7 — return home releases the card-held worker', () => {
+    const session = setup({ activeWorkers: 3 })
+    simulatePlacement(session, 0, 'forest', '1')
+
+    // Golden-path buy + accept + place on clay-pit, matching case 1.
+    let resp = buyC22ViaMeetingPlace(session)
+    if (resp.pending.type !== 'choice') throw new Error('expected accept/skip choice')
+    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')!
+    resp = session.resolveChoice(0, acceptOption.value)
+    if (resp.pending.type !== 'choice') throw new Error('expected place-farmer choice')
+    resp = session.resolveChoice(0, 'clay-pit')
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
+
+    // Drive the central return-home path directly (same pattern as
+    // card-held-return-home.test.ts). This clears every held worker.
+    ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
+
+    const afterState = session.getState().state
+    expect(getWorkerHeldOnCard(afterState.players[0]!, CARD_ID)).toBeUndefined()
+    // All 3 active workers are home again (the 3 action-space takenBy lists
+    // are cleared as part of the same hook).
+    expect(workersAvailable(afterState, afterState.players[0]!)).toBe(3)
   })
 })

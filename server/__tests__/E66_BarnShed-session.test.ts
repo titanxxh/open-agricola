@@ -8,7 +8,6 @@ describe('E66_BarnShed session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex
     state.round = 1
 
@@ -19,6 +18,7 @@ describe('E66_BarnShed session', () => {
 
     const opponent = state.players[1]!
     setWorkersAtHome(state, opponent, 2) // Ensure forest has accumulated resources
+    state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     if (forest) forest.resources.wood = 3
 

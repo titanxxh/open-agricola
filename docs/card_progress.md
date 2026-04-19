@@ -20,7 +20,7 @@
 | E | 169 | 159 | 0 | 2 | 1 |
 | **总计** | **892** | **821** | **5** | **3** | **1** |
 
-**截至 2026-04-18：821/892 = 92.0%。**
+**截至 2026-04-19：821/892 = 92.0%。**（2026-04-19 多项重构 / 对齐变更未新增已实现卡数：E16 BriarHedge border-fence、行动格按人数过滤、`canUseOccupied` → `computeArgs` 统一、E96 Elder + handHooks、C22 BasketChair + card-held-workers、D154 ChimneySweep wood→stone、C129 SecondSpouse 首置条件、A48/B143 对齐 BGA。）
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -35,19 +35,25 @@
 
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
-| ✅ 完全对齐 | ~803 + §2.1 列举 25 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
-| 🟡 简化实现（§2.2） | 8 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 2 张 | 行为与 BGA 偏差，是 bug | 排期修 |
+| ✅ 完全对齐 | ~803 + §2.1 列举 27 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
+| 🟡 简化实现（§2.2） | 6 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
+| ⚠ 行为偏差待修（§2.3） | 0 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
-| 🔀 刻意偏离 BGA（§2.5） | 2 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
+| 🔀 刻意偏离 BGA（§2.5） | 3 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| ⏳ 待实现 / 待评估（§2.6） | 2 张（D159 + E149；其余"BGA 也无逻辑"4 张未逐项列） | 未实现或需核心扩展 | 见 §2.6 优先级 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — C22 BasketChair BGA 对齐**：引入 `card-held-workers` 原语（`shared/cards/helpers/card-held-workers.ts`），允许卡牌通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人；`workersAvailable` 排除被卡持有的工人；回家阶段（`server/game-session.ts` returnHome）在清空行动格 `takenBy` 之后以 for 循环遍历所有玩家 cardStates，对每个 cardId 调用 `releaseWorkerFromCard(p, cardId)` 释放持有工人；`recall-placed-worker` 新增 `forceFirst` 与 `targetCardHold` 参数。C22 从简化实现（额外 place-farmer）重写为：`onBuy` hook 在本工作阶段已有首置 farmer 且首置格不是 Meeting Place 时，(a) 用 `recall-placed-worker forceFirst+targetCardHold` 把该工人从行动格撤回到卡持有态，(b) 再提供一次额外 `place-farmer` 让玩家补放另一个在家工人——净消耗 2 个在家工人，释放 1 个格位。若当时尚未放过 farmer 或首置格是 Meeting Place，onBuy seq 直接跳过。回家时工人随 for 循环释放。刻意偏离：(a) 不支持同轮再激活，(b) JobContract 的假人 meeple 清理未实现。新增 `server/__tests__/C22_BasketChair-session.test.ts`。
+- **2026-04-19 — A48 ShavingHorse + B143 ClayWarden BGA 对齐**：A48 删除 `WOOD_SPACES` 过滤（BGA 不按空间过滤），合并为两个 `after` listener——`gain/collect/receive` + `anytime-exchange`——复用同一 `checkAndExchange(context)` 检查木头净获得与当前总量；cost 从 `{}` 改为 `{ wood: 1 }` 与 BGA 对齐。B143 `HOLLOW_SPACES` 加入 `'hollow'`（3 人版空间），在 3 人局也能触发 opponent 钩子。新增 `server/__tests__/A48_ShavingHorse-session.test.ts`（7 例）、扩展 `server/__tests__/B143_ClayWarden-session.test.ts`（+1 例 3P）。
+- **2026-04-19 — E96 Elder BGA 对齐 + `handHooks` 通用手牌 hook 机制 + 批量移除冗余 played-includes 守卫**：新增 `CardEffect.handHooks` 字段，声明哪些 hook 在卡牌还在手牌时也应触发；`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。E96 Elder 通过此机制实现回合 1 免费打出自身（`onBeforeStartOfTurn` + `allowedCards` 过滤）。同时批量移除 756 处冗余的 `player.xxxPlayed.includes(CARD_ID)` 守卫——框架已在调用侧保证卡牌已打出，卡牌文件内无需重复检查。
 - **2026-04-19 — 行动格按人数过滤，对齐 BGA 2-3 人局配置**：`createActionSpaces(playerCount?)` 按 `players` 字段过滤行动格。新增 3P 变体：`hollow`（1 黏土/轮）、`resource-market`（XOR 芦苇+食/石+食）、`lessons-3`（固定 2 食）。7 个全人数通用行动格补 `players: [2,3,4]`。前端坐标表补 3P 条目。2P=10 主行动格、3P=14、4P=16。不改卡牌实现数。
+- **2026-04-19 — C129 SecondSpouse BGA 对齐**：加"占用者是对方首置 farmer + 上限≤2"判定，移除运行时 `players.length < 3` 检查（由牌组配置保证）。
 - **2026-04-19 — choice/farmSelect/selection 统一透传 `sourceCard` + InteractionBar 显示触发来源卡名**：`PendingAction` / `InteractionState` / 前端 `PendingChoice` 新增可选 `sourceCard`，`OptionalNode` 在弹出 `ui.interactionOptionalAction` 时也会把来源卡写入 `pendingChoiceContext`，因此像 `D161 CabbageBuyer` 这类卡牌触发的 optional offer 终于能在交互栏副标题统一显示“由某卡触发”。规则行为不变：若效果已触发但资源不足（例如 D161 在 `no improvement = 3 food` 时付不起），依旧不会额外显示一个不可执行的 choice。
+- **2026-04-19 — repo-wide `sourceCard` 补漏 + `ChoiceEffectPreview` / hybrid button UI 落地**：`ActionChoiceOption` / `ActionFlow.leaf` 新增 `effectPreview`，并把 option 级 `sourceCard` 扩到 `computeArgs` / `computeChoiceCandidates` / PlayerActionCard direct choice 全链路；引擎补上 hook flow/follow-up `sourceCard` 兜底、`OR/XOR` 首屏 prompt 的 `pendingChoiceContext.sourceCard`、以及 `seq(pay-resources, gain[, bonus-vp])` 的 preview 聚合。显性补漏卡包括 `Major_ClayOven` / `Major_StoneOven`、`E73_Scythe`、`E74_AshTrees`、`E53_BoarSpear`、`D23_PioneeringSpirit`、`C104_Collector`、`B42_ForestInn` 及一批 occupied-space extra option 卡（`A26/A28/A87/A94/A130/B129/B151/C129/D24/D112/E129/E150`）。`InteractionBar` 现按 `hybrid_dual` 渲染：按钮主文案显示真实效果（如 `food -> vegetable` / 具体 payment），按钮次文案显示动作类型，顶部副标题继续显示来源卡；新增 sourceCard/effectPreview 回归 45+ focused tests。
+- **2026-04-19 — `sourceCard` contract follow-up：修正 `computeReplace` 非 decline 链路与 mixed prompt 归因**：`HookDispatcher.applyComputeReplace()` 现在会保留 listener 返回的 `sourceCard`，因此像 `E24_Ambition` 这类 `minor-improvement -> improvement-any` 替换在进入真实改良选择时不再退回匿名 prompt。与此同时，pending 级 `sourceCard` 的判定收紧为“所有 option 都显式带同一个来源卡”才成立，避免 `A87_Conservator` / `A94_LazySowman` 这类“基础选项 + 卡牌额外选项”的混合 prompt 被误标成整段都由卡牌触发；对应 session 回归已补。
 - **2026-04-19 — `C18_RollOverPlow` / `A128_RiparianBuilder` sourceCard session 加固测试**：补两条跨阶段回归：`C18_RollOverPlow` 断言 `selection -> plow farmSelect` 两段交互都带 `sourceCard`；`A128_RiparianBuilder + A123_FrameBuilder` 断言赠送的建房动作进入 `prompt.selectPayment` 后仍保留 `sourceCard`，防止 `choice / farmSelect / payment-choice` 链路后退成匿名提示。
 - **2026-04-19 — house-redevelopment / wish-children optional-tail 引擎修复**：修复 `resolveChoice` leaf 在单候选 auto-resolve 分支遗留占位 `ChoiceNode` 的 bug；此前这会让 `house-redevelopment` 在翻修后提前结束，跳过可选 `improvement-any`，并把 D161 CabbageBuyer 的报价错误锁死在 3 food。修复后 D161 的 `no/minor/major = 3/2/1 food` 报价重新生效；session 回归测试已改为覆盖 `T1/T2/T3/T4` 的无改良 / minor / major / self-trigger 分支。顺带确认 `wish-children` + A92 AdoptiveParents 的 optional tail 也复用同一引擎路径，相关 session 测试改为按 prompt 语义而不是随机手牌阶段判断。
 - **2026-04-18 — D161 Cabbage Buyer 重实现 + isMajorImprovement 统一标志**：消除”固定 2 食物”偏离，改为 3/2/1 按实际打出改良的卡牌属性判定（`isEffectivelyMajor` helper）。新增基础设施 `isMajorImprovement` flag 标记 A60/D59/C60/D25 四张 minor-that-is-major 卡。D161 仅在 house-redevelopment 生效（farm-redev / standalone renovate 不触发），通过 tracker + `after:place-farmer` drain 延迟结算。
@@ -109,31 +115,24 @@
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 | D154 ChimneySweep | `renovate-house` computeCosts hook 无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；结算时每名其他玩家住石屋 +1 bonus VP | 2026-04-19：去掉 `houseType === 'clay'` 守卫、`players: '3+' → '4+'`；wood→clay 由 `applyCostOverride` 的 `Math.max(0, …)` clamp 处理——stone 不在基础 cost 中，负数不产生副作用；BGA `extraVp = true` 仅卡面 UI 标记，规则无影响 |
 
-### 2.2 🟡 简化实现（8 张）
+### 2.2 🟡 简化实现（6 张）
 
 > 简化原因写在各卡 `.ts` 文件顶部注释中。回归 BGA 完整规则需要的基础设施列在最后一列。
 
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
 | A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤；onBuy 直接从整手随机选 1 免费打 | `select-N-from-hand` pending 类型 |
-| A48 ShavingHorse | 只监听 `gain`（限 `copse`/`forest`/`grove`/`resource-market-4`）+ `collect`；缺 `receive`/`reap`/exchange-after 触发 | 通用 "wood-obtained" hook 或 `after:gain` 全资源监听 |
 | B3 Moonshine | XOR 折叠为"买不起则 PASS"（自动抉择） | `select-N-from-hand` + pass-to-opponent action |
-| C22 BasketChair | 每轮开始提供一次额外 place-farmer，不召回已放农民 | 新 farmer-recall-to-card 机制 |
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
 | D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
-| E96 Elder | 回合 1 StartOfWork 额外打出职业未实现 | 新 `stStartOfTurn allowedCards` hook |
+| ~~E96 Elder~~ | ~~回合 1 StartOfWork 额外打出职业未实现~~ | 已实现（2026-04-19），通过 `handHooks` 机制 |
 
-### 2.3 ⚠ 行为偏差待修（2 张）
+### 2.3 ⚠ 行为偏差待修（0 张）
 
-> 不是设计取舍，是 bug——只是修起来需要动一点架构 / action-space 配置。
+> 本节已清零。
 
-| Card | 偏差 | 影响 | 建议 |
-|---|---|---|---|
-| B143 ClayWarden | 只监听 `hollow-4`（仅 4 人空间）；3 人版 `hollow` action 空间在我们项目里整个缺失 | 3 人局：B143 永不触发（且整局没 Hollow 空间） | 新增 `hollow` 3 人版 action 空间；B143 listener 同步加 `hollow` |
-| C129 SecondSpouse | 我们只检查"对方占用"；BGA 还要求"占用者是其本人**第一个**放的 farmer 且占用人数 ≤2" | 我们更宽松——对方第二/三人占的也允许抢；轻微规则违规 | listener handler 加占用者来源判断（需要 `placedFarmers` 顺序信息） |
-
-> **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。
+> **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
 ### 2.4 ❌ 数值/元数据待修（0 张）
 
@@ -143,7 +142,7 @@
 >
 > 后续若再出现 cost/prereq/vp 偏差，重新在本节登记并走同样流程：`scripts/audit-card-vp.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（2 张）
+### 2.5 🔀 刻意偏离 BGA（3 张）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -151,13 +150,13 @@
 
 | 卡牌 | BGA 行为 | 我们的行为 | 偏离原因 | 回归 BGA 的代价 |
 |---|---|---|---|---|
+| C22 BasketChair | `onBuy` 时若本工作阶段已首置 farmer 于非 Meeting Place 格，则把该工人撤回到卡持有态，再给予额外 `place-farmer`（净消耗 2 个在家工人，释放 1 个格位）；BGA 允许 JobContract 伪人 meeple 互动、同轮工人用完后再激活 | (a) 不支持同轮再激活（heldWorker 用完即止）；(b) JobContract 的假人 meeple 清理未实现 | (a) 影响极少：需同轮两次 place-farmer + JobContract 共存；(b) JobContract 未实现，无实际影响 | (a) `onEndTurn` 监听放人计数，用完后重新激活一次；(b) 等 JobContract 实现后再处理假人清理 |
 | D161 CabbageBuyer | 按改良类型 3/2/1 售价 | 3/2/1 按打出改良的实际属性；仅在 house-redevelopment 生效 | 仅在 house-redevelopment 生效；farm-redev / 卡触发 renovate 不 offer | 给 farm-redev / standalone renovate 各加一条 offer 3 食物分支 |
-
 | E16 BriarHedge + `canStartFencing` | BGA `actFencing` 中 `maxBuyable = wood + borderFreePotential`，因此有 2–3 wood 时 E16 可让玩家进入围栏流程 | 我们 `canStartFencing` 仍要求 wood ≥ 4；E16 的折扣只在边 edge 选定后才被 `collectFenceDiscount` 应用，无法提前拉低入口门槛 | 入口守卫与折扣聚合解耦，改动范围最小；实际影响极小（仅在 2–3 wood 且 E16 已打出的特定边角场景） | `canStartFencing` 读 `collectFenceDiscount` 计算潜在折扣，动态降低最低 wood 要求 |
 
 > **历史记录**：~~E132 VeggieLover~~ 之前被误标为"刻意不同"。实际上它是 BGA 3+ 人卡（不是 5+），desc 与行为（harvest 1G+1V→6F、scoring 1/2/3 stack→2/4/6 VP）都已与 BGA 对齐。2026-04-17 移除。
 
-### 2.6 ⏳ 待实现 / 待评估（3 张）
+### 2.6 ⏳ 待实现 / 待评估（2 张）
 
 #### Tier 1 — BGA 自身无逻辑，我们也无逻辑（数据 only）
 
@@ -175,6 +174,8 @@
 | E149 Midnight Fencer | Occupation | `StartHarvest` listener，第 14 轮跨玩家拿围栏，可超过 15 上限 | 未做；最复杂剩余 | MED-HIGH |
 
 > `D155_Ebonist`、`D103_CanalBoatman`、`E93_Motivator` 已于 2026-04-17 收口。
+> `E96 Elder` 已于 2026-04-19 通过新增的 `handHooks` 机制实现回合 1 免费打出自身。
+> `E125 DelayedWayfarer` 已于 2026-04-18 通过新增的 `onAllWorkersPlaced` 阶段 hook + `place-farmer fromSupply` 模式对齐 BGA 时序。
 
 ---
 
@@ -200,7 +201,8 @@
 | `returnCardToBoard(player, cardId, state?)` | ✅ | 2026-04-18：helper 现在可选接收 `state`，统一负责“从 `player.improvements` / `player.minorPlayed` 移除卡”以及“若归还的是 major，则回收到 `state.availableMajorImprovements` 且不重复追加”。消费者：major/minor improvement 支付路径、D60 LargePottery。 |
 | `selectionEffect` / `selection-effect-registry` | ✅ | 2026-04-18：原 `fieldEffect` / `field-effect-registry` 更名，并在同日完成与 `selection` action 对齐。语义是“selection 提交后执行一个注册回调”，不再把这类“选择提交后的副作用”误称为 field effect。消费者：A58/A70/A71/B115/B165/C18/D27/D70/D71/D72/D102/E4/E71/E76。 |
 | `stable-removal` helper | ✅ | D102 / E76 |
-| `recall-placed-worker` action | ✅ | D93（通用农民回收） |
+| `recall-placed-worker` action | ✅ | D93（通用农民回收）；2026-04-19 新增 `forceFirst`（强制回收最先放置的工人）与 `targetCardHold`（回收后将工人持有到指定卡的 cardStates.extraData.heldWorkerId）参数 |
+| **Card-held workers（2026-04-19）** | ✅ | `shared/cards/helpers/card-held-workers.ts`：`holdWorkerOnCard(player, cardId, workerId)` / `getWorkerHeldOnCard(player, cardId): string \| undefined` / `releaseWorkerFromCard(player, cardId): string \| undefined` / `getCardHeldWorkerIds(player): Set<string>` 原语。持有的工人存于 `player.cardStates[cardId].extraData.heldWorkerId`；`workersAvailable(state, p)` 已排除被卡持有的工人（不在任何 `takenBy` 也不在家）；回家阶段（`GameSession.returnHome`）在清空行动格 `takenBy` 之后，以 for 循环遍历每个玩家的所有 cardStates key，对每个 cardId 调用 `releaseWorkerFromCard(p, cardId)` 释放持有工人（无单独的 releaseAll 辅助函数）。首个消费者：C22 BasketChair。 |
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
 | **Worker 身份模型**（2026-04-17） | ✅ | `PlayerState.workers[]`（5 槽，isActive/isNewborn）+ `ActionSpace.takenBy: WorkerRef[]` + `__roundPlacement__` 升级为 `{spaceId, workerId}[]`。删除聚合字段 familySize / newbornCount / workersAvailable，全部走 `shared/game/player.ts` helper。消费者：A25 Bassinet、B4 WoodPile（TODO 可接）、A92 AdoptiveParents（从盲减升级为精确取回）。 |
 | **`countPeopleOnSpace` helper**（2026-04-17） | ✅ | `shared/cards/helpers/space-occupancy.ts`：返回某行动格上当前物理占位的人数（含新生儿）。依赖 Worker 身份模型——等于 `space.takenBy.length`。消费者：A25 Bassinet；B4 WoodPile 原 TODO 可顺带消化。 |
@@ -222,7 +224,12 @@
 | **`computeAllowedPlacementSpaces`**（2026-04-19） | ✅ | `shared/actions/effects/placement-availability.ts`：单一允许集 helper，由 `takeAction` / `place-farmer` / `move-farmer-to-space` 三入口共用。替代已删除的 `canUseOccupied` hook phase。卡牌通过 `computeArgs` + `OCCUPIED_SPACE_CHOICE_PREFIX` 注入额外可用的已占用空间。消费者：A25/A28/A130/B151/C129/D24/E21/E150。 |
 | **`CardEffect.computeLockedFarmTiles`**（2026-04-18） | ✅ | 通用农场格锁定扩展点，卡牌可声明动态锁定的格子，验证层和交互层自动过滤。消费者：B38 FutureBuildingSite。 |
 | **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
+| **`CardEffect.handHooks` 手牌 hook 机制**（2026-04-19） | ✅ | `CardEffect.handHooks?: CardEffectHook[]`：声明哪些 hook 在卡牌还在手牌时也应触发。`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。框架保证 handHooks 只遍历手牌——一旦卡被打出（移入 `xxxPlayed`），只走正常路径。消费者：E96 Elder。 |
+| **`play-occupation` `allowedCards` 参数**（2026-04-19） | ✅ | `play-occupation` action 的 execute/resolveChoice 支持 `params.allowedCards?: string[]` 过滤可选职业。消费者：E96 Elder。 |
 | **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
+| **`onAllWorkersPlaced` 阶段 hook + 阶段 flow**（2026-04-18） | ✅ | `CardEffect.onAllWorkersPlaced?: CardEffectHook`：在所有玩家本轮在家工人都用完之后、`performRoundEnd` 之前触发；可返回 `ActionFlow` 走与普通行动一致的引擎链路（`continueAllWorkersPlacedHooks` 维护 stage resume cursor）。首个消费者：`E125 DelayedWayfarer`（本轮所有人放完后，从 supply 激活并放置一个 worker，对齐 BGA 时序）。 |
+| **`place-farmer` `fromSupply` 模式**（2026-04-18） | ✅ | `place-farmer` 接受 `params.fromSupply: true`：在执行前从 `player.workers` 里激活一个 inactive supply worker（标记 `isActive=true`），再走标准放置流程；专为 `onAllWorkersPlaced` 阶段“现激活、现放置”的卡牌（E125 DelayedWayfarer）服务，不影响普通工作阶段路径。 |
+| **`dispatchReapListener` + `'reap'` 合成 action**（2026-04-18） | ✅ | `shared/actions/effects/reap.ts` 导出 `dispatchReapListener(state, player, crop, amount)`：每次 base reap 与额外 reap 卡（D25/C70/E69/E70/E68/E72）产出作物后调用，分发 `'reap'` 合成 action 事件（`extraData = { crop: 'grain'\|'vegetable', amount }`）。卡牌可通过 `registerCardListener({actions: ['reap'], phases: ['immediatelyAfter']})` 订阅。首个消费者：B132 EstateMaster（满栏后每次蔬菜 reap +1 VP）。 |
 
 ---
 
@@ -263,6 +270,8 @@
 | E16 BriarHedge + B30 border-only | 04-19 | 0 | 821 | 92.0% |
 | 行动格按人数过滤 (2-3P) | 04-19 | 0 | 821 | 92.0% |
 | canUseOccupied → computeArgs 统一 | 04-19 | 0 | 821 | 92.0% |
+| E96 Elder BGA 对齐 + handHooks 机制 | 04-19 | 0 | 821 | 92.0% |
+| C22 BasketChair BGA 对齐 + card-held-workers 原语 | 04-19 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 

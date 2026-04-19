@@ -86,11 +86,4 @@ describe('E143_Hewer', () => {
     expect(flow).toBeNull()
   })
 
-  it('does not trigger when card is not played', () => {
-    const player = createPlayer()
-    player.occupationPlayed = []
-    const state = createState([player], 5)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
-    expect(flow).toBeNull()
-  })
 })

@@ -167,20 +167,6 @@ describe('C158_ForestCampaigner', () => {
       expect((result!.flow as any).params).toEqual({ food: 1 })
     })
 
-    it('does not trigger for player without the card', () => {
-      const listener = findListener('C158-forest-campaigner-before-place-farmer')!
-      const player = createPlayer()
-      player.occupationPlayed = [] // no card
-      const state = createState(
-        [player],
-        [createAccumulationSpace('forest', 10, { wood: 3 })],
-      )
-      const result = executeCardListener(listener, {
-        state, player, space: createSpace('forest'),
-        actionId: 'place-farmer', phase: 'before',
-      } as any)
-      expect(result).toBeUndefined()
-    })
 
     it('triggers regardless of which space the farmer is being placed on', () => {
       const listener = findListener('C158-forest-campaigner-before-place-farmer')!

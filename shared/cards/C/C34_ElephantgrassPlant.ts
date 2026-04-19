@@ -7,7 +7,6 @@ const CARD_ID = 'C34_ElephantgrassPlant'
 registerCardEffect({
   id: CARD_ID,
   onAfterHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.reed < 1) return
 
     return {

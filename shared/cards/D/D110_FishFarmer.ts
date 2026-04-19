@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id
     if (spaceId !== 'reed-bank' && spaceId !== 'clay-pit' && spaceId !== 'forest') return
     const fishingSpace = context.state.actionSpaces.find((s) => s.id === 'fishing')

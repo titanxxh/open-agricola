@@ -67,7 +67,19 @@ describe('room-manager ws sync', () => {
       sockets.map(
         (ws) =>
           new Promise<void>((resolve) => {
-            ws.once('close', () => resolve())
+            if (ws.readyState === WebSocket.CLOSED) {
+              resolve()
+              return
+            }
+            const timeout = setTimeout(() => resolve(), 1000)
+            ws.once('close', () => {
+              clearTimeout(timeout)
+              resolve()
+            })
+            if (ws.readyState === WebSocket.CONNECTING) {
+              ws.once('open', () => ws.close())
+              return
+            }
             ws.close()
           }),
       ),
@@ -173,5 +185,85 @@ describe('room-manager ws sync', () => {
     expect(resync.version).toBe(undoP1.version)
     expect(countTakenSpaces(resync)).toBe(initialTaken)
     expect(findTakenBy(resync, spaceId!)).toEqual([])
+  })
+
+  it('broadcasts devSetResources and devSetRound updates over ws', async () => {
+    const p1 = new WebSocket(baseUrl) as TestSocket
+    p1.received = []
+    attachCollector(p1)
+    sockets.push(p1)
+    await new Promise<void>((resolve) => p1.once('open', () => resolve()))
+
+    p1.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
+    const roomCreated = await waitForEvent(
+      p1,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
+    )
+
+    const p2 = new WebSocket(baseUrl) as TestSocket
+    p2.received = []
+    attachCollector(p2)
+    sockets.push(p2)
+    await new Promise<void>((resolve) => p2.once('open', () => resolve()))
+
+    p2.send(JSON.stringify({
+      type: 'joinRoom',
+      roomId: roomCreated.roomId,
+      requestedPlayerIndex: 1,
+      name: 'P2',
+    }))
+
+    const initialP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.cause === 'reconnect',
+    )
+    const initialP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.cause === 'reconnect',
+    )
+    const player0 = initialP1.payload.state.players[0]!
+    const initialWood = player0.resources.wood
+
+    p1.send(JSON.stringify({
+      type: 'devSetResources',
+      playerIndex: 0,
+      resources: { wood: initialWood + 5 },
+      requestId: 'dev-set-resources-1',
+    }))
+
+    const afterResourcesP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.requestId === 'dev-set-resources-1',
+    )
+    const afterResourcesP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.requestId === 'dev-set-resources-1',
+    )
+    expect(afterResourcesP1.payload.state.players[0]?.resources.wood).toBe(initialWood + 5)
+    expect(afterResourcesP2.payload.state.players[0]?.resources.wood).toBe(initialWood + 5)
+
+    p1.send(JSON.stringify({
+      type: 'devSetRound',
+      round: 6,
+      requestId: 'dev-set-round-1',
+    }))
+
+    const afterRoundP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.requestId === 'dev-set-round-1',
+    )
+    const afterRoundP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.requestId === 'dev-set-round-1',
+    )
+    expect(initialP2.payload.state.players[0]?.resources.wood).toBe(initialWood)
+    expect(afterRoundP1.payload.state.round).toBe(6)
+    expect(afterRoundP2.payload.state.round).toBe(6)
   })
 })

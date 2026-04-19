@@ -5,8 +5,7 @@ const CARD_ID = 'A12_DrinkingTrough'
 
 registerCardEffect({
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onComputeAnimalZones: (_player, zones) => {
     for (const zone of zones) {
       if (zone.zoneType === 'pasture') {
         // D11_LawnFertilizer already computed the combined capacity for size-1

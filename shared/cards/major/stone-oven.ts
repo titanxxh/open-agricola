@@ -15,5 +15,6 @@ export const stoneOven: MajorCardEffect = {
     type: 'leaf',
     actionId: 'bake-bread',
     optional: true,
+    sourceCard: 'Major_StoneOven',
   }),
 }

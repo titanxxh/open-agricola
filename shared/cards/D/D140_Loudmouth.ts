@@ -18,7 +18,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const gained = context.result?.type === 'ok' ? (context.result.resourcesGained ?? {}) : {}
     const buildingTotal = BUILDING_RESOURCES.reduce((sum, r) => sum + (gained[r] ?? 0), 0)
     const animalTotal = ANIMAL_RESOURCES.reduce((sum, r) => sum + (gained[r] ?? 0), 0)

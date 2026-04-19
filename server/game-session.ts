@@ -54,7 +54,8 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../shared/cards/session-card-context.ts'
 import { registerExecutorBackedCustomCard } from './custom-code-runtime.ts'
 import { getCardModifiers } from '../shared/cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
+import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../shared/cards/card-effects.ts'
+import type { CardEffectHook } from '../shared/cards/card-effects.ts'
 import {
   runRoundEndHooks,
   runBeforeFeedHooks,
@@ -72,6 +73,7 @@ import { computeAnimalZones } from '../shared/actions/effects/animals.ts'
 import { reap } from '../shared/actions/effects/reap.ts'
 import { breedAnimals } from '../shared/actions/effects/breed-animals.ts'
 import { recordActionSnapshot } from '../shared/cards/helpers/action-snapshot.ts'
+import { releaseWorkerFromCard } from '../shared/cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../shared/cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../shared/game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../shared/cards/types.ts'
@@ -560,6 +562,15 @@ export class GameSession {
 
   private getPlayerEffectCardIds(player: PlayerState) {
     return [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
+  }
+
+  /** Return hand card IDs whose registered effect declares `handHooks` containing `hook`. */
+  private getPlayerHandEffectCardIds(player: PlayerState, hook: CardEffectHook) {
+    const handCards = [...player.occupationHand, ...player.minorHand]
+    return handCards.filter(id => {
+      const effect = getCardEffect(id)
+      return effect?.handHooks?.includes(hook)
+    })
   }
 
   private getActiveInteractionContext() {
@@ -1209,7 +1220,10 @@ export class GameSession {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
-      const cards = this.getPlayerEffectCardIds(player)
+      const cards = [
+        ...this.getPlayerEffectCardIds(player),
+        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+      ]
       const startCardIndex = currentPlayerIndex === playerIndex ? cardIndex : 0
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
@@ -2258,6 +2272,13 @@ export class GameSession {
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
+    // Release any workers that cards were holding (e.g. C22_BasketChair).
+    for (const p of this.state.players) {
+      const cardStates = p.cardStates ?? {}
+      for (const cardId of Object.keys(cardStates)) {
+        releaseWorkerFromCard(p, cardId)
+      }
+    }
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {

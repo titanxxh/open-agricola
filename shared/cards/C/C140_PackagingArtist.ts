@@ -37,8 +37,7 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['minor-improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
       flow: {
         type: 'leaf',

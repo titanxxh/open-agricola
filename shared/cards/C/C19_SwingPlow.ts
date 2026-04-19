@@ -24,7 +24,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'farmland') return
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return

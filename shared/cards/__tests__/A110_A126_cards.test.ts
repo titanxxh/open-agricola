@@ -126,16 +126,6 @@ describe('A110_Roughcaster', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card not played', () => {
-    const listener = findListener('A110-roughcaster-after-construct')!
-    const player = createPlayer()
-    player.houseType = 'clay'
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space: createSpace('construct'),
-      actionId: 'construct', phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })
 
 // ─── A126_MasterWorkman ─────────────────────────────────────────────

@@ -24,34 +24,63 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k] [-h|--help]
+Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
+                             [--players N | -p N | --players=N | -p=N]
+                             [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
-fresh backend (tsx) and frontend (vite) bound to the LAN IP.
+fresh backend (tsx) and frontend (vite) bound to the LAN IP. Three persistent
+dev rooms (dev2 / dev3 / dev4) are created automatically; each survives
+backend restarts independently.
 
   --kill-only, --kill_only, -k   Only stop existing listeners; do not start
                                  backend or frontend. Skips the LAN-IP check.
+  --players N, -p N              Pick the dev room for N players (2/3/4).
+                                 Defaults to 4. Links for all three rooms are
+                                 always printed; the selected one is marked.
   -h, --help                     Show this help.
 EOF
 }
 
 KILL_ONLY=0
-for arg in "$@"; do
-  case "$arg" in
+PLAYERS="4"
+while [ $# -gt 0 ]; do
+  case "$1" in
     --kill-only|--kill_only|-k)
       KILL_ONLY=1
+      shift
+      ;;
+    --players|-p)
+      if [ $# -lt 2 ]; then
+        echo "Error: $1 requires a value (2, 3 or 4)."
+        exit 1
+      fi
+      PLAYERS="$2"
+      shift 2
+      ;;
+    --players=*|-p=*)
+      PLAYERS="${1#*=}"
+      shift
       ;;
     -h|--help)
       usage
       exit 0
       ;;
     *)
-      echo "Error: unknown argument: $arg"
+      echo "Error: unknown argument: $1"
       usage
       exit 1
       ;;
   esac
 done
+
+case "$PLAYERS" in
+  2|3|4) ;;
+  *)
+    echo "Error: --players must be 2, 3, or 4 (got: $PLAYERS)"
+    exit 1
+    ;;
+esac
 
 cd "$SCRIPT_DIR"
 
@@ -198,11 +227,10 @@ echo "Stopping existing processes..."
 stop_port_listeners "$FRONTEND_PORT" "frontend"
 stop_port_listeners "$BACKEND_PORT" "backend"
 
-echo "Starting backend (port $BACKEND_PORT on $LAN_IP, persistent dev room via SQLite)..."
+echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4 persisted via SQLite)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PERSIST_ROOMS=sqlite \
   ALLOW_ANONYMOUS_WS=true \
-  PERSISTENT_ROOM_ID=dev \
   BACKEND_HOST="$LAN_IP" \
   BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
@@ -216,11 +244,19 @@ start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
 echo ""
 echo "=== Open Agricola (intranet) ==="
 echo ""
-echo "WS multi-player (persistent room, survives backend restart):"
-echo "  P1: http://${LAN_IP}:5173/?player=p1&transport=ws&room=dev"
-echo "  P2: http://${LAN_IP}:5173/?player=p2&transport=ws&room=dev"
+echo "WS persistent dev rooms (each survives backend restart):"
+for n in 2 3 4; do
+  marker=""
+  if [ "$PLAYERS" = "$n" ]; then
+    marker="    <-- selected (--players $n)"
+  fi
+  echo "  ${n}-player room (room=dev${n})${marker}"
+  for ((i = 1; i <= n; i += 1)); do
+    echo "    P${i}: http://${LAN_IP}:5173/?player=p${i}&transport=ws&room=dev${n}"
+  done
+done
 echo ""
-echo "HTTP single-player (debug):"
+echo "HTTP single-player (debug, non-persistent):"
 echo "  http://${LAN_IP}:5173/?player=p1"
 echo ""
 echo "Logs:"

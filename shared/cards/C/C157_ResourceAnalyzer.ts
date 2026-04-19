@@ -11,7 +11,6 @@ const BUILD_RESOURCES = ['stone', 'clay', 'reed', 'wood'] as const
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const otherPlayers = state.players.filter((p) => p.id !== player.id)
 
     let typesWithMost = 0

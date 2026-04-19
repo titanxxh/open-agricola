@@ -31,8 +31,7 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['occupation', 'play-occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     // Substitute up to 2 food with 1 building resource (simplified: -2 food discount)
     return { costs: { food: -2 } }
   },

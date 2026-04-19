@@ -14,8 +14,7 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     // Each sow action plants one distinct type → 1 food
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },

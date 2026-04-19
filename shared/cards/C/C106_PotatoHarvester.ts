@@ -8,7 +8,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { food: 3 }),
   onAfterReap: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Count vegetable fields that were harvested
     const vegFields = _state.harvestReapSummary?.[player.id]?.vegetableFields ?? 0
     if (vegFields <= 0) return

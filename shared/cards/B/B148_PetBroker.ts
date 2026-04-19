@@ -8,7 +8,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const occCount = player.occupationPlayed.length
     if (occCount === 0) return
     zones.push({

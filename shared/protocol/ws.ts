@@ -39,6 +39,8 @@ type ClientCommandBody =
   | { type: 'undoAction' }
   | { type: 'newGame'; seed?: number }
   | { type: 'loadGame'; state: unknown }
+  | { type: 'devSetResources'; playerIndex: number; resources: Record<string, number> }
+  | { type: 'devSetRound'; round: number }
   | { type: 'devDrawCard'; playerIndex: number; cardId: string }
   | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }

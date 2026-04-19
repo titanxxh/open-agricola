@@ -6,7 +6,6 @@ const CARD_ID = 'A99_FellowGrazer'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return player.pastures.filter((p) => p.size >= 3).length * 2
   },
 })

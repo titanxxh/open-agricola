@@ -8,7 +8,6 @@ export const listener: CardListenerRegistration = {
   phases: ['computeReplace'],
   actions: ['sow'],
   handler: (context) => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.actionContext?.checkedReplaceAction === true) return
     return {
       decline: true,

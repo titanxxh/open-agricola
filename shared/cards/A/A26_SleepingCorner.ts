@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
 
 const CARD_ID = 'A26_SleepingCorner'
@@ -32,6 +32,7 @@ const computeArgsListener: CardListenerRegistration = {
       .map((s) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${s.id}`,
         labelKey: s.nameKey,
+        sourceCard: CARD_ID,
       }))
     if (extraOptions.length === 0) return
     return { extraOptions, sourceCard: CARD_ID }

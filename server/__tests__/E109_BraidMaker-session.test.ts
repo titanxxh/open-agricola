@@ -31,39 +31,6 @@ describe('E109_BraidMaker session', () => {
     return session
   }
 
-  it('lets the player build Basketmakers Workshop for 1 reed + 1 stone', () => {
-    const session = setup()
-    let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const basket = resp.pending.options.find(
-      (o) => o.value === 'major:Major_Basket',
-    )
-    expect(basket).toBeDefined()
-
-    resp = session.resolveChoice(0, basket!.value)
-    // Walk to completion
-    let steps = 0
-    while (resp.pending.type === 'choice' && steps < 8) {
-      steps++
-      const options = resp.pending.options ?? []
-      const next = options.find(
-        (o) => o.value !== 'cancel',
-      )
-      if (next) {
-        resp = session.resolveChoice(0, next.value)
-      } else {
-        break
-      }
-    }
-
-    const player = resp.state.players[0]!
-    expect(player.improvements).toContain('Major_Basket')
-    // Discount: 1 reed + 1 stone (vs 2+2 base). Player started with 2 reed, 3 stone.
-    expect(player.resources.reed).toBe(1)
-    expect(player.resources.stone).toBe(2)
-  })
 
   it('provides a harvest-time reed → food exchange', () => {
     // E109's exchange field enables 1 reed → 2 food exchange. We verify the

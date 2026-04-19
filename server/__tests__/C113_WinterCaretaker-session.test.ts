@@ -71,20 +71,4 @@ describe('C113_WinterCaretaker session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onEndHarvest returns undefined when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-
-    const player = state.players[0]!
-    // Card not in occupationPlayed
-    player.resources.food = 5
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onEndHarvest!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

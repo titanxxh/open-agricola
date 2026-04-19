@@ -30,7 +30,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // Only apply within the grain-utilization action space
     if (context.space?.id !== 'grain-utilization') return
     // Don't recurse into already-replaced actions
@@ -73,7 +72,6 @@ const computeReplaceBakeListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-utilization') return
     if (context.actionContext?.checkedReplaceAction) return
 
@@ -112,7 +110,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-utilization') return
     if (context.doable) return
     // Make sow doable if fencing is possible (the card adds fence as an alternative)
@@ -130,7 +127,6 @@ const isDoableBakeListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-utilization') return
     if (context.doable) return
     if (canStartFencing(context.player)) {

@@ -22,7 +22,6 @@ const makeToolboxFlow = (): ActionHookResult => ({
 })
 
 const handler = (context: CardListenerContext): ActionHookResult | void => {
-  if (!context.player.minorPlayed.includes(CARD_ID)) return
   if (context.state.phase !== 'work') return
   return makeToolboxFlow()
 }

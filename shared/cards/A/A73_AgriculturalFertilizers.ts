@@ -23,7 +23,6 @@ const beforeListener: CardListenerRegistration = {
   actions: ['construct', 'fence', 'stables'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'spacesBefore', countUsedSpaces(context.player))
   },
 }
@@ -34,7 +33,6 @@ const afterListener: CardListenerRegistration = {
   actions: ['construct', 'fence', 'stables'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const before = readCardExtraData<number>(context.player, CARD_ID, 'spacesBefore') ?? 0
     const after = countUsedSpaces(context.player)
     if (after - before < 2) return

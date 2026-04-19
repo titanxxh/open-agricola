@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Check that at least 1 fence was built via result
     const newPastures =
       context.result?.type === 'ok'

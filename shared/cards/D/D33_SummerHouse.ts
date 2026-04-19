@@ -6,7 +6,6 @@ const CARD_ID = 'D33_SummerHouse'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     if (player.houseType !== 'stone') return 0
     const usedTiles = new Set<string>()
     player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))

@@ -7,7 +7,6 @@ const CARD_ID = 'D157_PartyOrganizer'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     if (familySize(player) < 5) return 0
     const othersWithFive = state.players.filter((p) => p.id !== player.id && familySize(p) >= 5)
     return othersWithFive.length === 0 ? 3 : 0

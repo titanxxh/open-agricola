@@ -6,7 +6,6 @@ const CARD_ID = 'A133_Braggart'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const count = player.improvements.length + player.minorPlayed.length
     if (count >= 10) return 9
     if (count >= 9) return 7

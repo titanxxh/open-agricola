@@ -28,6 +28,7 @@ export type ComputeReplaceResult = {
   actionId: string
   declined: boolean
   alternativeFlow?: ActionFlow
+  sourceCard?: string
 }
 
 const cloneValue = <T>(value: T): T => {
@@ -89,6 +90,7 @@ export class HookDispatcher {
     let actionId = applyComputeReplaceHooks(context)
     let declined = false
     let alternativeFlow: ActionFlow | undefined
+    let sourceCard = context.sourceCard
     const listenerContext: CardListenerContext = { ...context, phase: 'computeReplace' }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
@@ -99,13 +101,16 @@ export class HookDispatcher {
         if (typeof result.actionId === 'string') {
           actionId = result.actionId
         }
+        if (typeof result.sourceCard === 'string' && result.sourceCard.length > 0) {
+          sourceCard = result.sourceCard
+        }
         if (result.decline) {
           declined = true
           alternativeFlow = result.alternativeFlow
         }
       }
     }
-    return { actionId, declined, alternativeFlow }
+    return { actionId, declined, alternativeFlow, sourceCard }
   }
 
   applyIsDoable(

@@ -7,7 +7,6 @@ const CARD_ID = 'E90_DungCollector'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const bredAnimalCount = state.harvestBreedSummary?.[player.id]?.animalCount ?? 0
     if (bredAnimalCount < 2) return

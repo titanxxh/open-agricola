@@ -7,7 +7,6 @@ const CARD_ID = 'A29_AleBenches'
 registerCardEffect({
   id: CARD_ID,
   onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
     return payGainFlow({
       cardId: CARD_ID,

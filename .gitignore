@@ -36,4 +36,4 @@ test-results/
 .gstack/
 deploy/Caddyfile
 __pycache__/
-.worktrees/
+.worktree/

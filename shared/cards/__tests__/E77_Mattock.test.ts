@@ -111,16 +111,4 @@ describe('E77_Mattock', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('E77-mattock-after-collect')!
-    const player = createPlayer()
-    player.minorPlayed = []
-    const space = createSpace('reed-bank', { gainPerRound: { reed: 1 } })
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space,
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

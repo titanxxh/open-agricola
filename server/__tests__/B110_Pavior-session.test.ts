@@ -86,20 +86,4 @@ describe('B110_Pavior session', () => {
     expect((flow as any).params?.vegetable).toBeUndefined()
   })
 
-  it('does not trigger when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 3
-
-    const player = state.players[0]!
-    // Card NOT in occupationPlayed
-    player.resources.stone = 5
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

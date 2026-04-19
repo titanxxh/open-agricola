@@ -11,8 +11,7 @@ const isDoableListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
   actions: ['play-occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { doable: false }
   },
 }
@@ -24,7 +23,6 @@ const onPlayListener: CardListenerRegistration = {
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const remainingTurns = Math.max(0, 14 - context.state.round)
     const bonusVp = SCORE_MAP[remainingTurns] ?? 5
     if (bonusVp <= 0) return

@@ -90,6 +90,7 @@ src/ (前端)
 - Sandbox 配置（玩家人数、A/B/C/D/E 默认牌组、自定义卡列表）由 `server/workshop.ts` + SQLite `sandbox_settings` / `sandbox_cards` 持久化；再次进入“我的沙盒”时沿用上次配置。
 - Sandbox 开局会把 `playerCount`、`deckIds`、`customCardIds` 下沉到 `createInitialState()`，因此人数、默认命名、基础牌组过滤都由领域层统一生成。
 - 自定义 `effect_code` 不再被主后端动态 `import()` 或直接执行。主后端只保存 `compiled_code + code_manifest`，运行时注册代理 hook / listener，并通过内部 RPC 调用同机 `custom-code-executor` sidecar 返回纯数据结果。
+- **沙盒内可用的 hook / phase / scope / actionId、AST 禁用清单、`PlayerState` 字段口径、`cardStates` 写入位置等约束，全部以 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md) 为唯一真源。** 该文件含若干 `prompt-sync:begin/end` 标记块，通过 `pnpm run check:prompt-sync` 与 `shared/cards/card-effects.ts` / `server/custom-code-executor/engine.ts` / `server/ast-validator.ts` 自动同源校验。Workshop AI Designer 系统提示词（`src/services/llmPrompts.ts`）必须与之一致，CI 兜底。
 
 ## 4. 核心设计原则
 
@@ -130,7 +131,8 @@ Phase 2 前端联调已完成：
 - `GameContainerApi` / `FarmBoard` 现在会把 `sow` 交互拆成“真实农场格”与“off-board extra-sow tray”两类目标；像 `E68_CherryOrchard` 这类虚拟田仍完全由服务端 `interaction.farm.selectableFields` 驱动，前端只负责渲染与提交坐标。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
-- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时按 `PERSIST_ROOMS` 恢复该房间状态；当前默认后端是 SQLite（`data/open-agricola.db` 中的 `rooms.state_json`），若显式设为 `json` 则读写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）。每次该房间状态变更后都会立刻写回；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
+- **固定持久化 dev 房（dev2 / dev3 / dev4）**：后端启动时硬编码三间常驻房间，房间 ID 与人数一一对应（`dev2`=2 人、`dev3`=3 人、`dev4`=4 人），分别独立持久化、各自存活于跨重启之间。默认按 `PERSIST_ROOMS=sqlite` 写入 `data/open-agricola.db` 的 `rooms.state_json`；若显式设为 `json` 则写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev2.json` 等）。每次房间状态变更都会立刻写回；这些房间在无人连接时也不销毁、也不可被 `dissolveRoom`。前端使用 `?transport=ws&room=devN&player=pK` 进入对应房间，`p1..pN` 会映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 入座，服务端对这三间房允许同座位重连替换旧连接。对应地，`./restart-intranet.sh` 默认会打印三间房的链接，可用 `--players N` 突出某一间。早期版本中遗留的单一 `dev` 房与 `.persisted-room.json` / `PERSISTENT_ROOM_ID` 环境变量已不再支持，启动时会自动从 SQLite 中清理旧的 `dev` 行（json 文件会备份成 `<roomId>.json.legacy.bak` 后删除）。
+- **`playerCount` 在房间恢复链路上一致透传**：`createSessionForRoom(stateOrSeed?, customCardDbIds, requestUserId, playerCount?)` 对外多了一个可选 `playerCount` 参数；只有当 `stateOrSeed` 为 `undefined` 或 number seed（即将构造全新 state）时才把它放进 `GameSession.initialStateOptions.playerCount`，避免覆盖 serialized state 已经编码的人数。`loadRoomFromState`、`restoreRoomFromSqliteRow`（针对 `state_json IS NULL` 的行）以及 WS `newGame` 命令都会把 `room.maxPlayers` 透传下去——这样像 `dev4` 这种 `max_players=4` 但 `state_json=NULL` 的持久化房，重启后第一次构造也会按 4 人初始化（包含 4 人 action board 的 17 个空间），而不是退化成 2 人。
 - `./restart-intranet.sh` 现在直接使用当前仓库的绝对路径二进制启动 `tsx` / `vite`，并按同样的绝对路径匹配旧进程，避免跨 clone/worktree 的全局 `pkill` 误伤。
 - 普通 SQLite 房间同样遵循“空房先保留、TTL 后回收”的策略：连接全部断开时不会立刻从内存删掉，而是保留分享链接可重连的窗口期。服务端启动恢复范围也覆盖 `waiting` 与 `playing` 房间，因此等待中的房间不会再因为后端重启直接丢失。恢复与重开都会继续带上房间记录里的 `custom_card_ids`。
 
@@ -224,6 +226,8 @@ type StateUpdateEnvelope =
   - `allowedCommands`
   - `anytimeActions`
   - `choice` / `farmSelect` / `selection` 的 `sourceCard`（当交互由某张卡触发时，前端可统一显示“由某卡触发”）
+  - `choice.options[].sourceCard`（当同一个 pending 里混入多张卡注入的 option 时，来源卡归属下沉到 option 级）
+  - `choice.options[].effectPreview`（按钮主文案用的结构化效果预览；当前覆盖 `resourceExchange` / `payment` / `text`）
   - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`（对 `sow`，`selectableFields` 允许包含 off-board 虚拟田位、每格独立 `allowedCrops` 与 `sourceCard`）
 
 协议层规则：
@@ -369,14 +373,13 @@ type SessionResponse = {
 
 从这一刻起，这局游戏的所有状态修改都必须经由 `GameSession` 暴露的方法，例如：
 
-- `takeAction()`
+- `takeAction()` / `takeAnytimeAction()`
 - `resolveChoice()`
-- `confirmAnimalReorg()`
-- `confirmHarvestFeed()`
-- `confirmNextPlayer()`
+- `commitFarmChoice()` / `commitSelectionChoice()`（farmSelect / selection 提交入口）
+- `confirmAnimalReorg()` / `confirmHarvestFeed()`
+- `confirmNextPlayer()` / `confirmPlayerSwitch()`
 - `performRoundEnd()`
-- `undoStep()`
-- `undoAction()`
+- `undoStep()` / `undoAction()`
 
 ### 6.2 状态修改的唯一入口
 
@@ -478,21 +481,29 @@ WebSocket 比轮询 HTTP 更适合这个场景。
 5. 所有玩家加入后，服务端发送 `gameStarted`
 6. 同时推送当前 `stateUpdate`
 
-客户端消息：
+客户端消息（实际以 `shared/protocol/ws.ts` 中 `ClientCommand` 为准；这里列出主路径常用项）：
 
 ```ts
-{ type: 'createRoom', name?: string, maxPlayers?: number }
-{ type: 'joinRoom', roomId: string, name?: string }
+{ type: 'createRoom', name?: string, maxPlayers?: number, customCardIds?: string[] }
+{ type: 'joinRoom', roomId: string, requestedPlayerIndex?: number, name?: string }
+{ type: 'dissolveRoom' }
 { type: 'getState' }
 { type: 'action', spaceId: string }
 { type: 'choice', value: string }
+{ type: 'anytime', actionId: string }
 { type: 'reorg', zones: [...] }
 { type: 'feed', selections: [...] }
 { type: 'nextPlayer' }
+{ type: 'confirmPlayerSwitch' }
 { type: 'roundEnd' }
-{ type: 'undoStep' }
-{ type: 'undoAction' }
+{ type: 'commitFarm', playerIndex, farmType: 'fence'|'room'|'stable'|'plow'|'sow', payload }
+{ type: 'commitSelection', playerIndex, payload: { positions: [...] } }
+{ type: 'undoStep' } | { type: 'undoAction' }
+{ type: 'newGame', seed?: number } | { type: 'loadGame', state: SerializedGameState }
+{ type: 'devSetResources' | 'devSetRound' | 'devDrawCard' | 'devPlayCard' | 'devCreatePasture', ... }
 ```
+
+> **协议名 vs 引擎名（容易踩坑）**：WS 协议字段 `type` 用的是 `action` / `choice` / `reorg` / `feed` / `nextPlayer` / `anytime` 这一套；而 `interaction.allowedCommands` 白名单里出现的是引擎语义名：`takeAction` / `resolveChoice` / `confirmReorg` / `confirmFeed` / `confirmNextPlayer` / `takeAnytimeAction`。它们是同一个意图的两层视角——`room-manager` 收到 WS 消息后调用 `GameSession.takeAction()` / `resolveChoice()` / `takeAnytimeAction()` / `confirmNextPlayer()` 等同名方法。前端在判断"现在能做什么"时，应当读 `interaction.allowedCommands`（引擎名）而不是直接复用 WS `type`，否则会和服务端 `commitFarm` 一类的合并指令对不上号。
 
 服务端消息：
 
@@ -1007,6 +1018,14 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 
 如果某些字段只服务于后端恢复，例如 `roundStartSnapshot`，建议不要在每次 `stateUpdate` 中携带，而是保留在服务端。
 
+`SerializedActionSpace.players?: number[]` 是 BGA 行动格的“人数变体白名单”：例如 `Resource Market`（4 人版）、`Hollow`（4 人版）、`Lessons-3`（3 人版）等空间只有当 `players.length` 落在该数组里才会进入 `state.actionSpaces`。`createActionSpaces(playerCount?)`（`shared/logic/state.ts`）按 `players` 字段过滤模板：
+
+- 2P：10 个主行动格
+- 3P：14 个（含 3P 专属 `hollow` / `resource-market` / `lessons-3`）
+- 4P：16 个（含 4P 专属 hollow/resource-market/lessons-4）
+
+7 张通用格在卡定义里显式带 `players: [2, 3, 4]`。`shared/actions/index.ts` 的 `getAvailableActions(playerCount)` 与 `shared/game/serialization.ts` 的 `rehydrateState`、`shared/logic/state.ts` 的 `normalizeState` 都从 `state.players?.length` 推导出当前人数，再调用 `createActionSpaces`，所以即使 `state_json` 缺字段，也会按 `players.length` 重新构造正确的 action board。前端 `ActionBoard` 通过 `getBoardPlayerCount(players)` 推 2/3/4 并切换 `action-board--{n}p` className 与底图（2P=830px、3P/4P=1000px 加边栏）。
+
 ### 11.4.1 Worker 身份模型（2026-04-17）
 
 - `PlayerState.workers: Worker[]`（固定 5 槽，id `'1'..'5'`）是 worker 身份的唯一真相源；`isActive` / `isNewborn` 两个布尔标记状态。
@@ -1016,6 +1035,8 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 - `__roundPlacement__` 现在记录 `{spaceId, workerId}[]`；`getRoundPlacementOrder(p)` 仍返回 `string[]` 保留向后兼容，`getRoundPlacementDetails(p)` 返回结构化列表。
 - A92 AdoptiveParents 精准定位新生儿（`findFirstNewborn`），从所在 space 的 takenBy 移除对应 WorkerRef 并把该 worker 的 `isNewborn` 翻为 false。
 - 送工人回家路径（D150 GodlySpouse / D93 SheepInspector / E3 TeaTime）通过 `removeWorkerRef(space, playerId, workerId)` 按 workerId 精确移除，保留其他占位者。
+
+**Card-held workers（2026-04-19）**：卡牌可通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人。持有态工人既不出现在任何 `ActionSpace.takenBy`（未占用行动格），也不在家（`workersAvailable` 的计算中会排除此类工人，`workersAtHome` 等价于"既未在格又未被卡持有"）。回家阶段，`GameSession.returnHome` 在清空各行动格 `takenBy` 之后，以 for 循环遍历每个玩家的所有 `cardStates` key，对每个 `cardId` 调用 `releaseWorkerFromCard(p, cardId)` 释放卡持有工人，使其回到"可用于下一轮"的活跃状态（无单独的 releaseAll 辅助函数）。工具函数在 `shared/cards/helpers/card-held-workers.ts`：`holdWorkerOnCard(player, cardId, workerId): void` / `getWorkerHeldOnCard(player, cardId): string | undefined` / `releaseWorkerFromCard(player, cardId): string | undefined` / `getCardHeldWorkerIds(player): Set<string>`。首个消费者：C22 BasketChair。
 
 ### 11.5 `PendingAction` 与结构化日志
 
@@ -1027,7 +1048,7 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 `PendingAction` 描述“当前还有什么后续命令必须完成”。
 它不是前端临时 UI 状态，而是后端规则态。
 
-推荐结构：
+推荐结构（与 `shared/game/types.ts` 中 `PendingAction` 一致）：
 
 ```ts
 type PendingAction =
@@ -1038,12 +1059,66 @@ type PendingAction =
       spaceId: string
       options: ActionChoiceOption[]
       promptKey?: string
+      promptParams?: Record<string, unknown>
+      costOverride?: Partial<Resource>
       sourceCard?: string
+      actionContext?: Record<string, unknown>
     }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
-  | { type: 'harvestFeed'; playerIndex: number; remaining: number; foodUsed: number; feedQueue?: { index: number; remaining: number; foodUsed: number }[] }
+  | {
+      type: 'harvestFeed'
+      playerIndex: number
+      remaining: number
+      foodUsed: number
+      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+    }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
+  | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
 ```
+
+`confirmPlayerSwitch` 是 `PlayerSwitchNode`（见 §11.6.2b）暂停引擎时使用的 pending：当卡牌效果需要从 owner 视角执行（opponent scope），引擎会在切换前后各插入一个 `PlayerSwitchNode`，前端展示确认 UI，确认后 `GameSession.confirmPlayerSwitch()` 切换活跃玩家并继续推进引擎；该 pending 同时会标记 `undoBoundary`（undo 不能跨越此边界）。
+
+此外，`shared/protocol/game.ts` 的 `InteractionState` 在协议层把 pending 拆得更细，`stateId` 涵盖 `idle / choice / farmSelect / selection / animalReorg / harvestFeed / confirmNextPlayer / confirmPlayerSwitch`。`farmSelect` / `selection` 不在 `PendingAction` 类型里单列（服务端把它们也归在 `pending.type === 'choice'` + `actionContext` 元数据里），但前端通过 `interaction` 直接消费这两个分支。
+
+其中 `ActionChoiceOption` 目前约定为：
+
+```ts
+type ChoiceEffectPreview =
+  | {
+      kind: 'resourceExchange'
+      resourcesPaid?: Partial<Resource>
+      resourcesGained?: Partial<Resource>
+      bonusVp?: number
+    }
+  | {
+      kind: 'payment'
+      resourcesPaid?: Partial<Resource>
+      cardUsed?: string
+    }
+  | {
+      kind: 'text'
+      text: string
+    }
+
+type ActionChoiceOption = {
+  value: string
+  labelKey: string
+  labelParams?: Record<string, unknown>
+  sourceCard?: string
+  effectPreview?: ChoiceEffectPreview
+}
+```
+
+协议约束：
+
+- `pending.sourceCard` / `interaction.sourceCard` 表示“整个当前交互的统一来源”；一旦一个 pending 内混入多张卡各自注入的 option，不能只靠这一层。
+- `options[].sourceCard` 是 option 级 canonical carrier，`computeArgs` / `computeChoiceCandidates` / card-owned direct choice 都应在这里补齐来源卡。
+- `options[].effectPreview` 只负责“按钮主文案的真实效果”，不替代 `labelKey`；当前前端采用 `hybrid_dual`：主文案看 preview，次文案仍显示动作类型，顶部副标题继续显示触发卡。
+- 当前 preview 生产点：
+  - `shared/cards/helpers/pay-gain-node.ts`
+  - `shared/actions/effects/pay-helpers.ts`
+  - `shared/actions/effects/exchange.ts`
+  - 引擎对 `seq(pay-resources, gain[, bonus-vp])` 的 option 会做一次轻量聚合，因此像 `D161_CabbageBuyer` 这类手写 `payLeaf + gainLeaf` 组合也能拿到 `resourceExchange` preview。
 
 `LogEntry` 则使用结构化方式存储：
 
@@ -1107,7 +1182,7 @@ type ActionHookResult = {
   doable?: boolean
   actionId?: string
   extraOptions?: ActionChoiceOption[]
-  followUpActions?: string[]
+  followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
   sourceCard?: string
@@ -1115,6 +1190,12 @@ type ActionHookResult = {
   logParams?: Record<string, unknown>
 }
 ```
+
+这里的 `sourceCard` 现在不仅是日志/提示用元数据，也被视为 flow/follow-up/source option 的兜底来源：
+
+- 对 `ActionHookResult.flow`，引擎会在插入节点前递归把顶层 `sourceCard` 补到缺失的 child leaf，但不会覆盖 child 自己显式写的 `sourceCard`。
+- 对 `followUpActions`，统一推荐对象形式 `{ actionId, sourceCard }`；若 listener 顶层有 `sourceCard` 且 follow-up 仍是字符串，引擎会做兜底转换。
+- 对 `OptionalNode` / `OrNode` / `XorNode` / `ChoiceNode` 的 choice 构建路径，引擎会把统一来源写入 `pendingChoiceContext.sourceCard`，供 `server/game-session.ts` 透传到 `pending` / `interaction`。
 
 这样可以覆盖常见卡牌能力：
 
@@ -1215,7 +1296,7 @@ Base reap 和额外 reap 卡（D25、C70、E69、E70、E68、E72）在产出作�
 ```
 
 这类 Hook 应由 `GameSession` 在明确的阶段切点统一触发，而不是分散在前端页面或 HTTP 接口里。
-当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndTurn`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor，因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer`、`A106_SlurrySpreader` 这类“按本次实际收割田地数/是否收到最后一份作物结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取；对 `onBeforeStartOfTurn`，`E93_Motivator` 这类“回合开始前插入一次可选额外放人”的效果也复用同一阶段 flow。
+当前实现里，`onBeforeHarvest`、`onAfterReap`、`onHarvest`、`onEndTurn`、`onAllWorkersPlaced`、`onEndHarvest`、`onAfterHarvest`、`onBeforeStartOfTurn` 均已升级为可返回 `ActionFlow` 的阶段 flow：`GameSession` 会为它们创建与普通行动相同的 `Engine`，并维护阶段级 resume cursor（见 `continueStageHook` / `continueAllWorkersPlacedHooks`），因此可选支付、可选得分、动物重组等都能在阶段推进中暂停后恢复，而不是只能即时修改状态。对 `onAfterReap`，服务端会在 `reap` 后暂存本次收获摘要，供 `A64_BarleyMill`、`C120_AgriculturalLabourer`、`A106_SlurrySpreader` 这类“按本次实际收割田地数/是否收到最后一份作物结算”的卡牌读取；对 `onEndHarvest`，服务端会在 breeding 后暂存本次 newborn 摘要，供 `C71_SlurrySpreader`、`D115_FodderPlanter` 这类“按本次繁殖结果追加动作/限制 sow 次数”的卡牌读取；对 `onBeforeStartOfTurn`，`E93_Motivator` 这类“回合开始前插入一次可选额外放人”的效果也复用同一阶段 flow。`onAllWorkersPlaced` 在“所有人本轮在家工人都用完之后、`performRoundEnd` 之前”触发，首个消费者是 `E125 DelayedWayfarer`（本轮所有人放完后从 supply 激活一个 worker，对齐 BGA 时序）；`place-farmer` 为此新增了 `params.fromSupply` 模式，可在该阶段把 supply worker 标记为 active 后立刻放置。
 
 #### 11.6.2a ActivateCardNode 架构
 

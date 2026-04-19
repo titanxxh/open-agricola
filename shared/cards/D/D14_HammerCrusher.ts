@@ -12,7 +12,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
     return {
       flow: {
@@ -33,7 +32,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.doable) return
     if (context.player.houseType !== 'clay') return
     // With 2 clay + 1 reed from this card, stone renovation becomes possible

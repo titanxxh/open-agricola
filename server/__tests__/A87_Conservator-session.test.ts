@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { setWorkersAtHome } from '../../shared/game/player'
 import {
   executeCardListener,
   getRegisteredCardListeners,
@@ -55,7 +56,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
     } as any)
 
     expect(result?.extraOptions).toEqual([
-      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone' },
+      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
     ])
   })
 
@@ -109,7 +110,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
     } as any)
 
     expect(result?.extraOptions).toEqual([
-      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone' },
+      { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
     ])
   })
 
@@ -224,5 +225,30 @@ describe('A87_Conservator isDoable listener', () => {
     } as any)
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('A87_Conservator session sourceCard', () => {
+  it('does not stamp the whole renovation target prompt with sourceCard when only one option comes from the card', () => {
+    const session = setup({
+      houseType: 'wood',
+      rooms: 2,
+      resources: { clay: 2, stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    expect(resp.pending.promptKey).toBe('ui.interactionChooseRenovationTarget')
+    expect((resp.pending as any).sourceCard).toBeUndefined()
+    expect((resp.interaction as any).sourceCard).toBeUndefined()
+    expect(resp.pending.options.find((option) => option.value === 'clay')?.sourceCard).toBeUndefined()
+    expect(resp.pending.options.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)
   })
 })

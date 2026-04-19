@@ -5,8 +5,7 @@ const CARD_ID = 'C135_Constable'
 
 registerCardEffect({
   id: CARD_ID,
-  computePostScore: (_state, player, categories) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
+  computePostScore: (_state, _player, categories) => {
     // 3 VP if this player has no negative scoring categories
     const hasNegative = categories.some((cat) => cat.total < 0)
     return hasNegative ? 0 : 3

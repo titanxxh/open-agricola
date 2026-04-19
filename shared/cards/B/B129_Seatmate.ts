@@ -26,7 +26,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.round < 13) return
     const round13Space = context.state.actionSpaces.find(
       (s) => s.roundAvailable === 13 || s.id === context.state.roundActionOrder[12],
@@ -37,6 +36,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${round13Space.id}`,
         labelKey: round13Space.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }

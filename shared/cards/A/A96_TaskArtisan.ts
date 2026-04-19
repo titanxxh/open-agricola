@@ -40,7 +40,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: buildTaskArtisanFlow(), sourceCard: CARD_ID }
   },
 }
@@ -50,8 +49,7 @@ registerCardListener(onBuyListener)
 // onRoundStart: check if the revealed action for this round is a quarry
 registerCardEffect({
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onRoundStart: (state, _player) => {
     const revealedAction = state.roundActionOrder[state.round - 1]
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
     return buildTaskArtisanFlow()

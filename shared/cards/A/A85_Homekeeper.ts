@@ -9,7 +9,6 @@ const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: numb
 registerCardEffect({
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     if (player.houseType === 'wood') return 0
 
     const pastureTiles = player.pastures.flatMap((pasture) => pasture.tiles)

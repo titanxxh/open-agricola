@@ -20,7 +20,6 @@ registerSelectionEffect('add-vegetable', ({ player, positions }) => {
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Need grain to pay and at least one vegetable field with crops
     if ((player.resources.grain ?? 0) < 1) return
     const vegFields = player.fields.filter(f => fieldHasCrop(f, 'vegetable'))

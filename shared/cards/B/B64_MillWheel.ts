@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'grain-utilization') return
     const fishing = context.state.actionSpaces.find((s) => s.id === 'fishing')
     if (!fishing || !isSpaceOccupied(fishing)) return

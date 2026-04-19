@@ -14,7 +14,6 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const roomCount = getRoomsBuiltThisAction(context.player)
     if (roomCount <= 0) return
     return {
@@ -36,7 +35,6 @@ registerCardListener(constructListener)
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const storedFood = getStoredResource(player, CARD_ID, 'food')
     if (storedFood <= 0) return
     return {

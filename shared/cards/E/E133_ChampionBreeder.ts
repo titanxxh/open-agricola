@@ -6,7 +6,6 @@ const CARD_ID = 'E133_ChampionBreeder'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const summary = state.harvestBreedSummary?.[player.id]
     if (!summary) return
     const { animalCount } = summary

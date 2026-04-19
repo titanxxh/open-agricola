@@ -81,4 +81,36 @@ describe('B143_ClayWarden session', () => {
     const after = session.getState().state
     expect(after.players[0]!.resources.clay).toBe(clayBefore)
   })
+
+  it('owner gains 2 clay when opponent uses 3P hollow space', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 1
+    state.round = 1
+
+    const owner = state.players[0]!
+    owner.occupationPlayed.push('B143_ClayWarden')
+    setWorkersAtHome(state, owner, 2)
+    owner.resources.clay = 0
+
+    const opponent = state.players[1]!
+    setWorkersAtHome(state, opponent, 2)
+
+    const hollow = state.actionSpaces.find((s) => s.id === 'hollow')
+    expect(hollow).toBeDefined()
+    hollow!.resources.clay = 2
+
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'hollow')
+    expect(resp.ok).toBe(true)
+
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    const after = session.getState().state
+    // 3P gain: 1 base + 1 extra = 2 clay
+    expect(after.players[0]!.resources.clay).toBe(2)
+  })
 })

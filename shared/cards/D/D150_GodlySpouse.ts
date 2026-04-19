@@ -10,8 +10,7 @@ const CARD_ID = 'D150_GodlySpouse'
 
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onBeforeStartOfTurn: (_state, _player) => {
     return { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID }
   },
 })
@@ -22,7 +21,6 @@ const afterWishChildrenListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (getRoundPlacementOrder(context.player).length !== 2) return
 

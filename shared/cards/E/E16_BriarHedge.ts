@@ -27,8 +27,7 @@ registerPrerequisite('1 Animal of Each Type', (player) => {
 
 registerCardEffect({
   id: CARD_ID,
-  computeFenceDiscount: (_state, player, ctx) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
+  computeFenceDiscount: (_state, _player, ctx) => {
     return ctx.newFenceEdges.filter(isBorderEdge).length
   },
 })

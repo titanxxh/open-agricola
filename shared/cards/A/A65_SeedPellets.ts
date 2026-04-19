@@ -20,7 +20,6 @@ const beforeSowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
@@ -32,7 +31,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
     if (!context.player.fields.some((field) => fieldIsEmpty(field))) return

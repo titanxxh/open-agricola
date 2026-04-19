@@ -12,7 +12,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'day-laborer') return
     const children: ActionFlow[] = [
       { type: 'leaf', actionId: 'construct', optional: false, sourceCard: CARD_ID, actionContext: { max: 1, trueAction: false } },

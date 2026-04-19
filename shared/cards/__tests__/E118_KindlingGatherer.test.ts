@@ -124,15 +124,4 @@ describe('E118_KindlingGatherer', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('E118-kindling-gatherer-after-collect')!
-    const player = createPlayer()
-    player.occupationPlayed = []
-    const space = createSpace('fishing', { gainPerRound: { food: 1 } })
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space,
-      actionId: 'collect', phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

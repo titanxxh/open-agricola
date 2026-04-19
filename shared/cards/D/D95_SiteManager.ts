@@ -43,7 +43,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return {
       flow: {
         type: 'leaf',
@@ -66,7 +65,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     if (!context.cardId) return
 

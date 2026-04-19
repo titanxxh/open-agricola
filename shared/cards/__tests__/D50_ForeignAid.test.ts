@@ -129,26 +129,6 @@ describe('D50_ForeignAid', () => {
       expect(result.options.map(o => o.value)).toEqual(['forest', 'farmland'])
     })
 
-    it('does not filter when player does not have the card', () => {
-      const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
-      const player = createPlayer()
-      player.minorPlayed = [] // no card
-      const state = createState(player)
-      const result = {
-        type: 'choice' as const,
-        options: [
-          { value: 'cultivation', labelKey: 'actions.cultivation.name' },
-          { value: 'forest', labelKey: 'actions.forest.name' },
-        ],
-      }
-      executeCardListener(listener, {
-        state, player,
-        actionId: 'place-farmer', phase: 'computeArgs',
-        result,
-      } as any)
-      // All options remain
-      expect(result.options).toHaveLength(2)
-    })
 
     it('does nothing when result is not a choice', () => {
       const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!

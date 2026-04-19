@@ -30,7 +30,6 @@ const afterGainCollectListener: CardListenerRegistration = {
   actions: ['gain', 'collect'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return
     const top = stack[stack.length - 1] as keyof Resource

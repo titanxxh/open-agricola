@@ -37,7 +37,6 @@ const hasHouseRoom = (player: CardListenerContext['player']) =>
   effectiveRooms(player) > familySize(player)
 
 const shouldOfferReplace = (context: CardListenerContext) => {
-  if (!context.player.minorPlayed.includes(CARD_ID)) return false
   if (context.state.round < 5) return false
   if (!hasHouseRoom(context.player)) return false
   if (context.actionContext?.trueAction === false) return false
@@ -75,7 +74,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['minor-improvement', 'improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.state.round < 5) return
     if (!hasHouseRoom(context.player)) return
     if (context.actionContext?.trueAction === false) return

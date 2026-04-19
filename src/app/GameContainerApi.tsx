@@ -1100,19 +1100,22 @@ export const GameContainerApi = () => {
 
   const applyDevResource = useCallback(async () => {
     if (!devPlayerId || !state) return
-    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
-    const player = clone.players.find((p) => p.id === devPlayerId)
+    const playerIndex = state.players.findIndex((p) => p.id === devPlayerId)
+    if (playerIndex < 0) return
+    const player = state.players[playerIndex]
     if (!player) return
     const delta = Number(devAmount ?? 0)
-    player.resources[devResource] = Math.max(0, (player.resources[devResource] ?? 0) + delta)
-    
-    await transport.loadGame(clone)
-    
+    const nextValue = Math.max(0, (player.resources[devResource] ?? 0) + delta)
+    try {
+      await transport.devSetResources(playerIndex, { [devResource]: nextValue })
+    } catch (e) {
+      console.error('applyDevResource error', e)
+    }
   }, [devPlayerId, devResource, devAmount, state, transport])
 
   const applyDevRound = useCallback(() => {
     if (!state || !Number.isFinite(devRound)) return
-    void transport.loadGame({ ...state, round: Math.max(1, Math.min(14, Math.floor(devRound))) }).catch((e) => console.error('applyDevRound error', e))
+    void transport.devSetRound(Math.max(1, Math.min(14, Math.floor(devRound)))).catch((e) => console.error('applyDevRound error', e))
   }, [state, devRound, transport])
 
   const stripCardId = (id: string) => id.trim()

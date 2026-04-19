@@ -120,17 +120,6 @@ describe('D17_DrillHarrow', () => {
       expect(result).toBeUndefined()
     })
 
-    it('does not trigger when card is not played', () => {
-      const listener = findListener('D17-drill-harrow-before-sow')!
-      const player = createPlayer()
-      player.minorPlayed = []
-      const result = executeCardListener(listener, {
-        state: createState(player), player, space: createSpace('sow'),
-        actionId: 'sow', phase: 'before',
-      } as any)
-
-      expect(result).toBeUndefined()
-    })
   })
 
   describe('isDoable listener', () => {

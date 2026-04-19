@@ -21,7 +21,6 @@ const beforeListener: CardListenerRegistration = {
   actions: TRACKED_ACTIONS,
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'woodBefore', context.player.resources.wood)
   },
 }
@@ -32,7 +31,6 @@ const afterListener: CardListenerRegistration = {
   actions: TRACKED_ACTIONS,
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const before = readCardExtraData<number>(context.player, CARD_ID, 'woodBefore') ?? context.player.resources.wood
     const spent = Math.max(0, before - context.player.resources.wood)
     if (spent <= 0) return
@@ -51,7 +49,6 @@ registerCardEffect({
     writeCardExtraData(player, CARD_ID, 'woodBefore', 0)
   },
   onEndTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const totalSpent = readCardExtraData<number>(player, CARD_ID, 'woodSpent') ?? 0
     const refund = Math.floor(totalSpent / 2)
     writeCardExtraData(player, CARD_ID, 'woodSpent', 0)

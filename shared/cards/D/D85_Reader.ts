@@ -9,7 +9,6 @@ const CARD_ID = 'D85_Reader'
 registerCardEffect({
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return player.occupationPlayed.length >= 6 ? 1 : 0
   },
 })

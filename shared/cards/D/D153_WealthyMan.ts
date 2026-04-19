@@ -16,7 +16,6 @@ const harvestGrainFieldThreshold: Record<number, number> = {
 registerCardEffect({
   id: CARD_ID,
   onStartHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const threshold = harvestGrainFieldThreshold[state.round]
     if (threshold === undefined) return

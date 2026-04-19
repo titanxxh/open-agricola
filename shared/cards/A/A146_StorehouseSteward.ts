@@ -18,7 +18,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isFoodAccumulationSpace(context.space)) return
     const foodGained = context.result?.type === 'ok'
       ? (context.result.resourcesGained?.food ?? 0)

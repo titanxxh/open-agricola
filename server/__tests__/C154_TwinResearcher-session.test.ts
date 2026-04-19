@@ -148,27 +148,4 @@ describe('C154_TwinResearcher session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession(undefined, undefined, { playerCount: 4 })
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.resources.food = 3
-
-    const forest = state.actionSpaces.find((s) => s.id === 'forest')!
-    const grove = state.actionSpaces.find((s) => s.id === 'grove')!
-    setResource(forest, 'wood', 3)
-    setResource(grove, 'wood', 3)
-    session.loadState(state)
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space: forest,
-      actionId: 'place-farmer',
-      phase: 'before',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

@@ -22,7 +22,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const builtCardId = getBuiltCardId(context.choice)
     if (!builtCardId || !TRIGGER_MAJORS.has(builtCardId)) return
     return {

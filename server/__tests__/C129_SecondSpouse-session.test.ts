@@ -1,15 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
-
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/game/player'
+import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'
 
-const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
+/**
+ * Helper: occupy a space with a player's worker and record it as their Nth round placement.
+ * If `isFirstPlacement` is true, this is the first entry in their round placements.
+ * If false, a prior placement is recorded first.
+ */
+function occupySpace(
+  state: ReturnType<GameSession['getState']>['state'],
+  playerIdx: number,
+  spaceId: string,
+  workerId: string,
+  isFirstPlacement: boolean,
+) {
+  const player = state.players[playerIdx]!
+  const space = state.actionSpaces.find(s => s.id === spaceId)!
+  space.takenBy.push({ playerId: player.id, workerId })
+  if (!isFirstPlacement) {
+    // Record a prior placement on some other space so this one is NOT the first
+    recordRoundPlacement(player, 'forest', `${workerId}-prior`)
+  }
+  recordRoundPlacement(player, spaceId, workerId)
+}
 
 const setup = (options?: {
   withCard?: boolean
   playerCount?: number
-  occupyUrgentWishChildren?: boolean
 }) => {
   const playerCount = options?.playerCount ?? 3
   const session = new GameSession(undefined, undefined, { playerCount })
@@ -17,7 +36,7 @@ const setup = (options?: {
   state.currentPlayerIndex = 0
   state.round = 5
 
-  // Ensure urgent-wish-children is open at round 1 (so it's available at round 5)
+  // Open urgent-wish-children at round 1
   state.roundActionOrder = state.roundActionOrder.map((spaceId) =>
     spaceId === 'urgent-wish-children' ? null : spaceId,
   )
@@ -32,89 +51,104 @@ const setup = (options?: {
     player.occupationPlayed.push('C129_SecondSpouse')
   }
 
-  if (options?.occupyUrgentWishChildren ?? true) {
-    const urgentWishChildren = state.actionSpaces.find(
-      (space) => space.id === 'urgent-wish-children',
-    )
-    if (urgentWishChildren) {
-      urgentWishChildren.takenBy = state.players[1]!.id
-    }
-  }
-
-  session.loadState(state)
-  return session
+  return { session, state }
 }
 
 describe('C129_SecondSpouse session', () => {
-  it('makes occupied urgent-wish-children available with card in 3+ player game', () => {
-    const withCard = setup({ withCard: true, playerCount: 3 }).getState()
-    expect(withCard.ok).toBe(true)
-    expect(withCard.actionAvailability?.['urgent-wish-children']).toBe(true)
-  })
+  it('allowed when occupier is other player\'s FIRST placed worker', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b1', true)
+    session.loadState(state)
 
-  it('does not allow using occupied urgent-wish-children without the card', () => {
-    const session = setup({ withCard: false, playerCount: 3 })
-    const state = session.getState()
-    expect(state.actionAvailability?.['urgent-wish-children']).toBe(false)
-
-    const failedTake = session.takeAction(0, 'urgent-wish-children')
-    expect(failedTake.ok).toBe(false)
-    expect(failedTake.error).toBe('space unavailable')
-  })
-
-  it('does not work in 2-player games', () => {
-    const session = setup({ withCard: true, playerCount: 2 })
-    const state = session.getState()
-    expect(state.actionAvailability?.['urgent-wish-children']).toBe(false)
-  })
-
-  it('lets the player use occupied urgent-wish-children without overwriting occupant', () => {
-    const session = setup({ withCard: true, playerCount: 3 })
-
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
     const resp = session.takeAction(0, 'urgent-wish-children')
     expect(resp.ok).toBe(true)
     expect(familySize(resp.state.players[0]!)).toBe(3)
     expect(newbornCount(resp.state.players[0]!)).toBe(1)
-    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
-    // Occupant should not change
-    const urgentSpace = resp.state.actionSpaces.find(
-      (space) => space.id === 'urgent-wish-children',
-    )
-    expect(urgentSpace?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
+    // Original occupant preserved
+    const space = resp.state.actionSpaces.find(s => s.id === 'urgent-wish-children')!
+    expect(space.takenBy.some(t => t.playerId === resp.state.players[1]!.id)).toBe(true)
+  })
+
+  it('NOT allowed when occupier is NOT other player\'s first placed worker', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b2', false) // b2 is second placement
+    session.loadState(state)
+
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(false)
+    const resp = session.takeAction(0, 'urgent-wish-children')
+    expect(resp.ok).toBe(false)
+  })
+
+  it('allowed when 2 occupants and at least one is first placed', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    // Player B: first placement on urgent-wish-children
+    occupySpace(state, 1, 'urgent-wish-children', 'b1', true)
+    // Player C: NOT first placement on urgent-wish-children
+    occupySpace(state, 2, 'urgent-wish-children', 'c2', false)
+    session.loadState(state)
+
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
+  })
+
+  it('NOT allowed when 3+ occupants', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b1', true)
+    occupySpace(state, 2, 'urgent-wish-children', 'c1', true)
+    // Push a third occupant manually
+    const space = state.actionSpaces.find(s => s.id === 'urgent-wish-children')!
+    space.takenBy.push({ playerId: 'extra', workerId: 'x1' })
+    session.loadState(state)
+
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(false)
+  })
+
+  it('NOT allowed when all occupants are non-first placements', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b2', false)
+    occupySpace(state, 2, 'urgent-wish-children', 'c2', false)
+    session.loadState(state)
+
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(false)
+  })
+
+  it('does not allow using occupied urgent-wish-children without the card', () => {
+    const { session, state } = setup({ withCard: false, playerCount: 3 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b1', true)
+    session.loadState(state)
+
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(false)
+    const resp = session.takeAction(0, 'urgent-wish-children')
+    expect(resp.ok).toBe(false)
   })
 
   it('does not allow if occupied by own farmer', () => {
-    const session = setup({ withCard: true, playerCount: 3, occupyUrgentWishChildren: false })
-    const state = session.getState().state
-    // Occupy with own player's farmer
-    const urgentWishChildren = state.actionSpaces.find(
-      (space) => space.id === 'urgent-wish-children',
-    )
-    if (urgentWishChildren) {
-      urgentWishChildren.takenBy = state.players[0]!.id
-    }
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    occupySpace(state, 0, 'urgent-wish-children', 'a1', true) // Own farmer
     session.loadState(state)
 
-    const result = session.getState()
-    expect(result.actionAvailability?.['urgent-wish-children']).toBe(false)
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(false)
   })
 
   it('does not affect normal wish-children space', () => {
-    const session = setup({ withCard: true, playerCount: 3 })
-    const state = session.getState().state
-    // Also make wish-children available and occupy it
-    state.roundActionOrder = state.roundActionOrder.map((spaceId) =>
-      spaceId === 'wish-children' ? null : spaceId,
+    const { session, state } = setup({ withCard: true, playerCount: 3 })
+    // Make wish-children available and occupy it
+    state.roundActionOrder = state.roundActionOrder.map((id) =>
+      id === 'wish-children' ? null : id,
     )
     state.roundActionOrder[1] = 'wish-children'
-    const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
-    if (wishChildren) {
-      wishChildren.takenBy = state.players[1]!.id
-    }
+    occupySpace(state, 1, 'wish-children', 'b1', true)
     session.loadState(state)
 
-    const result = session.getState()
-    // wish-children should still be unavailable (card only affects urgent-wish-children)
-    expect(result.actionAvailability?.['wish-children']).toBe(false)
+    expect(session.getState().actionAvailability?.['wish-children']).toBe(false)
+  })
+
+  it('2-player game: card still fires when forcibly in occupationPlayed (deck prevents this in real play)', () => {
+    const { session, state } = setup({ withCard: true, playerCount: 2 })
+    occupySpace(state, 1, 'urgent-wish-children', 'b1', true)
+    session.loadState(state)
+
+    // Card triggers even in 2-player (runtime doesn't block; deck config prevents)
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
   })
 })

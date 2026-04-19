@@ -21,7 +21,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.cardId || !ALLOWED_MAJORS.includes(context.cardId)) return
     return { costs: { stone: -1 } }
   },

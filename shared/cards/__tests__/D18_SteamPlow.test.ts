@@ -95,16 +95,6 @@ describe('D18_SteamPlow', () => {
     expect(flow).toBeNull()
   })
 
-  it('onStartReturnHome returns nothing when card is not played', () => {
-    const player = createPlayer()
-    player.minorPlayed = []
-    player.resources.wood = 5
-    player.resources.food = 3
-    const state = createState(player)
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(flow).toBeNull()
-  })
 
   it('onStartReturnHome triggers at exact resource threshold (2 wood, 1 food)', () => {
     const player = createPlayer()

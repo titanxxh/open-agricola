@@ -23,7 +23,6 @@ const FOOD_THRESHOLD = 6
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if ((player.resources.food ?? 0) < 1) return
 
     // Offer to place 1 food on card (pay 1 food from supply, store on card counter)

@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { setWorkersAtHome } from '../../shared/game/player'
 
 import '../../shared/cards/D/D156_RetailDealer'
 
 describe('D156_RetailDealer session', () => {
   /**
    * Setup with D156_RetailDealer already played.
-   * resource-market-4 exists in all games (player count filtering is UI-only).
+   * Keep a 4-player board so resource-market-4 exists, but disable extra workers
+   * for players 3/4 so turn order still only rotates across the first two seats.
    */
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -22,6 +23,7 @@ describe('D156_RetailDealer session', () => {
     player.cardStates['D156_RetailDealer'] = {
       extraData: { remaining: 3 },
     }
+    state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
 
     session.loadState(state)
     return session

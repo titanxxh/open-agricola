@@ -36,7 +36,6 @@ registerCardEffect({
     updateInfobox(player)
   },
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })
@@ -46,7 +45,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length <= 0) return

@@ -9,7 +9,6 @@ registerCardEffect({
   id: CARD_ID,
   // At start of each harvest: optionally pay 1 wood to place on card
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.wood < 1) return
     return {
       type: 'seq',
@@ -23,7 +22,6 @@ registerCardEffect({
   },
   // In feeding phase: get 1 food per wood on card
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const woodCount = getCardStack(player, CARD_ID).length
     if (woodCount <= 0) return
     return gainLeaf(CARD_ID, { food: woodCount })

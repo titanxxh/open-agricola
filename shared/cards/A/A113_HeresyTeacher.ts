@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || !LESSONS_SPACES.has(context.space.id)) return
     for (const field of context.player.fields) {
       const grain = fieldFindStackOfKind(field, 'grain')

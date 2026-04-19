@@ -36,7 +36,6 @@ registerCardEffect({
     }
   },
   onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // When round 14 starts, remove exclusive use
     if (state.round === 14) {
       writeCardExtraData(player, CARD_ID, 'exclusiveOwnerId', null)

@@ -21,7 +21,6 @@ registerCardEffect({
     return gainLeaf(CARD_ID, { wood })
   },
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const vegInFields = (p: typeof player) =>
       p.fields
         .filter((f) => fieldHasCrop(f, 'vegetable'))

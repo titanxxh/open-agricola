@@ -43,7 +43,6 @@ registerCardEffect({
     return buildingChoiceFlow()
   },
   onAllWorkersPlaced: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const playedRound = readCardExtraData<number>(player, CARD_ID, PLAYED_ROUND_KEY)
     if (playedRound !== state.round) return
     if (!(player.workers ?? []).some((w) => !w.isActive)) return
@@ -70,7 +69,6 @@ registerCardListener({
   phases: ['isDoable' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context) => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.actionContext?.fromSupply) return
     const hasSupply = (context.player.workers ?? []).some((w) => !w.isActive)
     if (hasSupply) return { doable: true }

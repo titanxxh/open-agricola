@@ -12,7 +12,6 @@ const grainRewardFlow = (
   context: CardListenerContext,
   grainCount: number,
 ): ActionHookResult | void => {
-  if (!context.player.occupationPlayed.includes(CARD_ID)) return
   const availableClay = getStoredResource(context.player, CARD_ID, 'clay')
   const clayToGain = Math.min(availableClay, grainCount)
   if (clayToGain <= 0) return
@@ -34,7 +33,6 @@ const onPlayListener: CardListenerRegistration = {
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return {
       flow: {
         type: 'leaf',
@@ -68,7 +66,6 @@ registerCardListener(gainListener)
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
       ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
     if (grainFields <= 0) return

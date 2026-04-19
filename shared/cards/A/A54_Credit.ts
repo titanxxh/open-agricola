@@ -19,7 +19,6 @@ registerCardEffect({
     return gainLeaf(CARD_ID, { food: 5 })
   },
   onRoundEnd: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
     // Must pay 1 food or take a begging marker
     player.cardStates = player.cardStates ?? {}
@@ -29,8 +28,7 @@ registerCardEffect({
       debtDue: true,
     }
   },
-  onAfterRoundEnd: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onAfterRoundEnd: (state, _player) => {
     if (harvestRounds.includes(state.round)) return
     return {
       type: 'xor',

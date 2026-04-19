@@ -181,17 +181,6 @@ describe('C39_StudioBoat', () => {
       expect(space.resources.food).toBe(2)
     })
 
-    it('does not accumulate if player does not have card', () => {
-      const effect = getCardEffect(CARD_ID)!
-      const owner = createPlayer()
-      owner.minorPlayed = [] // no card
-      const state = createState(owner)
-      const space = createSpace(CARD_ID, { resources: { ...emptyResources, food: 0 } })
-      state.actionSpaces = [space]
-
-      effect.onRoundStart!(state, owner)
-      expect(space.resources.food).toBe(0)
-    })
 
     it('does not accumulate if space does not exist', () => {
       const effect = getCardEffect(CARD_ID)!

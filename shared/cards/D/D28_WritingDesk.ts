@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id
     if (spaceId !== 'lessons' && spaceId !== 'lessons-2') return
     // Need at least 2 occupations in hand (one for main Lessons, one for Writing Desk)

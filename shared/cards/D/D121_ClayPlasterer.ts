@@ -22,7 +22,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
     // Base cost: 5 clay + 2 reed → discount to 3 clay + 2 reed
     return { costs: { clay: -2 } }
@@ -35,7 +34,6 @@ const renovationCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Only applies when renovating wood → clay (current house is wood)
     if (context.player.houseType !== 'wood') return
     // Base renovation cost: { clay: rooms, reed: 1 }

@@ -23,7 +23,6 @@ const CARD_ID = 'B157_Salter'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
     if (pending <= 0) return
     const counters = initCardState(player, CARD_ID)
@@ -37,7 +36,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const { sheep, boar, cattle } = context.player.resources
     const hasSheep = (sheep ?? 0) >= 1
     const hasBoar = (boar ?? 0) >= 1

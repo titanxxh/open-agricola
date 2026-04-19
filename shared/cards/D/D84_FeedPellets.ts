@@ -11,7 +11,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.vegetable < 1) return
     const ownedTypes = ANIMAL_TYPES.filter(t => player.resources[t] > 0)
     if (ownedTypes.length === 0) return

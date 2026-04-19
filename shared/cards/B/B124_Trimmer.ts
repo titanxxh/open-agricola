@@ -43,7 +43,6 @@ const afterFencingListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fencing'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)
     const storedArea = getStoredArea(context.player)
@@ -68,14 +67,12 @@ registerCardEffect({
     setCardFlag(player, CARD_ID, false)
   },
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Unflag at start of work phase to allow triggering
     setCardFlag(player, CARD_ID, false)
     // Update stored area for comparison
     setStoredArea(player, countPastureTiles(player))
   },
   onReturnHome: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Flag at return home to prevent triggering outside work phase
     setCardFlag(player, CARD_ID, true)
   },

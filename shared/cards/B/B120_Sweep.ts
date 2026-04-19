@@ -61,7 +61,6 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     if (context.actionId !== context.space.id) return
     const round = context.state.round

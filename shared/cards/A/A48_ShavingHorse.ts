@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 
@@ -8,14 +8,22 @@ const CARD_ID = 'A48_ShavingHorse'
 
 /**
  * A48 Shaving Horse (MinorImprovement, A, 48)
- * After gaining wood from an action space, you can optionally exchange 1 wood for 3 food.
+ *
+ * Each time after you obtain at least 1 wood, if you then have 5+ wood you
+ * may exchange 1 wood for 3 food. With 7+ wood it becomes mandatory. BGA
+ * does not filter by action space — any wood-producing action counts.
  */
 
-const WOOD_SPACES = new Set(['copse', 'forest', 'grove', 'resource-market-4'])
-
-const exchangeFlow = (woodAfterGain: number): ActionHookResult | void => {
-  if (woodAfterGain < 5) return
-  const mandatory = woodAfterGain >= 7
+const checkAndExchange = (
+  context: CardListenerContext,
+): ActionHookResult | void => {
+  const result = context.result
+  const gained =
+    result?.type === 'ok' ? result.resourcesGained?.wood ?? 0 : 0
+  if (gained <= 0) return
+  const currentWood = context.player.resources.wood ?? 0
+  if (currentWood < 5) return
+  const mandatory = currentWood >= 7
   return {
     flow: {
       type: 'seq',
@@ -29,35 +37,24 @@ const exchangeFlow = (woodAfterGain: number): ActionHookResult | void => {
   }
 }
 
-const afterCollectListener: CardListenerRegistration = {
-  id: 'A48-shaving-horse-after-collect',
+const afterObtainListener: CardListenerRegistration = {
+  id: 'A48-shaving-horse-after-obtain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
-    const gained = (context.result as any)?.resourcesGained?.wood ?? 0
-    if (gained <= 0) return
-    return exchangeFlow(context.player.resources.wood ?? 0)
-  },
+  actions: ['gain', 'collect', 'receive'],
+  handler: checkAndExchange,
 }
 
-const afterGainListener: CardListenerRegistration = {
-  id: 'A48-shaving-horse-after-gain',
+const afterExchangeListener: CardListenerRegistration = {
+  id: 'A48-shaving-horse-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['gain'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
-    if (!context.space || !WOOD_SPACES.has(context.space.id)) return
-    const gained = (context.result as any)?.resourcesGained?.wood ?? 0
-    if (gained <= 0) return
-    return exchangeFlow(context.player.resources.wood ?? 0)
-  },
+  actions: ['anytime-exchange'],
+  handler: checkAndExchange,
 }
 
-registerCardListener(afterCollectListener)
-registerCardListener(afterGainListener)
+registerCardListener(afterObtainListener)
+registerCardListener(afterExchangeListener)
 
 export const A48_ShavingHorse = new MinorImprovement({
   id: CARD_ID,
@@ -66,5 +63,5 @@ export const A48_ShavingHorse = new MinorImprovement({
   number: 48,
   category: 'FOOD_PROVIDER',
   desc: ['Each time after you obtain at least 1 <WOOD>, if you then have 5 or more <WOOD> in your supply, you can exchange 1 <WOOD> for 3 <FOOD>. With 7 or more <WOOD>, you must do so.'],
-  cost: {},
+  cost: { wood: 1 },
 })

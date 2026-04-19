@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'fishing') return
     // The food was on the space before collecting - check the resources that were gained
     // BGA check: count($event['meeples']) <= 2 means ≤2 food was on the space

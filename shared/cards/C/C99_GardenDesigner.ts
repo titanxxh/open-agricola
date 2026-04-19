@@ -7,7 +7,6 @@ const CARD_ID = 'C99_GardenDesigner'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player, ctx) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
     if (emptyFields === 0) return 0
 

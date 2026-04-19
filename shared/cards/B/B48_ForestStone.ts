@@ -25,7 +25,6 @@ const woodCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context.space)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
@@ -43,7 +42,6 @@ const stoneCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isStoneAccumulationSpace(context.space)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     const newCount = foodCount + 2

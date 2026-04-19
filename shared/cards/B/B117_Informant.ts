@@ -18,7 +18,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
   onBeforeReturnHome: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.stone <= player.resources.clay) return
     return gainLeaf(CARD_ID, { wood: 1 })
   },

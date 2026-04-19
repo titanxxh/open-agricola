@@ -6,8 +6,7 @@ const CARD_ID = 'A118_Treegardener'
 
 registerCardEffect({
   id: CARD_ID,
-  onHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onHarvestFieldPhase: (_state, _player) => {
 
     const children: ActionFlow[] = [
       {

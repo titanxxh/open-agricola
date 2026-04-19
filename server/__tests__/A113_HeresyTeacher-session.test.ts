@@ -123,12 +123,6 @@ describe('A113 Heresy Teacher session', () => {
     expect(p1.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
   })
 
-  it('does not trigger without card in occupationPlayed', () => {
-    const session = setup({ withCard: false })
-    fireListener(session, 'lessons')
-    const p1 = session.getState().state.players[0]!
-    expect(p1.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-  })
 
   it('does not add veg to non-qualifying fields', () => {
     const session = setup({

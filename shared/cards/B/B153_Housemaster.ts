@@ -7,7 +7,6 @@ const CARD_ID = 'B153_Housemaster'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const majorVps = player.improvements
       .map((id) => getMajorCardEffect(id)?.vp ?? 0)
       .filter((vp) => vp > 0)

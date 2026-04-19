@@ -41,7 +41,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!checkRoomsSurroundedByFields(context)) return
     // Only activate if player actually needs the "without room" bypass

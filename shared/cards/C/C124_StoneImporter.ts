@@ -15,7 +15,6 @@ const harvestFoodCosts: Record<number, number> = {
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const foodCost = harvestFoodCosts[state.round]
     if (foodCost === undefined) return
     if (player.resources.food < foodCost) return

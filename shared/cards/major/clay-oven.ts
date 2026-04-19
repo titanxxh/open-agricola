@@ -15,5 +15,6 @@ export const clayOven: MajorCardEffect = {
     type: 'leaf',
     actionId: 'bake-bread',
     optional: true,
+    sourceCard: 'Major_ClayOven',
   }),
 }

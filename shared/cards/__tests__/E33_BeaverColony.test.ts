@@ -223,17 +223,6 @@ describe('E33_BeaverColony reed bonus VP', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card not played', () => {
-    const listener = findListener('E33-beaver-colony-after-collect')!
-    const player = createPlayer()
-    const result = executeCardListener(listener, {
-      state: createState(player), player,
-      space: createSpace('reed-bank'),
-      actionId: 'collect', phase: 'immediatelyAfter',
-      result: { type: 'ok', resourcesGained: { reed: 1 } },
-    } as any)
-    expect(result).toBeUndefined()
-  })
 
   it('gives bonus VP after gain on resource-market-4', () => {
     const listener = findListener('E33-beaver-colony-after-gain')!

@@ -60,17 +60,6 @@ describe('C125_Nightworker session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onRoundStart returns undefined when card not played', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    player.resources.wood = 0
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeUndefined()
-  })
 
   it('onRoundStart returns undefined when no accumulation spaces have resources of missing type', () => {
     const { session, state } = setupSession()

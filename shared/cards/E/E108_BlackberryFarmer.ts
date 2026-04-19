@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Count fences built from the farm-choice `fence` extraData.
     // Palisades are tracked separately under `newPalisadeEdges` and must NOT
     // contribute to future-meeples for this card.

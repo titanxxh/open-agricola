@@ -17,7 +17,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const qualifying = context.player.fields.filter((f) => {
       const top = fieldTopStack(f)
       return !!top && top.kind === 'grain' && top.remaining === 3 && fieldTotalRemaining(f) === 3

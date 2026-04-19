@@ -10,7 +10,6 @@ const CARD_ID = 'A100_Curator'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Count farmers on accumulation spaces (spaces with gainPerRound resources)
     const farmersOnAccumulation = state.actionSpaces.filter(
       (s) => spaceHasPlayer(s, player.id) && Object.values(s.resources ?? {}).some((v) => v > 0),

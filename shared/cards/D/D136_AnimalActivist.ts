@@ -20,7 +20,6 @@ registerCardEffect({
     return gainLeaf(CARD_ID, { wood })
   },
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const fencedStables = (p: typeof player) =>
       p.pastures.reduce((sum, past) => sum + past.stables, 0)
     const myCount = fencedStables(player)

@@ -25,7 +25,6 @@ registerCardEffect({
     updateInfobox(player)
   },
   onAfterReap: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const stack = getCardStack(player, CARD_ID)
     if (stack.length === 0) return
 

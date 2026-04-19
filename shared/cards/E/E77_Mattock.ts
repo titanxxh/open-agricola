@@ -24,7 +24,6 @@ const collectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isReedOrStoneAccumulationSpace(context)) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
@@ -39,7 +38,6 @@ const placeFarmerListener: CardListenerRegistration = {
   phases: ['during' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !RESOURCE_MARKET_IDS.has(context.space.id)) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },

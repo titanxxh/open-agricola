@@ -4,7 +4,7 @@ import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../game/space'
@@ -53,6 +53,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${secondSpaceId}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }

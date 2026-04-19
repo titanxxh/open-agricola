@@ -8,7 +8,6 @@ const CARD_ID = 'A61_WinnowingFan'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
 
     const bakeRates = getPlayerBakeRates(player)

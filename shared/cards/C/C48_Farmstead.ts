@@ -25,7 +25,6 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', countUsedTiles(context.player))
   },
 }
@@ -36,7 +35,6 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const before = readCardExtraData<number>(context.player, CARD_ID, 'usedTilesBefore') ?? 0
     const after = countUsedTiles(context.player)
     writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', undefined)

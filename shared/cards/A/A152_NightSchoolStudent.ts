@@ -11,7 +11,6 @@ const LESSONS_SPACES = ['lessons', 'lessons-4']
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Check if any lessons space is occupied
     const lessonsOccupied = LESSONS_SPACES.some((id) => {
       const s = state.actionSpaces.find((space) => space.id === id)

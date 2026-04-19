@@ -15,7 +15,6 @@ const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context.space)) return
     return returnToSpaceThenGainFlow({
       cardId: CARD_ID,

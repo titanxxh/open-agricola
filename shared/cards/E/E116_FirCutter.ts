@@ -32,7 +32,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -43,7 +42,6 @@ const animalMarketListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || !ANIMAL_MARKET_SPACES.has(context.space.id)) return
 
     // Number of placed farmers = familySize - workersAvailable

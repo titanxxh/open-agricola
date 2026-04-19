@@ -19,7 +19,6 @@ const fishingListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // Check if this is the Fishing action space
     if (context.space?.id !== 'fishing') return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
@@ -36,7 +35,6 @@ const occupationListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     writeCardExtraData(context.player, CARD_ID, 'foodCount', 0)

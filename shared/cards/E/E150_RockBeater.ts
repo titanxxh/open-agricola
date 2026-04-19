@@ -26,7 +26,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const space = context.state.actionSpaces.find((s) => s.id === 'resource-market-4')
     // Only add when occupied by another player
     if (!space || !isSpaceOccupied(space)) return
@@ -35,6 +34,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}resource-market-4`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }
@@ -48,7 +48,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'stone') return
     return { costs: { stone: -2 } }
   },

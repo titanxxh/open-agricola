@@ -9,8 +9,7 @@ const CARD_ID = 'A141_TurnipFarmer'
 // if both the Day Laborer and Grain Seeds action spaces are occupied, you get 1 vegetable.
 registerCardEffect({
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onStartReturnHome: (state, _player) => {
     const dayLaborer = state.actionSpaces.find((s) => s.id === 'day-laborer')
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     if (!dayLaborer || !grainSeeds) return

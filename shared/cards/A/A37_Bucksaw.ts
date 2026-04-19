@@ -11,8 +11,7 @@ const afterRenovateListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return payGainNode({
       cardId: CARD_ID,
       cost: { wood: 1 },

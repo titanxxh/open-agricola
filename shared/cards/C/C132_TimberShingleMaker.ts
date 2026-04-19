@@ -20,7 +20,6 @@ const CARD_ID = 'C132_TimberShingleMaker'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return player.cardStates?.[CARD_ID]?.counters?.woodPlaced ?? 0
   },
 })
@@ -31,7 +30,6 @@ const afterRenovateListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Only triggers when renovating to stone
     if (context.player.houseType !== 'stone') return
     const rooms = context.player.rooms

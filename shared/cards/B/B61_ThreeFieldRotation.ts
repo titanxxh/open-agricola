@@ -8,7 +8,6 @@ const CARD_ID = 'B61_ThreeFieldRotation'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const hasGrain = player.fields.some(f => fieldHasCrop(f, 'grain'))
     const hasVeg = player.fields.some(f => fieldHasCrop(f, 'vegetable'))
     const hasEmpty = player.fields.some(f => fieldIsEmpty(f))

@@ -22,7 +22,6 @@ const CARD_ID = 'D18_SteamPlow'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Check player can afford the cost
     if ((player.resources.wood ?? 0) < 2 || (player.resources.food ?? 0) < 1) return
     return {

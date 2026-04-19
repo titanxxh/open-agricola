@@ -12,7 +12,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     let bonus = 0
     if (context.player.resources.sheep > 0) bonus += 1
     if (context.player.resources.cattle > 0) bonus += 1

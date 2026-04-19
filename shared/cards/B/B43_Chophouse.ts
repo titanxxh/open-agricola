@@ -12,7 +12,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const id = context.space?.id
     if (id !== 'grain-seeds' && id !== 'vegetable-seeds') return
     const count = id === 'grain-seeds' ? 3 : 2

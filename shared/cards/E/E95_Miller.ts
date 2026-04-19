@@ -40,7 +40,6 @@ const onBuyListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Only trigger when the Miller card itself was just played
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return {
       flow: {
         type: 'leaf',

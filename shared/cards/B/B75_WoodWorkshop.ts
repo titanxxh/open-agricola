@@ -97,8 +97,7 @@ const beforeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -109,7 +108,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.doable) return
     const previewPlayer = createPreviewPlayer(context.player)
     const doable = context.actionId === 'minor-improvement'

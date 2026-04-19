@@ -4,6 +4,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const TRACKED_ACTIONS = ['collect', 'gain', 'receive'] as const
+const CARD_ID = 'E53_BoarSpear'
 
 const boarSpearDuringListener: CardListenerRegistration = {
   id: 'E53-boar-spear-during',
@@ -30,6 +31,7 @@ const boarSpearDuringListener: CardListenerRegistration = {
         value: String(i),
         labelKey: 'card.boarSpear.convert',
         labelParams: { boar: i, food: i * 4 },
+        sourceCard: CARD_ID,
       })
     }
     
@@ -37,6 +39,7 @@ const boarSpearDuringListener: CardListenerRegistration = {
     
     return {
       extraOptions: options,
+      sourceCard: CARD_ID,
     }
   },
 }
@@ -63,6 +66,7 @@ const boarSpearAfterListener: CardListenerRegistration = {
     const previousConverted = cardState.counters?.['converted'] ?? 0
     
     return {
+      sourceCard: CARD_ID,
       flow: {
         type: 'seq',
         children: [
@@ -71,6 +75,7 @@ const boarSpearAfterListener: CardListenerRegistration = {
             actionId: 'exchange', 
             optional: false,
             promptKey: 'card.boarSpear.converting',
+            sourceCard: CARD_ID,
           },
         ],
       },

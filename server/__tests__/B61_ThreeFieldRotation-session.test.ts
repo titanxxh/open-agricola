@@ -92,24 +92,4 @@ describe('B61_ThreeFieldRotation session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('does NOT gain food if card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-
-    const player = state.players[0]!
-    // Card not in minorPlayed
-    player.fields = [
-      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
-      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-      { row: 0, col: 2, stacks: [] },
-    ]
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

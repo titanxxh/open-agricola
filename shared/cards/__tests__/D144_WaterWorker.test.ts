@@ -123,14 +123,4 @@ describe('D144_WaterWorker', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('D144-water-worker-after-place-farmer')!
-    const player = createPlayer()
-    player.occupationPlayed = []
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space: createSpace('day-laborer'),
-      actionId: 'place-farmer', phase: 'after',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

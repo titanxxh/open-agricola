@@ -19,7 +19,6 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'goodsBefore', countGoods(context.player))
   },
 }
@@ -30,7 +29,6 @@ const afterExchangeListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const goodsBefore = readCardExtraData<number>(context.player, CARD_ID, 'goodsBefore') ?? 0
     const goodsAfter = countGoods(context.player)
     const goodsLost = goodsBefore - goodsAfter

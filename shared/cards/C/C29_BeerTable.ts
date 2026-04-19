@@ -7,7 +7,6 @@ const CARD_ID = 'C29_BeerTable'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if ((player.resources.grain ?? 0) < 1) return
     return {
       type: 'seq',

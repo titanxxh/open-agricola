@@ -93,23 +93,6 @@ describe('D93_SheepInspector listener', () => {
     expect(listener!.scope).toBe('player')
   })
 
-  it('does nothing if occupation is not played', () => {
-    const listener = findListener()!
-    const player = createPlayer('p1')
-    const forest = createSpace('forest', player.id)
-    const justPlaced = createSpace('clay-pit', player.id)
-    const state = createState([player], [forest, justPlaced])
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space: justPlaced,
-      actionId: 'place-farmer',
-      phase: 'after',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 
   it('does nothing when already flagged this work phase', () => {
     const listener = findListener()!
@@ -219,16 +202,6 @@ describe('D93_SheepInspector listener', () => {
     expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })
 
-  it('onRoundStart is a no-op when occupation is not played', () => {
-    const player = createPlayer('p1')
-    // Simulate stale flag even without the occupation played — just checking no throw
-    setCardFlag(player, CARD_ID, true)
-    const effect = getCardEffect(CARD_ID)
-    const state = createState([player], [])
-    effect!.onRoundStart!(state, player)
-    // Flag left alone since occupation not played
-    expect(isCardFlagged(player, CARD_ID)).toBe(true)
-  })
 })
 
 describe('D93_SheepInspector end-to-end via GameSession', () => {

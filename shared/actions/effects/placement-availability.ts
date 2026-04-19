@@ -10,18 +10,23 @@ import { isSpaceOccupied } from '../../game/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
-import { placeFarmerAction } from './place-farmer'
 
 export type AllowedPlacement = {
   spaceId: string
   allowOccupied: boolean
 }
 
-const placeFarmerVirtualSpace: ActionSpace = {
-  ...placeFarmerAction,
+const createPlaceFarmerVirtualSpace = (): ActionSpace => ({
+  id: 'place-farmer',
+  nameKey: 'actions.place-farmer.name',
+  descriptionKey: 'actions.place-farmer.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: () => ({ type: 'ok' }),
   resources: {} as Resource,
   takenBy: [],
-}
+})
 
 export function computeAllowedPlacementSpaces(
   state: GameState,
@@ -34,7 +39,7 @@ export function computeAllowedPlacementSpaces(
   const context: ActionExecutionContext & { actionId: string } = {
     state,
     player,
-    space: placeFarmerVirtualSpace,
+    space: createPlaceFarmerVirtualSpace(),
     actionId: 'place-farmer',
   }
 

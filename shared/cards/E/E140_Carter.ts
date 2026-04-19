@@ -37,7 +37,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const triggerRound = readCardExtraData<number>(context.player, CARD_ID, 'triggerRound')
     if (triggerRound == null || context.state.round !== triggerRound) return
     if (!isBuildingResourceSpace(context.space)) return

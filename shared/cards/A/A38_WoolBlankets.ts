@@ -6,7 +6,6 @@ const CARD_ID = 'A38_WoolBlankets'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     if (player.houseType === 'wood') return 3
     if (player.houseType === 'clay') return 2
     return 0

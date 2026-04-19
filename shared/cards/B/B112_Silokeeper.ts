@@ -24,7 +24,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const currentRound = context.state.round
     const triggerRevealRound = TRIGGER_ROUND_MAP[currentRound] ?? -1
     if (triggerRevealRound < 0) return

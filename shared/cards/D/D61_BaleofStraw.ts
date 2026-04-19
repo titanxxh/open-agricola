@@ -8,7 +8,6 @@ const CARD_ID = 'D61_BaleofStraw'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     // Count grain fields (fields with grain crop planted)
     const grainFieldCount = player.fields.filter(

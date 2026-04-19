@@ -30,7 +30,6 @@ const CARD_ID = 'D24_BrotherlyLove'
  */
 
 const isActive = (context: CardListenerContext): boolean => {
-  if (!context.player.minorPlayed.includes(CARD_ID)) return false
   return familySize(context.player) === 4 && workersAvailable(context.state, context.player) === 1
 }
 
@@ -59,6 +58,7 @@ const computeArgsListener: CardListenerRegistration = {
       extraOptions.push({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       })
     }
     if (extraOptions.length === 0) return

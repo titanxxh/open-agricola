@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, TradeModifier } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A28_ForestSchool'
@@ -26,6 +26,7 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
       .map((space) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       }))
     if (extraOptions.length === 0) return
     return { extraOptions, sourceCard: CARD_ID }

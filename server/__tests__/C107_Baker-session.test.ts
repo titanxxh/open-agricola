@@ -82,19 +82,4 @@ describe('C107_Baker session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onStartHarvestFeedingPhase returns undefined when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-
-    const player = state.players[0]!
-    player.resources.grain = 3
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvestFeedingPhase!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

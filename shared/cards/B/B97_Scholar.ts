@@ -8,7 +8,6 @@ const CARD_ID = 'B97_Scholar'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.houseType !== 'stone') return
     return {
       type: 'xor',

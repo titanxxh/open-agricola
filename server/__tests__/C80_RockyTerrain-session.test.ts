@@ -92,19 +92,4 @@ describe('C80_RockyTerrain', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card is not played', () => {
-    const listener = findListener('C80-rocky-terrain-after-plow')
-    expect(listener).toBeDefined()
-
-    const player = createPlayer()
-    player.minorPlayed = []
-    const state = createState(player)
-
-    const result = executeCardListener(listener!, {
-      state, player, space: createSpace('plow'),
-      actionId: 'plow', phase: 'after',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 })

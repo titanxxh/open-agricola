@@ -7,7 +7,6 @@ const CARD_ID = 'E142_Smuggler'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     // Can exchange up to 2 goods: WOOD→GRAIN or GRAIN→STONE (or both once each)
     const canWood2 = player.resources.wood >= 2

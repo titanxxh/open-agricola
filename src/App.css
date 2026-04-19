@@ -231,6 +231,7 @@ a:focus-visible,
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+  text-align: left;
 }
 
 .interaction-actions button:disabled {
@@ -383,6 +384,26 @@ a:focus-visible,
 .interaction-resource-exchange-arrow .res-icon-arrow {
   font-size: 22px;
   filter: drop-shadow(0 1px 0 rgba(255, 240, 200, 0.55));
+}
+
+.interaction-option-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.interaction-option-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interaction-option-subtitle {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 /* ══════════ HEADER ══════════ */
@@ -619,6 +640,10 @@ a:focus-visible,
   min-width: 0;
 }
 
+.center {
+  container-type: inline-size;
+}
+
 .actions h2,
 .center h2,
 .players h2 {
@@ -635,28 +660,34 @@ a:focus-visible,
 .action-board {
   position: relative;
   background:
-    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
-    url('/bga-img/add_2p.png') 0px 0 / 156px auto no-repeat,
     url('/bga-img/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* Left panel dashed border (matches BGA #add-board) */
+.action-board.action-board--2p {
+  background:
+    url('/bga-img/central.png') 0px 0 / 830px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
+.action-board.action-board--3p {
+  background:
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/left_3p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
+.action-board.action-board--4p {
+  background:
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/left_4p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
 .action-board::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 156px;
-  height: 614px;
-  border: 1px dashed white;
-  border-left: none;
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-  z-index: 1;
-  pointer-events: none;
+  content: none;
 }
 
 /* --- Action card holder (wrapper) --- */
@@ -985,6 +1016,15 @@ a:focus-visible,
   background: #1f2937;
   -webkit-mask-position: 75% 0%;
   mask-position: 75% 0%;
+}
+
+/* --- Held-worker overlay on a played card --- */
+
+.held-worker-marker {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 2;
 }
 
 /* --- Round action cards (actions_background.png sprite behind frame) --- */
@@ -1495,8 +1535,11 @@ a:focus-visible,
 /* ══════════ FARM GRID ══════════ */
 .farm-grid {
   display: grid;
-  --tile: clamp(56px, 8vw, 96px);
-  --fence: clamp(8px, 1.2vw, 14px);
+  /* Size tiles by the .center container width, not the viewport.
+     Otherwise, in the 3-column board layout the .center column is
+     only ~1/3 of the viewport and the vw-sized grid overflows. */
+  --tile: clamp(40px, min(8vw, 14cqw), 96px);
+  --fence: clamp(6px, min(1.2vw, 2.1cqw), 14px);
   grid-template-columns: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence) var(--tile) var(--fence)
     var(--tile) var(--fence);
@@ -1711,22 +1754,35 @@ a:focus-visible,
 
 .pasture-info {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  right: calc(var(--tile, 60px) * 0.04);
+  bottom: calc(var(--tile, 60px) * 0.04);
   display: grid;
-  gap: 4px;
+  gap: calc(var(--tile, 60px) * 0.05);
   background: rgba(255, 255, 255, 0.88);
+  padding: calc(var(--tile, 60px) * 0.04) calc(var(--tile, 60px) * 0.07);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  /* No fixed min-width: a single "0/1" badge should hug its content so it
+     doesn't cover the tile label on narrow tiles. The reorg variant adds
+     its own min-width below. */
+  max-width: calc(100% - 6px);
+}
+
+/* Reorg mode shows a 3-row grid of +/- controls; needs more horizontal room. */
+.pasture-info:has(.pasture-controls) {
+  min-width: 68px;
   padding: 4px 6px;
   border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  min-width: 68px;
 }
 
 .pasture-count {
-  font-size: 11px;
+  /* Scale with tile size so the badge stays proportional on narrow boards. */
+  font-size: clamp(8px, calc(var(--tile, 60px) * 0.16), 14px);
   font-weight: 700;
   color: #2f4f1f;
   text-align: right;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .pasture-controls {
@@ -2267,6 +2323,9 @@ a:focus-visible,
 .action-desc .icon-line .res-icon {
   font-size: inherit;
 }
+.action-desc .icon-line .icon-token {
+  display: inline-block;
+}
 
 /* Farm Expansion: smaller font for its many cost lines */
 [data-action-id="farm-expansion"] .action-desc .icon-line {
@@ -2278,10 +2337,24 @@ a:focus-visible,
 }
 /* Lessons: smaller first line */
 [data-action-id="lessons"] .action-desc .icon-line:first-child,
+[data-action-id="lessons-3"] .action-desc .icon-line:first-child,
 [data-action-id="lessons-4"] .action-desc .icon-line:first-child {
   font-size: 0.7em;
 }
 /* Resource Market: smaller text */
+[data-action-id="resource-market"] .action-desc .icon-line {
+  font-size: 0.7em;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market {
+  gap: 1px;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market .icon-token--slash {
+  margin: 0 0.16em;
+  font-size: 0.9em;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market .icon-token--spaced-plus {
+  margin-left: 0.18em;
+}
 [data-action-id="resource-market-4"] .action-desc .icon-line {
   font-size: 0.65em;
 }

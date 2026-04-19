@@ -11,7 +11,6 @@ const BREEDABLE_TYPES = ['cattle', 'boar', 'sheep'] as const
 registerCardEffect({
   id: CARD_ID,
   onReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
     if (player.fields.length < 2) return
 

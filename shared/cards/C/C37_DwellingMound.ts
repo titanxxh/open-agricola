@@ -10,8 +10,7 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['plow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { costs: { food: 1 } }
   },
 }

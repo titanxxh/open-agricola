@@ -16,7 +16,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const gainPerRound = context.space?.gainPerRound ?? {}
     const isWood = (gainPerRound.wood ?? 0) > 0
     const isClay = (gainPerRound.clay ?? 0) > 0

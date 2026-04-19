@@ -9,7 +9,6 @@ const CARD_ID = 'E100_MuseumCaretaker'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const r = player.resources
     if (
       (r.wood ?? 0) >= 1 &&

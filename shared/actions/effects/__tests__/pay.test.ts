@@ -399,6 +399,11 @@ describe('payment choice ordering', () => {
       resourcesPaid: { stone: 1, wood: 2, reed: 1 },
       cardUsed: undefined,
     })
+    expect((result.options[0] as any)?.effectPreview).toEqual({
+      kind: 'payment',
+      resourcesPaid: { stone: 1, wood: 2, reed: 1 },
+      cardUsed: undefined,
+    })
   })
 
   it('sorts same-cost returned-card solutions deterministically', () => {
@@ -412,6 +417,18 @@ describe('payment choice ordering', () => {
     expect(result.options.map((option) => option.labelParams)).toMatchObject([
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
+    ])
+    expect(result.options.map((option) => (option as any).effectPreview)).toEqual([
+      {
+        kind: 'payment',
+        resourcesPaid: { clay: 2 },
+        cardUsed: 'Major_ClayOven',
+      },
+      {
+        kind: 'payment',
+        resourcesPaid: { clay: 2 },
+        cardUsed: 'Major_StoneOven',
+      },
     ])
   })
 })

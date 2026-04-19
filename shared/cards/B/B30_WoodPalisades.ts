@@ -7,7 +7,6 @@ const CARD_ID = 'B30_WoodPalisades'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return getPalisadeCount(player)
   },
 })

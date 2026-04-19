@@ -22,7 +22,6 @@ const woodCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context.space)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
@@ -40,7 +39,6 @@ const renovationListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'foodCount', 3)
     updateInfobox(context.player, 3)
   },

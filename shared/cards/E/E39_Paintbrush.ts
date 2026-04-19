@@ -7,7 +7,6 @@ const CARD_ID = 'E39_Paintbrush'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.clay < 1) return
 
     const children: ActionFlow[] = [

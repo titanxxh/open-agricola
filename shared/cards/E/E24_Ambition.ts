@@ -25,7 +25,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // Only replace when on meeting-place or wish-children action spaces
     const spaceId = context.space?.id
     if (spaceId !== 'meeting-place' && spaceId !== 'wish-children' && spaceId !== 'urgent-wish-children') return

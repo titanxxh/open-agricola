@@ -41,7 +41,6 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.stableTiles.length === 0) return
 
     const selectableTiles = player.stableTiles.map((t) => ({

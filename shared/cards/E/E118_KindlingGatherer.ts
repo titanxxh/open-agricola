@@ -34,7 +34,6 @@ const placeFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     if (!PLACE_FARMER_FOOD_SPACES.has(context.space.id)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
@@ -47,7 +46,6 @@ const collectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     if (!COLLECT_FOOD_SPACES.has(context.space.id)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
@@ -60,7 +58,6 @@ const gainListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     if (!GAIN_FOOD_SPACES.has(context.space.id)) return
     // Only trigger if food was actually gained

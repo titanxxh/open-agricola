@@ -20,7 +20,6 @@ const duringListener: CardListenerRegistration = {
   phases: ['during' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'major-improvement') return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
@@ -33,7 +32,6 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'major-improvement') return
     return {
       flow: {
@@ -54,7 +52,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const majorSpace = context.state.actionSpaces.find((s) => s.id === 'major-improvement')
     if (!majorSpace) return
     // Only add if the space is occupied (if empty, it's already available normally)
@@ -64,6 +61,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}major-improvement`,
         labelKey: majorSpace.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }

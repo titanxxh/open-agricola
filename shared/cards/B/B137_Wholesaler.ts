@@ -47,7 +47,6 @@ const afterVegetableSeedsListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'vegetable-seeds') return
     const data = getData(context)
     if (data.vegetableTaken) return
@@ -69,7 +68,6 @@ const afterPigMarketListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'pig-market') return
     const data = getData(context)
     if (data.boarTaken) return
@@ -91,7 +89,6 @@ const afterEasternQuarryListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'eastern-quarry') return
     const data = getData(context)
     if (data.stoneTaken) return
@@ -113,7 +110,6 @@ const afterCattleMarketListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'cattle-market') return
     const data = getData(context)
     if (data.cattleTaken) return

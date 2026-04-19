@@ -15,7 +15,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const n = context.player.occupationPlayed.length
     if (!TRIGGER_COUNTS.has(n)) return
     return {

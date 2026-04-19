@@ -18,7 +18,6 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context.space)) return
     // Check if there is at least 1 pig on the pig-market space
     const pigMarket = context.state.actionSpaces.find((s) => s.id === 'pig-market')

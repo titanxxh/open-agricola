@@ -14,8 +14,7 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['bake-bread'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return payGainNode({
       cardId: CARD_ID,
       cost: { grain: 1 },

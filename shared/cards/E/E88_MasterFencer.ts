@@ -9,7 +9,6 @@ const CARD_ID = 'E88_MasterFencer'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.houseType !== 'stone') return
 
     const wood = player.resources.wood ?? 0

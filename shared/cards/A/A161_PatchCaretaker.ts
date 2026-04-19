@@ -23,7 +23,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     const currentTypes = getAccumulatedTypes(context.space)
     if (currentTypes.length === 0) return // Not an accumulation space

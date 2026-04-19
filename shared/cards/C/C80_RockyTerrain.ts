@@ -20,7 +20,6 @@ const plowListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['plow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.player.resources.food < 1) return
     return payGainNode({
       cardId: CARD_ID,

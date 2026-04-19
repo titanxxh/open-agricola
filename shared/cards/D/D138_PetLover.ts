@@ -30,7 +30,6 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id
     const animalType = spaceId ? ANIMAL_MARKET_SPACES[spaceId] : undefined
     if (!animalType) return

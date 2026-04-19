@@ -8,7 +8,6 @@ const CARD_ID = 'C49_BeerStall'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const looseKeys = getLooseStableKeys(player)
     const emptyStables = looseKeys.filter(k => !player.stableAnimals?.[k]).length
     if (emptyStables <= 0 || player.resources.grain < 1) return

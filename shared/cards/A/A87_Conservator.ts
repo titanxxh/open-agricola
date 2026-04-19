@@ -40,8 +40,9 @@ const choiceCandidateListener: CardListenerRegistration = {
     if (context.player.houseType !== 'wood') return
     return {
       extraOptions: [
-        { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone' },
+        { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
       ],
+      sourceCard: CARD_ID,
     }
   },
 }

@@ -6,7 +6,6 @@ const CARD_ID = 'C35_LanternHouse'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return -(player.minorHand.length + player.occupationHand.length)
   },
 })
