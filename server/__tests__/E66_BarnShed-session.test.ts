@@ -6,7 +6,7 @@ import '../../shared/cards/E/E66_BarnShed'
 
 describe('E66_BarnShed session', () => {
   const setup = (currentPlayerIndex = 0) => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex

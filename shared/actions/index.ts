@@ -14,15 +14,18 @@ import { fishing } from '../cards/action/common-fishing'
 import { forest } from '../cards/action/common-forest'
 import { grainSeeds } from '../cards/action/common-grain-seeds'
 import { grove } from '../cards/action/common-grove'
+import { hollow } from '../cards/action/common-hollow'
 import { hollow4 } from '../cards/action/common-hollow-4'
 import { houseRedevelopment } from '../cards/action/round-house-redevelopment'
 import { majorImprovement } from '../cards/action/round-major-improvement'
 import { meetingPlace } from '../cards/action/common-meeting-place'
 import { lessons } from '../cards/action/common-lessons'
+import { lessons3 } from '../cards/action/common-lessons-3'
 import { lessons4 } from '../cards/action/common-lessons-4'
 import { farmExpansion } from '../cards/action/common-farm-expansion'
 import { grainUtilization } from '../cards/action/round-grain-utilization'
 import { reedBank } from '../cards/action/common-reed-bank'
+import { resourceMarket } from '../cards/action/common-resource-market'
 import { resourceMarket4 } from '../cards/action/common-resource-market-4'
 import { sheepMarket } from '../cards/action/round-sheep-market'
 import { pigMarket } from '../cards/action/round-pig-market'
@@ -51,6 +54,7 @@ const baseActionDefinitions: ActionDefinition[] = [
   copse,
   grove,
   clayPit,
+  hollow,
   hollow4,
   reedBank,
   fishing,
@@ -58,6 +62,7 @@ const baseActionDefinitions: ActionDefinition[] = [
   dayLaborer,
   meetingPlace,
   lessons,
+  lessons3,
   lessons4,
   westernQuarry,
   easternQuarry,
@@ -76,6 +81,7 @@ const baseActionDefinitions: ActionDefinition[] = [
   pigMarket,
   cattleMarket,
   vegetableSeeds,
+  resourceMarket,
   resourceMarket4,
 ]
 
@@ -99,9 +105,13 @@ export const getActionDefinition = (
   actionId: string,
 ): ActionDefinition | undefined => actionDefinitionLookup.get(actionId)
 
-export const createActionSpaces = (): ActionSpace[] =>
-  actionDefinitions.map((action) => ({
-    ...action,
-    resources: { ...emptyResources },
-    takenBy: [],
-  }))
+export const createActionSpaces = (playerCount?: number): ActionSpace[] =>
+  actionDefinitions
+    .filter((action) =>
+      !playerCount || !action.players || action.players.includes(playerCount),
+    )
+    .map((action) => ({
+      ...action,
+      resources: { ...emptyResources },
+      takenBy: [],
+    }))

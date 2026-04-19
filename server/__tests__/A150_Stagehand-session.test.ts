@@ -6,7 +6,7 @@ import '../../shared/cards/A/A150_Stagehand'
 
 describe('A150_Stagehand session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     // traveling-players is a 4-player action space, keep all 4 players
     state.currentPlayerIndex = 1
