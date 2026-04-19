@@ -24,6 +24,11 @@ const inferCardType = (cardId: string): CardType | null => {
   return null
 }
 
+export const getAnyCardDisplayName = (
+  locale: Locale,
+  cardId: string,
+): string => getCardDisplayName(locale, inferCardType(cardId), cardId)
+
 export const getCardDisplayName = (
   locale: Locale,
   cardType: CardType | null,

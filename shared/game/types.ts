@@ -348,6 +348,7 @@ export type PendingAction =
       promptKey?: string
       promptParams?: Record<string, unknown>
       costOverride?: Partial<Resource>
+      sourceCard?: string
       actionContext?: Record<string, unknown>
     }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
@@ -444,6 +445,7 @@ export type InteractionState =
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
+      sourceCard?: string
     })
   | (InteractionBase & {
       stateId: 'farmSelect'
@@ -453,6 +455,7 @@ export type InteractionState =
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
+      sourceCard?: string
       farm: InteractionFarmSelection
     })
   | (InteractionBase & {
@@ -463,6 +466,7 @@ export type InteractionState =
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
+      sourceCard?: string
       selection: InteractionSelection
     })
   | (InteractionBase & {

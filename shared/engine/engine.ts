@@ -129,6 +129,15 @@ export class Engine {
     return null
   }
 
+  private findPairedChoiceNode(node: ActionNode): ChoiceNode | null {
+    const parent = this.tree.findParent(node.id)
+    if (!(parent instanceof SequenceNode)) return null
+    const index = parent.children.findIndex((child) => child.id === node.id)
+    if (index === -1) return null
+    const candidate = parent.children[index + 1]
+    return candidate instanceof ChoiceNode ? candidate : null
+  }
+
   private buildActivateCardNodes(
     matched: { registration: { id: string; cardIds?: string[] }; cardId: string; ownerPlayerId: string }[],
     phase: string,
@@ -727,6 +736,12 @@ export class Engine {
       }
       this.pendingChoiceNodeId = node.id
       this.pendingChoiceActionId = null
+      this.pendingChoiceContext = {
+        params: actionNode.params,
+        costs: undefined,
+        sourceCard: actionNode.sourceCard,
+        actionContext: actionNode.actionContext,
+      }
       const label = this.getChoiceLabel(node) ?? {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,
@@ -895,7 +910,7 @@ if (extraOptions.length > 0) {
 result.options = [...result.options, ...extraOptions]
           }
         }
-        const choiceNode = this.findChoiceNode(this.tree.root)
+        const choiceNode = this.findPairedChoiceNode(node) ?? this.findChoiceNode(this.tree.root)
         if (choiceNode) {
           choiceNode.setChoice(result.promptKey, result.options)
           this.pendingChoiceNodeId = choiceNode.id
@@ -921,6 +936,7 @@ nodeId: this.pendingChoiceNodeId ?? node.id,
 choice: { promptKey: result.promptKey, promptParams: result.promptParams, options: result.options },
 }
       }
+      this.findPairedChoiceNode(node)?.setState('resolved')
       if (result.type === 'flow') {
         const flowNode = this.buildFlowNode(result.flow)
         this.tree.insertAfter(node.id, [flowNode])

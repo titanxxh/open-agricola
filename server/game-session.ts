@@ -788,6 +788,7 @@ export class GameSession {
         promptParams: this.pending.promptParams,
         options: this.pending.options,
         costOverride: this.pending.costOverride,
+        sourceCard: this.pending.sourceCard,
         selection: this.buildSelectionInteraction(selectionPlayer),
         allowedCommands: ['resolveChoice', 'commitSelection', 'takeAnytimeAction', 'undoStep', 'undoAction'],
         anytimeActions,
@@ -806,6 +807,7 @@ export class GameSession {
         promptParams: this.pending.promptParams,
         options: this.pending.options,
         costOverride: this.pending.costOverride,
+        sourceCard: this.pending.sourceCard,
         farm,
         allowedCommands: [...allowedCommands],
         anytimeActions,
@@ -819,6 +821,7 @@ export class GameSession {
       promptParams: this.pending.promptParams,
       options: this.pending.options,
       costOverride: this.pending.costOverride,
+      sourceCard: this.pending.sourceCard,
       allowedCommands: [...allowedCommands],
       anytimeActions,
     }
@@ -1607,6 +1610,7 @@ export class GameSession {
                 options: result.options ?? [], promptKey: result.promptKey,
                 promptParams: result.promptParams,
                 costOverride: this.engine?.getLastComputedCosts(),
+                sourceCard: this.engine?.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
                 actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
               }
               return
@@ -1632,6 +1636,7 @@ export class GameSession {
           options: step.choice.options, promptKey: step.choice.promptKey,
           promptParams: step.choice.promptParams,
           costOverride: this.engine?.getLastComputedCosts(),
+          sourceCard: this.engine?.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
           actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
         }
         return
@@ -1937,6 +1942,7 @@ export class GameSession {
         options: result.options ?? [], promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
+        sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
@@ -2364,6 +2370,7 @@ export class GameSession {
         options: result.options ?? [], promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
+        sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
       }
       return this.respond()
@@ -2489,6 +2496,7 @@ export class GameSession {
             options: payment.options ?? [],
             promptKey: payment.promptKey,
             costOverride: override,
+            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
@@ -2559,6 +2567,7 @@ export class GameSession {
             options: payment.options ?? [],
             promptKey: payment.promptKey,
             costOverride: override,
+            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
@@ -2612,6 +2621,7 @@ export class GameSession {
             options: payment.options ?? [],
             promptKey: payment.promptKey,
             costOverride: override,
+            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
@@ -2656,6 +2666,7 @@ export class GameSession {
             options: payment.options ?? [],
             promptKey: payment.promptKey,
             costOverride: override,
+            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
               farmPayment: {
