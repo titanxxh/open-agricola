@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+import type { PlayerState } from '../../shared/game/types.ts'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
+
+const CARD_ID = 'A128_RiparianBuilder'
 
 describe('A128_RiparianBuilder session', () => {
   const setup = () => {
@@ -13,7 +17,7 @@ describe('A128_RiparianBuilder session', () => {
     state.currentPlayerIndex = 1
 
     const owner = state.players[0]!
-    owner.occupationPlayed.push('A128_RiparianBuilder')
+    owner.occupationPlayed.push(CARD_ID)
     owner.houseType = 'clay'
     owner.rooms = 2
     owner.resources = { ...owner.resources, wood: 5, clay: 10, reed: 6 }
@@ -126,5 +130,52 @@ describe('A128_RiparianBuilder session', () => {
     resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.observedCount).toBeUndefined()
+  })
+
+  it('preserves sourceCard when granted construct enters room payment choice', () => {
+    const session = setup()
+    const state = session.getState().state
+    const owner = state.players[0]!
+    owner.houseType = 'stone'
+    owner.resources = { ...owner.resources, wood: 1, stone: 5, reed: 2, clay: 0 }
+    owner.occupationPlayed.push('A123_FrameBuilder')
+    owner.activeModifiers = [
+      ...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+    ]
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'reed-bank')
+    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+
+    resp = session.confirmPlayerSwitch()
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+
+    const constructOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    expect(constructOption).toBeDefined()
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.farm.maxSelections).toBe(1)
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
+    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('choice')
+    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.options).toHaveLength(2)
   })
 })

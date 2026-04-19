@@ -168,6 +168,7 @@ export const en = {
     interactionStableSelectSubtitle: 'Selected {selected} / Max {max}',
     interactionSowSelectSubtitle: 'Selected {selected} fields',
     interactionOptionalAction: 'Optional action',
+    interactionTriggeredByCard: 'Triggered by {card}',
     interactionOptionalSkip: 'Skip',
     interactionFlowSelect: 'Choose an action',
     interactionFlowDone: 'Done',

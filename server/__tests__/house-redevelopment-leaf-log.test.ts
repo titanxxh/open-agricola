@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game-session'
 
+import '../../shared/cards/A/A55_JunkRoom'
+
 /**
  * Regression: when a SEQ wraps multiple leaves (renovate-house + optional
  * improvement-any), the renovation `log.actionDetail` must be emitted as soon
@@ -10,6 +12,45 @@ import { GameSession } from '../game-session'
  * timing bug).
  */
 describe('house-redevelopment leaf-flush logging', () => {
+  it('continues into optional improvement choice after auto-resolved renovation', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 6
+    const owner = state.players[0]!
+    owner.houseType = 'wood'
+    owner.rooms = 2
+    owner.resources.wood = 1
+    owner.resources.clay = 5
+    owner.resources.reed = 5
+    owner.resources.food = 5
+    owner.minorHand = ['A55_JunkRoom']
+    state.availableMajorImprovements = ['Major_Fireplace1']
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.pending.options.some((option) => option.value === '__skip__')).toBe(true)
+
+    const playImprovement = resp.pending.options.find((option) => option.value !== '__skip__')
+    expect(playImprovement).toBeDefined()
+
+    const resp2 = session.resolveChoice(0, playImprovement!.value)
+    expect(resp2.ok).toBe(true)
+    expect(resp2.pending.type).toBe('choice')
+    if (resp2.pending.type !== 'choice') return
+
+    expect(resp2.pending.promptKey).toBe('ui.interactionChooseImprovement')
+    expect(resp2.pending.options.map((option) => option.value)).toEqual(
+      expect.arrayContaining(['major:Major_Fireplace1', 'minor:A55_JunkRoom']),
+    )
+  })
+
   it('emits log.actionDetail for renovate-house before improvement choice prompt', () => {
     const session = new GameSession()
     const state = session.getState().state

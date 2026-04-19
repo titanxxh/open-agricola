@@ -505,6 +505,7 @@ export const GameContainerApi = () => {
           options: interaction.options,
           playerIndex: interaction.playerIndex,
           spaceId: interaction.spaceId,
+          sourceCard: interaction.sourceCard,
           fenceExtraWood:
             interaction.stateId === 'farmSelect' && interaction.farm.farmType === 'fence'
               ? interaction.farm.extraWood ?? 0
@@ -1535,6 +1536,7 @@ export const GameContainerApi = () => {
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
                 hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
                 existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+                fencePlacementMode={fencePlacementMode}
                 toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
                 togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
                 toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}

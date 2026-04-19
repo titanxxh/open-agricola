@@ -71,3 +71,21 @@ export const getNextEmptyTile = (
 
 export const getNextEmptyTileForPlayer = (player: PlayerState) =>
   getNextEmptyTile(player.roomTiles, player.fields, player.stableTiles)
+
+export const isBorderEdge = (edgeId: string): boolean => {
+  const match = /^([HV])-(\d+)-(\d+)$/.exec(edgeId)
+  if (!match) return false
+  const type = match[1]
+  const r = Number(match[2])
+  const c = Number(match[3])
+  if (!Number.isFinite(r) || !Number.isFinite(c)) return false
+  if (type === 'H') {
+    if (c < 0 || c >= FARM_COLS) return false
+    return r === 0 || r === FARM_ROWS
+  }
+  if (type === 'V') {
+    if (r < 0 || r >= FARM_ROWS) return false
+    return c === 0 || c === FARM_COLS
+  }
+  return false
+}

@@ -104,17 +104,20 @@ describe('E74_AshTrees session flow', () => {
     expect(useThree).toBeDefined()
     resp = session.resolveChoice(0, useThree!.value)
 
-    // 3 fences on tile (1,1); 2 palisades on tile (1,2)
+    // Enclose tile (0,0) with 2 fences + 2 palisades.
+    // Palisades must be on border: H-0-0 (top), V-0-0 (left).
+    // Fences on internal edges: H-1-0, V-0-1.
+    // Cost: 2 fences × 1 = 2, minus 2 freeFences = 0; 2 palisades × 2 = 4. Total = 4 wood.
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: ['H-1-1', 'H-2-1', 'V-1-1'],
-      palisadeEdges: ['V-1-2', 'V-1-3'],
+      edges: ['H-1-0', 'V-0-1'],
+      palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
     const result = resp.state.players[0]!
     expect(result.resources.wood).toBe(0)
-    // counter decrements by 3 (newFenceEdges.length), not 5
-    expect(result.cardStates?.E74_AshTrees?.counters?.fences).toBe(2)
+    // counter decrements by 2 (newFenceEdges.length), not 5 — palisades do NOT decrement E74 counter
+    expect(result.cardStates?.E74_AshTrees?.counters?.fences).toBe(3)
   })
 })

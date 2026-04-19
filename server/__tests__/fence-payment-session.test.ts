@@ -106,10 +106,11 @@ describe('fence payment session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    // Enclose tile (1,1) using 3 fences + 1 palisade on the top edge.
+    // Enclose tile (0,1) using 3 fences + 1 palisade on the top (border) edge.
+    // H-0-1 is row=0 (border). H-1-1, V-0-1, V-0-2 are internal fences.
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: ['H-2-1', 'V-1-1', 'V-1-2'],
-      palisadeEdges: ['H-1-1'],
+      edges: ['H-1-1', 'V-0-1', 'V-0-2'],
+      palisadeEdges: ['H-0-1'],
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
@@ -125,7 +126,7 @@ describe('fence payment session', () => {
     expect(resp.ok).toBe(true)
     const segments = resp.state.players[0]!.fenceSegments
     expect(segments).toHaveLength(4)
-    const palisade = segments.find((s) => s.edge === 'H-1-1')
+    const palisade = segments.find((s) => s.edge === 'H-0-1')
     expect(palisade).toBeDefined()
     expect(palisade?.type).toBe('palisade')
   })

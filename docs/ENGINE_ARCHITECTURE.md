@@ -223,6 +223,7 @@ type StateUpdateEnvelope =
   - `stateId`
   - `allowedCommands`
   - `anytimeActions`
+  - `choice` / `farmSelect` / `selection` 的 `sourceCard`（当交互由某张卡触发时，前端可统一显示“由某卡触发”）
   - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`（对 `sow`，`selectableFields` 允许包含 off-board 虚拟田位、每格独立 `allowedCrops` 与 `sourceCard`）
 
 协议层规则：
@@ -1031,7 +1032,14 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 ```ts
 type PendingAction =
   | { type: 'none' }
-  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
+  | {
+      type: 'choice'
+      playerIndex: number
+      spaceId: string
+      options: ActionChoiceOption[]
+      promptKey?: string
+      sourceCard?: string
+    }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
   | { type: 'harvestFeed'; playerIndex: number; remaining: number; foodUsed: number; feedQueue?: { index: number; remaining: number; foodUsed: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
@@ -1065,6 +1073,7 @@ type PendingAction =
 - `isDoable`：改变行动是否可执行
 - `computeReplace`：把一个行动替换成另一个行动
 - `computeCosts`：调整支付成本
+- `computeFenceDiscount`：围栏支付时由各卡牌返回免费 fence segment 数（聚合器 `collectFenceDiscount(state, player, ctx)`，`shared/cards/card-effects.ts`）；当前消费者：E16 BriarHedge（每条 border edge 折扣 1 wood，最多 4）
 - `computeArgs`：追加选项、额外参数（针对 `execute()` 已经返回 `choice` 的传统路径）
 - `computeChoiceCandidates`：针对 opt-in `getBaseChoiceOptions` 的 action，注入额外候选目标（见 §11.6.3）
 - `canUseOccupied`：允许把已占用行动位视为仍可用

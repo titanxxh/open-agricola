@@ -119,9 +119,25 @@ const skipImprovement = (session: GameSession, actorIdx: number, resp: ReturnTyp
 }
 
 /**
+ * Accept the optional "play an improvement" step so the actual improvement
+ * picker (`ui.interactionChooseImprovement`) is shown.
+ */
+const enterImprovementChoice = (
+  session: GameSession,
+  actorIdx: number,
+  resp: ReturnType<GameSession['takeAction']>,
+) => {
+  if (resp.pending.type !== 'choice') return resp
+  const enterOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+  if (!enterOpt) return resp
+  return session.resolveChoice(actorIdx, enterOpt.value)
+}
+
+/**
  * Build a specific major improvement during house-redevelopment.
  */
 const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, majorId: string) => {
+  resp = enterImprovementChoice(session, actorIdx, resp)
   if (resp.pending.type !== 'choice') return resp
   const opt = resp.pending.options?.find((o) => o.value === `major:${majorId}`)
   if (!opt) return resp
@@ -136,6 +152,27 @@ const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<Gam
     // If skip is for actor and it's the D161 offer (after improvement), also break
     // but we need to detect we've landed on D161 offer vs a normal improvement choice
     // We'll just break when we've exhausted non-skip choices
+    const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
+    if (!nonSkip) break
+    resp = session.resolveChoice(actorIdx, nonSkip.value)
+  }
+  return resp
+}
+
+/**
+ * Build a specific minor improvement during house-redevelopment.
+ */
+const buildMinor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, minorId: string) => {
+  resp = enterImprovementChoice(session, actorIdx, resp)
+  if (resp.pending.type !== 'choice') return resp
+  const opt = resp.pending.options?.find((o) => o.value === `minor:${minorId}`)
+  if (!opt) return resp
+  resp = session.resolveChoice(actorIdx, opt.value)
+  let safety = 5
+  while (resp.pending.type === 'choice' && safety-- > 0) {
+    const opts = resp.pending.options ?? []
+    const hasSkip = opts.some((o) => o.value === '__skip__')
+    if (hasSkip && resp.pending.playerIndex !== actorIdx) break
     const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
     if (!nonSkip) break
     resp = session.resolveChoice(actorIdx, nonSkip.value)
@@ -179,6 +216,9 @@ describe('D161_CabbageBuyer session', () => {
     // Now we should see the D161 offer for p0 (cost=3, optional seq)
     expect(resp.pending.type).toBe('choice')
     expect(resp.pending.playerIndex).toBe(0)
+    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('choice')
+    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
 
     // Accept the offer (non-skip option)
     const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
@@ -192,24 +232,16 @@ describe('D161_CabbageBuyer session', () => {
     expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore + 1)
   })
 
-  // ── Case 2: improvement optional step always auto-skips → cost always = 3 ──
-  //
-  // KNOWN LIMITATION: D161's tagImprovementListener fires after:improvement-any,
-  // but the improvement-any OptionalNode inside house-redevelopment auto-skips
-  // during engine execution and never presents a user choice. As a result,
-  // hasMajor and hasMinor remain false and the cost is always 3 regardless of
-  // what improvements could theoretically be built. T2 documents this behavior.
+  // ── Case 2: major improvement built → cost = 1 food ──────────────────────
 
-  it('T2: improvement step always auto-skips — offer always costs 3 food (known limitation)', () => {
+  it('T2: major improvement built during house-redevelopment — offer costs 1 food', () => {
     const session = setup()
     const ownerFoodBefore = session.getState().state.players[0]!.resources.food
     const ownerVegBefore = session.getState().state.players[0]!.resources.vegetable ?? 0
 
-    // driveRenovation drives house-redevelopment; the improvement-any step auto-skips
     let resp = driveRenovation(session, 1).resp
+    resp = buildMajor(session, 1, resp, 'Major_Fireplace1')
 
-    // The improvement optional auto-skips — driveRenovation reaches end of action directly.
-    // No improvement choice is presented, so hasMajor stays false → cost = 3.
     resp = walkPlayerSwitch(session, resp)
 
     expect(resp.pending.type).toBe('choice')
@@ -222,30 +254,23 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     const after = session.getState().state
-    // Cost is always 3 because improvement-any step never fires (auto-skipped by engine)
-    expect(after.players[0]!.resources.food).toBe(ownerFoodBefore - 3)
+    expect(after.players[0]!.resources.food).toBe(ownerFoodBefore - 1)
     expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore + 1)
   })
 
-  // ── Case 3: minor improvement — same auto-skip behavior → cost = 3 ──────
-  //
-  // Even with a minor card in hand, the improvement-any OptionalNode auto-skips,
-  // so hasMinor stays false and cost remains 3.
+  // ── Case 3: minor improvement built → cost = 2 food ──────────────────────
 
-  it('T3: minor card in hand — improvement step still auto-skips, offer costs 3 food', () => {
+  it('T3: minor improvement built during house-redevelopment — offer costs 2 food', () => {
     const session = setup()
     const state = session.getState().state
-    // Give A55_JunkRoom to p1 (the actor) as a hand card
-    state.players[1]!.minorHand.push('A55_JunkRoom')
+    state.players[1]!.minorHand = ['A55_JunkRoom']
     session.loadState(state)
 
     const ownerFoodBefore = session.getState().state.players[0]!.resources.food
     const ownerVegBefore = session.getState().state.players[0]!.resources.vegetable ?? 0
 
     let resp = driveRenovation(session, 1).resp
-
-    // The improvement optional auto-skips even with A55_JunkRoom in hand.
-    // hasMinor stays false → cost = 3.
+    resp = buildMinor(session, 1, resp, 'A55_JunkRoom')
     resp = walkPlayerSwitch(session, resp)
 
     expect(resp.pending.type).toBe('choice')
@@ -258,16 +283,11 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     const after = session.getState().state
-    // Cost is always 3 because improvement-any step never fires
-    expect(after.players[0]!.resources.food).toBe(ownerFoodBefore - 3)
+    expect(after.players[0]!.resources.food).toBe(ownerFoodBefore - 2)
     expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore + 1)
   })
 
-  // ── Case 4: owner self-trigger — same auto-skip → cost = 3 ─────────────
-  //
-  // When the D161 owner (p0) themselves takes house-redevelopment, the
-  // self-trigger fires after place-farmer. No player switch needed.
-  // Improvement step auto-skips → cost = 3.
+  // ── Case 4: owner self-trigger with no improvement → cost = 3 ────────────
 
   it('T4: owner (p0) takes house-redevelopment — self-trigger fires, cost=3', () => {
     // Set currentPlayerIndex to 0 so p0 is both owner and actor
@@ -278,8 +298,8 @@ describe('D161_CabbageBuyer session', () => {
 
     let resp = driveRenovation(session, 0).resp
 
-    // Improvement step auto-skips for self-trigger too.
-    // D161 fires for p0 — no player switch since owner == actor.
+    // Explicitly skip the optional improvement step.
+    resp = skipImprovement(session, 0, resp)
     resp = walkPlayerSwitch(session, resp)
 
     // D161 offer should be presented for p0
@@ -293,7 +313,6 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     const after = session.getState().state
-    // Cost = 3 (improvement-any auto-skips, hasMajor stays false)
     expect(after.players[0]!.resources.food).toBe(ownerFoodBefore - 3)
     expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore + 1)
   })
