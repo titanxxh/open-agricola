@@ -6,12 +6,13 @@ import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-plac
 import { PlayerCard } from '../common/PlayerCard'
 import { getOccupation } from '../../../shared/game/occupations'
 
-const BOARD_W = 1000
+const BOARD_W_2P = 830
+const BOARD_W_WITH_SIDE = 1000
 const BOARD_H = 795
 
 type Pos = { top: number; left: number; width: number; height: number; size: 's' | 'std' }
 
-const CX = 170
+const SIDE_PANEL_OFFSET = 170
 
 const SIDE_ACTIONS: Record<string, Pos> = {
   'copse':             { top: 18,  left: 5,   width: 60,  height: 83,  size: 's' },
@@ -26,48 +27,57 @@ const SIDE_ACTIONS: Record<string, Pos> = {
 }
 
 const CENTRAL_ACTIONS: Record<string, Pos> = {
-  'farm-expansion': { top: -3,  left: 30 + CX,  width: 115, height: 134, size: 'std' },
-  'meeting-place':  { top: 134, left: 31 + CX,  width: 115, height: 72,  size: 'std' },
-  'grain-seeds':    { top: 220, left: 30 + CX,  width: 115, height: 69,  size: 'std' },
-  'farmland':       { top: 310, left: 30 + CX,  width: 115, height: 80,  size: 'std' },
-  'forest':         { top: 203, left: 253 + CX, width: 60,  height: 86,  size: 's' },
-  'clay-pit':       { top: 306, left: 175 + CX, width: 60,  height: 86,  size: 's' },
-  'lessons':        { top: 406, left: 30 + CX,  width: 115, height: 94,  size: 'std' },
-  'reed-bank':      { top: 411, left: 254 + CX, width: 60,  height: 86,  size: 's' },
-  'day-laborer':    { top: 526, left: 30 + CX,  width: 115, height: 74,  size: 'std' },
-  'fishing':        { top: 514, left: 175 + CX, width: 62,  height: 86,  size: 's' },
+  'farm-expansion': { top: -3,  left: 30,  width: 115, height: 134, size: 'std' },
+  'meeting-place':  { top: 134, left: 31,  width: 115, height: 72,  size: 'std' },
+  'grain-seeds':    { top: 220, left: 30,  width: 115, height: 69,  size: 'std' },
+  'farmland':       { top: 310, left: 30,  width: 115, height: 80,  size: 'std' },
+  'forest':         { top: 203, left: 253, width: 60,  height: 86,  size: 's' },
+  'clay-pit':       { top: 306, left: 175, width: 60,  height: 86,  size: 's' },
+  'lessons':        { top: 406, left: 30,  width: 115, height: 94,  size: 'std' },
+  'reed-bank':      { top: 411, left: 254, width: 60,  height: 86,  size: 's' },
+  'day-laborer':    { top: 526, left: 30,  width: 115, height: 74,  size: 'std' },
+  'fishing':        { top: 514, left: 175, width: 62,  height: 86,  size: 's' },
 }
 
-const BASE_POS: Record<string, Pos> = { ...SIDE_ACTIONS, ...CENTRAL_ACTIONS }
+const SIDE_ACTION_OVERRIDES: Record<number, Partial<Record<string, Partial<Pos>>>> = {
+  3: {
+    'resource-market': { top: 255, left: 4, width: 111, height: 64 },
+    'hollow': { top: 329, left: 6 },
+    'lessons-3': { top: 433, left: 2 },
+  },
+  4: {
+    'grove': { top: 138 },
+  },
+}
 
 type SlotPos = { top: number; left: number }
 
 const ROUND_POS: Record<number, SlotPos> = {
-  1:  { top: 2,   left: 167 + CX },
-  2:  { top: 1,   left: 331 + CX },
-  3:  { top: 1,   left: 493 + CX },
-  4:  { top: 1,   left: 657 + CX },
-  5:  { top: 156, left: 330 + CX },
-  6:  { top: 156, left: 493 + CX },
-  7:  { top: 156, left: 657 + CX },
-  8:  { top: 311, left: 330 + CX },
-  9:  { top: 311, left: 493 + CX },
-  10: { top: 462, left: 330 + CX },
-  11: { top: 462, left: 493 + CX },
-  12: { top: 626, left: 6 + CX },
-  13: { top: 626, left: 172 + CX },
-  14: { top: 626, left: 489 + CX },
+  1:  { top: 2,   left: 167 },
+  2:  { top: 1,   left: 331 },
+  3:  { top: 1,   left: 493 },
+  4:  { top: 1,   left: 657 },
+  5:  { top: 156, left: 330 },
+  6:  { top: 156, left: 493 },
+  7:  { top: 156, left: 657 },
+  8:  { top: 311, left: 330 },
+  9:  { top: 311, left: 493 },
+  10: { top: 462, left: 330 },
+  11: { top: 462, left: 493 },
+  12: { top: 626, left: 6 },
+  13: { top: 626, left: 172 },
+  14: { top: 626, left: 489 },
 }
 
 const ROUND_SLOT_SIZE = 140
 
 const HARVEST_POS: Record<number, SlotPos> = {
-  4:  { top: 64,  left: 788 + CX },
-  7:  { top: 213, left: 787 + CX },
-  9:  { top: 370, left: 630 + CX },
-  11: { top: 532, left: 632 + CX },
-  13: { top: 663, left: 302 + CX },
-  14: { top: 688, left: 617 + CX },
+  4:  { top: 64,  left: 788 },
+  7:  { top: 213, left: 787 },
+  9:  { top: 370, left: 630 },
+  11: { top: 532, left: 632 },
+  13: { top: 663, left: 302 },
+  14: { top: 688, left: 617 },
 }
 
 const ACCUMULATE_DIR: Record<string, 'left' | 'right' | 'bottom'> = {
@@ -87,7 +97,7 @@ const ACCUMULATE_DIR: Record<string, 'left' | 'right' | 'bottom'> = {
   'cattle-market': 'bottom',
 }
 
-const RESOURCE_OFFSET: Record<string, React.CSSProperties> = {
+const RESOURCE_OFFSET: Partial<Record<string, React.CSSProperties>> = {
   'forest':            { left: -54, bottom: 5 },
   'reed-bank':         { left: -75, bottom: 7 },
   'clay-pit':          { bottom: 5, left: 92 },
@@ -97,6 +107,12 @@ const RESOURCE_OFFSET: Record<string, React.CSSProperties> = {
   'hollow':            { left: 87, bottom: 9 },
   'traveling-players': { left: -54, bottom: 1 },
   'copse':             { left: 87, bottom: 5 },
+}
+
+const RESOURCE_OFFSET_OVERRIDES: Record<number, Partial<Record<string, React.CSSProperties>>> = {
+  3: {
+    'hollow': { left: 85, bottom: 5 },
+  },
 }
 
 const ACTION_SPRITE: Record<string, string> = {
@@ -124,7 +140,9 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'farmland':           ['<field>'],
   'day-laborer':        ['+2<food>'],
   'lessons':            ['[Pay] 1<food>*', '1<occupation>'],
+  'lessons-3':          ['[Pay] 2<food>', '1<occupation>'],
   'lessons-4':          ['[Pay] 2<food>*', '1<occupation>'],
+  'resource-market':    ['+1<reed> / <stone> +1<food>'],
   'resource-market-4':  ['+1<reed>+1<stone>+1<food>'],
   // Round actions
   'fencing':            ['1<wood><arrow><fence-icon>'],
@@ -143,7 +161,28 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'eastern-quarry':     [],
 }
 
-function renderIconDesc(templates: string[]): React.ReactNode {
+function getIconLineClassName(actionId?: string): string {
+  return actionId === 'resource-market'
+    ? 'icon-line icon-line--resource-market'
+    : 'icon-line'
+}
+
+function getIconTokenClassName(actionId: string | undefined, token: string): string | undefined {
+  if (actionId !== 'resource-market') return undefined
+  const trimmed = token.trim()
+  if (trimmed === '/') return 'icon-token icon-token--slash'
+  if (token !== trimmed && trimmed.startsWith('+')) return 'icon-token icon-token--spaced-plus'
+  return undefined
+}
+
+function renderTextToken(key: number, token: string, actionId?: string): React.ReactNode {
+  const className = getIconTokenClassName(actionId, token)
+  return className
+    ? <span key={key} className={className}>{token}</span>
+    : <span key={key}>{token}</span>
+}
+
+function renderIconDesc(templates: string[], actionId?: string): React.ReactNode {
   return templates.map((tpl, i) => {
     const parts: React.ReactNode[] = []
     let rest = tpl
@@ -166,13 +205,13 @@ function renderIconDesc(templates: string[]): React.ReactNode {
       // Plain text until next < or [
       const nextSpecial = rest.search(/[<\[]/)
       if (nextSpecial === -1) {
-        parts.push(<span key={key++}>{rest}</span>)
+        parts.push(renderTextToken(key++, rest, actionId))
         break
       }
-      parts.push(<span key={key++}>{rest.slice(0, nextSpecial)}</span>)
+      parts.push(renderTextToken(key++, rest.slice(0, nextSpecial), actionId))
       rest = rest.slice(nextSpecial)
     }
-    return <div key={i} className="icon-line">{parts}</div>
+    return <div key={i} className={getIconLineClassName(actionId)}>{parts}</div>
   })
 }
 
@@ -225,6 +264,77 @@ type SpaceFarmerMarker = {
 const isFamilyGrowthAction = (spaceId: string) =>
   spaceId.startsWith('wish-children') || spaceId.startsWith('urgent-wish-children')
 
+const getBoardPlayerCount = (players: PlayerState[]): 2 | 3 | 4 => {
+  const count = players.length
+  if (count >= 4) return 4
+  if (count === 3) return 3
+  return 2
+}
+
+const getBoardOffset = (playerCount: 2 | 3 | 4) =>
+  playerCount === 2 ? 0 : SIDE_PANEL_OFFSET
+
+const shiftPos = (pos: Pos, leftOffset: number): Pos => ({
+  ...pos,
+  left: pos.left + leftOffset,
+})
+
+const shiftSlotPos = (pos: SlotPos, leftOffset: number): SlotPos => ({
+  ...pos,
+  left: pos.left + leftOffset,
+})
+
+const getBasePositions = (playerCount: 2 | 3 | 4): Record<string, Pos> => {
+  const leftOffset = getBoardOffset(playerCount)
+  const shiftedCentral = Object.fromEntries(
+    Object.entries(CENTRAL_ACTIONS).map(([spaceId, pos]) => [
+      spaceId,
+      shiftPos(pos, leftOffset),
+    ]),
+  ) as Record<string, Pos>
+  const basePositions = { ...SIDE_ACTIONS, ...shiftedCentral }
+  const overrides = SIDE_ACTION_OVERRIDES[playerCount]
+  if (!overrides) return basePositions
+  return Object.fromEntries(
+    Object.entries(basePositions).map(([spaceId, pos]) => [
+      spaceId,
+      {
+        ...pos,
+        ...(overrides[spaceId] ?? {}),
+      },
+    ]),
+  ) as Record<string, Pos>
+}
+
+const getResourceOffsets = (playerCount: 2 | 3 | 4): Partial<Record<string, React.CSSProperties>> => {
+  const overrides = RESOURCE_OFFSET_OVERRIDES[playerCount]
+  if (!overrides) return RESOURCE_OFFSET
+  return {
+    ...RESOURCE_OFFSET,
+    ...overrides,
+  }
+}
+
+const getRoundPositions = (playerCount: 2 | 3 | 4): Record<number, SlotPos> => {
+  const leftOffset = getBoardOffset(playerCount)
+  return Object.fromEntries(
+    Object.entries(ROUND_POS).map(([round, pos]) => [
+      Number(round),
+      shiftSlotPos(pos, leftOffset),
+    ]),
+  ) as Record<number, SlotPos>
+}
+
+const getHarvestPositions = (playerCount: 2 | 3 | 4): Record<number, SlotPos> => {
+  const leftOffset = getBoardOffset(playerCount)
+  return Object.fromEntries(
+    Object.entries(HARVEST_POS).map(([round, pos]) => [
+      Number(round),
+      shiftSlotPos(pos, leftOffset),
+    ]),
+  ) as Record<number, SlotPos>
+}
+
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
@@ -232,12 +342,19 @@ export const ActionBoard = ({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
+  const playerCount = getBoardPlayerCount(players)
+  const boardClassName = `action-board action-board--${playerCount}p`
+  const boardWidth = playerCount === 2 ? BOARD_W_2P : BOARD_W_WITH_SIDE
+  const basePositions = useMemo(() => getBasePositions(playerCount), [playerCount])
+  const resourceOffsets = useMemo(() => getResourceOffsets(playerCount), [playerCount])
+  const roundPositions = useMemo(() => getRoundPositions(playerCount), [playerCount])
+  const harvestPositions = useMemo(() => getHarvestPositions(playerCount), [playerCount])
 
   const updateScale = useCallback(() => {
     const el = wrapperRef.current
     if (!el) return
-    setScale(el.clientWidth / BOARD_W)
-  }, [])
+    setScale(el.clientWidth / boardWidth)
+  }, [boardWidth])
 
   useEffect(() => {
     updateScale()
@@ -302,7 +419,7 @@ export const ActionBoard = ({
     const items = buildStackItems(space)
     if (!items.length) return null
     const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
-    const offset: React.CSSProperties = RESOURCE_OFFSET[space.id]
+    const offset: React.CSSProperties = resourceOffsets[space.id]
       ?? (isRound ? { bottom: 6, right: 30 } : {})
     return (
       <div className="resource-holder" data-n={totalCount} style={offset}>
@@ -433,10 +550,10 @@ export const ActionBoard = ({
     <section className="actions">
       <h2>{t(locale, 'ui.actionArea')}</h2>
       <div className="action-board-wrapper" ref={wrapperRef} style={{ height: BOARD_H * scale }}>
-        <div className="action-board" style={{ transform: `scale(${scale})`, width: BOARD_W, height: BOARD_H }}>
+        <div className={boardClassName} style={{ transform: `scale(${scale})`, width: boardWidth, height: BOARD_H }}>
 
           {baseActions.map((space) => {
-            const pos = BASE_POS[space.id]
+            const pos = basePositions[space.id]
             if (!pos) return null
             const accDir = ACCUMULATE_DIR[space.id]
             const canTake = canTakeAction(space, currentPlayer)
@@ -465,7 +582,7 @@ export const ActionBoard = ({
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
                       : ACTION_ICON_DESC[space.id]?.length
-                        ? renderIconDesc(ACTION_ICON_DESC[space.id])
+                        ? renderIconDesc(ACTION_ICON_DESC[space.id], space.id)
                         : t(locale, space.descriptionKey)}
                   </div>
                   <div className="action-footer" />
@@ -478,7 +595,7 @@ export const ActionBoard = ({
           })}
 
           {roundSlots.map((slot) => {
-            const pos = ROUND_POS[slot.round]
+            const pos = roundPositions[slot.round]
             if (!pos) return null
             const isOpen = devMode || currentRound >= slot.round
             const action = slot.action
@@ -515,7 +632,7 @@ export const ActionBoard = ({
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
                           : ACTION_ICON_DESC[action.id]?.length
-                            ? renderIconDesc(ACTION_ICON_DESC[action.id])
+                            ? renderIconDesc(ACTION_ICON_DESC[action.id], action.id)
                             : t(locale, action.descriptionKey)}
                       </div>
                       <div className="action-footer" />
@@ -534,7 +651,7 @@ export const ActionBoard = ({
             )
           })}
 
-          {Object.entries(HARVEST_POS).map(([r, hp]) => (
+          {Object.entries(harvestPositions).map(([r, hp]) => (
             <div
               key={`h-${r}`}
               className={`harvest-marker ${currentRound >= Number(r) ? 'past' : ''}`}
@@ -548,11 +665,11 @@ export const ActionBoard = ({
       </div>
 
       {/* Dynamic PlayerActionCard action spaces — rendered as BGA-style cards */}
-      {baseActions.filter((s) => !BASE_POS[s.id]).length > 0 && (
+      {baseActions.filter((s) => !basePositions[s.id]).length > 0 && (
         <div className="player-action-cards-row">
           <h3>{t(locale, 'ui.playerActionCards')}</h3>
           <div className="hand-row">
-            {baseActions.filter((s) => !BASE_POS[s.id]).map((space) => {
+            {baseActions.filter((s) => !basePositions[s.id]).map((space) => {
               const canTake = canTakeAction(space, currentPlayer)
               const isOccupation = !!getOccupation(space.id)
               const cardType = isOccupation ? 'occupation' as const : 'minor' as const
