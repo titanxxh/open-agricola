@@ -1965,6 +1965,23 @@ export class GameSession {
     if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
       this.usedBakeBreadThisAction = true
     }
+    // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
+    // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
+    // ActionFlow that runs after the engine's own choice resolution.
+    if (pending.sourceCard) {
+      const cardEffect = getCardEffect(pending.sourceCard)
+      if (cardEffect?.resolveChoice) {
+        const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
+          sourceCard: pending.sourceCard,
+          actionContext: pending.actionContext,
+        })
+        if (cardFlow && this.engine) {
+          // Insert the follow-up so it runs after the engine finishes resolving the choice.
+          // Mirrors engine.ts resolveChoice flow-insertion (line ~1526-1531).
+          this.engine.insertFollowUpFlow(cardFlow)
+        }
+      }
+    }
     const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
     this.flushEngineLog()
