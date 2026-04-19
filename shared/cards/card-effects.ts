@@ -66,6 +66,13 @@ type EffectHandler = (state: GameState, player: PlayerState) => void
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 
+export type ResolveChoiceHandler = (
+  state: GameState,
+  player: PlayerState,
+  choice: string,
+  ctx: { sourceCard: string; actionContext?: Record<string, unknown> },
+) => ActionFlow | void
+
 /**
  * Mutable context passed through all computeBonusScore handlers during scoring.
  *
@@ -92,6 +99,9 @@ export type CardEffect = {
   /** Lower values run first in computeBonusScore ordering (default: 100). */
   scoringPriority?: number
   onBuy?: FlowEffectHandlerWithPayment
+  /** Fires when a pending `choice` whose sourceCard is this card is resolved.
+   *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
+  resolveChoice?: ResolveChoiceHandler
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: EffectHandler

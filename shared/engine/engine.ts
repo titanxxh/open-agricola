@@ -1607,4 +1607,13 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     this.pendingChoiceContext = null
     return result
   }
+
+  /** Public helper: insert an ActionFlow to run after the currently-resolving pending choice.
+   *  Mirrors the internal flow-insertion done by resolveChoice() for { type: 'flow' } results. */
+  insertFollowUpFlow(flow: ActionFlow): void {
+    const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
+    if (!insertionTargetId) return
+    const flowNode = this.buildFlowNode(flow)
+    this.tree.insertAfter(insertionTargetId, [flowNode])
+  }
 }
