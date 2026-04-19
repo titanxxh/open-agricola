@@ -8,13 +8,11 @@ const CARD_ID = 'B143_ClayWarden'
 
 /**
  * B143 Clay Warden (Occupation, B, 143)
- * Each time another player uses the Hollow accumulation space,
- * card owner gets 1 clay.
- *
- * scope 'opponent' — fires when an opponent uses hollow-4 (the Hollow space).
- * Players 3+.
+ * Each time another player uses a Hollow accumulation space, card owner
+ * gets 1 clay (plus extra per player count). Fires for both the 3P
+ * `hollow` space and the 4P `hollow-4` space.
  */
-const HOLLOW_SPACES = new Set(['hollow-4'])
+const HOLLOW_SPACES = new Set(['hollow', 'hollow-4'])
 
 const listener: CardListenerRegistration = {
   id: 'B143-clay-warden-opponent-hollow',
