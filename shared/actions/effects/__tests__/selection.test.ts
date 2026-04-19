@@ -74,3 +74,70 @@ describe('selectionAction', () => {
     ).toEqual(['0-0', '1-1'])
   })
 })
+
+describe('selection action with occupation-hand kind', () => {
+  it("execute() emits promptKey 'ui.interactionOccupationHand' when selectionKind is occupation-hand", () => {
+    const result = selectionAction.execute({
+      actionContext: { selectionKind: 'occupation-hand', maxSelections: 3 },
+    } as never)
+
+    expect(result.type).toBe('choice')
+    if (result.type === 'choice') {
+      expect(result.promptKey).toBe('ui.interactionOccupationHand')
+      expect(result.promptParams).toEqual({ maxSelections: 3 })
+    }
+  })
+
+  it("execute() keeps farm-position promptKey when selectionKind is absent", () => {
+    const result = selectionAction.execute({
+      actionContext: {},
+    } as never)
+
+    expect(result.type).toBe('choice')
+    if (result.type === 'choice') {
+      expect(result.promptKey).toBe('ui.interactionSelection')
+    }
+  })
+
+  it('resolveChoice propagates a flow returned by the effect handler', () => {
+    const player = createMockPlayer()
+    const testFlow = { type: 'leaf' as const, actionId: 'noop', sourceCard: 'TEST' }
+
+    registerSelectionEffect('test-flow-effect', () => testFlow)
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'TEST',
+        actionContext: { selectionEffect: 'test-flow-effect' },
+      } as never,
+      'id1,id2',
+    )
+
+    expect(result.type).toBe('flow')
+    if (result.type === 'flow') {
+      expect(result.flow).toEqual(testFlow)
+      expect(result.extraData).toEqual({ selectedPositions: ['id1', 'id2'] })
+    }
+  })
+
+  it('resolveChoice returns ok when effect handler returns void (no flow)', () => {
+    const player = createMockPlayer()
+
+    registerSelectionEffect('test-void-effect', () => undefined)
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'VOID_CARD',
+        actionContext: { selectionEffect: 'test-void-effect' },
+      } as never,
+      'pos1,pos2',
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type === 'ok') {
+      expect(result.extraData).toEqual({ selectedPositions: ['pos1', 'pos2'] })
+    }
+  })
+})
