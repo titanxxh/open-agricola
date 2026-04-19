@@ -425,7 +425,7 @@ const PlayedCardStats = ({
         <div
           className={`action-farmer action-farmer-${playerColor ?? 'red'} held-worker-marker`}
           data-testid={`played-card-held-worker-${rawId}`}
-          title="Worker on card"
+          title={t(locale, 'ui.heldWorkerOnCard')}
         />
       ) : null}
       {open && hasResourceStats ? (

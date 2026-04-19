@@ -342,6 +342,7 @@ export const en = {
     harvestFeedBasic: 'Basic',
     harvestFeedConfirm: 'Confirm feeding',
     harvestFeedProgress: '{fed}/{required} · Begging {begging}',
+    heldWorkerOnCard: 'Worker on card',
   },
   prompt: {
     selectPayment: 'Choose payment method',
