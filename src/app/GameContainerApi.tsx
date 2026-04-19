@@ -807,6 +807,14 @@ export const GameContainerApi = () => {
   const selectionInteraction =
     interaction.stateId === 'selection' ? interaction.selection : null
 
+  const occupationHandInteraction = useMemo(
+    () =>
+      interaction.stateId === 'selection' && interaction.selection.kind === 'occupation-hand'
+        ? interaction.selection
+        : null,
+    [interaction],
+  )
+
   const maxRoomSelections = useMemo(
     () => (farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0),
     [farmInteraction],
@@ -1548,6 +1556,12 @@ export const GameContainerApi = () => {
                 isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
                 selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
                 isInteractive={isInteractive}
+                occupationHandSelection={occupationHandInteraction ?? undefined}
+                onConfirmOccupationHandSelection={(ids) => {
+                  if (!isInteractive) return
+                  const pendingPlayerIndex = interaction.stateId === 'selection' ? interaction.playerIndex : 0
+                  void transport.commitSelection(pendingPlayerIndex, { cardIds: ids }).catch((e) => console.error(e))
+                }}
               />
             </section>
           </main>

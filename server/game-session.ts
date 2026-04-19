@@ -2818,7 +2818,7 @@ export class GameSession {
 
   commitSelectionChoice(
     playerIndex: number,
-    payload: { positions?: FarmTilePosition[] },
+    payload: { positions?: FarmTilePosition[]; cardIds?: string[] },
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection choice for this player')
@@ -2826,8 +2826,35 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const positions = payload.positions ?? []
+    const selectionKind = (this.pending.actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (this.pending.actionContext?.maxSelections as number) ?? 1
+
+    // occupation-hand: validate card IDs
+    if (selectionKind === 'occupation-hand') {
+      const cardIds = payload.cardIds ?? []
+      if (cardIds.length > maxSelections) {
+        return this.respond(false, 'too many card selections')
+      }
+      for (const id of cardIds) {
+        if (!player.occupationHand.includes(id)) {
+          return this.respond(false, `card ${id} not in occupation hand`)
+        }
+      }
+      this.pushHistory()
+      const choiceValue = cardIds.length > 0 ? cardIds.join(',') : 'cancel'
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
+      this.engine?.resolveChoice(choiceValue, {
+        state: this.state,
+        player: this.state.players[playerIndex]!,
+        space,
+      })
+      this.flushEngineLog()
+      this.runEngineSteps()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
+    // farm-position (default)
+    const positions = payload.positions ?? []
     if (positions.length > maxSelections) {
       return this.respond(false, 'too many selection positions')
     }
