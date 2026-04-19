@@ -204,6 +204,33 @@ describe('ActionBoard', () => {
     expect(html).toContain('icon-token icon-token--spaced-plus')
   })
 
+  it('does not render C22_BasketChair as an action-board space even when it is in minorPlayed', () => {
+    // C22 is a MinorImprovement, NOT a PlayerActionCard (no registerPlayerActionSpace).
+    // It must never appear in baseActions / ActionBoard tiles.
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    // Simulate C22 already played — it should be in minorPlayed but NOT in actionSpaces.
+    playerA.minorPlayed = ['C22_BasketChair']
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}   // actionSpaces does NOT contain C22_BasketChair
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    // The PlayerCard inner div carries data-id={cardId}; absence confirms C22 is not rendered.
+    expect(html).not.toContain('data-id="C22_BasketChair"')
+  })
+
   it('shows owner name when hovering future meeple resources', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
