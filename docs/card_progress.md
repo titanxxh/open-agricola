@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — A48 ShavingHorse + B143 ClayWarden BGA 对齐**：A48 删除 `WOOD_SPACES` 过滤（BGA 不按空间过滤），合并为两个 `after` listener——`gain/collect/receive` + `anytime-exchange`——复用同一 `checkAndExchange(context)` 检查木头净获得与当前总量；cost 从 `{}` 改为 `{ wood: 1 }` 与 BGA 对齐。B143 `HOLLOW_SPACES` 加入 `'hollow'`（3 人版空间），在 3 人局也能触发 opponent 钩子。新增 `server/__tests__/A48_ShavingHorse-session.test.ts`（7 例）、扩展 `server/__tests__/B143_ClayWarden-session.test.ts`（+1 例 3P）。
 - **2026-04-19 — E96 Elder BGA 对齐 + `handHooks` 通用手牌 hook 机制 + 批量移除冗余 played-includes 守卫**：新增 `CardEffect.handHooks` 字段，声明哪些 hook 在卡牌还在手牌时也应触发；`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。E96 Elder 通过此机制实现回合 1 免费打出自身（`onBeforeStartOfTurn` + `allowedCards` 过滤）。同时批量移除 756 处冗余的 `player.xxxPlayed.includes(CARD_ID)` 守卫——框架已在调用侧保证卡牌已打出，卡牌文件内无需重复检查。
 - **2026-04-19 — 行动格按人数过滤，对齐 BGA 2-3 人局配置**：`createActionSpaces(playerCount?)` 按 `players` 字段过滤行动格。新增 3P 变体：`hollow`（1 黏土/轮）、`resource-market`（XOR 芦苇+食/石+食）、`lessons-3`（固定 2 食）。7 个全人数通用行动格补 `players: [2,3,4]`。前端坐标表补 3P 条目。2P=10 主行动格、3P=14、4P=16。不改卡牌实现数。
 - **2026-04-19 — C129 SecondSpouse BGA 对齐**：加"占用者是对方首置 farmer + 上限≤2"判定，移除运行时 `players.length < 3` 检查（由牌组配置保证）。
@@ -120,7 +121,6 @@
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
 | A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤；onBuy 直接从整手随机选 1 免费打 | `select-N-from-hand` pending 类型 |
-| A48 ShavingHorse | 只监听 `gain`（限 `copse`/`forest`/`grove`/`resource-market-4`）+ `collect`；缺 `receive`/`reap`/exchange-after 触发 | 通用 "wood-obtained" hook 或 `after:gain` 全资源监听 |
 | B3 Moonshine | XOR 折叠为"买不起则 PASS"（自动抉择） | `select-N-from-hand` + pass-to-opponent action |
 | C22 BasketChair | 每轮开始提供一次额外 place-farmer，不召回已放农民 | 新 farmer-recall-to-card 机制 |
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
@@ -128,15 +128,11 @@
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 | ~~E96 Elder~~ | ~~回合 1 StartOfWork 额外打出职业未实现~~ | 已实现（2026-04-19），通过 `handHooks` 机制 |
 
-### 2.3 ⚠ 行为偏差待修（2 张）
+### 2.3 ⚠ 行为偏差待修（0 张）
 
-> 不是设计取舍，是 bug——只是修起来需要动一点架构 / action-space 配置。
+> 本节已清零。
 
-| Card | 偏差 | 影响 | 建议 |
-|---|---|---|---|
-| B143 ClayWarden | 只监听 `hollow-4`（仅 4 人空间）；3 人版 `hollow` action 空间在我们项目里整个缺失 | 3 人局：B143 永不触发（且整局没 Hollow 空间） | 新增 `hollow` 3 人版 action 空间；B143 listener 同步加 `hollow` |
-
-> **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。
+> **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
 ### 2.4 ❌ 数值/元数据待修（0 张）
 
