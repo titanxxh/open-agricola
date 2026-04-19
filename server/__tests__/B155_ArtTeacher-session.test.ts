@@ -17,7 +17,6 @@ describe('B155_ArtTeacher session', () => {
   const makeSession = (playerCount = 2) => {
     const session = new GameSession(undefined, undefined, { playerCount })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
     return session
@@ -85,7 +84,6 @@ describe('B155_ArtTeacher session', () => {
   it('drains traveling-players food when playing a subsequent occupation', () => {
     const session = makeSession(4)
     const state = session.getState().state
-    state.players = state.players.slice(0, 4) // 4p game: TP space exists
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
@@ -129,7 +127,6 @@ describe('B155_ArtTeacher session', () => {
   it('does not drain TP food when player has no ArtTeacher played', () => {
     const session = makeSession(4)
     const state = session.getState().state
-    state.players = state.players.slice(0, 4)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!

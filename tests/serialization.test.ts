@@ -86,6 +86,17 @@ describe('shared/game/serialization', () => {
       expect(restored.actionSpaces.length).toBeGreaterThan(0)
     })
 
+    it('keeps player-count action spaces filtered after round-trip', () => {
+      for (const playerCount of [2, 3, 4] as const) {
+        const original = createInitialState(42, { playerCount })
+        const serialized = serializeState(original)
+        const restored = rehydrateState(serialized)
+        const originalIds = original.actionSpaces.map((space) => space.id).sort()
+        const restoredIds = restored.actionSpaces.map((space) => space.id).sort()
+        expect(restoredIds).toEqual(originalIds)
+      }
+    })
+
     it('rebuilds missing activeModifiers from played cards', () => {
       const modified = createInitialState(42)
       const player = modified.players[0]!

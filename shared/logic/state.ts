@@ -235,9 +235,11 @@ export const normalizeState = (raw: GameState): GameState => {
   }
   // Preserve caller-added spaces not produced by createActionSpaces / PlayerActionCard.
   // (e.g. `__test-worker-sink__` and `card-worker:...` pseudo-spaces.)
+  const allBaseActionIds = new Set(createActionSpaces().map((space) => space.id))
   const knownIds = new Set(actionSpaces.map((s) => s.id))
   for (const stored of raw.actionSpaces ?? []) {
     if (knownIds.has(stored.id)) continue
+    if (allBaseActionIds.has(stored.id)) continue
     actionSpaces.push({
       ...stored,
       takenBy: normalizeTakenBy(stored.takenBy),

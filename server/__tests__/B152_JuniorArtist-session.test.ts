@@ -15,7 +15,6 @@ const setup = (options?: {
 }) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 5
 
@@ -28,6 +27,7 @@ const setup = (options?: {
     clay: 5,
   }
   state.players[1]!.workersAvailable = 2
+  state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push(CARD_ID)

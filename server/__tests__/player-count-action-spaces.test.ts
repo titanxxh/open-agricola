@@ -186,4 +186,37 @@ describe('normalizeState preserves player-count filtering', () => {
     const restoredIds = restored.actionSpaces.map((s) => s.id).sort()
     expect(restoredIds).toEqual(originalIds)
   })
+
+  it('drops unsupported base action spaces from serialized 2P state', () => {
+    const original = createInitialState(42, { playerCount: 2 })
+    const serialized = JSON.parse(JSON.stringify(original))
+    serialized.actionSpaces.push({
+      ...serialized.actionSpaces[0],
+      id: 'copse',
+      nameKey: 'actions.copse.name',
+      descriptionKey: 'actions.copse.description',
+      roundAvailable: 1,
+      gainPerRound: { wood: 1 },
+      resources: { ...serialized.actionSpaces[0].resources, wood: 0 },
+      takenBy: [],
+    })
+
+    const restored = normalizeState(serialized)
+    expect(restored.actionSpaces.some((space) => space.id === 'copse')).toBe(false)
+  })
+
+  it('preserves caller-added pseudo action spaces during normalization', () => {
+    const original = createInitialState(42, { playerCount: 2 })
+    const serialized = JSON.parse(JSON.stringify(original))
+    serialized.actionSpaces.push({
+      ...serialized.actionSpaces[0],
+      id: '__test-worker-sink__',
+      nameKey: 'test.worker-sink.name',
+      descriptionKey: 'test.worker-sink.description',
+      takenBy: [],
+    })
+
+    const restored = normalizeState(serialized)
+    expect(restored.actionSpaces.some((space) => space.id === '__test-worker-sink__')).toBe(true)
+  })
 })

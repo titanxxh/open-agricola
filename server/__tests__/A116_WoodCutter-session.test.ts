@@ -8,7 +8,6 @@ describe('A116_WoodCutter session', () => {
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -18,6 +17,7 @@ describe('A116_WoodCutter session', () => {
     player.resources.wood = 0
 
     state.players[1]!.workersAvailable = 2
+    state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
 
     // Ensure wood spaces have accumulated resources
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
