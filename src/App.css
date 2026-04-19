@@ -1864,6 +1864,11 @@ a:focus-visible,
   box-shadow: 0 0 0 1px gold inset;
 }
 
+.farm-cell.palisade-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .farm-post {
   background: #7b5b32;
   border-radius: 2px;
