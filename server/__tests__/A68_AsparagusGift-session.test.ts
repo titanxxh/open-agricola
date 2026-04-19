@@ -7,9 +7,12 @@ import '../../shared/cards/B/B30_WoodPalisades'
 const CARD_ID = 'A68_AsparagusGift'
 const B30 = 'B30_WoodPalisades'
 
-// Tile (0,0) is free by default
+// Tile (0,0) edges
 const tile00Fences = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
-const tile00Palisades = tile00Fences
+// For palisades, only border edges of tile (0,0) are valid: H-0-0 (top) and V-0-0 (left).
+// Complete the enclosure with internal fences: H-1-0, V-0-1.
+const tile00BorderPalisades = ['H-0-0', 'V-0-0']
+const tile00InternalFences = ['H-1-0', 'V-0-1']
 
 const setup = (opts: { withB30?: boolean; wood: number; round?: number }) => {
   const session = new GameSession()
@@ -31,16 +34,19 @@ const setup = (opts: { withB30?: boolean; wood: number; round?: number }) => {
 }
 
 describe('A68 Asparagus Gift — session', () => {
-  it('does not award vegetable when palisade-only build of 4 happens at round 3', () => {
-    // fencesBuilt measured via getFenceCount delta. Palisade-only → delta is 0.
-    const session = setup({ withB30: true, wood: 8, round: 3 })
+  it('does not award vegetable when palisade-dominated build at round 3 has fewer real fences than round', () => {
+    // fencesBuilt measured via getFenceCount (regular fences only). Delta must be < round.
+    // 2 palisades (border: H-0-0, V-0-0) + 2 real fences (internal: H-1-0, V-0-1).
+    // fencesBuilt = 2, round = 3 → 2 < 3 → no vegetable.
+    // Cost: 2 palisades × 2 + 2 fences × 1 = 6 wood.
+    const session = setup({ withB30: true, wood: 6, round: 3 })
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: [],
-      palisadeEdges: tile00Palisades,
+      edges: tile00InternalFences,
+      palisadeEdges: tile00BorderPalisades,
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
