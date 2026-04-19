@@ -903,9 +903,10 @@ const argResults = this.hooks.computeArgs(
 { ...executionContext, actionId: replacedActionId },
 result,
 )
+const existingValues = new Set(result.options.map((o) => o.value))
 const extraOptions = argResults
 .flatMap((entry) => entry.extraOptions ?? [])
-.filter((option) => option)
+.filter((option) => option && !existingValues.has(option.value))
 if (extraOptions.length > 0) {
 result.options = [...result.options, ...extraOptions]
           }
@@ -1134,9 +1135,10 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
             { ...executionContext, actionId },
             result,
           )
+          const existingValues = new Set(result.options.map((o) => o.value))
           const extraOptions = argResults
             .flatMap((entry) => entry.extraOptions ?? [])
-            .filter((option) => option)
+            .filter((option) => option && !existingValues.has(option.value))
           if (extraOptions.length > 0) {
             result.options = [...result.options, ...extraOptions]
           }
