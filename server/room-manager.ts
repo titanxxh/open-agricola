@@ -814,6 +814,18 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
+      if (msg.type === 'devSetResources') {
+        const resp = callRoom(s => s.devSetResources(msg.playerIndex, msg.resources))
+        broadcastState(room, resp, 'dev', msg.requestId)
+        return
+      }
+
+      if (msg.type === 'devSetRound') {
+        const resp = callRoom(s => s.devSetRound(msg.round))
+        broadcastState(room, resp, 'dev', msg.requestId)
+        return
+      }
+
       if (msg.type === 'devDrawCard') {
         const resp = callRoom(s => s.devDrawCard(msg.playerIndex, msg.cardId))
         broadcastState(room, resp, 'dev', msg.requestId)

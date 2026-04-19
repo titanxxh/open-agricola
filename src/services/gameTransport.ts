@@ -32,6 +32,8 @@ export interface GameTransport {
   undoAction(): Promise<GameSyncPayload>
   newGame(seed?: number): Promise<GameSyncPayload>
   loadGame(state: unknown): Promise<GameSyncPayload>
+  devSetResources(playerIndex: number, resources: Record<string, number>): Promise<GameSyncPayload>
+  devSetRound(round: number): Promise<GameSyncPayload>
   devDrawCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devPlayCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
@@ -146,6 +148,14 @@ export class HttpGameTransport implements GameTransport {
 
   loadGame(state: unknown) {
     return this.send(() => post('/api/game/load', { state }))
+  }
+
+  devSetResources(playerIndex: number, resources: Record<string, number>) {
+    return this.send(() => post('/api/game/dev/set-resources', { playerIndex, resources }))
+  }
+
+  devSetRound(round: number) {
+    return this.send(() => post('/api/game/dev/set-round', { round }))
   }
 
   devDrawCard(playerIndex: number, cardId: string) {
@@ -352,6 +362,14 @@ export class WsGameTransport implements GameTransport {
 
   async loadGame(state: unknown): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'loadGame', state })
+  }
+
+  async devSetResources(playerIndex: number, resources: Record<string, number>): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'devSetResources', playerIndex, resources })
+  }
+
+  async devSetRound(round: number): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'devSetRound', round })
   }
 
   async devDrawCard(playerIndex: number, cardId: string): Promise<GameSyncPayload> {
