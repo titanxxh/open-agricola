@@ -3,6 +3,13 @@ import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
 import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
 import { holdWorkerOnCard } from '../../cards/helpers/card-held-workers'
 
+type RecallPlacedWorkerParams = {
+  excludeSpaceId?: string
+  excludeMeetingPlace?: boolean
+  forceFirst?: boolean
+  targetCardHold?: string
+}
+
 /**
  * Generic "recall a worker I placed this round back home" helper.
  *
@@ -16,6 +23,8 @@ import { holdWorkerOnCard } from '../../cards/helpers/card-held-workers'
  * Params:
  *   - excludeSpaceId?: string  — space to exclude (the one just placed)
  *   - excludeMeetingPlace?: boolean (default true) — matches BGA rule
+ *   - forceFirst?: boolean — skip choice UI and recall the first placement of the round
+ *   - targetCardHold?: string — card ID to hold the recalled worker on instead of returning it home
  *
  * This helper is narrow by design: it does not pay any cost, flag any card,
  * or interact with "fake" meeples. Wrap it in a SEQ with pay / flag leaves
@@ -35,14 +44,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params }) => {
-    const p = params as
-      | {
-          excludeSpaceId?: string
-          excludeMeetingPlace?: boolean
-          forceFirst?: boolean
-          targetCardHold?: string
-        }
-      | undefined
+    const p = params as RecallPlacedWorkerParams | undefined
     const excludeSpaceId = p?.excludeSpaceId
     const excludeMeetingPlace = p?.excludeMeetingPlace ?? true
     const forceFirst = p?.forceFirst === true
@@ -101,7 +103,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ state, player, params }, choice) => {
-    const p = params as { targetCardHold?: string } | undefined
+    const p = params as RecallPlacedWorkerParams | undefined
     const target = state.actionSpaces.find(
       (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
