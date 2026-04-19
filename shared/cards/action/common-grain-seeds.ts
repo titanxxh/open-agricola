@@ -6,4 +6,5 @@ export const grainSeeds = createGainAction({
   descriptionKey: 'actions.grain-seeds.description',
   roundAvailable: 1,
   gain: { grain: 1 },
+  players: [2, 3, 4],
 })

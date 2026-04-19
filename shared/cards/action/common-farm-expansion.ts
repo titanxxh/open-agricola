@@ -7,6 +7,7 @@ export const farmExpansion: ActionDefinition = {
   descriptionKey: 'actions.farm-expansion.description',
   roundAvailable: 1,
   gainPerRound: {},
+  players: [2, 3, 4],
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

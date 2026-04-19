@@ -6,4 +6,5 @@ export const clayPit = createAccumulatingAction({
   descriptionKey: 'actions.clay-pit.description',
   roundAvailable: 1,
   gainPerRound: { clay: 1 },
+  players: [2, 3, 4],
 })
