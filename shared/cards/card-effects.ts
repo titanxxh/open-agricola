@@ -153,6 +153,14 @@ export type CardEffect = {
 
 const cardEffectOverrides = new Map<string, CardEffect>()
 
+/**
+ * @deprecated Use `CardRegistry.loadImpl(cardId, { effect })` instead.
+ * This module-level global registry is kept for backward compatibility during
+ * PR-1 → PR-3 migration; it will be removed once all cards adopt the
+ * `_impl` export pattern and `GameCore` wires into per-session `CardRegistry`.
+ *
+ * See `shared/cards/registry.ts` for the new per-session approach.
+ */
 export const registerCardEffect = (effect: CardEffect) => {
   cardEffectOverrides.set(effect.id, effect)
 }
