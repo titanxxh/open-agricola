@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerCardEffect } from '../card-effects'
-import { ensureCardState, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
 import type { ActionFlow } from '../../game/types'
@@ -12,12 +12,13 @@ const KEY_OCC = 'occ'
  * B3 Moonshine (Minor, B, 3):
  *
  * onBuy → randomly pick one occupation from the player's hand via
- *   `rollAndCacheCardPick`, set pendingUndoBoundary so the roll cannot be
- *   undone, then emit a pending choice with two options:
+ *   `rollAndCacheCardPick` (writes to player.cardStates[CARD_ID].extraData.occ),
+ *   set pendingUndoBoundary so the roll cannot be undone, then emit a pending
+ *   choice (via `emit-choice` leaf) with two options:
  *     • play  — play that occupation for 2 FOOD (disabled when food < 2)
  *     • pass  — pass the occupation to the next player (or discard solo)
  *
- * resolveChoice:
+ * resolveChoice (CardEffect hook, called from GameSession.resolvePendingChoice):
  *   • 'play' → return a play-occupation leaf (costOverride: {food: 2},
  *               allowedCards: [pick]); the session auto-resolves the single-
  *               option choice emitted by play-occupation.
@@ -26,11 +27,9 @@ const KEY_OCC = 'occ'
  * BGA reference: B3_Moonshine.php — NODE_SEQ with randomizeOcc then a
  * NODE_XOR over playOcc (OCCUPATION action, flat 2-food cost) / passOcc.
  *
- * Storage: the picked occupation ID is stored in two places so both the
- * typed resolveChoice helper (readCardExtraData → extraData.occ) and the
- * test assertion (cardStates[CARD_ID].occ) work correctly:
- *   • player.cardStates[CARD_ID].extraData.occ  (via rollAndCacheCardPick)
- *   • player.cardStates[CARD_ID].occ            (top-level mirror)
+ * Storage: the picked occupation ID lives at
+ *   player.cardStates[CARD_ID].extraData.occ  (written by rollAndCacheCardPick)
+ * Access it via readCardExtraData / writeCardExtraData.
  */
 
 registerCardEffect({
@@ -40,10 +39,7 @@ registerCardEffect({
     if (player.occupationHand.length === 0) return
 
     // Roll and cache via Task-1.1 helper (writes to extraData.occ).
-    const pick = rollAndCacheCardPick(state, player, CARD_ID, KEY_OCC, player.occupationHand)
-
-    // Mirror at top-level so tests can read cardStates[CARD_ID]?.occ directly.
-    ;(ensureCardState(player, CARD_ID) as Record<string, unknown>)[KEY_OCC] = pick
+    rollAndCacheCardPick(state, player, CARD_ID, KEY_OCC, player.occupationHand)
 
     state.pendingUndoBoundary = true
 
@@ -51,7 +47,7 @@ registerCardEffect({
 
     const flow: ActionFlow = {
       type: 'leaf',
-      actionId: 'noop',
+      actionId: 'emit-choice',
       sourceCard: CARD_ID,
       params: {
         promptKey: 'cards.B3_Moonshine.choice',
@@ -79,10 +75,7 @@ registerCardEffect({
     if (!pick) return
 
     if (choice === 'play') {
-      // Clear both storage locations.
       writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
-      delete (player.cardStates?.[CARD_ID] as Record<string, unknown> | undefined)?.[KEY_OCC]
-
       return {
         type: 'leaf',
         actionId: 'play-occupation',
@@ -94,7 +87,6 @@ registerCardEffect({
     if (choice === 'pass') {
       passOccupationToNextPlayer(state, player, pick)
       writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
-      delete (player.cardStates?.[CARD_ID] as Record<string, unknown> | undefined)?.[KEY_OCC]
     }
   },
 })
