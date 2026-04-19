@@ -33,7 +33,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.phase !== 'work') return
     if (!isUnconditionalSow(context)) return
     if (workersAvailable(context.state, context.player) <= 0) return
@@ -62,7 +61,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.phase !== 'work') return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
@@ -77,7 +75,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.result?.type !== 'choice') return
     if (context.sourceCard !== CARD_ID) return
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces

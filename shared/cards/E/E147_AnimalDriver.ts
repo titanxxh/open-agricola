@@ -7,7 +7,6 @@ const CARD_ID = 'E147_AnimalDriver'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     // Count fenced stables: sum of stables inside pastures
     const fencedStables = player.pastures.reduce((sum, pasture) => sum + pasture.stables, 0)

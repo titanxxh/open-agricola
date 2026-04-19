@@ -6,8 +6,7 @@ const CARD_ID = 'B82_ValueAssets'
 
 registerCardEffect({
   id: CARD_ID,
-  onAfterHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onAfterHarvest: (_state, _player) => {
 
     const children: ActionFlow[] = [
       {

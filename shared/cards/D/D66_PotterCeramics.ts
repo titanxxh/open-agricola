@@ -17,7 +17,6 @@ const beforeBakeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if ((context.player.resources.clay ?? 0) < 1) return
     return {
       flow: {
@@ -42,7 +41,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.doable) return
     if ((context.player.resources.clay ?? 0) < 1) return
     // If the player has clay, they can exchange it for grain and then bake.

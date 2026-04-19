@@ -16,7 +16,6 @@ const listener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')

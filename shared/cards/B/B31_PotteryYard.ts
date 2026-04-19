@@ -6,7 +6,6 @@ const CARD_ID = 'B31_PotteryYard'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
 
     // Build a set of all used tile positions on the 3x5 farm board.
     const usedTiles = new Set<string>()

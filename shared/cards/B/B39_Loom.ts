@@ -14,13 +14,11 @@ const sheepFoodIncome = (sheep: number): number => {
 registerCardEffect({
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const gain = sheepFoodIncome(player.resources.sheep ?? 0)
     if (gain <= 0) return
     return gainLeaf(CARD_ID, { food: gain })
   },
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     return Math.floor(player.resources.sheep / 3)
   },
 })

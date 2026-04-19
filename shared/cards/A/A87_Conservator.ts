@@ -36,7 +36,6 @@ const choiceCandidateListener: CardListenerRegistration = {
   phases: ['computeChoiceCandidates' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context) => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
     return {
       extraOptions: [
@@ -52,7 +51,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context) => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
     if (context.doable) return
     const stonePlan = buildRenovationPlan(context.player, 'stone')

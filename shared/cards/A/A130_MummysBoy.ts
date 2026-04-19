@@ -38,7 +38,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     // Need at least 2 farmers already placed (placedFarmers = familySize - workersAvailable)
     const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
@@ -66,7 +65,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
     if (placedFarmers < 3) return
@@ -85,7 +83,6 @@ registerCardListener(afterPlaceFarmerListener)
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(player, CARD_ID)) {
       setCardFlag(player, CARD_ID, false)
     }

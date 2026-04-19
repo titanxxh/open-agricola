@@ -72,12 +72,6 @@ describe('D60_LargePottery', () => {
       expect(fx()(createState(player), player)).toBe(expected)
     })
 
-    it('returns 0 when the card is not in play, regardless of clay', () => {
-      const player = createPlayer()
-      player.minorPlayed = []
-      player.resources.clay = 9
-      expect(fx()(createState(player), player)).toBe(0)
-    })
   })
 
   describe('dual-type: D60 counts as both minor and major', () => {

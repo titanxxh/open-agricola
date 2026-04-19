@@ -22,7 +22,6 @@ registerCardEffect({
     }
   },
   computeBonusScore: (_state, player, ctx) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const wood = (player.resources.wood ?? 0) - (ctx.reserved.wood ?? 0)
     const clay = (player.resources.clay ?? 0) - (ctx.reserved.clay ?? 0)
     const stone = (player.resources.stone ?? 0) - (ctx.reserved.stone ?? 0)

@@ -22,7 +22,6 @@ const CARD_ID = 'E159_OldMiser'
 registerCardEffect({
   id: CARD_ID,
   onBeforeFeed: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Give familySize extra food to offset the -1 food per person reduction.
     // The feeding formula is: required = max(0, familySize * 2 - newborn)
     // With familySize extra food: effective cost = familySize * 2 - newborn - familySize
@@ -30,7 +29,6 @@ registerCardEffect({
     player.resources.food += familySize(player)
   },
   computePostScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     // Normal scoring: familySize * 3. With Old Miser: familySize * 2.
     // Difference: -familySize (i.e., -1 per person).
     return -familySize(player)

@@ -24,7 +24,6 @@ const CARD_ID = 'D106_WhiskyDistiller'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
     if (pending <= 0) return
     const counters = initCardState(player, CARD_ID)
@@ -38,7 +37,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.round > 12) return // no round+2 would exist after round 12
     if ((context.player.resources.grain ?? 0) < 1) return
     return {

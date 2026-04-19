@@ -7,8 +7,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 registerCardEffect({
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onBeforeStartOfTurn: (state, _player) => {
     if (!harvestRounds.includes(state.round)) return
     return {
       type: 'seq',

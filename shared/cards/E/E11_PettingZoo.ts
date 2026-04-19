@@ -14,7 +14,6 @@ const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: numb
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const roomTiles = player.roomTiles ?? []
     const hasAdjacentPasture = player.pastures.some(p =>
       (p.tiles ?? []).some(pt =>

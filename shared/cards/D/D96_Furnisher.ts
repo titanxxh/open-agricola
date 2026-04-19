@@ -23,7 +23,6 @@ const afterConstructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const roomsBuilt = getRoomsBuiltThisAction(context.player)
     if (roomsBuilt <= 0) return
 
@@ -60,7 +59,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     // Reduce wood cost by 1 (the improvement doesn't need to cost any wood per BGA ruling)
     return { costs: { wood: -1 } }

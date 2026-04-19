@@ -30,7 +30,6 @@ const CARD_ID = 'D24_BrotherlyLove'
  */
 
 const isActive = (context: CardListenerContext): boolean => {
-  if (!context.player.minorPlayed.includes(CARD_ID)) return false
   return familySize(context.player) === 4 && workersAvailable(context.state, context.player) === 1
 }
 

@@ -21,7 +21,6 @@ registerCardEffect({
     writeCardInfobox(player, CARD_ID, `Round ${triggerRound}`)
   },
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
     if (triggerRound == null || state.round !== triggerRound) return
     // Only offer if player has occupations in hand

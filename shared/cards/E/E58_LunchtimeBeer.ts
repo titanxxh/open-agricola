@@ -6,8 +6,7 @@ const CARD_ID = 'E58_LunchtimeBeer'
 
 registerCardEffect({
   id: CARD_ID,
-  onStartHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onStartHarvest: (_state, _player) => {
     return {
       type: 'seq',
       optional: true,

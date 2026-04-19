@@ -5,8 +5,7 @@ const CARD_ID = 'C31_WritingChamber'
 
 registerCardEffect({
   id: CARD_ID,
-  computePostScore: (_state, player, categories) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
+  computePostScore: (_state, _player, categories) => {
     const negativeTotal = categories.reduce((sum, cat) => sum + Math.min(0, cat.total), 0)
     return Math.min(7, Math.abs(negativeTotal))
   },

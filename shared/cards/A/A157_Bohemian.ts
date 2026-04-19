@@ -11,8 +11,7 @@ const LESSONS_SPACES = ['lessons', 'lessons-4']
 // action space is unoccupied, you get 1 food.
 registerCardEffect({
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onStartReturnHome: (state, _player) => {
     // At least one lessons space must be unoccupied
     const anyUnoccupied = LESSONS_SPACES.some(
       (id) => {

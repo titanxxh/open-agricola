@@ -91,13 +91,6 @@ describe('C22_BasketChair session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onBeforeStartOfTurn does nothing when the card is not in play', () => {
-    const player = createPlayer('p1', { minorPlayed: [] })
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBeforeStartOfTurn!(state, player)
-    expect(flow).toBeUndefined()
-  })
 
   it('onRoundEnd clears the card flag for the next round', () => {
     const player = createPlayer('p1')

@@ -40,7 +40,6 @@ const CARD_ID = 'C150_ParrotBreeder'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Unflag at the start of each round so the anytime action can be used once
     // per round (mirrors the BGA once-per-round semantics implicitly tied to
     // the onPlayerAfterPlaceFarmer unflag).

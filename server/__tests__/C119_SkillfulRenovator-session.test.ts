@@ -106,20 +106,4 @@ describe('C119_SkillfulRenovator', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card is not played', () => {
-    const listener = findListener('C119-skillful-renovator-after-renovate')
-    expect(listener).toBeDefined()
-
-    const player = createPlayer()
-    player.occupationPlayed = []
-    recordRoundPlacement(player, 'forest', '1')
-    const state = createState(player)
-
-    const result = executeCardListener(listener!, {
-      state, player, space: createSpace('renovate-house'),
-      actionId: 'renovate-house', phase: 'after',
-    } as any)
-
-    expect(result).toBeUndefined()
-  })
 })

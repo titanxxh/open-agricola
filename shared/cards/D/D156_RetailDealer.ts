@@ -29,7 +29,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'resource-market-4') return
     const remaining = readCardExtraData<number>(context.player, CARD_ID, 'remaining') ?? 0
     if (remaining <= 0) return

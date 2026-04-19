@@ -35,7 +35,6 @@ const countUnfencedStables = (player: PlayerState): number => {
 registerCardEffect({
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const unfencedCount = countUnfencedStables(player)
     if (unfencedCount === 0) return
 

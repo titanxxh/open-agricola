@@ -15,7 +15,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !QUARRY_SPACES.has(context.space.id)) return
     return {
       flow: {

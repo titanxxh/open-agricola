@@ -20,7 +20,6 @@ registerCardEffect({
     }
   },
   onStartHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
     return {
       type: 'leaf',

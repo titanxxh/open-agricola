@@ -17,7 +17,6 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'boarBefore', context.player.resources.boar)
     writeCardExtraData(context.player, CARD_ID, 'cattleBefore', context.player.resources.cattle)
   },
@@ -29,7 +28,6 @@ const afterExchangeListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const boarBefore = readCardExtraData<number>(context.player, CARD_ID, 'boarBefore') ?? 0
     const cattleBefore = readCardExtraData<number>(context.player, CARD_ID, 'cattleBefore') ?? 0
     const boarLost = Math.max(0, boarBefore - context.player.resources.boar)

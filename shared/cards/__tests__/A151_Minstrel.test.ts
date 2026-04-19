@@ -111,11 +111,4 @@ describe('A151_Minstrel', () => {
     expect(seq.children[0].params.sheep).toBe(3)
   })
 
-  it('returns nothing when card is not played', () => {
-    const player = createPlayer()
-    player.occupationPlayed = []
-    const state = createState(player)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(flow).toBeNull()
-  })
 })

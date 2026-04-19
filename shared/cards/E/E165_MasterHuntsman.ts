@@ -24,7 +24,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -35,7 +34,6 @@ const majorImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const choice = context.choice
     if (!choice || !choice.startsWith('major:')) return
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }

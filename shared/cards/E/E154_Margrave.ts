@@ -10,7 +10,6 @@ const CARD_ID = 'E154_Margrave'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     if (player.houseType !== 'stone') return 0
     return state.players.filter((p) => p.id !== player.id && p.houseType !== 'stone').length
   },

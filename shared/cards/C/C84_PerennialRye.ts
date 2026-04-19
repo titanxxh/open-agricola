@@ -17,7 +17,6 @@ const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })
@@ -27,7 +26,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.resources.grain < 1) return
     if (HARVEST_ROUNDS.includes(context.state.round)) return

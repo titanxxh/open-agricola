@@ -20,7 +20,6 @@ const CARD_ID = 'B69_PottersMarket'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
     if (pending <= 0) return
     const counters = initCardState(player, CARD_ID)
@@ -34,7 +33,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if ((context.player.resources.clay ?? 0) < 3) return
     if ((context.player.resources.food ?? 0) < 2) return
     if (context.state.round >= 14) return // no future rounds

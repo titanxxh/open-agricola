@@ -7,7 +7,6 @@ const CARD_ID = 'E107_LandSurveyor'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const fieldCount = player.fields.length
     let food = 0

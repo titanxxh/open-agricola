@@ -6,7 +6,6 @@ const CARD_ID = 'D133_BeerTentOperator'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.wood < 1 || player.resources.grain < 1) return
 
     return {

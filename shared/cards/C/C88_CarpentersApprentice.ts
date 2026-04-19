@@ -13,7 +13,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
     return { costs: { wood: -2 } }
   },
@@ -25,7 +24,6 @@ const stablesCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stablesBuilt = context.player.stableTiles.length
     if (stablesBuilt >= 2) {
       return { costs: { wood: -1 } }
@@ -39,7 +37,6 @@ const fenceIsDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.doable) return
     const freeFences = Math.max(0, 15 - getFenceCount(context.player))
     if (freeFences <= 0) return
@@ -61,7 +58,6 @@ const fenceBeforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const freeFences = Math.max(0, 15 - getFenceCount(context.player))
     if (freeFences <= 0) return
     return {
@@ -84,7 +80,6 @@ const fenceAfterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     clearPendingFenceBonus(context.player)
   },
 }

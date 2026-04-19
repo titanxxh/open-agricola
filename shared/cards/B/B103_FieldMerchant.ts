@@ -12,7 +12,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.trueAction === false) return
     if (context.actionContext?.checkedReplaceAction) return
     return {
@@ -42,7 +41,6 @@ const onPlayListener: CardListenerRegistration = {
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -53,7 +51,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.doable) return
     return { doable: true }
   },

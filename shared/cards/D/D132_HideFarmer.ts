@@ -6,7 +6,6 @@ const CARD_ID = 'D132_HideFarmer'
 registerCardEffect({
   id: CARD_ID,
   computePostScore: (_state, player, categories) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     // Find the 'empty' scoring category (unused farmyard spaces)
     const emptyCat = categories.find(c => c.key === 'empty')
     if (!emptyCat || emptyCat.total >= 0) return 0

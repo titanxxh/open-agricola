@@ -11,8 +11,7 @@ const CARD_ID = 'E143_Hewer'
 // We use onBeforeReturnHome as the equivalent of BGA's EndWorkPhase.
 registerCardEffect({
   id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onBeforeReturnHome: (state, _player) => {
     if (state.round < 3) return
 
     // Check all clay accumulation spaces are unoccupied

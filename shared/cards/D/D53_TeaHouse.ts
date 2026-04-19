@@ -27,7 +27,6 @@ const CARD_ID = 'D53_TeaHouse'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })
@@ -37,7 +36,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     // Only available when player has placed exactly 1 farmer this round
     const roundPlacements = getRoundPlacementOrder(context.player).length

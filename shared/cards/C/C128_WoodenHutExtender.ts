@@ -21,7 +21,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'wood') return
     const round = context.state.round
     // Always reduce reed from 2 to 1 (-1 reed)

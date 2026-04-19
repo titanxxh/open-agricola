@@ -43,7 +43,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const flow = queueStableTreeWood(context.state, context.player)
     if (!flow) return
     return { flow, sourceCard: CARD_ID }

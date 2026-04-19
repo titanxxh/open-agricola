@@ -36,7 +36,6 @@ registerSelectionEffect('asparagus-knife-harvest', ({ player, positions }) => {
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!TRIGGER_ROUNDS.includes(state.round)) return
 
     const vegFields = player.fields.filter(

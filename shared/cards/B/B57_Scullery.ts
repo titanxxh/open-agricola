@@ -8,7 +8,6 @@ const CARD_ID = 'B57_Scullery'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.houseType !== 'wood') return
     return gainLeaf(CARD_ID, { food: 1 })
   },

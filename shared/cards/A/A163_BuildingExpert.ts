@@ -26,7 +26,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space || context.space.id !== 'resource-market-4') return
     const placed = getRoundPlacementOrder(context.player).length
     const resource = PLACEMENT_TO_RESOURCE[placed]

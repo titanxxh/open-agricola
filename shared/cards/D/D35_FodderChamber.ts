@@ -6,7 +6,6 @@ const CARD_ID = 'D35_FodderChamber'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
     const divisors = [7, 5, 4, 3, 3, 3]
     const divisor = divisors[state.players.length - 1] ?? 3

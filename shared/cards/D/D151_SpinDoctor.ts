@@ -14,7 +14,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'traveling-players') return
     if (workersAvailable(context.state, context.player) <= 0) return
     // Collect all visible action spaces except Meeting Place

@@ -26,7 +26,6 @@ registerCardEffect({
     }
   },
   computeBonusScore: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const myPastures = player.pastures.length
     const maxPastures = Math.max(...state.players.map((p) => p.pastures.length))
     return myPastures === maxPastures && myPastures > 0 ? 2 : 0

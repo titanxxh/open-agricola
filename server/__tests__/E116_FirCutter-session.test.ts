@@ -224,26 +224,4 @@ describe('E116_FirCutter session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [] // Card not played
-    setActiveWorkerCount(player, 2)
-    setWorkersAtHome(state, player, 1)
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: { id: 'sheep-market' } as any,
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
 })

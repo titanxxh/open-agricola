@@ -11,7 +11,6 @@ const FARMLAND_SPACE_ID = 'farmland'
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!TRIGGER_ROUNDS.includes(state.round)) return
     // Check if player has a worker on Farmland
     const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)

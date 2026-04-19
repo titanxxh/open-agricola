@@ -44,7 +44,6 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const blocked = getBlockedSpaceIds(context.state)
     if (blocked.size === 0) return
     // Mutate the result options to filter out blocked spaces

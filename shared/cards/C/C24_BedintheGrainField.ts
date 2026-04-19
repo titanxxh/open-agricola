@@ -11,7 +11,6 @@ registerCardEffect({
     writeCardExtraData(player, CARD_ID, 'nextHarvestReady', true)
   },
   onStartHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const ready = readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')
     if (!ready) return
     writeCardExtraData(player, CARD_ID, 'nextHarvestReady', false)

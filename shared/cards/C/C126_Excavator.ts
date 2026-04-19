@@ -15,7 +15,6 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   order: 10,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'day-laborer') return
     return {
       flow: {

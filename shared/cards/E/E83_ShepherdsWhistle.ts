@@ -22,7 +22,6 @@ const hasEmptyUnfencedStable = (player: import('../../game/types').PlayerState):
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!hasEmptyUnfencedStable(player)) return
     return gainLeaf(CARD_ID, { sheep: 1 })
   },

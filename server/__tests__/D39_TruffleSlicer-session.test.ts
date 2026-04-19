@@ -165,18 +165,4 @@ describe('D39_TruffleSlicer', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger when card is not played', () => {
-    const listener = findListener('D39-truffle-slicer-after-place-farmer')!
-    const player = createPlayer()
-    player.minorPlayed = []
-    const result = executeCardListener(listener, {
-      state: createState(player),
-      player,
-      space: createSpace('forest'),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

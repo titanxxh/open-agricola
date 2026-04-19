@@ -6,8 +6,7 @@ const CARD_ID = 'E61_RaisedBed'
 
 registerCardEffect({
   id: CARD_ID,
-  onStartHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onStartHarvest: (_state, _player) => {
     return gainLeaf(CARD_ID, { food: 4 })
   },
 })

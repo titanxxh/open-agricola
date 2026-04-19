@@ -7,7 +7,6 @@ const CARD_ID = 'D115_FodderPlanter'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!canSow(player)) return
     const newbornAnimals = state.harvestBreedSummary?.[player.id]?.animalCount ?? 0
     if (newbornAnimals <= 0) return

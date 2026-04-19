@@ -25,7 +25,6 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const { sheep, boar, cattle } = context.player.resources
     if (!((sheep ?? 0) > 0 && (boar ?? 0) > 0 && (cattle ?? 0) > 0)) return

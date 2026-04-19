@@ -10,7 +10,6 @@ const CARD_ID = 'E86_PenBuilder'
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const discards = player.cardStates?.[CARD_ID]?.counters?.discards ?? 0
     if (discards <= 0) return
     zones.push({

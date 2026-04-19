@@ -8,8 +8,7 @@ const CARD_ID = 'C159_FishermansFriend'
 // Traveling Players than on the Fishing accumulation space, you get the difference.
 registerCardEffect({
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onRoundStart: (state, _player) => {
     const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
     const fishing = state.actionSpaces.find((s) => s.id === 'fishing')
     const tpFood = travelingPlayers?.resources?.food ?? 0

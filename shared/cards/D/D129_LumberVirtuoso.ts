@@ -16,7 +16,6 @@ const CARD_ID = 'D129_LumberVirtuoso'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.wood < 5) return
 
     const excessWood = player.resources.wood - 5

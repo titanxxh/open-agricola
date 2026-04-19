@@ -7,7 +7,6 @@ const CARD_ID = 'A166_Haydryer'
 registerCardEffect({
   id: CARD_ID,
   onBeforeHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const pastureCount = player.pastures.length
     const cost = Math.max(0, 4 - pastureCount)
     return payGainFlow({

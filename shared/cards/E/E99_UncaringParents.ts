@@ -6,7 +6,6 @@ const CARD_ID = 'E99_UncaringParents'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.houseType !== 'stone') return
 
     return {

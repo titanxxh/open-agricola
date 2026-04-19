@@ -17,11 +17,9 @@ const CARD_ID = 'B140_FarmyardWorker'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
   onBeforeReturnHome: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!isCardFlagged(player, CARD_ID)) return
     return gainLeaf(CARD_ID, { food: 2 })
   },
@@ -34,7 +32,6 @@ const farmyardListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables', 'fencing', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },

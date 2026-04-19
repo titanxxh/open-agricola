@@ -12,7 +12,6 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
@@ -24,7 +23,6 @@ const renovateListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'stone') return
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },

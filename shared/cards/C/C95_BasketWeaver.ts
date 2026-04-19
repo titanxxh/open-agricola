@@ -37,7 +37,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.state.availableMajorImprovements.includes(TARGET_MAJOR)) return
     return {
       flow: {
@@ -61,7 +60,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.actionCardId !== CARD_ID) return
     if (context.cardId !== TARGET_MAJOR) return
     // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.

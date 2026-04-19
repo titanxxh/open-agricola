@@ -37,7 +37,6 @@ const tryGainLivestock = (
   needStables: boolean,
   needRooms: boolean,
 ): ActionHookResult | void => {
-  if (!context.player.occupationPlayed.includes(CARD_ID)) return
   const actionToken = readActionSnapshotToken(context.player)
   if (actionToken === undefined) return
   if (readCardExtraData<number>(context.player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return

@@ -38,7 +38,6 @@ registerCardEffect({
     writeCardInfobox(player, CARD_ID, '0 / 4')
   },
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const held = player.cardStates?.[CARD_ID]?.counters?.held ?? 0
     if (held <= 0) return
     zones.push({
@@ -57,7 +56,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isAccumulationSpace(context)) return
 
     const counters = initCardState(context.player, CARD_ID)

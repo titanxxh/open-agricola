@@ -30,7 +30,6 @@ registerCardEffect({
 
   // Provide extra sowable field when card has no crop
   onComputeSowableFields: (player): ExtraSowableField[] => {
-    if (!player.minorPlayed.includes(CARD_ID)) return []
     const cardCrop = getCardCrop(player)
     if (cardCrop) return [] // Already has a crop
     return [
@@ -44,7 +43,6 @@ registerCardEffect({
 
   // Handle sowing into the card's virtual field
   onSowExtraField: (player, tile, crop): boolean => {
-    if (!player.minorPlayed.includes(CARD_ID)) return false
     if (tile.row !== VIRTUAL_TILE.row || tile.col !== VIRTUAL_TILE.col) return false
     if (crop !== 'vegetable') return false
 
@@ -63,7 +61,6 @@ registerCardEffect({
 
   // Harvest from card field during field phase
   onHarvestFieldPhase: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const cardCrop = getCardCrop(player)
     if (!cardCrop || cardCrop.remaining <= 0) return
 
@@ -97,7 +94,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     // If already doable via normal fields, no need to intervene
     if (canSow(context.player)) return
     // Check if card field is empty and player has vegetable

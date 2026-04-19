@@ -29,7 +29,6 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.space) return
     // Fire only for the top-level space action (actionId === spaceId), not
     // sub-actions (e.g., 'collect') triggered inside the space's flow.

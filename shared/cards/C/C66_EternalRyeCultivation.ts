@@ -7,7 +7,6 @@ const CARD_ID = 'C66_EternalRyeCultivation'
 registerCardEffect({
   id: CARD_ID,
   onAfterHarvest: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     const grain = player.resources.grain
     let flow: ActionFlow | null = null

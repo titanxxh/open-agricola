@@ -20,8 +20,7 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 registerCardEffect({
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onRoundStart: (state, _player) => {
 
     const choices: ActionFlow[] = []
     for (const space of state.actionSpaces) {

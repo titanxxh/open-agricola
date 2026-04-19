@@ -10,7 +10,6 @@ const CARD_ID = 'A35_SwimmingClass'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Check if this player has a farmer on the Fishing space
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
     if (!fishingSpace || !spaceHasPlayer(fishingSpace, player.id)) return

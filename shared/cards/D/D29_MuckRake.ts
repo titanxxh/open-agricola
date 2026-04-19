@@ -6,7 +6,6 @@ const CARD_ID = 'D29_MuckRake'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const types = new Set(Object.values(player.stableAnimals ?? {}).filter(Boolean))
     let bonus = 0
     if (types.has('sheep')) bonus++

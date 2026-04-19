@@ -18,7 +18,6 @@ const CARD_ID = 'B101_FurnitureCarpenter'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFieldPhase: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Check if any player has built Major_Joinery
     const anyPlayerHasJoinery = state.players.some(
       (p) => p.improvements?.includes('Major_Joinery'),

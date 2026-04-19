@@ -19,7 +19,6 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, FENCES_BEFORE_KEY, getFenceCount(context.player))
   },
 }
@@ -30,7 +29,6 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const fencesBefore = readCardExtraData<number>(context.player, CARD_ID, FENCES_BEFORE_KEY) ?? 0
     const fencesBuilt = getFenceCount(context.player) - fencesBefore
     if (fencesBuilt < context.state.round) return

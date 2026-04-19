@@ -8,7 +8,6 @@ const CARD_ID = 'E117_PipeSmoker'
 registerCardEffect({
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const grainFieldCount = player.fields.filter(
       (f) => fieldHasCrop(f, 'grain'),

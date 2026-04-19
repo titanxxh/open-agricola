@@ -6,8 +6,7 @@ const CARD_ID = 'C55_Studio'
 
 registerCardEffect({
   id: CARD_ID,
-  onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onHarvestFeedingPhase: (_state, _player) => {
 
     const children: ActionFlow[] = [
       {

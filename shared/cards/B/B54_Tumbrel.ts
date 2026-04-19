@@ -31,7 +31,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     const stableCount = context.player.stableTiles.length
     if (stableCount <= 0) return

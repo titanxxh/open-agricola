@@ -30,7 +30,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'vegetable-seeds') return
     if (workersAvailable(context.state, context.player) <= 0) return
 
@@ -59,7 +58,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isCardFlagged(context.player, CARD_ID)) return
 
     // Gain 1 additional good of each accumulating type from the space

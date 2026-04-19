@@ -23,7 +23,6 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     // Find building resource types the player has 0 of
     const missingTypes = BUILDING_RESOURCES.filter(

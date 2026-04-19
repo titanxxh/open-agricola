@@ -36,7 +36,7 @@
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
 | ✅ 完全对齐 | ~803 + §2.1 列举 25 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
-| 🟡 简化实现（§2.2） | 8 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
+| 🟡 简化实现（§2.2） | 7 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 2 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
 | 🔀 刻意偏离 BGA（§2.5） | 2 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — E96 Elder BGA 对齐 + `handHooks` 通用手牌 hook 机制 + 批量移除冗余 played-includes 守卫**：新增 `CardEffect.handHooks` 字段，声明哪些 hook 在卡牌还在手牌时也应触发；`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。E96 Elder 通过此机制实现回合 1 免费打出自身（`onBeforeStartOfTurn` + `allowedCards` 过滤）。同时批量移除 756 处冗余的 `player.xxxPlayed.includes(CARD_ID)` 守卫——框架已在调用侧保证卡牌已打出，卡牌文件内无需重复检查。
 - **2026-04-19 — 行动格按人数过滤，对齐 BGA 2-3 人局配置**：`createActionSpaces(playerCount?)` 按 `players` 字段过滤行动格。新增 3P 变体：`hollow`（1 黏土/轮）、`resource-market`（XOR 芦苇+食/石+食）、`lessons-3`（固定 2 食）。7 个全人数通用行动格补 `players: [2,3,4]`。前端坐标表补 3P 条目。2P=10 主行动格、3P=14、4P=16。不改卡牌实现数。
 - **2026-04-19 — C129 SecondSpouse BGA 对齐**：加"占用者是对方首置 farmer + 上限≤2"判定，移除运行时 `players.length < 3` 检查（由牌组配置保证）。
 - **2026-04-19 — choice/farmSelect/selection 统一透传 `sourceCard` + InteractionBar 显示触发来源卡名**：`PendingAction` / `InteractionState` / 前端 `PendingChoice` 新增可选 `sourceCard`，`OptionalNode` 在弹出 `ui.interactionOptionalAction` 时也会把来源卡写入 `pendingChoiceContext`，因此像 `D161 CabbageBuyer` 这类卡牌触发的 optional offer 终于能在交互栏副标题统一显示“由某卡触发”。规则行为不变：若效果已触发但资源不足（例如 D161 在 `no improvement = 3 food` 时付不起），依旧不会额外显示一个不可执行的 choice。
@@ -123,7 +124,7 @@
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
 | D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
-| E96 Elder | 回合 1 StartOfWork 额外打出职业未实现 | 新 `stStartOfTurn allowedCards` hook |
+| ~~E96 Elder~~ | ~~回合 1 StartOfWork 额外打出职业未实现~~ | 已实现（2026-04-19），通过 `handHooks` 机制 |
 
 ### 2.3 ⚠ 行为偏差待修（2 张）
 
@@ -222,6 +223,8 @@
 | **`computeAllowedPlacementSpaces`**（2026-04-19） | ✅ | `shared/actions/effects/placement-availability.ts`：单一允许集 helper，由 `takeAction` / `place-farmer` / `move-farmer-to-space` 三入口共用。替代已删除的 `canUseOccupied` hook phase。卡牌通过 `computeArgs` + `OCCUPIED_SPACE_CHOICE_PREFIX` 注入额外可用的已占用空间。消费者：A25/A28/A130/B151/C129/D24/E21/E150。 |
 | **`CardEffect.computeLockedFarmTiles`**（2026-04-18） | ✅ | 通用农场格锁定扩展点，卡牌可声明动态锁定的格子，验证层和交互层自动过滤。消费者：B38 FutureBuildingSite。 |
 | **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
+| **`CardEffect.handHooks` 手牌 hook 机制**（2026-04-19） | ✅ | `CardEffect.handHooks?: CardEffectHook[]`：声明哪些 hook 在卡牌还在手牌时也应触发。`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。框架保证 handHooks 只遍历手牌——一旦卡被打出（移入 `xxxPlayed`），只走正常路径。消费者：E96 Elder。 |
+| **`play-occupation` `allowedCards` 参数**（2026-04-19） | ✅ | `play-occupation` action 的 execute/resolveChoice 支持 `params.allowedCards?: string[]` 过滤可选职业。消费者：E96 Elder。 |
 | **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
 
 ---
@@ -263,6 +266,7 @@
 | E16 BriarHedge + B30 border-only | 04-19 | 0 | 821 | 92.0% |
 | 行动格按人数过滤 (2-3P) | 04-19 | 0 | 821 | 92.0% |
 | canUseOccupied → computeArgs 统一 | 04-19 | 0 | 821 | 92.0% |
+| E96 Elder BGA 对齐 + handHooks 机制 | 04-19 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 

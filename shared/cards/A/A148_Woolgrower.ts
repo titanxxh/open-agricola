@@ -14,12 +14,10 @@ const CARD_ID = 'A148_Woolgrower'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const counters = initCardState(player, CARD_ID)
     counters.completedHarvests = (counters.completedHarvests ?? 0) + 1
   },
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const capacity = player.cardStates?.[CARD_ID]?.counters?.completedHarvests ?? 0
     if (capacity <= 0) return
     zones.push({

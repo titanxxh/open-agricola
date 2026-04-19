@@ -11,7 +11,6 @@ export const afterListener: CardListenerRegistration = {
   phases: ['after'],
   actions: ['renovate-house'],
   handler: (context): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     incCounter(context.player, CARD_ID, 'observedCount')
     return payGainNode({
       cardId: CARD_ID,

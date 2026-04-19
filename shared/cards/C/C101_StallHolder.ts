@@ -12,7 +12,6 @@ const CARD_ID = 'C101_StallHolder'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })

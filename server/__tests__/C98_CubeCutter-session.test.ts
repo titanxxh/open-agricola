@@ -92,21 +92,4 @@ describe('C98_CubeCutter session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onHarvestFieldPhase returns undefined when card is not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-
-    const player = state.players[0]!
-    // Card not in occupationPlayed
-    player.resources.wood = 3
-    player.resources.food = 5
-
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFieldPhase!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })

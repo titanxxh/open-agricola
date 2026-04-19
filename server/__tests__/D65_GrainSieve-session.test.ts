@@ -87,20 +87,6 @@ describe('D65_GrainSieve session', () => {
     expect(flow).toBeNull()
   })
 
-  it('onAfterReap does not trigger when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 3 }, grainFields: 3, vegetableFields: 0 },
-    }
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('integration: harvest with 2 grain fields gains 1 bonus grain', () => {
     const session = setupForHarvest({

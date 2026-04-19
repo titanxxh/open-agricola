@@ -50,7 +50,6 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // BGA ruling: Lantern House disables Illusionist.
     if (context.player.occupationPlayed.includes('C35_LanternHouse')) return
 

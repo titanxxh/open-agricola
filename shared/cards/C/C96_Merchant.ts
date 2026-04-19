@@ -12,7 +12,6 @@ const immediatelyAfterListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.sourceCard === CARD_ID) return
     if (context.trueAction === false) return
     const secondActionId = context.actionId === 'minor-improvement' ? 'minor-improvement' : 'improvement-any'

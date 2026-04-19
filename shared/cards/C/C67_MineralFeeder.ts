@@ -23,7 +23,6 @@ const hasSheepInPasture = (player: import('../../game/types').PlayerState): bool
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (harvestRounds.includes(state.round)) return
     if (!hasSheepInPasture(player)) return
     return gainLeaf(CARD_ID, { grain: 1 })

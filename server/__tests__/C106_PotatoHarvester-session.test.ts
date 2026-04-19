@@ -86,20 +86,6 @@ describe('C106_PotatoHarvester session', () => {
     expect(flow).toBeNull()
   })
 
-  it('onAfterReap does not trigger when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    // Card NOT in occupationPlayed
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { vegetable: 2 }, grainFields: 0, vegetableFields: 2 },
-    }
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('integration: harvest with 2 vegetable fields gains 2 food', () => {
     const session = setupForHarvest({

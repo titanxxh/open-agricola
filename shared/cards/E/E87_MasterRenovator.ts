@@ -22,7 +22,6 @@ const CARD_ID = 'E87_MasterRenovator'
 registerCardEffect({
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (state.round !== 7 && state.round !== 9) return
     if (player.houseType === 'stone') return
     const renovation = getRenovation(player)
@@ -49,7 +48,6 @@ const costListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.sourceCard !== CARD_ID) return
     return { costs: { reed: -1 } }
   },

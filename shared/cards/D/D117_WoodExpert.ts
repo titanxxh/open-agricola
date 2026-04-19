@@ -46,7 +46,6 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!context.cardId) return
     const woodInCost = getImprovementWoodCost(context.cardId)
     if (woodInCost <= 0) return

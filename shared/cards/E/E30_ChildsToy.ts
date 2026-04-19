@@ -6,7 +6,6 @@ const CARD_ID = 'E30_ChildsToy'
 registerCardEffect({
   id: CARD_ID,
   onBeforeFeed: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Remove newborn discount by treating newborns as adults
     // This makes newborns cost 2 food like adults
     for (const w of player.workers) {

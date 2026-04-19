@@ -9,7 +9,6 @@ const CARD_ID = 'D52_RollingPin'
 registerCardEffect({
   id: CARD_ID,
   onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const clay = player.resources.clay ?? 0
     const wood = player.resources.wood ?? 0
     if (clay <= wood) return

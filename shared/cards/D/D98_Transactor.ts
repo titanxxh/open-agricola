@@ -7,8 +7,7 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
 registerCardEffect({
   id: CARD_ID,
-  onBeforeHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onBeforeHarvest: (state, _player) => {
     if (state.round !== 14) return
 
     // Collect all building resources from action spaces (imperative mutation, auto-collect)

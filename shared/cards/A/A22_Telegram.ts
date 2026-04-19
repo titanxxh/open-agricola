@@ -34,7 +34,6 @@ registerCardEffect({
     }
   },
   onBeforeStartOfTurn: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
     if (triggerRound === undefined || state.round !== triggerRound) return
     // Check if player has a farmer in reserve (familySize > workersAvailable means

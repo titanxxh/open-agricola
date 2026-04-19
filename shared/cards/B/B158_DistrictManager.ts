@@ -11,7 +11,6 @@ const CARD_ID = 'B158_DistrictManager'
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const grove = state.actionSpaces.find((s) => s.id === 'grove')
     if (!forest || !grove) return

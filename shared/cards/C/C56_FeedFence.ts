@@ -20,7 +20,6 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const built = getStableTilesBuiltThisAction(context.player)
     if (built <= 0) return
     // +2 bonus for 4th stable (when player now has exactly 4 stables)

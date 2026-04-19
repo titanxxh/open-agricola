@@ -14,7 +14,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'fishing') return
     const current = readCardExtraData<number>(context.player, CARD_ID, 'woodCount') ?? 0
     writeCardExtraData(context.player, CARD_ID, 'woodCount', current + 2)
@@ -26,7 +25,6 @@ registerCardListener(afterCollectListener)
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const wood = readCardExtraData<number>(player, CARD_ID, 'woodCount') ?? 0
     // 1 VP per wood except at positions 1, 4, 7, 10 (1-indexed)
     // i.e. no VP at 0-indexed positions 0, 3, 6, 9

@@ -21,7 +21,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const myFamilySize = familySize(context.player)
     // Check if ALL other players have more farmers than current player
     const otherPlayers = context.state.players.filter(

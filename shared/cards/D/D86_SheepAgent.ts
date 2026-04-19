@@ -20,7 +20,6 @@ const OTHER_ANIMAL_HOLDER_OCCUPATIONS = [
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     let capacity = player.occupationPlayed.length
     for (const otherId of OTHER_ANIMAL_HOLDER_OCCUPATIONS) {
       if (player.occupationPlayed.includes(otherId)) {

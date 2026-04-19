@@ -11,8 +11,7 @@ const beforeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['play-occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }
@@ -22,8 +21,7 @@ const isDoableListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
   actions: ['play-occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { doable: true }
   },
 }

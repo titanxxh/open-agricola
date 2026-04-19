@@ -6,8 +6,7 @@ const CARD_ID = 'A145_Ropemaker'
 
 registerCardEffect({
   id: CARD_ID,
-  onEndHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onEndHarvest: (_state, _player) => {
     return gainLeaf(CARD_ID, { reed: 1 })
   },
 })

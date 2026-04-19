@@ -7,7 +7,6 @@ const CARD_ID = 'E132_VeggieLover'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1 || player.resources.vegetable < 1) return
     return {
       type: 'seq',
@@ -19,7 +18,6 @@ registerCardEffect({
     }
   },
   computeBonusScore: (_state, player, ctx) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     const grain = (player.resources.grain ?? 0) - (ctx.reserved.grain ?? 0)
     const veg = (player.resources.vegetable ?? 0) - (ctx.reserved.vegetable ?? 0)
     const sets = Math.min(grain, veg, 3)

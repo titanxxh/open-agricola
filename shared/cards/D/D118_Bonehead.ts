@@ -33,7 +33,6 @@ const afterOccupationListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return
     return {
@@ -52,7 +51,6 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return
     return {

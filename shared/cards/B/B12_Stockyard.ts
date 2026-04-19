@@ -11,8 +11,7 @@ const CARD_ID = 'B12_Stockyard'
  */
 registerCardEffect({
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onComputeAnimalZones: (_player, zones) => {
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',

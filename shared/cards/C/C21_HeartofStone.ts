@@ -11,7 +11,6 @@ const CARD_ID = 'C21_HeartofStone'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const revealedAction = state.roundActionOrder[state.round - 1]
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
     // Check if player has room in house (fewer family members than rooms)

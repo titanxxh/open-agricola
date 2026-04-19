@@ -16,7 +16,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (!isWoodAccumulationSpace(context.space)) return
     return payGainNode({
       cardId: CARD_ID,

@@ -16,7 +16,6 @@ const CARD_ID = 'B110_Pavior'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.stone < 1) return
     const resource = state.round === 14 ? 'vegetable' : 'food'
     return gainLeaf(CARD_ID, { [resource]: 1 })

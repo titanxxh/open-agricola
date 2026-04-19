@@ -7,7 +7,6 @@ const CARD_ID = 'D65_GrainSieve'
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     // Check if at least 2 grain were harvested from fields
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields ?? 0
     if (grainFields < 2) return

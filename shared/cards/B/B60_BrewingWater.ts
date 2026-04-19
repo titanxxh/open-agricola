@@ -13,7 +13,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.space?.id !== 'fishing') return
     // Queue eagerly; futureMeeplesNode only resolves if the player accepts the optional payment.
     // If declined, pending entry stays until next futureMeeplesNode execution (known limitation).

@@ -27,7 +27,6 @@ registerCardEffect({
   id: CARD_ID,
 
   onComputeSowableFields: (player): ExtraSowableField[] => {
-    if (!player.minorPlayed.includes(CARD_ID)) return []
     if (getCardCrop(player)) return []
     return [
       {
@@ -39,7 +38,6 @@ registerCardEffect({
   },
 
   onSowExtraField: (player, tile, crop): boolean => {
-    if (!player.minorPlayed.includes(CARD_ID)) return false
     if (tile.row !== VIRTUAL_TILE.row || tile.col !== VIRTUAL_TILE.col) return false
     if (crop !== 'grain' && crop !== 'vegetable') return false
     if (getCardCrop(player)) return false
@@ -53,7 +51,6 @@ registerCardEffect({
   },
 
   onHarvestFieldPhase: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const cardCrop = getCardCrop(player)
     if (!cardCrop || cardCrop.remaining <= 0) return
     player.resources[cardCrop.crop] += 1
@@ -69,7 +66,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (canSow(context.player)) return
     if (getCardCrop(context.player)) return
     if (context.player.resources.grain <= 0 && context.player.resources.vegetable <= 0) return

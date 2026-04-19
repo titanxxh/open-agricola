@@ -14,7 +14,6 @@ registerCardEffect({
     player.resources.begging += 1
   },
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.occupationHand.length === 0) return
     return {
       type: 'seq',

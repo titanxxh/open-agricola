@@ -9,7 +9,6 @@ const CARD_ID = 'B114_Childless'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     if (roomCount < 3) return
     if (familySize(player) !== 2) return

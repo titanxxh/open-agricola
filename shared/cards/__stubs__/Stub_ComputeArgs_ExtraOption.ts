@@ -9,7 +9,6 @@ export const listener: CardListenerRegistration = {
   phases: ['computeArgs'],
   actions: ['improvement-any'],
   handler: (context) => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     incCounter(context.player, CARD_ID, 'observedCount')
     return {
       extraOptions: [{ value: 'stub-bonus-improvement', labelKey: 'ui.stubBonus' }],

@@ -28,7 +28,6 @@ const afterOccupationListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Don't trigger on playing this card itself
     if (context.choice === CARD_ID) return
     // Calculate the food cost that was paid. The lessons cost depends on the

@@ -129,25 +129,6 @@ describe('B168_PastureMaster session', () => {
     }
   })
 
-  it('does not trigger if card not played', () => {
-    const listener = findListener('B168-pasture-master-after-renovate')
-    expect(listener).toBeDefined()
-
-    const state = createBaseState()
-    const player = state.players[0]!
-    player.occupationPlayed = [] // Card not played
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: { id: 'renovate-house' } as any,
-      actionId: 'renovate-house',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
 
   it('skips pastures with stables but no animals', () => {
     const listener = findListener('B168-pasture-master-after-renovate')

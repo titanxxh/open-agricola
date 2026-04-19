@@ -9,8 +9,7 @@ const CARD_ID = 'D54_TroutPool'
 // BGA: startOfWork → we use onRoundStart
 registerCardEffect({
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onRoundStart: (state, _player) => {
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
     const fishFood = fishingSpace?.resources?.food ?? 0
     if (fishFood < 3) return

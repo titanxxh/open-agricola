@@ -9,7 +9,6 @@ const CARD_ID = 'B135_NutritionExpert'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
 
     const animalTypes = ['sheep', 'boar', 'cattle'] as const
     const availableAnimals = animalTypes.filter((a) => (player.resources[a] ?? 0) >= 1)

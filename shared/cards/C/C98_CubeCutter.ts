@@ -8,7 +8,6 @@ registerCardEffect({
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
   onHarvestFieldPhase: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.resources.wood < 1 || player.resources.food < 1) return
     return {
       type: 'seq',

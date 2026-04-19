@@ -38,7 +38,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const flow = queueFoodNextFour(context.state, context.player)
     if (!flow) return
     return { flow, sourceCard: CARD_ID }

@@ -7,7 +7,6 @@ const CARD_ID = 'C71_Slurry'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvest: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (!canSow(player)) return
     const bredAnimalTypes = state.harvestBreedSummary?.[player.id]?.animalTypes ?? 0
     if (bredAnimalTypes < 2) return

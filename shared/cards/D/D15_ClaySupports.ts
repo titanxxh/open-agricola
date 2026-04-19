@@ -23,7 +23,6 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (context.player.houseType !== 'clay') return
     // Base cost: 5 clay + 2 reed → alternative: 2 clay + 1 wood + 1 reed
     return { costs: { clay: -3, reed: -1, wood: 1 } }

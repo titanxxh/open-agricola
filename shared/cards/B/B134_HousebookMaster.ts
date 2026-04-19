@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     // Check that renovation was to stone
     if (context.player.houseType !== 'stone') return
     const round = context.state.round

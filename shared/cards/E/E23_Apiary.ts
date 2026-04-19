@@ -8,7 +8,6 @@ const CARD_ID = 'E23_Apiary'
 registerCardEffect({
   id: CARD_ID,
   onBeforeReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.fields.length === 0) return
     return {
       type: 'seq',

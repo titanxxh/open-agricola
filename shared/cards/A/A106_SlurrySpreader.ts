@@ -8,7 +8,6 @@ const CARD_ID = 'A106_SlurrySpreader'
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     const summary = state.harvestReapSummary?.[player.id]
     if (!summary) return

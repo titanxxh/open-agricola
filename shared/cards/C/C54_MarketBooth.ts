@@ -7,7 +7,6 @@ const CARD_ID = 'C54_MarketBooth'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.grain < 1) return
     if (getFenceCount(player) === 0) return
 

@@ -29,7 +29,6 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const desc = getPlayedCardDesc(context.choice)
     if (!desc || !hasAccumulationText(desc)) return
     return {
@@ -45,7 +44,6 @@ const afterOccupationListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['play-occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const desc = getPlayedCardDesc(context.choice)
     if (!desc || !hasAccumulationText(desc)) return
     return {

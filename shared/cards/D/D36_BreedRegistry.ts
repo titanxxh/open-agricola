@@ -14,7 +14,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const gained = context.result?.type === 'ok'
       ? (context.result.resourcesGained?.sheep ?? 0)
       : 0
@@ -31,7 +30,6 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     writeCardExtraData(context.player, CARD_ID, 'sheepBeforeExchange', context.player.resources.sheep)
   },
 }
@@ -43,7 +41,6 @@ const afterExchangeListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['anytime-exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const sheepBefore = readCardExtraData<number>(context.player, CARD_ID, 'sheepBeforeExchange') ?? 0
     if (context.player.resources.sheep < sheepBefore) {
       writeCardExtraData(context.player, CARD_ID, 'sheepConverted', true)
@@ -58,7 +55,6 @@ registerCardListener(afterExchangeListener)
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const gained = readCardExtraData<number>(player, CARD_ID, 'sheepGained') ?? 0
     const converted = readCardExtraData<boolean>(player, CARD_ID, 'sheepConverted') ?? false
     if (converted) return 0

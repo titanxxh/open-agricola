@@ -8,7 +8,6 @@ const CARD_ID = 'D113_FoodMerchant'
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     // Count grain fields that were harvested
     const grainFields = player.fields.filter(f => fieldHasCrop(f, 'grain'))
     // Check harvestReapSummary for grain fields harvested

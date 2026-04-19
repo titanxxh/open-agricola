@@ -15,11 +15,9 @@ const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     enforceAnimalCapacity(player)
   },
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const stabledPastures = zones.filter(
       (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
         zone.zoneType === 'pasture' &&
@@ -46,7 +44,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const gained = (context.result as any)?.resourcesGained?.reed ?? 0
     if (gained <= 0) return
     return {
@@ -62,7 +59,6 @@ const afterGainListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !REED_ACTION_SPACES.has(context.space.id)) return
     const gained = (context.result as any)?.resourcesGained?.reed ?? 0
     if (gained <= 0) return

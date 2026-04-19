@@ -6,7 +6,6 @@ const CARD_ID = 'C12_CattleFarm'
 registerCardEffect({
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const pastureCount = player.pastures.length
     if (pastureCount === 0) return
     zones.push({

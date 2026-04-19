@@ -7,7 +7,6 @@ const CARD_ID = 'C41_FarmStore'
 registerCardEffect({
   id: CARD_ID,
   onEndHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     if (player.resources.food < 1) return
 
     const children: ActionFlow[] = [

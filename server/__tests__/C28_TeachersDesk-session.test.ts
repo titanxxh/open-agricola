@@ -106,23 +106,4 @@ describe('C28_TeachersDesk session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger without the card', () => {
-    const listener = findListener('C28-teachers-desk-before-place-farmer')!
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationHand.push('C107_Baker')
-    session.loadState(state)
-
-    const space = state.actionSpaces.find((s) => s.id === 'major-improvement')!
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space,
-      actionId: 'place-farmer',
-      phase: 'before',
-    } as any)
-    expect(result).toBeUndefined()
-  })
 })

@@ -98,11 +98,4 @@ describe('B81_Handcart', () => {
     expect(flow).toBeNull()
   })
 
-  it('returns nothing when card is not played', () => {
-    const player = createPlayer()
-    player.minorPlayed = []
-    const state = createState(player)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
-    expect(flow).toBeNull()
-  })
 })

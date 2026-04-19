@@ -17,8 +17,7 @@ const CARD_ID = 'B160_PubOwner'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { grain: 1 }),
-  onBeforeReturnHome: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
+  onBeforeReturnHome: (state, _player) => {
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')

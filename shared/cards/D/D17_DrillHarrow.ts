@@ -30,7 +30,6 @@ const beforeSowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     return {
       flow: {
@@ -53,7 +52,6 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!isUnconditionalSow(context)) return
     if (context.doable) return
     // Player can plow to create an empty field, making sow possible

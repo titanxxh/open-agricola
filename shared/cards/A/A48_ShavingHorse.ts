@@ -35,7 +35,6 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const gained = (context.result as any)?.resourcesGained?.wood ?? 0
     if (gained <= 0) return
     return exchangeFlow(context.player.resources.wood ?? 0)
@@ -48,7 +47,6 @@ const afterGainListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (!context.space || !WOOD_SPACES.has(context.space.id)) return
     const gained = (context.result as any)?.resourcesGained?.wood ?? 0
     if (gained <= 0) return

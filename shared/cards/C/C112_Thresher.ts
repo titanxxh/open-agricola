@@ -31,7 +31,6 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: TRIGGER_SPACE_IDS,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if ((context.player.resources.grain ?? 0) < 1) return
     return payGainNode({
       cardId: CARD_ID,

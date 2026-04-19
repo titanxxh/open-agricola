@@ -17,12 +17,10 @@ const CARD_ID = 'E111_Recluse'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.minorPlayed.length > 0) return
     return gainLeaf(CARD_ID, { food: 1 })
   },
   onStartHarvest: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (player.minorPlayed.length > 0) return
     return gainLeaf(CARD_ID, { wood: 1 })
   },

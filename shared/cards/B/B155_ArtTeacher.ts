@@ -54,7 +54,6 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -65,7 +64,6 @@ const beforeLessonsListener: CardListenerRegistration = {
   actions: ['lessons', 'lessons-4'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id
     if (!spaceId || !LESSONS_SPACE_IDS.has(spaceId)) return
 

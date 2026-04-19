@@ -60,7 +60,6 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
 
     const justPlacedSpaceId = context.space?.id
@@ -106,7 +105,6 @@ registerCardListener(listener)
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(player, CARD_ID)) {
       setCardFlag(player, CARD_ID, false)
     }

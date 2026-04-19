@@ -10,7 +10,6 @@ const CARD_ID = 'C123_Freemason'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     if (roomCount !== 2) return
     if (player.houseType === 'stone') {

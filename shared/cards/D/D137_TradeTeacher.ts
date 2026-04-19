@@ -95,7 +95,6 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const spaceId = context.space?.id
     if (!spaceId || !LESSONS_SPACE_IDS.has(spaceId)) return
 

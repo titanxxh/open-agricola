@@ -7,7 +7,6 @@ const CARD_ID = 'E48_TownHall'
 registerCardEffect({
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
 
     if (player.houseType === 'clay') {
       return gainLeaf(CARD_ID, { food: 1 })

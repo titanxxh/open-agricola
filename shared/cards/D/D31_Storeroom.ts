@@ -7,7 +7,6 @@ const CARD_ID = 'D31_Storeroom'
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return 0
     const inFields = (crop: 'grain' | 'vegetable') =>
       player.fields
         .filter((f) => fieldHasCrop(f, crop))

@@ -89,35 +89,6 @@ describe('B54_Tumbrel session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('sow listener does not fire when card not played', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-    player.stableTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }]
-
-    const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
-    session.loadState(state)
-
-    const listener = getRegisteredCardListeners().find(
-      (reg) => reg.id === 'B54-tumbrel-after-sow',
-    )
-    expect(listener).toBeDefined()
-
-    const context: CardListenerContext = {
-      state,
-      player,
-      space,
-      actionId: 'sow',
-      phase: 'after',
-      result: { type: 'ok' },
-    }
-
-    const result = executeCardListener(listener!, context)
-    expect(result).toBeUndefined()
-  })
 
   it('sow listener gains 3 food with 3 stables', () => {
     const session = new GameSession()

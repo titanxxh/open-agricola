@@ -9,11 +9,9 @@ const CARD_ID = 'D99_EarthenwarePotter'
 registerCardEffect({
   id: CARD_ID,
   onBuy: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     markCardCounterIfBoughtByRound(state, player, CARD_ID, 'earlyBuy', 4)
   },
   onAfterHarvest: (state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     if (!hasCardCounter(player, CARD_ID, 'earlyBuy')) return
     if (state.round < 14) return
     const n = Math.min(player.resources.clay ?? 0, familySize(player))

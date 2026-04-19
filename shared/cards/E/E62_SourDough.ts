@@ -24,7 +24,6 @@ const CARD_ID = 'E62_SourDough'
 registerCardEffect({
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     setCardFlag(player, CARD_ID, false)
   },
 })
@@ -34,7 +33,6 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     // All players must still have workers to place
     const allPlayersHaveWorkers = context.state.players.every(

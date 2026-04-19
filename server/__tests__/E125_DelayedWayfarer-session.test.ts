@@ -144,14 +144,6 @@ describe('E125_DelayedWayfarer card effect', () => {
       expect(flow).toBeUndefined()
     })
 
-    it('does nothing when the card is not played', () => {
-      const player = createPlayer('p1', { occupationPlayed: [] })
-      const state = createState(5, [player])
-      player.cardStates[CARD_ID] = { extraData: { playedRound: 5 } }
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onAllWorkersPlaced!(state, player)
-      expect(flow).toBeUndefined()
-    })
 
     it('does not trigger twice in the same round (flag cleared to -1)', () => {
       const player = createPlayer('p1')

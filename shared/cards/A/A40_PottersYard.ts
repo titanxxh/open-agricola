@@ -97,7 +97,6 @@ const beforePlowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['plow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (getClayRemaining(context.player) <= 0) return
     setUsedCountBefore(context.player, getUsedTiles(context.player).size)
   },
@@ -109,7 +108,6 @@ const beforeConstructListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (getClayRemaining(context.player) <= 0) return
     setUsedCountBefore(context.player, getUsedTiles(context.player).size)
   },
@@ -121,7 +119,6 @@ const beforeFencingListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fencing'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (getClayRemaining(context.player) <= 0) return
     setUsedCountBefore(context.player, getUsedTiles(context.player).size)
   },
@@ -133,7 +130,6 @@ const beforeStablesListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     if (getClayRemaining(context.player) <= 0) return
     setUsedCountBefore(context.player, getUsedTiles(context.player).size)
   },
@@ -146,7 +142,6 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
   phases: ['after' as ActionHookPhase],
   actions: [actionName],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const clayRemaining = getClayRemaining(context.player)
     if (clayRemaining <= 0) return
     const usedBefore = getUsedCountBefore(context.player)

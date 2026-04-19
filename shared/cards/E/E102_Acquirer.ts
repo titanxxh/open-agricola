@@ -10,7 +10,6 @@ const CARD_ID = 'E102_Acquirer'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const n = familySize(player)
     if ((player.resources.food ?? 0) < n) return
 

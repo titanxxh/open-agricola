@@ -63,8 +63,7 @@ registerCardEffect({
   },
   // Each round start: accumulate 1 food on the action space
   // (since PlayerActionCard infra forces gainPerRound to {}, we do it manually)
-  onRoundStart: (state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
+  onRoundStart: (state, _player) => {
     const space = state.actionSpaces.find((s) => s.id === CARD_ID)
     if (!space) return
     space.resources.food = (space.resources.food ?? 0) + 1

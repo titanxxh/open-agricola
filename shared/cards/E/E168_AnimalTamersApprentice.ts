@@ -10,7 +10,6 @@ const CARD_ID = 'E168_AnimalTamersApprentice'
 registerCardEffect({
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
     const roomCount = player.roomTiles.length
     // Occupied rooms = min(familySize, roomCount); unoccupied = rest
     const occupied = Math.max(0, familySize(player) - (player.houseAnimalCount ?? 0))

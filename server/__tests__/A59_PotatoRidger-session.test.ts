@@ -109,21 +109,6 @@ describe('A59_PotatoRidger session', () => {
     expect(flow).toBeNull()
   })
 
-  it('card not played → no trigger', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    // Card NOT in minorPlayed
-    player.resources.vegetable = 5
-
-    state.harvestReapSummary = {
-      [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
-    }
-
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeNull()
-  })
 
   it('integration: mandatory exchange triggers during harvest with 4+ veg', () => {
     // 3 veg fields with remaining=1 each → after harvest: 3 veg harvested

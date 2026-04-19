@@ -28,7 +28,6 @@ const afterRenovateListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const placed = getRoundPlacementOrder(context.player).length
     if (placed <= 0) return
     return { flow: gainLeaf(CARD_ID, { wood: placed }), sourceCard: CARD_ID }

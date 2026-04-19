@@ -8,7 +8,6 @@ const CARD_ID = 'A64_BarleyMill'
 registerCardEffect({
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
       ?? player.fields.filter((field) => {
         const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0

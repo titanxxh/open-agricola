@@ -139,18 +139,6 @@ describe('E105_Pioneer', () => {
       expect(result).toBeUndefined()
     })
 
-    it('does not trigger for player without card', () => {
-      const listener = findListener('E105-pioneer-after-place-farmer')!
-      const player = createPlayer()
-      player.occupationPlayed = [] // no card
-      const state = createState(player)
-      state.round = 5
-      const result = executeCardListener(listener, {
-        state, player, space: createSpace('wish-children'),
-        actionId: 'place-farmer', phase: 'after',
-      } as any)
-      expect(result).toBeUndefined()
-    })
 
     it('does not trigger on round 1 for non-matching base action space', () => {
       const listener = findListener('E105-pioneer-after-place-farmer')!

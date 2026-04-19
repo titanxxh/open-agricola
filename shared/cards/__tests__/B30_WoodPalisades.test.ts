@@ -52,13 +52,4 @@ describe('B30_WoodPalisades', () => {
     expect(score).toBe(2)
   })
 
-  it('awards 0 VP when card is not in minorPlayed', () => {
-    const player = createPlayer()
-    player.minorPlayed = []
-    player.fenceSegments = [{ edge: 'H-0-0', type: 'palisade' }]
-    const state = createState(player)
-    const effect = getCardEffect(CARD_ID)!
-    const score = effect.computeBonusScore!(state, player, { reserved: {} })
-    expect(score).toBe(0)
-  })
 })

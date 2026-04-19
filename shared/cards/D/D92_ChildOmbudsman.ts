@@ -13,7 +13,6 @@ const afterFamilyGrowthListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['wish-children', 'wish-children-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (context.state.round < 5) return
     const count = (readCardExtraData<number>(context.player, CARD_ID, 'growthCount') ?? 0) + 1
     writeCardExtraData(context.player, CARD_ID, 'growthCount', count)
@@ -25,7 +24,6 @@ registerCardListener(afterFamilyGrowthListener)
 registerCardEffect({
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return 0
     return -(readCardExtraData<number>(player, CARD_ID, 'growthCount') ?? 0) * 2
   },
 })

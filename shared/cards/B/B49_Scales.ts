@@ -18,7 +18,6 @@ const CARD_ID = 'B49_Scales'
  */
 
 const checkBalance = (context: CardListenerContext): ActionHookResult | void => {
-  if (!context.player.minorPlayed.includes(CARD_ID)) return
 
   const occCount = context.player.occupationPlayed.length
   const impCount =

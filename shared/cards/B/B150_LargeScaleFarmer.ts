@@ -51,7 +51,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const placedSpaceId = context.space?.id
     if (!placedSpaceId) return
     const otherSpaceId = TRIGGER_SPACES[placedSpaceId]
