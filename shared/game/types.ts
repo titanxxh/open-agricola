@@ -454,6 +454,12 @@ export type InteractionSelection =
       maxSelections: number
       minSelections?: number
     }
+  | {
+      kind: 'occupation-hand'
+      selectableCards: string[]
+      minSelections: number
+      maxSelections: number
+    }
 
 type InteractionBase = {
   allowedCommands: InteractionCommand[]
