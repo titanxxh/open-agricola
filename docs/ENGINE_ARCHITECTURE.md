@@ -1019,6 +1019,8 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 - A92 AdoptiveParents 精准定位新生儿（`findFirstNewborn`），从所在 space 的 takenBy 移除对应 WorkerRef 并把该 worker 的 `isNewborn` 翻为 false。
 - 送工人回家路径（D150 GodlySpouse / D93 SheepInspector / E3 TeaTime）通过 `removeWorkerRef(space, playerId, workerId)` 按 workerId 精确移除，保留其他占位者。
 
+**Card-held workers（2026-04-19）**：卡牌可通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人。持有态工人既不出现在任何 `ActionSpace.takenBy`（未占用行动格），也不在家（`workersAvailable` 的计算中会排除此类工人，`workersAtHome` 等价于"既未在格又未被卡持有"）。回家阶段，`GameSession.returnHome` 在清空各行动格 `takenBy` 之后，统一调用 `releaseAllHeldWorkers` 释放所有卡牌持有工人，使其回到"可用于下一轮"的活跃状态。工具函数在 `shared/cards/helpers/card-held-workers.ts`（`holdWorkerOnCard` / `releaseHeldWorker` / `getHeldWorkerId` / `releaseAllHeldWorkers`）。首个消费者：C22 BasketChair。
+
 ### 11.5 `PendingAction` 与结构化日志
 
 除了 `GameState` 本体，前端还依赖两类同步对象：

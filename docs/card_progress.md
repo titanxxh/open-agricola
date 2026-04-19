@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — C22 BasketChair BGA 对齐**：引入 `card-held-workers` 原语（`shared/cards/helpers/card-held-workers.ts`），允许卡牌通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人；`workersAvailable` 排除被卡持有的工人；回家阶段（`server/game-session.ts` returnHome）在清空行动格 `takenBy` 之后统一释放卡牌持有工人；`recall-placed-worker` 新增 `forceFirst` 与 `targetCardHold` 参数。C22 从简化实现（额外 place-farmer）重写为：`onRoundStart` 从供应区激活并持有一个工人（若不存在则跳过），玩家在本轮可额外放置该工人，回家时释放。刻意偏离：(a) 不支持同轮再激活，(b) JobContract 的假人 meeple 清理未实现。新增 `server/__tests__/C22_BasketChair-session.test.ts`。
 - **2026-04-19 — A48 ShavingHorse + B143 ClayWarden BGA 对齐**：A48 删除 `WOOD_SPACES` 过滤（BGA 不按空间过滤），合并为两个 `after` listener——`gain/collect/receive` + `anytime-exchange`——复用同一 `checkAndExchange(context)` 检查木头净获得与当前总量；cost 从 `{}` 改为 `{ wood: 1 }` 与 BGA 对齐。B143 `HOLLOW_SPACES` 加入 `'hollow'`（3 人版空间），在 3 人局也能触发 opponent 钩子。新增 `server/__tests__/A48_ShavingHorse-session.test.ts`（7 例）、扩展 `server/__tests__/B143_ClayWarden-session.test.ts`（+1 例 3P）。
 - **2026-04-19 — E96 Elder BGA 对齐 + `handHooks` 通用手牌 hook 机制 + 批量移除冗余 played-includes 守卫**：新增 `CardEffect.handHooks` 字段，声明哪些 hook 在卡牌还在手牌时也应触发；`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。E96 Elder 通过此机制实现回合 1 免费打出自身（`onBeforeStartOfTurn` + `allowedCards` 过滤）。同时批量移除 756 处冗余的 `player.xxxPlayed.includes(CARD_ID)` 守卫——框架已在调用侧保证卡牌已打出，卡牌文件内无需重复检查。
 - **2026-04-19 — 行动格按人数过滤，对齐 BGA 2-3 人局配置**：`createActionSpaces(playerCount?)` 按 `players` 字段过滤行动格。新增 3P 变体：`hollow`（1 黏土/轮）、`resource-market`（XOR 芦苇+食/石+食）、`lessons-3`（固定 2 食）。7 个全人数通用行动格补 `players: [2,3,4]`。前端坐标表补 3P 条目。2P=10 主行动格、3P=14、4P=16。不改卡牌实现数。
@@ -122,7 +123,6 @@
 |---|---|---|
 | A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤；onBuy 直接从整手随机选 1 免费打 | `select-N-from-hand` pending 类型 |
 | B3 Moonshine | XOR 折叠为"买不起则 PASS"（自动抉择） | `select-N-from-hand` + pass-to-opponent action |
-| C22 BasketChair | 每轮开始提供一次额外 place-farmer，不召回已放农民 | 新 farmer-recall-to-card 机制 |
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
 | D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
@@ -150,6 +150,7 @@
 
 | 卡牌 | BGA 行为 | 我们的行为 | 偏离原因 | 回归 BGA 的代价 |
 |---|---|---|---|---|
+| C22 BasketChair | `onRoundStart` 激活并持有供应区工人，BGA 允许 JobContract 伪人 meeple 互动、同轮工人用完后再激活 | (a) 不支持同轮再激活（heldWorker 用完即止）；(b) JobContract 的假人 meeple 清理未实现 | (a) 影响极少：需同轮两次 place-farmer + JobContract 共存；(b) JobContract 未实现，无实际影响 | (a) `onEndTurn` 监听放人计数，用完后重新激活一次；(b) 等 JobContract 实现后再处理假人清理 |
 | D161 CabbageBuyer | 按改良类型 3/2/1 售价 | 3/2/1 按打出改良的实际属性；仅在 house-redevelopment 生效 | 仅在 house-redevelopment 生效；farm-redev / 卡触发 renovate 不 offer | 给 farm-redev / standalone renovate 各加一条 offer 3 食物分支 |
 
 | E16 BriarHedge + `canStartFencing` | BGA `actFencing` 中 `maxBuyable = wood + borderFreePotential`，因此有 2–3 wood 时 E16 可让玩家进入围栏流程 | 我们 `canStartFencing` 仍要求 wood ≥ 4；E16 的折扣只在边 edge 选定后才被 `collectFenceDiscount` 应用，无法提前拉低入口门槛 | 入口守卫与折扣聚合解耦，改动范围最小；实际影响极小（仅在 2–3 wood 且 E16 已打出的特定边角场景） | `canStartFencing` 读 `collectFenceDiscount` 计算潜在折扣，动态降低最低 wood 要求 |
@@ -199,7 +200,8 @@
 | `returnCardToBoard(player, cardId, state?)` | ✅ | 2026-04-18：helper 现在可选接收 `state`，统一负责“从 `player.improvements` / `player.minorPlayed` 移除卡”以及“若归还的是 major，则回收到 `state.availableMajorImprovements` 且不重复追加”。消费者：major/minor improvement 支付路径、D60 LargePottery。 |
 | `selectionEffect` / `selection-effect-registry` | ✅ | 2026-04-18：原 `fieldEffect` / `field-effect-registry` 更名，并在同日完成与 `selection` action 对齐。语义是“selection 提交后执行一个注册回调”，不再把这类“选择提交后的副作用”误称为 field effect。消费者：A58/A70/A71/B115/B165/C18/D27/D70/D71/D72/D102/E4/E71/E76。 |
 | `stable-removal` helper | ✅ | D102 / E76 |
-| `recall-placed-worker` action | ✅ | D93（通用农民回收） |
+| `recall-placed-worker` action | ✅ | D93（通用农民回收）；2026-04-19 新增 `forceFirst`（强制回收最先放置的工人）与 `targetCardHold`（回收后将工人持有到指定卡的 cardStates.extraData.heldWorkerId）参数 |
+| **Card-held workers（2026-04-19）** | ✅ | `shared/cards/helpers/card-held-workers.ts`：`holdWorkerOnCard(player, cardId, workerId)` / `releaseHeldWorker(player, cardId)` / `getHeldWorkerId(player, cardId)` 原语。持有的工人存于 `player.cardStates[cardId].extraData.heldWorkerId`；`workersAvailable(state, p)` 已排除被卡持有的工人（不在任何 `takenBy` 也不在家）；回家阶段（`GameSession.returnHome`）在清空行动格 `takenBy` 之后统一释放所有卡持有的工人（调用 `releaseAllHeldWorkers`）。首个消费者：C22 BasketChair。 |
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
 | **Worker 身份模型**（2026-04-17） | ✅ | `PlayerState.workers[]`（5 槽，isActive/isNewborn）+ `ActionSpace.takenBy: WorkerRef[]` + `__roundPlacement__` 升级为 `{spaceId, workerId}[]`。删除聚合字段 familySize / newbornCount / workersAvailable，全部走 `shared/game/player.ts` helper。消费者：A25 Bassinet、B4 WoodPile（TODO 可接）、A92 AdoptiveParents（从盲减升级为精确取回）。 |
 | **`countPeopleOnSpace` helper**（2026-04-17） | ✅ | `shared/cards/helpers/space-occupancy.ts`：返回某行动格上当前物理占位的人数（含新生儿）。依赖 Worker 身份模型——等于 `space.takenBy.length`。消费者：A25 Bassinet；B4 WoodPile 原 TODO 可顺带消化。 |
@@ -265,6 +267,7 @@
 | 行动格按人数过滤 (2-3P) | 04-19 | 0 | 821 | 92.0% |
 | canUseOccupied → computeArgs 统一 | 04-19 | 0 | 821 | 92.0% |
 | E96 Elder BGA 对齐 + handHooks 机制 | 04-19 | 0 | 821 | 92.0% |
+| C22 BasketChair BGA 对齐 + card-held-workers 原语 | 04-19 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
