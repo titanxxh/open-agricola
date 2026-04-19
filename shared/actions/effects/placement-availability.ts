@@ -8,7 +8,7 @@ import type {
 import type { CardListenerContext } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../game/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
-import { runActionHooks } from '../hooks'
+import { runActionHooks, applyCanUseOccupiedHooks } from '../hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 import { placeFarmerAction } from './place-farmer'
 
@@ -58,6 +58,36 @@ export function computeAllowedPlacementSpaces(
       if (!space) continue
       if (!space.canBeExecutedByPlayer(state, player)) continue
       extra.push({ spaceId, allowOccupied: true })
+    }
+  }
+
+  // Also check canUseOccupied hooks + card listeners for occupied spaces
+  for (const space of state.actionSpaces) {
+    if (!isSpaceOccupied(space)) continue
+    if (!space.canBeExecutedByPlayer(state, player)) continue
+    const spaceContext: ActionExecutionContext & { actionId: string } = {
+      state,
+      player,
+      space,
+      actionId: space.id,
+    }
+    let canUseOccupied = applyCanUseOccupiedHooks(spaceContext, false)
+    const canUseOccupiedListenerCtx: CardListenerContext = {
+      ...spaceContext,
+      phase: 'canUseOccupied',
+      canUseOccupied,
+    }
+    const canUseOccupiedMatched = getMatchingListeners(canUseOccupiedListenerCtx)
+    for (const entry of canUseOccupiedMatched) {
+      const result = executeCardListener(entry.registration, canUseOccupiedListenerCtx, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (result && typeof result.canUseOccupied === 'boolean') {
+        canUseOccupied = result.canUseOccupied
+      }
+    }
+    if (canUseOccupied) {
+      extra.push({ spaceId: space.id, allowOccupied: true })
     }
   }
 
