@@ -31,6 +31,14 @@ export type CardListenerRegistration = {
 
 const cardListeners: CardListenerRegistration[] = []
 
+/**
+ * @deprecated Use `CardRegistry.loadImpl(cardId, { listeners })` instead.
+ * This module-level global registry is kept for backward compatibility during
+ * PR-1 → PR-3 migration; it will be removed once all cards adopt the
+ * `_impl` export pattern and `GameCore` wires into per-session `CardRegistry`.
+ *
+ * See `shared/cards/registry.ts` for the new per-session approach.
+ */
 export const registerCardListener = (registration: CardListenerRegistration) => {
   cardListeners.push(registration)
 }
