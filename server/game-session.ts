@@ -117,6 +117,7 @@ import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
 import { smallestAvailableWorker } from '../shared/game/player.ts'
 import { computeAllowedPlacementSpaces } from '../shared/actions/effects/placement-availability.ts'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../shared/actions/effects/placement-constants.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validateFenceSelection } from './fence-validation.ts'
@@ -1721,6 +1722,32 @@ export class GameSession {
 
     for (const space of this.state.actionSpaces) {
       result[space.id] = this.isActionSpaceAvailableToPlayer(player, space, roundOpen)
+    }
+
+    // Also mark occupied spaces that computeArgs listeners expose as extra options
+    if (workersAvailable(this.state, player) > 0) {
+      const listenerContext: import('../shared/cards/card-listeners.ts').CardListenerContext = {
+        state: this.state,
+        player,
+        space: this.state.actionSpaces[0],
+        actionId: 'place-farmer',
+        phase: 'computeArgs',
+      }
+      const matched = getMatchingListeners(listenerContext)
+      for (const entry of matched) {
+        const r = executeCardListener(entry.registration, listenerContext, {
+          ownerPlayerId: entry.ownerPlayerId,
+        })
+        if (!r?.extraOptions) continue
+        for (const opt of r.extraOptions) {
+          if (opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) {
+            const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
+            if (!result[spaceId]) {
+              result[spaceId] = true
+            }
+          }
+        }
+      }
     }
 
     return result
