@@ -1,4 +1,3 @@
-import { gainResources } from '../../actions/effects/gain'
 import type { ActionDefinition } from '../../game/types'
 
 export const resourceMarket: ActionDefinition = {
@@ -9,24 +8,13 @@ export const resourceMarket: ActionDefinition = {
   gainPerRound: {},
   players: [3],
   canBeExecutedByPlayer: () => true,
-  execute: () => ({
-    type: 'choice',
-    promptKey: 'actions.resource-market.description',
-    options: [
-      { value: 'reed-food', labelKey: 'actions.resource-market.option-reed' },
-      { value: 'stone-food', labelKey: 'actions.resource-market.option-stone' },
-    ],
-  }),
-  resolveChoice: ({ player }, choice) => {
-    if (choice === 'reed-food') {
-      gainResources(player, { reed: 1, food: 1 })
-    } else {
-      gainResources(player, { stone: 1, food: 1 })
-    }
-    return { type: 'ok' }
-  },
+  execute: () => ({ type: 'ok' }),
   flow: {
-    type: 'seq',
-    children: [{ type: 'leaf', actionId: 'gain' }],
+    type: 'xor',
+    promptKey: 'actions.resource-market.description',
+    children: [
+      { type: 'leaf', actionId: 'gain', params: { reed: 1, food: 1 }, choiceLabelKey: 'actions.resource-market.option-reed' },
+      { type: 'leaf', actionId: 'gain', params: { stone: 1, food: 1 }, choiceLabelKey: 'actions.resource-market.option-stone' },
+    ],
   },
 }
