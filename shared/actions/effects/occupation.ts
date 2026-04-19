@@ -121,13 +121,16 @@ export const getOccupationCost = (
 
 const getLessonsCost = (player: PlayerState, spaceId: string) => {
   const isLessons4 = spaceId === 'lessons-4'
-  const base = isLessons4
-    ? player.occupationPlayed.length <= 1
-      ? 1
-      : 2
-    : player.occupationPlayed.length === 0
-      ? 0
-      : 1
+  const isLessons3 = spaceId === 'lessons-3'
+  const base = isLessons3
+    ? 2
+    : isLessons4
+      ? player.occupationPlayed.length <= 1
+        ? 1
+        : 2
+      : player.occupationPlayed.length === 0
+        ? 0
+        : 1
   let food = base
   for (const mod of player.activeModifiers ?? []) {
     if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {

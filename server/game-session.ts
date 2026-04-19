@@ -116,6 +116,8 @@ import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bon
 import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
 import { smallestAvailableWorker } from '../shared/game/player.ts'
+import { computeAllowedPlacementSpaces } from '../shared/actions/effects/placement-availability.ts'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../shared/actions/effects/placement-constants.ts'
 import { validatePlowSelection } from './plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
 import { validateFenceSelection } from './fence-validation.ts'
@@ -1680,20 +1682,14 @@ export class GameSession {
     return this.respond()
   }
 
-  private canUseOccupiedActionSpace(player: PlayerState, space: ActionSpace): boolean {
-    if (!isSpaceOccupied(space)) return false
-    return this.hookDispatcher.applyCanUseOccupied(
-      { state: this.state, player, space, actionId: space.id },
-      false,
-    )
-  }
-
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
     const openRound = roundOpen.get(space.id) ?? space.roundAvailable
     if (this.state.round < openRound) return false
     if (workersAvailable(this.state, player) <= 0) return false
-    const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (isSpaceOccupied(space) && !canUseOccupied) return false
+    if (isSpaceOccupied(space)) {
+      const allowed = computeAllowedPlacementSpaces(this.state, player)
+      if (!allowed.some(a => a.spaceId === space.id)) return false
+    }
     return this.hookDispatcher.applyIsDoable(
       { state: this.state, player, space, actionId: space.id },
       space,
@@ -1723,6 +1719,32 @@ export class GameSession {
 
     for (const space of this.state.actionSpaces) {
       result[space.id] = this.isActionSpaceAvailableToPlayer(player, space, roundOpen)
+    }
+
+    // Also mark occupied spaces that computeArgs listeners expose as extra options
+    if (workersAvailable(this.state, player) > 0) {
+      const listenerContext: import('../shared/cards/card-listeners.ts').CardListenerContext = {
+        state: this.state,
+        player,
+        space: this.state.actionSpaces[0],
+        actionId: 'place-farmer',
+        phase: 'computeArgs',
+      }
+      const matched = getMatchingListeners(listenerContext)
+      for (const entry of matched) {
+        const r = executeCardListener(entry.registration, listenerContext, {
+          ownerPlayerId: entry.ownerPlayerId,
+        })
+        if (!r?.extraOptions) continue
+        for (const opt of r.extraOptions) {
+          if (opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) {
+            const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
+            if (!result[spaceId]) {
+              result[spaceId] = true
+            }
+          }
+        }
+      }
     }
 
     return result
@@ -1815,8 +1837,10 @@ export class GameSession {
     if (!player || workersAvailable(this.state, player) <= 0) return this.respond(false, 'no workers available')
     const space = this.state.actionSpaces.find((s) => s.id === spaceId)
     if (!space) return this.respond(false, 'space unavailable')
-    const canUseOccupied = this.canUseOccupiedActionSpace(player, space)
-    if (isSpaceOccupied(space) && !canUseOccupied) return this.respond(false, 'space unavailable')
+    if (isSpaceOccupied(space)) {
+      const allowed = computeAllowedPlacementSpaces(this.state, player)
+      if (!allowed.some(a => a.spaceId === spaceId)) return this.respond(false, 'space unavailable')
+    }
 
     this.pushHistory(true)
     this.turnOwnerPlayerIndex = playerIndex

@@ -6,4 +6,5 @@ export const reedBank = createAccumulatingAction({
   descriptionKey: 'actions.reed-bank.description',
   roundAvailable: 1,
   gainPerRound: { reed: 1 },
+  players: [2, 3, 4],
 })

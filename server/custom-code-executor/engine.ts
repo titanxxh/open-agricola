@@ -29,7 +29,6 @@ const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
     'computeArgs',
     'computeReplace',
     'isDoable',
-    'canUseOccupied',
   ].includes(value)
 
 const isCardListenerScope = (value: unknown): value is CardListenerScope =>

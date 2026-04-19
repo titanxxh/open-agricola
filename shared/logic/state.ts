@@ -79,6 +79,7 @@ export const baseActionOrder = [
   'copse',
   'grove',
   'clay-pit',
+  'hollow',
   'hollow-4',
   'reed-bank',
   'fishing',
@@ -86,10 +87,12 @@ export const baseActionOrder = [
   'day-laborer',
   'meeting-place',
   'lessons',
+  'lessons-3',
   'lessons-4',
   'farmland',
   'grain-seeds',
   'farm-expansion',
+  'resource-market',
   'resource-market-4',
 ]
 
@@ -208,7 +211,7 @@ export const normalizeState = (raw: GameState): GameState => {
     raw.roundActionOrder?.length === 14
       ? raw.roundActionOrder
       : generateRoundActionOrder(seed)
-  const baseSpaces = createActionSpaces()
+  const baseSpaces = createActionSpaces(raw.players?.length)
   const spaceMap = new Map(
     (raw.actionSpaces ?? []).map((space) => [space.id, space]),
   )
@@ -554,7 +557,7 @@ export const createInitialState = (
     phase: 'work',
     currentPlayerIndex: 0,
     players: createInitialPlayers(gameSeed, options),
-    actionSpaces: createActionSpaces(),
+    actionSpaces: createActionSpaces(options.playerCount ?? 2),
     log: [{ key: 'log.startGame' }],
     roundStartSnapshot: null,
     roundActionOrder,

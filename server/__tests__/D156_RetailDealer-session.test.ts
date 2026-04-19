@@ -10,7 +10,7 @@ describe('D156_RetailDealer session', () => {
    * resource-market-4 exists in all games (player count filtering is UI-only).
    */
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

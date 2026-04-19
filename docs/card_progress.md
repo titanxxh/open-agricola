@@ -37,7 +37,7 @@
 |---|---|---|---|
 | ✅ 完全对齐 | ~803 + §2.1 列举 25 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 8 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 3 张 | 行为与 BGA 偏差，是 bug | 排期修 |
+| ⚠ 行为偏差待修（§2.3） | 2 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
 | 🔀 刻意偏离 BGA（§2.5） | 2 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 4 张 | 未实现或需核心扩展 | 见 §2.6 优先级 |
@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — 行动格按人数过滤，对齐 BGA 2-3 人局配置**：`createActionSpaces(playerCount?)` 按 `players` 字段过滤行动格。新增 3P 变体：`hollow`（1 黏土/轮）、`resource-market`（XOR 芦苇+食/石+食）、`lessons-3`（固定 2 食）。7 个全人数通用行动格补 `players: [2,3,4]`。前端坐标表补 3P 条目。2P=10 主行动格、3P=14、4P=16。不改卡牌实现数。
 - **2026-04-19 — choice/farmSelect/selection 统一透传 `sourceCard` + InteractionBar 显示触发来源卡名**：`PendingAction` / `InteractionState` / 前端 `PendingChoice` 新增可选 `sourceCard`，`OptionalNode` 在弹出 `ui.interactionOptionalAction` 时也会把来源卡写入 `pendingChoiceContext`，因此像 `D161 CabbageBuyer` 这类卡牌触发的 optional offer 终于能在交互栏副标题统一显示“由某卡触发”。规则行为不变：若效果已触发但资源不足（例如 D161 在 `no improvement = 3 food` 时付不起），依旧不会额外显示一个不可执行的 choice。
 - **2026-04-19 — `C18_RollOverPlow` / `A128_RiparianBuilder` sourceCard session 加固测试**：补两条跨阶段回归：`C18_RollOverPlow` 断言 `selection -> plow farmSelect` 两段交互都带 `sourceCard`；`A128_RiparianBuilder + A123_FrameBuilder` 断言赠送的建房动作进入 `prompt.selectPayment` 后仍保留 `sourceCard`，防止 `choice / farmSelect / payment-choice` 链路后退成匿名提示。
 - **2026-04-19 — house-redevelopment / wish-children optional-tail 引擎修复**：修复 `resolveChoice` leaf 在单候选 auto-resolve 分支遗留占位 `ChoiceNode` 的 bug；此前这会让 `house-redevelopment` 在翻修后提前结束，跳过可选 `improvement-any`，并把 D161 CabbageBuyer 的报价错误锁死在 3 food。修复后 D161 的 `no/minor/major = 3/2/1 food` 报价重新生效；session 回归测试已改为覆盖 `T1/T2/T3/T4` 的无改良 / minor / major / self-trigger 分支。顺带确认 `wish-children` + A92 AdoptiveParents 的 optional tail 也复用同一引擎路径，相关 session 测试改为按 prompt 语义而不是随机手牌阶段判断。
@@ -69,12 +70,14 @@
 - **2026-04-17 §6 24 张卡逐项复核完成**：原 §6 的 23 张"未复核"全部核对，按 ✅/⚠/❌ 重排进 §2.1–§2.4；C129/C137 卡名从 WetNurse/Baker 修正为 SecondSpouse/CharcoalBurner；E132 VeggieLover 从原 §5 "刻意不同"移除（其实是 3+ 卡且行为已对齐）。
 - **2026-04-17 desc 对齐 / 命名修复**：全量 BGA `$this->desc` ↔ 我们 `desc` 审计 `895/902` 已对齐（详见 `docs/card_desc_audit.md`）；`A159_JoinerOfSea` → `A159_JoineroftheSea` 改名对齐 BGA。
 - **2026-04-17 Wave 9 已补完（6 张）**：`A41_VegetableSlicer` · `A85_Homekeeper` · `A106_SlurrySpreader` · `D103_CanalBoatman` · `E68_CherryOrchard` · `E93_Motivator`。本轮明确延后：`A87_Conservator`、`E149_MidnightFencer`（见 §2.6）。
+- **2026-04-19 — D154 ChimneySweep 对齐 BGA**：renovate 费用 hook 去掉 `houseType === 'clay'` 守卫，无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；wood→clay 依靠 `applyCostOverride` 的 `Math.max(0, …)` clamp 保持 0（stone 不在基础 cost 中，无副作用）。`players: '3+' → '4+'` 修正元数据。§2.3 移除 D154、§2.1 补入。BGA `$this->extraVp = true` 仅是卡面 UI 小图标（`card-extra-score` div），不影响规则，我们卡牌定义目前无对应字段，不在本次范围。新增 `server/__tests__/D154_ChimneySweep-session.test.ts`（9 用例：players 元数据、UC1 clay→stone 减 2 石、UC2 无卡对照、UC3 A87+D154 wood→stone 减 2 石、UC4 wood→clay clamp 验证、UC5a/b/c 结算 bonus 分、无卡时 bonus 为 0）。
+- **2026-04-19 — 架构统一：所有放置入口改走 `computeAllowedPlacementSpaces`，退役 `canUseOccupied` hook**：8 张相关卡（A25/A28/A130/B151/C129/D24/E21/E150）迁移到纯 `computeArgs`（`OCCUPIED_SPACE_CHOICE_PREFIX`）；`isActionSpaceAvailableToPlayer` / `takeAction` / `place-farmer` / `move-farmer-to-space` 三入口统一走 `computeAllowedPlacementSpaces`；`ActionHookPhase` 删除 `canUseOccupied`、`HookDispatcher.applyCanUseOccupied` 方法删除、`placement-availability.ts` 中 canUseOccupied bridge 循环删除。
 - **2026-04-19 — E16 BriarHedge + B30 WoodPalisades border-fence 对齐 BGA**：`isBorderEdge(edgeId)` helper（`shared/game/farm.ts`）检测农场边缘格；新增 `CardEffect.computeFenceDiscount` hook + `collectFenceDiscount(state, player, ctx)` 聚合器（`shared/cards/card-effects.ts`）；E16 注册 `computeFenceDiscount`，按每条 border edge 抵扣 1 wood（最多抵 4）；B30 palisade 限制仅能放 border edge（新增 `PALISADE_NOT_ON_BORDER` 错误码，`server/fence-validation.ts`）；前端 palisade 模式自动过滤内部边缘（`useFarmSelection` hook early-return + gray-out）；5 个 session 测试场景覆盖折扣 + B30 共存；§2.2 移除 E16 简化条目，迁入 §2.1。已知偏离：`canStartFencing` 仍要求 wood ≥ 4，见 §2.5。
 - **2026-04-18 — E125 DelayedWayfarer BGA 对齐**：新增 `onAllWorkersPlaced` hook phase（所有工人放完后、round end 前触发）；`place-farmer` 增加 `fromSupply` 模式（激活 supply worker）；E125 从简化（下轮开始）改为精确时序（本轮所有人放完后）；修复引擎 OptionalNode 路径漏传 `actionContext`/`sourceCard` 的 bug。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 25 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 27 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 27 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 迁入 2026-04-19）。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 27 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 + D154 迁入 2026-04-19）。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -92,7 +95,7 @@
 | E154 Margrave | 任意玩家翻新 + 自己住石屋 → 2 food | 触发条件、计分一致 |
 | E156 ClaypitOwner | 对手打/造印刷 clay 成本改良 → 1 food + 1 clay | 印刷成本检测覆盖 minor + major（含复合成本 fees） |
 | A25 Bassinet | 首次使用非累积空间且格上恰好 1 人（含新生儿），可 canUseOccupied + family growth；Meeting Place 显式排除 | Worker 身份模型重写；`countPeopleOnSpace` helper + actions 过滤器 bug 已修（2026-04-17） |
-| A87 Conservator | 木屋玩家进入 House Redevelopment 后，在 `Renovate House` 内部多一个 wood→stone 直跳目标（同 prompt 二选一，1 候选自动短路） | 引擎 `computeChoiceCandidates` opt-in 路径（详见 ENGINE_ARCHITECTURE §11.6.2）；A87 仅注入额外 `stone` 候选 + `isDoable` 救入口；A143/A123 cost-type modifier `appliesTo:['renovation']` 自动生效；D154 clay-only 守卫（§2.3）仍屏蔽 wood→stone |
+| A87 Conservator | 木屋玩家进入 House Redevelopment 后，在 `Renovate House` 内部多一个 wood→stone 直跳目标（同 prompt 二选一，1 候选自动短路） | 引擎 `computeChoiceCandidates` opt-in 路径（详见 ENGINE_ARCHITECTURE §11.6.2）；A87 仅注入额外 `stone` 候选 + `isDoable` 救入口；A143/A123 cost-type modifier `appliesTo:['renovation']` 自动生效；D154 ChimneySweep 的 2-stone 折扣在 2026-04-19 对齐后也覆盖 wood→stone 直升 |
 | B30 WoodPalisades | 按 segment 替代 fence：2 wood、+1 VP、不计入 `MAX_FENCES`、不进入 fence-keyed 卡统计；palisade 仅能放 border edge（2026-04-19 对齐 BGA） | `FenceSegment[]` + `getFenceCount`/`getPalisadeCount` helper；`validateFenceSelection({ allowPalisades })`；`ActionDetailEffects.fencing` / `palisading` 拆分；9 张 fence-keyed 卡迁到 helper；`PALISADE_NOT_ON_BORDER` 错误码（见 §2.0 changelog） |
 | E16 BriarHedge | 打出后，围栏时每条 border edge 抵扣 1 wood（最多 4），`computeFenceDiscount` hook；`canStartFencing` 仍要求 wood ≥ 4（见 §2.5） | `isBorderEdge` helper + `computeFenceDiscount` + `collectFenceDiscount` 聚合器（2026-04-19） |
 | A113 HeresyTeacher | Lessons 空间使用后，对"≥3 谷且无菜"的田底堆 unshift `{kind:'vegetable',remaining:1}` | BGA 自身未实现；借 Field.stacks 多堆模型落地，底堆 veg 在顶堆 grain 收完后才会被 reap（见 §3 新基建） |
@@ -104,6 +107,7 @@
 | D35 FodderChamber | cost + vp 对齐 | 2026-04-17 PR2：`cost: { stone: 3, grain: 3 }`、`vp: 2`；`computeBonusScore` 按人数分档（7/5/4/3 除数）对齐 BGA |
 | D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
+| D154 ChimneySweep | `renovate-house` computeCosts hook 无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；结算时每名其他玩家住石屋 +1 bonus VP | 2026-04-19：去掉 `houseType === 'clay'` 守卫、`players: '3+' → '4+'`；wood→clay 由 `applyCostOverride` 的 `Math.max(0, …)` clamp 处理——stone 不在基础 cost 中，负数不产生副作用；BGA `extraVp = true` 仅卡面 UI 标记，规则无影响 |
 
 ### 2.2 🟡 简化实现（8 张）
 
@@ -120,7 +124,7 @@
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 | E96 Elder | 回合 1 StartOfWork 额外打出职业未实现 | 新 `stStartOfTurn allowedCards` hook |
 
-### 2.3 ⚠ 行为偏差待修（3 张）
+### 2.3 ⚠ 行为偏差待修（2 张）
 
 > 不是设计取舍，是 bug——只是修起来需要动一点架构 / action-space 配置。
 
@@ -128,7 +132,8 @@
 |---|---|---|---|
 | B143 ClayWarden | 只监听 `hollow-4`（仅 4 人空间）；3 人版 `hollow` action 空间在我们项目里整个缺失 | 3 人局：B143 永不触发（且整局没 Hollow 空间） | 新增 `hollow` 3 人版 action 空间；B143 listener 同步加 `hollow` |
 | C129 SecondSpouse | 我们只检查"对方占用"；BGA 还要求"占用者是其本人**第一个**放的 farmer 且占用人数 ≤2" | 我们更宽松——对方第二/三人占的也允许抢；轻微规则违规 | listener handler 加占用者来源判断（需要 `placedFarmers` 顺序信息） |
-| D154 ChimneySweep | 我们限制 `houseType === 'clay'` 才减 2 stone；BGA 不区分 | wood→stone 直接跳级翻新（A87 Conservator 等卡）减免不生效 | 去掉 `houseType` 条件；保持 `costs: { stone: -2 }` 始终返回 |
+
+> **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。
 
 ### 2.4 ❌ 数值/元数据待修（0 张）
 
@@ -203,6 +208,7 @@
 | `validateFenceSelection({ allowPalisades })` | ✅ | B30：围栏选择校验支持 palisade 模式，新增错误码 `EDGE_TYPE_CONFLICT` / `PALISADES_NOT_UNLOCKED` |
 | `ActionDetailEffects` fencing / palisading 拆分 | ✅ | B30：effects 日志区分围栏与木栅两种建造 |
 | `useFarmSelection` 围栏/木栅模式切换 | ✅ | B30 前端：同一 farm selection 可切换 fence / palisade 目标 |
+| `createActionSpaces(playerCount?)` 人数过滤 | ✅ | 2026-04-19：行动格按 `players` 字段过滤；`normalizeState` 从 `players.length` 推导；3P 新增 hollow/resource-market/lessons-3 变体 |
 | `isBorderEdge(edgeId)` | ✅ | `shared/game/farm.ts`：检测农场边缘格（farmyard 外边缘），供 E16 折扣与 B30 限制复用 |
 | `CardEffect.computeFenceDiscount` hook + `collectFenceDiscount(state, player, ctx)` | ✅ | `shared/cards/card-effects.ts`：围栏支付时调用，卡牌可按边数返回免费 segment 数；E16 BriarHedge 消费者 |
 | `PALISADE_NOT_ON_BORDER` 错误码 | ✅ | `server/fence-validation.ts`：palisade 模式下不允许选内部 edge，对齐 BGA B30 限制 |
@@ -213,6 +219,7 @@
 | **`mustBePlayedViaMinorAction` 标志**（2026-04-17） | ✅ | D25：次要改良卡可标记 `mustBePlayedViaMinorAction: true` 强制仅能通过"次要改良"行动打出；`playMinorImprovement` action 的 `isDoable` listener 检查此标志，防止其他路径打出。 |
 | **`isMajorImprovement` flag + `isEffectivelyMajor` helper**（2026-04-18） | ✅ | `CardDefinition.isMajorImprovement?: boolean` 标记"本质是 major 的 minor"（A60/D59/C60/D25 四张）。`shared/cards/helpers/card-identity.ts` 导出 `isEffectivelyMajor(cardId)` 统一判定入口（先查 major pool，再查 minor 的 flag）。消费者：D161 CabbageBuyer。 |
 | **choice / farmSelect / selection 统一 `sourceCard` 元数据**（2026-04-19） | ✅ | `PendingAction`、`InteractionState`、前端 `PendingChoice` 统一新增可选 `sourceCard`。`shared/engine/engine.ts` 的 `OptionalNode` 在弹出 `ui.interactionOptionalAction` 时会把来源卡写入 `pendingChoiceContext`；`server/game-session.ts` 再把它透传到 `pending` / `interaction`。消费者：`InteractionBar` 统一副标题“由 {card} 触发”，当前直接受益卡：D161 CabbageBuyer。 |
+| **`computeAllowedPlacementSpaces`**（2026-04-19） | ✅ | `shared/actions/effects/placement-availability.ts`：单一允许集 helper，由 `takeAction` / `place-farmer` / `move-farmer-to-space` 三入口共用。替代已删除的 `canUseOccupied` hook phase。卡牌通过 `computeArgs` + `OCCUPIED_SPACE_CHOICE_PREFIX` 注入额外可用的已占用空间。消费者：A25/A28/A130/B151/C129/D24/E21/E150。 |
 | **`CardEffect.computeLockedFarmTiles`**（2026-04-18） | ✅ | 通用农场格锁定扩展点，卡牌可声明动态锁定的格子，验证层和交互层自动过滤。消费者：B38 FutureBuildingSite。 |
 | **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
 | **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
@@ -254,6 +261,8 @@
 | D25 多身份卡基础设施 | 04-17 | +1 | 820 | 91.9% |
 | A113 Heresy Teacher + Field.stacks | 04-18 | +1 | 821 | 92.0% |
 | E16 BriarHedge + B30 border-only | 04-19 | 0 | 821 | 92.0% |
+| 行动格按人数过滤 (2-3P) | 04-19 | 0 | 821 | 92.0% |
+| canUseOccupied → computeArgs 统一 | 04-19 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 

@@ -3,9 +3,9 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
-import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { isSpaceOccupied } from '../../game/space'
 import { familySize, workersAvailable } from '../../game/player'
 
 const CARD_ID = 'D24_BrotherlyLove'
@@ -66,21 +66,7 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'D24-brotherly-love-can-use-occupied',
-  cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isActive(context)) return
-    if (!context.space || !isSpaceOccupied(context.space)) return
-    // Only allow if the space is occupied by the player's own farmer
-    if (!spaceHasPlayer(context.space, context.player.id)) return
-    return { canUseOccupied: true }
-  },
-}
-
 registerCardListener(computeArgsListener)
-registerCardListener(canUseOccupiedListener)
 
 export const D24_BrotherlyLove = new MinorImprovement({
   id: CARD_ID,

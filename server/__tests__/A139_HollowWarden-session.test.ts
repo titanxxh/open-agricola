@@ -8,7 +8,7 @@ const CARD_ID = 'A139_HollowWarden'
 
 describe('A139_HollowWarden session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 4) // 4 players for hollow-4 space
     state.currentPlayerIndex = 0
