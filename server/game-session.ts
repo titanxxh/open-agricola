@@ -1687,11 +1687,8 @@ export class GameSession {
     if (this.state.round < openRound) return false
     if (workersAvailable(this.state, player) <= 0) return false
     if (isSpaceOccupied(space)) {
-      const canUseOccupied = this.hookDispatcher.applyCanUseOccupied(
-        { state: this.state, player, space, actionId: space.id },
-        false,
-      )
-      if (!canUseOccupied) return false
+      const allowed = computeAllowedPlacementSpaces(this.state, player)
+      if (!allowed.some(a => a.spaceId === space.id)) return false
     }
     return this.hookDispatcher.applyIsDoable(
       { state: this.state, player, space, actionId: space.id },
