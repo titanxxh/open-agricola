@@ -51,24 +51,7 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'C129-second-spouse-can-use-occupied',
-  cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
-  actions: ['urgent-wish-children'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.space || !isSpaceOccupied(context.space)) return
-    // Must be occupied by another player, not self
-    if (spaceHasPlayer(context.space, context.player.id)) return
-    // Require 3+ players
-    if ((context.state.players?.length ?? 0) < 3) return
-    return { canUseOccupied: true }
-  },
-}
-
 registerCardListener(computeArgsListener)
-registerCardListener(canUseOccupiedListener)
 
 export const C129_SecondSpouse = new Occupation({
   id: CARD_ID,

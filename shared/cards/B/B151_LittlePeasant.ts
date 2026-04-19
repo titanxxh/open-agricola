@@ -33,18 +33,6 @@ const onPlayListener: CardListenerRegistration = {
   },
 }
 
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'B151-little-peasant-can-use-occupied',
-  cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isSpaceOccupied(context.space)) return
-    if (!canIgnoreOccupiedSpaces(context.player)) return
-    if (isMeetingPlace(context.space)) return
-    return { canUseOccupied: true }
-  },
-}
-
 const computeArgsListener: CardListenerRegistration = {
   id: 'B151-little-peasant-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -69,7 +57,6 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 registerCardListener(onPlayListener)
-registerCardListener(canUseOccupiedListener)
 registerCardListener(computeArgsListener)
 
 export const B151_LittlePeasant = new Occupation({

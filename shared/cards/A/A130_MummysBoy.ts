@@ -78,26 +78,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-// canUseOccupied: allow using 2nd farmer's space when occupied
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'A130-mummys-boy-can-use-occupied',
-  cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (isCardFlagged(context.player, CARD_ID)) return
-    const secondSpaceId = getSecondFarmerSpaceId(context)
-    if (!secondSpaceId) return
-    if (context.space?.id === secondSpaceId) {
-      return { canUseOccupied: true }
-    }
-  },
-}
-
 registerCardListener(computeArgsListener)
 registerCardListener(afterPlaceFarmerListener)
-registerCardListener(canUseOccupiedListener)
 
 // Start of turn: unflag
 registerCardEffect({

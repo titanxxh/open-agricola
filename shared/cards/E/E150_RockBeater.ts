@@ -41,20 +41,7 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-// 2. Allow using resource-market-4 even when occupied (canUseOccupied hook)
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'E150-rock-beater-can-use-occupied-resource-market-4',
-  cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
-  actions: ['resource-market-4'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (!context.space || !isSpaceOccupied(context.space)) return
-    return { canUseOccupied: true }
-  },
-}
-
-// 3. Stone rooms cost 2 stone less
+// 2. Stone rooms cost 2 stone less
 const constructCostListener: CardListenerRegistration = {
   id: 'E150-rock-beater-compute-costs-construct',
   cardIds: [CARD_ID],
@@ -68,7 +55,6 @@ const constructCostListener: CardListenerRegistration = {
 }
 
 registerCardListener(computeArgsListener)
-registerCardListener(canUseOccupiedListener)
 registerCardListener(constructCostListener)
 
 export const E150_RockBeater = new Occupation({
