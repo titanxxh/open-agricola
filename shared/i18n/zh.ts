@@ -329,6 +329,7 @@ export const zh = {
     harvestFeedBasic: '基础',
     harvestFeedConfirm: '确认喂养',
     harvestFeedProgress: '{fed}/{required} · 乞讨 {begging}',
+    heldWorkerOnCard: '工人寄存在卡上',
   },
   prompt: {
     selectPayment: '选择支付方式',

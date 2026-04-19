@@ -1014,6 +1014,15 @@ a:focus-visible,
   mask-position: 75% 0%;
 }
 
+/* --- Held-worker overlay on a played card --- */
+
+.held-worker-marker {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 2;
+}
+
 /* --- Round action cards (actions_background.png sprite behind frame) --- */
 
 .action-card-holder.round {
