@@ -1,4 +1,5 @@
 import type { CropStack, FenceSegment } from '../shared/game/types'
+import { isBorderEdge } from '../shared/game/farm.ts'
 
 export type FarmTilePosition = {
   row: number
@@ -57,6 +58,7 @@ export type FenceValidationError = {
     | 'LOCKED'
     | 'EDGE_TYPE_CONFLICT'
     | 'PALISADES_NOT_UNLOCKED'
+    | 'PALISADE_NOT_ON_BORDER'
   edges: string[]
   palisadeEdges: string[]
   newFenceEdges: string[]
@@ -390,6 +392,20 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     return {
       ok: false,
       error: { code: 'NO_NEW_FENCES', edges, palisadeEdges, newFenceEdges, newPalisadeEdges },
+    }
+  }
+
+  const invalidPalisade = newPalisadeEdges.find((e) => !isBorderEdge(e))
+  if (invalidPalisade) {
+    return {
+      ok: false,
+      error: {
+        code: 'PALISADE_NOT_ON_BORDER',
+        edges,
+        palisadeEdges,
+        newFenceEdges: [],
+        newPalisadeEdges: [],
+      },
     }
   }
 
