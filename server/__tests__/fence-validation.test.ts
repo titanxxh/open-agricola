@@ -280,3 +280,36 @@ describe('validateFenceSelection — palisade support', () => {
     }
   })
 })
+
+describe('palisade must be on border', () => {
+  it('rejects palisade on internal edge', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+    const result = validateFenceSelection(
+      player,
+      ['H-0-0', 'V-0-0'], // legal fence
+      ['H-1-0'],          // palisade on internal edge — should reject
+      0,
+      0,
+      { allowPalisades: true },
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error?.code).toBe('PALISADE_NOT_ON_BORDER')
+    }
+  })
+
+  it('accepts palisade on top/left border', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-1'],      // internal fences closing tile(0,0)
+      ['H-0-0', 'V-0-0'],      // border palisades
+      0,
+      0,
+      { allowPalisades: true },
+    )
+    expect(result.ok).toBe(true)
+  })
+})
