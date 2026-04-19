@@ -46,7 +46,7 @@ describe('A53_Claypipe session flow', () => {
   })
 
   it('triggers after taking Hollow and then playing Claypipe via Meeting Place in the same round', () => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
 
     state.players = state.players.slice(0, 2)

@@ -8,7 +8,7 @@ const CARD_ID = 'B156_StorehouseKeeper'
 
 describe('B156_StorehouseKeeper session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

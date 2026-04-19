@@ -21,7 +21,7 @@ describe('C154_TwinResearcher session', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -53,7 +53,7 @@ describe('C154_TwinResearcher session', () => {
 
   it('does not trigger when counts differ', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -78,7 +78,7 @@ describe('C154_TwinResearcher session', () => {
 
   it('triggers on clay-pit when it matches hollow-4', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -104,7 +104,7 @@ describe('C154_TwinResearcher session', () => {
 
   it('does not trigger on non-pair spaces', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -125,7 +125,7 @@ describe('C154_TwinResearcher session', () => {
 
   it('does not trigger when player has no food', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -150,7 +150,7 @@ describe('C154_TwinResearcher session', () => {
 
   it('does not trigger without the card', () => {
     const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

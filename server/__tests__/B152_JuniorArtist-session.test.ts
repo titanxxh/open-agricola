@@ -13,7 +13,7 @@ const setup = (options?: {
   occupationHand?: string[]
   travelingPlayersFood?: number
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(undefined, undefined, { playerCount: 4 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
