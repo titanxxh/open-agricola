@@ -1608,9 +1608,10 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     return result
   }
 
-  /** Public helper: insert an ActionFlow to run after the currently-resolving pending choice.
-   *  Mirrors the internal flow-insertion done by resolveChoice() for { type: 'flow' } results. */
-  insertFollowUpFlow(flow: ActionFlow): void {
+  /** Insert an ActionFlow to run after the pending choice is resolved. Precondition: a
+   *  pending choice is currently active (pendingChoiceNodeId is set). No-op otherwise.
+   *  Mirrors the `{ type: 'flow' }` branch of resolveChoice. */
+  insertFlowAfterPendingChoice(flow: ActionFlow): void {
     const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
     if (!insertionTargetId) return
     const flowNode = this.buildFlowNode(flow)
