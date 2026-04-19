@@ -17,8 +17,11 @@ const SIDE_ACTIONS: Record<string, Pos> = {
   'copse':             { top: 18,  left: 5,   width: 60,  height: 83,  size: 's' },
   'grove':             { top: 110, left: 54,  width: 60,  height: 86,  size: 's' },
   'resource-market-4': { top: 236, left: 5,   width: 110, height: 65,  size: 'std' },
+  'resource-market':   { top: 236, left: 5,   width: 110, height: 65,  size: 'std' },
   'hollow-4':          { top: 313, left: 5,   width: 60,  height: 86,  size: 's' },
+  'hollow':            { top: 313, left: 5,   width: 60,  height: 86,  size: 's' },
   'lessons-4':         { top: 412, left: 5,   width: 115, height: 94,  size: 'std' },
+  'lessons-3':         { top: 412, left: 5,   width: 115, height: 94,  size: 'std' },
   'traveling-players': { top: 516, left: 53,  width: 65,  height: 84,  size: 's' },
 }
 
@@ -75,6 +78,7 @@ const ACCUMULATE_DIR: Record<string, 'left' | 'right' | 'bottom'> = {
   'clay-pit': 'right',
   'fishing': 'right',
   'hollow-4': 'right',
+  'hollow': 'right',
   'copse': 'right',
   'sheep-market': 'bottom',
   'western-quarry': 'bottom',
@@ -90,6 +94,7 @@ const RESOURCE_OFFSET: Record<string, React.CSSProperties> = {
   'fishing':           { bottom: 10, left: 98 },
   'grove':             { left: -51, bottom: 3 },
   'hollow-4':          { left: 87, bottom: 9 },
+  'hollow':            { left: 87, bottom: 9 },
   'traveling-players': { left: -54, bottom: 1 },
   'copse':             { left: 87, bottom: 5 },
 }

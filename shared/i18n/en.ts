@@ -370,6 +370,7 @@ export const en = {
       description: 'Become start player and optionally play 1 improvement',
     },
     lessons: { name: 'Lessons', description: 'Play 1 occupation (first is free)' },
+    'lessons-3': { name: 'Lessons', description: 'Play 1 occupation (costs 2 food)' },
     'lessons-4': { name: 'Lessons', description: 'Play 1 occupation (first two cost 1 food)' },
     'grain-utilization': {
       name: 'Grain Utilization',
@@ -387,6 +388,7 @@ export const en = {
     copse: { name: 'Copse', description: 'Accumulate 1 wood each round' },
     grove: { name: 'Grove', description: 'Accumulate 2 wood each round' },
     'clay-pit': { name: 'Clay Pit', description: 'Accumulate 1 clay each round' },
+    hollow: { name: 'Hollow', description: 'Accumulate 1 clay each round' },
     'hollow-4': { name: 'Hollow', description: 'Accumulate 2 clay each round' },
     'reed-bank': { name: 'Reed Bank', description: 'Accumulate 1 reed each round' },
     'traveling-players': { name: 'Traveling Players', description: 'Accumulate 1 food each round' },
@@ -394,6 +396,7 @@ export const en = {
     'eastern-quarry': { name: 'Eastern Quarry', description: 'Accumulate 1 stone each round' },
     'grain-seeds': { name: 'Grain Seeds', description: 'Gain 1 grain' },
     'vegetable-seeds': { name: 'Vegetable Seeds', description: 'Gain 1 vegetable' },
+    'resource-market': { name: 'Resource Market', description: 'Take 1 reed or 1 stone, plus 1 food' },
     'resource-market-4': { name: 'Resource Market', description: 'Gain 1 reed, 1 stone, and 1 food' },
     farmland: { name: 'Farmland', description: 'Plow 1 field' },
     cultivation: { name: 'Cultivation', description: 'Plow 1 field and optionally sow' },
