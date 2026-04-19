@@ -288,3 +288,133 @@ describe('FarmBoard', () => {
     expect(html).toContain('selected')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Occupation-hand multi-select mode (Task 5.1)
+// ---------------------------------------------------------------------------
+
+const BASE_OCC_HAND = ['A102_Grocer', 'A105_BarrowPusher', 'A106_SlurrySpreader', 'A108_MushroomCollector']
+
+const renderWithOccSelection = (
+  occupationHandSelection?: {
+    kind: 'occupation-hand'
+    selectableCards: string[]
+    minSelections: number
+    maxSelections: number
+  },
+  overrides: Partial<{ onConfirmOccupationHandSelection: (ids: string[]) => void }> = {},
+) => {
+  const player = createPlayer('p1', 'Player A', 'red')
+  const displayPlayer = { ...player, occupationHand: BASE_OCC_HAND }
+
+  return renderToStaticMarkup(
+    <FarmBoard
+      locale="en"
+      players={[displayPlayer]}
+      currentPlayer={displayPlayer}
+      displayPlayer={displayPlayer}
+      devMode={false}
+      currentStartPlayerId=""
+      nextStartPlayerId=""
+      playedCards={[]}
+      farmCells={[]}
+      roomPositions={new Set()}
+      fieldPositions={new Set()}
+      fieldMap={new Map()}
+      stablePositions={new Set()}
+      pendingRoomSet={new Set()}
+      pendingStableSet={new Set()}
+      roomSelectableSet={new Set()}
+      stableSelectableSet={new Set()}
+      maxStableSelections={0}
+      plowSelectableSet={new Set()}
+      pendingPlowTile={null}
+      positionSelectableSet={new Set()}
+      pendingPositionSelections={new Set()}
+      togglePositionSelection={() => {}}
+      pendingSowSelections={{}}
+      sowRemaining={{ grain: 0, vegetable: 0, wood: 0 }}
+      sowSelectableMap={new Map()}
+      pastureTiles={new Map()}
+      pastureDisplayMap={new Map()}
+      pastureCapacityMap={new Map()}
+      houseDisplay={{ animalType: null, animalCount: 0 }}
+      stableDisplayMap={new Map()}
+      isReorgActive={false}
+      reorgRemaining={null}
+      hasReorgOverflow={false}
+      animalReorg={null}
+      pendingFenceSet={new Set()}
+      existingFenceSet={new Set()}
+      fenceSelectableSet={new Set()}
+      toggleRoomTile={() => {}}
+      toggleStableTile={() => {}}
+      togglePlowTile={() => {}}
+      updateSowSelection={() => {}}
+      toggleFenceEdge={() => {}}
+      adjustReorgAnimal={() => {}}
+      confirmAnimalReorg={() => {}}
+      cancelAnimalDiscardPrompt={() => {}}
+      setViewPlayerId={() => {}}
+      isSelectingMinor={false}
+      isSelectingOccupation={false}
+      isSelectingImprovementAny={false}
+      selectableMinorIds={new Set()}
+      selectableOccupationIds={new Set()}
+      cardAvailability={{}}
+      futureCardResources={{}}
+      resolveChoice={() => {}}
+      isInteractive={true}
+      occupationHandSelection={occupationHandSelection}
+      onConfirmOccupationHandSelection={overrides.onConfirmOccupationHandSelection}
+      {...({ extraSowTargets: [] } as any)}
+    />,
+  )
+}
+
+describe('FarmBoard occupation-hand multi-select mode', () => {
+  it('renders confirm button (disabled at 0 selections) when occupationHandSelection is active', () => {
+    const html = renderWithOccSelection({
+      kind: 'occupation-hand',
+      selectableCards: BASE_OCC_HAND.slice(0, 3),
+      minSelections: 3,
+      maxSelections: 3,
+    })
+
+    // Confirm button should be present with the testid
+    expect(html).toContain('data-testid="occupation-hand-confirm"')
+
+    // Starts at 0 selected < min=3, so button must be disabled
+    expect(html).toContain('disabled=""')
+  })
+
+  it('marks selectable cards with selectable class and non-selectable cards with unselectable', () => {
+    const selectableCards = [BASE_OCC_HAND[0], BASE_OCC_HAND[1], BASE_OCC_HAND[2]]
+    const nonSelectableCard = BASE_OCC_HAND[3]
+
+    const html = renderWithOccSelection({
+      kind: 'occupation-hand',
+      selectableCards,
+      minSelections: 1,
+      maxSelections: 3,
+    })
+
+    // Selectable cards should get the selectable class
+    expect(html).toMatch(/\bselectable\b/)
+
+    // The non-selectable card should not appear with selectable class and should be disabled
+    // We verify via unselectable class applied to disabled cards
+    expect(html).toMatch(/\bunselectable\b/)
+
+    // The non-selectable card ID should still appear in the HTML (card is rendered)
+    expect(html).toContain(nonSelectableCard)
+  })
+
+  it('does not render confirm button when occupationHandSelection is undefined', () => {
+    const html = renderWithOccSelection(undefined)
+
+    // No multi-select mode — confirm button must be absent
+    expect(html).not.toContain('data-testid="occupation-hand-confirm"')
+    expect(html).not.toContain('hand-select-confirm')
+  })
+})
