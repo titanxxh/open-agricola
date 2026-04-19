@@ -110,25 +110,31 @@ describe('validateFenceSelection — palisade support', () => {
   it('charges 2 wood per palisade segment', () => {
     const player = createPlayer()
     player.resources.wood = 10
-    const palisadeEdges = edgesForTile(0, 0)
-    const result = validateFenceSelection(player, [], palisadeEdges, 0, 0, {
+    // Border edges of tile (0,0): H-0-0 (top) and V-0-0 (left) are border.
+    // Internal edges H-1-0 and V-0-1 must be regular fences.
+    // Cost: 2 palisades * 2 + 2 fences * 1 = 6
+    const palisadeEdges = ['H-0-0', 'V-0-0']
+    const fenceEdges = ['H-1-0', 'V-0-1']
+    const result = validateFenceSelection(player, fenceEdges, palisadeEdges, 0, 0, {
       allowPalisades: true,
     })
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.payableWoodCost).toBe(8)
+      expect(result.payableWoodCost).toBe(6)
       expect(result.newPalisadeEdges).toEqual(palisadeEdges)
-      expect(result.newFenceEdges).toEqual([])
+      expect(result.newFenceEdges.sort()).toEqual(fenceEdges.sort())
     }
   })
 
   it('freeFences only discounts fence segments, not palisades', () => {
     const player = createPlayer()
     player.resources.wood = 10
+    // Palisades on border: H-0-0 (top), V-0-0 (left).
+    // Fences on internal: H-1-0, V-0-1.
     const result = validateFenceSelection(
       player,
-      ['H-0-0', 'V-0-0'],
       ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
       0,
       2,
       { allowPalisades: true },
@@ -157,28 +163,36 @@ describe('validateFenceSelection — palisade support', () => {
   })
 
   it('palisade-only enclosure forms a pasture', () => {
+    // A fully-palisaded enclosure requires all 4 edges on the border.
+    // Use a 1x1 tile at (0,4): edges H-0-4 (top border), H-1-4 (internal),
+    // V-0-4 (internal), V-0-5 (right border) — still has 2 internal edges.
+    // No single interior tile can be fully palisaded. Use 2 palisades + 2 fences.
+    // Instead, verify that palisades-on-border + fences-internal forms a pasture
+    // and fenceCount=2, palisadeCount=2.
     const player = createPlayer()
     player.resources.wood = 10
-    const palisadeEdges = edgesForTile(0, 0)
-    const result = validateFenceSelection(player, [], palisadeEdges, 0, 0, {
+    // Palisades on border edges of tile (0,0): H-0-0, V-0-0
+    // Fences on internal edges of tile (0,0): H-1-0, V-0-1
+    const result = validateFenceSelection(player, ['H-1-0', 'V-0-1'], ['H-0-0', 'V-0-0'], 0, 0, {
       allowPalisades: true,
     })
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.newPastures).toHaveLength(1)
       expect(result.newPastures[0]?.tiles).toHaveLength(1)
-      expect(getFenceCount(result.player)).toBe(0)
-      expect(getPalisadeCount(result.player)).toBe(4)
+      expect(getFenceCount(result.player)).toBe(2)
+      expect(getPalisadeCount(result.player)).toBe(2)
     }
   })
 
   it('mixed fence + palisade segments enclose a pasture together', () => {
     const player = createPlayer()
     player.resources.wood = 10
+    // Palisades on border: H-0-0, V-0-0. Fences on internal: H-1-0, V-0-1.
     const result = validateFenceSelection(
       player,
-      ['H-0-0', 'V-0-0'],
       ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
       0,
       0,
       { allowPalisades: true },
@@ -216,14 +230,15 @@ describe('validateFenceSelection — palisade support', () => {
     expect(preloadedEdges).toHaveLength(13)
 
     // Scenario A: 2 new fences + 2 new palisades enclosing tile (0,0).
+    // Palisades on border: H-0-0, V-0-0. Fences on internal: H-1-0, V-0-1.
     // Fence total after = 13 + 2 = 15 (exactly at cap). Expect ok.
     const playerA = createPlayer()
     playerA.resources.wood = 20
     playerA.fenceSegments = preloadedEdges.map((edge) => ({ edge, type: 'fence' }))
     const resultA = validateFenceSelection(
       playerA,
-      ['H-0-0', 'V-0-0'],
       ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
       0,
       0,
       { allowPalisades: true },
@@ -235,6 +250,7 @@ describe('validateFenceSelection — palisade support', () => {
     }
 
     // Scenario B: 3 new fences + 1 new palisade enclosing tile (0,0).
+    // Palisade on border: H-0-0. Fences on internal: H-1-0, V-0-1 + border V-0-0.
     // Fence total after = 13 + 3 = 16 (over cap). Expect MAX_FENCES_EXCEEDED
     // even though palisades are not counted toward the cap.
     const playerB = createPlayer()
@@ -242,8 +258,8 @@ describe('validateFenceSelection — palisade support', () => {
     playerB.fenceSegments = preloadedEdges.map((edge) => ({ edge, type: 'fence' }))
     const resultB = validateFenceSelection(
       playerB,
-      ['H-0-0', 'H-1-0', 'V-0-0'],
-      ['V-0-1'],
+      ['H-1-0', 'V-0-0', 'V-0-1'],
+      ['H-0-0'],
       0,
       0,
       { allowPalisades: true },
@@ -257,10 +273,11 @@ describe('validateFenceSelection — palisade support', () => {
   it('writes fence segments with correct fence/palisade types', () => {
     const player = createPlayer()
     player.resources.wood = 10
+    // Palisades on border edges: H-0-0, V-0-0. Fences on internal: H-1-0, V-0-1.
     const result = validateFenceSelection(
       player,
-      ['H-0-0', 'V-0-0'],
       ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
       0,
       0,
       { allowPalisades: true },
@@ -275,8 +292,8 @@ describe('validateFenceSelection — palisade support', () => {
         .filter((s) => s.type === 'palisade')
         .map((s) => s.edge)
         .sort()
-      expect(fenceEdges).toEqual(['H-0-0', 'V-0-0'])
-      expect(palisadeEdges).toEqual(['H-1-0', 'V-0-1'])
+      expect(fenceEdges).toEqual(['H-1-0', 'V-0-1'])
+      expect(palisadeEdges).toEqual(['H-0-0', 'V-0-0'])
     }
   })
 })

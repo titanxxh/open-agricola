@@ -13,10 +13,10 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
 
     const player = state.players[0]!
     // No existing fences → freeFences = 15
-    // 1 fence edge × 1 wood = 1, minus freeFences (capped at 1 used) → 0
-    // 3 palisade edges × 2 wood = 6
-    // total = 6 wood
-    player.resources.wood = 6
+    // 2 fence edges × 1 wood = 2, minus freeFences (2 used) → 0
+    // 2 palisade edges × 2 wood = 4
+    // total = 4 wood
+    player.resources.wood = 4
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
 
@@ -25,10 +25,12 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    // Fence tile (0,0). 1 fence + 3 palisade = 4 segments (minimum).
+    // Fence tile (0,0). 2 fences (internal) + 2 palisades (border).
+    // Palisades must be on border: H-0-0 (top), V-0-0 (left).
+    // Fences on internal: H-1-0, V-0-1.
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: ['H-0-0'],
-      palisadeEdges: ['H-1-0', 'V-0-0', 'V-0-1'],
+      edges: ['H-1-0', 'V-0-1'],
+      palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
     })
 
@@ -46,8 +48,8 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    // Only 5 wood — not enough for 6-wood palisade+fence build.
-    player.resources.wood = 5
+    // Only 3 wood — not enough for 4-wood palisade+fence build (2 palisades @ 2 each).
+    player.resources.wood = 3
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
 
@@ -56,9 +58,10 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
+    // Same layout as above but insufficient wood.
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: ['H-0-0'],
-      palisadeEdges: ['H-1-0', 'V-0-0', 'V-0-1'],
+      edges: ['H-1-0', 'V-0-1'],
+      palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
     })
 
