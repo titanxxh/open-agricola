@@ -1076,7 +1076,6 @@ type PendingAction =
 - `computeFenceDiscount`：围栏支付时由各卡牌返回免费 fence segment 数（聚合器 `collectFenceDiscount(state, player, ctx)`，`shared/cards/card-effects.ts`）；当前消费者：E16 BriarHedge（每条 border edge 折扣 1 wood，最多 4）
 - `computeArgs`：追加选项、额外参数（针对 `execute()` 已经返回 `choice` 的传统路径）
 - `computeChoiceCandidates`：针对 opt-in `getBaseChoiceOptions` 的 action，注入额外候选目标（见 §11.6.3）
-- `canUseOccupied`：允许把已占用行动位视为仍可用
 - `before`：主动作执行前
 - `during`：主动作执行中
 - `immediatelyAfter`：主动作完成后立刻触发
