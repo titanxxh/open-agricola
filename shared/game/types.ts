@@ -277,6 +277,10 @@ export type ActionChoiceOption = {
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ChoiceEffectPreview
+  /** When true, UI greys out the option and server rejects attempts to pick it. */
+  disabled?: boolean
+  /** i18n key shown as tooltip explaining why the option is disabled. */
+  disabledReasonKey?: string
 }
 
 export type ActionExecutionResult =
