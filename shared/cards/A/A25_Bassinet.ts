@@ -2,20 +2,14 @@ import { MinorImprovement } from '../types'
 import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionChoiceOption, GameState } from '../../game/types'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { countPeopleOnSpace } from '../helpers/space-occupancy'
-import type { GameState } from '../../game/types'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
 
 const CARD_ID = 'A25_Bassinet'
 const MEETING_PLACE_ID = 'meeting-place'
 
-/**
- * Derive the first globally-used non-accumulating action space of this work
- * phase (round).  Starting player acts first; players interleave by slot index
- * (slot 0 → all players in turn order, then slot 1, etc.).
- * Newborn workers pushed to takenBy but not recorded via recordRoundPlacement,
- * so they don't pollute this lookup.
- */
 function findFirstNonAccumSpaceThisRound(state: GameState): string | null {
   const startIdx = state.players.findIndex((p) => p.startPlayer)
   const N = state.players.length
@@ -30,46 +24,35 @@ function findFirstNonAccumSpaceThisRound(state: GameState): string | null {
       const spaceId = placements[slot]
       const space = state.actionSpaces.find((s) => s.id === spaceId)
       if (!space) continue
-      if (Object.keys(space.gainPerRound).length > 0) continue // skip accumulating spaces
+      if (Object.keys(space.gainPerRound).length > 0) continue
       return spaceId
     }
   }
   return null
 }
 
-/**
- * A25 Bassinet (MinorImprovement, A, #25, VP=1, cost={})
- *
- * BGA desc: You can place a(nother) person on the first non-accumulating
- * action space used in each work phase, if there is only 1 person,
- * including newborns, on that space. (There can never be two people on
- * Meeting Place.)
- *
- * Implementation: canUseOccupied listener.  Only fires when the card owner
- * themselves is placing a farmer and all conditions are met.
- */
-const canUseOccupiedListener: CardListenerRegistration = {
-  id: 'A25-bassinet-can-use-occupied',
+const computeArgsListener: CardListenerRegistration = {
+  id: 'A25-bassinet-compute-args-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['canUseOccupied' as ActionHookPhase],
+  phases: ['computeArgs' as ActionHookPhase],
+  actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.ownerPlayer) return
-    if (!context.ownerPlayer.minorPlayed.includes(CARD_ID)) return
-    // Only grant the benefit to the card owner's own placements
-    if (context.player.id !== context.ownerPlayer.id) return
-
-    const space = context.space
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
+    const targetId = findFirstNonAccumSpaceThisRound(context.state)
+    if (!targetId) return
+    if (targetId === MEETING_PLACE_ID) return
+    if (countPeopleOnSpace(context.state, targetId) !== 1) return
+    const space = context.state.actionSpaces.find((s) => s.id === targetId)
     if (!space) return
-    if (space.id === MEETING_PLACE_ID) return // Meeting Place explicitly excluded
-
-    if (findFirstNonAccumSpaceThisRound(context.state) !== space.id) return
-    if (countPeopleOnSpace(context.state, space.id) !== 1) return
-
-    return { canUseOccupied: true }
+    if (!space.canBeExecutedByPlayer(context.state, context.player)) return
+    const extraOptions: ActionChoiceOption[] = [
+      { value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${targetId}`, labelKey: space.nameKey },
+    ]
+    return { extraOptions, sourceCard: CARD_ID }
   },
 }
 
-registerCardListener(canUseOccupiedListener)
+registerCardListener(computeArgsListener)
 
 export const A25_Bassinet = new MinorImprovement({
   id: CARD_ID,
