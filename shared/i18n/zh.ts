@@ -354,6 +354,7 @@ export const zh = {
     'day-laborer': { name: '打零工', description: '立即获得 2 食物' },
     'meeting-place': { name: '集会所', description: '成为起始玩家并可打出 1 张改良' },
     lessons: { name: '课程', description: '打出 1 张职业（首次免费）' },
+    'lessons-3': { name: '课程（3人）', description: '打出 1 张职业（支付 2 食物）' },
     'lessons-4': { name: '课程（4人）', description: '打出 1 张职业（前两张支付 1 食物）' },
     'grain-utilization': { name: '谷物利用', description: '播种或烤面包' },
     'farm-expansion': {
@@ -368,6 +369,7 @@ export const zh = {
     copse: { name: '小树林', description: '每回合累积 1 木材' },
     grove: { name: '树林', description: '每回合累积 2 木材' },
     'clay-pit': { name: '黏土坑', description: '每回合累积 1 黏土' },
+    hollow: { name: '低洼地', description: '每回合累积 1 黏土' },
     'hollow-4': { name: '低洼地', description: '每回合累积 2 黏土' },
     'reed-bank': { name: '芦苇河岸', description: '每回合累积 1 芦苇' },
     'traveling-players': { name: '流浪艺人', description: '每回合累积 1 食物' },
@@ -375,6 +377,7 @@ export const zh = {
     'eastern-quarry': { name: '东部采石场', description: '每回合累积 1 石料' },
     'grain-seeds': { name: '谷物种子', description: '立即获得 1 谷物' },
     'vegetable-seeds': { name: '蔬菜种子', description: '立即获得 1 蔬菜' },
+    'resource-market': { name: '资源市场', description: '获得 1 芦苇或 1 石料，加 1 食物' },
     'resource-market-4': { name: '资源市场', description: '获得 1 芦苇、1 石料与 1 食物' },
     farmland: { name: '农田', description: '开垦 1 块田地' },
     cultivation: { name: '耕作', description: '开垦 1 田地并可播种' },
