@@ -195,8 +195,12 @@ describe('B3_Moonshine session', () => {
 
   // ---------------------------------------------------------------------------
   // Case 5: Solo (1 player) — pass discards rather than passing to another player
+  // Skipped after main's 2026-04-19 player-count-aware action-space filtering:
+  // meeting-place is configured with `players: [2,3,4]`, so a 1-player session
+  // cannot reach B3 through the normal path. Solo discard semantics are covered
+  // by the unit test in shared/cards/helpers/__tests__/pass-occupation.test.ts.
   // ---------------------------------------------------------------------------
-  it('case 5: solo game — pass discards the picked occupation', () => {
+  it.skip('case 5: solo game — pass discards the picked occupation', () => {
     const session = makeSession({ food: 3 })
     // Trim to 1 player directly in state
     const state = session.getState().state
