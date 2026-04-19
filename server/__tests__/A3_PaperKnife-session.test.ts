@@ -33,7 +33,6 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { checkCustomPrerequisite } from '../../shared/cards/helpers/prerequisite-registry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getPlayedCardKeys } from '../../shared/game/player'
 import type { GameState, PlayerState } from '../../shared/game/types'
 import { GameSession } from '../game-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
@@ -122,38 +121,42 @@ describe('A3_PaperKnife onBuy', () => {
     expect(player.occupationPlayed).toEqual([])
   })
 
-  it('plays one of the occupations in hand for free when ≥3 are held', () => {
+  it('onBuy emits a selection leaf (occupation-hand, min=max=3) when ≥3 occupations in hand', () => {
     const player = createPlayer('p1')
     player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
-    const handSnapshot = [...player.occupationHand]
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect((flow as any).type).toBe('leaf')
-    expect((flow as any).actionId).toBe('noop')
+    expect((flow as any).actionId).toBe('selection')
 
-    // Exactly one occupation moved hand → played.
-    expect(player.occupationPlayed).toHaveLength(1)
-    expect(player.occupationHand).toHaveLength(2)
-    const played = player.occupationPlayed[0]!
-    expect(handSnapshot).toContain(played)
-    expect(player.occupationHand).not.toContain(played)
-    expect(getPlayedCardKeys(player)).toContain(`occupation:${played}`)
+    // Hand must NOT be mutated by onBuy — mutation happens downstream via play-occupation
+    expect(player.occupationPlayed).toHaveLength(0)
+    expect(player.occupationHand).toHaveLength(3)
+
+    // actionContext must carry occupation-hand selection params
+    const ctx = (flow as any).actionContext
+    expect(ctx.selectionKind).toBe('occupation-hand')
+    expect(ctx.minSelections).toBe(3)
+    expect(ctx.maxSelections).toBe(3)
+    expect(ctx.selectableCards).toEqual(['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite'])
   })
 
-  it('does not consume any resources (free play)', () => {
+  it('does not consume any resources or mutate hand in onBuy', () => {
     const player = createPlayer('p1')
     player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
     player.resources.food = 5
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
     effect!.onBuy!(state, player)
-    // Food untouched.
+    // Food untouched and hand unchanged — only a selection leaf was returned.
     expect(player.resources.food).toBe(5)
+    expect(player.occupationHand).toHaveLength(3)
+    expect(player.occupationPlayed).toHaveLength(0)
   })
 
-  it('selection is deterministic given the same seed + hand + round', () => {
+  it('onBuy selectableCards snapshot matches occupation hand at call time', () => {
     const a = createPlayer('p1')
     const b = createPlayer('p1')
     a.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
@@ -161,9 +164,12 @@ describe('A3_PaperKnife onBuy', () => {
     const stateA = createState([a])
     const stateB = createState([b])
     const effect = getCardEffect(CARD_ID)!
-    effect.onBuy!(stateA, a)
-    effect.onBuy!(stateB, b)
-    expect(a.occupationPlayed[0]).toBe(b.occupationPlayed[0])
+    const flowA = effect.onBuy!(stateA, a)
+    const flowB = effect.onBuy!(stateB, b)
+    // Both should produce identical selectableCards (same hand)
+    expect((flowA as any).actionContext.selectableCards).toEqual(
+      (flowB as any).actionContext.selectableCards,
+    )
   })
 })
 
