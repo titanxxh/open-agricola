@@ -501,32 +501,44 @@ export const InteractionBar = ({
                 />
               ) : pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
                 <div className="interaction-actions">
-                  {visibleOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => resolveChoice(option.value)}
-                      disabled={
-                        !isInteractive ||
-                        (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
-                          option.value === 'confirm' &&
-                          isRoomConfirmDisabled) ||
-                        (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
-                          option.value === 'confirm' &&
-                          isStableConfirmDisabled) ||
-                        (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
-                          option.value === 'confirm' &&
-                          !hasPendingPlowSelection) ||
-                        (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
-                          option.value === 'confirm' &&
-                          (pendingSowSelectionsLength ?? 0) === 0) ||
-                        (pendingChoice.promptKey === 'ui.interactionSelection' &&
-                          option.value === 'confirm' &&
-                          isSelectionConfirmDisabled)
-                      }
-                    >
-                      {renderOptionContent(locale, option)}
-                    </button>
-                  ))}
+                  {visibleOptions.map((option) => {
+                    const isDisabled =
+                      !!option.disabled ||
+                      !isInteractive ||
+                      (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
+                        option.value === 'confirm' &&
+                        isRoomConfirmDisabled) ||
+                      (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
+                        option.value === 'confirm' &&
+                        isStableConfirmDisabled) ||
+                      (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
+                        option.value === 'confirm' &&
+                        !hasPendingPlowSelection) ||
+                      (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
+                        option.value === 'confirm' &&
+                        (pendingSowSelectionsLength ?? 0) === 0) ||
+                      (pendingChoice.promptKey === 'ui.interactionSelection' &&
+                        option.value === 'confirm' &&
+                        isSelectionConfirmDisabled)
+                    const disabledTitle =
+                      option.disabled && option.disabledReasonKey
+                        ? t(locale, option.disabledReasonKey)
+                        : undefined
+                    return (
+                      <button
+                        key={option.value}
+                        disabled={isDisabled}
+                        title={disabledTitle}
+                        className={option.disabled ? 'choice-option-disabled' : undefined}
+                        onClick={() => {
+                          if (option.disabled) return
+                          resolveChoice(option.value)
+                        }}
+                      >
+                        {renderOptionContent(locale, option)}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </>

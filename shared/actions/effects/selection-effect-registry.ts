@@ -1,12 +1,15 @@
-import type { PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 
 export type SelectionEffectContext = {
   player: PlayerState
   positions: string[]
   sourceCard: string | undefined
+  state: GameState
 }
 
-export type SelectionEffectHandler = (ctx: SelectionEffectContext) => void
+export type SelectionEffectHandler = (
+  ctx: SelectionEffectContext,
+) => ActionFlow | void
 
 const registry = new Map<string, SelectionEffectHandler>()
 
@@ -20,9 +23,8 @@ export const registerSelectionEffect = (
 export const runSelectionEffect = (
   name: string,
   ctx: SelectionEffectContext,
-): boolean => {
+): ActionFlow | void => {
   const handler = registry.get(name)
-  if (!handler) return false
-  handler(ctx)
-  return true
+  if (!handler) return
+  return handler(ctx)
 }

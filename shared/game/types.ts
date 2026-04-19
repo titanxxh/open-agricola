@@ -208,6 +208,11 @@ export type GameState = {
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
+  /** Monotonic counter incremented every time a card consumes randomness. */
+  rngTick?: number
+  /** One-shot flag: cards set this before emitting a pending-choice that must not be undone across.
+   * GameSession.pushHistory reads, honors, and clears this flag. */
+  pendingUndoBoundary?: boolean
   availableMajorImprovements: string[]
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
@@ -272,6 +277,10 @@ export type ActionChoiceOption = {
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ChoiceEffectPreview
+  /** When true, UI greys out the option and server rejects attempts to pick it. */
+  disabled?: boolean
+  /** i18n key shown as tooltip explaining why the option is disabled. */
+  disabledReasonKey?: string
 }
 
 export type ActionExecutionResult =
@@ -448,6 +457,12 @@ export type InteractionSelection =
       selectablePositions: FarmTilePosition[]
       maxSelections: number
       minSelections?: number
+    }
+  | {
+      kind: 'occupation-hand'
+      selectableCards: string[]
+      minSelections: number
+      maxSelections: number
     }
 
 type InteractionBase = {

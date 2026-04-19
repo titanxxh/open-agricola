@@ -200,6 +200,8 @@ export const zh = {
     interactionSowSelect: '为每块空田选择播种作物',
     interactionSowConfirm: '确认播种',
     interactionSowCancel: '取消',
+    interactionOccupationHand: '从手牌选 {maxSelections} 张职业',
+    interactionOccupationHandConfirm: '确认（{selected}/{max}）',
     interactionSelection: '选择位置',
     interactionSelectionSubtitle: '已选: {selected}/{max}',
     interactionSelectionConfirm: '确认',
@@ -421,6 +423,8 @@ export const zh = {
     'farm-redevelopment': { name: '农场改建', description: '改建房屋' },
     'renovate-house': { name: '住宅翻修', description: '把住宅升级到下一档材质' },
     'card-choice': { name: '卡牌选择', description: '从卡牌选项中选择' },
+    'emit-choice': { name: '卡牌抉择', description: '卡牌触发的玩家抉择' },
+    selection: { name: '选择', description: '从手牌或农场中选择位置或卡牌' },
   },
   improvements: {
     Major_Fireplace1: { name: '壁炉', description: '烤面包：1 谷物 → 2 食物' },
@@ -950,6 +954,12 @@ export const zh = {
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
     B83_MuddyPuddles: { anytime: '泥塘：付1黏土 → 取顶部商品' },
     B154_SheepKeeper: { anytime: '牧羊人：7+羊 → 3 分 + 2 食物' },
+    B3_Moonshine: {
+      choice: '私酿酒：为抽到的职业选择处理方式',
+      choicePlay: '打出它（支付 2 食物）',
+      choicePass: '传给下家',
+      choicePlayDisabled: '食物不足（需要 2）',
+    },
   },
   fence: {
     error: {

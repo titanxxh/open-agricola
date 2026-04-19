@@ -241,6 +241,11 @@ a:focus-visible,
   opacity: 0.85;
 }
 
+.interaction-actions button.choice-option-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .collector-multi-select {
   display: flex;
   flex-direction: column;
@@ -2184,6 +2189,32 @@ a:focus-visible,
 }
 
 .hand-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.player-card.selected {
+  box-shadow: 0 0 0 3px var(--color-primary);
+}
+
+.hand-select-confirm {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hand-select-confirm button {
+  padding: 6px 16px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hand-select-confirm button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

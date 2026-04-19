@@ -29,7 +29,8 @@ type ClientCommandBody =
       type: 'commitSelection'
       playerIndex: number
       payload: {
-        positions: { row: number; col: number }[]
+        positions?: { row: number; col: number }[]
+        cardIds?: string[]
       }
     }
   | { type: 'nextPlayer' }

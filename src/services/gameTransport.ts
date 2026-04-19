@@ -16,7 +16,8 @@ export interface GameTransport {
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
   commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload>
   commitSelection(playerIndex: number, payload: {
-    positions: { row: number; col: number }[]
+    positions?: { row: number; col: number }[]
+    cardIds?: string[]
   }): Promise<GameSyncPayload>
   confirmReorg(playerIndex: number, zones: {
     id: string; zoneType: 'pasture' | 'house' | 'stable'
@@ -109,7 +110,7 @@ export class HttpGameTransport implements GameTransport {
 
   commitSelection(
     playerIndex: number,
-    payload: { positions: { row: number; col: number }[] },
+    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
   ) {
     return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
   }
@@ -323,7 +324,7 @@ export class WsGameTransport implements GameTransport {
 
   async commitSelection(
     playerIndex: number,
-    payload: { positions: { row: number; col: number }[] },
+    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
   ): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
   }

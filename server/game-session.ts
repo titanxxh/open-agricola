@@ -114,6 +114,7 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from './farm-interaction.ts'
+import { buildOccupationHandSelectionInteraction } from './occupation-hand-interaction.ts'
 import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
@@ -602,6 +603,8 @@ export class GameSession {
     switch (promptKey) {
       case 'ui.interactionSelection':
         return 'farm-position' as const
+      case 'ui.interactionOccupationHand':
+        return 'occupation-hand' as const
       default:
         return null
     }
@@ -634,6 +637,10 @@ export class GameSession {
 
   private buildSelectionInteraction(player: PlayerState): InteractionSelection {
     const actionContext = this.pending.type === 'choice' ? this.pending.actionContext : undefined
+    const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
+    if (kind === 'occupation-hand') {
+      return buildOccupationHandSelectionInteraction(player, actionContext)
+    }
     return buildFarmPositionSelectionInteraction(player, actionContext)
   }
 
@@ -876,6 +883,13 @@ export class GameSession {
   }
 
   private pushHistory(actionStart = false, undoBoundary = false) {
+    // Cards can flag a one-shot undo boundary on state via `state.pendingUndoBoundary`
+    // (e.g. immediately after rolling random). Merge it with the explicit parameter,
+    // then clear the flag so it fires exactly once.
+    const effectiveBoundary = undoBoundary || this.state.pendingUndoBoundary === true
+    if (this.state.pendingUndoBoundary) {
+      this.state.pendingUndoBoundary = false
+    }
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       pending: this.clonePending(this.pending),
@@ -888,7 +902,7 @@ export class GameSession {
       stageResume: this.stageResume ? { ...this.stageResume } : null,
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
-      undoBoundary,
+      undoBoundary: effectiveBoundary,
     }
     this.history.push(entry)
     if (actionStart) {
@@ -1938,6 +1952,12 @@ export class GameSession {
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
+    // Reject attempts to resolve a choice with an option that's been marked disabled
+    // (e.g. B3 Moonshine's "play" option when the player can't afford 2 food).
+    const chosenOption = pending.options.find((o) => o.value === value)
+    if (chosenOption?.disabled) {
+      return this.respond(false, 'option disabled')
+    }
     if (!this.engine) {
       if (pending.promptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
         this.pending = { type: 'none' }
@@ -1964,6 +1984,23 @@ export class GameSession {
       promptKey === 'ui.interactionBakeBreadCount'
     if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
       this.usedBakeBreadThisAction = true
+    }
+    // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
+    // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
+    // ActionFlow that runs after the engine's own choice resolution.
+    if (pending.sourceCard) {
+      const cardEffect = getCardEffect(pending.sourceCard)
+      if (cardEffect?.resolveChoice) {
+        const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
+          sourceCard: pending.sourceCard,
+          actionContext: pending.actionContext,
+        })
+        if (cardFlow && this.engine) {
+          // Insert the follow-up so it runs after the engine finishes resolving the choice.
+          // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
+          this.engine.insertFlowAfterPendingChoice(cardFlow)
+        }
+      }
     }
     const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
@@ -2781,7 +2818,7 @@ export class GameSession {
 
   commitSelectionChoice(
     playerIndex: number,
-    payload: { positions?: FarmTilePosition[] },
+    payload: { positions?: FarmTilePosition[]; cardIds?: string[] },
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection choice for this player')
@@ -2789,8 +2826,35 @@ export class GameSession {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const positions = payload.positions ?? []
+    const selectionKind = (this.pending.actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (this.pending.actionContext?.maxSelections as number) ?? 1
+
+    // occupation-hand: validate card IDs
+    if (selectionKind === 'occupation-hand') {
+      const cardIds = payload.cardIds ?? []
+      if (cardIds.length > maxSelections) {
+        return this.respond(false, 'too many card selections')
+      }
+      for (const id of cardIds) {
+        if (!player.occupationHand.includes(id)) {
+          return this.respond(false, `card ${id} not in occupation hand`)
+        }
+      }
+      this.pushHistory()
+      const choiceValue = cardIds.length > 0 ? cardIds.join(',') : 'cancel'
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
+      this.engine?.resolveChoice(choiceValue, {
+        state: this.state,
+        player: this.state.players[playerIndex]!,
+        space,
+      })
+      this.flushEngineLog()
+      this.runEngineSteps()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
+    // farm-position (default)
+    const positions = payload.positions ?? []
     if (positions.length > maxSelections) {
       return this.respond(false, 'too many selection positions')
     }
@@ -2947,6 +3011,14 @@ export class GameSession {
       if (!stillOnSameFarmPrompt) {
         return cancelResult
       }
+    }
+    // Task 0.6 introduced `state.pendingUndoBoundary` to signal an undo-blocker from a
+    // card's handler (e.g. after rolling random). pushHistory consumes the flag and marks
+    // the next history entry. But between the roll and the next pushHistory, the flag
+    // lives only on state. Honor it directly here so undo cannot cross the roll even in
+    // that window.
+    if (this.state.pendingUndoBoundary === true) {
+      return this.respond(false, 'cannot undo past boundary')
     }
     if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
       return this.respond(false, 'cannot undo past boundary')
