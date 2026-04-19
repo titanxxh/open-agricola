@@ -939,41 +939,64 @@ git commit -m "feat(scripts): add check-bundle-size CI guard (print-only, PR-4 f
 
 ---
 
-## Task 6: GitHub Actions ci.yml
+## Task 6: Extend existing GitHub Actions ci.yml
+
+**Context:** `.github/workflows/ci.yml` already exists (contains a `check-prompt-sync` job for custom-card-sandbox docs). We **add a new job `verify`** alongside it, and broaden the `push` paths filter so `verify` runs on any main push.
 
 **Files:**
-- Create: `.github/workflows/ci.yml`
+- Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Read existing workflow for reference**
+- [ ] **Step 1: Read existing workflow**
 
-Run: `cat .github/workflows/deploy-pages.yml | head -30`
-Expected: See pnpm setup pattern used in repo.
+Run: `cat .github/workflows/ci.yml`
+Expected: See existing `check-prompt-sync` job + narrow `paths:` filter.
 
-- [ ] **Step 2: Create ci.yml**
+- [ ] **Step 2: Overwrite ci.yml keeping existing job + adding verify job**
 
-Create `.github/workflows/ci.yml`:
+Overwrite `.github/workflows/ci.yml` with:
 
 ```yaml
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  push:
+    branches: [main, ui]
+  workflow_dispatch:
 
 jobs:
+  check-prompt-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check prompt sync (strict)
+        run: pnpm run check:prompt-sync -- --strict
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.33.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -1000,16 +1023,20 @@ jobs:
         run: pnpm run check:bundle-size
 ```
 
+Key changes vs. the existing file:
+- Removed the narrow `paths:` filter on `push` (so `verify` runs on every main/ui push)
+- Added `verify` job alongside existing `check-prompt-sync` (which is kept verbatim)
+
 - [ ] **Step 3: Validate YAML syntax locally (optional)**
 
 Run: `pnpm exec tsx -e "import yaml from 'js-yaml'; import fs from 'fs'; yaml.load(fs.readFileSync('.github/workflows/ci.yml', 'utf8')); console.log('YAML ok')" 2>&1 | tail -5`
-Expected: "YAML ok" OR "Cannot find js-yaml" (acceptable — this is optional sanity check; skip if lib missing).
+Expected: "YAML ok" OR "Cannot find js-yaml" (acceptable — optional sanity check).
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
-git commit -m "ci: add CI workflow for lint/test/build/checks (non-strict PR-1)"
+git commit -m "ci: add verify job (lint/test/build/checks, non-strict PR-1) alongside prompt-sync"
 ```
 
 ---
