@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game-session'
 import { computeAllowedPlacementSpaces } from '../../shared/actions/effects/placement-availability'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
+import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'
 
 describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', () => {
@@ -26,10 +27,10 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
     // p0 holds C129
     p0.occupationPlayed.push('C129_SecondSpouse')
 
-    // p1 occupies urgent-wish-children
+    // p1 occupies urgent-wish-children (first placement this round)
     const urgent = st.actionSpaces.find((s) => s.id === 'urgent-wish-children')!
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(urgent as any).takenBy = p1.id
+    urgent.takenBy.push({ playerId: p1.id, workerId: 'b1' })
+    recordRoundPlacement(p1, 'urgent-wish-children', 'b1')
 
     session.loadState(st)
 
@@ -64,8 +65,8 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
 
     // p1 occupies urgent-wish-children — NO C129
     const urgent = st.actionSpaces.find((s) => s.id === 'urgent-wish-children')!
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(urgent as any).takenBy = p1.id
+    urgent.takenBy.push({ playerId: p1.id, workerId: 'b1' })
+    recordRoundPlacement(p1, 'urgent-wish-children', 'b1')
 
     session.loadState(st)
 
