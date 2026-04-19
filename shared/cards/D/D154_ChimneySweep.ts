@@ -21,7 +21,6 @@ const renovateCostListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
-    if (context.player.houseType !== 'clay') return
     return { costs: { stone: -2 } }
   },
 }
@@ -38,5 +37,5 @@ export const D154_ChimneySweep = new Occupation({
     'Renovating to stone costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house.',
   ],
   cost: {},
-  players: "3+",
+  players: "4+",
 })
