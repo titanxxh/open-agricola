@@ -950,6 +950,7 @@ export const zh = {
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
     B83_MuddyPuddles: { anytime: '泥塘：付1黏土 → 取顶部商品' },
     B154_SheepKeeper: { anytime: '牧羊人：7+羊 → 3 分 + 2 食物' },
+    B3_Moonshine: { choicePlayDisabled: '食物不足（需要 2）' },
   },
   fence: {
     error: {

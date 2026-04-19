@@ -241,6 +241,11 @@ a:focus-visible,
   opacity: 0.85;
 }
 
+.interaction-actions button.choice-option-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .collector-multi-select {
   display: flex;
   flex-direction: column;
