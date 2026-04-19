@@ -100,4 +100,32 @@ describe('WsGameTransport request correlation', () => {
 
     transport.destroy()
   })
+
+  it('sends dedicated dev commands for setResources and setRound', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const setResourcesPromise = transport.devSetResources(1, { wood: 7, clay: 3 })
+    const setRoundPromise = transport.devSetRound(6)
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'devSetResources',
+      playerIndex: 1,
+      resources: { wood: 7, clay: 3 },
+    })
+    expect(socket.sent[1]).toMatchObject({
+      type: 'devSetRound',
+      round: 6,
+    })
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 3))
+    socket.emit(buildEnvelope(String(socket.sent[1]?.requestId), 4))
+
+    await expect(setResourcesPromise).resolves.toMatchObject({ historyLength: 3 })
+    await expect(setRoundPromise).resolves.toMatchObject({ historyLength: 4 })
+
+    transport.destroy()
+  })
 })

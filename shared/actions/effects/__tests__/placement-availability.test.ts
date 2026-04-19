@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game-session'
 import { computeAllowedPlacementSpaces } from '../placement-availability'
@@ -9,6 +10,18 @@ afterEach(() => {
 })
 
 describe('computeAllowedPlacementSpaces', () => {
+  it('can be imported by the runtime from place-farmer without module init cycles', () => {
+    expect(() =>
+      execFileSync(
+        'pnpm',
+        ['exec', 'tsx', '-e', "import './shared/actions/effects/place-farmer.ts'"],
+        {
+          cwd: process.cwd(),
+          stdio: 'pipe',
+        },
+      )).not.toThrow()
+  })
+
   it('returns all non-occupied, executable spaces as allowOccupied:false', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
     const { state } = session.getState()
