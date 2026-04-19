@@ -206,6 +206,8 @@ export const en = {
     interactionSowSelect: 'Select crops for each empty field',
     interactionSowConfirm: 'Confirm sowing',
     interactionSowCancel: 'Cancel',
+    interactionOccupationHand: 'Select {maxSelections} occupation(s) from hand',
+    interactionOccupationHandConfirm: 'Confirm ({selected}/{max})',
     interactionSelection: 'Select Positions',
     interactionSelectionSubtitle: 'Selected: {selected}/{max}',
     interactionSelectionConfirm: 'Confirm',
@@ -440,6 +442,8 @@ export const en = {
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
     'renovate-house': { name: 'Renovate House', description: 'Upgrade your house to the next material tier' },
     'card-choice': { name: 'Card Choice', description: 'Make a choice from card options' },
+    'emit-choice': { name: 'Emit Choice', description: 'Card-driven player choice' },
+    selection: { name: 'Selection', description: 'Select positions or cards from hand' },
   },
   improvements: {
     Major_Fireplace1: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },
@@ -991,7 +995,12 @@ export const en = {
     E91_PlowBuilder: { anytime: 'Plow Builder: Pay 1 Food → Plow (harvest + Joinery)' },
     D129_LumberVirtuoso: { anytime: 'Lumber Virtuoso: Discard wood to 5 → Build Stables/Rooms' },
     E85_MasterTanner: { anytime: 'Master Tanner: Place food on card from cooked pig/cattle' },
-    B3_Moonshine: { choicePlayDisabled: 'Not enough food (need 2)' },
+    B3_Moonshine: {
+      choice: 'Moonshine: Choose what to do with the drawn occupation',
+      choicePlay: 'Play it (pay 2 food)',
+      choicePass: 'Give to next player',
+      choicePlayDisabled: 'Not enough food (need 2)',
+    },
   },
   fence: {
     error: {
