@@ -8,7 +8,6 @@ export type CardListenerContext = ActionExecutionContext & {
   result?: ActionExecutionResult
   choice?: string
   doable?: boolean
-  canUseOccupied?: boolean
   extraData?: Record<string, unknown>
   cardId?: string
   actionCardId?: string
