@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession, type SessionResponse } from './game-session.ts'
@@ -47,11 +47,29 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   return result
 }
 
-/** Fixed room ID for dev: one persistent room, survives backend restart. */
-export const FIXED_DEV_ROOM_ID = process.env.PERSISTENT_ROOM_ID ?? 'dev'
+/**
+ * Fixed dev rooms: one per supported player count. Each survives backend restarts
+ * and is persisted independently in SQLite (or output/<id>.json in json mode).
+ *
+ * Connect with `?room=devN&player=pK&transport=ws` (N = 2/3/4, K = 1..N).
+ */
+export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
+  { id: 'dev2', playerCount: 2 },
+  { id: 'dev3', playerCount: 3 },
+  { id: 'dev4', playerCount: 4 },
+]
+
+export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(
+  FIXED_DEV_ROOMS.map((r) => r.id),
+)
+
+export const isFixedDevRoom = (roomId: string): boolean =>
+  FIXED_DEV_ROOM_IDS.has(roomId)
+
+/** One-shot list of room IDs from previous schemes that should be purged on startup. */
+const LEGACY_DEV_ROOM_IDS = ['dev'] as const
 
 const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
-const LEGACY_PERSISTED_ROOM_FILE = process.env.PERSISTED_ROOM_FILE ?? join(process.cwd(), '.persisted-room.json')
 
 /**
  * Persistence backend for rooms:
@@ -168,7 +186,7 @@ export const resolveJoinPlayerIndex = (
     )
     if (occupied) {
       // Allow reconnection if same userId, or in dev room
-      if (room.id !== FIXED_DEV_ROOM_ID && !(userId && occupied.userId === userId)) {
+      if (!isFixedDevRoom(room.id) && !(userId && occupied.userId === userId)) {
         return { ok: false, error: 'player slot occupied' }
       }
       return {
@@ -204,17 +222,13 @@ function savePersistedState(roomId: string, serialized: SerializedGameState, roo
 }
 
 function loadPersistedStateJson(roomId: string): SerializedGameState | null {
-  const candidates = [getPersistedRoomFile(roomId)]
-  if (roomId === FIXED_DEV_ROOM_ID) {
-    candidates.push(LEGACY_PERSISTED_ROOM_FILE)
-  }
-  for (const filePath of candidates) {
-    if (!existsSync(filePath)) continue
+  const filePath = getPersistedRoomFile(roomId)
+  if (existsSync(filePath)) {
     try {
       const raw = readFileSync(filePath, 'utf-8')
       return JSON.parse(raw) as SerializedGameState
     } catch {
-      continue
+      /* fall through */
     }
   }
   return null
@@ -347,7 +361,7 @@ export const removePlayerFromRoom = (
   room.players = room.players.filter((player) => player.ws !== ws)
   if (room.players.length === beforeCount) return 'not-present'
   if (room.players.length === 0) {
-    if (room.id !== FIXED_DEV_ROOM_ID) {
+    if (!isFixedDevRoom(room.id)) {
       roomLastActivity.set(room.id, now)
     }
     return 'empty'
@@ -355,55 +369,93 @@ export const removePlayerFromRoom = (
   return 'remaining'
 }
 
-function ensurePersistentRoom(): void {
-  if (rooms.has(FIXED_DEV_ROOM_ID)) return
+/** One-shot purge of legacy single-`dev` room data (predates dev2/dev3/dev4). */
+function purgeLegacyDevRooms(): void {
   if (PERSIST_ROOMS === 'sqlite') {
     try {
       const db = getDb()
-      const row = db.prepare(
-        'SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE id = ?',
-      ).get(FIXED_DEV_ROOM_ID) as PersistedRoomRow | undefined
-      if (row) {
-        const restored = restoreRoomFromSqliteRow(row)
-        if (restored) {
-          rooms.set(FIXED_DEV_ROOM_ID, restored)
-          return
-        }
-      }
+      const placeholders = LEGACY_DEV_ROOM_IDS.map(() => '?').join(', ')
+      db.prepare(`DELETE FROM room_players WHERE room_id IN (${placeholders})`)
+        .run(...LEGACY_DEV_ROOM_IDS)
+      db.prepare(`DELETE FROM rooms WHERE id IN (${placeholders})`)
+        .run(...LEGACY_DEV_ROOM_IDS)
     } catch (err) {
-      console.warn('[room-manager] failed to restore persistent room from SQLite:', err)
+      console.warn('[room-manager] purgeLegacyDevRooms (sqlite) failed:', err)
     }
   }
-
-  const serialized = loadPersistedStateJson(FIXED_DEV_ROOM_ID)
-  const session = new GameSession()
-  if (serialized) {
+  for (const legacyId of LEGACY_DEV_ROOM_IDS) {
     try {
-      session.loadState(rehydrateState(serialized))
-    } catch (err) {
-      console.warn('[room-manager] load persisted state failed, starting fresh:', err)
-    }
+      const filePath = getPersistedRoomFile(legacyId)
+      if (existsSync(filePath)) {
+        try {
+          writeFileSync(`${filePath}.legacy.bak`, readFileSync(filePath, 'utf-8'), 'utf-8')
+        } catch { /* ignore */ }
+        try { unlinkSync(filePath) } catch { /* ignore */ }
+      }
+    } catch { /* non-critical */ }
   }
-  rooms.set(FIXED_DEV_ROOM_ID, {
-    id: FIXED_DEV_ROOM_ID,
-    session,
-    players: [],
-    maxPlayers: 2,
-    version: 0,
-  })
+}
+
+function ensurePersistentRooms(): void {
+  purgeLegacyDevRooms()
+  for (const { id, playerCount } of FIXED_DEV_ROOMS) {
+    if (rooms.has(id)) continue
+    if (PERSIST_ROOMS === 'sqlite') {
+      try {
+        const db = getDb()
+        const row = db.prepare(
+          'SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE id = ?',
+        ).get(id) as PersistedRoomRow | undefined
+        if (row) {
+          const restored = restoreRoomFromSqliteRow(row)
+          if (restored) {
+            rooms.set(id, restored)
+            continue
+          }
+        }
+      } catch (err) {
+        console.warn(`[room-manager] failed to restore persistent room ${id} from SQLite:`, err)
+      }
+    }
+
+    const serialized = loadPersistedStateJson(id)
+    let session: GameSession
+    if (serialized) {
+      session = new GameSession()
+      try {
+        session.loadState(rehydrateState(serialized))
+      } catch (err) {
+        console.warn(`[room-manager] load persisted state for ${id} failed, starting fresh:`, err)
+        session = new GameSession(undefined, undefined, { playerCount })
+      }
+    } else {
+      session = new GameSession(undefined, undefined, { playerCount })
+    }
+    rooms.set(id, {
+      id,
+      session,
+      players: [],
+      maxPlayers: playerCount,
+      version: 0,
+    })
+  }
 }
 
 /**
  * In SQLite mode: restore all 'playing' rooms from the database into memory.
- * Called once at startup. Players will reconnect via joinRoom.
+ * Called once at startup. Players will reconnect via joinRoom. Fixed dev rooms
+ * are excluded — `ensurePersistentRooms` already loaded them with the right
+ * playerCount-bound seed when they didn't have a persisted state yet.
  */
 function restoreRoomsFromSqlite(): void {
   if (PERSIST_ROOMS !== 'sqlite') return
   try {
     const db = getDb()
+    const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
+    const placeholders = fixedIds.map(() => '?').join(', ')
     const rows = db.prepare(
-      "SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE status != 'finished' AND id != ?",
-    ).all(FIXED_DEV_ROOM_ID) as PersistedRoomRow[]
+      `SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
+    ).all(...fixedIds) as PersistedRoomRow[]
     for (const row of rows) {
       if (rooms.has(row.id)) continue
       try {
@@ -473,7 +525,7 @@ const broadcastState = (
   }
   broadcast(room, envelope)
   // Persist on every state change for sqlite, only dev room for json
-  if (PERSIST_ROOMS === 'sqlite' || room.id === FIXED_DEV_ROOM_ID) {
+  if (PERSIST_ROOMS === 'sqlite' || isFixedDevRoom(room.id)) {
     savePersistedState(room.id, serializeState(resp.state), room)
   }
   // Mark room as finished in SQLite when game ends
@@ -514,7 +566,7 @@ function startRoomCleanup(): void {
   setInterval(() => {
     const now = Date.now()
     for (const [roomId, room] of rooms) {
-      if (roomId === FIXED_DEV_ROOM_ID) continue
+      if (isFixedDevRoom(roomId)) continue
       if (room.players.length > 0) {
         roomLastActivity.set(roomId, now)
         continue
@@ -537,7 +589,7 @@ function startRoomCleanup(): void {
 
 export const createWsServer = (server: import('node:http').Server) => {
   if (process.env.NODE_ENV !== 'production') {
-    ensurePersistentRoom()
+    ensurePersistentRooms()
   }
   restoreRoomsFromSqlite()
   startRoomCleanup()
@@ -697,7 +749,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (msg.type === 'dissolveRoom') {
         if (!currentRoom) { sendCommandError('not in a room'); return }
         const room = currentRoom
-        if (room.id === FIXED_DEV_ROOM_ID) { sendCommandError('cannot dissolve dev room'); return }
+        if (isFixedDevRoom(room.id)) { sendCommandError('cannot dissolve dev room'); return }
         if (room.createdBy !== currentUserId) { sendCommandError('only the room creator can dissolve'); return }
         broadcast(room, { type: 'roomDissolved', roomId: room.id })
         for (const p of room.players) {
@@ -874,7 +926,7 @@ export const getRooms = (): RoomSummary[] =>
 export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean; error?: string } => {
   const room = rooms.get(roomId)
   if (!room) return { ok: false, error: 'room not found' }
-  if (room.id === FIXED_DEV_ROOM_ID) return { ok: false, error: 'cannot dissolve dev room' }
+  if (isFixedDevRoom(room.id)) return { ok: false, error: 'cannot dissolve dev room' }
   if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
   broadcast(room, { type: 'roomDissolved', roomId: room.id })
   for (const p of room.players) {

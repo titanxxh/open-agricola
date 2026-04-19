@@ -130,7 +130,7 @@ Phase 2 前端联调已完成：
 - `GameContainerApi` / `FarmBoard` 现在会把 `sow` 交互拆成“真实农场格”与“off-board extra-sow tray”两类目标；像 `E68_CherryOrchard` 这类虚拟田仍完全由服务端 `interaction.farm.selectableFields` 驱动，前端只负责渲染与提交坐标。
 - `newGame` 支持可选 `seed` 参数，HTTP `/api/game/new` 与 WS `newGame` 均支持；`GameSession` 构造函数接受 `number` 类型 seed。
 - 双窗口实时同步验证通过（P1 操作后 P2 立即看到状态变化）。
-- **固定持久化房间（dev）**：可选使用固定房间 ID（默认 `dev`，由 `PERSISTENT_ROOM_ID` 配置）。后端启动时按 `PERSIST_ROOMS` 恢复该房间状态；当前默认后端是 SQLite（`data/open-agricola.db` 中的 `rooms.state_json`），若显式设为 `json` 则读写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev.json`）。每次该房间状态变更后都会立刻写回；该房间在无人连接时也不销毁。使用 `?transport=ws&room=dev` 时，前端会把 `player=p1/p2` 映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 进入，服务端对固定房间允许同座位重连替换旧连接，避免刷新后被分配到错误玩家位。为兼容旧环境，固定 dev 房间仍会回退读取旧 `.persisted-room.json`。
+- **固定持久化 dev 房（dev2 / dev3 / dev4）**：后端启动时硬编码三间常驻房间，房间 ID 与人数一一对应（`dev2`=2 人、`dev3`=3 人、`dev4`=4 人），分别独立持久化、各自存活于跨重启之间。默认按 `PERSIST_ROOMS=sqlite` 写入 `data/open-agricola.db` 的 `rooms.state_json`；若显式设为 `json` 则写 `PERSISTED_ROOMS_DIR/<roomId>.json`（默认 `output/dev2.json` 等）。每次房间状态变更都会立刻写回；这些房间在无人连接时也不销毁、也不可被 `dissolveRoom`。前端使用 `?transport=ws&room=devN&player=pK` 进入对应房间，`p1..pN` 会映射为固定座位并通过 `joinRoom(roomId, requestedPlayerIndex)` 入座，服务端对这三间房允许同座位重连替换旧连接。对应地，`./restart-intranet.sh` 默认会打印三间房的链接，可用 `--players N` 突出某一间。早期版本中遗留的单一 `dev` 房与 `.persisted-room.json` / `PERSISTENT_ROOM_ID` 环境变量已不再支持，启动时会自动从 SQLite 中清理旧的 `dev` 行（json 文件会备份成 `<roomId>.json.legacy.bak` 后删除）。
 - `./restart-intranet.sh` 现在直接使用当前仓库的绝对路径二进制启动 `tsx` / `vite`，并按同样的绝对路径匹配旧进程，避免跨 clone/worktree 的全局 `pkill` 误伤。
 - 普通 SQLite 房间同样遵循“空房先保留、TTL 后回收”的策略：连接全部断开时不会立刻从内存删掉，而是保留分享链接可重连的窗口期。服务端启动恢复范围也覆盖 `waiting` 与 `playing` 房间，因此等待中的房间不会再因为后端重启直接丢失。恢复与重开都会继续带上房间记录里的 `custom_card_ids`。
 
