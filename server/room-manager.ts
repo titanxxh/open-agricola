@@ -156,8 +156,16 @@ const createSessionForRoom = (
   stateOrSeed?: SerializedGameState | number,
   customCardDbIds: string[] = [],
   requestUserId?: string,
+  playerCount?: number,
 ): GameSession => {
   const customCards = loadCustomCardsFromDb(customCardDbIds, requestUserId)
+  // playerCount only applies when GameSession seeds a fresh state (i.e. when
+  // no serialized state is supplied). When `stateOrSeed` is a serialized
+  // state, the player count is already encoded in `state.players`.
+  const initialOptions =
+    playerCount && (stateOrSeed === undefined || typeof stateOrSeed === 'number')
+      ? { playerCount }
+      : undefined
   return new GameSession(
     typeof stateOrSeed === 'number'
       ? stateOrSeed
@@ -165,6 +173,7 @@ const createSessionForRoom = (
         ? rehydrateState(stateOrSeed)
         : undefined,
     customCards.length > 0 ? customCards : undefined,
+    initialOptions,
   )
 }
 
@@ -314,9 +323,9 @@ function loadRoomFromState(
   customCardDbIds: string[] = [],
   version = 0,
 ): Room {
-  let session = createSessionForRoom(undefined, customCardDbIds, createdBy)
+  let session = createSessionForRoom(undefined, customCardDbIds, createdBy, maxPlayers)
   try {
-    session = createSessionForRoom(serialized, customCardDbIds, createdBy)
+    session = createSessionForRoom(serialized, customCardDbIds, createdBy, maxPlayers)
   } catch (err) {
     console.warn(`[room-manager] failed to rehydrate room ${roomId}, starting fresh:`, err)
   }
@@ -328,7 +337,12 @@ export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
   if (!row.state_json) {
     return {
       id: row.id,
-      session: createSessionForRoom(undefined, customCardDbIds, row.created_by ?? undefined),
+      session: createSessionForRoom(
+        undefined,
+        customCardDbIds,
+        row.created_by ?? undefined,
+        row.max_players,
+      ),
       players: [],
       maxPlayers: row.max_players,
       version: row.version,
@@ -854,7 +868,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'newGame') {
-        room.session = createSessionForRoom(msg.seed, room.customCardDbIds ?? [], room.createdBy)
+        room.session = createSessionForRoom(msg.seed, room.customCardDbIds ?? [], room.createdBy, room.maxPlayers)
         const resp = room.session.withCtx(() => room.session.getState())
         broadcastState(room, resp, 'reconnect', msg.requestId)
         return
