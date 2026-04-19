@@ -6,7 +6,7 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addWorkerRef, isSpaceOccupied } from '../../game/space'
+import { addWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
 import { computeAllowedPlacementSpaces } from './placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
@@ -68,14 +68,19 @@ export const placeFarmerAction: ActionDefinition = {
       if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }
-    const available = state.actionSpaces
-      .filter((s) => !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player))
-      .map((s) => ({ value: s.id, labelKey: s.nameKey }))
-    if (available.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    const allowed = computeAllowedPlacementSpaces(state, player)
+    if (allowed.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    const options = allowed.map((a) => {
+      const space = state.actionSpaces.find((s) => s.id === a.spaceId)!
+      return {
+        value: a.allowOccupied ? `${OCCUPIED_SPACE_CHOICE_PREFIX}${a.spaceId}` : a.spaceId,
+        labelKey: space.nameKey,
+      }
+    })
     return {
       type: 'choice',
       promptKey: 'ui.interactionPlaceFarmerExtra',
-      options: available,
+      options,
     }
   },
   resolveChoice: ({ state, player }, choice) => {
@@ -85,13 +90,10 @@ export const placeFarmerAction: ActionDefinition = {
       : choice
     const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
     if (!targetSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
-    if (isSpaceOccupied(targetSpace) && !allowOccupied) {
-      return { type: 'fail', logKey: 'log.placeFarmerFail' }
-    }
     const placeResult = placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
-    const result = targetSpace.execute({ state, player, space: targetSpace })
-    if (result.type === 'flow') return result
-    return result
+    const execResult = targetSpace.execute({ state, player, space: targetSpace })
+    if (execResult.type === 'flow') return execResult
+    return execResult
   },
 }
