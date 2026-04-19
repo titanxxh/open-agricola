@@ -656,28 +656,34 @@ a:focus-visible,
 .action-board {
   position: relative;
   background:
-    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
-    url('/bga-img/add_2p.png') 0px 0 / 156px auto no-repeat,
     url('/bga-img/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* Left panel dashed border (matches BGA #add-board) */
+.action-board.action-board--2p {
+  background:
+    url('/bga-img/central.png') 0px 0 / 830px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
+.action-board.action-board--3p {
+  background:
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/left_3p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
+.action-board.action-board--4p {
+  background:
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/left_4p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+
 .action-board::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 156px;
-  height: 614px;
-  border: 1px dashed white;
-  border-left: none;
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-  z-index: 1;
-  pointer-events: none;
+  content: none;
 }
 
 /* --- Action card holder (wrapper) --- */
@@ -2288,6 +2294,9 @@ a:focus-visible,
 .action-desc .icon-line .res-icon {
   font-size: inherit;
 }
+.action-desc .icon-line .icon-token {
+  display: inline-block;
+}
 
 /* Farm Expansion: smaller font for its many cost lines */
 [data-action-id="farm-expansion"] .action-desc .icon-line {
@@ -2299,10 +2308,24 @@ a:focus-visible,
 }
 /* Lessons: smaller first line */
 [data-action-id="lessons"] .action-desc .icon-line:first-child,
+[data-action-id="lessons-3"] .action-desc .icon-line:first-child,
 [data-action-id="lessons-4"] .action-desc .icon-line:first-child {
   font-size: 0.7em;
 }
 /* Resource Market: smaller text */
+[data-action-id="resource-market"] .action-desc .icon-line {
+  font-size: 0.7em;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market {
+  gap: 1px;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market .icon-token--slash {
+  margin: 0 0.16em;
+  font-size: 0.9em;
+}
+[data-action-id="resource-market"] .action-desc .icon-line--resource-market .icon-token--spaced-plus {
+  margin-left: 0.18em;
+}
 [data-action-id="resource-market-4"] .action-desc .icon-line {
   font-size: 0.65em;
 }
