@@ -2985,6 +2985,11 @@ export class GameSession {
         return cancelResult
       }
     }
+    // Also block if the current state has a pending boundary (set during onBuy before the
+    // next pushHistory call consumes it — e.g. B3 Moonshine sets it after rolling randomly).
+    if (this.state.pendingUndoBoundary === true) {
+      return this.respond(false, 'cannot undo past boundary')
+    }
     if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
       return this.respond(false, 'cannot undo past boundary')
     }
