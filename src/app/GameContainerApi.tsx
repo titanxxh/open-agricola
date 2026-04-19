@@ -505,6 +505,7 @@ export const GameContainerApi = () => {
           options: interaction.options,
           playerIndex: interaction.playerIndex,
           spaceId: interaction.spaceId,
+          sourceCard: interaction.sourceCard,
           fenceExtraWood:
             interaction.stateId === 'farmSelect' && interaction.farm.farmType === 'fence'
               ? interaction.farm.extraWood ?? 0

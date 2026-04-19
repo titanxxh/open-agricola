@@ -8,6 +8,7 @@ export type PendingChoice = {
   playerIndex: number
   spaceId: string
   fenceExtraWood?: number
+  sourceCard?: string
 }
 
 export type PendingAnimalReorg = {

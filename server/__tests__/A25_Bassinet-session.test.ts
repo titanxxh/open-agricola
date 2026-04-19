@@ -172,8 +172,14 @@ describe('A25_Bassinet session', () => {
     expect(fgResp.ok).toBe(true)
     expect(fgResp.pending.type).toBe('choice')
 
-    // Skip FG's own optional minor-improvement → reveals A92 offer
-    const a92Resp = session.resolveChoice(0, '__skip__')
+    // Depending on the dealt hand, wish-children may first offer its own
+    // optional minor-improvement tail. If so, skip it to reach the A92 offer.
+    const fgChoice = fgResp.pending.type === 'choice' ? fgResp.pending : null
+    const showsWishChildrenMinorTail =
+      fgChoice?.options.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
+    const a92Resp = showsWishChildrenMinorTail
+      ? session.resolveChoice(0, '__skip__')
+      : fgResp
     expect(a92Resp.ok).toBe(true)
     expect(a92Resp.pending.type).toBe('choice')
 

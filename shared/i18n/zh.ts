@@ -162,6 +162,7 @@ export const zh = {
     interactionStableSelectSubtitle: '已选 {selected} / 最多 {max}',
     interactionSowSelectSubtitle: '已选 {selected} 块田地',
     interactionOptionalAction: '可选动作',
+    interactionTriggeredByCard: '由 {card} 触发',
     interactionOptionalSkip: '跳过',
     interactionFlowSelect: '请选择要执行的动作',
     interactionFlowDone: '完成',

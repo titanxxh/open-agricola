@@ -5,7 +5,7 @@ import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import type { AnytimeAction, Resource } from '../../../shared/game/types'
 import { AnytimeBar } from './AnytimeBar'
-import { translateCardText } from '../common/cardText'
+import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: Partial<Resource>
@@ -184,6 +184,10 @@ export const InteractionBar = ({
     (pendingNextPlayerIndex !== null && isInteractive) ||
     !isInteractive
   )
+  const triggerCardName =
+    pendingChoice?.sourceCard
+      ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
+      : null
 
   return (
     <div className="interaction-bar">
@@ -237,6 +241,11 @@ export const InteractionBar = ({
               <div className="interaction-title">
                 {t(locale, pendingChoice.promptKey as string ?? 'ui.interactionChooseOne')}
               </div>
+              {triggerCardName ? (
+                <div className="interaction-subtitle">
+                  {t(locale, 'ui.interactionTriggeredByCard', { card: triggerCardName })}
+                </div>
+              ) : null}
               {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
                 <div className="interaction-subtitle">
                   {t(locale, 'ui.interactionRoomSelectSubtitle', {

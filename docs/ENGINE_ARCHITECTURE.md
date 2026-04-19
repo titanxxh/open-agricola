@@ -223,6 +223,7 @@ type StateUpdateEnvelope =
   - `stateId`
   - `allowedCommands`
   - `anytimeActions`
+  - `choice` / `farmSelect` / `selection` 的 `sourceCard`（当交互由某张卡触发时，前端可统一显示“由某卡触发”）
   - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`（对 `sow`，`selectableFields` 允许包含 off-board 虚拟田位、每格独立 `allowedCrops` 与 `sourceCard`）
 
 协议层规则：
@@ -1031,7 +1032,14 @@ type SerializedGameState = Omit<GameState, 'actionSpaces'> & {
 ```ts
 type PendingAction =
   | { type: 'none' }
-  | { type: 'choice'; playerIndex: number; spaceId: string; options: ActionChoiceOption[]; promptKey?: string }
+  | {
+      type: 'choice'
+      playerIndex: number
+      spaceId: string
+      options: ActionChoiceOption[]
+      promptKey?: string
+      sourceCard?: string
+    }
   | { type: 'animalReorg'; playerIndex: number; spaceId: string }
   | { type: 'harvestFeed'; playerIndex: number; remaining: number; foodUsed: number; feedQueue?: { index: number; remaining: number; foodUsed: number }[] }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
