@@ -61,7 +61,6 @@ src/       前端：React UI、transport 抽象、hooks
 - `before`、`during`、`immediatelyAfter`、`after`——执行生命周期
 - `computeCosts`、`computeArgs`、`computeReplace`——行动定制
 - `isDoable`——可用性覆盖
-- `canUseOccupied`——允许使用已占用的行动格
 
 ### Transport 抽象（`src/services/`）
 
