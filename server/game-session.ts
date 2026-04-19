@@ -1977,8 +1977,8 @@ export class GameSession {
         })
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
-          // Mirrors engine.ts resolveChoice flow-insertion (line ~1526-1531).
-          this.engine.insertFollowUpFlow(cardFlow)
+          // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
+          this.engine.insertFlowAfterPendingChoice(cardFlow)
         }
       }
     }
