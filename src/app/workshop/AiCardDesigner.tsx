@@ -1,3 +1,18 @@
+/**
+ * Workshop AI Card Designer.
+ *
+ * The system prompt fed to the LLM lives in `src/services/llmPrompts.ts`.
+ * Sandbox constraints visible to users (sandbox-error tooltips, "what can I
+ * write" hints, etc.) MUST stay consistent with the single source of truth:
+ *   docs/CUSTOM_CARD_SANDBOX.md
+ *
+ * CI runs `pnpm run check:prompt-sync` to keep llmPrompts.ts and the SANDBOX
+ * doc aligned with the underlying source code (cardEffectHooks /
+ * isActionHookPhase / DENIED_IDENTIFIERS / DENIED_PROPERTY_ACCESS).
+ *
+ * If you add UI copy here that lists hooks / phases / denied identifiers,
+ * link to the SANDBOX doc rather than embedding a parallel list.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
