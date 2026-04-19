@@ -36,7 +36,7 @@
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
 | ✅ 完全对齐 | ~803 + §2.1 列举 27 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
-| 🟡 简化实现（§2.2） | 6 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
+| 🟡 简化实现（§2.2） | 4 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 0 张 | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
 | 🔀 刻意偏离 BGA（§2.5） | 3 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-19 — A3 + B3 BGA 对齐**：A3 PaperKnife 改为"展示手牌 → 玩家选 3 → 引擎随机从 3 中取 1 免费打出"（不再整手随机直接打出）；B3 Moonshine 改为"服务端随机选 1 张手牌 → 玩家选 play/pass 二选一"（不再自动 XOR 折叠）。新基础设施：`CardEffect.resolveChoice` hook、`rollAndCacheCardPick` + `state.rngTick`（`shared/cards/helpers/card-random.ts`）、`state.pendingUndoBoundary`（`server/game-session.ts` 的 `pushHistory` 消费）、`InteractionSelection.kind: 'occupation-hand'` + `buildOccupationHandSelectionInteraction`（`server/occupation-hand-interaction.ts`）、`ActionChoiceOption.disabled / .disabledReasonKey`（server 拒绝 disabled 选项）、`passOccupationToNextPlayer`（`shared/cards/helpers/pass-occupation.ts`）、`emit-choice` action（`shared/actions/effects/emit-choice.ts`）。§2.2 移除 A3 和 B3 条目。
 - **2026-04-19 — C22 BasketChair BGA 对齐**：引入 `card-held-workers` 原语（`shared/cards/helpers/card-held-workers.ts`），允许卡牌通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人；`workersAvailable` 排除被卡持有的工人；回家阶段（`server/game-session.ts` returnHome）在清空行动格 `takenBy` 之后以 for 循环遍历所有玩家 cardStates，对每个 cardId 调用 `releaseWorkerFromCard(p, cardId)` 释放持有工人；`recall-placed-worker` 新增 `forceFirst` 与 `targetCardHold` 参数。C22 从简化实现（额外 place-farmer）重写为：`onBuy` hook 在本工作阶段已有首置 farmer 且首置格不是 Meeting Place 时，(a) 用 `recall-placed-worker forceFirst+targetCardHold` 把该工人从行动格撤回到卡持有态，(b) 再提供一次额外 `place-farmer` 让玩家补放另一个在家工人——净消耗 2 个在家工人，释放 1 个格位。若当时尚未放过 farmer 或首置格是 Meeting Place，onBuy seq 直接跳过。回家时工人随 for 循环释放。刻意偏离：(a) 不支持同轮再激活，(b) JobContract 的假人 meeple 清理未实现。新增 `server/__tests__/C22_BasketChair-session.test.ts`。
 - **2026-04-19 — A48 ShavingHorse + B143 ClayWarden BGA 对齐**：A48 删除 `WOOD_SPACES` 过滤（BGA 不按空间过滤），合并为两个 `after` listener——`gain/collect/receive` + `anytime-exchange`——复用同一 `checkAndExchange(context)` 检查木头净获得与当前总量；cost 从 `{}` 改为 `{ wood: 1 }` 与 BGA 对齐。B143 `HOLLOW_SPACES` 加入 `'hollow'`（3 人版空间），在 3 人局也能触发 opponent 钩子。新增 `server/__tests__/A48_ShavingHorse-session.test.ts`（7 例）、扩展 `server/__tests__/B143_ClayWarden-session.test.ts`（+1 例 3P）。
 - **2026-04-19 — E96 Elder BGA 对齐 + `handHooks` 通用手牌 hook 机制 + 批量移除冗余 played-includes 守卫**：新增 `CardEffect.handHooks` 字段，声明哪些 hook 在卡牌还在手牌时也应触发；`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。E96 Elder 通过此机制实现回合 1 免费打出自身（`onBeforeStartOfTurn` + `allowedCards` 过滤）。同时批量移除 756 处冗余的 `player.xxxPlayed.includes(CARD_ID)` 守卫——框架已在调用侧保证卡牌已打出，卡牌文件内无需重复检查。
@@ -115,14 +116,12 @@
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 | D154 ChimneySweep | `renovate-house` computeCosts hook 无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；结算时每名其他玩家住石屋 +1 bonus VP | 2026-04-19：去掉 `houseType === 'clay'` 守卫、`players: '3+' → '4+'`；wood→clay 由 `applyCostOverride` 的 `Math.max(0, …)` clamp 处理——stone 不在基础 cost 中，负数不产生副作用；BGA `extraVp = true` 仅卡面 UI 标记，规则无影响 |
 
-### 2.2 🟡 简化实现（6 张）
+### 2.2 🟡 简化实现（4 张）
 
 > 简化原因写在各卡 `.ts` 文件顶部注释中。回归 BGA 完整规则需要的基础设施列在最后一列。
 
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
-| A3 PaperKnife | 跳过"选 3 再随机 1"中间步骤；onBuy 直接从整手随机选 1 免费打 | `select-N-from-hand` pending 类型 |
-| B3 Moonshine | XOR 折叠为"买不起则 PASS"（自动抉择） | `select-N-from-hand` + pass-to-opponent action |
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
 | D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
@@ -226,6 +225,13 @@
 | **minor / occupation 印刷 `vp` 接入计分**（2026-04-17, PR1） | ✅ | `shared/logic/scoring.ts:287-293` 通过 `getRegisteredMinorImprovement(id).vp` / `getRegisteredOccupation(id).vp` 把印刷 VP 计入 `cardEntries`；之前硬编码 `score: 0`。配套本地审计脚本 `scripts/audit-card-vp.ts`（`npx tsx scripts/audit-card-vp.ts [--strict]`）对齐 BGA minor/occupation `vp` 字段；**不进 CI**，只作本地 gate。 |
 | **`CardEffect.handHooks` 手牌 hook 机制**（2026-04-19） | ✅ | `CardEffect.handHooks?: CardEffectHook[]`：声明哪些 hook 在卡牌还在手牌时也应触发。`continueStageHook` 在遍历已打出卡后额外遍历手牌中声明了当前 hook 的卡。框架保证 handHooks 只遍历手牌——一旦卡被打出（移入 `xxxPlayed`），只走正常路径。消费者：E96 Elder。 |
 | **`play-occupation` `allowedCards` 参数**（2026-04-19） | ✅ | `play-occupation` action 的 execute/resolveChoice 支持 `params.allowedCards?: string[]` 过滤可选职业。消费者：E96 Elder。 |
+| **`CardEffect.resolveChoice` hook**（2026-04-19） | ✅ | `shared/cards/card-effects.ts`：卡牌在 choice prompt 返回后可声明此 hook 接管结果（例：A3 用它实现"从玩家选中的 3 张中随机取 1"）。 |
+| **`rollAndCacheCardPick` + `state.rngTick`**（2026-04-19） | ✅ | `shared/cards/helpers/card-random.ts`：确定性 RNG helper，`state.rngTick` 作为单调递增种子，保证同一 state 快照回放结果一致。消费者：A3 PaperKnife。 |
+| **`state.pendingUndoBoundary` flag**（2026-04-19） | ✅ | `server/game-session.ts` 的 `pushHistory` 消费：当 flag 为 true 时阻止 undo 越过当前状态边界（防止玩家看到随机结果后撤销重抽）。消费者：A3 PaperKnife。 |
+| **`InteractionSelection.kind: 'occupation-hand'` + `buildOccupationHandSelectionInteraction`**（2026-04-19） | ✅ | `server/occupation-hand-interaction.ts`：在 `InteractionSelection` 通用 selection 框架下新增"从手牌选职业"子类型，前端按此 kind 渲染手牌选择面板。消费者：A3 PaperKnife、B3 Moonshine。 |
+| **`ActionChoiceOption.disabled` / `.disabledReasonKey`**（2026-04-19） | ✅ | 选项可标记为 disabled + 提供 i18n reason key；server 校验时拒绝玩家选中 disabled 选项（防止前端绕过禁用直接提交）。 |
+| **`passOccupationToNextPlayer`**（2026-04-19） | ✅ | `shared/cards/helpers/pass-occupation.ts`：把一组手牌传给下一位玩家并等待其选择；实现"传牌"语义。消费者：B3 Moonshine。 |
+| **`emit-choice` action**（2026-04-19） | ✅ | `shared/actions/effects/emit-choice.ts`：在 ActionFlow 中发出一个 choice prompt 并等待玩家回应，作为通用的"弹出选择后继续"叶节点。 |
 | **Dual-type cards (`CardDefinition.alsoCountsAs`)**（2026-04-17, PR3） | ✅ | 新增 `CardType = 'major' \| 'minor' \| 'occupation'` + `CardBase.alsoCountsAs?: CardType[]`（对齐 BGA `getOtherCardTypes()`）。`shared/cards/helpers/card-type.ts` 提供 `cardCountsAs(cardId, asType)` 与 `collectCardsAs(player, asType)`；`prerequisites.ts` 的 3 个 count 函数 + 5 处 caller（A101/A31/D145/C5/B133）全部切到 dual-type 计数。落地卡：D60/D59/A60 均 `alsoCountsAs: ['major']`。前端 `PlayerCard` + `card-sprite.css` 走 `data-also-counts-as` 属性选择器切换 `card_frame_major_minor.png` + `minor_major_costtext.png`——未来新增 dual-type minor 零改动即可正确渲染。 |
 | **`onAllWorkersPlaced` 阶段 hook + 阶段 flow**（2026-04-18） | ✅ | `CardEffect.onAllWorkersPlaced?: CardEffectHook`：在所有玩家本轮在家工人都用完之后、`performRoundEnd` 之前触发；可返回 `ActionFlow` 走与普通行动一致的引擎链路（`continueAllWorkersPlacedHooks` 维护 stage resume cursor）。首个消费者：`E125 DelayedWayfarer`（本轮所有人放完后，从 supply 激活并放置一个 worker，对齐 BGA 时序）。 |
 | **`place-farmer` `fromSupply` 模式**（2026-04-18） | ✅ | `place-farmer` 接受 `params.fromSupply: true`：在执行前从 `player.workers` 里激活一个 inactive supply worker（标记 `isActive=true`），再走标准放置流程；专为 `onAllWorkersPlaced` 阶段“现激活、现放置”的卡牌（E125 DelayedWayfarer）服务，不影响普通工作阶段路径。 |
@@ -272,6 +278,7 @@
 | canUseOccupied → computeArgs 统一 | 04-19 | 0 | 821 | 92.0% |
 | E96 Elder BGA 对齐 + handHooks 机制 | 04-19 | 0 | 821 | 92.0% |
 | C22 BasketChair BGA 对齐 + card-held-workers 原语 | 04-19 | 0 | 821 | 92.0% |
+| A3+B3 BGA 对齐 via hand-picker infra | 04-19 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
