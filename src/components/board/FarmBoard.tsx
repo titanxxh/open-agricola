@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -253,6 +253,13 @@ type Props = {
   >
   resolveChoice: (value: string) => void
   isInteractive: boolean
+  occupationHandSelection?: {
+    kind: 'occupation-hand'
+    selectableCards: string[]
+    minSelections: number
+    maxSelections: number
+  }
+  onConfirmOccupationHandSelection?: (cardIds: string[]) => void
 }
 
 type TooltipPosition = {
@@ -540,8 +547,32 @@ export const FarmBoard = ({
   resolveChoice,
   devMode,
   isInteractive,
+  occupationHandSelection,
+  onConfirmOccupationHandSelection,
 }: Props) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+
+  // Multi-select state for occupation-hand selection interaction
+  const isMultiOccupationSelect = !!occupationHandSelection
+  const [selectedOccIds, setSelectedOccIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setSelectedOccIds(new Set())
+  }, [occupationHandSelection?.selectableCards.join('|')])
+
+  const toggleOcc = (id: string) => {
+    setSelectedOccIds((prev) => {
+      if (prev.has(id)) {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      }
+      if (occupationHandSelection && prev.size >= occupationHandSelection.maxSelections) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }
   const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
@@ -1105,6 +1136,24 @@ export const FarmBoard = ({
                 <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
               ) : (
                 displayPlayer.occupationHand.map((cardId) => {
+                  if (isMultiOccupationSelect) {
+                    const isSelectable = occupationHandSelection!.selectableCards.includes(cardId)
+                    return (
+                      <PlayerCard
+                        key={`occupation-${cardId}`}
+                        locale={locale}
+                        cardId={cardId}
+                        cardType="occupation"
+                        devMode={devMode}
+                        onClick={() => {
+                          if (isSelectable) toggleOcc(cardId)
+                        }}
+                        disabled={!isSelectable}
+                        selectable={isSelectable}
+                        selected={selectedOccIds.has(cardId)}
+                      />
+                    )
+                  }
                   const canPlay = cardAvailability[`occupation:${cardId}`] !== false
                   const isSelectingThisHand = isSelectingOccupation
                   const isOptionSelectable =
@@ -1135,6 +1184,24 @@ export const FarmBoard = ({
                 })
               )}
             </div>
+            {isMultiOccupationSelect && occupationHandSelection && (
+              <div className="hand-select-confirm">
+                <button
+                  type="button"
+                  disabled={
+                    selectedOccIds.size < occupationHandSelection.minSelections ||
+                    selectedOccIds.size > occupationHandSelection.maxSelections
+                  }
+                  onClick={() => onConfirmOccupationHandSelection?.([...selectedOccIds])}
+                  data-testid="occupation-hand-confirm"
+                >
+                  {t(locale, 'ui.interactionOccupationHandConfirm', {
+                    selected: selectedOccIds.size,
+                    max: occupationHandSelection.maxSelections,
+                  })}
+                </button>
+              </div>
+            )}
           </div>
           <div className="hand-section minor">
             <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
