@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FarmTilePosition } from '../../shared/game/types'
 import type { PendingSowCrop } from '../types/ui'
+import { isBorderEdge } from '../../shared/game/farm'
 
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])
@@ -39,6 +40,8 @@ export const useFarmSelection = () => {
         setPendingFenceEdges((prev) => [...prev, edgeId])
       } else setPendingFenceEdges((prev) => [...prev, edgeId])
     } else {
+      // palisade can only be placed on the farm border
+      if (!isBorderEdge(edgeId)) return
       if (inPalisade) setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
       else if (inFence) {
         setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))

@@ -3,6 +3,7 @@ import * as React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { useFarmSelection } from '../useFarmSelection'
+import { isBorderEdge } from '../../../shared/game/farm'
 
 type Captured = ReturnType<typeof useFarmSelection>
 
@@ -54,6 +55,8 @@ function applyToggle(state: State, edgeId: string): State {
     }
     return { ...state, pendingFenceEdges: [...pendingFenceEdges, edgeId] }
   }
+  // palisade mode: only border edges allowed
+  if (!isBorderEdge(edgeId)) return state
   if (inPalisade) {
     return { ...state, pendingPalisadeEdges: pendingPalisadeEdges.filter((e) => e !== edgeId) }
   }
@@ -108,15 +111,17 @@ describe('useFarmSelection — palisade toggle', () => {
     expect(s1.pendingPalisadeEdges).toEqual(['edge-2'])
   })
 
-  it('clicking edge in palisade mode that is in fence pending replaces it', () => {
+  it('clicking border edge in palisade mode that is in fence pending replaces it', () => {
+    // H-0-0 is a valid border edge; verify that switching to palisade mode
+    // moves it from fence pending to palisade pending
     const s0: State = {
-      pendingFenceEdges: ['edge-1'],
+      pendingFenceEdges: ['H-0-0'],
       pendingPalisadeEdges: [],
       fencePlacementMode: 'palisade',
     }
-    const s1 = applyToggle(s0, 'edge-1')
+    const s1 = applyToggle(s0, 'H-0-0')
     expect(s1.pendingFenceEdges).toEqual([])
-    expect(s1.pendingPalisadeEdges).toEqual(['edge-1'])
+    expect(s1.pendingPalisadeEdges).toEqual(['H-0-0'])
   })
 
   it('same edge clicked twice in same mode cancels', () => {
@@ -127,9 +132,32 @@ describe('useFarmSelection — palisade toggle', () => {
     expect(s2.pendingPalisadeEdges).toEqual([])
 
     const p0: State = { pendingFenceEdges: [], pendingPalisadeEdges: [], fencePlacementMode: 'palisade' }
-    const p1 = applyToggle(p0, 'edge-2')
-    const p2 = applyToggle(p1, 'edge-2')
+    const p1 = applyToggle(p0, 'H-0-0')
+    const p2 = applyToggle(p1, 'H-0-0')
     expect(p2.pendingFenceEdges).toEqual([])
     expect(p2.pendingPalisadeEdges).toEqual([])
+  })
+})
+
+describe('useFarmSelection palisade border-only', () => {
+  it('ignores internal edge in palisade mode', () => {
+    // H-1-1 is an internal horizontal edge (row 1, col 1 — not on the border)
+    const s0: State = { pendingFenceEdges: [], pendingPalisadeEdges: [], fencePlacementMode: 'palisade' }
+    const s1 = applyToggle(s0, 'H-1-1')
+    expect(s1.pendingPalisadeEdges).toEqual([])
+  })
+
+  it('accepts border edge in palisade mode', () => {
+    // H-0-0 is a top-border horizontal edge (row 0)
+    const s0: State = { pendingFenceEdges: [], pendingPalisadeEdges: [], fencePlacementMode: 'palisade' }
+    const s1 = applyToggle(s0, 'H-0-0')
+    expect(s1.pendingPalisadeEdges).toEqual(['H-0-0'])
+  })
+
+  it('fence mode still accepts internal edge', () => {
+    // Internal edges should still be selectable in fence mode
+    const s0: State = { pendingFenceEdges: [], pendingPalisadeEdges: [], fencePlacementMode: 'fence' }
+    const s1 = applyToggle(s0, 'H-1-1')
+    expect(s1.pendingFenceEdges).toEqual(['H-1-1'])
   })
 })
