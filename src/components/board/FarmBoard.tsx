@@ -273,6 +273,8 @@ const PlayedCardStats = ({
   resourceStats,
   stack,
   cardStacks,
+  heldWorkerId,
+  playerColor,
 }: {
   locale: Locale
   rawId: string
@@ -289,6 +291,8 @@ const PlayedCardStats = ({
   resourceStats?: CardResourceStats
   stack: string[]
   cardStacks?: CropStack[] | null
+  heldWorkerId?: string
+  playerColor?: PlayerState['color']
 }) => {
   const [open, setOpen] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
@@ -416,6 +420,13 @@ const PlayedCardStats = ({
             )
           })}
         </div>
+      ) : null}
+      {heldWorkerId ? (
+        <div
+          className={`action-farmer action-farmer-${playerColor ?? 'red'} held-worker-marker`}
+          data-testid={`played-card-held-worker-${rawId}`}
+          title="Worker on card"
+        />
       ) : null}
       {open && hasResourceStats ? (
         <div
@@ -1060,6 +1071,7 @@ export const FarmBoard = ({
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
           )
+          const heldWorkerId = displayPlayer.cardStates?.[rawId]?.extraData?.heldWorkerId as string | undefined
 
           return (
             <PlayedCardStats
@@ -1074,6 +1086,8 @@ export const FarmBoard = ({
               resourceStats={resourceStats}
               stack={cardStack}
               cardStacks={cardStacks}
+              heldWorkerId={heldWorkerId}
+              playerColor={displayPlayer.color}
             />
           )
         })}
