@@ -876,6 +876,13 @@ export class GameSession {
   }
 
   private pushHistory(actionStart = false, undoBoundary = false) {
+    // Cards can flag a one-shot undo boundary on state via `state.pendingUndoBoundary`
+    // (e.g. immediately after rolling random). Merge it with the explicit parameter,
+    // then clear the flag so it fires exactly once.
+    const effectiveBoundary = undoBoundary || this.state.pendingUndoBoundary === true
+    if (this.state.pendingUndoBoundary) {
+      this.state.pendingUndoBoundary = false
+    }
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       pending: this.clonePending(this.pending),
@@ -888,7 +895,7 @@ export class GameSession {
       stageResume: this.stageResume ? { ...this.stageResume } : null,
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
-      undoBoundary,
+      undoBoundary: effectiveBoundary,
     }
     this.history.push(entry)
     if (actionStart) {
