@@ -12,6 +12,7 @@ import { formatAnimalCounts, formatResources } from '../../../shared/logic/forma
 import { emptyResources } from '../../../shared/logic/state'
 import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
+import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { getFenceCount } from '../../../shared/actions/effects/fencing'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import { isBorderEdge } from '../../../shared/game/farm'
@@ -1071,7 +1072,7 @@ export const FarmBoard = ({
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
           )
-          const heldWorkerId = displayPlayer.cardStates?.[rawId]?.extraData?.heldWorkerId as string | undefined
+          const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
 
           return (
             <PlayedCardStats
