@@ -991,6 +991,7 @@ export const en = {
     E91_PlowBuilder: { anytime: 'Plow Builder: Pay 1 Food → Plow (harvest + Joinery)' },
     D129_LumberVirtuoso: { anytime: 'Lumber Virtuoso: Discard wood to 5 → Build Stables/Rooms' },
     E85_MasterTanner: { anytime: 'Master Tanner: Place food on card from cooked pig/cattle' },
+    B3_Moonshine: { choicePlayDisabled: 'Not enough food (need 2)' },
   },
   fence: {
     error: {

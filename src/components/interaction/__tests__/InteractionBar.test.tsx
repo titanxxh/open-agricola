@@ -424,6 +424,71 @@ describe('InteractionBar', () => {
     expect(html).not.toContain('fence-mode-toggle')
   })
 
+  it('renders disabled options greyed-out with disabled attribute and choice-option-disabled class', () => {
+    const disabledChoice: PendingChoice = {
+      promptKey: 'ui.interactionChooseOne',
+      options: [
+        { value: 'play', labelKey: 'ui.interactionConfirmButton', disabled: true, disabledReasonKey: 'cards.B3_Moonshine.choicePlayDisabled' },
+        { value: 'pass', labelKey: 'ui.interactionOptionalSkip' },
+      ],
+      playerIndex: 0,
+      spaceId: 'test-space',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={disabledChoice}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    // The disabled option should have disabled attribute, choice-option-disabled class, and tooltip
+    expect(html).toContain('choice-option-disabled')
+    // title attribute value may be HTML-encoded by renderToStaticMarkup
+    expect(html).toContain('Not enough food (need 2)')
+    // Verify disabled HTML attribute is present on the play button
+    const playButtonMatch = html.match(/<button[^>]*choice-option-disabled[^>]*>/)
+    expect(playButtonMatch).not.toBeNull()
+    expect(playButtonMatch![0]).toContain('disabled')
+    // The pass option should NOT have the disabled class
+    const afterPlayButton = html.slice(html.indexOf('choice-option-disabled') + 1)
+    expect(afterPlayButton).not.toContain('choice-option-disabled')
+  })
+
   it('shows fence/palisade mode toggle when player has played B30 Wood Palisades', () => {
     const fencePendingChoice: PendingChoice = {
       promptKey: 'ui.interactionFenceSelect',
