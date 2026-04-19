@@ -10,7 +10,6 @@ describe('B156_StorehouseKeeper session', () => {
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -18,6 +17,7 @@ describe('B156_StorehouseKeeper session', () => {
     player.occupationPlayed.push(CARD_ID)
     setWorkersAtHome(state, player, 2)
     state.players[1]!.workersAvailable = 2
+    state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
 
     session.loadState(state)
     return session

@@ -53,7 +53,7 @@ export const rebuildActiveModifiers = (state: GameState): GameState => {
 }
 
 export const rehydrateState = (raw: SerializedGameState): GameState => {
-  const templates = createActionSpaces()
+  const templates = createActionSpaces(raw.players?.length)
   // Migrate legacy Field shape: {crop, remaining} → {stacks}
   /* eslint-disable @typescript-eslint/no-explicit-any */
   ;((raw as any).players ?? []).forEach((p: any) => {

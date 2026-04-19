@@ -49,7 +49,6 @@ describe('A53_Claypipe session flow', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
 
-    state.players = state.players.slice(0, 2)
     state.round = 7
     state.phase = 'work'
     state.currentPlayerIndex = 0
@@ -60,6 +59,8 @@ describe('A53_Claypipe session flow', () => {
     setActiveWorkerCount(state.players[1]!, 1)
     markAllWorkersUsed(state, state.players[1]!)
     state.players[1]!.resources.food = 10
+    setActiveWorkerCount(state.players[2]!, 0)
+    setActiveWorkerCount(state.players[3]!, 0)
 
     const hollow = state.actionSpaces.find((space) => space.id === 'hollow-4')
     expect(hollow).toBeDefined()
