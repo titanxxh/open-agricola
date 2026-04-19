@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, ui]
+    paths:
+      - 'shared/cards/card-effects.ts'
+      - 'server/custom-code-executor/engine.ts'
+      - 'server/ast-validator.ts'
+      - 'docs/CUSTOM_CARD_SANDBOX.md'
+      - 'src/services/llmPrompts.ts'
+      - 'scripts/check-prompt-sync.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+jobs:
+  check-prompt-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check prompt sync (strict)
+        run: pnpm run check:prompt-sync -- --strict
