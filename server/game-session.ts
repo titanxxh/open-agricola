@@ -1945,6 +1945,12 @@ export class GameSession {
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
+    // Reject attempts to resolve a choice with an option that's been marked disabled
+    // (e.g. B3 Moonshine's "play" option when the player can't afford 2 food).
+    const chosenOption = pending.options.find((o) => o.value === value)
+    if (chosenOption?.disabled) {
+      return this.respond(false, 'option disabled')
+    }
     if (!this.engine) {
       if (pending.promptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
         this.pending = { type: 'none' }
