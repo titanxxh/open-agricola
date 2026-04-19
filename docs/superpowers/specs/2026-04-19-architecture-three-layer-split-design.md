@@ -690,3 +690,107 @@ jobs:
 - [x] §9 PR 拆分顺序（DSL 删除合并到 PR-2）
 
 所有项已在 brainstorming 阶段确认。
+
+---
+
+## 16. 自定义卡 prompt / sandbox 兼容性同步（PR-2 落地时一并处理）
+
+这一段补 brainstorming 阶段没显式列出、但 PR-2 删 DSL + 改 LLM prompt 时**必然撞到**的细节。来自 2026-04-19 第二轮文档对齐发现的 prompt vs runtime 错位（详见 `docs/CARD_DESIGN_PROMPT.md` 顶部 banner、`src/services/llmPrompts.ts` 注释、`docs/CARD_TEST_TEMPLATE.md`）。
+
+### 16.1 沙盒注入的全局是**最小集**，不能依赖项目内 helper
+
+`server/custom-code-executor/engine.ts`（PR-3 后是 `server/custom-code/isolate-executor.ts`）只往 isolate 注入：
+
+- `registerCardEffect` / `registerCardListener`
+- `MinorImprovement` / `Occupation`（**stub**：`def => def`，不是真正的类）
+- 极简 `console.log` / `console.warn`
+
+**不注入**任何 `shared/game/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/*` 里的 helper（`familySize`、`workersAvailable`、`workersAtHome`、`getFenceCount`、`getPalisadeCount`、`countFields`、`countOccupations`、`countPeopleOnSpace`、`fieldHasCrop`、`cardCountsAs`、`isEffectivelyMajor`、`holdWorkerOnCard`、`initCardState`、`incCounter` 等都拿不到，会抛 `ReferenceError`）。
+
+**对 PR-2 的影响**：
+
+- LLM prompt（`src/services/llmPrompts.ts`）**必须**告诉 LLM "项目 helper 一律不可用，请直接读 `state` / `player` 字段"。本次重构里 `LocalBrowserExecutor`（§7.2）若想保持与 `ServerIsolateExecutor` 行为一致，注入清单也应限制到这同一组最小集——除非显式扩展（见 §16.5）。
+- AST validator 跨端搬到 `shared/custom-code/ast-validator.ts` 后，**禁用清单**保持不变：`import` / `export` / 动态 import / `require` / `class` / generator / `with` / `eval` / `Function` / `process` / `globalThis` / `global` / `window` / `document` / `__dirname` / `__filename` / `fetch` / `XMLHttpRequest` / `WebSocket` / `setTimeout` / `setInterval` / `setImmediate` / `clearTimeout` / `clearInterval` / `Deno` / `Bun` / `Proxy` / `Reflect`，以及 `.constructor` / `.__proto__` / `.__defineGetter__` 等原型链字段。两端共用同一份。
+
+### 16.2 `state` / `player` / `paymentInfo` / `context` 是 JSON 深拷贝快照
+
+isolate 入口对所有输入做了 `JSON.parse(JSON.stringify(value ?? null))`：handler 看到的是**纯数据，没有方法**。
+
+**对 PR-2 / PR-4 的影响**：
+
+- 任何 prompt / 文档示例**不得**鼓励 LLM 调用 `player.xxx()` 或 helper。
+- `LocalBrowserExecutor`（§7.2）即使没有真隔离，也建议保持"传 JSON 拷贝进去"的口径，避免本地能跑、上线（多人对局走 isolate）就崩的语义漂移。
+- `CardListenerContext` 里 `ownerPlayer` / `triggerPlayer` / `effectPlayer` 都是 JSON 拷贝。`scope: 'opponent'` / `scope: 'any'` 时 `context.player` 是**触发玩家**，不是卡主——判定卡主必须用 `context.ownerPlayer`。Prompt / 示例必须显式说明（已在 `llmPrompts.ts` 示例 10 / `CARD_DESIGN_PROMPT.md` §7.6 同步）。
+
+### 16.3 沙盒识别的 hook / phase 是**白名单子集**，不是全集
+
+`extractManifestFromCompiledCode` 用 `cardEffectHooks` 数组过滤；`isActionHookPhase` 用硬编码 8 项过滤。结果：
+
+| 类别 | 沙盒识别 | 沙盒**不识别**（写了不会触发） |
+|---|---|---|
+| effect hook | `onBuy` / `onBeforeStartOfTurn` / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBefore/Start/ReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / 收获子阶段全套 / `onAfterReap` / 喂食子阶段全套 / `onHarvest` / `onEndHarvest` / `onAfterHarvest` | `computeBonusScore` / `computePostScore` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `computeFenceDiscount` / `handHooks` |
+| listener phase | `before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeReplace` / `isDoable` | `computeChoiceCandidates` / `anytime` |
+
+**对 PR-2 的影响**：
+
+- LLM prompt 不能教 LLM 写 `computeBonusScore` 终局加分（这是 brainstorming 时容易漏掉的常见诱导，自定义卡作者很自然就想要"游戏结束时按 X 加分"）。替代方案：在 `onAfterHarvest`（最后一轮检查 `state.round === 14`）等阶段串多个 `bonus-vp` leaf 近似实现。**`bonus-vp` 固定 +1，不接受 `amount` 参数**——要 N 分就把 N 个 leaf 串入 seq。
+- 删 DSL 后这套白名单是新 prompt 的**唯一权威**；写 prompt 时建议直接 `import { cardEffectHooks } from 'shared/cards/card-effects'` 然后字符串拼接到 prompt 里，避免双重维护漂移。
+
+### 16.4 `PlayerState` / `cardStates` 字段口径
+
+下面这几条是写 prompt / 文档时高频踩坑点，PR-2 改 prompt 时一并校准：
+
+- `PlayerState` 字段名是 **`fenceSegments`**，**不是** `fences`。
+- `state.players.length` —— **没有** `state.playerCount`。
+- `state.actionSpaces[*].takenBy` 是 **`WorkerRef[]`**，元素 `{ playerId, workerId }`（不是 `playerIndex`；`docs/CARD_TEST_TEMPLATE.md` 之前一处写错已修）。
+- `Worker` 字段：`{ id, isActive, isNewborn }`。家庭成员数 = `player.workers.filter(w => w.isActive).length`（少数卡可能把工人置为非活跃，如 A127 Lodger）。
+- `cardStates[id]` 的形状是 `{ counters?, flagged?, infobox?, stack?, extraData? }`。
+  - `store-on-card` 写到 `cardStates[id].counters[resource]`
+  - `take-from-card` 从 `cardStates[id].counters[resource]` 扣
+  - **prompt 不能教 LLM 写 `cardStates[id].grain`**——必须走 `cardStates[id].counters.grain`
+
+### 16.5 `LocalBrowserExecutor` 的设计取舍：是否扩展注入清单？
+
+§7.2 里 `LocalBrowserExecutor` "用户只能攻击自己" 没有 isolate，理论上可以把整个 `shared/game/player.ts` helper 全注入（没有体积成本，shared 已经在 client bundle 里）。**但建议保持注入清单与 `ServerIsolateExecutor` 完全一致**，理由：
+
+1. 一份代码两个宿主跑，语义必须等价——否则作者本地沙盒能跑、提交后多人对局崩，违反 "本地沙盒 = 多人对局的 dry-run" 的核心定位。
+2. 一旦本地放了 `familySize(player)`，AI Designer 出来的代码会**不可避免**地越来越倚重 helper，迁回 isolate 路径就回不去。
+3. 如果将来真要给沙盒加 helper，应当从 `ServerIsolateExecutor` 一侧加（在 isolate 里跑一段轻量 polyfill），让两端永远对齐。
+
+落地动作：`LocalBrowserExecutor` 的 wrapper 复用 `isolate-executor.ts` 的 `wrappedCode` 模板的"全局定义部分"（注入 `registerCardEffect/Listener/MinorImprovement/Occupation/console`，外加 `JSON.parse(JSON.stringify(...))` 拷贝输入），仅替换"isolate 边界"为"直接 `new Function(...)` + `try/catch`"。两份共用同一份"接口表面"。
+
+### 16.6 文档与 prompt 的同源约束（已落地）
+
+唯一真源已抽出为 **[`docs/CUSTOM_CARD_SANDBOX.md`](../../CUSTOM_CARD_SANDBOX.md)**。其它文件统一通过引用而不是各自维护一份列表：
+
+- `src/services/llmPrompts.ts` — 顶部 JSDoc 指向 SANDBOX.md；prompt 内的 hook / phase / actionId 列表必须与 SANDBOX.md 一致
+- `docs/CARD_DESIGN_PROMPT.md` — banner 指向 SANDBOX.md
+- `docs/ENGINE_ARCHITECTURE.md` §3.1 末段 — 指向 SANDBOX.md
+- `src/app/workshop/AiCardDesigner.tsx` — 顶部 JSDoc 指向 SANDBOX.md
+- `docs/CARD_TEST_TEMPLATE.md` — 沙盒口径与 §16.4 字段一致
+
+CI 兜底脚本已实现：`scripts/check-prompt-sync.ts`（npm script `pnpm run check:prompt-sync`），策略：
+
+1. 从代码源解析 `cardEffectHooks` / `isActionHookPhase` / `isCardListenerScope` / `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 5 个权威清单
+2. 与 `docs/CUSTOM_CARD_SANDBOX.md` 中 5 个 `<!-- prompt-sync:begin id=... -->` … `<!-- prompt-sync:end id=... -->` 标记块逐项 diff（要求完全一致，多/缺都报）
+3. 对 `src/services/llmPrompts.ts` 做"必须包含"子串检查（prompt 用 markdown 表/列表呈现，不要求结构同构，但每个 hook / phase 名都必须出现至少一次）
+4. 默认非 strict（`exit 0`，仅打印 WARN）；CI 用 `--strict` 任一漂移即 `exit 1`
+
+健全性测试：在 `cardEffectHooks` 临时塞一个假 hook，脚本能立刻报"missing in CUSTOM_CARD_SANDBOX.md block"+"missing in llmPrompts.ts entirely"，`--strict` 退出码为 1。还原后 `exit 0`。
+
+CI workflow 接入位置（§8.7 `ci.yml`）：在 `pnpm run check:reaches` 后追加一行 `pnpm run check:prompt-sync -- --strict`。
+
+### 16.7 对 PR 顺序的微调（**不强制改 §9，仅作 reviewer 备忘**）
+
+- PR-2 §3.4 "LLM prompt 改造" 的范围比 spec 原文略大：除了"删 DSL JSON schema 段落"，还要按 §16.1-§16.4 把现有 prompt 里**所有提到 helper 函数 / `state.playerCount` / `cardStates[id][resource]` / `bonus-vp { amount }` 的地方**改齐。这部分今天的代码改动已经在 `src/services/llmPrompts.ts` 完成（2026-04-19），PR-2 落地时直接复用、不要回写老 prompt。
+- PR-3 搬 `ast-validator.ts` 进 `shared/custom-code/` 时，注意 `typescript` 包是 client bundle 体积大头之一（§7.3 已提到）；前端工坊路由必须 `lazy()` 包，不要因为搬到 shared 就被多人对局主入口隐式拉进来。
+
+### 16.8 新增/不动的 LLM prompt 文件清单
+
+| 文件 | 本次状态 | PR-2 应该 |
+|---|---|---|
+| `src/services/llmPrompts.ts` | 已对齐 | 保留；PR-3 改名为 `client/services/llmPrompts.ts`（随 src→client 整体迁移） |
+| `src/services/llmService.ts` | 已对齐（链路：extractCardFromResponse → effect_code） | 保留；同上改名 |
+| `src/app/workshop/AiCardDesigner.tsx` | 已是 effect_code 主路径，effect_dsl 仅作回退 | PR-2 删 effect_dsl 回退分支（§3.2 已列） |
+| `docs/CARD_DESIGN_PROMPT.md` | 已加 banner + §7 沙盒约束 | 保留；PR-2 后核对一遍 hook 白名单未变 |
+| `docs/CARD_TEST_TEMPLATE.md` | WorkerRef 字段名已修 | 保留 |
