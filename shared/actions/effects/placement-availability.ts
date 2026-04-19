@@ -9,7 +9,8 @@ import type { CardListenerContext } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../game/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
-import { OCCUPIED_SPACE_CHOICE_PREFIX, placeFarmerAction } from './place-farmer'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+import { placeFarmerAction } from './place-farmer'
 
 export type AllowedPlacement = {
   spaceId: string
