@@ -1,4 +1,4 @@
-import type { ComplexCost, FarmTilePosition, PlayerState, Resource } from '../shared/game/types.ts'
+import type { ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../shared/game/types.ts'
 import { applyCostOverride, isComplexCost } from '../shared/actions/effects/pay.ts'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
@@ -25,7 +25,7 @@ import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
 } from '../shared/cards/helpers/pending-fence-bonus.ts'
-import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
+import { collectFenceDiscount, collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
@@ -41,6 +41,7 @@ type FarmChoiceOptions = {
   costOverride?: Partial<Resource>
   maxUnits?: number
   paymentChoice?: string
+  state?: GameState
   sowOptions?: {
     maxSelections?: number
     excludedFields?: FarmTilePosition[]
@@ -119,12 +120,26 @@ export const applyFarmChoice = <T extends PlayerState>(
       const freeFences = readPendingFenceBonus(normalized)?.freeFences ?? 0
       const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
       const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
+      const existingEdgeIds = new Set(
+        (normalized.fenceSegments ?? []).map((seg) => seg.edge),
+      )
+      const newFenceEdgesPreview = edges.filter((e) => !existingEdgeIds.has(e))
+      const newPalisadeEdgesPreview = palisadeEdges.filter(
+        (e) => !existingEdgeIds.has(e),
+      )
+      const bonusFreeFences = options.state
+        ? collectFenceDiscount(options.state, normalized, {
+            newFenceEdges: newFenceEdgesPreview,
+            newPalisadeEdges: newPalisadeEdgesPreview,
+          })
+        : 0
+      const totalFreeFences = freeFences + bonusFreeFences
       const validated = validateFenceSelection(
         normalized,
         edges,
         palisadeEdges,
         adjustedExtraWood,
-        freeFences,
+        totalFreeFences,
         {
           skipPayment: true,
           allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
