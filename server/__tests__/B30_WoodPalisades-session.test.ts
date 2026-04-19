@@ -7,8 +7,11 @@ import '../../shared/cards/B/B30_WoodPalisades'
 
 const CARD_ID = 'B30_WoodPalisades'
 
-// Tile (0,0) is free by default (starter rooms are at col 0, rows 2 & 1).
-const tile00Edges = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+// Tile (0,0) corner edges:
+// H-0-0 = top border (border), H-1-0 = bottom of tile (internal)
+// V-0-0 = left border (border), V-0-1 = right of tile (internal)
+const tile00Fences = ['H-1-0', 'V-0-1']     // internal edges
+const tile00Palisades = ['H-0-0', 'V-0-0']  // border edges
 
 const setup = (overrides: { withCard?: boolean; wood?: number } = {}) => {
   const session = new GameSession()
@@ -34,15 +37,15 @@ const bonusVpFor = (session: GameSession) => {
 }
 
 describe('B30 Wood Palisades — session', () => {
-  it('places 4 palisades, costs 8 wood, scores +4 VP', () => {
-    const session = setup({ wood: 8 })
+  it('places 2 border palisades + 2 internal fences, costs 6 wood, scores +2 VP', () => {
+    const session = setup({ wood: 6 })
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: [],
-      palisadeEdges: tile00Edges,
+      edges: tile00Fences,
+      palisadeEdges: tile00Palisades,
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
@@ -50,9 +53,9 @@ describe('B30 Wood Palisades — session', () => {
     const player = resp.state.players[0]!
     expect(player.resources.wood).toBe(0)
     expect(player.pastures).toHaveLength(1)
-    expect(getFenceCount(player)).toBe(0)
-    expect(getPalisadeCount(player)).toBe(4)
-    expect(bonusVpFor(session)).toBe(4)
+    expect(getFenceCount(player)).toBe(2)
+    expect(getPalisadeCount(player)).toBe(2)
+    expect(bonusVpFor(session)).toBe(2)
   })
 
   it('mixes 2 fence + 2 palisade, costs 6 wood, scores +2 VP', () => {
@@ -62,8 +65,8 @@ describe('B30 Wood Palisades — session', () => {
     expect(resp.ok).toBe(true)
 
     resp = session.commitFarmChoice(0, 'fence', {
-      edges: ['H-0-0', 'H-1-0'],
-      palisadeEdges: ['V-0-0', 'V-0-1'],
+      edges: ['V-0-1', 'H-1-0'],
+      palisadeEdges: ['V-0-0', 'H-0-0'],
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
@@ -84,10 +87,25 @@ describe('B30 Wood Palisades — session', () => {
 
     resp = session.commitFarmChoice(0, 'fence', {
       edges: [],
-      palisadeEdges: tile00Edges,
+      palisadeEdges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('PALISADES_NOT_UNLOCKED')
+  })
+
+  it('rejects palisade on internal edge even when B30 is played', () => {
+    const session = setup({ wood: 6 })
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+
+    resp = session.commitFarmChoice(0, 'fence', {
+      edges: ['H-0-0', 'V-0-0'],
+      palisadeEdges: ['H-1-0'], // internal
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('PALISADE_NOT_ON_BORDER')
   })
 })
