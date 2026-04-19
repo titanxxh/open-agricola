@@ -208,6 +208,11 @@ export type GameState = {
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
+  /** Monotonic counter incremented every time a card consumes randomness. */
+  rngTick?: number
+  /** One-shot flag: cards set this before emitting a pending-choice that must not be undone across.
+   * GameSession.pushHistory reads, honors, and clears this flag. */
+  pendingUndoBoundary?: boolean
   availableMajorImprovements: string[]
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
