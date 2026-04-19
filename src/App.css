@@ -640,6 +640,10 @@ a:focus-visible,
   min-width: 0;
 }
 
+.center {
+  container-type: inline-size;
+}
+
 .actions h2,
 .center h2,
 .players h2 {
@@ -1531,8 +1535,11 @@ a:focus-visible,
 /* ══════════ FARM GRID ══════════ */
 .farm-grid {
   display: grid;
-  --tile: clamp(56px, 8vw, 96px);
-  --fence: clamp(8px, 1.2vw, 14px);
+  /* Size tiles by the .center container width, not the viewport.
+     Otherwise, in the 3-column board layout the .center column is
+     only ~1/3 of the viewport and the vw-sized grid overflows. */
+  --tile: clamp(40px, min(8vw, 14cqw), 96px);
+  --fence: clamp(6px, min(1.2vw, 2.1cqw), 14px);
   grid-template-columns: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence) var(--tile) var(--fence)
     var(--tile) var(--fence);
@@ -1747,22 +1754,35 @@ a:focus-visible,
 
 .pasture-info {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  right: calc(var(--tile, 60px) * 0.04);
+  bottom: calc(var(--tile, 60px) * 0.04);
   display: grid;
-  gap: 4px;
+  gap: calc(var(--tile, 60px) * 0.05);
   background: rgba(255, 255, 255, 0.88);
+  padding: calc(var(--tile, 60px) * 0.04) calc(var(--tile, 60px) * 0.07);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  /* No fixed min-width: a single "0/1" badge should hug its content so it
+     doesn't cover the tile label on narrow tiles. The reorg variant adds
+     its own min-width below. */
+  max-width: calc(100% - 6px);
+}
+
+/* Reorg mode shows a 3-row grid of +/- controls; needs more horizontal room. */
+.pasture-info:has(.pasture-controls) {
+  min-width: 68px;
   padding: 4px 6px;
   border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  min-width: 68px;
 }
 
 .pasture-count {
-  font-size: 11px;
+  /* Scale with tile size so the badge stays proportional on narrow boards. */
+  font-size: clamp(8px, calc(var(--tile, 60px) * 0.16), 14px);
   font-weight: 700;
   color: #2f4f1f;
   text-align: right;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .pasture-controls {
