@@ -126,6 +126,12 @@ export type CardEffect = {
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
+  /** Extra free fence segments granted by a card (e.g. E16 BriarHedge for border edges). */
+  computeFenceDiscount?: (
+    state: GameState,
+    player: PlayerState,
+    context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
+  ) => number
 }
 
 const cardEffectOverrides = new Map<string, CardEffect>()
@@ -398,6 +404,33 @@ export const computeExtraSowableFields = (player: PlayerState): ExtraSowableFiel
     }
   }
   return extras
+}
+
+export const collectFenceDiscount = (
+  state: GameState,
+  player: PlayerState,
+  context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
+): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let total = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.computeFenceDiscount) continue
+    try {
+      total += effect.computeFenceDiscount(state, player, context)
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeFenceDiscount threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return Math.max(0, total)
 }
 
 /**
