@@ -21,7 +21,7 @@ const CARD_ID = 'C129_SecondSpouse'
  * Players: 3+ (deck configuration, no runtime check).
  */
 
-function canStealUrgentWish(
+function checkCondition(
   state: GameState,
   self: PlayerState,
   space: ActionSpace,
@@ -47,7 +47,7 @@ const computeArgsListener: CardListenerRegistration = {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const space = context.state.actionSpaces.find((s) => s.id === 'urgent-wish-children')
     if (!space) return
-    if (!canStealUrgentWish(context.state, context.player, space)) return
+    if (!checkCondition(context.state, context.player, space)) return
     if (!space.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
       {
