@@ -114,6 +114,7 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from './farm-interaction.ts'
+import { buildOccupationHandSelectionInteraction } from './occupation-hand-interaction.ts'
 import { readPendingFenceBonus } from '../shared/cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../shared/game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../shared/game/space.ts'
@@ -602,6 +603,8 @@ export class GameSession {
     switch (promptKey) {
       case 'ui.interactionSelection':
         return 'farm-position' as const
+      case 'ui.interactionOccupationHand':
+        return 'occupation-hand' as const
       default:
         return null
     }
@@ -634,6 +637,10 @@ export class GameSession {
 
   private buildSelectionInteraction(player: PlayerState): InteractionSelection {
     const actionContext = this.pending.type === 'choice' ? this.pending.actionContext : undefined
+    const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
+    if (kind === 'occupation-hand') {
+      return buildOccupationHandSelectionInteraction(player, actionContext)
+    }
     return buildFarmPositionSelectionInteraction(player, actionContext)
   }
 
