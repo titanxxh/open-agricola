@@ -2428,6 +2428,7 @@ export class GameSession {
           ? this.pending.actionContext.maxRooms
           : undefined,
       paymentChoice: value,
+      state: this.state,
     })
     if (!result.ok) {
       return this.respond(false, result.error)
@@ -2521,6 +2522,7 @@ export class GameSession {
           extraWood: extraWood ?? 0,
         }, {
           costOverride: override,
+          state: this.state,
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
