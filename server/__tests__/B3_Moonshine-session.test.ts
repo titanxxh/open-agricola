@@ -95,7 +95,7 @@ describe('B3_Moonshine session', () => {
 
     // The random pick should be cached in cardStates
     const p0 = resp.state.players[0]!
-    const cachedOcc = p0.cardStates?.[CARD_ID]?.occ
+    const cachedOcc = p0.cardStates?.[CARD_ID]?.extraData?.occ
     expect(cachedOcc === OCC_A || cachedOcc === OCC_B).toBe(true)
 
     // B3 should have moved from minorHand to minorPlayed
@@ -117,7 +117,7 @@ describe('B3_Moonshine session', () => {
     expect(b3Resp.pending.type).toBe('choice')
     if (b3Resp.pending.type !== 'choice') return
 
-    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.occ as string | undefined
+    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
 
     const playResp = session.resolveChoice(0, 'play')
@@ -142,7 +142,7 @@ describe('B3_Moonshine session', () => {
     expect(b3Resp.pending.type).toBe('choice')
     if (b3Resp.pending.type !== 'choice') return
 
-    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.occ as string | undefined
+    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
 
     const passResp = session.resolveChoice(0, 'pass')
@@ -214,7 +214,7 @@ describe('B3_Moonshine session', () => {
     expect(b3Resp.pending.type).toBe('choice')
     if (b3Resp.pending.type !== 'choice') return
 
-    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.occ as string | undefined
+    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
 
     const passResp = session.resolveChoice(0, 'pass')
@@ -242,8 +242,8 @@ describe('B3_Moonshine session', () => {
     expect(resp2.pending.type).toBe('choice')
     if (resp1.pending.type !== 'choice' || resp2.pending.type !== 'choice') return
 
-    const pick1 = resp1.state.players[0]!.cardStates?.[CARD_ID]?.occ
-    const pick2 = resp2.state.players[0]!.cardStates?.[CARD_ID]?.occ
+    const pick1 = resp1.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
+    const pick2 = resp2.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
 
     expect(pick1).toBeDefined()
     expect(pick2).toBeDefined()
@@ -263,7 +263,7 @@ describe('B3_Moonshine session', () => {
     if (b3Resp.pending.type !== 'choice') return
 
     // The cached pick must be set
-    const pickBefore = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.occ
+    const pickBefore = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
     expect(pickBefore).toBeDefined()
 
     // undoStep should be blocked because the boundary was set during the roll
@@ -274,7 +274,7 @@ describe('B3_Moonshine session', () => {
 
     // The cached pick must still be present (boundary held)
     const stateAfterUndo = session.getState().state
-    const pickAfter = stateAfterUndo.players[0]?.cardStates?.[CARD_ID]?.occ
+    const pickAfter = stateAfterUndo.players[0]?.cardStates?.[CARD_ID]?.extraData?.occ
     expect(pickAfter).toBeDefined()
   })
 
@@ -310,7 +310,7 @@ describe('B3_Moonshine session', () => {
     if (b3Resp.pending.type !== 'choice') return
 
     // The pick must be OCC_B since it's the only occupation in hand
-    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.occ
+    const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
     expect(pickedOcc).toBe(OCC_B)
 
     const woodBefore = b3Resp.state.players[0]!.resources.wood

@@ -26,6 +26,7 @@ import { unflagCardAction } from './effects/unflag-card'
 import { setCardInfoboxAction } from './effects/set-card-infobox'
 import { clearCardInfoboxAction } from './effects/clear-card-infobox'
 import { noopAction } from './effects/noop'
+import { emitChoiceAction } from './effects/emit-choice'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
 import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
@@ -74,6 +75,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   setCardInfoboxAction,
   clearCardInfoboxAction,
   noopAction,
+  emitChoiceAction,
   returnFirstWorkerHomeAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,

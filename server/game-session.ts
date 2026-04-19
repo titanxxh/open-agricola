@@ -2985,8 +2985,11 @@ export class GameSession {
         return cancelResult
       }
     }
-    // Also block if the current state has a pending boundary (set during onBuy before the
-    // next pushHistory call consumes it — e.g. B3 Moonshine sets it after rolling randomly).
+    // Task 0.6 introduced `state.pendingUndoBoundary` to signal an undo-blocker from a
+    // card's handler (e.g. after rolling random). pushHistory consumes the flag and marks
+    // the next history entry. But between the roll and the next pushHistory, the flag
+    // lives only on state. Honor it directly here so undo cannot cross the roll even in
+    // that window.
     if (this.state.pendingUndoBoundary === true) {
       return this.respond(false, 'cannot undo past boundary')
     }
