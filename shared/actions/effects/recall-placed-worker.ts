@@ -1,6 +1,7 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition, ActionSpace } from '../../game/types'
 import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
 import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
+import { holdWorkerOnCard } from '../../cards/helpers/card-held-workers'
 
 /**
  * Generic "recall a worker I placed this round back home" helper.
@@ -34,9 +35,44 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params }) => {
-    const excludeSpaceId = (params as { excludeSpaceId?: string } | undefined)?.excludeSpaceId
-    const excludeMeetingPlace =
-      (params as { excludeMeetingPlace?: boolean } | undefined)?.excludeMeetingPlace ?? true
+    const p = params as
+      | {
+          excludeSpaceId?: string
+          excludeMeetingPlace?: boolean
+          forceFirst?: boolean
+          targetCardHold?: string
+        }
+      | undefined
+    const excludeSpaceId = p?.excludeSpaceId
+    const excludeMeetingPlace = p?.excludeMeetingPlace ?? true
+    const forceFirst = p?.forceFirst === true
+    const targetCardHold = p?.targetCardHold
+
+    const applyRelocation = (space: ActionSpace, workerId: string | undefined) => {
+      const removed = removeWorkerRef(space, player.id, workerId)
+      if (removed && targetCardHold) {
+        holdWorkerOnCard(player, targetCardHold, removed.workerId)
+      }
+    }
+
+    if (forceFirst) {
+      const placements = getRoundPlacementDetails(player)
+      const first = placements[0]
+      if (!first) return { type: 'fail', logKey: 'log.actionFail' }
+      if (excludeMeetingPlace && isMeetingPlace(first.spaceId)) {
+        return { type: 'fail', logKey: 'log.actionFail' }
+      }
+      if (excludeSpaceId && first.spaceId === excludeSpaceId) {
+        return { type: 'fail', logKey: 'log.actionFail' }
+      }
+      const origin = state.actionSpaces.find((s) => s.id === first.spaceId)
+      if (!origin) return { type: 'fail', logKey: 'log.actionFail' }
+      if (!origin.takenBy.some((t) => t.playerId === player.id && t.workerId === first.workerId)) {
+        return { type: 'fail', logKey: 'log.actionFail' }
+      }
+      applyRelocation(origin, first.workerId)
+      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+    }
 
     const candidates = state.actionSpaces.filter((space) => {
       if (!spaceHasPlayer(space, player.id)) return false
@@ -51,7 +87,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       const only = candidates[0]!
       const placements = getRoundPlacementDetails(player)
       const entry = placements.find(e => e.spaceId === only.id)
-      removeWorkerRef(only, player.id, entry?.workerId)
+      applyRelocation(only, entry?.workerId)
       return { type: 'ok', logKey: 'log.cardEffectTrigger' }
     }
 
@@ -64,14 +100,18 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       })),
     }
   },
-  resolveChoice: ({ state, player }, choice) => {
+  resolveChoice: ({ state, player, params }, choice) => {
+    const p = params as { targetCardHold?: string } | undefined
     const target = state.actionSpaces.find(
       (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
     if (!target) return { type: 'fail', logKey: 'log.actionFail' }
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find(e => e.spaceId === target.id)
-    removeWorkerRef(target, player.id, entry?.workerId)
+    const removed = removeWorkerRef(target, player.id, entry?.workerId)
+    if (removed && p?.targetCardHold) {
+      holdWorkerOnCard(player, p.targetCardHold, removed.workerId)
+    }
     return { type: 'ok', logKey: 'log.cardEffectTrigger' }
   },
 }
