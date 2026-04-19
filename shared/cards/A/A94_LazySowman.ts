@@ -87,6 +87,7 @@ const computeArgsListener: CardListenerRegistration = {
       .map((space) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       }))
     if (extraOptions.length === 0) return
     return { extraOptions, sourceCard: CARD_ID }

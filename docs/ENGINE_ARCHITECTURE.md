@@ -224,6 +224,8 @@ type StateUpdateEnvelope =
   - `allowedCommands`
   - `anytimeActions`
   - `choice` / `farmSelect` / `selection` 的 `sourceCard`（当交互由某张卡触发时，前端可统一显示“由某卡触发”）
+  - `choice.options[].sourceCard`（当同一个 pending 里混入多张卡注入的 option 时，来源卡归属下沉到 option 级）
+  - `choice.options[].effectPreview`（按钮主文案用的结构化效果预览；当前覆盖 `resourceExchange` / `payment` / `text`）
   - `farmSelect` 的 `selectableTiles` / `selectableEdges` / `selectableFields`（对 `sow`，`selectableFields` 允许包含 off-board 虚拟田位、每格独立 `allowedCrops` 与 `sourceCard`）
 
 协议层规则：
@@ -1045,6 +1047,46 @@ type PendingAction =
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
 ```
 
+其中 `ActionChoiceOption` 目前约定为：
+
+```ts
+type ChoiceEffectPreview =
+  | {
+      kind: 'resourceExchange'
+      resourcesPaid?: Partial<Resource>
+      resourcesGained?: Partial<Resource>
+      bonusVp?: number
+    }
+  | {
+      kind: 'payment'
+      resourcesPaid?: Partial<Resource>
+      cardUsed?: string
+    }
+  | {
+      kind: 'text'
+      text: string
+    }
+
+type ActionChoiceOption = {
+  value: string
+  labelKey: string
+  labelParams?: Record<string, unknown>
+  sourceCard?: string
+  effectPreview?: ChoiceEffectPreview
+}
+```
+
+协议约束：
+
+- `pending.sourceCard` / `interaction.sourceCard` 表示“整个当前交互的统一来源”；一旦一个 pending 内混入多张卡各自注入的 option，不能只靠这一层。
+- `options[].sourceCard` 是 option 级 canonical carrier，`computeArgs` / `computeChoiceCandidates` / card-owned direct choice 都应在这里补齐来源卡。
+- `options[].effectPreview` 只负责“按钮主文案的真实效果”，不替代 `labelKey`；当前前端采用 `hybrid_dual`：主文案看 preview，次文案仍显示动作类型，顶部副标题继续显示触发卡。
+- 当前 preview 生产点：
+  - `shared/cards/helpers/pay-gain-node.ts`
+  - `shared/actions/effects/pay-helpers.ts`
+  - `shared/actions/effects/exchange.ts`
+  - 引擎对 `seq(pay-resources, gain[, bonus-vp])` 的 option 会做一次轻量聚合，因此像 `D161_CabbageBuyer` 这类手写 `payLeaf + gainLeaf` 组合也能拿到 `resourceExchange` preview。
+
 `LogEntry` 则使用结构化方式存储：
 
 - `key`：i18n key
@@ -1107,7 +1149,7 @@ type ActionHookResult = {
   doable?: boolean
   actionId?: string
   extraOptions?: ActionChoiceOption[]
-  followUpActions?: string[]
+  followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
   sourceCard?: string
@@ -1115,6 +1157,12 @@ type ActionHookResult = {
   logParams?: Record<string, unknown>
 }
 ```
+
+这里的 `sourceCard` 现在不仅是日志/提示用元数据，也被视为 flow/follow-up/source option 的兜底来源：
+
+- 对 `ActionHookResult.flow`，引擎会在插入节点前递归把顶层 `sourceCard` 补到缺失的 child leaf，但不会覆盖 child 自己显式写的 `sourceCard`。
+- 对 `followUpActions`，统一推荐对象形式 `{ actionId, sourceCard }`；若 listener 顶层有 `sourceCard` 且 follow-up 仍是字符串，引擎会做兜底转换。
+- 对 `OptionalNode` / `OrNode` / `XorNode` / `ChoiceNode` 的 choice 构建路径，引擎会把统一来源写入 `pendingChoiceContext.sourceCard`，供 `server/game-session.ts` 透传到 `pending` / `interaction`。
 
 这样可以覆盖常见卡牌能力：
 

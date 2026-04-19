@@ -4,6 +4,8 @@ import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 
 import '../../shared/cards/A/A94_LazySowman'
 
+const CARD_ID = 'A94_LazySowman'
+
 const setup = (options?: {
   withCard?: boolean
   grain?: number
@@ -51,6 +53,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.pending.promptKey).toBe('ui.interactionPlaceFarmerExtra')
     expect(resp.pending.options.map((option) => option.value)).toContain('allow-occupied:day-laborer')
     expect(resp.pending.options.map((option) => option.value)).not.toContain('allow-occupied:meeting-place')
+    expect(resp.pending.options.find((option) => option.value === 'allow-occupied:day-laborer')?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, 'allow-occupied:day-laborer')
     expect(resp.ok).toBe(true)
@@ -100,9 +103,12 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
+    expect((resp.pending as any).sourceCard).toBeUndefined()
+    expect((resp.interaction as any).sourceCard).toBeUndefined()
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
     const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
+    expect(sowOption?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
@@ -118,9 +124,12 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
+    expect((resp.pending as any).sourceCard).toBeUndefined()
+    expect((resp.interaction as any).sourceCard).toBeUndefined()
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
     const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
+    expect(sowOption?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)

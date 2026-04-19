@@ -1,5 +1,6 @@
 import type {
   ActionDefinition,
+  ChoiceEffectPreview,
   ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,
@@ -7,6 +8,7 @@ import type {
   PlayerState,
   GameState,
   ActionChoiceOption,
+  Resource,
 } from '../game/types'
 import type { FollowUpAction } from '../actions/hooks'
 import {
@@ -92,6 +94,29 @@ export class Engine {
     return followUp
   }
 
+  private applyFallbackSourceCardToFlow(flow: ActionFlow, sourceCard?: string): ActionFlow {
+    if (!sourceCard) return flow
+    if (flow.type === 'leaf') {
+      return flow.sourceCard ? flow : { ...flow, sourceCard }
+    }
+    if (flow.type === 'playerSwitch') return flow
+    return {
+      ...flow,
+      children: flow.children.map((child) => this.applyFallbackSourceCardToFlow(child, sourceCard)),
+    }
+  }
+
+  private normalizeFollowUpAction(
+    followUp: FollowUpAction,
+    sourceCard?: string,
+  ): FollowUpAction {
+    if (!sourceCard) return followUp
+    if (typeof followUp === 'string') {
+      return { actionId: followUp, sourceCard }
+    }
+    return followUp.sourceCard ? followUp : { ...followUp, sourceCard }
+  }
+
   private buildFollowUpNodes(
     followUps: FollowUpAction[],
     baseId: string,
@@ -175,6 +200,7 @@ export class Engine {
         node.choiceLabelKey,
         node.choiceLabelParams,
         node.actionContext,
+        node.effectPreview,
       )
       clone.beforePhaseResolved = node.beforePhaseResolved
       return clone
@@ -315,6 +341,173 @@ export class Engine {
     return null
   }
 
+  private getNodeSourceCard(node: EngineNode): string | undefined {
+    const sourceCards = new Set<string>()
+    const visit = (entry: EngineNode) => {
+      if (entry instanceof ActionNode) {
+        if (entry.sourceCard) sourceCards.add(entry.sourceCard)
+        return
+      }
+      if (entry instanceof OptionalNode) {
+        visit(entry.child)
+        return
+      }
+      if (
+        entry instanceof SequenceNode ||
+        entry instanceof ParallelNode ||
+        entry instanceof OrNode ||
+        entry instanceof XorNode
+      ) {
+        entry.children.forEach(visit)
+      }
+    }
+    visit(node)
+    return sourceCards.size === 1 ? [...sourceCards][0] : undefined
+  }
+
+  private getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
+    if (options.length === 0) return undefined
+    const normalized = options.map((option) =>
+      typeof option.sourceCard === 'string' && option.sourceCard.length > 0
+        ? option.sourceCard
+        : null,
+    )
+    if (normalized.some((sourceCard) => sourceCard === null)) return undefined
+    const sourceCards = [...new Set(normalized)] as string[]
+    return sourceCards.length === 1 ? sourceCards[0] : undefined
+  }
+
+  private resolveChoiceSourceCard(
+    sourceCard: string | undefined,
+    options: ActionChoiceOption[],
+  ): string | undefined {
+    return sourceCard ?? this.getOptionsSourceCard(options)
+  }
+
+  private sanitizePreviewResources(
+    resources?: Partial<Resource>,
+  ): Partial<Resource> | undefined {
+    if (!resources) return undefined
+    const sanitized: Partial<Resource> = {}
+    Object.entries(resources).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value <= 0) return
+      sanitized[key as keyof Resource] = value
+    })
+    return Object.keys(sanitized).length > 0 ? sanitized : undefined
+  }
+
+  private mergePreviewResources(
+    base: Partial<Resource>,
+    delta?: Partial<Resource>,
+  ): Partial<Resource> {
+    const merged: Partial<Resource> = { ...base }
+    Object.entries(delta ?? {}).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value <= 0) return
+      const resourceKey = key as keyof Resource
+      merged[resourceKey] = (merged[resourceKey] ?? 0) + value
+    })
+    return merged
+  }
+
+  private getActionEffectPreview(node: ActionNode): ChoiceEffectPreview | undefined {
+    if (node.effectPreview) return node.effectPreview
+    const params = this.sanitizePreviewResources(node.params)
+    if (node.actionId === 'pay-resources') {
+      return { kind: 'payment', resourcesPaid: params }
+    }
+    if (node.actionId === 'gain') {
+      return { kind: 'resourceExchange', resourcesGained: params }
+    }
+    if (node.actionId === 'bonus-vp') {
+      return { kind: 'resourceExchange', bonusVp: 1 }
+    }
+    return undefined
+  }
+
+  private collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
+    if (node instanceof ActionNode) return [node]
+    if (node instanceof OptionalNode) {
+      return this.collectOrderedActionNodes(node.child)
+    }
+    if (node instanceof SequenceNode) {
+      const flattened: ActionNode[] = []
+      for (const child of node.children) {
+        const childActions = this.collectOrderedActionNodes(child)
+        if (!childActions) return null
+        flattened.push(...childActions)
+      }
+      return flattened
+    }
+    return null
+  }
+
+  private getSequenceEffectPreview(node: SequenceNode): ChoiceEffectPreview | undefined {
+    const actionNodes = this.collectOrderedActionNodes(node)
+    if (!actionNodes || actionNodes.length === 0) return undefined
+    const [firstAction, ...restActions] = actionNodes
+    if (
+      firstAction?.actionId === 'pay-resources' &&
+      restActions.every((actionNode) => actionNode.actionId === 'gain' || actionNode.actionId === 'bonus-vp')
+    ) {
+      let resourcesGained: Partial<Resource> = {}
+      let bonusVp = 0
+      restActions.forEach((actionNode) => {
+        if (actionNode.actionId === 'gain') {
+          resourcesGained = this.mergePreviewResources(resourcesGained, actionNode.params)
+        } else if (actionNode.actionId === 'bonus-vp') {
+          bonusVp += 1
+        }
+      })
+      return {
+        kind: 'resourceExchange',
+        resourcesPaid: this.sanitizePreviewResources(firstAction.params),
+        resourcesGained: this.sanitizePreviewResources(resourcesGained),
+        bonusVp: bonusVp > 0 ? bonusVp : undefined,
+      }
+    }
+    return undefined
+  }
+
+  private getNodeEffectPreview(node: EngineNode): ChoiceEffectPreview | undefined {
+    if (node instanceof ActionNode) {
+      return this.getActionEffectPreview(node)
+    }
+    if (node instanceof OptionalNode) {
+      return this.getNodeEffectPreview(node.child)
+    }
+    if (node instanceof SequenceNode) {
+      const aggregated = this.getSequenceEffectPreview(node)
+      if (aggregated) return aggregated
+      for (const child of node.children) {
+        const preview = this.getNodeEffectPreview(child)
+        if (preview) return preview
+      }
+      return undefined
+    }
+    if (
+      node instanceof ParallelNode ||
+      node instanceof OrNode ||
+      node instanceof XorNode
+    ) {
+      for (const child of node.children) {
+        const preview = this.getNodeEffectPreview(child)
+        if (preview) return preview
+      }
+    }
+    return undefined
+  }
+
+  private getFlowSourceCard(flow: ActionFlow): string | undefined {
+    if (flow.type === 'leaf') return flow.sourceCard
+    if (flow.type === 'playerSwitch') return undefined
+    const sourceCards = [...new Set(
+      flow.children
+        .map((child) => this.getFlowSourceCard(child))
+        .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0),
+    )]
+    return sourceCards.length === 1 ? sourceCards[0] : undefined
+  }
+
   private markCheckedReplaceAction(actionContext?: Record<string, unknown>) {
     return {
       ...(actionContext ?? {}),
@@ -349,17 +542,23 @@ export class Engine {
     executionContext: ActionExecutionContext,
     defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
   ) {
-    if (actionNode.choiceLabelKey) return defaultLabel
     const replaceResult = this.hooks.applyComputeReplace({
       ...executionContext,
       actionId: actionNode.actionId,
     })
+    const replaceSourceCard = replaceResult.sourceCard ?? actionNode.sourceCard
+    if (actionNode.choiceLabelKey) return { ...defaultLabel, sourceCard: replaceSourceCard }
     if (!replaceResult.declined || !replaceResult.alternativeFlow) {
-      return defaultLabel
+      return { ...defaultLabel, sourceCard: replaceSourceCard }
     }
+    const alternativeFlow = this.applyFallbackSourceCardToFlow(
+      replaceResult.alternativeFlow,
+      replaceResult.sourceCard,
+    )
     return {
       labelKey: 'ui.interactionActionOrReplace',
       labelParams: { actionNameKey: defaultLabel.labelKey },
+      sourceCard: this.getFlowSourceCard(alternativeFlow),
     }
   }
 
@@ -377,6 +576,7 @@ export class Engine {
         flow.choiceLabelKey,
         flow.choiceLabelParams,
         flow.actionContext,
+        flow.effectPreview,
       )
       const definition = this.registry.get(flow.actionId)
       if (definition?.resolveChoice) {
@@ -637,10 +837,12 @@ export class Engine {
         .filter((child) => child.getState() !== 'resolved')
         .map((child) => ({
           nodeId: child.id,
+          node: this.tree.findNodeById(child.id) ?? child,
           actionNode: this.findActionNode(child),
         }))
         .filter((entry) => entry.actionNode !== null) as {
         nodeId: string
+        node: EngineNode
         actionNode: ActionNode
       }[]
       const options = availableActions
@@ -664,19 +866,22 @@ export class Engine {
             ),
           )
           if (!doable) return null
-          const baseLabel = this.getChoiceLabel(this.tree.findNodeById(entry.nodeId) ?? entry.actionNode)
+          const baseLabel = this.getChoiceLabel(entry.node)
           if (!baseLabel) return null
           const label = this.getReplaceAwareChoiceLabel(entry.actionNode, executionContext, baseLabel)
           return {
             value: entry.nodeId,
             labelKey: label.labelKey,
             labelParams: label.labelParams,
+            sourceCard: label.sourceCard ?? this.getNodeSourceCard(entry.node),
+            effectPreview: this.getNodeEffectPreview(entry.node),
           }
         })
         .filter((option) => option !== null) as {
         value: string
         labelKey: string
         labelParams?: Record<string, unknown>
+        sourceCard?: string
       }[]
       if (
         node instanceof OrNode &&
@@ -689,6 +894,12 @@ export class Engine {
       }
       this.pendingChoiceNodeId = node.id
       this.pendingChoiceActionId = null
+      this.pendingChoiceContext = {
+        params: undefined,
+        costs: undefined,
+        sourceCard: this.resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
+        actionContext: undefined,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
@@ -752,7 +963,13 @@ export class Engine {
         choice: {
           promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
           options: [
-            { value: actionNode.id, labelKey: label.labelKey, labelParams: label.labelParams },
+            {
+              value: actionNode.id,
+              labelKey: label.labelKey,
+              labelParams: label.labelParams,
+              sourceCard: actionNode.sourceCard,
+              effectPreview: this.getNodeEffectPreview(node.child),
+            },
             { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
           ],
         },
@@ -760,6 +977,14 @@ export class Engine {
     }
     if (node instanceof ChoiceNode) {
       if (node.choices.length > 0) {
+        if (!this.pendingChoiceContext) {
+          this.pendingChoiceContext = {
+            params: undefined,
+            costs: undefined,
+            sourceCard: this.getOptionsSourceCard(node.choices),
+            actionContext: undefined,
+          }
+        }
         return {
           type: 'choice',
           nodeId: node.id,
@@ -790,18 +1015,36 @@ export class Engine {
       const result = executeCardListener(listener, listenerContext as any, {
         ownerPlayerId,
       })
-      if (result?.flow) {
+      const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
+        this.normalizeFollowUpAction(followUp, result?.sourceCard),
+      )
+      if (result?.flow || normalizedFollowUps.length > 0) {
         const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
-        const flowNode = this.buildFlowNode(result.flow)
-        if (node.phase === 'before') {
-          this.collectNodeIds(flowNode, this.beforePhaseFlowNodeIds)
+        const effectPlayer =
+          (ownerPlayerId
+            ? context.state.players.find((player) => player.id === ownerPlayerId)
+            : null) ?? context.player
+        const insertedNodes: EngineNode[] = []
+        if (result?.flow) {
+          const flowNode = this.buildFlowNode(
+            this.applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
+          )
+          if (node.phase === 'before') {
+            this.collectNodeIds(flowNode, this.beforePhaseFlowNodeIds)
+          }
+          insertedNodes.push(flowNode)
+        }
+        insertedNodes.push(...this.buildFollowUpNodes(normalizedFollowUps, node.id, effectPlayer))
+        if (insertedNodes.length === 0) {
+          node.resolve(result ?? {})
+          return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
         }
         if (needsSwitch) {
           const switchTo = new PlayerSwitchNode(`ps-to-${node.id}`, ownerPlayerId)
           const switchBack = new PlayerSwitchNode(`ps-back-${node.id}`, context.player.id)
-          this.tree.insertAfter(node.id, [switchTo, flowNode, switchBack])
+          this.tree.insertAfter(node.id, [switchTo, ...insertedNodes, switchBack])
         } else {
-          this.tree.insertAfter(node.id, [flowNode])
+          this.tree.insertAfter(node.id, insertedNodes)
         }
       }
       if (result?.logKey && !shouldSkipImmediateListenerLog(result)) {
@@ -828,9 +1071,17 @@ export class Engine {
         actionId: node.actionId,
       })
       const replacedActionId = replaceResult.actionId
+      const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
       if (replaceResult.declined && replaceResult.alternativeFlow) {
         const flowNode = this.buildFlowNode(
-          this.buildReplaceChoiceFlow(node, replaceResult.alternativeFlow, replacedActionId),
+          this.buildReplaceChoiceFlow(
+            node,
+            this.applyFallbackSourceCardToFlow(
+              replaceResult.alternativeFlow,
+              replaceResult.sourceCard,
+            ),
+            replacedActionId,
+          ),
         )
         this.tree.insertAfter(node.id, [flowNode])
         node.resolve({ type: 'ok' })
@@ -845,7 +1096,7 @@ export class Engine {
         player: context.player,
         space: context.space,
         params: node.params,
-        sourceCard: node.sourceCard,
+        sourceCard: replaceSourceCard,
         actionContext: node.actionContext,
       }
       const doable = this.hooks.applyIsDoable(
@@ -925,7 +1176,7 @@ result.options = [...result.options, ...extraOptions]
         this.pendingChoiceContext = {
           params: executionContext.params,
           costs: executionContext.costs,
-          sourceCard: executionContext.sourceCard,
+          sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
           actionContext: executionContext.actionContext,
         }
         if (duringActivateNodes.length > 0) {
@@ -967,11 +1218,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         ...afterPhase.actionHookResults,
       ]
       const hookFlows = allActionHookResults
-        .map((entry) => entry.flow)
+        .map((entry) => entry.flow
+          ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+          : null)
         .filter((flow) => flow)
         .map((flow) => this.buildFlowNode(flow as ActionFlow))
       const followUps = allActionHookResults
-        .flatMap((entry) => entry.followUpActions ?? [])
+        .flatMap((entry) =>
+          (entry.followUpActions ?? []).map((followUp) =>
+            this.normalizeFollowUpAction(followUp, entry.sourceCard),
+          ),
+        )
         .filter((action) => action)
       const immediateActivateNodes = this.buildActivateCardNodes(
         immediatePhase.matchedListeners, 'immediatelyAfter', replacedActionId,
@@ -1049,9 +1306,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           actionId: child.actionId,
         })
         const actionId = replaceResult.actionId
+        executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
         if (replaceResult.declined && replaceResult.alternativeFlow) {
           const flowNode = this.buildFlowNode(
-            this.buildReplaceChoiceFlow(child, replaceResult.alternativeFlow, actionId),
+            this.buildReplaceChoiceFlow(
+              child,
+              this.applyFallbackSourceCardToFlow(
+                replaceResult.alternativeFlow,
+                replaceResult.sourceCard,
+              ),
+              actionId,
+            ),
           )
           this.tree.insertAfter(node.id, [flowNode])
           targetNode!.resolve(choice)
@@ -1128,7 +1393,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.pendingChoiceContext = {
             params: executionContext.params,
             costs: executionContext.costs,
-            sourceCard: executionContext.sourceCard,
+            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
             actionContext: executionContext.actionContext,
           }
           const argResults = this.hooks.computeArgs(
@@ -1169,11 +1434,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         })
         
         const hookFlows = allResults
-          .map((entry) => entry.flow)
+          .map((entry) => entry.flow
+            ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+            : null)
           .filter((flow) => flow)
           .map((flow) => this.buildFlowNode(flow as ActionFlow))
         const followUps = allResults
-          .flatMap((entry) => entry.followUpActions ?? [])
+          .flatMap((entry) =>
+            (entry.followUpActions ?? []).map((followUp) =>
+              this.normalizeFollowUpAction(followUp, entry.sourceCard),
+            ),
+          )
           .filter((action) => action)
         const immediateActivateNodes = this.buildActivateCardNodes(
           immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
@@ -1235,13 +1506,19 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.pendingChoiceContext = {
             params: executionContext.params,
             costs: executionContext.costs,
-            sourceCard: executionContext.sourceCard,
+            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
             actionContext: executionContext.actionContext,
           }
           return result
         }
       }
       this.pendingChoiceNodeId = null
+      this.pendingChoiceContext = {
+        params: executionContext.params,
+        costs: executionContext.costs,
+        sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
+        actionContext: executionContext.actionContext,
+      }
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
@@ -1276,11 +1553,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     })
     
     const hookFlows = allResults
-      .map((entry) => entry.flow)
+      .map((entry) => entry.flow
+        ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+        : null)
       .filter((flow) => flow)
       .map((flow) => this.buildFlowNode(flow as ActionFlow))
     const followUps = allResults
-      .flatMap((entry) => entry.followUpActions ?? [])
+      .flatMap((entry) =>
+        (entry.followUpActions ?? []).map((followUp) =>
+          this.normalizeFollowUpAction(followUp, entry.sourceCard),
+        ),
+      )
       .filter((action) => action)
     const immediateActivateNodes = this.buildActivateCardNodes(
       immediatePhase.matchedListeners, 'immediatelyAfter', actionId,

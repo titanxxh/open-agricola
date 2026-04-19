@@ -270,6 +270,12 @@ const formatTradeLabel = (trade: Trade): string => {
   return `${fromKey} → ${toAmount} ${toKey}`
 }
 
+const buildTradeEffectPreview = (trade: Trade, times: number) => ({
+  kind: 'resourceExchange' as const,
+  resourcesPaid: scaleResources(trade.from, times),
+  resourcesGained: scaleResources(trade.to, times),
+})
+
 const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
   const trades = getPlayerCookeryTrades(player)
   const options: ActionChoiceOption[] = []
@@ -280,6 +286,8 @@ const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
     options.push({
       value: `trade:${i}:${max}`,
       labelKey: formatTradeLabel(trade),
+      sourceCard: trade.sourceId,
+      effectPreview: buildTradeEffectPreview(trade, max),
     })
   }
   options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })

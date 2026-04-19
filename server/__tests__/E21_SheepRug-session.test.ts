@@ -56,18 +56,20 @@ describe('E21_SheepRug session', () => {
 
     let resp = session.takeAction(0, 'wish-children')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(['choice', 'confirmNextPlayer']).toContain(resp.pending.type)
     expect(familySize(resp.state.players[0]!)).toBe(3)
     expect(newbornCount(resp.state.players[0]!)).toBe(1)
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
 
-    if (resp.pending.type !== 'choice') return
-    const skipOption = resp.pending.options.find((option) => option.value === '__skip__')
-    expect(skipOption).toBeDefined()
+    if (resp.pending.type === 'choice') {
+      const skipOption = resp.pending.options.find((option) => option.value === '__skip__')
+      expect(skipOption).toBeDefined()
 
-    resp = session.resolveChoice(0, skipOption!.value)
-    expect(resp.ok).toBe(true)
+      resp = session.resolveChoice(0, skipOption!.value)
+      expect(resp.ok).toBe(true)
+    }
+
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 })

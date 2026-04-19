@@ -31,9 +31,9 @@ registerPlayerActionSpace({
         type: 'choice',
         promptKey: 'ui.interactionPioneeringSpirit',
         options: [
-          { value: 'vegetable', labelKey: 'resources.vegetable' },
-          { value: 'boar', labelKey: 'resources.boar' },
-          { value: 'cattle', labelKey: 'resources.cattle' },
+          { value: 'vegetable', labelKey: 'resources.vegetable', sourceCard: CARD_ID },
+          { value: 'boar', labelKey: 'resources.boar', sourceCard: CARD_ID },
+          { value: 'cattle', labelKey: 'resources.cattle', sourceCard: CARD_ID },
         ],
       }
     },

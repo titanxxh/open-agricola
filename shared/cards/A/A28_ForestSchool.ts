@@ -3,7 +3,7 @@ import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, TradeModifier } from '../../game/types'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied } from '../../game/space'
 
 const CARD_ID = 'A28_ForestSchool'
@@ -16,6 +16,7 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.player.minorPlayed.includes(CARD_ID)) return
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
       .filter((space) =>
         LESSONS_SPACE_IDS.includes(space.id) &&
@@ -25,13 +26,26 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
       .map((space) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       }))
     if (extraOptions.length === 0) return
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
 
+const lessonsCanUseOccupiedListener: CardListenerRegistration = {
+  id: 'A28-forest-school-can-use-occupied-lessons',
+  cardIds: [CARD_ID],
+  phases: ['canUseOccupied' as ActionHookPhase],
+  actions: LESSONS_SPACE_IDS,
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!isSpaceOccupied(context.space)) return
+    return { canUseOccupied: true }
+  },
+}
+
 registerCardListener(lessonsComputeArgsListener)
+registerCardListener(lessonsCanUseOccupiedListener)
 
 export const A28_ForestSchool = new MinorImprovement({
   id: "A28_ForestSchool",

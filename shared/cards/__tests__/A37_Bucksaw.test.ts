@@ -67,7 +67,7 @@ describe('A37_Bucksaw', () => {
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type === 'seq') {
       expect(result.flow.optional).toBe(true)
-      expect(result.flow.children).toEqual([
+      expect(result.flow.children).toMatchObject([
         {
           type: 'leaf',
           actionId: 'pay-resources',
@@ -75,6 +75,12 @@ describe('A37_Bucksaw', () => {
           sourceCard: 'A37_Bucksaw',
           choiceLabelKey: 'ui.interactionResourceExchange',
           choiceLabelParams: {
+            resourcesPaid: { wood: 1 },
+            resourcesGained: { grain: 1 },
+            bonusVp: 1,
+          },
+          effectPreview: {
+            kind: 'resourceExchange',
             resourcesPaid: { wood: 1 },
             resourcesGained: { grain: 1 },
             bonusVp: 1,

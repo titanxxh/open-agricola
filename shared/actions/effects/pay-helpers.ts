@@ -502,6 +502,15 @@ const describePaymentSolution = (
   }
 }
 
+const describePaymentEffectPreview = (
+  solution: PaymentSolution,
+  includeReturnedCard: boolean,
+) => ({
+  kind: 'payment' as const,
+  resourcesPaid: solution.resourcesPaid,
+  cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
+})
+
 
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
@@ -516,6 +525,7 @@ export const buildPaymentChoiceResult = (
     value: `${optionValuePrefix}:${idx}`,
     labelKey: 'prompt.selectPaymentOption',
     labelParams: describePaymentSolution(solution, includeReturnedCard) as unknown as Record<string, string | number>,
+    effectPreview: describePaymentEffectPreview(solution, includeReturnedCard),
   })),
   }
 }

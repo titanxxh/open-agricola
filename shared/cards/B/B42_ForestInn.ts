@@ -28,10 +28,10 @@ registerPlayerActionSpace({
         if (owner) owner.resources.food += 1
       }
       // Build options based on available wood
-      const options: { value: string; labelKey: string }[] = []
-      if (player.resources.wood >= 5) options.push({ value: '5', labelKey: 'ui.interactionForestInn5' })
-      if (player.resources.wood >= 7) options.push({ value: '7', labelKey: 'ui.interactionForestInn7' })
-      if (player.resources.wood >= 9) options.push({ value: '9', labelKey: 'ui.interactionForestInn9' })
+      const options: { value: string; labelKey: string; sourceCard: string }[] = []
+      if (player.resources.wood >= 5) options.push({ value: '5', labelKey: 'ui.interactionForestInn5', sourceCard: CARD_ID })
+      if (player.resources.wood >= 7) options.push({ value: '7', labelKey: 'ui.interactionForestInn7', sourceCard: CARD_ID })
+      if (player.resources.wood >= 9) options.push({ value: '9', labelKey: 'ui.interactionForestInn9', sourceCard: CARD_ID })
       if (options.length === 0) return { type: 'ok' }
       return {
         type: 'choice',

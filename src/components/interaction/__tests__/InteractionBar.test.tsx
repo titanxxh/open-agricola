@@ -236,7 +236,15 @@ describe('InteractionBar', () => {
     const triggeredChoice: PendingChoice = {
       promptKey: 'ui.interactionOptionalAction',
       options: [
-        { value: 'action-pay-resources-0', labelKey: 'actions.pay-resources.name' },
+        {
+          value: 'action-pay-resources-0',
+          labelKey: 'actions.pay-resources.name',
+          effectPreview: {
+            kind: 'resourceExchange',
+            resourcesPaid: { food: 3 },
+            resourcesGained: { vegetable: 1 },
+          },
+        },
         { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
       ],
       playerIndex: 0,
@@ -287,7 +295,78 @@ describe('InteractionBar', () => {
 
     expect(html).toContain('Optional action')
     expect(html).toContain('Triggered by Cabbage Buyer')
+    expect(html).toContain('Exchange resources')
+    expect(html).toContain('data-resource=\"food\"')
+    expect(html).toContain('data-resource=\"vegetable\"')
+  })
+
+  it('renders payment previews with concrete cost main text and pay-resources subtitle', () => {
+    const paymentChoice: PendingChoice = {
+      promptKey: 'prompt.selectPayment',
+      options: [
+        {
+          value: 'pay:test:0',
+          labelKey: 'prompt.selectPaymentOption',
+          labelParams: {
+            resourcesPaid: { wood: 2 },
+            cardUsed: 'Major_ClayOven',
+          },
+          effectPreview: {
+            kind: 'payment',
+            resourcesPaid: { wood: 2 },
+            cardUsed: 'Major_ClayOven',
+          },
+        },
+      ],
+      playerIndex: 0,
+      spaceId: 'major-improvement',
+    }
+
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={paymentChoice}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
     expect(html).toContain('Pay Resources')
+    expect(html).toContain('data-resource=\"wood\"')
+    expect(html).toContain('Return Clay Oven')
   })
 
   it('hides fence/palisade mode toggle when player has not played B30 Wood Palisades', () => {

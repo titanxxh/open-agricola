@@ -52,6 +52,7 @@ const computeArgsListener: CardListenerRegistration = {
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}urgent-wish-children`,
         labelKey: space.nameKey,
+        sourceCard: CARD_ID,
       },
     ]
     return { extraOptions, sourceCard: CARD_ID }

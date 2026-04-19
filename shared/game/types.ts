@@ -249,10 +249,29 @@ export type ActionCostPreview = {
   getBaseCost: (context: ActionAvailabilityContext) => Partial<Resource>
 }
 
+export type ChoiceEffectPreview =
+  | {
+      kind: 'resourceExchange'
+      resourcesPaid?: Partial<Resource>
+      resourcesGained?: Partial<Resource>
+      bonusVp?: number
+    }
+  | {
+      kind: 'payment'
+      resourcesPaid?: Partial<Resource>
+      cardUsed?: string
+    }
+  | {
+      kind: 'text'
+      text: string
+    }
+
 export type ActionChoiceOption = {
   value: string
   labelKey: string
   labelParams?: Record<string, unknown>
+  sourceCard?: string
+  effectPreview?: ChoiceEffectPreview
 }
 
 export type ActionExecutionResult =
@@ -272,6 +291,7 @@ export type ActionFlow =
       actionContext?: Record<string, unknown>
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
+      effectPreview?: ChoiceEffectPreview
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
