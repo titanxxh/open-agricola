@@ -1,12 +1,7 @@
-import type { ActionDefinition, ActionExecutionContext, ActionSpace } from '../../game/types'
-import { applyCanUseOccupiedHooks } from '../hooks'
-import {
-  executeCardListener,
-  getMatchingListeners,
-  type CardListenerContext,
-} from '../../cards/card-listeners'
-import { addWorkerRef, isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import type { ActionDefinition, ActionSpace } from '../../game/types'
+import { addWorkerRef, spaceHasPlayer } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
+import { computeAllowedPlacementSpaces, type AllowedPlacement } from './placement-availability'
 
 /**
  * Move a farmer from a source action space to another selectable action space and execute it.
@@ -15,36 +10,13 @@ import { smallestAvailableWorker } from '../../game/player'
  * - execute(): lists selectable spaces (excluding params.excludeSpaceId) → returns choice
  * - resolveChoice(): marks target space as takenBy, executes the space's action
  */
-const canUseOccupiedSpace = (
-  context: ActionExecutionContext & { actionId: string },
-) => {
-  let canUseOccupied = applyCanUseOccupiedHooks(context, false)
-  const listenerContext: CardListenerContext = {
-    ...context,
-    phase: 'canUseOccupied',
-    canUseOccupied,
-  }
-  const matched = getMatchingListeners(listenerContext)
-  for (const entry of matched) {
-    const result = executeCardListener(entry.registration, listenerContext, {
-      ownerPlayerId: entry.ownerPlayerId,
-    })
-    if (typeof result?.canUseOccupied === 'boolean') {
-      canUseOccupied = result.canUseOccupied
-    }
-  }
-  return canUseOccupied
-}
-
 const isSelectableSpace = (
-  context: Omit<ActionExecutionContext, 'space'>,
   space: ActionSpace,
-  excludeId?: string,
-) => {
+  excludeId: string | undefined,
+  allowed: AllowedPlacement[],
+): boolean => {
   if (space.id === excludeId) return false
-  if (!space.canBeExecutedByPlayer(context.state, context.player)) return false
-  if (!isSpaceOccupied(space)) return true
-  return canUseOccupiedSpace({ ...context, space, actionId: space.id })
+  return allowed.some((a) => a.spaceId === space.id)
 }
 
 export const moveFarmerToSpaceAction: ActionDefinition = {
@@ -56,9 +28,8 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params }) => {
     const excludeId = params?.excludeSpaceId as string | undefined
-    const spaces = state.actionSpaces.filter(
-      (space) => isSelectableSpace({ state, player, params }, space, excludeId),
-    )
+    const allowed = computeAllowedPlacementSpaces(state, player)
+    const spaces = state.actionSpaces.filter((s) => isSelectableSpace(s, excludeId, allowed))
     if (spaces.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
     return {
       type: 'choice',
