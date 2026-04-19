@@ -14,6 +14,7 @@ import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getFenceCount } from '../../../shared/actions/effects/fencing'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
+import { isBorderEdge } from '../../../shared/game/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -220,6 +221,7 @@ type Props = {
   pendingPalisadeSet?: Set<string>
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
+  fencePlacementMode?: 'fence' | 'palisade'
   toggleRoomTile: (tile: FarmTilePosition) => void
   toggleStableTile: (tile: FarmTilePosition) => void
   togglePlowTile: (tile: FarmTilePosition) => void
@@ -506,6 +508,7 @@ export const FarmBoard = ({
   pendingPalisadeSet,
   existingFenceSet,
   fenceSelectableSet,
+  fencePlacementMode,
   toggleRoomTile,
   toggleStableTile,
   togglePlowTile,
@@ -916,8 +919,14 @@ export const FarmBoard = ({
             isInteractive && edgeId && !!pendingPalisadeSet && pendingPalisadeSet.has(edgeId)
           const isPending = isPendingFence || isPendingPalisade
           const isActive = isExisting || isPending
+          const blockedForPalisade =
+            fencePlacementMode === 'palisade' && !!edgeId && !isBorderEdge(edgeId)
           const isSelectable =
-            isInteractive && !!edgeId && !isExisting && fenceSelectableSet.has(edgeId)
+            isInteractive &&
+            !!edgeId &&
+            !isExisting &&
+            fenceSelectableSet.has(edgeId) &&
+            !blockedForPalisade
           const builtSegment = edgeId
             ? displayPlayer.fenceSegments.find((s) => s.edge === edgeId)
             : undefined
@@ -933,7 +942,7 @@ export const FarmBoard = ({
               key={cell.key}
               className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
-              }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}`}
+              }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}`}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

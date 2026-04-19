@@ -1536,6 +1536,7 @@ export const GameContainerApi = () => {
                 stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
                 hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
                 existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+                fencePlacementMode={fencePlacementMode}
                 toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
                 togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
                 toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
