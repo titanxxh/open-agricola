@@ -1,4 +1,5 @@
 import type { GameState, PlayerState, Worker } from './types'
+import { getCardHeldWorkerIds } from '../cards/helpers/card-held-workers'
 
 export const getPlayedCardKeys = (
   p: Pick<PlayerState, 'improvements' | 'minorPlayed' | 'occupationPlayed'>,
@@ -26,8 +27,12 @@ export const isWorkerOnAnySpace = (
     s.takenBy.some(t => t.playerId === playerId && t.workerId === workerId),
   )
 
-export const workersAtHome = (state: GameState, p: PlayerState): Worker[] =>
-  activeWorkers(p).filter(w => !isWorkerOnAnySpace(state, p.id, w.id))
+export const workersAtHome = (state: GameState, p: PlayerState): Worker[] => {
+  const held = getCardHeldWorkerIds(p)
+  return activeWorkers(p).filter(
+    (w) => !isWorkerOnAnySpace(state, p.id, w.id) && !held.has(w.id),
+  )
+}
 
 export const workersAvailable = (state: GameState, p: PlayerState): number =>
   workersAtHome(state, p).length

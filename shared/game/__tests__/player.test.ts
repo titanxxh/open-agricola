@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Worker } from '../types'
 import { markAllWorkersUsed } from '../../game/player'
 import { familySize, workersAvailable, newbornCount } from '../../game/player'
+import { holdWorkerOnCard, releaseWorkerFromCard } from '../../cards/helpers/card-held-workers'
 import {
   activateSmallestInactive,
   activeWorkers,
@@ -86,5 +87,14 @@ describe('player helpers', () => {
   it('activateSmallestInactive returns null when family is full', () => {
     const p = makePlayer(Array.from({ length: 5 }, (_, i) => makeWorker(String(i + 1))))
     expect(activateSmallestInactive(p)).toBe(null)
+  })
+
+  it('workersAtHome excludes workers held on a card', () => {
+    const p = makePlayer([makeWorker('1'), makeWorker('2')])
+    const s = emptyState([p])
+    holdWorkerOnCard(p, 'C22_BasketChair', '1')
+    expect(workersAtHome(s, p).map((w) => w.id)).toEqual(['2'])
+    releaseWorkerFromCard(p, 'C22_BasketChair')
+    expect(workersAtHome(s, p).map((w) => w.id).sort()).toEqual(['1', '2'])
   })
 })
