@@ -3,6 +3,7 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
+import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../game/farm'
 
 /**
@@ -162,6 +163,11 @@ const cardEffectOverrides = new Map<string, CardEffect>()
  * See `shared/cards/registry.ts` for the new per-session approach.
  */
 export const registerCardEffect = (effect: CardEffect) => {
+  const active = getActiveCardRegistry()
+  if (active && effect.id) {
+    active.loadImpl(effect.id, { effect })
+    return
+  }
   cardEffectOverrides.set(effect.id, effect)
 }
 
