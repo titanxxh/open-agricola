@@ -1,6 +1,7 @@
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/protocol/game'
 import type { Resource } from '../../shared/game/types'
 import type { ClientCommand, ServerEvent } from '../../shared/protocol/ws'
+import type { DraftPickPayload } from '../../shared/draft/types'
 
 export type ValidateResult = {
   valid: boolean
@@ -38,6 +39,7 @@ export interface GameTransport {
   devDrawCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devPlayCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
+  draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
   onSnapshot(cb: SnapshotListener): () => void
   destroy(): void
@@ -169,6 +171,10 @@ export class HttpGameTransport implements GameTransport {
 
   devCreatePasture(playerIndex: number) {
     return this.send(() => post('/api/game/dev/create-pasture', { playerIndex }))
+  }
+
+  draftSubmit(playerId: string, pick: DraftPickPayload) {
+    return this.send(() => post('/api/game/draft-submit', { playerId, pick }))
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
@@ -383,6 +389,10 @@ export class WsGameTransport implements GameTransport {
 
   async devCreatePasture(playerIndex: number): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'devCreatePasture', playerIndex })
+  }
+
+  async draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'draftSubmit', playerId, pick })
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {

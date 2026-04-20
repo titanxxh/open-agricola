@@ -907,6 +907,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         broadcastState(room, resp, 'action', msg.requestId)
         return
       }
+
+      if (msg.type === 'draftSubmit') {
+        const resp = callRoom(s => s.submitDraftPick(msg.playerId, msg.pick))
+        broadcastState(room, resp, 'draftSubmit', msg.requestId)
+        return
+      }
     })
 
     ws.on('close', () => {

@@ -1,5 +1,6 @@
 import type { Resource } from '../game/types'
 import type { StateUpdateEnvelope } from './game'
+import type { DraftPickPayload } from '../draft/types'
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }
@@ -49,6 +50,7 @@ type ClientCommandBody =
   | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }
   | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
   | { type: 'dissolveRoom' }
+  | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
 export type ClientCommand = ClientCommandBody & { requestId?: string }
 
