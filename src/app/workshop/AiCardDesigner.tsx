@@ -76,7 +76,6 @@ export type ExtractedCard = {
     prerequisite?: string
     modifiers?: unknown[]
   }
-  effects?: Record<string, unknown>
   sourceCode?: string
 }
 
@@ -89,7 +88,6 @@ type ApiCard = {
   name: string
   description: string
   art_url: string | null
-  effect_dsl: Record<string, unknown> | null
   effect_code: string | null
   card_json: Record<string, unknown>  // already parsed by server
   status: string
@@ -693,7 +691,6 @@ function AbilityPanel({
       if (parsed?.card) {
         setExtracted({
           card: parsed.card as ExtractedCard['card'],
-          effects: parsed.effects ?? undefined,
           sourceCode: parsed.sourceCode || undefined,
         })
       }
@@ -886,9 +883,6 @@ function AbilityPanel({
         <div className="ai-extracted-summary">
           <span className="ws-badge">{extracted.card.card_type === 'minor' ? (locale === 'zh' ? '小改进' : 'Minor') : (locale === 'zh' ? '职业' : 'Occupation')}</span>
           <span className="ai-extracted-name">{extracted.card.name}</span>
-          {extracted.effects && Object.keys(extracted.effects).length > 0 && (
-            <span className="ai-extracted-hooks">{Object.keys(extracted.effects).join(', ')}</span>
-          )}
           <ResourceText text={(extracted.card.desc ?? []).join(' ')} />
         </div>
       )}
@@ -1095,11 +1089,9 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
         status: 'draft',
       }
 
-      // If we have source code from TS extraction, save as effect_code
+      // LLM must emit TS source; if missing we simply don't populate effect_code.
       if (extracted?.sourceCode) {
         body.effect_code = extracted.sourceCode
-      } else if (extracted?.effects && Object.keys(extracted.effects).length > 0 && !('_hasCode' in extracted.effects)) {
-        body.effect_dsl = extracted.effects
       }
 
       const r = await fetch(`${API_BASE}/api/workshop/cards`, {
@@ -1180,7 +1172,6 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     }
     setExtracted({
       card: cardData,
-      effects: apiCard.effect_dsl ?? undefined,
       sourceCode: apiCard.effect_code ?? undefined,
     })
     // Restore locales from card_json
@@ -1210,7 +1201,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
             <option value="">{locale === 'zh' ? '-- 选择已有卡牌 --' : '-- Select a card --'}</option>
             {myCards.map(c => {
               const hasArt = !!c.art_url
-              const hasCode = !!(c.effect_code ?? c.effect_dsl)
+              const hasCode = !!c.effect_code
               const missing = [
                 !hasArt && (locale === 'zh' ? '缺图片' : 'no art'),
                 !hasCode && (locale === 'zh' ? '缺代码' : 'no code'),
@@ -1306,8 +1297,8 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
             <span className={artUrl ? 'ai-complete-tag' : 'ai-missing-tag'}>
               {artUrl ? '✓' : '✗'} {locale === 'zh' ? '图片' : 'Art'}
             </span>
-            <span className={extracted?.effects || extracted?.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
-              {extracted?.effects || extracted?.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
+            <span className={extracted?.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
+              {extracted?.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
             </span>
             {autoSaving && (
               <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>

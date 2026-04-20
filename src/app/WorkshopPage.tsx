@@ -14,7 +14,9 @@ type WorkshopCard = {
   name: string
   description: string
   card_json: Record<string, unknown>
-  effect_dsl: Record<string, unknown> | null
+  effect_code: string | null
+  compiled_code?: string | null
+  code_manifest?: Record<string, unknown> | null
   art_url: string | null
   status: 'draft' | 'published'
   author_id?: string
@@ -30,7 +32,7 @@ type CardVersion = {
   id: string
   version_number: number
   card_json: Record<string, unknown>
-  effect_dsl: Record<string, unknown> | null
+  effect_code: string | null
   art_url: string | null
   created_at: number
 }
@@ -118,56 +120,14 @@ function CardTile({ card, onSelect, onLike, mine, t }: {
 
 // ── Card Source Viewer (generated .ts code) ─────────────────────────────────
 
-function CardSourceViewer({ card, token, t }: { card: WorkshopCard; token: string | null; t: (key: string, params?: Record<string, string | number>) => string }) {
-  const [code, setCode] = useState<string | null>(null)
-  const [showCode, setShowCode] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  const loadCode = async () => {
-    if (code) { setShowCode(!showCode); return }
-    setLoading(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards/preview-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-        body: JSON.stringify({
-          card_id: card.card_id,
-          card_type: card.card_type,
-          name: card.name,
-          description: card.description,
-          card_json: card.card_json,
-          effect_dsl: card.effect_dsl,
-        }),
-      })
-      const d = await r.json()
-      if (d.ok) { setCode(d.code); setShowCode(true) }
-    } catch { /* ignore */ }
-    setLoading(false)
-  }
-
-  const effectCode = (card as Record<string, unknown>).effect_code as string | null
-  if (effectCode) {
-    return (
-      <div className="ws-detail-section">
-        <h3>{t('platform.cardCode')}</h3>
-        <pre className="ws-code">{effectCode}</pre>
-        <p className="ws-code-note">{t('platform.codeNote')}</p>
-      </div>
-    )
-  }
-
+function CardSourceViewer({ card, t }: { card: WorkshopCard; t: (key: string, params?: Record<string, string | number>) => string }) {
+  const effectCode = card.effect_code
+  if (!effectCode) return null
   return (
     <div className="ws-detail-section">
-      <h3>{t('platform.effect')}</h3>
-      <pre className="ws-code">{JSON.stringify(card.effect_dsl, null, 2)}</pre>
-      <div className="ws-code-toolbar">
-        <button type="button" className="btn-secondary ws-btn-sm" onClick={loadCode} disabled={loading}>
-          {loading ? t('platform.generating') : showCode ? t('platform.hideCode') : t('platform.showCode')}
-        </button>
-      </div>
-      {showCode && code && (
-        <pre className="ws-code" style={{ marginTop: '8px' }}>{code}</pre>
-      )}
+      <h3>{t('platform.cardCode')}</h3>
+      <pre className="ws-code">{effectCode}</pre>
+      <p className="ws-code-note">{t('platform.codeNote')}</p>
     </div>
   )
 }
@@ -266,7 +226,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
         name: card.name,
         description: card.description,
         card_json: card.card_json,
-        effect_dsl: card.effect_dsl,
+        effect_code: card.effect_code,
         art_url: card.art_url,
         status: newStatus,
       }),
@@ -338,8 +298,8 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
         </div>
       </div>
 
-      {(card.effect_dsl || 'effect_code' in card) && (
-        <CardSourceViewer card={card} token={token} t={t} />
+      {card.effect_code && (
+        <CardSourceViewer card={card} t={t} />
       )}
 
       {showVersions && (
