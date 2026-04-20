@@ -266,4 +266,81 @@ describe('room-manager ws sync', () => {
     expect(afterRoundP1.payload.state.round).toBe(6)
     expect(afterRoundP2.payload.state.round).toBe(6)
   })
+
+  it('forwards createRoom draftMode/draftPoolSize into the session state', async () => {
+    const p1 = new WebSocket(baseUrl) as TestSocket
+    p1.received = []
+    attachCollector(p1)
+    sockets.push(p1)
+    await new Promise<void>((resolve) => p1.once('open', () => resolve()))
+
+    p1.send(
+      JSON.stringify({
+        type: 'createRoom',
+        name: 'P1',
+        maxPlayers: 2,
+        draftMode: 'simultaneous',
+        draftPoolSize: 8,
+      }),
+    )
+    const roomCreated = await waitForEvent(
+      p1,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
+        event.type === 'roomCreated',
+    )
+
+    const p2 = new WebSocket(baseUrl) as TestSocket
+    p2.received = []
+    attachCollector(p2)
+    sockets.push(p2)
+    await new Promise<void>((resolve) => p2.once('open', () => resolve()))
+
+    p2.send(
+      JSON.stringify({
+        type: 'joinRoom',
+        roomId: roomCreated.roomId,
+        requestedPlayerIndex: 1,
+        name: 'P2',
+      }),
+    )
+
+    const initialP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.cause === 'reconnect',
+    )
+    expect(initialP2.payload.state.phase).toBe('draft')
+    expect(initialP2.payload.state.draft).not.toBeNull()
+    expect(initialP2.payload.state.draft?.poolSize).toBe(8)
+    expect(initialP2.payload.pending.type).toBe('cardDraft')
+    for (const player of initialP2.payload.state.players) {
+      expect(player.occupationHand).toEqual([])
+      expect(player.minorHand).toEqual([])
+    }
+  })
+
+  it('rejects createRoom with an invalid draftPoolSize', async () => {
+    const p1 = new WebSocket(baseUrl) as TestSocket
+    p1.received = []
+    attachCollector(p1)
+    sockets.push(p1)
+    await new Promise<void>((resolve) => p1.once('open', () => resolve()))
+
+    p1.send(
+      JSON.stringify({
+        type: 'createRoom',
+        name: 'P1',
+        maxPlayers: 2,
+        draftMode: 'simultaneous',
+        draftPoolSize: 99,
+        requestId: 'bad-draft-1',
+      }),
+    )
+    const err = await waitForEvent(
+      p1,
+      (event): event is Extract<ServerEvent, { type: 'error' }> =>
+        event.type === 'error' && event.requestId === 'bad-draft-1',
+    )
+    expect(err.error).toMatch(/draftPoolSize/)
+  })
 })

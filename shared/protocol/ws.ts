@@ -1,6 +1,6 @@
 import type { Resource } from '../game/types'
 import type { StateUpdateEnvelope } from './game'
-import type { DraftPickPayload } from '../draft/types'
+import type { DraftMode, DraftPickPayload } from '../draft/types'
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }
@@ -47,7 +47,16 @@ type ClientCommandBody =
   | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState' }
-  | { type: 'createRoom'; maxPlayers?: number; name?: string; customCardIds?: string[] }
+  | {
+      type: 'createRoom'
+      maxPlayers?: number
+      name?: string
+      customCardIds?: string[]
+      /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
+      draftMode?: DraftMode
+      /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */
+      draftPoolSize?: number
+    }
   | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
   | { type: 'dissolveRoom' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
