@@ -6,7 +6,7 @@ import {
   removePlayerFromRoom,
   resolveJoinPlayerIndex,
   restoreRoomFromSqliteRow,
-} from '../room-manager.ts'
+} from '../game/room-manager.ts'
 
 const PRIMARY_DEV_ROOM_ID = FIXED_DEV_ROOMS[0]!.id
 
