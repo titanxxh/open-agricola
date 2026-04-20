@@ -12,8 +12,6 @@ const CARD_ID = 'E109_BraidMaker'
  *   - exchanges: each harvest, 1 REED → 2 FOOD (max 1).
  *   - onPlayerComputeCardCosts: whenever buying Major_Basket (regardless of
  *     trigger), override trades to cost { stone: 1, reed: 1 }.
- *   - orderComputeCardCosts: runs before A143 Stonecutter, C27 Blueprint,
- *     B95 Master Bricklayer.
  *
  * Implementation:
  *   - exchanges field on the card definition handles the harvest reed → food.
@@ -21,8 +19,11 @@ const CARD_ID = 'E109_BraidMaker'
  *     Major_Basket → applies delta that reduces base cost { reed: 2, stone: 2 }
  *     to { reed: 1, stone: 1 }. No flag / actionCardId gate — BGA applies it
  *     any time this card is owned.
- *   - `order: -10` ensures this runs before Stonecutter/Blueprint/MasterBricklayer
- *     (which use the default order 0).
+ *   - BGA uses orderComputeCardCosts to sort this before Stonecutter /
+ *     Blueprint / MasterBricklayer because those can do trade-absolute-assignment
+ *     variants. Our implementation emits deltas (commutative addition), so
+ *     order is a no-op. See shared/actions/hooks.ts ActionHookRegistration.order
+ *     for details.
  */
 
 const computeCostsListener: CardListenerRegistration = {
@@ -30,7 +31,6 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
-  order: -10,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== 'Major_Basket') return
     // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.
