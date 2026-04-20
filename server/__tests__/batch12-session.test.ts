@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A54_Credit'
 import '../../shared/cards/A/A96_TaskArtisan'

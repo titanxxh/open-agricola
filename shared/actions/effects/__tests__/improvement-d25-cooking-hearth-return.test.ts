@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../../../../server/game-session'
+import { GameSession } from '../../../../server/game/authoritative-session'
 import '../../../cards/D/D25_WitchesDanceFloor'
 
 describe('D25 — CookingHearth accepts fireplaceIdentity minor as return-cost', () => {

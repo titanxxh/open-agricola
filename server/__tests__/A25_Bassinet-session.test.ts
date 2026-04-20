@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import {
   setActiveWorkerCount,

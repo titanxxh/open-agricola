@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { GameSession } from './game-session.ts'
+import { GameSession } from './game/authoritative-session.ts'
 import { serializeState } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
 import { applyFarmChoice } from '../shared/logic/farm/farm-choice.ts'
@@ -59,7 +59,7 @@ const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): 
 }
 
 /** Call a session method and build the respondWith payload (including custom card defs). */
-const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game-session.ts').SessionResponse) => {
+const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse) => {
   const session = getSessionForRequest(req)
   const resp = session.withCtx(() => fn(session))
   return { resp, result: respondWith(resp, session) }
@@ -85,7 +85,7 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(JSON.stringify(payload))
 }
 
-const respondWith = (resp: import('./game-session.ts').SessionResponse, session?: GameSession) => {
+const respondWith = (resp: import('./game/authoritative-session.ts').SessionResponse, session?: GameSession) => {
   const result: Record<string, unknown> = {
     ...resp,
     state: serializeState(resp.state),

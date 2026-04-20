@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { computeScores } from '../../shared/logic/scoring'
 import type { FarmTilePosition } from '../../shared/game/types'
 import { positionKey } from '../../shared/game/farm'

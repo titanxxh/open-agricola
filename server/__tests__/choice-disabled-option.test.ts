@@ -11,7 +11,7 @@
  *  4. Verify resolving with a non-disabled option still succeeds.
  */
 import { describe, expect, it, beforeEach } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { registerCardEffect } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'

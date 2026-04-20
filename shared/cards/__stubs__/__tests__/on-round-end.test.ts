@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { GameSession } from '../../../../server/game-session'
+import { GameSession } from '../../../../server/game/authoritative-session'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as ON_ROUND_END_ID } from '../Stub_OnRoundEnd'
 import { clearActionHooks } from '../../../actions/hooks'
