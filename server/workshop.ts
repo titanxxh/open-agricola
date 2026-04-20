@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
-import { generateCardFile, generateCodeTemplate, type CardMeta } from './card-codegen.ts'
 import { validateAndCompileCustomCodeRemote } from './custom-code-executor/client.ts'
 import type { CustomCodeValidateResult } from '../shared/cards/custom-code-types.ts'
 
@@ -38,7 +37,6 @@ type WorkshopCard = {
   name: string
   description: string
   card_json: string
-  effect_dsl: string | null
   effect_code?: string | null
   compiled_code?: string | null
   code_manifest?: string | null
@@ -207,7 +205,6 @@ export async function handleWorkshopRoute(
     const cards = rows.map(r => ({
       ...r,
       card_json: JSON.parse(r.card_json as string),
-      effect_dsl: r.effect_dsl ? JSON.parse(r.effect_dsl as string) : null,
       liked_by_me: likedIds.has(r.id),
     }))
 
@@ -246,7 +243,6 @@ export async function handleWorkshopRoute(
       card: {
         ...row,
         card_json: JSON.parse(row.card_json as string),
-        effect_dsl: row.effect_dsl ? JSON.parse(row.effect_dsl as string) : null,
         liked_by_me: likedByMe,
       },
     })
@@ -275,53 +271,6 @@ export async function handleWorkshopRoute(
     return true
   }
 
-  // ── POST /api/workshop/cards/preview-code ─────────────────────────────────
-  if (req.method === 'POST' && url === '/api/workshop/cards/preview-code') {
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const body = await parseBody<{
-      card_id?: string; card_type?: string; name?: string; description?: string
-      card_json?: unknown; effect_dsl?: unknown
-    }>(req)
-    if (!body?.card_id) { sendJson(res, 400, { ok: false, error: 'Missing card_id' }); return true }
-
-    const cj = (body.card_json ?? {}) as Record<string, unknown>
-    const meta: CardMeta = {
-      id: body.card_id,
-      name: body.name ?? '',
-      cardType: (body.card_type === 'occupation' ? 'occupation' : 'minor'),
-      desc: body.description ? [body.description] : (cj.desc as string[] ?? []),
-      cost: (cj.cost as Record<string, number>) ?? {},
-      vp: (cj.vp as number) ?? 0,
-    }
-
-    const dsl = body.effect_dsl ? (typeof body.effect_dsl === 'string' ? JSON.parse(body.effect_dsl as string) : body.effect_dsl) : null
-    const code = generateCardFile(meta, dsl)
-    sendJson(res, 200, { ok: true, code })
-    return true
-  }
-
-  // ── POST /api/workshop/cards/generate-template ────────────────────────────
-  if (req.method === 'POST' && url === '/api/workshop/cards/generate-template') {
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const body = await parseBody<{
-      card_id?: string; card_type?: string; name?: string; description?: string
-      card_json?: unknown
-    }>(req)
-    if (!body?.card_id) { sendJson(res, 400, { ok: false, error: 'Missing card_id' }); return true }
-
-    const cj = (body.card_json ?? {}) as Record<string, unknown>
-    const meta: CardMeta = {
-      id: body.card_id,
-      name: body.name ?? '',
-      cardType: (body.card_type === 'occupation' ? 'occupation' : 'minor'),
-      desc: body.description ? [body.description] : (cj.desc as string[] ?? []),
-      cost: (cj.cost as Record<string, number>) ?? {},
-      vp: (cj.vp as number) ?? 0,
-    }
-    sendJson(res, 200, { ok: true, code: generateCodeTemplate(meta) })
-    return true
-  }
-
   // ── POST /api/workshop/cards ─────────────────────────────────────────────
   // Create or update a card (auth required)
   if (req.method === 'POST' && url === '/api/workshop/cards') {
@@ -333,7 +282,6 @@ export async function handleWorkshopRoute(
       name?: string
       description?: string
       card_json?: unknown
-      effect_dsl?: unknown
       effect_code?: string
       art_url?: string
       status?: string
@@ -408,10 +356,10 @@ export async function handleWorkshopRoute(
         'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
       ).get(body.id) as { n: number })?.n ?? 0) + 1
       db.prepare(`
-        INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO workshop_card_versions (id, card_id, card_json, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        nanoid(), body.id, existing.card_json, existing.effect_dsl ?? null,
+        nanoid(), body.id, existing.card_json,
         existing.effect_code ?? null, existing.compiled_code ?? null, existing.code_manifest ?? null,
         existing.art_url ?? null, versionNum, user.id, now,
       )
@@ -419,13 +367,12 @@ export async function handleWorkshopRoute(
       db.prepare(`
         UPDATE workshop_cards SET
           card_id = ?, card_type = ?, name = ?, description = ?,
-          card_json = ?, effect_dsl = ?, effect_code = ?, compiled_code = ?, code_manifest = ?,
+          card_json = ?, effect_code = ?, compiled_code = ?, code_manifest = ?,
           art_url = ?, status = ?, updated_at = ?
         WHERE id = ?
       `).run(
         body.card_id, body.card_type, body.name, body.description ?? '',
         JSON.stringify(body.card_json),
-        body.effect_dsl ? JSON.stringify(body.effect_dsl) : null,
         effectCode, compiledCode, codeManifest,
         body.art_url ?? null, newStatus, now, body.id,
       )
@@ -436,12 +383,11 @@ export async function handleWorkshopRoute(
       const id = nanoid()
       db.prepare(`
         INSERT INTO workshop_cards
-          (id, author_id, card_id, card_type, name, description, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, author_id, card_id, card_type, name, description, card_json, effect_code, compiled_code, code_manifest, art_url, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, user.id, body.card_id, body.card_type, body.name, body.description ?? '',
         JSON.stringify(body.card_json),
-        body.effect_dsl ? JSON.stringify(body.effect_dsl) : null,
         effectCode, compiledCode, codeManifest,
         body.art_url ?? null, newStatus, now, now,
       )
@@ -531,7 +477,6 @@ export async function handleWorkshopRoute(
     const cards = rows.map(r => ({
       ...r,
       card_json: JSON.parse(r.card_json as string),
-      effect_dsl: r.effect_dsl ? JSON.parse(r.effect_dsl as string) : null,
     }))
     sendJson(res, 200, { ok: true, cards, settings: getSandboxSettings(user.id) })
     return true
@@ -602,16 +547,15 @@ export async function handleWorkshopRoute(
     if (!cardRow) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     if (cardRow.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
     const rows = db.prepare(`
-      SELECT id, version_number, card_json, effect_dsl, art_url, created_at
+      SELECT id, version_number, card_json, art_url, created_at
       FROM workshop_card_versions
       WHERE card_id = ?
       ORDER BY version_number DESC
-    `).all(cardDbId) as { id: string; version_number: number; card_json: string; effect_dsl: string | null; art_url: string | null; created_at: number }[]
+    `).all(cardDbId) as { id: string; version_number: number; card_json: string; art_url: string | null; created_at: number }[]
 
     const versions = rows.map(r => ({
       ...r,
       card_json: JSON.parse(r.card_json),
-      effect_dsl: r.effect_dsl ? JSON.parse(r.effect_dsl) : null,
     }))
     sendJson(res, 200, { ok: true, versions })
     return true
@@ -633,7 +577,6 @@ export async function handleWorkshopRoute(
     const version = db.prepare('SELECT * FROM workshop_card_versions WHERE id = ? AND card_id = ?')
       .get(body.version_id, cardDbId) as {
         card_json: string
-        effect_dsl: string | null
         effect_code: string | null
         compiled_code: string | null
         code_manifest: string | null
@@ -642,19 +585,18 @@ export async function handleWorkshopRoute(
     if (!version) { sendJson(res, 404, { ok: false, error: 'Version not found' }); return true }
 
     // Save current state as a version before reverting
-    const current = db.prepare('SELECT card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
+    const current = db.prepare('SELECT card_json, effect_code, compiled_code, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
     const versionNum = ((db.prepare(
       'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
     ).get(cardDbId) as { n: number })?.n ?? 0) + 1
     const now = Date.now()
     db.prepare(`
-      INSERT INTO workshop_card_versions (id, card_id, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workshop_card_versions (id, card_id, card_json, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       nanoid(),
       cardDbId,
       current.card_json,
-      current.effect_dsl ?? null,
       current.effect_code ?? null,
       current.compiled_code ?? null,
       current.code_manifest ?? null,
@@ -668,11 +610,10 @@ export async function handleWorkshopRoute(
     const restored = JSON.parse(version.card_json)
     db.prepare(`
       UPDATE workshop_cards SET
-        card_json = ?, effect_dsl = ?, effect_code = ?, compiled_code = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
+        card_json = ?, effect_code = ?, compiled_code = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
       WHERE id = ?
     `).run(
       version.card_json,
-      version.effect_dsl,
       version.effect_code,
       version.compiled_code,
       version.code_manifest,
@@ -734,7 +675,6 @@ export async function handleWorkshopRoute(
       cards: rows.map(r => ({
         ...r,
         card_json: typeof r.card_json === 'string' ? JSON.parse(r.card_json as string) : r.card_json,
-        effect_dsl: r.effect_dsl && typeof r.effect_dsl === 'string' ? JSON.parse(r.effect_dsl as string) : r.effect_dsl,
         code_manifest: r.code_manifest && typeof r.code_manifest === 'string' ? JSON.parse(r.code_manifest as string) : r.code_manifest,
       })),
       page,
@@ -758,7 +698,6 @@ export async function handleWorkshopRoute(
     const card = {
       ...row,
       card_json: typeof row.card_json === 'string' ? JSON.parse(row.card_json as string) : row.card_json,
-      effect_dsl: row.effect_dsl && typeof row.effect_dsl === 'string' ? JSON.parse(row.effect_dsl as string) : row.effect_dsl,
       code_manifest: row.code_manifest && typeof row.code_manifest === 'string' ? JSON.parse(row.code_manifest as string) : row.code_manifest,
     }
     sendJson(res, 200, { ok: true, card })

@@ -83,6 +83,7 @@ function runMigrations(db: Database.Database): void {
           name TEXT NOT NULL,
           description TEXT NOT NULL DEFAULT '',
           card_json TEXT NOT NULL,
+          -- @deprecated: kept for historical data, no new writes since PR-2
           effect_dsl TEXT,
           effect_code TEXT,
           compiled_code TEXT,
@@ -129,6 +130,7 @@ function runMigrations(db: Database.Database): void {
           id TEXT PRIMARY KEY,
           card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
           card_json TEXT NOT NULL,
+          -- @deprecated: kept for historical data, no new writes since PR-2
           effect_dsl TEXT,
           effect_code TEXT,
           compiled_code TEXT,
