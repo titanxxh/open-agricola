@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import { serializeState } from '../shared/game/serialization.ts'
+import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
 import { applyFarmChoice } from '../shared/logic/farm/farm-choice.ts'
 import { getDb } from './db.ts'
@@ -58,11 +58,64 @@ const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): 
   return session.withCtx(() => fn(session))
 }
 
+/**
+ * Resolve the caller's chosen viewer (seat) for privacy filtering + seat binding.
+ *
+ * HTTP is per-user sandbox by design (one authenticated user gets a private
+ * `GameSession` and plays every seat). There is no persistent userId → seat
+ * mapping, so we can't default to a viewer. Instead callers **opt in** via the
+ * `X-Viewer-Player: <playerId>` header.
+ *
+ * When set and it matches a live `state.players[*].id`, responses are filtered
+ * with {@link serializeStateForPlayer} (opponent hands masked to '?') and
+ * every endpoint that accepts `body.playerIndex` (or `body.playerId`) is
+ * seat-bound to that viewer.
+ *
+ * When absent (the default), HTTP behaves exactly as before — no filtering
+ * and no seat guard — preserving the multi-seat sandbox / dev flow where one
+ * caller legitimately plays every seat. Production multi-player traffic is
+ * WS-only; WS enforces seat binding independently (see Task 4).
+ */
+const resolveViewerPlayerId = (req: IncomingMessage, session: GameSession): string | null => {
+  const headerVal = req.headers['x-viewer-player']
+  const fromHeader = Array.isArray(headerVal) ? headerVal[0] : headerVal
+  const candidate = (fromHeader ?? '').trim()
+  if (!candidate) return null
+  const state = session.getStateForRead()
+  return state.players.some((p) => p.id === candidate) ? candidate : null
+}
+
 /** Call a session method and build the respondWith payload (including custom card defs). */
 const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse) => {
   const session = getSessionForRequest(req)
   const resp = session.withCtx(() => fn(session))
-  return { resp, result: respondWith(resp, session) }
+  const viewerId = resolveViewerPlayerId(req, session)
+  return { resp, result: respondWith(resp, session, viewerId), viewerId }
+}
+
+/**
+ * Seat-binding guard for endpoints that accept `body.playerIndex`.
+ * If the caller opted into a viewer (via header/query) and that viewer doesn't
+ * match the seat at `playerIndex`, return a 403. Anonymous / unclaimed callers
+ * skip the guard so sandbox / dev flows keep working.
+ * Returns `true` when the caller is allowed to proceed, `false` when a 403 has
+ * already been sent.
+ */
+const enforceSeatBinding = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  playerIndex: number,
+): boolean => {
+  const session = getSessionForRequest(req)
+  const viewerId = resolveViewerPlayerId(req, session)
+  if (!viewerId) return true
+  const state = session.getStateForRead()
+  const seatId = state.players[playerIndex]?.id
+  if (seatId !== viewerId) {
+    sendJson(res, 403, { ok: false, error: 'seat mismatch' })
+    return false
+  }
+  return true
 }
 
 /** @deprecated Use getSessionForRequest instead. Kept for test compatibility. */
@@ -80,15 +133,22 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Viewer-Player',
   })
   res.end(JSON.stringify(payload))
 }
 
-const respondWith = (resp: import('./game/authoritative-session.ts').SessionResponse, session?: GameSession) => {
+const respondWith = (
+  resp: import('./game/authoritative-session.ts').SessionResponse,
+  session?: GameSession,
+  viewerPlayerId: string | null = null,
+) => {
   const result: Record<string, unknown> = {
     ...resp,
-    state: serializeState(resp.state),
+    state:
+      viewerPlayerId != null
+        ? serializeStateForPlayer(resp.state, viewerPlayerId)
+        : serializeState(resp.state),
   }
   // Include custom card definitions so the frontend can register them
   // in its card registry — custom cards render identically to built-in cards.
@@ -120,6 +180,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.takeAction(body.playerIndex!, body.spaceId!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -131,6 +192,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.resolveChoice(body.playerIndex!, body.value!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -142,6 +204,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.takeAnytimeAction(body.playerIndex!, body.actionId!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -153,6 +216,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.confirmAnimalReorg(body.playerIndex!, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1]))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -164,6 +228,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.confirmHarvestFeed(body.playerIndex!, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1]))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -182,6 +247,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, (s) =>
       s.commitSelectionChoice(
         body.playerIndex!,
@@ -261,6 +327,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.commitFarmChoice(body.playerIndex!, body.farmType!, body.payload!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -503,6 +570,14 @@ export const handleGameRoute = async (
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
+    }
+    {
+      const session = getSessionForRequest(req)
+      const viewerId = resolveViewerPlayerId(req, session)
+      if (viewerId && body.playerId !== viewerId) {
+        sendJson(res, 403, { ok: false, error: 'seat mismatch' })
+        return true
+      }
     }
     const pick = { occCardId: body.pick.occCardId, minorCardId: body.pick.minorCardId }
     const { resp, result } = callAndRespond(req, s => s.submitDraftPick(body.playerId!, pick))
