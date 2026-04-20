@@ -16,11 +16,21 @@ const DEFAULT_LOCKED: FarmTilePosition[] = [
   { row: 2, col: 1 },
 ]
 
+// Deterministic setup: fixed seed + explicit non-card placeholder hands so the
+// dealt-hand randomness from `new GameSession()` never leaks into the test.
+// See the equivalent comment in `worker-identity-fg.test.ts` for the rationale.
+const FILLER = '__test_filler__'
+
 const setup = (opts: { withCard?: boolean; locked?: FarmTilePosition[] } = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(/* seed */ 1)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
+
+  for (const p of state.players) {
+    p.minorHand = [FILLER]
+    p.occupationHand = [FILLER]
+  }
 
   const player = state.players[0]!
   player.resources = {
@@ -57,47 +67,40 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(B38_FutureBuildingSite.maxRound).toBe(4)
   })
 
-  // TODO(flaky): same GameSession() random-seed flake as A92 — retries for CI
-  // parallel run; root-cause fix tracked with A92 in a follow-up.
-  it('onBuy computes correct locked tiles for default 2-player layout', { retry: 2 }, () => {
-    const session = new GameSession()
+  it('onBuy computes correct locked tiles for default 2-player layout', () => {
+    // Independent setup (does NOT use the file-level setup helper because we want
+    // B38 to be unplayed in hand at the start). Apply the same deterministic
+    // hand-control as the file-level setup.
+    const session = new GameSession(/* seed */ 1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
-    const player = state.players[0]!
-    player.minorHand.push(CARD_ID)
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
+    state.players[0]!.minorHand = [CARD_ID]
     session.loadState(state)
 
-    // Use the meeting-place action to play the minor improvement
+    // meeting-place flow: seq[ set-first-player, optional(minor-improvement) ]
+    // After takeAction the engine surfaces the OptionalNode choice
+    // (accept-execute / __skip__).
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
 
-    // Navigate through the meeting-place flow
-    // First choice might be skip/play improvement
-    let foundCard = false
-    for (let i = 0; i < 5 && resp.pending.type === 'choice'; i++) {
-      const options = resp.pending.options?.map((o: any) => o.value) ?? []
-      const cardChoice = options.find((v: string) => v.includes(CARD_ID))
-      if (cardChoice) {
-        resp = session.resolveChoice(0, cardChoice)
-        expect(resp.ok).toBe(true)
-        foundCard = true
-        break
-      }
-      // If there's a non-skip option, choose it to advance
-      const nonSkip = options.find((v: string) => v !== '__skip__')
-      if (nonSkip) {
-        resp = session.resolveChoice(0, nonSkip)
-      } else {
-        break
-      }
-    }
-    expect(foundCard).toBe(true)
+    // Sole choice surfaced: the OptionalNode wrapping `minor-improvement`
+    // (accept-execute / __skip__). Because B38 is the only playable minor in the
+    // player's hand, `minor-improvement.execute` short-circuits the per-card
+    // choice and B38's onBuy runs immediately.
+    const acceptMinor = resp.pending.options.find((o) => o.value !== '__skip__')
+    expect(acceptMinor).toBeDefined()
+    resp = session.resolveChoice(0, acceptMinor!.value)
+    expect(resp.ok).toBe(true)
 
-    // After buying, check locked tiles in cardStates
     const p0 = resp.state.players[0]!
     expect(p0.minorPlayed).toContain(CARD_ID)
     const cardState = p0.cardStates?.[CARD_ID]
