@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, ui]
     paths:
-      - 'src/**'
+      - 'client/**'
       - 'shared/**'
       - 'public/**'
       - 'index.html'

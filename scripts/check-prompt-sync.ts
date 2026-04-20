@@ -13,7 +13,7 @@
  *
  * Targets it cross-checks against:
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
- *   - src/services/llmPrompts.ts          → table-row substring search
+ *   - client/services/llmPrompts.ts       → table-row substring search
  *
  * If a hook / phase / denylist entry exists in the source but is missing from
  * a target — drift detected. By default this prints a warning; pass --strict
@@ -36,7 +36,7 @@ const SOURCES = {
 
 const TARGETS = {
   sandboxDoc: 'docs/CUSTOM_CARD_SANDBOX.md',
-  llmPrompt: 'src/services/llmPrompts.ts',
+  llmPrompt: 'client/services/llmPrompts.ts',
 }
 
 type DriftReport = {
@@ -241,7 +241,7 @@ function main() {
   const verb = strict ? 'FAIL' : 'WARN'
   console.log(`${verb}: ${driftCount} drift(s) detected.`)
   console.log(`Update docs/CUSTOM_CARD_SANDBOX.md (machine-checkable blocks)`)
-  console.log(`and src/services/llmPrompts.ts to match the source files above.`)
+  console.log(`and client/services/llmPrompts.ts to match the source files above.`)
   if (strict) process.exit(1)
 }
 

@@ -1,7 +1,7 @@
 /**
  * Workshop AI Card Designer.
  *
- * The system prompt fed to the LLM lives in `src/services/llmPrompts.ts`.
+ * The system prompt fed to the LLM lives in `client/services/llmPrompts.ts`.
  * Sandbox constraints visible to users (sandbox-error tooltips, "what can I
  * write" hints, etc.) MUST stay consistent with the single source of truth:
  *   docs/CUSTOM_CARD_SANDBOX.md
