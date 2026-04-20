@@ -1499,6 +1499,14 @@ type CardContinuation = {
 - `src/app/GameContainerApi.tsx`
 - 或后续演进后的房间容器组件
 
+### 12.4 客户端 bundle 边界（PR-4 懒加载落地）
+
+为巩固“前端仅作展示层”的约束，主 bundle **不得**静态 import `shared/cards/register-all` 或 `shared/cards/catalog`。卡牌元数据（`id` / `nameKey` / `cost` / `reward` / `victoryPoints` / `minPlayers` / `reaches` 等）在应用启动时通过 `GET /cards-manifest.json` 经 `client/services/card-meta.ts` 运行时拉取，所有 UI 查询卡牌只面向这份轻量元数据缓存。
+
+客户端收到后端快照后走 `client/services/rehydrate.ts` 这个**轻量 rehydrator**，而不是 `shared/game/serialization.rehydrateState`——因为客户端永远不会执行 `ActionSpace.onTaken` 回调，跳过回调重建这一步即可切断对 `shared/actions` 与 `shared/cards/catalog` 的依赖链。原始 `rehydrateState` 仍保留给服务端使用。
+
+`shared/logic/state.ts` 已拆出 `state-constants.ts`，客户端只引用常量层，不拖 `shared/logic` 里对 actions/catalog 的依赖。`CardRegistry` 新增 `loadByIds(ids, lookup)` 与 `unload(id)`，为后续 draft/按房间动态装卡的玩法（PR-5）打下基础。主 bundle 预算由 `scripts/check-bundle-size.ts` 默认 strict 守护（main ≤ 550KB raw / ≤ 170KB gzip），落地时实际 ~472KB raw / ~143KB gzip。
+
 ## 13. 测试策略
 
 新的主设计应当围绕“后端权威 + WS 广播”来测试。
