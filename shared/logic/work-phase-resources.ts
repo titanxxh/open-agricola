@@ -7,7 +7,7 @@ export const trackWorkPhaseBuildingResources = (
   playerId: string,
   gainedResources: Partial<Resource>,
 ): number => {
-  if (state.phase !== 'work') return 0
+  if (state.roundPhase !== 'work') return 0
   let totalBuildingGained = 0
   for (const res of BUILDING_RESOURCES) {
     const amount = gainedResources[res] ?? 0

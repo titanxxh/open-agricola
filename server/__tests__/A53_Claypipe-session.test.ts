@@ -11,7 +11,7 @@ describe('A53_Claypipe session flow', () => {
 
     state.players = state.players.slice(0, 2)
     state.round = 7
-    state.phase = 'work'
+    state.roundPhase = 'work'
     state.currentPlayerIndex = 0
     state.players.forEach((player) => {
       markAllWorkersUsed(state, player)
@@ -34,7 +34,7 @@ describe('A53_Claypipe session flow', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(8)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
 
     const gainLog = resp.state.log.find(
@@ -50,7 +50,7 @@ describe('A53_Claypipe session flow', () => {
     const state = session.getState().state
 
     state.round = 7
-    state.phase = 'work'
+    state.roundPhase = 'work'
     state.currentPlayerIndex = 0
     setActiveWorkerCount(state.players[0]!, 2)
     state.players[0]!.resources.food = 10
@@ -91,7 +91,7 @@ describe('A53_Claypipe session flow', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(8)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
 
     const harvestLog = resp.state.log.find(
       (entry) => entry.key === 'log.harvest' && entry.params?.round === 7,

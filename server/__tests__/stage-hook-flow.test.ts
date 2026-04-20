@@ -48,7 +48,7 @@ describe('stage hook flows', () => {
     resp = chooseFirstOption(session, 0)
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(4)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
@@ -160,7 +160,7 @@ describe('stage hook flows', () => {
 
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(5)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
     expect(resp.state.players[0]!.resources.grain).toBe(2)
     expect(readCardResourceStats(resp.state.players[0]!, 'A64_BarleyMill')).toEqual({
@@ -202,7 +202,7 @@ describe('stage hook flows', () => {
 
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(5)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
     expect(resp.state.players[0]!.resources.grain).toBe(2)
     expect(resp.state.players[0]!.resources.clay).toBe(2)
@@ -277,7 +277,7 @@ describe('stage hook flows', () => {
 
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(5)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.sheep).toBe(3)
@@ -359,7 +359,7 @@ describe('stage hook flows', () => {
 
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(5)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.sheep).toBe(3)

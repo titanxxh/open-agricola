@@ -5,7 +5,7 @@ import { countPeopleOnSpace } from '../space-occupancy'
 const mkState = (takenBy: any[]): GameState => ({
   actionSpaces: [{ id: 'farmland', takenBy } as any],
   players: [],
-  round: 1, phase: 'work', currentPlayerIndex: 0,
+  round: 1, roundPhase: 'work', currentPlayerIndex: 0,
   log: [], roundStartSnapshot: null, roundActionOrder: [],
   gameSeed: 0, availableMajorImprovements: [], futureMeeples: [],
   pendingFutureMeeples: [], gameOver: false, workPhaseObtainedResources: {},

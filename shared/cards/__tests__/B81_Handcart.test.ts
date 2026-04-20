@@ -41,7 +41,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
 
 const createState = (...players: PlayerState[]): GameState =>
   ({
-    round: 5, phase: 'work', currentPlayerIndex: 0, players,
+    round: 5, roundPhase: 'work', currentPlayerIndex: 0, players,
     actionSpaces: [
       createSpace('wood-accumulation', {
         gainPerRound: { wood: 3 },

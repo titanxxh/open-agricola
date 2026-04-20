@@ -9,7 +9,7 @@ describe('A55_JunkRoom session log dedupe', () => {
 
     state.players = state.players.slice(0, 2)
     state.round = 3
-    state.phase = 'work'
+    state.roundPhase = 'work'
     state.currentPlayerIndex = 0
     state.players[0]!.workersAvailable = 1
     state.players[0]!.familySize = 1

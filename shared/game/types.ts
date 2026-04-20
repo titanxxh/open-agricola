@@ -208,7 +208,12 @@ export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' |
 
 export type GameState = {
   round: number
-  phase: RoundPhase
+  /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
+  phase: 'draft' | 'playing'
+  /** Round sub-phase (preparation/work/returning-home/harvest/field/feeding/breeding). */
+  roundPhase: RoundPhase
+  /** Draft state when `phase === 'draft'`, otherwise null. */
+  draft: import('../draft/types').DraftState | null
   currentPlayerIndex: number
   players: PlayerState[]
   actionSpaces: ActionSpace[]
@@ -409,6 +414,7 @@ export type PendingAction =
     }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
+  | { type: 'cardDraft'; round: number; totalRounds: number; allSubmitted: boolean }
   | { type: 'none' }
 
 export type InteractionCommand =

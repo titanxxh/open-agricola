@@ -836,6 +836,14 @@ export class GameCore {
         anytimeActions: [],
       }
     }
+    if (this.pending.type === 'cardDraft') {
+      // Draft phase: no regular interaction commands (client uses DraftOverlay).
+      return {
+        stateId: 'idle',
+        allowedCommands: [],
+        anytimeActions: [],
+      }
+    }
     if (this.pending.type === 'none') {
       // Idle: only compute anytime actions (no farm interaction needed)
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
@@ -1361,7 +1369,7 @@ export class GameCore {
 
   private continueHarvestFieldStart(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (playerIndex === 0 && cardIndex === 0) {
-      this.state.phase = 'field'
+      this.state.roundPhase = 'field'
       this.state.log.unshift({ key: 'log.harvestPhaseReap' })
     }
     if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
@@ -1402,7 +1410,7 @@ export class GameCore {
       return this.respond()
     }
     delete this.state.harvestReapSummary
-    this.state.phase = 'harvest'
+    this.state.roundPhase = 'harvest'
     return this.continueHarvestEffects()
   }
 
@@ -1411,7 +1419,7 @@ export class GameCore {
       return this.respond()
     }
 
-    this.state.phase = 'feeding'
+    this.state.roundPhase = 'feeding'
     if (this.continueStageHook('onStartHarvestFeedingPhase')) {
       return this.respond()
     }
@@ -1510,7 +1518,7 @@ export class GameCore {
     }
     const startIdx = this.state.players.findIndex((player) => player.startPlayer)
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
-    this.state.phase = 'work'
+    this.state.roundPhase = 'work'
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.pending = { type: 'none' }
@@ -2334,7 +2342,7 @@ export class GameCore {
     }
 
     this.pushHistory()
-    this.state.phase = 'returning-home'
+    this.state.roundPhase = 'returning-home'
     return this.continueBeforeReturnHomeHooks()
   }
 
@@ -2380,13 +2388,13 @@ export class GameCore {
   }
 
   private startHarvest(): SessionResponse {
-    this.state.phase = 'harvest'
+    this.state.roundPhase = 'harvest'
     this.state.log.unshift({ key: 'log.harvest', params: { round: this.state.round } })
     return this.continueHarvestFromBeforeHarvest()
   }
 
   private startBreedPhase(): SessionResponse {
-    this.state.phase = 'breeding'
+    this.state.roundPhase = 'breeding'
     return this.continueAfterFeedingPhase()
   }
 
@@ -2426,7 +2434,7 @@ export class GameCore {
   }
 
   private finalizeRound(): SessionResponse {
-    this.state.phase = 'preparation'
+    this.state.roundPhase = 'preparation'
     this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
     return this.continueAfterRoundEnd()
   }
