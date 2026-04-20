@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, ui]
+  workflow_dispatch:
+
+jobs:
+  check-prompt-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check prompt sync (strict)
+        run: pnpm run check:prompt-sync -- --strict
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (informational — pre-existing warnings, see CLAUDE.md)
+        run: pnpm run lint
+        continue-on-error: true
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build (includes cards manifest)
+        run: pnpm run build
+
+      - name: Check reaches (warn-only in PR-1)
+        run: pnpm run check:reaches
+
+      - name: Check no-DSL (warn-only in PR-1)
+        run: pnpm run check:no-dsl
+
+      - name: Check bundle size (print-only in PR-1)
+        run: pnpm run check:bundle-size
