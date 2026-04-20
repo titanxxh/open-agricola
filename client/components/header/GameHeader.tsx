@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
-import { harvestRounds } from '../../../shared/logic/state'
+import { harvestRounds } from '../../../shared/logic/state-constants'
 import { setPage } from '../../app/PageRouter'
 import { LocaleSwitcher } from '../common/LocaleSwitcher'
 
