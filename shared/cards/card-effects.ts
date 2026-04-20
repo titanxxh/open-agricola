@@ -3,7 +3,7 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
-import { getActiveCardRegistry } from './active-registry'
+import { getActiveCardRegistry, setActiveCardRegistry } from './active-registry'
 import { positionKey } from '../game/farm'
 
 /**
@@ -166,13 +166,22 @@ export const registerCardEffect = (effect: CardEffect) => {
   const active = getActiveCardRegistry()
   if (active && effect.id) {
     active.loadImpl(effect.id, { effect })
-    return
   }
+  // Also mirror into the legacy global map so that:
+  //  - Tests registering a synthetic card effect *before* constructing a new
+  //    GameSession (which would build a fresh CardRegistry) still find the
+  //    effect via the legacy fallback inside `getCardEffect`.
+  //  - Repeated `registerCardEffect` calls overwrite the entry for a given id,
+  //    matching pre-migration behaviour.
   cardEffectOverrides.set(effect.id, effect)
 }
 
 export const clearCardEffects = () => {
   cardEffectOverrides.clear()
+  // Also detach any session-owned active registry so subsequent test setup
+  // re-registers into the legacy global by default. A new GameSession will
+  // reattach its own registry on construction.
+  setActiveCardRegistry(null)
 }
 
 export const clearCustomCardEffects = () => {
@@ -187,6 +196,9 @@ export const getCardEffect = (id: string): CardEffect | null => {
   const sessionCtx = getCurrentSessionContext()
   const custom = sessionCtx?.customEffects.get(id)
   if (custom) return custom
+  const active = getActiveCardRegistry()
+  const fromActive = active?.getEffect(id)
+  if (fromActive) return fromActive
   return cardEffectOverrides.get(id) ?? getMajorCardEffect(id) ?? null
 }
 

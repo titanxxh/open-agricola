@@ -52,6 +52,9 @@ import {
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
+import { CardRegistry, type CardImpl } from '../cards/registry.ts'
+import { setActiveCardRegistry } from '../cards/active-registry.ts'
+import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
@@ -222,6 +225,14 @@ export interface GameCoreOptions {
    * leave it unset (defaults to a no-op).
    */
   registerCustomCardImpl?: (data: CustomCardData) => void
+  /**
+   * Optional pre-built per-session card registry. When omitted, `GameCore`
+   * constructs a new `CardRegistry` and populates it from `ALL_CARD_IMPLS`.
+   * The registry is published via `setActiveCardRegistry` so that any legacy
+   * `registerCardListener` / `registerCardEffect` calls issued later (e.g.
+   * custom-code cards at runtime) forward into this session's registry.
+   */
+  cardRegistry?: CardRegistry
 }
 
 export class GameCore {
@@ -257,6 +268,7 @@ export class GameCore {
   private engineLog: LogStore
   private sessionCardContext: SessionCardContext | null = null
   private readonly registerCustomCardImpl: (data: CustomCardData) => void
+  private readonly cardRegistry: CardRegistry
   readonly cardWarnings: string[] = []
 
   constructor(options: GameCoreOptions = {}) {
@@ -271,6 +283,19 @@ export class GameCore {
     clearActionHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
+
+    // Build or accept a per-session card registry, then publish it as the
+    // "active" registry so any subsequent `registerCardListener` /
+    // `registerCardEffect` calls (e.g. from custom-code cards) forward into it.
+    if (options.cardRegistry) {
+      this.cardRegistry = options.cardRegistry
+    } else {
+      this.cardRegistry = new CardRegistry()
+      for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+        this.cardRegistry.loadImpl(cardId, impl as CardImpl)
+      }
+    }
+    setActiveCardRegistry(this.cardRegistry)
 
     // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
