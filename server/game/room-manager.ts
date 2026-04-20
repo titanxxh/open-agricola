@@ -891,6 +891,28 @@ export const createWsServer = (server: import('node:http').Server) => {
       const callRoom = <T>(fn: (session: GameSession) => T): T =>
         room.session.withCtx(() => fn(room.session))
 
+      // ── Seat-binding guards (PR-6 Task 4) ───────────────────────────────
+      // Any command that carries a client-supplied playerIndex / playerId
+      // must match the connection's own seat. This is the main anti-spoof
+      // enforcement for multi-player: without it, a malicious client could
+      // submit actions on another player's seat just by lying in the payload.
+      const assertOwnSeat = (expectedPlayerIndex: unknown): boolean => {
+        if (typeof expectedPlayerIndex !== 'number' || expectedPlayerIndex !== currentPlayerIndex) {
+          sendCommandError('seat mismatch: you cannot act on another player')
+          return false
+        }
+        return true
+      }
+      const assertOwnPlayerId = (expectedPlayerId: unknown): boolean => {
+        const state = room.session.getState().state
+        const ownId = state.players[currentPlayerIndex]?.id
+        if (typeof expectedPlayerId !== 'string' || !ownId || expectedPlayerId !== ownId) {
+          sendCommandError('seat mismatch: you cannot act on another player')
+          return false
+        }
+        return true
+      }
+
       if (msg.type === 'getState') {
         const resp = callRoom(s => s.getState())
         sendStateTo(ws, room, resp, msg.requestId)
@@ -946,12 +968,14 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'commitFarm') {
+        if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload))
         broadcastState(room, resp, 'choice', msg.requestId)
         return
       }
 
       if (msg.type === 'commitSelection') {
+        if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.commitSelectionChoice(currentPlayerIndex, msg.payload))
         broadcastState(room, resp, 'choice', msg.requestId)
         return
@@ -982,7 +1006,12 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
+      // Dev commands bypass game rules but must still respect seat binding:
+      // testers / dev tooling are expected to operate from their own seat.
+      // If a future debug flow genuinely needs cross-seat mutation, add an
+      // explicit admin-only channel rather than weakening this guard.
       if (msg.type === 'devSetResources') {
+        if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.devSetResources(msg.playerIndex, msg.resources))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
@@ -995,12 +1024,14 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'devDrawCard') {
+        if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.devDrawCard(msg.playerIndex, msg.cardId))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
       }
 
       if (msg.type === 'devPlayCard') {
+        if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.devPlayCard(msg.playerIndex, msg.cardId))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
@@ -1013,6 +1044,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'draftSubmit') {
+        if (!assertOwnPlayerId(msg.playerId)) return
         const resp = callRoom(s => s.submitDraftPick(msg.playerId, msg.pick))
         broadcastState(room, resp, 'draftSubmit', msg.requestId)
         return
