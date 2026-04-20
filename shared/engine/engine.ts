@@ -863,6 +863,7 @@ export class Engine {
             action.canBeExecutedByPlayer(
               executionContext.state,
               executionContext.player,
+              { sourceCard: executionContext.sourceCard },
             ),
           )
           if (!doable) return null
@@ -939,6 +940,7 @@ export class Engine {
         action.canBeExecutedByPlayer(
           executionContext.state,
           executionContext.player,
+          { sourceCard: executionContext.sourceCard },
         ),
       )
       if (!doable) {
@@ -1102,7 +1104,11 @@ export class Engine {
       const doable = this.hooks.applyIsDoable(
         { ...executionContext, actionId: replacedActionId },
         action,
-        action.canBeExecutedByPlayer(executionContext.state, executionContext.player),
+        action.canBeExecutedByPlayer(
+          executionContext.state,
+          executionContext.player,
+          { sourceCard: executionContext.sourceCard },
+        ),
       )
       if (!doable) {
         return { type: 'blocked', nodeId: node.id }
