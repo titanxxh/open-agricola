@@ -24,6 +24,7 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
+import { DraftOverlay } from './draft/DraftOverlay'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -1281,6 +1282,30 @@ export const GameContainerApi = () => {
 
   if (!state || !currentPlayer || !displayPlayer) {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
+  }
+
+  // Card-draft phase — render the draft overlay instead of the game board.
+  // The locked URL-pinned player wins in WS mode; otherwise fall back to the
+  // sandbox "self" (current player) so HTTP debugging still works.
+  if (state.phase === 'draft' && state.draft) {
+    const meId = (isWs && lockedViewPlayerId) ? lockedViewPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        <DraftOverlay
+          state={state}
+          meId={meId}
+          locale={locale}
+          onSubmit={async (pick) => {
+            try {
+              await transport.draftSubmit(meId, pick)
+              // State update arrives via onSnapshot subscription — no manual refresh.
+            } catch (e) {
+              console.error('draftSubmit error', e)
+            }
+          }}
+        />
+      </div>
+    )
   }
 
   return (
