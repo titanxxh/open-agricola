@@ -252,6 +252,18 @@
 - TODO(PR-future): `collectLockedFarmTileKeys` in `shared/cards/card-effects.ts` 是 rule-ish（遍历 `getCardEffect` mutable 注册表、调用卡牌 `computeLockedFarmTiles` handler，主要消费者在 `shared/session/game-core.ts` / `shared/logic/farm/farm-interaction.ts` / `shared/logic/farm/farm-choice.ts` 规则路径上，`client/components/board/FarmBoard.tsx` 只是顺带复用）。不适合迁到 `shared/cards/view-helpers/`；evaluate 在后续 PR 中将前端使用的那份改为消费 server 预先计算的 `lockedTileKeys` 快照字段，或包成显式输入的 shared helper。Tracked during PR-3 Task 10 audit.
 - TODO(PR-future): `applyMajorEffectsToAllPlayers` in `shared/cards/major/index.ts` 是 rule-ish（遍历所有玩家触发 major hook 并返回 `ActionFlow`），`client/app/hooks/use-round-flow.ts` 在前端调用本就越线；evaluate 在后续 PR 中将 `onRoundStart` 合入 server 权威流程（让 `GameSession` 先跑 hook，前端只消费结果）或包成 explicit-inputs 的 shared helper。Tracked during PR-3 Task 10 audit.
 
+### 客户端 bundle 懒加载（PR-4）
+
+- 2026-04-20 PR-4 懒加载 + 路由切分落地：
+  - 主 bundle 834KB → ~472KB raw (-43%) / 234KB → ~143KB gzip (-39%)
+  - 客户端走 `/cards-manifest.json` 运行时获取元数据（`client/services/card-meta.ts`），不再静态 import `shared/cards/catalog`
+  - 客户端专用轻量 rehydrate（`client/services/rehydrate.ts`），不再触发 `shared/game/serialization` 的 actions/catalog 依赖链
+  - `shared/logic/state.ts` 拆出 `state-constants.ts`（客户端安全常量层）
+  - `scripts/build-cards-manifest.ts` 新增对 `PlayerActionCard` + major 字面量卡的覆盖（875 → 897 entries）
+  - `CardRegistry` 新增 `loadByIds(ids, lookup)` / `unload(id)` API（PR-5 draft 玩法基建）
+  - `scripts/check-bundle-size.ts` 默认 strict（main ≤ 550KB raw / ≤ 170KB gzip，当前 buffer ~17%）
+  - `scripts/check-reaches.ts` 已 strict（PR-1 遗留，PR-4 CI 一并收紧）
+
 ---
 
 ## 4. 实现进度时间线
