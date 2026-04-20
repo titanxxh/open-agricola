@@ -28,5 +28,5 @@ export const D11_LawnFertilizer_impl = {
     }
   },
 },
-  reaches: [] as readonly string[],
+  reaches: ['A12_DrinkingTrough'] as readonly string[],
 } satisfies CardImpl

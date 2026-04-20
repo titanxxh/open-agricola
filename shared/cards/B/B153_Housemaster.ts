@@ -37,5 +37,5 @@ export const B153_Housemaster_impl = {
     return 0
   },
 },
-  reaches: [] as readonly string[],
+  reaches: ['A60_OrientalFireplace'] as readonly string[],
 } satisfies CardImpl

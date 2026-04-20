@@ -38,6 +38,31 @@ function extractStringLiterals(node: ts.Node): string[] {
   return out
 }
 
+function unwrapTypeWrappers(node: ts.Node | undefined): ts.Node | null {
+  if (!node) return null
+  // `X satisfies T`, `X as T`, `<T>X`, `(X)` all wrap the underlying expression.
+  let cur: ts.Node = node
+  while (
+    ts.isSatisfiesExpression(cur) ||
+    ts.isAsExpression(cur) ||
+    ts.isTypeAssertionExpression(cur) ||
+    ts.isParenthesizedExpression(cur)
+  ) {
+    cur = cur.expression
+  }
+  return cur
+}
+
+function unwrapObjectLiteral(node: ts.Node | undefined): ts.ObjectLiteralExpression | null {
+  const cur = unwrapTypeWrappers(node)
+  return cur && ts.isObjectLiteralExpression(cur) ? cur : null
+}
+
+function unwrapArrayLiteral(node: ts.Node | undefined): ts.ArrayLiteralExpression | null {
+  const cur = unwrapTypeWrappers(node)
+  return cur && ts.isArrayLiteralExpression(cur) ? cur : null
+}
+
 function findImplExport(sf: ts.SourceFile): { cardId: string; implNode: ts.Node; reaches: string[] } | null {
   for (const stmt of sf.statements) {
     if (!ts.isVariableStatement(stmt) || !stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue
@@ -47,18 +72,22 @@ function findImplExport(sf: ts.SourceFile): { cardId: string; implNode: ts.Node;
       const implMatch = name.match(/^([A-E]\d+_\w+)_impl$/)
       if (!implMatch) continue
       const cardId = implMatch[1]
-      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
+      const objLit = unwrapObjectLiteral(decl.initializer)
+      if (!objLit) continue
       const reaches: string[] = []
-      for (const prop of decl.initializer.properties) {
+      for (const prop of objLit.properties) {
         if (!ts.isPropertyAssignment(prop)) continue
         const key = ts.isIdentifier(prop.name) ? prop.name.text : prop.name.getText()
-        if (key === 'reaches' && ts.isArrayLiteralExpression(prop.initializer)) {
-          for (const el of prop.initializer.elements) {
-            if (ts.isStringLiteral(el)) reaches.push(el.text)
+        if (key === 'reaches') {
+          const arr = unwrapArrayLiteral(prop.initializer)
+          if (arr) {
+            for (const el of arr.elements) {
+              if (ts.isStringLiteral(el)) reaches.push(el.text)
+            }
           }
         }
       }
-      return { cardId, implNode: decl.initializer, reaches }
+      return { cardId, implNode: objLit, reaches }
     }
   }
   return null
