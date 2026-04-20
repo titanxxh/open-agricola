@@ -1658,10 +1658,55 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 - 7 轮后 `finalizeDraft` 把 kept 灌回 `player.occupationHand` / `player.minorHand`，`phase` 切到 `'playing'`，主引擎走 round 1。
 - 协议：`ClientCommand.draftSubmit`（WS 与 HTTP `/api/game/draft-submit` 两条路径）；UI 侧用 `PendingAction.cardDraft` 携带当前池与已提交状态。
 - 持久化：`phase` / `draft` 通过现有 `serializeState` 自动 passthrough；SQLite / JSON 房间存档无 schema 改动。
-- 隐私：当前信任式同步（广播 full state），对手池技术上可见。per-connection 视角过滤留给 issue #7 单独跟进。
+- 隐私：PR-6 已落地 per-connection 视角过滤（见 §15）。issue #7 已关闭，对手池与对手手牌对非 viewer 会被替换为 `'?'` 占位。
 - Bundle 影响：draft 相关的 UI（`DraftOverlay` / `DraftPoolRow` / `DraftHistoryPanel`）随 main bundle 发货，落地后 main 为 ~477KB raw / ~145KB gzip，仍在预算内（550KB raw / 170KB gzip）。
 
-## 15. 当前结论
+## 15. Hand Privacy & Seat Binding（PR-6）
+
+协议层安全加固：之前版本会把所有玩家的 `occupationHand` / `minorHand` 以及 draft `pools` 广播给房间里的全部连接，任何客户端都能直接读到对手的卡牌 ID。同时 WS 命令信任 `msg.playerIndex` / `msg.playerId`，认证用户可以冒充其他玩家发出指令。PR-6 在不改变"后端权威 + 完整快照"模型的前提下，加上 **per-viewer 状态过滤** 与 **seat binding** 两道护栏（issue #7 已在 PR-6 修复）。
+
+### State filter（手牌 / draft 池视角化）
+
+- `serializeStateForPlayer(state, viewerPlayerId)`（`shared/game/serialization.ts`）— 在 `serializeState` 基础上，对 **非 viewer** 的字段做长度保留替换：
+  - `player.occupationHand` → 同等长度的 `['?', '?', ...]`
+  - `player.minorHand` → 同等长度的 `['?', '?', ...]`
+  - `draft.pools[otherPid]` → 同等长度的 `['?', '?', ...]`
+  - viewer 自己的手牌 / 池保持真实 ID，方便前端渲染与操作。
+- 长度保留是刻意的：前端仍可按位置画牌背、计算"对手有几张"，也保留了未来做 patch/diff 的兼容性。
+- 持久化（JSON / SQLite）仍然写 **未过滤的 authoritative state**，filter 只发生在"向某个具体 viewer 发送"这一步。
+
+### 广播层：per-connection envelope
+
+- `broadcastState`（`server/room-manager.ts`）对每个连接都用 **自己座位绑定的 `playerId`** 构造独立的 `StateUpdateEnvelope`，而不是一个 envelope 广播给所有 socket。
+- 观察者（未绑定座位的连接）收到的是完全过滤版（所有手牌 / 池都是 `'?'`），防止"旁观" = "信息泄漏"。
+- 代价：广播时多了一次 per-connection `serializeStateForPlayer` 调用，但 filter 本身只遍历手牌数组与 draft pool 数组，常数开销，测试里未观察到性能回退。
+
+### HTTP `/api/game/*` 的 opt-in filter
+
+- HTTP 层默认信任（单人 dev 沙箱场景，看到所有手牌是期望行为）。
+- 真正进入多人模式时，前端可以带 `X-Viewer-Player: <playerId>` header：
+  - 服务端会走 `serializeStateForPlayer` 过滤响应
+  - 同时对写操作做 **seat binding 校验**：认证用户请求里的 `playerIndex` / `playerId` 必须与 header 中的 viewer 一致，否则返回 403
+- 不设置 header 就不校验，保留 dev / 测试路径的自由度。
+
+### WS 命令 seat binding
+
+- 所有需要指定 "谁在操作" 的 WS 命令都校验 `msg.playerIndex` / `msg.playerId` 是否等于 **连接绑定的座位**：
+  - `action`、`choice`、`anytime`、`commitFarm`、`commitSelection`、`reorg`、`feed`
+  - `devSetResources`、`devDrawCard`、`devPlayCard`
+  - `draftSubmit`
+- 校验不通过时返回 `seat mismatch` 错误，不改 state。`assertOwnSeat` / `assertOwnPlayerId` 是共用断言。
+- 观察者连接（无座位）发任何写命令都会被拒绝。
+
+### 测试覆盖
+
+- `shared/game/__tests__/serialization-filter.test.ts` — 9 个
+- `server/__tests__/privacy-broadcast.test.ts` — 4 个
+- `server/__tests__/privacy-http.test.ts` — 10 个
+- `server/__tests__/ws-seat-binding.test.ts` — 7 个
+- 共 30 个新测试覆盖 filter 对齐、viewer 对称性、seat mismatch 拒绝、观察者隔离等场景。
+
+## 16. 当前结论
 
 项目的主设计应明确为：
 
