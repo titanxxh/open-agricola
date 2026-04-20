@@ -14,7 +14,7 @@ import type {
   CustomCodeListenerResult,
   CustomCodeManifest,
   CustomCodeValidateResult,
-} from '../../shared/cards/custom-code-types.ts'
+} from '../../shared/custom-code/types.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8

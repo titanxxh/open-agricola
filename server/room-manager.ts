@@ -9,7 +9,7 @@ import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol
 import { validateSession } from './auth.ts'
 import { getDb } from './db.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
-import type { CustomCodeManifest } from '../shared/cards/custom-code-types.ts'
+import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 
 /** Load custom card data from DB by workshop_cards.id list. Allows published + author's drafts. */
 function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
