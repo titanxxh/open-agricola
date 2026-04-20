@@ -134,7 +134,7 @@ pnpm run test:e2e                                 # Playwright E2E（需要后�
 pnpm exec vitest run tests/path/to/file.spec.ts   # 单文件
 
 # Lint 与构建
-pnpm run lint   # ESLint（~340 个 pre-existing any 类型警告，不阻塞）
+pnpm run lint   # ESLint（~1170 个 pre-existing warning，exit 0；error 必须清零）
 pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
 ```
 

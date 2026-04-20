@@ -120,7 +120,7 @@ describe('B130_FullPeasant session', () => {
     state.players[0]!.resources.wood = 10
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'fencing')
+    const resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     // fencing immediately goes into fence-selection UI (not a pre-placement choice).
     // We can't easily complete fence-selection here; just verify takeAction succeeded.

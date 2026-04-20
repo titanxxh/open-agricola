@@ -135,7 +135,7 @@ describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
 
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'meeting-place')
+    const resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
