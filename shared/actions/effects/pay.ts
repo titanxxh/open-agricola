@@ -317,12 +317,12 @@ export const sortPaymentSolutions = (
 
 const applyBonus = (
   cost: Partial<Resource>,
-  bonus: Bonus,
+  discount: Partial<Resource>,
 ): Partial<Resource> => {
   const result = { ...cost }
-  const discountKeys = Object.keys(bonus.discount) as ResourceKey[]
+  const discountKeys = Object.keys(discount) as ResourceKey[]
   for (const key of discountKeys) {
-    const discountAmount = bonus.discount[key] ?? 0
+    const discountAmount = discount[key] ?? 0
     result[key] = Math.max(0, (result[key] ?? 0) - discountAmount)
   }
   return result
@@ -408,23 +408,6 @@ export const applyTradeModifier = (
   return modifiedTrades
 }
 
-export const applyBonusModifier = (
-  baseBonuses: Bonus[],
-  modifier: BonusModifier,
-): Bonus[] => {
-  const modifiedBonuses: Bonus[] = [...baseBonuses]
-  
-  const newBonus: Bonus = {
-    discount: modifier.discount,
-    optional: modifier.optional ?? true,
-    sources: [modifier.cardId],
-    conditions: modifier.conditions,
-  }
-  modifiedBonuses.push(newBonus)
-
-  return modifiedBonuses
-}
-
 export const getEffectiveCost = (
   baseCost: ComplexCost,
 ): ComplexCost => {
@@ -468,8 +451,10 @@ export const applyCostModifiers = (
       const bonusMod = mod as BonusModifier
       effectiveBonuses.push({
         discount: bonusMod.discount,
+        choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
+        conditions: bonusMod.conditions,
       })
     }
   }
@@ -487,6 +472,24 @@ export const applyCostModifiers = (
   }
 
   return result
+}
+
+const validateBonus = (bonus: Bonus): void => {
+  const hasDiscount = bonus.discount !== undefined
+  const hasChoices = bonus.choices !== undefined
+  if (hasDiscount === hasChoices) {
+    throw new Error(
+      'Bonus must have exactly one of discount or choices (got ' +
+        `discount=${hasDiscount}, choices=${hasChoices})`,
+    )
+  }
+  if (hasChoices && (bonus.choices!.length === 0)) {
+    throw new Error('Bonus.choices must be a non-empty array')
+  }
+  // TODO(cost-modifier-coverage): Bonus.conditions / BonusChoice.conditions is
+  // propagated through applyBonusModifier and applyCostModifiers but not yet
+  // evaluated by computeAllBuyableCombinations. See
+  // docs/superpowers/specs/2026-04-20-cost-modifier-coverage-design.md §"out of scope".
 }
 
 export const computeAllBuyableCombinations = (
@@ -512,6 +515,11 @@ export const computeAllBuyableCombinations = (
       ? [effectiveCost.fee]
       : [{}]
 
+  // Validate bonus invariants once up-front
+  for (const bonus of effectiveCost.bonuses ?? []) {
+    validateBonus(bonus)
+  }
+
   for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
     const baseFee = baseFees[feeIdx]
     const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
@@ -519,24 +527,45 @@ export const computeAllBuyableCombinations = (
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
-      const bonuses = effectiveCost.bonuses ?? [undefined]
+      // Expand bonuses in BGA style: each bonus multiplies the path count.
+      // Start with one path = baseFee with no bonuses applied.
+      type BonusPath = { cost: Partial<Resource>; sources: string[] }
+      let bonusPaths: BonusPath[] = [{ cost: baseFee, sources: [] }]
 
-      for (const bonus of bonuses) {
-        let effectiveCostFee = baseFee
-        let bonusId: string | undefined
-
-        if (bonus) {
-          effectiveCostFee = applyBonus(baseFee, bonus)
-          bonusId = bonus.sources?.join(',') ?? 'unknown'
+      for (const bonus of effectiveCost.bonuses ?? []) {
+        const expanded: BonusPath[] = []
+        // If optional, include a "skip" path that keeps the existing costs.
+        if (bonus.optional) {
+          for (const path of bonusPaths) {
+            expanded.push({ cost: path.cost, sources: [...path.sources] })
+          }
         }
+        // For each existing path, try each candidate discount.
+        const candidates: { discount: Partial<Resource>; sources?: string[] }[] =
+          bonus.choices ??
+          [{ discount: bonus.discount!, sources: bonus.sources }]
+        for (const path of bonusPaths) {
+          for (const candidate of candidates) {
+            const nextCost = applyBonus(path.cost, candidate.discount)
+            const combined = new Set([
+              ...path.sources,
+              ...(bonus.sources ?? []),
+              ...(candidate.sources ?? []),
+            ])
+            const nextSources = [...combined]
+            expanded.push({ cost: nextCost, sources: nextSources })
+          }
+        }
+        bonusPaths = expanded
+      }
 
+      for (const { cost: effectiveCostFee, sources } of bonusPaths) {
         if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
           const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
-
           rawSolutions.push({
             resourcesRemaining: remaining,
             tradesUsed: tradeCombo.tradesUsed,
-            bonusUsed: bonusId,
+            bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
             feeIndex: baseFees.length > 1 ? feeIdx : undefined,
           })
         }

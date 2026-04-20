@@ -138,12 +138,29 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
 })
 
 describe('worker-identity: A92 AdoptiveParents removes newborn from FG space takenBy', () => {
+  // Deterministic setup: pass a fixed seed AND explicitly overwrite both players'
+  // minor/occupation hands with non-card placeholders. This avoids two sources of
+  // flake:
+  //   1) `new GameSession()` calls `createSeed()` → `Math.random()` → different
+  //      hands every run.
+  //   2) `loadState` → `normalizeState` re-deals hands when ANY player has an
+  //      empty hand, so we cannot just clear them.
+  // With placeholder ids the hands stay non-empty (no re-deal) but the cards are
+  // unknown to every registry/listener, so wish-children's
+  // `optional(minor-improvement)` finds zero playable minors and the OptionalNode
+  // resolves silently, putting A92's offer as the very next pending choice.
+  const FILLER = '__test_filler__'
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(/* seed */ 1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 2
+
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
 
     const player = state.players[0]!
     // 2 initial active workers (ids '1', '2'), worker '3' is inactive
@@ -160,33 +177,43 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     return session
   }
 
-  // TODO(flaky): this test is intermittently non-deterministic (~25% fail rate under parallel
-  // test execution). Root cause likely in `new GameSession()` initial state randomness leaking
-  // through `session.loadState(state)`. Tracked separately; quarantined with retry for now so
-  // CI doesn't go red on unrelated PRs.
-  it('A92 accepts: removes newborn WorkerRef from FG space, flips isNewborn=false, syncs legacy fields', { retry: 2 }, () => {
+  // Drain any non-A92 optional choices that wish-children's flow may surface
+  // before A92's after-place-farmer offer. With the deterministic setup above
+  // there should be none, but we keep this as a safety net so the test doesn't
+  // re-regress if some other listener later injects a benign optional choice.
+  const advanceToA92Offer = (
+    session: GameSession,
+    initial: ReturnType<typeof session.takeAction>,
+  ) => {
+    let resp = initial
+    for (let i = 0; i < 5; i++) {
+      if (resp.pending.type !== 'choice') break
+      const accept = resp.pending.options.find((o) => o.value !== '__skip__')
+      if (accept?.sourceCard === 'A92_AdoptiveParents') break
+      resp = session.resolveChoice(0, '__skip__')
+      expect(resp.ok).toBe(true)
+    }
+    return resp
+  }
+
+  it('A92 accepts: removes newborn WorkerRef from FG space, flips isNewborn=false, syncs legacy fields', () => {
     const session = setup()
 
-    // Step 1: do Family Growth — wish-children places parent worker '1' + newborn '3' on space,
-    //         then offers optional minor-improvement (wish-children's own tail).
+    // Step 1: do Family Growth — wish-children places parent worker '1' + newborn '3' on space.
     const fgResp = session.takeAction(0, 'wish-children')
     expect(fgResp.ok).toBe(true)
-    // FG space already has 2 refs before we resolve anything
     expect(fgResp.state.actionSpaces.find((s) => s.id === 'wish-children')!.takenBy).toHaveLength(2)
     expect(newbornCount(fgResp.state.players[0]!)).toBe(1)
 
-    // Step 2: skip the optional minor-improvement offered by wish-children flow.
-    //         After skip, A92's after-place-farmer hook fires and offers its optional seq.
-    expect(fgResp.pending.type).toBe('choice')
-    if (fgResp.pending.type !== 'choice') return
-    const a92Resp = session.resolveChoice(0, '__skip__')
-    expect(a92Resp.ok).toBe(true)
-
-    // Step 3: accept the A92 optional offer (pay 1 food to grow child as adult + extra placement).
+    // Step 2: drain to A92's offer.
+    const a92Resp = advanceToA92Offer(session, fgResp)
     expect(a92Resp.pending.type).toBe('choice')
     if (a92Resp.pending.type !== 'choice') return
+
+    // Step 3: accept the A92 optional offer (pay 1 food to grow child as adult + extra placement).
     const acceptOption = a92Resp.pending.options.find((o) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
+    expect(acceptOption!.sourceCard).toBe('A92_AdoptiveParents')
     if (!acceptOption) return
 
     const afterAcceptResp = session.resolveChoice(0, acceptOption.value)
@@ -228,16 +255,9 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     // Step 1: Family Growth
     const fgResp = session.takeAction(0, 'wish-children')
     expect(fgResp.ok).toBe(true)
-    expect(fgResp.pending.type).toBe('choice')
-    if (fgResp.pending.type !== 'choice') return
 
-    // Step 2: skip the optional minor-improvement → get A92 offer
-    const a92Resp = session.resolveChoice(0, '__skip__')
-    expect(a92Resp.ok).toBe(true)
-
-    // Depending on how optional sequences are flattened, we may either see
-    // the explicit A92 choice here, or the engine may already have short-
-    // circuited to the next-player confirmation after a skip.
+    // Step 2: drain to A92's offer, then skip it.
+    const a92Resp = advanceToA92Offer(session, fgResp)
     const skipResp = a92Resp.pending.type === 'choice'
       ? session.resolveChoice(0, '__skip__')
       : a92Resp

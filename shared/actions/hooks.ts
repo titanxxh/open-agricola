@@ -67,6 +67,22 @@ export type ActionHookRegistration = {
   id: string
   actions?: string[]
   phases?: ActionHookPhase[]
+  /**
+   * Sort order for hook execution within a phase (ascending). Lower runs first.
+   *
+   * NOTE: for the `computeCosts` phase, hook results are merged into a
+   * ComplexCost as follows:
+   *   - `costs` (deltas) are summed by applyCostOverride (addition is commutative)
+   *   - `trades` are pushed into ComplexCost.trades (order does not affect
+   *     payment enumeration — computeAllBuyableCombinations enumerates all
+   *     trade combinations regardless of insertion order)
+   *   - `bonuses` are pushed into ComplexCost.bonuses (same — bonus iteration
+   *     accumulates non-optional and expands optional, independent of order)
+   *
+   * So `order` has NO observable effect for computeCosts. It is retained for
+   * other phases (before / during / after / immediatelyAfter etc.) where
+   * sequential side-effects may need deterministic ordering.
+   */
   order?: number
   handler: ActionHookHandler
 }

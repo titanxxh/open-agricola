@@ -22,8 +22,15 @@ export type Trade = {
   sourceId?: string
 }
 
-export type Bonus = {
+export type BonusChoice = {
   discount: Partial<Resource>
+  sources?: string[]
+  conditions?: Record<string, number>
+}
+
+export type Bonus = {
+  discount?: Partial<Resource>
+  choices?: BonusChoice[]
   optional?: boolean
   sources?: string[]
   conditions?: Record<string, number>
@@ -44,7 +51,8 @@ export type BonusModifier = {
   type: 'bonus'
   cardId: string
   appliesTo: CostModifierType[]
-  discount: Partial<Resource>
+  discount?: Partial<Resource>
+  choices?: BonusChoice[]
   optional?: boolean
   conditions?: Record<string, number>
 }
@@ -222,9 +230,20 @@ export type GameState = {
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
 }
 
+export type CanBeExecutedByPlayerContext = {
+  /**
+   * The card id that originated this action invocation, if any. Forwarded so
+   * doable checks can route through the same per-card cost/effect modifiers
+   * that pay-time uses (e.g. D95 Site Manager treats `actionCardId === 'D95_SiteManager'`
+   * as the trigger for its food-for-resource substitution).
+   */
+  sourceCard?: string
+}
+
 export type CanBeExecutedByPlayer = (
   state: GameState,
   player: PlayerState,
+  context?: CanBeExecutedByPlayerContext,
 ) => boolean
 
 export type ActionAvailabilityContext = {
