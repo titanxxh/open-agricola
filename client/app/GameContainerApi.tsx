@@ -9,7 +9,7 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/
 import { parsePositionKey, positionKey } from '../../shared/game/farm'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
-import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
+import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { useFarmSelection } from '../hooks/useFarmSelection'
@@ -110,11 +110,18 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
+          const searchParams = new URLSearchParams(window.location.search)
+          const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          const maxPlayersParam = new URLSearchParams(window.location.search).get('maxPlayers')
+          const maxPlayersParam = searchParams.get('maxPlayers')
           const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
-          ws.sendRoomCommand('createRoom', { maxPlayers, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
+          const draftParams = parseDraftParamsFromQuery(window.location.search)
+          ws.sendRoomCommand('createRoom', {
+            maxPlayers,
+            name: displayName ?? playerParam ?? 'Player 1',
+            customCardIds,
+            ...(draftParams ?? {}),
+          })
         })
 
         if ('error' in resp) {

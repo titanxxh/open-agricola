@@ -31,6 +31,8 @@ export function LobbyPage() {
   const [error, setError] = useState('')
   const [showPlayerSelect, setShowPlayerSelect] = useState(false)
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
+  const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
+  const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -58,7 +60,14 @@ export function LobbyPage() {
     return () => clearInterval(interval)
   }, [fetchRooms, fetchMyRooms])
 
-  const handleCreateGame = () => setPage('game', { transport: 'ws', maxPlayers: String(selectedMaxPlayers) })
+  const handleCreateGame = () => {
+    const params: Record<string, string> = { transport: 'ws', maxPlayers: String(selectedMaxPlayers) }
+    if (draftMode !== 'none') {
+      params.draftMode = draftMode
+      params.draftPoolSize = String(draftPoolSize)
+    }
+    setPage('game', params)
+  }
 
   const handleJoinRoom = () => {
     const id = joinRoomId.trim()
@@ -128,6 +137,40 @@ export function LobbyPage() {
                     </button>
                   ))}
                 </div>
+                <div className="player-select-label">{t('platform.draftModeLabel')}</div>
+                <div className="player-select-options">
+                  <button
+                    type="button"
+                    className={`player-select-btn${draftMode === 'none' ? ' active' : ''}`}
+                    onClick={() => setDraftMode('none')}
+                  >
+                    {t('platform.draftModeNone')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`player-select-btn${draftMode === 'simultaneous' ? ' active' : ''}`}
+                    onClick={() => setDraftMode('simultaneous')}
+                  >
+                    {t('platform.draftModeSimultaneous')}
+                  </button>
+                </div>
+                {draftMode === 'simultaneous' && (
+                  <>
+                    <div className="player-select-label">{t('platform.draftPoolSizeLabel')}</div>
+                    <div className="player-select-options">
+                      {([7, 8, 9, 10] as const).map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`player-select-btn${draftPoolSize === n ? ' active' : ''}`}
+                          onClick={() => setDraftPoolSize(n)}
+                        >
+                          {t('platform.draftPoolSizeOption', { n: String(n) })}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 <div className="player-select-actions">
                   <button type="button" className="btn-primary" onClick={handleCreateGame}>
                     {t('platform.createGame')}
