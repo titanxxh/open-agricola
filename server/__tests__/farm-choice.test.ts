@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { applyFarmChoice } from '../farm-choice.ts'
+import { applyFarmChoice } from '../../shared/logic/farm/farm-choice.ts'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import type { PlayerState } from '../../shared/game/types.ts'
-import { buildRoomFarmInteraction } from '../farm-interaction.ts'
+import { buildRoomFarmInteraction } from '../../shared/logic/farm/farm-interaction.ts'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 

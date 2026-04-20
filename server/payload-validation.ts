@@ -1,4 +1,4 @@
-import type { PlayerFarmState } from './fence-validation'
+import type { PlayerFarmState } from '../shared/logic/farm/fence-validation'
 
 export type ApiValidationError = {
   code: string
