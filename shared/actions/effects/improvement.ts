@@ -697,8 +697,12 @@ export const minorImprovementAction: ActionDefinition = {
   descriptionKey: 'actions.minor-improvement.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    buildPlayableMinorOptions(state, player).length > 0,
+  // Forward `sourceCard` so doable check sees the same `actionCardId` that
+  // pay-time will use. This lets per-card cost-modifier listeners (e.g. D95
+  // Site Manager's food-for-resource substitution) participate in the
+  // affordability probe instead of silently no-op'ing during doable check.
+  canBeExecutedByPlayer: (state, player, context) =>
+    buildPlayableMinorOptions(state, player, context?.sourceCard).length > 0,
   execute: ({ state, player }) => {
     const options = buildPlayableMinorOptions(state, player)
     if (options.length === 0) {
@@ -720,13 +724,22 @@ export const improvementAnyAction: ActionDefinition = {
   descriptionKey: 'actions.major-improvement.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    buildMajorImprovementOptions(
-      state.availableMajorImprovements,
-      state,
-      player,
-    ).length > 0 ||
-    buildMinorImprovementOptions(state, player).length > 0,
+  // Forward `sourceCard` so doable check sees the same `actionCardId` that
+  // pay-time will use. This lets per-card cost-modifier listeners (e.g. D95
+  // Site Manager's food-for-resource substitution) participate in the
+  // affordability probe instead of silently no-op'ing during doable check.
+  canBeExecutedByPlayer: (state, player, context) => {
+    const actionCardId = context?.sourceCard
+    return (
+      buildMajorImprovementOptions(
+        state.availableMajorImprovements,
+        state,
+        player,
+        actionCardId,
+      ).length > 0 ||
+      buildMinorImprovementOptions(state, player, actionCardId).length > 0
+    )
+  },
   execute: ({ state, player, sourceCard, params }) => {
     const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
     const allowedPurchases = Array.isArray((params as { allowedPurchases?: string[] } | undefined)?.allowedPurchases)
