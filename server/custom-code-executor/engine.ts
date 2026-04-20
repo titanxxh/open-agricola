@@ -1,6 +1,6 @@
 import ivm from 'isolated-vm'
 import type { ActionHookPhase } from '../../shared/actions/hooks.ts'
-import { validateCardCode } from '../ast-validator.ts'
+import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../card-compiler.ts'
 import { cardEffectHooks, type CardEffectHook } from '../../shared/cards/card-effects.ts'
 import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'

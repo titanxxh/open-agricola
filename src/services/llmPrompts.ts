@@ -9,7 +9,7 @@
  * the underlying source code:
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
  *   - server/custom-code-executor/engine.ts (isActionHookPhase, isCardListenerScope)
- *   - server/ast-validator.ts             (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
+ *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
  *
  * Other relevant context:
  *   - shared/cards/card-listeners.ts      (CardListenerContext shape)
