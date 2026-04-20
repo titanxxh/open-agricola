@@ -184,8 +184,63 @@ export function transformCardFile(source: string, filePath: string): TransformRe
   }
   parts.push(`  reaches: [] as readonly string[]`)
 
-  const implBlock = `\nexport const ${cardId}_impl = {\n${parts.join(',\n')},\n}\n`
+  const implBlock = `\nexport const ${cardId}_impl = {\n${parts.join(',\n')},\n} satisfies CardImpl\n`
   out = out.trimEnd() + '\n' + implBlock
+
+  // Post-processing:
+  // 1. Strip the now-unused *value* imports of register* functions that we removed
+  //    calls of. The type import (`CardListenerRegistration`, etc.) must stay.
+  // 2. Ensure `import type { CardImpl } from '../registry'` is present so the
+  //    `satisfies CardImpl` expression typechecks.
+  const strippedFns: string[] = []
+  if (collected.listeners.length > 0) strippedFns.push('registerCardListener')
+  if (collected.effects.length > 0) strippedFns.push('registerCardEffect')
+  if (collected.modifiers.length > 0) strippedFns.push('registerCardModifier')
+  if (collected.bonusScoreHandlers.length > 0) strippedFns.push('registerBonusScoreHandler')
+
+  for (const fn of strippedFns) {
+    const esc = fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // Case 1: sole value in a named-only import — delete the whole line.
+    //   import { fn } from '...'\n
+    out = out.replace(
+      new RegExp(`^[ \\t]*import\\s*\\{\\s*${esc}\\s*\\}\\s*from\\s*['\"][^'\"]+['\"];?[ \\t]*\\n`, 'gm'),
+      '',
+    )
+    // Case 2: first in a multi-name import — `{ fn, Other }` -> `{ Other }`
+    out = out.replace(new RegExp(`\\{\\s*${esc}\\s*,\\s*`, 'g'), '{ ')
+    // Case 3: last in a multi-name import — `{ Other, fn }` -> `{ Other }`
+    out = out.replace(new RegExp(`,\\s*${esc}\\s*\\}`, 'g'), ' }')
+    // Case 4: middle of a list — `{ A, fn, B }` -> `{ A, B }` (catches the general case)
+    out = out.replace(new RegExp(`,\\s*${esc}\\s*,`, 'g'), ',')
+  }
+  // Clean up any `import { } from '...'` lines left as residue.
+  out = out.replace(/^[ \t]*import\s*\{\s*\}\s*from\s*['"][^'"]+['"];?[ \t]*\n/gm, '')
+
+  // Insert `import type { CardImpl } from '../registry'` once if missing. We
+  // locate the last import statement (handling multi-line forms via the parsed
+  // AST) and insert right after it so the new import doesn't split a
+  // multi-line import block.
+  if (!/import\s+type\s*\{[^}]*\bCardImpl\b[^}]*\}\s*from\s*['"][^'"]*registry['"]/.test(out)) {
+    // Re-parse `out` to find import-statement boundaries accurately.
+    const sfOut = ts.createSourceFile(filePath, out, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    let lastImportEnd = -1
+    for (const stmt of sfOut.statements) {
+      if (ts.isImportDeclaration(stmt)) {
+        lastImportEnd = stmt.getEnd()
+      } else {
+        break
+      }
+    }
+    const injected = `\nimport type { CardImpl } from '../registry'`
+    if (lastImportEnd > 0) {
+      out = out.slice(0, lastImportEnd) + injected + out.slice(lastImportEnd)
+    } else {
+      out = `import type { CardImpl } from '../registry'\n${out}`
+    }
+  }
+
+  // Collapse excess blank lines one more time after mutation.
+  out = out.replace(/\n{3,}/g, '\n\n')
 
   return { output: out, collected, cardId, changed: true }
 }

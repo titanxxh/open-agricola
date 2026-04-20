@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
 import type { ActionSpace } from '../../game/types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A161_PatchCaretaker'
 
@@ -42,8 +42,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A161_PatchCaretaker = new Occupation({
   id: CARD_ID,
   name: 'Patch Caretaker',
@@ -55,3 +53,8 @@ export const A161_PatchCaretaker = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const A161_PatchCaretaker_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

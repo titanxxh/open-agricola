@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B138_ForestGuardian'
 
@@ -62,9 +62,6 @@ const collectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(collectListener)
-
 export const B138_ForestGuardian = new Occupation({
   id: CARD_ID,
   name: 'Forest Guardian',
@@ -77,3 +74,8 @@ export const B138_ForestGuardian = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const B138_ForestGuardian_impl = {
+  listeners: [onBuyListener, collectListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

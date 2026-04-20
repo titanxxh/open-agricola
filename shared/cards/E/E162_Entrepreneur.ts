@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E162_Entrepreneur'
 
@@ -11,14 +11,18 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 const getMissingBuildingResources = (player: { resources: Resource }): (keyof Resource)[] =>
   BUILDING_RESOURCES.filter((res) => (player.resources[res] ?? 0) === 0)
 
-/**
- * E162 Entrepreneur: At the start of each round, you can move 1 food to this card
- * or discard 1 food from it. If you do either, you get 1 building resource of a
- * type you currently do not have.
- *
- * For simplicity: auto-pick the first missing resource type.
- */
-registerCardEffect({
+export const E162_Entrepreneur = new Occupation({
+  id: CARD_ID,
+  name: 'Entrepreneur',
+  deck: 'E',
+  number: 162,
+  desc: ['At the start of each round, you can move 1 <FOOD> to this card or discard 1 <FOOD> from it. If you do either, you get 1 building resource of a type you currently do not have.'],
+  cost: {},
+  players: '4+',
+})
+
+export const E162_Entrepreneur_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
 
@@ -69,14 +73,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const E162_Entrepreneur = new Occupation({
-  id: CARD_ID,
-  name: 'Entrepreneur',
-  deck: 'E',
-  number: 162,
-  desc: ['At the start of each round, you can move 1 <FOOD> to this card or discard 1 <FOOD> from it. If you do either, you get 1 building resource of a type you currently do not have.'],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

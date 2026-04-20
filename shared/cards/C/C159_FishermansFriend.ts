@@ -1,23 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C159_FishermansFriend'
-
-// C159 Fisherman's Friend: At the start of each round, if there is more food on the
-// Traveling Players than on the Fishing accumulation space, you get the difference.
-registerCardEffect({
-  id: CARD_ID,
-  onRoundStart: (state, _player) => {
-    const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
-    const fishing = state.actionSpaces.find((s) => s.id === 'fishing')
-    const tpFood = travelingPlayers?.resources?.food ?? 0
-    const fishFood = fishing?.resources?.food ?? 0
-    const diff = tpFood - fishFood
-    if (diff <= 0) return
-    return gainLeaf(CARD_ID, { food: diff })
-  },
-})
 
 export const C159_FishermansFriend = new Occupation({
   id: CARD_ID,
@@ -30,3 +15,19 @@ export const C159_FishermansFriend = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const C159_FishermansFriend_impl = {
+  effect: {
+  id: CARD_ID,
+  onRoundStart: (state, _player) => {
+    const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
+    const fishing = state.actionSpaces.find((s) => s.id === 'fishing')
+    const tpFood = travelingPlayers?.resources?.food ?? 0
+    const fishFood = fishing?.resources?.food ?? 0
+    const diff = tpFood - fishFood
+    if (diff <= 0) return
+    return gainLeaf(CARD_ID, { food: diff })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

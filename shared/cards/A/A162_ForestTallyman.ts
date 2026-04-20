@@ -1,7 +1,7 @@
 import { PlayerActionCard } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A162_ForestTallyman'
 
@@ -26,18 +26,6 @@ registerPlayerActionSpace({
   }),
 })
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const newSpaces = createPlayerActionSpaces(state)
-    for (const space of newSpaces) {
-      if (!state.actionSpaces.some((s) => s.id === space.id)) {
-        state.actionSpaces.push(space)
-      }
-    }
-  },
-})
-
 export const A162_ForestTallyman = new PlayerActionCard({
   id: "A162_ForestTallyman",
   name: "Forest Tallyman",
@@ -48,3 +36,18 @@ export const A162_ForestTallyman = new PlayerActionCard({
   cost: {},
   players: "4+",
 })
+
+export const A162_ForestTallyman_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const newSpaces = createPlayerActionSpaces(state)
+    for (const space of newSpaces) {
+      if (!state.actionSpaces.some((s) => s.id === space.id)) {
+        state.actionSpaces.push(space)
+      }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

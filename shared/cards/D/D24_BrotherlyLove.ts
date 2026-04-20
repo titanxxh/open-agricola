@@ -1,5 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
@@ -7,6 +6,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-co
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../game/space'
 import { familySize, workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D24_BrotherlyLove'
 
@@ -66,8 +66,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export const D24_BrotherlyLove = new MinorImprovement({
   id: CARD_ID,
   name: 'Brotherly Love',
@@ -79,3 +77,8 @@ export const D24_BrotherlyLove = new MinorImprovement({
   ],
   cost: {},
 })
+
+export const D24_BrotherlyLove_impl = {
+  listeners: [computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

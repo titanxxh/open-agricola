@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E31_Upholstery'
 
@@ -43,8 +43,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E31_Upholstery = new MinorImprovement({
   id: CARD_ID,
   name: 'Upholstery',
@@ -56,3 +54,8 @@ export const E31_Upholstery = new MinorImprovement({
   ],
   cost: {},
 })
+
+export const E31_Upholstery_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

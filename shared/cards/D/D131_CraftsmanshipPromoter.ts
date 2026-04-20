@@ -1,14 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { stone: 1 }),
-  // TODO: allow building major improvements (bottom row) via Minor Improvement action
-})
 
 export const D131_CraftsmanshipPromoter = new Occupation({
   id: CARD_ID,
@@ -21,3 +15,12 @@ export const D131_CraftsmanshipPromoter = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const D131_CraftsmanshipPromoter_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { stone: 1 }),
+  // TODO: allow building major improvements (bottom row) via Minor Improvement action
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

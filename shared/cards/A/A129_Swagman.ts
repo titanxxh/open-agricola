@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
-import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A129_Swagman'
 
@@ -63,18 +62,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-
-// Unflag at start of each round
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
-    }
-  },
-})
-
 export const A129_Swagman = new Occupation({
   id: CARD_ID,
   name: 'Swagman',
@@ -88,3 +75,16 @@ export const A129_Swagman = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const A129_Swagman_impl = {
+  listeners: [afterPlaceFarmerListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    if (isCardFlagged(player, CARD_ID)) {
+      setCardFlag(player, CARD_ID, false)
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

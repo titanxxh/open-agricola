@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B94_StockProtector'
 
@@ -53,10 +53,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
-registerCardListener(isDoableListener)
-
 export const B94_StockProtector = new Occupation({
   id: CARD_ID,
   name: "Stock Protector",
@@ -68,3 +64,8 @@ export const B94_StockProtector = new Occupation({
   players: "1+",
   newSet: true,
 })
+
+export const B94_StockProtector_impl = {
+  listeners: [beforeListener, afterListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

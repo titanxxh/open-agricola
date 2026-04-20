@@ -1,22 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D2_DwellingPlan'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'seq' as const,
-    optional: true,
-    children: [
-      {
-        type: 'leaf' as const,
-        actionId: 'renovation',
-        sourceCard: CARD_ID,
-      },
-    ],
-  }),
-})
 
 export const D2_DwellingPlan = new MinorImprovement({
   id: CARD_ID,
@@ -29,3 +14,21 @@ export const D2_DwellingPlan = new MinorImprovement({
   passing: true,
   newSet: true,
 })
+
+export const D2_DwellingPlan_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => ({
+    type: 'seq' as const,
+    optional: true,
+    children: [
+      {
+        type: 'leaf' as const,
+        actionId: 'renovation',
+        sourceCard: CARD_ID,
+      },
+    ],
+  }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,6 +1,6 @@
 import { PlayerActionCard } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D23_PioneeringSpirit'
 
@@ -48,18 +48,6 @@ registerPlayerActionSpace({
   }),
 })
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const newSpaces = createPlayerActionSpaces(state)
-    for (const space of newSpaces) {
-      if (!state.actionSpaces.some((s) => s.id === space.id)) {
-        state.actionSpaces.push(space)
-      }
-    }
-  },
-})
-
 export const D23_PioneeringSpirit = new PlayerActionCard({
   id: CARD_ID,
   name: "Pioneering Spirit",
@@ -70,3 +58,18 @@ export const D23_PioneeringSpirit = new PlayerActionCard({
   cost: {},
   newSet: true,
 })
+
+export const D23_PioneeringSpirit_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const newSpaces = createPlayerActionSpaces(state)
+    for (const space of newSpaces) {
+      if (!state.actionSpaces.some((s) => s.id === space.id)) {
+        state.actionSpaces.push(space)
+      }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

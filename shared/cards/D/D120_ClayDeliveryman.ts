@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D120_ClayDeliveryman'
 
-registerCardEffect({
+export const D120_ClayDeliveryman = new Occupation({
+  id: CARD_ID,
+  name: 'Clay Deliveryman',
+  deck: 'D',
+  number: 120,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['Place 1 <CLAY> on each remaining space for rounds 6 to 14. At the start of these rounds, you get the <CLAY>.'],
+  cost: {},
+  players: '1+',
+})
+
+export const D120_ClayDeliveryman_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Place 1 clay on each remaining space for rounds 6 to 14
@@ -21,15 +33,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const D120_ClayDeliveryman = new Occupation({
-  id: CARD_ID,
-  name: 'Clay Deliveryman',
-  deck: 'D',
-  number: 120,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Place 1 <CLAY> on each remaining space for rounds 6 to 14. At the start of these rounds, you get the <CLAY>.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

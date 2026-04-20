@@ -1,25 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D114_SeedTrader'
-
-/**
- * D114 Seed Trader (Occupation, D, 114)
- * When you play this card, you immediately get 2 grain and 2 vegetable.
- * Anytime (once per round): buy 1 grain for 1 food.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { grain: 2, vegetable: 2 }),
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D114-seed-trader-anytime',
@@ -43,8 +29,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const D114_SeedTrader = new Occupation({
   id: CARD_ID,
   name: 'Seed Trader',
@@ -57,3 +41,15 @@ export const D114_SeedTrader = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D114_SeedTrader_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { grain: 2, vegetable: 2 }),
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

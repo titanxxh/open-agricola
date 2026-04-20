@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D119_WoodBarterer'
 
@@ -53,9 +53,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(isDoableListener)
-
 export const D119_WoodBarterer = new Occupation({
   id: CARD_ID,
   name: "Wood Barterer",
@@ -66,3 +63,8 @@ export const D119_WoodBarterer = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const D119_WoodBarterer_impl = {
+  listeners: [beforeListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

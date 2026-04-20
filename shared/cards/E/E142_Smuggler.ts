@@ -1,10 +1,27 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E142_Smuggler'
 
-registerCardEffect({
+export const E142_Smuggler = new Occupation({
+  id: CARD_ID,
+  name: "Smuggler",
+  deck: "E",
+  number: 142,
+  category: "GOODS_PROVIDER",
+  desc: [
+    'In the feeding phase of each harvest, you can exchange up to 2 goods as follows:',
+    '[<WOOD> <ARROW> <GRAIN>]',
+    'or',
+    '[<GRAIN> <ARROW> <STONE>]',
+  ],
+  cost: {},
+  players: "3+",
+})
+
+export const E142_Smuggler_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
 
@@ -81,20 +98,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const E142_Smuggler = new Occupation({
-  id: CARD_ID,
-  name: "Smuggler",
-  deck: "E",
-  number: 142,
-  category: "GOODS_PROVIDER",
-  desc: [
-    'In the feeding phase of each harvest, you can exchange up to 2 goods as follows:',
-    '[<WOOD> <ARROW> <GRAIN>]',
-    'or',
-    '[<GRAIN> <ARROW> <STONE>]',
-  ],
-  cost: {},
-  players: "3+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

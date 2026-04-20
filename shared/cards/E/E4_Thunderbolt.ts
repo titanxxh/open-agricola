@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E4_Thunderbolt'
 
@@ -19,7 +19,19 @@ registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => 
   }
 })
 
-registerCardEffect({
+export const E4_Thunderbolt = new MinorImprovement({
+  id: "E4_Thunderbolt",
+  name: "Thunderbolt",
+  deck: "E",
+  number: 4,
+  desc: ["Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
+  cost: {},
+  prerequisite: "1 Grain Field",
+  passing: true,
+})
+
+export const E4_Thunderbolt_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
@@ -38,15 +50,6 @@ registerCardEffect({
       },
     }
   },
-})
-
-export const E4_Thunderbolt = new MinorImprovement({
-  id: "E4_Thunderbolt",
-  name: "Thunderbolt",
-  deck: "E",
-  number: 4,
-  desc: ["Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
-  cost: {},
-  prerequisite: "1 Grain Field",
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

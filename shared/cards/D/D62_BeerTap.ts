@@ -1,14 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D62_BeerTap'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
-  // TODO: implement harvest-time grain->food exchange (2/3/4 grain -> 3/6/9 food)
-})
 
 export const D62_BeerTap = new MinorImprovement({
   id: CARD_ID,
@@ -20,3 +14,12 @@ export const D62_BeerTap = new MinorImprovement({
   cost: { wood: 1 },
   newSet: true,
 })
+
+export const D62_BeerTap_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
+  // TODO: implement harvest-time grain->food exchange (2/3/4 grain -> 3/6/9 food)
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

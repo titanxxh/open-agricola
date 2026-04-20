@@ -1,6 +1,4 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -9,6 +7,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D166_StableMilker'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
@@ -36,14 +35,6 @@ const tryGainCattle = (
   return { flow: gainLeaf(CARD_ID, { cattle: 1 }), sourceCard: CARD_ID }
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const result = tryGainCattle(player)
-    return result?.flow
-  },
-})
-
 const listener: CardListenerRegistration = {
   id: 'D166-stable-milker-after-stables',
   cardIds: [CARD_ID],
@@ -53,8 +44,6 @@ const listener: CardListenerRegistration = {
     return tryGainCattle(context.player)
   },
 }
-
-registerCardListener(listener)
 
 export const D166_StableMilker = new Occupation({
   id: CARD_ID,
@@ -69,3 +58,15 @@ export const D166_StableMilker = new Occupation({
   players: '4+',
   evenMoreSet: true,
 })
+
+export const D166_StableMilker_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const result = tryGainCattle(player)
+    return result?.flow
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

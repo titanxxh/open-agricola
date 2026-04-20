@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B1_UpscaleLifestyle'
 
-registerCardEffect({
+export const B1_UpscaleLifestyle = new MinorImprovement({
+  id: CARD_ID,
+  name: "Upscale Lifestyle",
+  deck: "B",
+  number: 1,
+  category: "FARM_PLANNER",
+  desc: ["You immediately get 5 <CLAY> and a __Renovation__ action. If you take the action, you must pay the renovation cost."],
+  cost: { wood: 3 },
+  passing: true,
+})
+
+export const B1_UpscaleLifestyle_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => ({
     type: 'seq' as const,
@@ -23,15 +35,6 @@ registerCardEffect({
       },
     ],
   }),
-})
-
-export const B1_UpscaleLifestyle = new MinorImprovement({
-  id: CARD_ID,
-  name: "Upscale Lifestyle",
-  deck: "B",
-  number: 1,
-  category: "FARM_PLANNER",
-  desc: ["You immediately get 5 <CLAY> and a __Renovation__ action. If you take the action, you must pay the renovation cost."],
-  cost: { wood: 3 },
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

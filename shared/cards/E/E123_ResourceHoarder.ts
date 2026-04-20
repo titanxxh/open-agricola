@@ -1,9 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardInfobox } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E123_ResourceHoarder'
 
@@ -35,17 +34,6 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0]) => {
   writeCardInfobox(player, CARD_ID, `Stack: ${stack.join(', ')} (top→)`)
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    if (!player.cardStates) player.cardStates = {}
-    if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
-    // Store stack bottom-to-top
-    player.cardStates[CARD_ID]!.stack = [...INITIAL_STACK]
-    updateInfobox(player)
-  },
-})
-
 /**
  * computeCosts listener: for construct, improvement-any, minor-improvement, and renovate,
  * offer a discount from the top of the stack.
@@ -68,8 +56,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 /**
  * After paying for construct/improvement/renovate: remove the top resource from stack
  * if a discount was applied.
@@ -89,8 +75,6 @@ const afterPayListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPayListener)
-
 export const E123_ResourceHoarder = new Occupation({
   id: CARD_ID,
   name: 'Resource Hoarder',
@@ -100,3 +84,18 @@ export const E123_ResourceHoarder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E123_ResourceHoarder_impl = {
+  listeners: [computeCostsListener, afterPayListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (!player.cardStates) player.cardStates = {}
+    if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
+    // Store stack bottom-to-top
+    player.cardStates[CARD_ID]!.stack = [...INITIAL_STACK]
+    updateInfobox(player)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

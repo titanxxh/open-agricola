@@ -1,5 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -11,6 +10,7 @@ import {
   writeCardInfobox,
   writeCardExtraData,
 } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 const CARD_ID = 'A17_ReclamationPlow'
@@ -140,10 +140,6 @@ const reclamationPlowAfterPlowListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(reclamationPlowDuringListener)
-registerCardListener(reclamationPlowAfterListener)
-registerCardListener(reclamationPlowAfterPlowListener)
-
 export const A17_ReclamationPlow = new MinorImprovement({
   id: CARD_ID,
   name: "Reclamation Plow",
@@ -153,3 +149,8 @@ export const A17_ReclamationPlow = new MinorImprovement({
   desc: ["After the next time you take animals from an accumulation space and accommodate all of them on your farm, you can plow 1 field."],
   cost: {"wood":1},
 })
+
+export const A17_ReclamationPlow_impl = {
+  listeners: [reclamationPlowDuringListener, reclamationPlowAfterListener, reclamationPlowAfterPlowListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

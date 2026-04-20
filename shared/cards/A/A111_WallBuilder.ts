@@ -1,5 +1,4 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
@@ -9,6 +8,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A111_WallBuilder'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
@@ -44,8 +44,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A111_WallBuilder = new Occupation({
   id: CARD_ID,
   name: 'Wall Builder',
@@ -58,3 +56,8 @@ export const A111_WallBuilder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A111_WallBuilder_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

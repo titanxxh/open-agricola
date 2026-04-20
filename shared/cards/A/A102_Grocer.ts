@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A102_Grocer'
 
@@ -13,13 +12,6 @@ const CARD_ID = 'A102_Grocer'
  * Player pays 1 food to take the top good at any time.
  */
 const STACK_ITEMS = ['wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable']
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, STACK_ITEMS)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'A102-grocer-anytime',
@@ -43,8 +35,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const A102_Grocer = new Occupation({
   id: CARD_ID,
   name: 'Grocer',
@@ -55,3 +45,14 @@ export const A102_Grocer = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A102_Grocer_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, STACK_ITEMS)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C63_CraftBrewery'
 
-registerCardEffect({
+export const C63_CraftBrewery = new MinorImprovement({
+  id: "C63_CraftBrewery",
+  name: "Craft Brewery",
+  deck: "C",
+  number: 63,
+  category: "FOOD_PROVIDER",
+  desc: ["In the feeding phase of each harvest, you can use this card to exchange 1 <GRAIN> from your supply plus 1 <GRAIN> from a field for 2 bonus <SCORE> and 4 <FOOD>."],
+  cost: {"wood":2,"clay":1},
+})
+
+export const C63_CraftBrewery_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     if (player.resources.grain < 1) return
@@ -23,14 +34,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C63_CraftBrewery = new MinorImprovement({
-  id: "C63_CraftBrewery",
-  name: "Craft Brewery",
-  deck: "C",
-  number: 63,
-  category: "FOOD_PROVIDER",
-  desc: ["In the feeding phase of each harvest, you can use this card to exchange 1 <GRAIN> from your supply plus 1 <GRAIN> from a field for 2 bonus <SCORE> and 4 <FOOD>."],
-  cost: {"wood":2,"clay":1},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

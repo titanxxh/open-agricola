@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import { buildRenovationPlan, canRenovate } from '../../actions/effects/renovation'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A87_Conservator'
 
@@ -62,9 +62,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(choiceCandidateListener)
-registerCardListener(isDoableListener)
-
 export const A87_Conservator = new Occupation({
   id: CARD_ID,
   name: 'Conservator',
@@ -77,3 +74,8 @@ export const A87_Conservator = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A87_Conservator_impl = {
+  listeners: [choiceCandidateListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

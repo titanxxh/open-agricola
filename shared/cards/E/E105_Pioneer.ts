@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E105_Pioneer'
 
@@ -25,14 +24,6 @@ const buildPioneerChoiceFlow = (): ActionFlow => ({
     gainLeaf(CARD_ID, { reed: 1, food: 1 }),
     gainLeaf(CARD_ID, { stone: 1, food: 1 }),
   ],
-})
-
-// onBuy: XOR choice of building resource + food
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => {
-    return buildPioneerChoiceFlow()
-  },
 })
 
 /** Get the action space ID most recently revealed this round */
@@ -58,8 +49,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-
 export { getMostRecentlyRevealedSpaceId }
 
 export const E105_Pioneer = new Occupation({
@@ -74,3 +63,14 @@ export const E105_Pioneer = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E105_Pioneer_impl = {
+  listeners: [afterPlaceFarmerListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => {
+    return buildPioneerChoiceFlow()
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

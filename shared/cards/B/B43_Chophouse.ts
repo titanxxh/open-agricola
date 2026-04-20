@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B43_Chophouse'
 
@@ -26,8 +26,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B43_Chophouse = new MinorImprovement({
   id: CARD_ID,
   name: 'Chophouse',
@@ -39,3 +37,8 @@ export const B43_Chophouse = new MinorImprovement({
   altCosts: [{ wood: 2 }, { clay: 2 }],
   newSet: true,
 })
+
+export const B43_Chophouse_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,17 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C89_StableMaster'
-
-registerCardEffect({
-  id: CARD_ID,
-  onComputeAnimalZones: (_player, zones) => {
-    const stableZone = zones.find(z => z.zoneType === 'stable')
-    if (stableZone) {
-      stableZone.capacity += 2 // 1 → 3
-    }
-  },
-})
 
 export const C89_StableMaster = new Occupation({
   id: CARD_ID,
@@ -23,3 +13,16 @@ export const C89_StableMaster = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C89_StableMaster_impl = {
+  effect: {
+  id: CARD_ID,
+  onComputeAnimalZones: (_player, zones) => {
+    const stableZone = zones.find(z => z.zoneType === 'stable')
+    if (stableZone) {
+      stableZone.capacity += 2 // 1 → 3
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

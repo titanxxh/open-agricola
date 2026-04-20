@@ -1,30 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E60_WorkingGloves'
-
-/**
- * E60 Working Gloves — MinorImprovement (#60, < 81, so minorPlayed).
- * When you play this card, you get 1 food.
- * Each time you pay an occupation cost, you can pay 1 building resource of your
- * choice in place of (up to) 2 food.
- *
- * BGA: onBuy → gain 1 food.
- * onPlayerComputeCostsOccupation → for trades with food, add alternatives
- *   substituting 1 of {wood,clay,reed,stone} for up to 2 food.
- *
- * Simplified: apply { food: -2 } discount on occupation cost when played.
- * This is equivalent to eliminating the food component (up to 2 food) of the cost.
- */
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
-})
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'E60-working-gloves-compute-costs-occupation',
@@ -37,8 +17,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const E60_WorkingGloves = new MinorImprovement({
   id: CARD_ID,
   name: 'Working Gloves',
@@ -50,3 +28,12 @@ export const E60_WorkingGloves = new MinorImprovement({
   ],
   cost: {},
 })
+
+export const E60_WorkingGloves_impl = {
+  listeners: [computeCostsListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

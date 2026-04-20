@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C124_StoneImporter'
 
@@ -12,7 +12,19 @@ const harvestFoodCosts: Record<number, number> = {
   14: 1,
 }
 
-registerCardEffect({
+export const C124_StoneImporter = new Occupation({
+  id: CARD_ID,
+  name: "Stone Importer",
+  deck: "C",
+  number: 124,
+  category: "BUILDING_RESOURCE_PROVIDER",
+  desc: ["In the breeding phase of the 1st/2nd/3rd/4th/5th/6th harvest, you can use this card to buy exactly 2 <STONE> for 2/2/3/3/4/1 <FOOD>."],
+  cost: {},
+  players: "1+",
+})
+
+export const C124_StoneImporter_impl = {
+  effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
     const foodCost = harvestFoodCosts[state.round]
@@ -28,15 +40,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C124_StoneImporter = new Occupation({
-  id: CARD_ID,
-  name: "Stone Importer",
-  deck: "C",
-  number: 124,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["In the breeding phase of the 1st/2nd/3rd/4th/5th/6th harvest, you can use this card to buy exactly 2 <STONE> for 2/2/3/3/4/1 <FOOD>."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

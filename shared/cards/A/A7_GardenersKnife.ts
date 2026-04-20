@@ -1,10 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A7_GardenersKnife'
 
-registerCardEffect({
+export const A7_GardenersKnife = new MinorImprovement({
+  id: CARD_ID,
+  name: "Gardener's Knife",
+  deck: 'A',
+  number: 7,
+  category: 'FOOD_PROVIDER',
+  desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
+  cost: { wood: 1 },
+  passing: true,
+  newSet: true,
+})
+
+export const A7_GardenersKnife_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain')).length
@@ -20,16 +33,6 @@ registerCardEffect({
       params,
     }
   },
-})
-
-export const A7_GardenersKnife = new MinorImprovement({
-  id: CARD_ID,
-  name: "Gardener's Knife",
-  deck: 'A',
-  number: 7,
-  category: 'FOOD_PROVIDER',
-  desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
-  cost: { wood: 1 },
-  passing: true,
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

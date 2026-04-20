@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getExtraRoomCapacity } from '../card-effects'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D21_Recruitment'
 
@@ -81,9 +81,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-registerCardListener(isDoableListener)
-
 export const D21_Recruitment = new MinorImprovement({
   id: CARD_ID,
   name: 'Recruitment',
@@ -94,3 +91,8 @@ export const D21_Recruitment = new MinorImprovement({
   cost: { food: 1 },
   prerequisite: 'No People Left in the House',
 })
+
+export const D21_Recruitment_impl = {
+  listeners: [computeReplaceListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

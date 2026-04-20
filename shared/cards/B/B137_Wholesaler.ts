@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B137_Wholesaler'
 
@@ -24,19 +23,6 @@ const INITIAL_DATA: WholesalerData = {
 
 const getData = (context: CardListenerContext): WholesalerData =>
   readCardExtraData<WholesalerData>(context.player, CARD_ID, 'wholesaler') ?? { ...INITIAL_DATA }
-
-/**
- * Place 1 vegetable, 1 pig, 1 stone, and 1 cattle on this card.
- * Each time you use VegetableSeeds (round 8+), PigMarket (round 9+),
- * EasternQuarry (round 10+), or CattleMarket (round 11+), you get the
- * corresponding good from this card.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'wholesaler', { ...INITIAL_DATA })
-  },
-})
 
 /**
  * After using VegetableSeeds, gain 1 vegetable from card.
@@ -122,11 +108,6 @@ const afterCattleMarketListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterVegetableSeedsListener)
-registerCardListener(afterPigMarketListener)
-registerCardListener(afterEasternQuarryListener)
-registerCardListener(afterCattleMarketListener)
-
 export const B137_Wholesaler = new Occupation({
   id: CARD_ID,
   name: 'Wholesaler',
@@ -137,3 +118,14 @@ export const B137_Wholesaler = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const B137_Wholesaler_impl = {
+  listeners: [afterVegetableSeedsListener, afterPigMarketListener, afterEasternQuarryListener, afterCattleMarketListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'wholesaler', { ...INITIAL_DATA })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

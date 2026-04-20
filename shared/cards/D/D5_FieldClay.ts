@@ -1,19 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D5_FieldClay'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const plantedCount = player.fields.filter((f) => !fieldIsEmpty(f)).length
-    if (plantedCount > 0) {
-      return { type: 'seq', children: [gainLeaf(CARD_ID, { clay: plantedCount })] }
-    }
-  },
-})
 
 export const D5_FieldClay = new MinorImprovement({
   id: CARD_ID,
@@ -26,3 +16,16 @@ export const D5_FieldClay = new MinorImprovement({
   passing: true,
   prerequisite: "1 Planted Field",
 })
+
+export const D5_FieldClay_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const plantedCount = player.fields.filter((f) => !fieldIsEmpty(f)).length
+    if (plantedCount > 0) {
+      return { type: 'seq', children: [gainLeaf(CARD_ID, { clay: plantedCount })] }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

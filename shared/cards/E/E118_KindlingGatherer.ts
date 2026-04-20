@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E118_KindlingGatherer'
 
@@ -68,10 +68,6 @@ const gainListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(placeFarmerListener)
-registerCardListener(collectListener)
-registerCardListener(gainListener)
-
 export const E118_KindlingGatherer = new Occupation({
   id: CARD_ID,
   name: 'Kindling Gatherer',
@@ -82,3 +78,8 @@ export const E118_KindlingGatherer = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E118_KindlingGatherer_impl = {
+  listeners: [placeFarmerListener, collectListener, gainListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

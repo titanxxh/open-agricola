@@ -1,15 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C100_Butler'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return player.rooms > familySize(player) ? 4 : 0
-  },
-})
 
 export const C100_Butler = new Occupation({
   id: CARD_ID,
@@ -22,3 +15,13 @@ export const C100_Butler = new Occupation({
   players: "1+",
   maxRound: 11,
 })
+
+export const C100_Butler_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return player.rooms > familySize(player) ? 4 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

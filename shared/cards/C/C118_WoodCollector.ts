@@ -1,10 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C118_WoodCollector'
 
-registerCardEffect({
+export const C118_WoodCollector = new Occupation({
+  id: CARD_ID,
+  name: "Wood Collector",
+  deck: "C",
+  number: 118,
+  category: "RESOURCE_WOOD",
+  desc: ["Place 1 <WOOD> on each of the next 5 round spaces. At the start of these rounds, you get the <WOOD>."],
+  players: "1+",
+})
+
+export const C118_WoodCollector_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     queueFutureMeeples(state, {
@@ -16,14 +27,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const C118_WoodCollector = new Occupation({
-  id: CARD_ID,
-  name: "Wood Collector",
-  deck: "C",
-  number: 118,
-  category: "RESOURCE_WOOD",
-  desc: ["Place 1 <WOOD> on each of the next 5 round spaces. At the start of these rounds, you get the <WOOD>."],
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

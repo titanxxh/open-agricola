@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTotalRemaining } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D71_Changeover'
 
@@ -54,8 +54,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const D71_Changeover = new MinorImprovement({
   id: CARD_ID,
   name: 'Changeover',
@@ -66,3 +64,8 @@ export const D71_Changeover = new MinorImprovement({
   cost: {},
   newSet: true,
 })
+
+export const D71_Changeover_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

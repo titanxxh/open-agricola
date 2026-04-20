@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D74_RoyalWood'
 
@@ -39,10 +38,21 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
+export const D74_RoyalWood = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Royal Wood',
+  deck: 'D',
+  number: 74,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: [
+    'At the end of each turn in which you use the __Farm Expansion__ action space or build an improvement, you get 1 <WOOD> back for every 2 <WOOD> paid during those actions (rounded down).',
+  ],
+  cost: { food: 1 },
+})
 
-registerCardEffect({
+export const D74_RoyalWood_impl = {
+  listeners: [beforeListener, afterListener],
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'woodSpent', 0)
@@ -56,16 +66,6 @@ registerCardEffect({
     if (refund <= 0) return
     return gainLeaf(CARD_ID, { wood: refund })
   },
-})
-
-export const D74_RoyalWood = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Royal Wood',
-  deck: 'D',
-  number: 74,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'At the end of each turn in which you use the __Farm Expansion__ action space or build an improvement, you get 1 <WOOD> back for every 2 <WOOD> paid during those actions (rounded down).',
-  ],
-  cost: { food: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

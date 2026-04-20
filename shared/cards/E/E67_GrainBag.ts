@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E67_GrainBag'
 
@@ -22,8 +22,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E67_GrainBag = new MinorImprovement({
   id: CARD_ID,
   name: 'Grain Bag',
@@ -34,3 +32,8 @@ export const E67_GrainBag = new MinorImprovement({
   cost: { reed: 1 },
   vp: 1,
 })
+
+export const E67_GrainBag_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

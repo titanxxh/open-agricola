@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C131_PrivateTeacher'
 
@@ -33,8 +33,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C131_PrivateTeacher = new Occupation({
   id: CARD_ID,
   name: 'Private Teacher',
@@ -46,3 +44,8 @@ export const C131_PrivateTeacher = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const C131_PrivateTeacher_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

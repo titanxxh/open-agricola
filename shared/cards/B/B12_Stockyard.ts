@@ -1,26 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B12_Stockyard'
-
-/**
- * B12 Stockyard — This card can hold up to 3 animals of the same type.
- * (It is not considered a pasture.)
- *
- * BGA: onPlayerComputeDropZones adds a zone with capacity 3, any animal type.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onComputeAnimalZones: (_player, zones) => {
-    zones.push({
-      id: `card:${CARD_ID}`,
-      zoneType: 'card',
-      capacity: 3,
-      animalType: null,
-      animalCount: 0,
-    })
-  },
-})
 
 export const B12_Stockyard = new MinorImprovement({
   id: CARD_ID,
@@ -33,3 +14,19 @@ export const B12_Stockyard = new MinorImprovement({
   vp: 1,
   newSet: true,
 })
+
+export const B12_Stockyard_impl = {
+  effect: {
+  id: CARD_ID,
+  onComputeAnimalZones: (_player, zones) => {
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      capacity: 3,
+      animalType: null,
+      animalCount: 0,
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

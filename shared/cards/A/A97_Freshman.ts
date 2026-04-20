@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A97_Freshman'
 
@@ -61,10 +61,6 @@ const isDoableBakeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-registerCardListener(afterPlaceFarmerListener)
-registerCardListener(isDoableBakeListener)
-
 export const A97_Freshman = new Occupation({
   id: CARD_ID,
   name: "Freshman",
@@ -75,3 +71,8 @@ export const A97_Freshman = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A97_Freshman_impl = {
+  listeners: [computeReplaceListener, afterPlaceFarmerListener, isDoableBakeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E101_Blighter'
 const SCORE_MAP = [0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
@@ -42,9 +42,6 @@ const onPlayListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(isDoableListener)
-registerCardListener(onPlayListener)
-
 export const E101_Blighter = new Occupation({
   id: CARD_ID,
   name: "Blighter",
@@ -55,3 +52,8 @@ export const E101_Blighter = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const E101_Blighter_impl = {
+  listeners: [isDoableListener, onPlayListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

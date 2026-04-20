@@ -1,15 +1,25 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E143_Hewer'
 
-// BGA: From round 3 on, at the end of each work phase in which all clay accumulation
-// spaces are unoccupied, you get 1 stone and 1 food.
-// Clay accumulation spaces: clay-pit (all player counts), hollow-4 (4 players only)
-// We use onBeforeReturnHome as the equivalent of BGA's EndWorkPhase.
-registerCardEffect({
+export const E143_Hewer = new Occupation({
+  id: CARD_ID,
+  name: 'Hewer',
+  deck: 'E',
+  number: 143,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: [
+    'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
+  ],
+  cost: {},
+  players: '3+',
+})
+
+export const E143_Hewer_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, _player) => {
     if (state.round < 3) return
@@ -38,17 +48,6 @@ registerCardEffect({
 
     return gainLeaf(CARD_ID, { stone: 1, food: 1 })
   },
-})
-
-export const E143_Hewer = new Occupation({
-  id: CARD_ID,
-  name: 'Hewer',
-  deck: 'E',
-  number: 143,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E109_BraidMaker'
 
@@ -38,8 +38,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const E109_BraidMaker = new Occupation({
   id: CARD_ID,
   name: 'Braid Maker',
@@ -55,3 +53,8 @@ export const E109_BraidMaker = new Occupation({
     { from: { reed: 1 }, to: { food: 2 }, max: 1, trigger: 'anytime' },
   ],
 })
+
+export const E109_BraidMaker_impl = {
+  listeners: [computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

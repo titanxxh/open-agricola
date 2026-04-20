@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E5_NightLoot'
 
@@ -18,7 +18,19 @@ const CARD_ID = 'E5_NightLoot'
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-registerCardEffect({
+export const E5_NightLoot = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Night Loot',
+  deck: 'E',
+  number: 5,
+  category: 'RESOURCE_WOOD',
+  desc: ['Immediately remove 2 different building resources total from accumulation spaces and place them in your supply.'],
+  cost: { food: 2 },
+  passing: true,
+})
+
+export const E5_NightLoot_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state) => {
     // Find which building resource types are available on accumulation spaces
@@ -66,15 +78,6 @@ registerCardEffect({
       children: choices,
     }
   },
-})
-
-export const E5_NightLoot = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Night Loot',
-  deck: 'E',
-  number: 5,
-  category: 'RESOURCE_WOOD',
-  desc: ['Immediately remove 2 different building resources total from accumulation spaces and place them in your supply.'],
-  cost: { food: 2 },
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow, Resource } from '../../game/types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E78_SleightofHand'
 
@@ -36,7 +36,19 @@ const buildSingleExchange = (): ActionFlow => ({
   ),
 })
 
-registerCardEffect({
+export const E78_SleightofHand = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Sleight of Hand',
+  deck: 'E',
+  number: 78,
+  category: 'RESOURCE_WOOD',
+  desc: ['When you play this card, you can immediately exchange up to 4 building resources for an equal number of other building resources.'],
+  prerequisite: '3 Occupations',
+  occupationPrerequisites: { min: 3 },
+})
+
+export const E78_SleightofHand_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     // Check if the player has any building resources to exchange
@@ -57,15 +69,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E78_SleightofHand = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Sleight of Hand',
-  deck: 'E',
-  number: 78,
-  category: 'RESOURCE_WOOD',
-  desc: ['When you play this card, you can immediately exchange up to 4 building resources for an equal number of other building resources.'],
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

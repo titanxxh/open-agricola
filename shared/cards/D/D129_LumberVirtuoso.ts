@@ -1,19 +1,24 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D129_LumberVirtuoso'
 
-/**
- * D129 Lumber Virtuoso — Each harvest in which you have at least 5 wood in
- * your supply, you can discard down to 5 wood to take a Build Stables or
- * Build Wood Rooms action by paying the usual costs.
- *
- * Implementation: onStartHarvest returns an optional flow when wood >= 5.
- * The flow pays excess wood (wood - 5), then offers XOR of stables / construct.
- * Both sub-actions handle their own usual costs.
- */
-registerCardEffect({
+export const D129_LumberVirtuoso = new Occupation({
+  id: CARD_ID,
+  name: 'Lumber Virtuoso',
+  deck: 'D',
+  number: 129,
+  category: 'ACTIONS_BOOSTER',
+  desc: [
+    'Each harvest in which you have at least 5 <WOOD> in your supply, you can discard down to 5 <WOOD> to take a __Build Stables__ or __Build Wood Rooms__ action by paying the usual costs.',
+  ],
+  cost: {},
+  players: '3+',
+})
+
+export const D129_LumberVirtuoso_impl = {
+  effect: {
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
     if (player.resources.wood < 5) return
@@ -56,17 +61,6 @@ registerCardEffect({
 
     return choice
   },
-})
-
-export const D129_LumberVirtuoso = new Occupation({
-  id: CARD_ID,
-  name: 'Lumber Virtuoso',
-  deck: 'D',
-  number: 129,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each harvest in which you have at least 5 <WOOD> in your supply, you can discard down to 5 <WOOD> to take a __Build Stables__ or __Build Wood Rooms__ action by paying the usual costs.',
-  ],
-  cost: {},
-  players: '3+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

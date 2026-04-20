@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C69_LandConsolidation'
 
@@ -55,8 +55,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C69_LandConsolidation = new MinorImprovement({
   id: CARD_ID,
   name: 'Land Consolidation',
@@ -68,3 +66,8 @@ export const C69_LandConsolidation = new MinorImprovement({
   ],
   cost: {},
 })
+
+export const C69_LandConsolidation_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

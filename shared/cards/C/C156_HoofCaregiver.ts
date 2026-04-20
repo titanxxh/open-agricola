@@ -1,22 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C156_HoofCaregiver'
-
-// BGA: Adds 1 cattle to Cattle Market accumulation space, then gains 1 grain + 1 food
-// per cattle on that space. We don't have the Cattle Market action space model here,
-// so simplified: gain 1 grain + 1 food immediately (as if 1 cattle was on the space).
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { grain: 1, food: 1 },
-    }
-  },
-})
 
 export const C156_HoofCaregiver = new Occupation({
   id: CARD_ID,
@@ -29,3 +14,18 @@ export const C156_HoofCaregiver = new Occupation({
   players: "4+",
   newSet: true,
 })
+
+export const C156_HoofCaregiver_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { grain: 1, food: 1 },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

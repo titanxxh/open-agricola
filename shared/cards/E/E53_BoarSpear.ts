@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const TRACKED_ACTIONS = ['collect', 'gain', 'receive'] as const
 const CARD_ID = 'E53_BoarSpear'
@@ -87,9 +87,6 @@ const boarSpearAfterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(boarSpearDuringListener)
-registerCardListener(boarSpearAfterListener)
-
 export const E53_BoarSpear = new MinorImprovement({
   id: "E53_BoarSpear",
   name: "Boar Spear",
@@ -100,3 +97,8 @@ export const E53_BoarSpear = new MinorImprovement({
   vp: 1,
   cost: {"wood":1,"stone":1},
 })
+
+export const E53_BoarSpear_impl = {
+  listeners: [boarSpearDuringListener, boarSpearAfterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

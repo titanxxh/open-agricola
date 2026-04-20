@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D43_Hutch'
 
-registerCardEffect({
+export const D43_Hutch = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Hutch',
+  deck: 'D',
+  number: 43,
+  category: 'FOOD_PROVIDER',
+  desc: ['Place 0, 1, 2, and 3 <FOOD> in this order on the next 4 round spaces. At the start of these rounds, you get the <FOOD>.'],
+  cost: { wood: 1, reed: 1 },
+  vp: 1,
+})
+
+export const D43_Hutch_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Place 0, 1, 2, 3 food on next 4 round spaces (rounds +1 gets 0, +2 gets 1, +3 gets 2, +4 gets 3)
@@ -24,15 +36,6 @@ registerCardEffect({
     }
     return futureMeeplesNode()
   },
-})
-
-export const D43_Hutch = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Hutch',
-  deck: 'D',
-  number: 43,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 0, 1, 2, and 3 <FOOD> in this order on the next 4 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  cost: { wood: 1, reed: 1 },
-  vp: 1,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

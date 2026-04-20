@@ -1,20 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B61_ThreeFieldRotation'
-
-registerCardEffect({
-  id: CARD_ID,
-  onStartHarvestFieldPhase: (_state, player) => {
-    const hasGrain = player.fields.some(f => fieldHasCrop(f, 'grain'))
-    const hasVeg = player.fields.some(f => fieldHasCrop(f, 'vegetable'))
-    const hasEmpty = player.fields.some(f => fieldIsEmpty(f))
-    if (!hasGrain || !hasVeg || !hasEmpty) return
-    return gainLeaf(CARD_ID, { food: 3 })
-  },
-})
 
 export const B61_ThreeFieldRotation = new MinorImprovement({
   id: CARD_ID,
@@ -27,3 +16,17 @@ export const B61_ThreeFieldRotation = new MinorImprovement({
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },
 })
+
+export const B61_ThreeFieldRotation_impl = {
+  effect: {
+  id: CARD_ID,
+  onStartHarvestFieldPhase: (_state, player) => {
+    const hasGrain = player.fields.some(f => fieldHasCrop(f, 'grain'))
+    const hasVeg = player.fields.some(f => fieldHasCrop(f, 'vegetable'))
+    const hasEmpty = player.fields.some(f => fieldIsEmpty(f))
+    if (!hasGrain || !hasVeg || !hasEmpty) return
+    return gainLeaf(CARD_ID, { food: 3 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

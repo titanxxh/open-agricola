@@ -1,10 +1,26 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getFenceCount } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C54_MarketBooth'
 
-registerCardEffect({
+// NOTE: This implementation does not deduct the fence token since there is no pay-fence action.
+// The fence cost is tracked in fences (player.fences), which decrements are done elsewhere.
+// DONE_WITH_CONCERNS: fence payment approximated (fence cost omitted from flow).
+
+export const C54_MarketBooth = new MinorImprovement({
+  id: CARD_ID,
+  name: "Market Booth",
+  deck: "C",
+  number: 54,
+  category: "FOOD_PROVIDER",
+  desc: ["After the field phase of each harvest, you can exchange 1 <GRAIN> plus 1 <FENCE> (both from your supply) for 5 <FOOD>."],
+  cost: {},
+  // Note: BGA costs 1 stable (not representable as Resource)
+})
+
+export const C54_MarketBooth_impl = {
+  effect: {
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
     if (player.resources.grain < 1) return
@@ -23,19 +39,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-// NOTE: This implementation does not deduct the fence token since there is no pay-fence action.
-// The fence cost is tracked in fences (player.fences), which decrements are done elsewhere.
-// DONE_WITH_CONCERNS: fence payment approximated (fence cost omitted from flow).
-
-export const C54_MarketBooth = new MinorImprovement({
-  id: CARD_ID,
-  name: "Market Booth",
-  deck: "C",
-  number: 54,
-  category: "FOOD_PROVIDER",
-  desc: ["After the field phase of each harvest, you can exchange 1 <GRAIN> plus 1 <FENCE> (both from your supply) for 5 <FOOD>."],
-  cost: {},
-  // Note: BGA costs 1 stable (not representable as Resource)
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

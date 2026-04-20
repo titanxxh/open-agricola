@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
 import type { ActionHookPhase } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E125_DelayedWayfarer'
 const PLAYED_ROUND_KEY = 'playedRound'
@@ -36,7 +35,32 @@ const buildingChoiceFlow = (): ActionFlow => ({
   ],
 })
 
-registerCardEffect({
+export const E125_DelayedWayfarer = new Occupation({
+  id: CARD_ID,
+  name: 'Delayed Wayfarer',
+  deck: 'E',
+  number: 125,
+  category: 'BUILDING_RESOURCES_-_ALL',
+  desc: [
+    'When you play this card, you immediately get 1 building resource of your choice and, once all people have been placed this round, you can place a person from your supply.',
+  ],
+  cost: {},
+  players: '1+',
+})
+
+export const E125_DelayedWayfarer_impl = {
+  listeners: [{
+  id: 'E125-isDoable-place-farmer-from-supply',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context) => {
+    if (!context.actionContext?.fromSupply) return
+    const hasSupply = (context.player.workers ?? []).some((w) => !w.isActive)
+    if (hasSupply) return { doable: true }
+  },
+}],
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, state.round)
@@ -61,29 +85,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-registerCardListener({
-  id: 'E125-isDoable-place-farmer-from-supply',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context) => {
-    if (!context.actionContext?.fromSupply) return
-    const hasSupply = (context.player.workers ?? []).some((w) => !w.isActive)
-    if (hasSupply) return { doable: true }
-  },
-})
-
-export const E125_DelayedWayfarer = new Occupation({
-  id: CARD_ID,
-  name: 'Delayed Wayfarer',
-  deck: 'E',
-  number: 125,
-  category: 'BUILDING_RESOURCES_-_ALL',
-  desc: [
-    'When you play this card, you immediately get 1 building resource of your choice and, once all people have been placed this round, you can place a person from your supply.',
-  ],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

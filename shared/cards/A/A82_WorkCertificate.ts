@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A82_WorkCertificate'
 
@@ -86,8 +86,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A82_WorkCertificate = new MinorImprovement({
   id: CARD_ID,
   name: 'Work Certificate',
@@ -100,3 +98,8 @@ export const A82_WorkCertificate = new MinorImprovement({
   occupationPrerequisites: { min: 3 },
   newSet: true,
 })
+
+export const A82_WorkCertificate_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,12 +1,26 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D99_EarthenwarePotter'
 
-registerCardEffect({
+export const D99_EarthenwarePotter = new Occupation({
+  id: CARD_ID,
+  name: "Earthenware Potter",
+  deck: "D",
+  number: 99,
+  category: "POINTS_PROVIDER",
+  desc: [
+    'If you play this card in round 4 or before, after the final harvest, you get 1 bonus <SCORE> for each person for which you then pay 1 <CLAY>.',
+  ],
+  cost: {},
+  players: "1+",
+})
+
+export const D99_EarthenwarePotter_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     markCardCounterIfBoughtByRound(state, player, CARD_ID, 'earlyBuy', 4)
@@ -23,17 +37,6 @@ registerCardEffect({
       promptKey: 'ui.interactionEarthenwarePotter',
     })
   },
-})
-
-export const D99_EarthenwarePotter = new Occupation({
-  id: CARD_ID,
-  name: "Earthenware Potter",
-  deck: "D",
-  number: 99,
-  category: "POINTS_PROVIDER",
-  desc: [
-    'If you play this card in round 4 or before, after the final harvest, you get 1 bonus <SCORE> for each person for which you then pay 1 <CLAY>.',
-  ],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

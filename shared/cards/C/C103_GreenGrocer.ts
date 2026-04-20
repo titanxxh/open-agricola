@@ -1,13 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payGainActionFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C103_GreenGrocer'
 
-// C103 Green Grocer: At the start of each round, you can make exactly one exchange:
-// 1 cattle → 1 vegetable; 1 vegetable → 1 cattle; 2 sheep → 1 vegetable;
-// 1 vegetable → 2 sheep; 2 food → 1 grain; 1 grain → 2 food
-registerCardEffect({
+export const C103_GreenGrocer = new Occupation({
+  id: CARD_ID,
+  name: 'Green Grocer',
+  deck: 'C',
+  number: 103,
+  category: 'GOODS_PROVIDER',
+  desc: ['At the start of each round, you can make exactly one of the following exchanges: 1 <CATTLE> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 1 <CATTLE>; 2 <SHEEP> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 2 <SHEEP>; 2 <FOOD> <ARROW> 1 <GRAIN>; 1 <GRAIN> <ARROW> 2 <FOOD>'],
+  cost: {},
+  players: '1+',
+  newSet: true,
+})
+
+export const C103_GreenGrocer_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
 
@@ -30,16 +40,6 @@ registerCardEffect({
 
     return { type: 'xor', optional: true, children }
   },
-})
-
-export const C103_GreenGrocer = new Occupation({
-  id: CARD_ID,
-  name: 'Green Grocer',
-  deck: 'C',
-  number: 103,
-  category: 'GOODS_PROVIDER',
-  desc: ['At the start of each round, you can make exactly one of the following exchanges: 1 <CATTLE> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 1 <CATTLE>; 2 <SHEEP> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 2 <SHEEP>; 2 <FOOD> <ARROW> 1 <GRAIN>; 1 <GRAIN> <ARROW> 2 <FOOD>'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

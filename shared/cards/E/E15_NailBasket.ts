@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E15_NailBasket'
 
@@ -39,8 +39,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E15_NailBasket = new MinorImprovement({
   id: CARD_ID,
   name: 'Nail Basket',
@@ -53,3 +51,8 @@ export const E15_NailBasket = new MinorImprovement({
   cost: { reed: 1 },
   vp: 1,
 })
+
+export const E15_NailBasket_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

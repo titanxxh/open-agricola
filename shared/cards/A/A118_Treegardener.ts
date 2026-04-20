@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A118_Treegardener'
 
-registerCardEffect({
+export const A118_Treegardener = new Occupation({
+  id: CARD_ID,
+  name: "Treegardener",
+  deck: "A",
+  number: 118,
+  category: "BUILDING_RESOURCE_PROVIDER",
+  desc: ["In the field phase of each harvest, you get 1 <WOOD> and you can buy up to 2 additional <WOOD> for 1 <FOOD> each."],
+  cost: {},
+  players: "1+",
+})
+
+export const A118_Treegardener_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, _player) => {
 
@@ -41,15 +53,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const A118_Treegardener = new Occupation({
-  id: CARD_ID,
-  name: "Treegardener",
-  deck: "A",
-  number: 118,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["In the field phase of each harvest, you get 1 <WOOD> and you can buy up to 2 additional <WOOD> for 1 <FOOD> each."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

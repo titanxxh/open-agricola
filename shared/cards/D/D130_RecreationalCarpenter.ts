@@ -1,26 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D130_RecreationalCarpenter'
-
-// D130 Recreational Carpenter: At the end of each work phase in which you did not use the
-// Meeting Place action space, you can take a Build Rooms action without placing a person.
-// BGA: EndWorkPhase → we use onBeforeReturnHome
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
-    const meetingPlace = state.actionSpaces.find((s) => s.id === 'meeting-place')
-    if (meetingPlace && spaceHasPlayer(meetingPlace, player.id)) return
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
-      ],
-    }
-  },
-})
 
 export const D130_RecreationalCarpenter = new Occupation({
   id: CARD_ID,
@@ -33,3 +15,21 @@ export const D130_RecreationalCarpenter = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const D130_RecreationalCarpenter_impl = {
+  effect: {
+  id: CARD_ID,
+  onBeforeReturnHome: (state, player) => {
+    const meetingPlace = state.actionSpaces.find((s) => s.id === 'meeting-place')
+    if (meetingPlace && spaceHasPlayer(meetingPlace, player.id)) return
+    return {
+      type: 'seq',
+      optional: true,
+      children: [
+        { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
+      ],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

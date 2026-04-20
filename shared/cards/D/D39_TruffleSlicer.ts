@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D39_TruffleSlicer'
 
@@ -39,8 +39,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D39_TruffleSlicer = new MinorImprovement({
   id: CARD_ID,
   name: 'Truffle Slicer',
@@ -50,3 +48,8 @@ export const D39_TruffleSlicer = new MinorImprovement({
   desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
   cost: {},
 })
+
+export const D39_TruffleSlicer_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

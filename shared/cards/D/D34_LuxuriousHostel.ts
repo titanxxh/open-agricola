@@ -1,15 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D34_LuxuriousHostel'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return getStoneHouseBonusScore(player, CARD_ID)
-  },
-})
 
 export const D34_LuxuriousHostel = new MinorImprovement({
   id: CARD_ID,
@@ -24,3 +17,13 @@ export const D34_LuxuriousHostel = new MinorImprovement({
   extraVp: true,
   newSet: true,
 })
+
+export const D34_LuxuriousHostel_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return getStoneHouseBonusScore(player, CARD_ID)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

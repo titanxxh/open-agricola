@@ -1,6 +1,4 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
-import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
@@ -9,6 +7,7 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../game/space'
 import { familySize, workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A130_MummysBoy'
 
@@ -79,20 +78,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-registerCardListener(afterPlaceFarmerListener)
-
-// Start of turn: unflag
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    if (!player.occupationPlayed.includes(CARD_ID)) return
-    if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
-    }
-  },
-})
-
 export const A130_MummysBoy = new Occupation({
   id: CARD_ID,
   name: "Mummy's Boy",
@@ -106,3 +91,17 @@ export const A130_MummysBoy = new Occupation({
   players: '3+',
   evenMoreSet: true,
 })
+
+export const A130_MummysBoy_impl = {
+  listeners: [computeArgsListener, afterPlaceFarmerListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    if (!player.occupationPlayed.includes(CARD_ID)) return
+    if (isCardFlagged(player, CARD_ID)) {
+      setCardFlag(player, CARD_ID, false)
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

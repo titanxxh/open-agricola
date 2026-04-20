@@ -1,12 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ExtraSowableField } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B72_LoveforAgriculture'
 
@@ -78,9 +77,41 @@ const findPastureByTile = (
   return null
 }
 
-// --- Card Effect ---
+// --- isDoable listener: make sow doable when pastures can be sown ---
 
-registerCardEffect({
+const isDoableListener: CardListenerRegistration = {
+  id: 'B72-love-agriculture-isdoable-sow',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    // If already doable via normal fields, no need to intervene
+    if (canSow(context.player)) return
+    // Check if there are seeds AND eligible pastures
+    const hasSeeds =
+      context.player.resources.grain > 0 || context.player.resources.vegetable > 0
+    if (!hasSeeds) return
+    const eligible = getEligiblePastures(context.player)
+    if (eligible.length === 0) return
+    return { doable: true }
+  },
+}
+
+export const B72_LoveforAgriculture = new MinorImprovement({
+  id: CARD_ID,
+  name: "Love for Agriculture",
+  deck: "B",
+  number: 72,
+  category: "CROP_PROVIDER",
+  desc: [
+    "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered fields and hold 1 and 2 animals less, respectively.",
+  ],
+  cost: {},
+})
+
+export const B72_LoveforAgriculture_impl = {
+  listeners: [isDoableListener],
+  effect: {
   id: CARD_ID,
 
   // Provide extra sowable tiles from eligible pastures
@@ -155,38 +186,6 @@ registerCardEffect({
       zone.capacity = Math.max(0, zone.capacity - pastureSize)
     }
   },
-})
-
-// --- isDoable listener: make sow doable when pastures can be sown ---
-
-const isDoableListener: CardListenerRegistration = {
-  id: 'B72-love-agriculture-isdoable-sow',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    // If already doable via normal fields, no need to intervene
-    if (canSow(context.player)) return
-    // Check if there are seeds AND eligible pastures
-    const hasSeeds =
-      context.player.resources.grain > 0 || context.player.resources.vegetable > 0
-    if (!hasSeeds) return
-    const eligible = getEligiblePastures(context.player)
-    if (eligible.length === 0) return
-    return { doable: true }
-  },
-}
-
-registerCardListener(isDoableListener)
-
-export const B72_LoveforAgriculture = new MinorImprovement({
-  id: CARD_ID,
-  name: "Love for Agriculture",
-  deck: "B",
-  number: 72,
-  category: "CROP_PROVIDER",
-  desc: [
-    "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered fields and hold 1 and 2 animals less, respectively.",
-  ],
-  cost: {},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D36_BreedRegistry'
 
@@ -48,20 +47,6 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-registerCardListener(beforeExchangeListener)
-registerCardListener(afterExchangeListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const gained = readCardExtraData<number>(player, CARD_ID, 'sheepGained') ?? 0
-    const converted = readCardExtraData<boolean>(player, CARD_ID, 'sheepConverted') ?? false
-    if (converted) return 0
-    return gained <= 2 ? 3 : 0
-  },
-})
-
 export const D36_BreedRegistry = new MinorImprovement({
   id: CARD_ID,
   name: "Breed Registry",
@@ -72,3 +57,17 @@ export const D36_BreedRegistry = new MinorImprovement({
   cost: {},
   prerequisite: "No Sheep",
 })
+
+export const D36_BreedRegistry_impl = {
+  listeners: [afterCollectListener, beforeExchangeListener, afterExchangeListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const gained = readCardExtraData<number>(player, CARD_ID, 'sheepGained') ?? 0
+    const converted = readCardExtraData<boolean>(player, CARD_ID, 'sheepConverted') ?? false
+    if (converted) return 0
+    return gained <= 2 ? 3 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,26 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E86_PenBuilder'
-
-registerCardEffect({
-  id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
-    const discards = player.cardStates?.[CARD_ID]?.counters?.discards ?? 0
-    if (discards <= 0) return
-    zones.push({
-      id: `card:${CARD_ID}`,
-      zoneType: 'card',
-      capacity: discards * 2,
-      animalType: null,
-      animalCount: 0,
-    })
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E86-pen-builder-anytime',
@@ -47,8 +31,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E86_PenBuilder = new Occupation({
   id: CARD_ID,
   name: 'Pen Builder',
@@ -59,3 +41,22 @@ export const E86_PenBuilder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E86_PenBuilder_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onComputeAnimalZones: (player, zones) => {
+    const discards = player.cardStates?.[CARD_ID]?.counters?.discards ?? 0
+    if (discards <= 0) return
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      capacity: discards * 2,
+      animalType: null,
+      animalCount: 0,
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

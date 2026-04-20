@@ -1,12 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E88_MasterFencer'
 
-// E88 Master Fencer: Once you live in a stone house, at the start of each round,
-// you can pay 2 or 3 wood to build up to 3 or 4 fences, respectively.
-registerCardEffect({
+export const E88_MasterFencer = new Occupation({
+  id: CARD_ID,
+  name: 'Master Fencer',
+  deck: 'E',
+  number: 88,
+  category: 'FARMYARD_FENCING',
+  desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
+  cost: {},
+  players: '1+',
+})
+
+export const E88_MasterFencer_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     if (player.houseType !== 'stone') return
@@ -40,15 +50,6 @@ registerCardEffect({
 
     return { type: 'xor', optional: true, children: options }
   },
-})
-
-export const E88_MasterFencer = new Occupation({
-  id: CARD_ID,
-  name: 'Master Fencer',
-  deck: 'E',
-  number: 88,
-  category: 'FARMYARD_FENCING',
-  desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

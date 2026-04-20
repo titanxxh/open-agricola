@@ -1,10 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D41_HorseDrawnBoat'
 
-registerCardEffect({
+export const D41_HorseDrawnBoat = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Horse-Drawn Boat',
+  deck: 'D',
+  number: 41,
+  category: 'GOODS_PROVIDER',
+  desc: ['Alternate placing 1 <FOOD> and 1 <SHEEP> on each remaining round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
+  cost: { wood: 2 },
+  prerequisite: '3 Occupations',
+  occupationPrerequisites: { min: 3 },
+})
+
+export const D41_HorseDrawnBoat_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Alternate placing 1 food and 1 sheep on remaining round spaces starting with food
@@ -37,16 +50,6 @@ registerCardEffect({
     }
     return futureMeeplesNode()
   },
-})
-
-export const D41_HorseDrawnBoat = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Horse-Drawn Boat',
-  deck: 'D',
-  number: 41,
-  category: 'GOODS_PROVIDER',
-  desc: ['Alternate placing 1 <FOOD> and 1 <SHEEP> on each remaining round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
-  cost: { wood: 2 },
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

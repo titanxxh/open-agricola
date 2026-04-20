@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E51_WhaleOil'
 
@@ -43,17 +42,6 @@ const occupationListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(fishingListener)
-registerCardListener(occupationListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'foodCount', 0)
-    updateInfobox(player, 0)
-  },
-})
-
 export const E51_WhaleOil = new MinorImprovement({
   id: CARD_ID,
   name: 'Whale Oil',
@@ -63,3 +51,15 @@ export const E51_WhaleOil = new MinorImprovement({
   desc: ['Each time you use __Fishing__, place 1 <FOOD> from the general supply on this card. Each time before you play an occupation, you get <FOOD> equal to the amount on this card.'],
   cost: { wood: 1 },
 })
+
+export const E51_WhaleOil_impl = {
+  listeners: [fishingListener, occupationListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'foodCount', 0)
+    updateInfobox(player, 0)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

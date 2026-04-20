@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A83_ShepherdsCrook'
 const MIN_PASTURE_SIZE = 4
@@ -26,8 +26,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A83_ShepherdsCrook = new MinorImprovement({
   id: CARD_ID,
   name: "Shepherd's Crook",
@@ -37,3 +35,8 @@ export const A83_ShepherdsCrook = new MinorImprovement({
   desc: ["Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."],
   cost: {"wood":1},
 })
+
+export const A83_ShepherdsCrook_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

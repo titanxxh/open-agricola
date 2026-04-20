@@ -1,21 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E48_TownHall'
-
-registerCardEffect({
-  id: CARD_ID,
-  onHarvestFeedingPhase: (_state, player) => {
-
-    if (player.houseType === 'clay') {
-      return gainLeaf(CARD_ID, { food: 1 })
-    }
-    if (player.houseType === 'stone') {
-      return gainLeaf(CARD_ID, { food: 2 })
-    }
-  },
-})
 
 export const E48_TownHall = new MinorImprovement({
   id: CARD_ID,
@@ -27,3 +14,19 @@ export const E48_TownHall = new MinorImprovement({
   vp: 2,
   cost: { wood: 2, clay: 2 },
 })
+
+export const E48_TownHall_impl = {
+  effect: {
+  id: CARD_ID,
+  onHarvestFeedingPhase: (_state, player) => {
+
+    if (player.houseType === 'clay') {
+      return gainLeaf(CARD_ID, { food: 1 })
+    }
+    if (player.houseType === 'stone') {
+      return gainLeaf(CARD_ID, { food: 2 })
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

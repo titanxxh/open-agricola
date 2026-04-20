@@ -1,17 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D154_ChimneySweep'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (state, player) => {
-    return state.players.filter((p) => p.id !== player.id && p.houseType === 'stone').length
-  },
-})
 
 const renovateCostListener: CardListenerRegistration = {
   id: 'D154-chimney-sweep-compute-costs-renovation',
@@ -22,8 +14,6 @@ const renovateCostListener: CardListenerRegistration = {
     return { costs: { stone: -2 } }
   },
 }
-
-registerCardListener(renovateCostListener)
 
 export const D154_ChimneySweep = new Occupation({
   id: CARD_ID,
@@ -37,3 +27,14 @@ export const D154_ChimneySweep = new Occupation({
   cost: {},
   players: "4+",
 })
+
+export const D154_ChimneySweep_impl = {
+  listeners: [renovateCostListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (state, player) => {
+    return state.players.filter((p) => p.id !== player.id && p.houseType === 'stone').length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

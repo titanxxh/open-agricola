@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C27_Blueprint'
 
@@ -26,8 +26,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const C27_Blueprint = new MinorImprovement({
   id: CARD_ID,
   name: 'Blueprint',
@@ -37,3 +35,8 @@ export const C27_Blueprint = new MinorImprovement({
   desc: ["You can build the major improvements __Joinery__, __Pottery__, and __Basketmaker's Workshop__ even when taking a __Minor Improvement__ action. They each cost you 1 <STONE> less."],
   cost: { food: 1 },
 })
+
+export const C27_Blueprint_impl = {
+  listeners: [computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

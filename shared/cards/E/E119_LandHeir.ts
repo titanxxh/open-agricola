@@ -1,10 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E119_LandHeir'
 
-registerCardEffect({
+export const E119_LandHeir = new Occupation({
+  id: CARD_ID,
+  name: 'Land Heir',
+  deck: 'E',
+  number: 119,
+  category: 'RESOURCE_WOOD',
+  desc: ['If you play this card in round 4 or before, place 4 <WOOD> and 4 <CLAY> on the space for round 9. At the start of this round, you get the resources.'],
+  players: '1+',
+})
+
+export const E119_LandHeir_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     if (state.round > 4) return
@@ -22,14 +33,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const E119_LandHeir = new Occupation({
-  id: CARD_ID,
-  name: 'Land Heir',
-  deck: 'E',
-  number: 119,
-  category: 'RESOURCE_WOOD',
-  desc: ['If you play this card in round 4 or before, place 4 <WOOD> and 4 <CLAY> on the space for round 9. At the start of this round, you get the resources.'],
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

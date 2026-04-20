@@ -1,23 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A117_WoodCarrier'
-
-// BGA: When you play this card, you immediately get 1 WOOD for each improvement in front of you.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    // countAllImprovements in BGA = major + minor improvements
-    const n = player.improvements.length + player.minorPlayed.length
-    if (n <= 0) return
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { wood: n },
-    }
-  },
-})
 
 export const A117_WoodCarrier = new Occupation({
   id: CARD_ID,
@@ -30,3 +14,21 @@ export const A117_WoodCarrier = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const A117_WoodCarrier_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    // countAllImprovements in BGA = major + minor improvements
+    const n = player.improvements.length + player.minorPlayed.length
+    if (n <= 0) return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { wood: n },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

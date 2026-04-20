@@ -1,11 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { isEffectivelyMajor } from '../helpers/card-identity'
 import type { PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D161_CabbageBuyer'
 
@@ -128,10 +128,6 @@ const drainTrackerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(openTrackerListener)
-registerCardListener(tagImprovementListener)
-registerCardListener(drainTrackerListener)
-
 export const D161_CabbageBuyer = new Occupation({
   id: CARD_ID,
   name: 'Cabbage Buyer',
@@ -145,3 +141,8 @@ export const D161_CabbageBuyer = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const D161_CabbageBuyer_impl = {
+  listeners: [openTrackerListener, tagImprovementListener, drainTrackerListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

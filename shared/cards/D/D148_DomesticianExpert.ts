@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D148_DomesticianExpert'
 
@@ -14,7 +14,18 @@ const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): n
   return pairs
 }
 
-registerCardEffect({
+export const D148_DomesticianExpert = new Occupation({
+  id: CARD_ID,
+  name: 'Domestician Expert',
+  deck: 'D',
+  number: 148,
+  desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
+  cost: {},
+  players: '4+',
+})
+
+export const D148_DomesticianExpert_impl = {
+  effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
     const roomTiles = player.roomTiles ?? []
@@ -28,14 +39,6 @@ registerCardEffect({
       animalCount: 0,
     })
   },
-})
-
-export const D148_DomesticianExpert = new Occupation({
-  id: CARD_ID,
-  name: 'Domestician Expert',
-  deck: 'D',
-  number: 148,
-  desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

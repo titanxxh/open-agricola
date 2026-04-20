@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E79_FieldSpade'
 
@@ -17,8 +17,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E79_FieldSpade = new MinorImprovement({
   id: CARD_ID,
   name: 'Field Spade',
@@ -28,3 +26,8 @@ export const E79_FieldSpade = new MinorImprovement({
   desc: ['Each time after you sow in at least 1 field, you get 1 <STONE>.'],
   cost: { wood: 1 },
 })
+
+export const E79_FieldSpade_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

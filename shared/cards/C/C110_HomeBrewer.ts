@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C110_HomeBrewer'
 
-registerCardEffect({
+export const C110_HomeBrewer = new Occupation({
+  id: CARD_ID,
+  name: "Home Brewer",
+  deck: "C",
+  number: 110,
+  category: "FOOD_PROVIDER",
+  desc: ["After the field phase of each harvest, you can use this card to turn exactly 1 <GRAIN> into your choice of 3 <FOOD> or 1 bonus <SCORE>."],
+  cost: {},
+  players: "1+",
+})
+
+export const C110_HomeBrewer_impl = {
+  effect: {
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
     if (player.resources.grain < 1) return
@@ -36,15 +48,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const C110_HomeBrewer = new Occupation({
-  id: CARD_ID,
-  name: "Home Brewer",
-  deck: "C",
-  number: 110,
-  category: "FOOD_PROVIDER",
-  desc: ["After the field phase of each harvest, you can use this card to turn exactly 1 <GRAIN> into your choice of 3 <FOOD> or 1 bonus <SCORE>."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C149_ResourceRecycler'
 
@@ -48,8 +48,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C149_ResourceRecycler = new Occupation({
   id: CARD_ID,
   name: 'Resource Recycler',
@@ -63,3 +61,8 @@ export const C149_ResourceRecycler = new Occupation({
   players: '4+',
   evenMoreSet: true,
 })
+
+export const C149_ResourceRecycler_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D17_DrillHarrow'
 
@@ -60,9 +60,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeSowListener)
-registerCardListener(isDoableListener)
-
 export const D17_DrillHarrow = new MinorImprovement({
   id: CARD_ID,
   name: 'Drill Harrow',
@@ -73,3 +70,8 @@ export const D17_DrillHarrow = new MinorImprovement({
   cost: { wood: 1 },
   evenMoreSet: true,
 })
+
+export const D17_DrillHarrow_impl = {
+  listeners: [beforeSowListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

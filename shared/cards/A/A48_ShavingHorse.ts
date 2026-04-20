@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A48_ShavingHorse'
 
@@ -53,9 +53,6 @@ const afterExchangeListener: CardListenerRegistration = {
   handler: checkAndExchange,
 }
 
-registerCardListener(afterObtainListener)
-registerCardListener(afterExchangeListener)
-
 export const A48_ShavingHorse = new MinorImprovement({
   id: CARD_ID,
   name: 'Shaving Horse',
@@ -65,3 +62,8 @@ export const A48_ShavingHorse = new MinorImprovement({
   desc: ['Each time after you obtain at least 1 <WOOD>, if you then have 5 or more <WOOD> in your supply, you can exchange 1 <WOOD> for 3 <FOOD>. With 7 or more <WOOD>, you must do so.'],
   cost: { wood: 1 },
 })
+
+export const A48_ShavingHorse_impl = {
+  listeners: [afterObtainListener, afterExchangeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

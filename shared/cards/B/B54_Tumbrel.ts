@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B54_Tumbrel'
 
@@ -20,11 +19,6 @@ const isUnconditionalSow = (context: CardListenerContext): boolean => {
   return actionContext.maxSelections === undefined && actionContext.cropType === undefined
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 2 }),
-})
-
 const listener: CardListenerRegistration = {
   id: 'B54-tumbrel-after-sow',
   cardIds: [CARD_ID],
@@ -38,8 +32,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B54_Tumbrel = new MinorImprovement({
   id: CARD_ID,
   name: 'Tumbrel',
@@ -52,3 +44,12 @@ export const B54_Tumbrel = new MinorImprovement({
   cost: { wood: 1 },
   newSet: true,
 })
+
+export const B54_Tumbrel_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

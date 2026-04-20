@@ -1,11 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B97_Scholar'
 
-// B97 Scholar: Once you live in a stone house, at the start of each round, you can play
-// an occupation for 1 food, or a minor improvement (by paying its cost).
-registerCardEffect({
+export const B97_Scholar = new Occupation({
+  id: CARD_ID,
+  name: 'Scholar',
+  deck: 'B',
+  number: 97,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['Once you live in a stone house, at the start of each round, you can play an occupation for an occupation cost of 1 <FOOD>, or a minor improvement (by paying its cost).'],
+  cost: {},
+  players: '1+',
+})
+
+export const B97_Scholar_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     if (player.houseType !== 'stone') return
@@ -28,15 +38,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const B97_Scholar = new Occupation({
-  id: CARD_ID,
-  name: 'Scholar',
-  deck: 'B',
-  number: 97,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Once you live in a stone house, at the start of each round, you can play an occupation for an occupation cost of 1 <FOOD>, or a minor improvement (by paying its cost).'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

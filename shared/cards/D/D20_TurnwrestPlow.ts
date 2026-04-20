@@ -1,24 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D20_TurnwrestPlow'
 
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
-
-/**
- * Place 2 field tiles on this card. Each time you use Farmland or Cultivation,
- * you can plow up to 2 fields from this card.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, ['field', 'field'])
-  },
-})
 
 const listener: CardListenerRegistration = {
   id: 'D20-turnwrest-plow-after-place-farmer',
@@ -68,8 +56,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D20_TurnwrestPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Turnwrest Plow',
@@ -81,3 +67,14 @@ export const D20_TurnwrestPlow = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
 })
+
+export const D20_TurnwrestPlow_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, ['field', 'field'])
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

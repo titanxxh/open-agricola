@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E14_WoodSaw'
 
@@ -43,8 +43,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E14_WoodSaw = new MinorImprovement({
   id: CARD_ID,
   name: 'Wood Saw',
@@ -54,3 +52,8 @@ export const E14_WoodSaw = new MinorImprovement({
   desc: ['Each time all other players have more people than you, you can take a __Build Rooms__ action without placing a person.'],
   cost: { wood: 1 },
 })
+
+export const E14_WoodSaw_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

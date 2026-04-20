@@ -1,16 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C121_ClayKneader'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 2 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'C121-clay-kneader-after-place-farmer',
@@ -22,8 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
 }
-
-registerCardListener(listener)
 
 export const C121_ClayKneader = new Occupation({
   id: CARD_ID,
@@ -38,3 +30,12 @@ export const C121_ClayKneader = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const C121_ClayKneader_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

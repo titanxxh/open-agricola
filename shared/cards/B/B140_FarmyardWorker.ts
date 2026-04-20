@@ -1,29 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B140_FarmyardWorker'
-
-// B140 Farmyard Worker: At the end of each work phase in which you placed at least 1 good
-// on 1 of your farmyard spaces, you get 2 food.
-// We use a flag: set it when any stable/fencing action is taken, then check at onBeforeReturnHome.
-// The "placed a good on a farmyard space" refers to building: stable, fence, or room.
-
-// Track flag reset at round start
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-  onBeforeReturnHome: (_state, player) => {
-    if (!isCardFlagged(player, CARD_ID)) return
-    return gainLeaf(CARD_ID, { food: 2 })
-  },
-})
 
 // Listen for stables, fencing, construct (rooms) — any action that places goods on farmyard
 const farmyardListener: CardListenerRegistration = {
@@ -40,8 +22,6 @@ const farmyardListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(farmyardListener)
-
 export const B140_FarmyardWorker = new Occupation({
   id: CARD_ID,
   name: 'Farmyard Worker',
@@ -53,3 +33,18 @@ export const B140_FarmyardWorker = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const B140_FarmyardWorker_impl = {
+  listeners: [farmyardListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+  onBeforeReturnHome: (_state, player) => {
+    if (!isCardFlagged(player, CARD_ID)) return
+    return gainLeaf(CARD_ID, { food: 2 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

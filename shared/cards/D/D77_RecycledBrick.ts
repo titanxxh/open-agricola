@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { GameState, PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D77_RecycledBrick'
 
@@ -44,8 +44,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D77_RecycledBrick = new MinorImprovement({
   id: CARD_ID,
   name: 'Recycled Brick',
@@ -57,3 +55,8 @@ export const D77_RecycledBrick = new MinorImprovement({
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },
 })
+
+export const D77_RecycledBrick_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

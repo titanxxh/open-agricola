@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C112_Thresher'
 
@@ -40,8 +40,6 @@ const beforeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-
 export const C112_Thresher = new Occupation({
   id: CARD_ID,
   name: 'Thresher',
@@ -54,3 +52,8 @@ export const C112_Thresher = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C112_Thresher_impl = {
+  listeners: [beforeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

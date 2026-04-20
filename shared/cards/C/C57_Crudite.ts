@@ -1,11 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
 import type { Field } from '../../game/types'
 import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C57_Crudite'
 
@@ -45,24 +44,6 @@ const removeVegetableFromField = (player: { fields: Field[] }): boolean => {
   return true
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    if (player.resources.food < 3) return
-    return payGainFlow({
-      cardId: CARD_ID,
-      cost: { food: 3 },
-      gain: { vegetable: 1 },
-    })
-  },
-  onStartHarvestFieldPhase: (_state, player) => {
-    if (!hasQualifyingVegetableField(player)) return
-    // Remove 1 vegetable from qualifying field and gain 4 food
-    if (!removeVegetableFromField(player)) return
-    return gainLeaf(CARD_ID, { food: 4 })
-  },
-})
-
 /**
  * Anytime: discard vegetable from field for 4 food.
  * Requires a vegetable field with >= 2 remaining.
@@ -84,8 +65,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C57_Crudite = new MinorImprovement({
   id: CARD_ID,
   name: 'Crudite',
@@ -98,3 +77,25 @@ export const C57_Crudite = new MinorImprovement({
   cost: {},
   evenMoreSet: true,
 })
+
+export const C57_Crudite_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (player.resources.food < 3) return
+    return payGainFlow({
+      cardId: CARD_ID,
+      cost: { food: 3 },
+      gain: { vegetable: 1 },
+    })
+  },
+  onStartHarvestFieldPhase: (_state, player) => {
+    if (!hasQualifyingVegetableField(player)) return
+    // Remove 1 vegetable from qualifying field and gain 4 food
+    if (!removeVegetableFromField(player)) return
+    return gainLeaf(CARD_ID, { food: 4 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

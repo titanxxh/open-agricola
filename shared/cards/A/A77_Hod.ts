@@ -1,22 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A77_Hod'
-
-/**
- * A77 Hod — On buy: gain 1 clay.
- * Each time any player (including you) uses the Pig Market, owner gets 2 clay.
- *
- * BGA reference: A_77_Hod.php
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { clay: 1 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'A77-hod-any-pig-market',
@@ -30,8 +18,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A77_Hod = new MinorImprovement({
   id: CARD_ID,
   name: "Hod",
@@ -44,3 +30,12 @@ export const A77_Hod = new MinorImprovement({
   cost: { wood: 1 },
   newSet: true,
 })
+
+export const A77_Hod_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { clay: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D45_SheepWell'
 
-registerCardEffect({
+export const D45_SheepWell = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Sheep Well',
+  deck: 'D',
+  number: 45,
+  category: 'FOOD_PROVIDER',
+  desc: ['Place 1 <FOOD> on each of the next round spaces, up to the number of <SHEEP> you have. At the start of these rounds, you get the <FOOD>.'],
+  cost: { stone: 2 },
+  vp: 2,
+})
+
+export const D45_SheepWell_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Place 1 food on each of the next round spaces, up to the number of sheep you have
@@ -23,15 +35,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const D45_SheepWell = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Sheep Well',
-  deck: 'D',
-  number: 45,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 1 <FOOD> on each of the next round spaces, up to the number of <SHEEP> you have. At the start of these rounds, you get the <FOOD>.'],
-  cost: { stone: 2 },
-  vp: 2,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

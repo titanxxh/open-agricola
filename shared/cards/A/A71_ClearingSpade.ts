@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A71_ClearingSpade'
 
@@ -83,8 +83,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const A71_ClearingSpade = new MinorImprovement({
   id: CARD_ID,
   name: 'Clearing Spade',
@@ -94,3 +92,8 @@ export const A71_ClearingSpade = new MinorImprovement({
   desc: ['At any time, you can move 1 crop from a planted field containing at least 2 crops to an empty field.'],
   cost: { wood: 1 },
 })
+
+export const A71_ClearingSpade_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

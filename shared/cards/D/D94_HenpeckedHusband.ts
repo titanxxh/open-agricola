@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 const CARD_ID = 'D94_HenpeckedHusband'
 
 // D94 Henpecked Husband: Each time you take a Build Rooms action with the second person
@@ -18,8 +18,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D94_HenpeckedHusband = new Occupation({
   id: CARD_ID,
   name: "Henpecked Husband",
@@ -30,3 +28,8 @@ export const D94_HenpeckedHusband = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const D94_HenpeckedHusband_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

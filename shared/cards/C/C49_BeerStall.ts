@@ -1,11 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { getLooseStableKeys } from '../../actions/effects/animals'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C49_BeerStall'
 
-registerCardEffect({
+export const C49_BeerStall = new MinorImprovement({
+  id: CARD_ID,
+  name: "Beer Stall",
+  deck: "C",
+  number: 49,
+  category: "FOOD_PROVIDER",
+  desc: ['In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
+  cost: { wood: 1 },
+})
+
+export const C49_BeerStall_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     const looseKeys = getLooseStableKeys(player)
@@ -41,14 +52,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const C49_BeerStall = new MinorImprovement({
-  id: CARD_ID,
-  name: "Beer Stall",
-  deck: "C",
-  number: 49,
-  category: "FOOD_PROVIDER",
-  desc: ['In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
-  cost: { wood: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

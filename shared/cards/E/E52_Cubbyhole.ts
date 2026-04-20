@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import { getStoredResource } from '../helpers/card-storage'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E52_Cubbyhole'
 
@@ -30,9 +29,20 @@ const constructListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(constructListener)
+export const E52_Cubbyhole = new MinorImprovement({
+  id: CARD_ID,
+  name: "Cubbyhole",
+  deck: "E",
+  number: 52,
+  category: "FOOD",
+  desc: ["For each room that you add to your house, place 1 <FOOD> from the general supply on this card. At the start of each feeding phase, you get <FOOD> equal to the amount on this card."],
+  cost: {},
+  vp: 1,
+})
 
-registerCardEffect({
+export const E52_Cubbyhole_impl = {
+  listeners: [constructListener],
+  effect: {
   id: CARD_ID,
   onStartHarvestFeedingPhase: (_state, player) => {
     const storedFood = getStoredResource(player, CARD_ID, 'food')
@@ -44,15 +54,6 @@ registerCardEffect({
       sourceCard: CARD_ID,
     }
   },
-})
-
-export const E52_Cubbyhole = new MinorImprovement({
-  id: CARD_ID,
-  name: "Cubbyhole",
-  deck: "E",
-  number: 52,
-  category: "FOOD",
-  desc: ["For each room that you add to your house, place 1 <FOOD> from the general supply on this card. At the start of each feeding phase, you get <FOOD> equal to the amount on this card."],
-  cost: {},
-  vp: 1,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

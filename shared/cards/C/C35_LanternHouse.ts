@@ -1,14 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C35_LanternHouse'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return -(player.minorHand.length + player.occupationHand.length)
-  },
-})
 
 export const C35_LanternHouse = new MinorImprovement({
   id: CARD_ID,
@@ -24,3 +17,13 @@ export const C35_LanternHouse = new MinorImprovement({
   prerequisite: "No Occupations",
   occupationPrerequisites: { max: 0 },
 })
+
+export const C35_LanternHouse_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return -(player.minorHand.length + player.occupationHand.length)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

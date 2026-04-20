@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E56_RomanPot'
 
@@ -9,7 +9,19 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: nu
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
 
-registerCardEffect({
+export const E56_RomanPot = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Roman Pot',
+  deck: 'E',
+  number: 56,
+  category: 'FOOD_PROVIDER',
+  desc: ['Place 4 <FOOD> from the general supply on this card. At the start of each work phase, if you are the last player in turn order, move 1 <FOOD> from this card to your supply.'],
+  cost: { clay: 1 },
+  vp: 1,
+})
+
+export const E56_RomanPot_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'foodCount', 4)
@@ -27,15 +39,6 @@ registerCardEffect({
     updateInfobox(player, newCount)
     return gainLeaf(CARD_ID, { food: 1 })
   },
-})
-
-export const E56_RomanPot = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Roman Pot',
-  deck: 'E',
-  number: 56,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 4 <FOOD> from the general supply on this card. At the start of each work phase, if you are the last player in turn order, move 1 <FOOD> from this card to your supply.'],
-  cost: { clay: 1 },
-  vp: 1,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

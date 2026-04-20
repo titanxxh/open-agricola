@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C26_Flail'
 
@@ -23,11 +22,6 @@ const CARD_ID = 'C26_Flail'
  */
 
 const TRIGGER_SPACES = ['farmland', 'cultivation']
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'C26-flail-after-place-farmer',
@@ -49,8 +43,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C26_Flail = new MinorImprovement({
   id: CARD_ID,
   name: 'Flail',
@@ -62,3 +54,12 @@ export const C26_Flail = new MinorImprovement({
   ],
   cost: { wood: 1 },
 })
+
+export const C26_Flail_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

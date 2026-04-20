@@ -1,15 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C30_HalfTimberedHouse'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return getStoneHouseBonusScore(player, CARD_ID)
-  },
-})
 
 export const C30_HalfTimberedHouse = new MinorImprovement({
   id: CARD_ID,
@@ -21,3 +14,13 @@ export const C30_HalfTimberedHouse = new MinorImprovement({
   cost: { wood: 2, clay: 2, reed: 1 },
   prerequisite: "Stone House",
 })
+
+export const C30_HalfTimberedHouse_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return getStoneHouseBonusScore(player, CARD_ID)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

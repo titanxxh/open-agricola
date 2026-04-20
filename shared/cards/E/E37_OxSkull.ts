@@ -1,14 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E37_OxSkull'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return player.resources.cattle === 0 ? 3 : 0
-  },
-})
 
 export const E37_OxSkull = new MinorImprovement({
   id: CARD_ID,
@@ -21,3 +14,13 @@ export const E37_OxSkull = new MinorImprovement({
   prerequisite: "1 Cattle",
   vp: 0,
 })
+
+export const E37_OxSkull_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return player.resources.cattle === 0 ? 3 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

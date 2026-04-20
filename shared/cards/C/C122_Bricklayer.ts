@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { BonusModifier } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C122_Bricklayer'
 
@@ -24,8 +24,6 @@ const improvementCostListener: CardListenerRegistration = {
     return { costs: { clay: -1 } }
   },
 }
-
-registerCardListener(improvementCostListener)
 
 export const C122_Bricklayer = new Occupation({
   id: CARD_ID,
@@ -51,3 +49,8 @@ export const C122_Bricklayer = new Occupation({
     },
   ] as BonusModifier[],
 })
+
+export const C122_Bricklayer_impl = {
+  listeners: [improvementCostListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

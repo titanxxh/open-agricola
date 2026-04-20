@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import { registerCardEffect } from '../card-effects'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D93_SheepInspector'
 const MEETING_PLACE_PREFIX = 'meeting-place'
@@ -99,19 +98,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
-// Unflag at the start of each work phase (each round).
-registerCardEffect({
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
-    }
-    return
-  },
-})
-
 export const D93_SheepInspector = new Occupation({
   id: CARD_ID,
   name: "Sheep Inspector",
@@ -123,3 +109,17 @@ export const D93_SheepInspector = new Occupation({
   players: "1+",
   evenMoreSet: true,
 })
+
+export const D93_SheepInspector_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onRoundStart: (_state, player) => {
+    if (isCardFlagged(player, CARD_ID)) {
+      setCardFlag(player, CARD_ID, false)
+    }
+    return
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

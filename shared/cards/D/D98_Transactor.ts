@@ -1,11 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D98_Transactor'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
-registerCardEffect({
+export const D98_Transactor = new Occupation({
+  id: CARD_ID,
+  name: "Transactor",
+  deck: "D",
+  number: 98,
+  category: "POINTS_PROVIDER",
+  desc: ["Immediately before the final harvest at the end of round 14, you can take all the building resources that are left on the entire game board."],
+  cost: {},
+  players: "1+",
+})
+
+export const D98_Transactor_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeHarvest: (state, _player) => {
     if (state.round !== 14) return
@@ -32,15 +44,6 @@ registerCardEffect({
       sourceCard: CARD_ID,
     } satisfies ActionFlow
   },
-})
-
-export const D98_Transactor = new Occupation({
-  id: CARD_ID,
-  name: "Transactor",
-  deck: "D",
-  number: 98,
-  category: "POINTS_PROVIDER",
-  desc: ["Immediately before the final harvest at the end of round 14, you can take all the building resources that are left on the entire game board."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

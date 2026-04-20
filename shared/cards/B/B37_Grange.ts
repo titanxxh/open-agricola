@@ -1,13 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B37_Grange'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),
-})
 
 export const B37_Grange = new MinorImprovement({
   id: CARD_ID,
@@ -20,3 +15,11 @@ export const B37_Grange = new MinorImprovement({
   vp: 3,
   prerequisite: '6 Field Tiles and All Animal Types',
 })
+
+export const B37_Grange_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

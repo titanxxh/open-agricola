@@ -1,33 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
-
-/**
- * A20 Double-Turn Plow (Minor Improvement):
- * When you play this card, you can immediately plow up to 2 fields.
- * Cost: 1 grain (+ 1 food after round 3). Can only be played in round 5 or before.
- *
- * BGA reference:
- * - getBaseCosts: grain:1, food:1 if turn > 3
- * - isBuyable: turn <= 5
- * - onBuy: seq(optional plow, optional plow)
- */
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'seq' as const,
-    optional: true,
-    children: [
-      { type: 'leaf' as const, actionId: 'plow', sourceCard: CARD_ID, optional: true },
-      { type: 'leaf' as const, actionId: 'plow', sourceCard: CARD_ID, optional: true },
-    ],
-  }),
-})
 
 // computeCosts: add 1 food after round 3
 const computeCostsListener: CardListenerRegistration = {
@@ -42,8 +18,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const A20_DoubleTurnPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Double-Turn Plow',
@@ -56,3 +30,19 @@ export const A20_DoubleTurnPlow = new MinorImprovement({
   prerequisite: 'Round 5 or Before',
   evenMoreSet: true,
 })
+
+export const A20_DoubleTurnPlow_impl = {
+  listeners: [computeCostsListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => ({
+    type: 'seq' as const,
+    optional: true,
+    children: [
+      { type: 'leaf' as const, actionId: 'plow', sourceCard: CARD_ID, optional: true },
+      { type: 'leaf' as const, actionId: 'plow', sourceCard: CARD_ID, optional: true },
+    ],
+  }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

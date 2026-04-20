@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C80_RockyTerrain'
 
@@ -29,8 +29,6 @@ const plowListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(plowListener)
-
 export const C80_RockyTerrain = new MinorImprovement({
   id: CARD_ID,
   name: 'Rocky Terrain',
@@ -42,3 +40,8 @@ export const C80_RockyTerrain = new MinorImprovement({
   players: '1+',
   newSet: true,
 })
+
+export const C80_RockyTerrain_impl = {
+  listeners: [plowListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

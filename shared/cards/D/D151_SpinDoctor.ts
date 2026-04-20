@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D151_SpinDoctor'
 
@@ -39,8 +39,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D151_SpinDoctor = new Occupation({
   id: CARD_ID,
   name: 'Spin Doctor',
@@ -51,3 +49,8 @@ export const D151_SpinDoctor = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const D151_SpinDoctor_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

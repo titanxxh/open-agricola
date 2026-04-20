@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E150_RockBeater'
 
@@ -53,9 +53,6 @@ const constructCostListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-registerCardListener(constructCostListener)
-
 export const E150_RockBeater = new Occupation({
   id: CARD_ID,
   name: 'Rock Beater',
@@ -68,3 +65,8 @@ export const E150_RockBeater = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const E150_RockBeater_impl = {
+  listeners: [computeArgsListener, constructCostListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

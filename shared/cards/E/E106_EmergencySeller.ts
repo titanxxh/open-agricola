@@ -1,11 +1,26 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E106_EmergencySeller'
 
-registerCardEffect({
+export const E106_EmergencySeller = new Occupation({
+  id: CARD_ID,
+  name: 'Emergency Seller',
+  deck: 'E',
+  number: 106,
+  category: 'FOOD_MISC',
+  desc: [
+    'When you play this card, you can immediately turn as many building resources into food as you have people:',
+    '<WOOD>/<CLAY> <ARROW> 2 <FOOD>',
+    '<REED>/<STONE> <ARROW> 3 <FOOD>',
+  ],
+  players: '1+',
+})
+
+export const E106_EmergencySeller_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const farmers = familySize(player)
@@ -53,18 +68,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const E106_EmergencySeller = new Occupation({
-  id: CARD_ID,
-  name: 'Emergency Seller',
-  deck: 'E',
-  number: 106,
-  category: 'FOOD_MISC',
-  desc: [
-    'When you play this card, you can immediately turn as many building resources into food as you have people:',
-    '<WOOD>/<CLAY> <ARROW> 2 <FOOD>',
-    '<REED>/<STONE> <ARROW> 3 <FOOD>',
-  ],
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

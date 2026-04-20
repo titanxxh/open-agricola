@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A113_HeresyTeacher'
 const LESSONS_SPACES = new Set(['lessons', 'lessons-4'])
@@ -28,8 +28,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A113_HeresyTeacher = new Occupation({
   id: CARD_ID,
   name: 'Heresy Teacher',
@@ -42,3 +40,8 @@ export const A113_HeresyTeacher = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A113_HeresyTeacher_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

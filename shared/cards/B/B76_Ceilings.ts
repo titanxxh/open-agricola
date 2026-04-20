@@ -1,26 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/future-meeples'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B76_Ceilings'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    queueFutureMeeples(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: 5,
-      resources: { wood: 1 },
-    })
-    return futureMeeplesNode()
-  },
-})
 
 const listener: CardListenerRegistration = {
   id: 'B76-ceilings-after-renovation',
@@ -37,8 +22,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B76_Ceilings = new MinorImprovement({
   id: CARD_ID,
   name: "Ceilings",
@@ -51,3 +34,21 @@ export const B76_Ceilings = new MinorImprovement({
   occupationPrerequisites: {"min": 1},
   implemented: true,
 })
+
+export const B76_Ceilings_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    queueFutureMeeples(state, {
+      cardId: CARD_ID,
+      playerId: player.id,
+      startRound: state.round + 1,
+      count: 5,
+      resources: { wood: 1 },
+    })
+    return futureMeeplesNode()
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

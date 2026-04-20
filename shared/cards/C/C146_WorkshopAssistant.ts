@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C146_WorkshopAssistant'
 
@@ -45,35 +44,6 @@ const getAvailablePairs = (player: PlayerState): BuildingPair[] =>
 
 const findOwner = (state: GameState): PlayerState | undefined =>
   state.players?.find((p) => p.occupationPlayed.includes(CARD_ID))
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const numImprovements = player.improvements.length + player.minorPlayed.length
-    const n = Math.min(6, numImprovements)
-    if (n <= 0) return
-
-    // Accumulate resources for the auto-selected pairs
-    const totals: Partial<Resource> = {}
-    for (let i = 0; i < n; i++) {
-      const pair = ALL_PAIRS[i]!
-      totals[pair.a] = (totals[pair.a] ?? 0) + 1
-      totals[pair.b] = (totals[pair.b] ?? 0) + 1
-    }
-
-    return {
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf' as const,
-          actionId: 'store-on-card',
-          params: totals,
-          sourceCard: CARD_ID,
-        },
-      ],
-    }
-  },
-})
 
 const listener: CardListenerRegistration = {
   id: 'C146-workshop-assistant-after-renovate',
@@ -131,8 +101,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C146_WorkshopAssistant = new Occupation({
   id: CARD_ID,
   name: "Workshop Assistant",
@@ -146,3 +114,36 @@ export const C146_WorkshopAssistant = new Occupation({
   players: "3+",
   newSet: true,
 })
+
+export const C146_WorkshopAssistant_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const numImprovements = player.improvements.length + player.minorPlayed.length
+    const n = Math.min(6, numImprovements)
+    if (n <= 0) return
+
+    // Accumulate resources for the auto-selected pairs
+    const totals: Partial<Resource> = {}
+    for (let i = 0; i < n; i++) {
+      const pair = ALL_PAIRS[i]!
+      totals[pair.a] = (totals[pair.a] ?? 0) + 1
+      totals[pair.b] = (totals[pair.b] ?? 0) + 1
+    }
+
+    return {
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf' as const,
+          actionId: 'store-on-card',
+          params: totals,
+          sourceCard: CARD_ID,
+        },
+      ],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E140_Carter'
 
@@ -15,21 +14,6 @@ const isBuildingResourceSpace = (space: CardListenerContext['space']): boolean =
   (space.gainPerRound?.clay ?? 0) > 0 ||
   (space.gainPerRound?.reed ?? 0) > 0 ||
   (space.gainPerRound?.stone ?? 0) > 0
-
-/**
- * E140 Carter: Next round, each time you use a building resource accumulation space,
- * you also get 1 food for each building resource that you take from the space.
- *
- * One-time, one-round effect: active only during triggerRound.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    const triggerRound = state.round + 1
-    writeCardExtraData(player, CARD_ID, 'triggerRound', triggerRound)
-    writeCardInfobox(player, CARD_ID, `Active: Round ${triggerRound}`)
-  },
-})
 
 const afterCollectListener: CardListenerRegistration = {
   id: 'E140-carter-after-collect',
@@ -58,8 +42,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-
 export const E140_Carter = new Occupation({
   id: CARD_ID,
   name: 'Carter',
@@ -69,3 +51,16 @@ export const E140_Carter = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const E140_Carter_impl = {
+  listeners: [afterCollectListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    const triggerRound = state.round + 1
+    writeCardExtraData(player, CARD_ID, 'triggerRound', triggerRound)
+    writeCardInfobox(player, CARD_ID, `Active: Round ${triggerRound}`)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

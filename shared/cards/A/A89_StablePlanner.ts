@@ -1,15 +1,26 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A89_StablePlanner'
 const TARGET_ROUNDS_KEY = 'targetRounds'
 
-// A89 Stable Planner: onBuy places stable markers on round+3, +6, +9 spaces.
-// At the start of those rounds, player can build 1 stable at no cost.
-registerCardEffect({
+export const A89_StablePlanner = new Occupation({
+  id: CARD_ID,
+  name: 'Stable Planner',
+  deck: 'A',
+  number: 89,
+  category: 'FARM_PLANNER',
+  desc: ['Add 3, 6, and 9 to the current round. You can place 1 stable on each corresponding round space. At the start of these rounds (not earlier), you can build the stable at no cost.'],
+  cost: {},
+  players: '1+',
+  newSet: true,
+})
+
+export const A89_StablePlanner_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const offsets = [3, 6, 9]
@@ -42,16 +53,6 @@ registerCardEffect({
       ],
     } as ActionFlow
   },
-})
-
-export const A89_StablePlanner = new Occupation({
-  id: CARD_ID,
-  name: 'Stable Planner',
-  deck: 'A',
-  number: 89,
-  category: 'FARM_PLANNER',
-  desc: ['Add 3, 6, and 9 to the current round. You can place 1 stable on each corresponding round space. At the start of these rounds (not earlier), you can build the stable at no cost.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

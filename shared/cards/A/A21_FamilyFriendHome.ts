@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import { familySize as getFamilySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A21_FamilyFriendHome'
 
@@ -46,8 +46,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A21_FamilyFriendHome = new MinorImprovement({
   id: CARD_ID,
   name: 'Family Friendly Home',
@@ -60,3 +58,8 @@ export const A21_FamilyFriendHome = new MinorImprovement({
   occupationPrerequisites: { min: 1 },
   newSet: true,
 })
+
+export const A21_FamilyFriendHome_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

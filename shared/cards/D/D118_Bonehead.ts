@@ -1,28 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D118_Bonehead'
-
-/**
- * When you play this card, immediately place 6 wood on it.
- * Immediately after each time you play a card from your hand,
- * including this one, you get 1 wood from this card.
- *
- * onBuy: push 6 wood to stack, return pop-card-stack flow to give 1 wood immediately.
- * Listeners: after playing an occupation or improvement, pop 1 wood.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, ['wood', 'wood', 'wood', 'wood', 'wood', 'wood'])
-    // Return flow to give 1 wood immediately ("including this one")
-    return { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID }
-  },
-})
 
 /**
  * After playing an occupation (play-occupation action), give 1 wood from stack.
@@ -60,9 +42,6 @@ const afterImprovementListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterOccupationListener)
-registerCardListener(afterImprovementListener)
-
 export const D118_Bonehead = new Occupation({
   id: CARD_ID,
   name: 'Bonehead',
@@ -73,3 +52,16 @@ export const D118_Bonehead = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D118_Bonehead_impl = {
+  listeners: [afterOccupationListener, afterImprovementListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, ['wood', 'wood', 'wood', 'wood', 'wood', 'wood'])
+    // Return flow to give 1 wood immediately ("including this one")
+    return { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A149_HouseArtist'
 
@@ -43,9 +43,6 @@ const costListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(triggerListener)
-registerCardListener(costListener)
-
 export const A149_HouseArtist = new Occupation({
   id: CARD_ID,
   name: 'House Artist',
@@ -59,3 +56,8 @@ export const A149_HouseArtist = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const A149_HouseArtist_impl = {
+  listeners: [triggerListener, costListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

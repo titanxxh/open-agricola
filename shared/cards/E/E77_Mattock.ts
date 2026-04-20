@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E77_Mattock'
 
@@ -43,9 +43,6 @@ const placeFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(collectListener)
-registerCardListener(placeFarmerListener)
-
 export const E77_Mattock = new MinorImprovement({
   id: CARD_ID,
   name: 'Mattock',
@@ -55,3 +52,8 @@ export const E77_Mattock = new MinorImprovement({
   desc: ['Each time you get <REED> and/or <STONE> from an action space, you get 1 additional <CLAY>.'],
   cost: { wood: 1 },
 })
+
+export const E77_Mattock_impl = {
+  listeners: [collectListener, placeFarmerListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

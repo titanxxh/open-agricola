@@ -1,25 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { collectCardsAs } from '../helpers/card-type'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B133_VillagePeasant'
-
-// B133 Village Peasant: At the start of scoring, you get a number of vegetable equal to
-// the smallest of the numbers of major improvements, minor improvements, and occupations you have.
-// BGA: BeforeEndOfGame → gain vegetables that then score. Since each vegetable scores 1 VP,
-// we use computePostScore to award the equivalent VP directly.
-// Dual-type cards (D60 / D59 / A60) count on both the major AND minor sides, matching
-// BGA's hasType() semantics — the bottleneck moves accordingly.
-registerCardEffect({
-  id: CARD_ID,
-  computePostScore: (_state, player, _categories) => {
-    const majors = collectCardsAs(player, 'major').length
-    const minors = player.minorPlayed.length
-    const occupations = player.occupationPlayed.length
-    const n = Math.min(majors, minors, occupations)
-    return Math.max(0, n)
-  },
-})
 
 export const B133_VillagePeasant = new Occupation({
   id: CARD_ID,
@@ -32,3 +15,17 @@ export const B133_VillagePeasant = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const B133_VillagePeasant_impl = {
+  effect: {
+  id: CARD_ID,
+  computePostScore: (_state, player, _categories) => {
+    const majors = collectCardsAs(player, 'major').length
+    const minors = player.minorPlayed.length
+    const occupations = player.occupationPlayed.length
+    const n = Math.min(majors, minors, occupations)
+    return Math.max(0, n)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

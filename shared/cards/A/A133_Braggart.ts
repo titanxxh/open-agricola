@@ -1,21 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A133_Braggart'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const count = player.improvements.length + player.minorPlayed.length
-    if (count >= 10) return 9
-    if (count >= 9) return 7
-    if (count >= 8) return 5
-    if (count >= 7) return 4
-    if (count >= 6) return 3
-    if (count >= 5) return 2
-    return 0
-  },
-})
 
 export const A133_Braggart = new Occupation({
   id: CARD_ID,
@@ -27,3 +13,20 @@ export const A133_Braggart = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A133_Braggart_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const count = player.improvements.length + player.minorPlayed.length
+    if (count >= 10) return 9
+    if (count >= 9) return 7
+    if (count >= 8) return 5
+    if (count >= 7) return 4
+    if (count >= 6) return 3
+    if (count >= 5) return 2
+    return 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../game/types'
 import { payGainNode } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C154_TwinResearcher'
 
@@ -89,8 +89,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C154_TwinResearcher = new Occupation({
   id: CARD_ID,
   name: 'Twin Researcher',
@@ -104,3 +102,8 @@ export const C154_TwinResearcher = new Occupation({
   players: '4+',
   evenMoreSet: true,
 })
+
+export const C154_TwinResearcher_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

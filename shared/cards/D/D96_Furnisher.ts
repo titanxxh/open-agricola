@@ -1,20 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D96_Furnisher'
-
-// D96 Furnisher: When you play this card, get 2 wood.
-// Each time after you build at least one new room, you can build/play a number of
-// improvements equal to rooms built, paying up to 1 wood less for each.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
-})
 
 // After construct → optional improvement per room built
 const afterConstructListener: CardListenerRegistration = {
@@ -65,9 +56,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterConstructListener)
-registerCardListener(computeCostsListener)
-
 export const D96_Furnisher = new Occupation({
   id: CARD_ID,
   name: 'Furnisher',
@@ -80,3 +68,12 @@ export const D96_Furnisher = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D96_Furnisher_impl = {
+  listeners: [afterConstructListener, computeCostsListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

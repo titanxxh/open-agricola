@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D143_TreeCutter'
 
@@ -28,8 +28,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D143_TreeCutter = new Occupation({
   id: CARD_ID,
   name: 'Tree Cutter',
@@ -44,3 +42,8 @@ export const D143_TreeCutter = new Occupation({
   newSet: true,
   implemented: true,
 })
+
+export const D143_TreeCutter_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,25 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D18_SteamPlow'
 
-/**
- * D18 Steam Plow (Minor Improvement):
- * Immediately after each returning home phase, you can pay 2 wood and 1 food
- * to use the Farmland action space without placing a person.
- * (Farmland = plow 1 field, then optionally sow.)
- *
- * BGA reference:
- * - isListeningTo: PlayerEvent, type == ReturnHome
- * - onPlayerReturnHome: optional seq(pay 2 wood + 1 food, useActionSpace('ActionFarmland'))
- * - cost: wood 1, food 1, vp: 1
- *
- * We use onStartReturnHome to trigger at the start of the return home phase.
- * The Farmland action is: plow 1 field, then optionally sow.
- */
+export const D18_SteamPlow = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Steam Plow',
+  deck: 'D',
+  number: 18,
+  category: 'FARM_PLANNER',
+  desc: ['Immediately after each returning home phase, you can pay 2 <WOOD> and 1 <FOOD> to use the __Farmland__ action space without placing a person.'],
+  cost: { wood: 1, food: 1 },
+  vp: 1,
+  newSet: true,
+})
 
-registerCardEffect({
+export const D18_SteamPlow_impl = {
+  effect: {
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
     // Check player can afford the cost
@@ -40,16 +38,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D18_SteamPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Steam Plow',
-  deck: 'D',
-  number: 18,
-  category: 'FARM_PLANNER',
-  desc: ['Immediately after each returning home phase, you can pay 2 <WOOD> and 1 <FOOD> to use the __Farmland__ action space without placing a person.'],
-  cost: { wood: 1, food: 1 },
-  vp: 1,
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

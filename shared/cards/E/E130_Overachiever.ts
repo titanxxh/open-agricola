@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E130_Overachiever'
 
@@ -42,9 +42,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeWishChildrenListener)
-registerCardListener(computeCostsListener)
-
 export const E130_Overachiever = new Occupation({
   id: CARD_ID,
   name: "Overachiever",
@@ -55,3 +52,8 @@ export const E130_Overachiever = new Occupation({
   cost: {},
   players: "3+",
 })
+
+export const E130_Overachiever_impl = {
+  listeners: [beforeWishChildrenListener, computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

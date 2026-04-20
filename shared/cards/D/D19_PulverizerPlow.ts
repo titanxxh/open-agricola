@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 const CARD_ID = 'D19_PulverizerPlow'
 
 // D19 Pulverizer Plow: Immediately after each time you use a clay accumulation space,
@@ -37,8 +37,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D19_PulverizerPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Pulverizer Plow',
@@ -52,3 +50,8 @@ export const D19_PulverizerPlow = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
 })
+
+export const D19_PulverizerPlow_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

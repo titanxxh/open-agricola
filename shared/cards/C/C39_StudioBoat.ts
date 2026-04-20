@@ -1,8 +1,8 @@
 import { PlayerActionCard } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { collectAccumulatedResources } from '../../actions/effects/collect'
 import { incCounter } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C39_StudioBoat'
 
@@ -50,7 +50,21 @@ registerPlayerActionSpace({
   }),
 })
 
-registerCardEffect({
+export const C39_StudioBoat = new PlayerActionCard({
+  id: CARD_ID,
+  name: 'Studio Boat',
+  deck: 'C',
+  number: 39,
+  category: 'FOOD_PROVIDER',
+  desc: [
+    'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
+  ],
+  cost: { wood: 2, reed: 1 },
+  players: '1-3',
+})
+
+export const C39_StudioBoat_impl = {
+  effect: {
   id: CARD_ID,
   // On buy: create the action space
   onBuy: (state) => {
@@ -68,17 +82,6 @@ registerCardEffect({
     if (!space) return
     space.resources.food = (space.resources.food ?? 0) + 1
   },
-})
-
-export const C39_StudioBoat = new PlayerActionCard({
-  id: CARD_ID,
-  name: 'Studio Boat',
-  deck: 'C',
-  number: 39,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
-  ],
-  cost: { wood: 2, reed: 1 },
-  players: '1-3',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

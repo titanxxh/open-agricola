@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B107_Manservant'
 
@@ -34,11 +33,6 @@ const placeFood = (
   return futureMeeplesNode()
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => placeFood(state, player),
-})
-
 const listener: CardListenerRegistration = {
   id: 'B107-manservant-after-renovation',
   cardIds: [CARD_ID],
@@ -53,8 +47,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B107_Manservant = new Occupation({
   id: CARD_ID,
   name: 'Manservant',
@@ -67,3 +59,12 @@ export const B107_Manservant = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const B107_Manservant_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => placeFood(state, player),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

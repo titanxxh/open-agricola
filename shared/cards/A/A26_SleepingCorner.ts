@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A26_SleepingCorner'
 
@@ -39,8 +39,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export const A26_SleepingCorner = new MinorImprovement({
   id: CARD_ID,
   name: 'Sleeping Corner',
@@ -52,3 +50,8 @@ export const A26_SleepingCorner = new MinorImprovement({
   vp: 1,
   prerequisite: '2 Grain Fields',
 })
+
+export const A26_SleepingCorner_impl = {
+  listeners: [computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

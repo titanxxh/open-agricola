@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { canSow } from '../../actions/effects/sow'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D115_FodderPlanter'
 
-registerCardEffect({
+export const D115_FodderPlanter = new Occupation({
+  id: CARD_ID,
+  name: "Fodder Planter",
+  deck: "D",
+  number: 115,
+  category: "CROP_PROVIDER",
+  desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."],
+  cost: {},
+  players: "1+",
+})
+
+export const D115_FodderPlanter_impl = {
+  effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
     if (!canSow(player)) return
@@ -22,15 +34,6 @@ registerCardEffect({
       },
     }
   },
-})
-
-export const D115_FodderPlanter = new Occupation({
-  id: CARD_ID,
-  name: "Fodder Planter",
-  deck: "D",
-  number: 115,
-  category: "CROP_PROVIDER",
-  desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

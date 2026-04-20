@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D147_TrapBuilder'
 
@@ -28,8 +28,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D147_TrapBuilder = new Occupation({
   id: CARD_ID,
   name: 'Trap Builder',
@@ -41,3 +39,8 @@ export const D147_TrapBuilder = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const D147_TrapBuilder_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

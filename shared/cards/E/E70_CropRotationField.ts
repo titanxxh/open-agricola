@@ -1,13 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ExtraSowableField } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E70_CropRotationField'
 
@@ -21,9 +20,43 @@ const getCardCrop = (player: PlayerState): CardCrop | null =>
 const setCardCrop = (player: PlayerState, crop: CardCrop | null) =>
   writeCardExtraData(player, CARD_ID, 'cardCrop', crop)
 
-// --- Card Effect ---
+// --- isDoable listener: make sow doable when card field is available + seeds exist ---
 
-registerCardEffect({
+const isDoableListener: CardListenerRegistration = {
+  id: 'E70-crop-rotation-field-isdoable-sow',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    // If already doable via normal fields, no need to intervene
+    if (canSow(context.player)) return
+    // Check if card field is empty AND player has seeds
+    const cardCrop = getCardCrop(context.player)
+    if (cardCrop) return // Card already has a crop
+    const hasSeeds =
+      context.player.resources.grain > 0 || context.player.resources.vegetable > 0
+    if (!hasSeeds) return
+    return { doable: true }
+  },
+}
+
+export const E70_CropRotationField = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Crop Rotation Field',
+  deck: 'E',
+  number: 70,
+  category: 'CROP_PROVIDER',
+  desc: [
+    'This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
+  ],
+  cost: {},
+  prerequisite: '1 Occupation',
+  occupationPrerequisites: { min: 1 },
+})
+
+export const E70_CropRotationField_impl = {
+  listeners: [isDoableListener],
+  effect: {
   id: CARD_ID,
 
   // Provide the virtual tile as a sowable field when the card has no crop
@@ -87,40 +120,6 @@ registerCardEffect({
     }
     setCardCrop(player, cardCrop)
   },
-})
-
-// --- isDoable listener: make sow doable when card field is available + seeds exist ---
-
-const isDoableListener: CardListenerRegistration = {
-  id: 'E70-crop-rotation-field-isdoable-sow',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    // If already doable via normal fields, no need to intervene
-    if (canSow(context.player)) return
-    // Check if card field is empty AND player has seeds
-    const cardCrop = getCardCrop(context.player)
-    if (cardCrop) return // Card already has a crop
-    const hasSeeds =
-      context.player.resources.grain > 0 || context.player.resources.vegetable > 0
-    if (!hasSeeds) return
-    return { doable: true }
-  },
-}
-
-registerCardListener(isDoableListener)
-
-export const E70_CropRotationField = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Crop Rotation Field',
-  deck: 'E',
-  number: 70,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
-  ],
-  cost: {},
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

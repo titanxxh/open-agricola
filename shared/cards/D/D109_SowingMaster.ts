@@ -1,16 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D109_SowingMaster'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'D109-sowing-master-after-place-farmer',
@@ -22,8 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }
-
-registerCardListener(listener)
 
 export const D109_SowingMaster = new Occupation({
   id: CARD_ID,
@@ -39,3 +31,12 @@ export const D109_SowingMaster = new Occupation({
   evenMoreSet: true,
   implemented: true,
 })
+
+export const D109_SowingMaster_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

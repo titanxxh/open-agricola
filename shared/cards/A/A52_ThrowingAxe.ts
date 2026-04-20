@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A52_ThrowingAxe'
 
@@ -27,8 +27,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A52_ThrowingAxe = new MinorImprovement({
   id: CARD_ID,
   name: 'Throwing Axe',
@@ -40,3 +38,8 @@ export const A52_ThrowingAxe = new MinorImprovement({
   prerequisite: 'Play in Round 7 or Later',
   newSet: true,
 })
+
+export const A52_ThrowingAxe_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

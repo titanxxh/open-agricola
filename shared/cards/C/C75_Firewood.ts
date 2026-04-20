@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
 import { initCardState } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const OVEN_IMPROVEMENTS = new Set([
   'Major_Fireplace1',
@@ -52,8 +51,6 @@ const firewoodReturnHomeEffect = {
   },
 }
 
-registerCardEffect(firewoodReturnHomeEffect)
-
 const firewoodAfterBuildListener: CardListenerRegistration = {
   id: 'C75-firewood-after-build',
   cardIds: [CARD_ID],
@@ -68,8 +65,6 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(firewoodAfterBuildListener)
-
 export const C75_Firewood = new MinorImprovement({
   id: CARD_ID,
   name: "Firewood",
@@ -79,3 +74,9 @@ export const C75_Firewood = new MinorImprovement({
   desc: ["In the returning home phase of each round, place 1 <WOOD> on this card. Each time after you build a Fireplace, Cooking Hearth, or oven, move up to 4 <WOOD> from this card to your supply."],
   cost: {"food": 2},
 })
+
+export const C75_Firewood_impl = {
+  listeners: [firewoodAfterBuildListener],
+  effect: firewoodReturnHomeEffect,
+  reaches: [] as readonly string[],
+} satisfies CardImpl

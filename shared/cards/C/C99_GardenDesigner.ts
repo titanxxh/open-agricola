@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C99_GardenDesigner'
 
-registerCardEffect({
+export const C99_GardenDesigner = new Occupation({
+  id: "C99_GardenDesigner",
+  name: "Garden Designer",
+  deck: "C",
+  number: 99,
+  category: "POINTS_PROVIDER",
+  desc: ["At the start of scoring, you can place <FOOD> in empty fields. You get 1/2/3 bonus <SCORE> for each field in which you place 1/4/7 <FOOD>."],
+  cost: {},
+  players: "1+",
+})
+
+export const C99_GardenDesigner_impl = {
+  effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player, ctx) => {
     const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
@@ -24,15 +36,6 @@ registerCardEffect({
     }
     return vp
   },
-})
-
-export const C99_GardenDesigner = new Occupation({
-  id: "C99_GardenDesigner",
-  name: "Garden Designer",
-  deck: "C",
-  number: 99,
-  category: "POINTS_PROVIDER",
-  desc: ["At the start of scoring, you can place <FOOD> in empty fields. You get 1/2/3 bonus <SCORE> for each field in which you place 1/4/7 <FOOD>."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

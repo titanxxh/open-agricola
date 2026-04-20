@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A139_HollowWarden'
 
@@ -54,9 +54,6 @@ const hollowListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(hollowListener)
-
 export const A139_HollowWarden = new Occupation({
   id: CARD_ID,
   name: 'Hollow Warden',
@@ -70,3 +67,8 @@ export const A139_HollowWarden = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const A139_HollowWarden_impl = {
+  listeners: [onBuyListener, hollowListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

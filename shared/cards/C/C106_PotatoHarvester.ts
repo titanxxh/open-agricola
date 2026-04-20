@@ -1,22 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C106_PotatoHarvester'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 3 }),
-  onAfterReap: (_state, player) => {
-    // Count vegetable fields that were harvested
-    const vegFields = _state.harvestReapSummary?.[player.id]?.vegetableFields ?? 0
-    if (vegFields <= 0) return
-    return {
-      type: 'seq',
-      children: [gainLeaf(CARD_ID, { food: vegFields })],
-    }
-  },
-})
 
 export const C106_PotatoHarvester = new Occupation({
   id: CARD_ID,
@@ -31,3 +17,20 @@ export const C106_PotatoHarvester = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const C106_PotatoHarvester_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { food: 3 }),
+  onAfterReap: (_state, player) => {
+    // Count vegetable fields that were harvested
+    const vegFields = _state.harvestReapSummary?.[player.id]?.vegetableFields ?? 0
+    if (vegFields <= 0) return
+    return {
+      type: 'seq',
+      children: [gainLeaf(CARD_ID, { food: vegFields })],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

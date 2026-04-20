@@ -1,10 +1,25 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D40_Cesspit'
 
-registerCardEffect({
+export const D40_Cesspit = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Cesspit',
+  deck: 'D',
+  number: 40,
+  category: 'GOODS_PROVIDER',
+  desc: ['Alternate placing 1 <CLAY> and 1 <PIG> on each remaining round space, starting with <CLAY>. At the start of these rounds, you get the respective good.'],
+  cost: {},
+  vp: -1,
+  prerequisite: '2 Fields and 1 Occupation',
+  occupationPrerequisites: { min: 1 },
+  newSet: true,
+})
+
+export const D40_Cesspit_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Alternate placing 1 clay and 1 boar on remaining round spaces starting with clay
@@ -37,18 +52,6 @@ registerCardEffect({
     }
     return futureMeeplesNode()
   },
-})
-
-export const D40_Cesspit = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cesspit',
-  deck: 'D',
-  number: 40,
-  category: 'GOODS_PROVIDER',
-  desc: ['Alternate placing 1 <CLAY> and 1 <PIG> on each remaining round space, starting with <CLAY>. At the start of these rounds, you get the respective good.'],
-  cost: {},
-  vp: -1,
-  prerequisite: '2 Fields and 1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

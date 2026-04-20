@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E95_Miller'
 
@@ -82,9 +82,6 @@ const opponentGrainSeedsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(opponentGrainSeedsListener)
-
 export const E95_Miller = new Occupation({
   id: CARD_ID,
   name: 'Miller',
@@ -97,3 +94,8 @@ export const E95_Miller = new Occupation({
   cost: { food: 1 },
   players: '1+',
 })
+
+export const E95_Miller_impl = {
+  listeners: [onBuyListener, opponentGrainSeedsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

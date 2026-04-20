@@ -1,14 +1,24 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
 import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E10_StrawHat'
 const TRIGGER_ROUNDS = [3, 6]
 const FARMLAND_SPACE_ID = 'farmland'
 
-registerCardEffect({
+export const E10_StrawHat = new MinorImprovement({
+  id: "E10_StrawHat",
+  name: "Straw Hat",
+  deck: "E",
+  number: 10,
+  desc: ["At the end of the work phases of rounds 3 and 6, you can move your person from the __Farmland__ action space to an unoccupied action space and take that action, or get 1 <FOOD>."],
+  cost: {"reed":1},
+})
+
+export const E10_StrawHat_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
     if (!TRIGGER_ROUNDS.includes(state.round)) return
@@ -31,13 +41,6 @@ registerCardEffect({
     children.push(gainLeaf(CARD_ID, { food: 1 }))
     return { type: 'xor', optional: true, children }
   },
-})
-
-export const E10_StrawHat = new MinorImprovement({
-  id: "E10_StrawHat",
-  name: "Straw Hat",
-  deck: "E",
-  number: 10,
-  desc: ["At the end of the work phases of rounds 3 and 6, you can move your person from the __Farmland__ action space to an unoccupied action space and take that action, or get 1 <FOOD>."],
-  cost: {"reed":1},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

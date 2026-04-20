@@ -1,14 +1,26 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A84_Silage'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const BREEDABLE_TYPES = ['cattle', 'boar', 'sheep'] as const
 
-registerCardEffect({
+export const A84_Silage = new MinorImprovement({
+  id: CARD_ID,
+  name: "Silage",
+  deck: "A",
+  number: 84,
+  category: "LIVESTOCK_PROVIDER",
+  desc: ["In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a field - to breed exactly one type of animal."],
+  cost: {},
+  prerequisite: "2 Fields",
+})
+
+export const A84_Silage_impl = {
+  effect: {
   id: CARD_ID,
   onReturnHome: (state, player) => {
     if (harvestRounds.includes(state.round)) return
@@ -46,15 +58,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const A84_Silage = new MinorImprovement({
-  id: CARD_ID,
-  name: "Silage",
-  deck: "A",
-  number: 84,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a field - to breed exactly one type of animal."],
-  cost: {},
-  prerequisite: "2 Fields",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

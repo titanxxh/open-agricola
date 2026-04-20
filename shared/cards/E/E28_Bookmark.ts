@@ -1,19 +1,20 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E28_Bookmark'
 
-/**
- * E28 Bookmark: Add 3 to the current round and mark the corresponding round space.
- * At the start of that round, you can play 1 occupation without paying an occupation cost.
- *
- * Implementation:
- * - onBuy: Store triggerRound = round + 3 in extraData. Update infobox.
- * - onBeforeStartOfTurn: If current round === triggerRound, return optional flow
- *   to play an occupation for free (costOverride: {}).
- */
-registerCardEffect({
+export const E28_Bookmark = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Bookmark',
+  deck: 'E',
+  number: 28,
+  desc: ['Add 3 to the current round and mark the corresponding round space. At the start of that round, you can play 1 occupation without paying an occupation cost.'],
+  cost: { wood: 1 },
+})
+
+export const E28_Bookmark_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const triggerRound = Math.min(state.round + 3, 14)
@@ -38,13 +39,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E28_Bookmark = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Bookmark',
-  deck: 'E',
-  number: 28,
-  desc: ['Add 3 to the current round and mark the corresponding round space. At the start of that round, you can play 1 occupation without paying an occupation cost.'],
-  cost: { wood: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

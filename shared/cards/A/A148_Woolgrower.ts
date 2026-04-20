@@ -1,17 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { initCardState } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A148_Woolgrower'
 
-/**
- * A148 Woolgrower — This card can hold a number of <SHEEP> equal to the number
- * of completed feeding phases.
- *
- * BGA: Globals::getCompletedFeedingPhases() — incremented each feeding phase.
- * We track this via onHarvestFeedingPhase, and read it in onComputeAnimalZones.
- */
-registerCardEffect({
+export const A148_Woolgrower = new Occupation({
+  id: CARD_ID,
+  name: 'Woolgrower',
+  deck: 'A',
+  number: 148,
+  category: 'FARM_PLANNER',
+  desc: ['This card can hold a number of <SHEEP> equal to the number of completed feeding phases.'],
+  cost: {},
+  players: '4+',
+  newSet: true,
+})
+
+export const A148_Woolgrower_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     const counters = initCardState(player, CARD_ID)
@@ -28,16 +34,6 @@ registerCardEffect({
       animalCount: 0,
     })
   },
-})
-
-export const A148_Woolgrower = new Occupation({
-  id: CARD_ID,
-  name: 'Woolgrower',
-  deck: 'A',
-  number: 148,
-  category: 'FARM_PLANNER',
-  desc: ['This card can hold a number of <SHEEP> equal to the number of completed feeding phases.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl
