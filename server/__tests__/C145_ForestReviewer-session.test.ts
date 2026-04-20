@@ -60,7 +60,7 @@ const createGroveSpace = (takenBy: string | null): ActionSpace =>
 const createState = (players: PlayerState[], actionSpaces: ActionSpace[]): GameState =>
   ({
     round: 3,
-    phase: 'work',
+    roundPhase: 'work',
     currentPlayerIndex: 0,
     players,
     actionSpaces,

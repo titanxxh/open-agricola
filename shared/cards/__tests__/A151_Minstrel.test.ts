@@ -41,7 +41,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
 
 const createState = (...players: PlayerState[]): GameState =>
   ({
-    round: 4, phase: 'work', currentPlayerIndex: 0, players,
+    round: 4, roundPhase: 'work', currentPlayerIndex: 0, players,
     actionSpaces: [
       createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }], gainPerRound: { sheep: 1 }, resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 3, boar: 0, cattle: 0, begging: 0 } }),
       createSpace('grain-utilization', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),

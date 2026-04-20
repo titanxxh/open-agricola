@@ -55,7 +55,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
 const createState = (...players: PlayerState[]): GameState =>
   ({
     round: 3,
-    phase: 'work',
+    roundPhase: 'work',
     currentPlayerIndex: 0,
     players,
     actionSpaces: [],

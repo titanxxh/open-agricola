@@ -83,7 +83,7 @@ describe('harvest session flow', () => {
 
     expect(resp.pending.type).toBe('none')
     expect(resp.state.round).toBe(5)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
 
     expect(resp.state.players[0]!.resources.begging).toBe(2)
     expect(resp.state.players[1]!.resources.begging).toBe(1)

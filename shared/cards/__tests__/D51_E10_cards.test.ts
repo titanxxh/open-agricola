@@ -54,7 +54,7 @@ const createState = (players: PlayerState[], spaces: ActionSpace[] = []): GameSt
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
-    phase: 'work',
+    roundPhase: 'work',
   }) as GameState
 
 describe('PlayerActionSpace infrastructure', () => {
