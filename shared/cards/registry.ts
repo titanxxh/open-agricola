@@ -51,6 +51,22 @@ export class CardRegistry {
     }
   }
 
+  /**
+   * Batch-load multiple cards through a lookup function. Intended for the
+   * draft lifecycle: after players finalize their card pool, the server
+   * walks the picked ids and loads only those impls. Unknown ids (lookup
+   * returns undefined) are skipped silently so callers can pass the raw
+   * pool without pre-filtering.
+   */
+  loadByIds(ids: string[], lookup: (id: string) => CardImpl | undefined): void {
+    for (const id of ids) {
+      const impl = lookup(id)
+      if (impl) {
+        this.loadImpl(id, impl)
+      }
+    }
+  }
+
   unload(cardId: string): void {
     this.listenersByCard.delete(cardId)
     this.effectsByCard.delete(cardId)
