@@ -89,7 +89,15 @@ describe('C52_HuntsmansHat', () => {
     vi.resetModules()
     cardApi = await import('../card-listeners')
     cardApi.clearCardListeners()
-    await import('../C/C52_HuntsmansHat')
+    // Post PR-2 _impl migration: card files no longer self-register at import
+    // time. Pull the `_impl` export and push its listeners into the legacy
+    // map so the existing test reads via `getRegisteredCardListeners()` still
+    // see them.
+    const mod = await import('../C/C52_HuntsmansHat')
+    const impl = (mod as { C52_HuntsmansHat_impl?: { listeners?: Array<Parameters<typeof cardApi.registerCardListener>[0]> } }).C52_HuntsmansHat_impl
+    for (const listener of impl?.listeners ?? []) {
+      cardApi.registerCardListener(listener)
+    }
   })
 
   it('adds food equal to boar gained from pig-market collect', () => {
