@@ -234,6 +234,159 @@ describe('computeAllBuyableCombinations', () => {
     expect(solutions[0].resourcesPaid.wood).toBe(3)
   })
 
+  it('stacks multiple non-optional bonuses (accumulates discounts)', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const cost: ComplexCost = {
+      fee: { wood: 5 },
+      bonuses: [
+        { discount: { wood: 1 }, optional: false, sources: ['BonusA'] },
+        { discount: { wood: 1 }, optional: false, sources: ['BonusB'] },
+      ],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    expect(solutions.length).toBe(1)
+    expect(solutions[0]!.resourcesPaid.wood).toBe(3)  // 5 - 1 - 1 = 3
+  })
+
+  it('expands optional bonuses into use-or-skip paths', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = {
+      fee: { wood: 5 },
+      bonuses: [
+        { discount: { wood: 2 }, optional: true, sources: ['OptBonus'] },
+      ],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    // keepOnlyOptimals drops the dominated {5} path when {3} path exists.
+    expect(solutions.length).toBe(1)
+    expect(solutions[0]!.resourcesPaid.wood).toBe(3)
+  })
+
+  it('combines optional and mandatory bonuses', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = {
+      fee: { wood: 5 },
+      bonuses: [
+        { discount: { wood: 1 }, optional: false, sources: ['MustA'] },
+        { discount: { wood: 2 }, optional: true, sources: ['OptB'] },
+      ],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    expect(solutions.length).toBe(1)
+    expect(solutions[0]!.resourcesPaid.wood).toBe(2)
+  })
+
+  it('expands bonus.choices into alternative paths (optional: false = must pick one)', () => {
+    const player = createMockPlayer({ wood: 5, clay: 5, stone: 5 })
+    const cost: ComplexCost = {
+      fee: { clay: 2, stone: 2 },
+      bonuses: [
+        {
+          choices: [
+            { discount: { wood: -1, clay: 2 }, sources: ['ChA'] },
+            { discount: { wood: -1, stone: 2 }, sources: ['ChB'] },
+          ],
+          optional: false,
+          sources: ['BonusChoice'],
+        },
+      ],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    // Two Pareto-incomparable solutions survive.
+    expect(solutions.length).toBe(2)
+    const paid = solutions.map((s) => ({
+      clay: s.resourcesPaid.clay ?? 0,
+      stone: s.resourcesPaid.stone ?? 0,
+      wood: s.resourcesPaid.wood ?? 0,
+    }))
+    expect(paid).toContainEqual({ clay: 0, stone: 2, wood: 1 })
+    expect(paid).toContainEqual({ clay: 2, stone: 0, wood: 1 })
+  })
+
+  it('expands bonus.choices with optional: true (adds skip path)', () => {
+    const player = createMockPlayer({ wood: 5, clay: 5, stone: 5 })
+    const cost: ComplexCost = {
+      fee: { clay: 2, stone: 2 },
+      bonuses: [
+        {
+          choices: [
+            { discount: { wood: -1, clay: 2 }, sources: ['ChA'] },
+            { discount: { wood: -1, stone: 2 }, sources: ['ChB'] },
+          ],
+          optional: true,
+          sources: ['BonusChoice'],
+        },
+      ],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    // Skip path pays {clay:2, stone:2} (0 wood). Each choice pays 3 total but
+    // spends 1 wood. Under Pareto dominance (skip uses less wood), skip is
+    // NOT dominated by either choice — all 3 paths survive.
+    expect(solutions.length).toBe(3)
+    const paid = solutions.map((s) => ({
+      clay: s.resourcesPaid.clay ?? 0,
+      stone: s.resourcesPaid.stone ?? 0,
+      wood: s.resourcesPaid.wood ?? 0,
+    }))
+    expect(paid).toContainEqual({ clay: 2, stone: 2, wood: 0 })
+    expect(paid).toContainEqual({ clay: 0, stone: 2, wood: 1 })
+    expect(paid).toContainEqual({ clay: 2, stone: 0, wood: 1 })
+  })
+
+  it('throws when bonus has both discount and choices', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = {
+      fee: { wood: 1 },
+      bonuses: [
+        {
+          discount: { wood: 1 },
+          choices: [{ discount: { wood: 1 } }],
+        },
+      ],
+    }
+    expect(() => computeAllBuyableCombinations(player, cost)).toThrow(
+      /Bonus must have exactly one of discount or choices/,
+    )
+  })
+
+  it('throws when bonus has neither discount nor choices', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = {
+      fee: { wood: 1 },
+      bonuses: [{} as any],
+    }
+    expect(() => computeAllBuyableCombinations(player, cost)).toThrow(
+      /Bonus must have exactly one of discount or choices/,
+    )
+  })
+
+  it('applies BonusModifier.choices via activeModifiers path', () => {
+    const player = createMockPlayer({ wood: 5, clay: 5, stone: 5 })
+    player.activeModifiers = [
+      {
+        type: 'bonus',
+        cardId: 'Test_FrameBuilder',
+        appliesTo: ['construct'],
+        optional: true,
+        choices: [
+          { discount: { wood: -1, clay: 2 } },
+          { discount: { wood: -1, stone: 2 } },
+        ],
+      },
+    ]
+    const cost: ComplexCost = { fee: { clay: 2, stone: 2 } }
+    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    expect(solutions.length).toBeGreaterThanOrEqual(2)
+    const hasClaySave = solutions.some(
+      (s) => (s.resourcesPaid.clay ?? 0) === 0 && (s.resourcesPaid.wood ?? 0) === 1,
+    )
+    const hasStoneSave = solutions.some(
+      (s) => (s.resourcesPaid.stone ?? 0) === 0 && (s.resourcesPaid.wood ?? 0) === 1,
+    )
+    expect(hasClaySave).toBe(true)
+    expect(hasStoneSave).toBe(true)
+  })
+
   it('A88 HedgeKeeper: BGA-style empty-from trade covers up to 3 wood of fencing fee', () => {
     const player = createMockPlayer({ wood: 1 })
     player.activeModifiers = [{ ...hedgeKeeperModifier }]

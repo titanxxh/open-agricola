@@ -22,8 +22,15 @@ export type Trade = {
   sourceId?: string
 }
 
-export type Bonus = {
+export type BonusChoice = {
   discount: Partial<Resource>
+  sources?: string[]
+  conditions?: Record<string, number>
+}
+
+export type Bonus = {
+  discount?: Partial<Resource>
+  choices?: BonusChoice[]
   optional?: boolean
   sources?: string[]
   conditions?: Record<string, number>
@@ -44,7 +51,8 @@ export type BonusModifier = {
   type: 'bonus'
   cardId: string
   appliesTo: CostModifierType[]
-  discount: Partial<Resource>
+  discount?: Partial<Resource>
+  choices?: BonusChoice[]
   optional?: boolean
   conditions?: Record<string, number>
 }
