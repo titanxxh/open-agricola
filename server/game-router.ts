@@ -362,12 +362,11 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, author_id
+          `SELECT card_type, card_json, effect_code, compiled_code, code_manifest, art_url, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
           card_type: string
           card_json: string
-          effect_dsl: string | null
           effect_code: string | null
           compiled_code: string | null
           code_manifest: string | null
@@ -384,7 +383,6 @@ export const handleGameRoute = async (
           customCards.push({
             cardType: row.card_type as 'minor' | 'occupation',
             cardJson: JSON.parse(row.card_json),
-            effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
             effectCode: row.effect_code ?? null,
             compiledCode: row.compiled_code ?? null,
             codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,

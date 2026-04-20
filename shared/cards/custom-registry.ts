@@ -12,9 +12,8 @@
  * the id starts with "CUSTOM_".
  */
 import { MinorImprovement, Occupation, type CardBase } from './types.ts'
-import { registerCardEffect, clearCustomCardEffects } from './card-effects.ts'
+import { clearCustomCardEffects } from './card-effects.ts'
 import { clearCustomCardListeners } from './card-listeners.ts'
-import { dslToCardEffect } from './custom-dsl-runner.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
 
 // Re-export for backward compatibility
@@ -33,7 +32,7 @@ let nextMinorNumber = 1
 let nextOccupationNumber = 500
 
 /**
- * Register a custom card (and optionally its DSL effects) into the runtime registry.
+ * Register a custom card into the runtime registry.
  * If a SessionCardContext is active, registers there. Otherwise falls back to global maps.
  */
 export function registerCustomCard(
@@ -54,7 +53,7 @@ export function registerCustomCard(
   }
 
   // Legacy global path (for tests without session context, and frontend)
-  const { cardType, cardJson, effectDsl, artUrl } = data
+  const { cardType, cardJson, artUrl } = data
 
   const card = cardType === 'minor'
     ? new MinorImprovement(cardJson)
@@ -74,15 +73,6 @@ export function registerCustomCard(
 
   if (artUrl) {
     customArtUrls.set(cardJson.id, artUrl)
-  }
-
-  if (effectDsl) {
-    try {
-      const effect = dslToCardEffect(cardJson.id, effectDsl)
-      registerCardEffect(effect)
-    } catch (err) {
-      console.warn(`[custom-registry] failed to register DSL effect for ${cardJson.id}:`, err)
-    }
   }
 }
 
