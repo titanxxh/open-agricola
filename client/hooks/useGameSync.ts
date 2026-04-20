@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameState, InteractionState, PendingAction } from '../../shared/game/types'
 import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 import type { GameSyncPayload } from '../../shared/protocol/game'
-import { rehydrateState } from '../../shared/game/serialization'
+import { rehydrateStateForClient } from '../services/rehydrate'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 
 export type SyncedPending = PendingAction
@@ -40,7 +40,7 @@ export const useGameSync = () => {
         )
       }
     }
-    const hydrated = rehydrateState(payload.state)
+    const hydrated = rehydrateStateForClient(payload.state)
     setState(hydrated)
     setPending(payload.pending)
     setInteraction(payload.interaction)

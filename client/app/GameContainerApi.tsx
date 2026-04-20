@@ -11,7 +11,7 @@ import { emptyResources, resourceKeyList } from '../../shared/logic/state-consta
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
-import { rehydrateState } from '../../shared/game/serialization'
+import { rehydrateStateForClient } from '../services/rehydrate'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { DevPanel } from '../components/dev/DevPanel'
@@ -271,7 +271,7 @@ export const GameContainerApi = () => {
         confirmDiscard: false,
       })
     } else if (payload.pending.type === 'animalReorg') {
-      const hydrated = rehydrateState(payload.state)
+      const hydrated = rehydrateStateForClient(payload.state)
       const player = hydrated.players[payload.pending.playerIndex]
       if (player) {
         setAnimalReorg(null)
