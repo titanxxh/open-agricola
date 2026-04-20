@@ -61,5 +61,5 @@ jobs:
       - name: Check no-DSL (strict — DSL path fully removed)
         run: pnpm run check:no-dsl -- --strict
 
-      - name: Check bundle size (print-only in PR-1)
+      - name: Check bundle size (strict)
         run: pnpm run check:bundle-size
