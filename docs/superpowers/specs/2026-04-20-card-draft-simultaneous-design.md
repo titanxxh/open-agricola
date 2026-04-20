@@ -15,10 +15,11 @@
 ### Scope（PR-5 内）
 
 - **Draft 模式**：`simultaneous`（合并池，每轮同时挑 1 occ + 1 minor）
+- **Pool size 可配**：房间创建时选 `poolSize: 7 | 8 | 9 | 10`，代表每玩家每类初始发牌数。`poolSize=7` → kept 全 7 张；`poolSize>7` → 7 轮后每玩家手上剩 `poolSize-7` 张未被任何人选中的 "passthrough"，游戏开始时丢弃。默认 `8`（BGA 常用）
 - **并行玩家动作**：server 端 `DraftManager` 支持 N 个玩家同时提交，全员提交后原子推进
 - **状态机**：`GameState.phase: 'draft' | 'playing'`，`draft: DraftState | null`
 - **协议扩展**：`ClientCommand.draftSubmit`、`ServerEvent` 通过现有 `stateUpdate` 通道
-- **Lobby 选项**：`draftMode: 'none' | 'simultaneous'`，默认 `'none'` 保持现有房间向后兼容
+- **Lobby 选项**：`draftMode: 'none' | 'simultaneous'`（默认 `'none'`），启用 draft 时附加 `poolSize: 7..10`（默认 `8`）
 - **前端 UI**：draft overlay 组件——当前可选 pool、已挑卡、等待状态
 - **持久化**：draft 阶段的中间状态（pool / picks / pendingPicks）序列化后能从 sqlite / JSON 恢复
 - **2/3/4 人局支持**
@@ -35,8 +36,8 @@
 
 ### 3.1 开局
 
-1. 玩家在 lobby 选 `draftMode: simultaneous`，开始房间
-2. 服务器按玩家数量发牌：每人 7 张 occupation + 7 张 minor（deck 规则遵循现有 `dealHands`）
+1. 玩家在 lobby 选 `draftMode: simultaneous` 和 `poolSize ∈ {7,8,9,10}`（默认 8），开始房间
+2. 服务器按玩家数量发牌：每人 `poolSize` 张 occupation + `poolSize` 张 minor（deck 规则复用现有 `dealHands` 但发牌数改成 `poolSize`）
 3. `phase` 设为 `'draft'`，`round` 设为 1（1-indexed，共 7 轮）
 4. 每玩家看到自己的 14 张 pool，但不能看对手池
 5. 游戏主流程（round counter、action spaces 等）**未启动**
@@ -58,7 +59,7 @@
 
 ### 3.3 进入对局
 
-1. 把 `draft.kept[pid]` 写入 `player.occupationHand` / `player.minorHand`
+1. 把 `draft.kept[pid]` 写入 `player.occupationHand` / `player.minorHand`（`poolSize=7` 时 7 张全进；`poolSize>7` 时仍只有 7 张被 kept，剩余 `poolSize-7` 张 passthrough 自然丢弃）
 2. `phase = 'playing'`，`draft = null`
 3. 启动 round 1 正常流程
 
@@ -108,7 +109,9 @@ export type DraftState = {
   mode: 'simultaneous'
   round: number               // 1..7
   totalRounds: number         // 7
+  poolSize: number            // 7..10；每类初始发牌数；轮数固定 7
   // 每个玩家当前手上的 pool（这轮开始时他看到的 N 张 occ + N 张 minor）
+  // 每轮结束后 pool.length 会递减（上轮从这个池挑了 1 张，剩余传给下家，下家传给自己的又是另一个 N-1 size 池）
   pools: Record<string, {
     occ: string[]
     minor: string[]
@@ -310,7 +313,7 @@ type PendingAction =
 |---|---|---|---|
 | Draft 轮数 | 7 | 10 | 7（BGA 标准） |
 | 方向 | 顺时针 | 每轮交替 | 顺时针 |
-| pool size | 7 + 7 | 8 + 8 | 7 + 7 |
+| pool size | 8 + 8 | 7/9/10 | 房间创建可选，默认 8 + 8 |
 | lobby toggle 默认 | `none` | `simultaneous` | `none`（向后兼容） |
 | Draft 中途 dissolve | 允许 | 禁止 | 允许（复用现有 dissolve） |
 
