@@ -3,8 +3,8 @@ import { clearCustomCards, registerCustomCard, type CustomCardData } from '../..
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'
 import { runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { createInitialState } from '../../shared/logic/state.ts'
-import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code-executor/engine.ts'
-import { registerExecutorBackedCustomCard } from '../custom-code-runtime.ts'
+import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
+import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
