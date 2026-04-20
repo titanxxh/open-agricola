@@ -17,7 +17,7 @@ const huntsmansHatListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { space, result } = context
     if (space.id !== 'pig-market') return
-    const gained = (result as any)?.resourcesGained?.boar ?? 0
+    const gained = result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
     if (gained <= 0) return
     return {
       flow: gainLeaf(CARD_ID, { food: gained }),

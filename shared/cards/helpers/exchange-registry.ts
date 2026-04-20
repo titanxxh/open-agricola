@@ -44,8 +44,8 @@ export const getPlayerBakeRates = (player: PlayerState): BakeRate[] => {
   }
   for (const cardId of player.occupationPlayed) {
     const card = getRegisteredOccupation(cardId)
-    if (!card || !(card as any).isBaking || !(card as any).exchanges) continue
-    for (const ex of (card as any).exchanges) {
+    if (!card || !card.isBaking || !card.exchanges) continue
+    for (const ex of card.exchanges) {
       if (ex.trigger !== 'bake-bread') continue
       const grainCost = (ex.from as Record<string, number>).grain ?? 0
       const foodGain = (ex.to as Record<string, number>).food ?? 0

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
-import { applyFarmChoice } from '../shared/logic/farm/farm-choice.ts'
+import { applyFarmChoice, type FarmChoicePayloadMap } from '../shared/logic/farm/farm-choice.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
@@ -348,27 +348,27 @@ export const handleGameRoute = async (
     const player = normalizePlayerFarm(state.players[playerIndex]!)
 
     if (body.type === 'fence') {
-      const result = applyFarmChoice(player, 'fence', body.payload as any, { state })
+      const result = applyFarmChoice(player, 'fence', body.payload as FarmChoicePayloadMap['fence'], { state })
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'room') {
-      const result = applyFarmChoice(player, 'room', body.payload as any)
+      const result = applyFarmChoice(player, 'room', body.payload as FarmChoicePayloadMap['room'])
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'stable') {
-      const result = applyFarmChoice(player, 'stable', body.payload as any)
+      const result = applyFarmChoice(player, 'stable', body.payload as FarmChoicePayloadMap['stable'])
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'plow') {
-      const result = applyFarmChoice(player, 'plow', body.payload as any)
+      const result = applyFarmChoice(player, 'plow', body.payload as FarmChoicePayloadMap['plow'])
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }
     if (body.type === 'sow') {
-      const result = applyFarmChoice(player, 'sow', body.payload as any)
+      const result = applyFarmChoice(player, 'sow', body.payload as FarmChoicePayloadMap['sow'])
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
       return true
     }

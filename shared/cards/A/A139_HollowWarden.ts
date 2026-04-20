@@ -36,7 +36,7 @@ const onBuyListener: CardListenerRegistration = {
         actionContext: { trueAction: false },
         params: {
           allowedPurchases: FIREPLACE_IDS,
-        } as any,
+        },
       },
       sourceCard: CARD_ID,
     }

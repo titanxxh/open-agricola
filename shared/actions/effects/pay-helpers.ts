@@ -495,7 +495,7 @@ export const payCardPreviewCostByProvider = (
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
-): Record<string, any> => {
+): Record<string, unknown> => {
   return {
     resourcesPaid: solution.resourcesPaid,
     cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined

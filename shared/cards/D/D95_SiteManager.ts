@@ -52,7 +52,7 @@ const onBuyListener: CardListenerRegistration = {
         actionContext: { trueAction: false },
         params: {
           types: ['major'],
-        } as any,
+        },
       },
       sourceCard: CARD_ID,
     }

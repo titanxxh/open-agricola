@@ -13,7 +13,7 @@ const boarSpearDuringListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { actionId, player, result } = context
     
-    if (!TRACKED_ACTIONS.includes(actionId as any)) return
+    if (!(TRACKED_ACTIONS as readonly string[]).includes(actionId)) return
     
     const obtainedBoar =
       result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
@@ -51,7 +51,7 @@ const boarSpearAfterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { actionId, player, result, choice } = context
     
-    if (!TRACKED_ACTIONS.includes(actionId as any)) return
+    if (!(TRACKED_ACTIONS as readonly string[]).includes(actionId)) return
     
     const obtainedBoar =
       result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0

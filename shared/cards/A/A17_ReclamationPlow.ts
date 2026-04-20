@@ -60,7 +60,7 @@ const buildReclamationPlowUseFlow = (ambiguous: boolean): ActionFlow => ({
           type: 'leaf',
           actionId: 'flag-card',
           sourceCard: CARD_ID,
-          params: { infoboxText: USED_INFOBOX } as any,
+          params: { infoboxText: USED_INFOBOX },
           choiceLabelKey: 'ui.interactionReclamationPlowSkip',
         },
   ],

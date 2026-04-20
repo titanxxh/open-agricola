@@ -84,7 +84,7 @@ import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards
 import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
-import { applyFarmChoice } from '../logic/farm/farm-choice.ts'
+import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
 import {
   applyCostOverride,
 } from '../actions/effects/pay.ts'
@@ -2619,7 +2619,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player)
-    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as any, {
+    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
       costOverride: this.pending.costOverride,
       maxUnits:
         farmPayment.farmType === 'room' && typeof this.pending.actionContext?.maxRooms === 'number'
@@ -2903,7 +2903,7 @@ export class GameCore {
         const extraAllowedCrops = new Map(
           extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
         )
-        const result = applyFarmChoice(normalized, 'sow', payload as any, {
+        const result = applyFarmChoice(normalized, 'sow', payload as FarmChoicePayloadMap['sow'], {
           sowOptions: {
             maxSelections,
             excludedFields,

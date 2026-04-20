@@ -184,7 +184,7 @@ export class Engine {
 
   private collectNodeIds(node: EngineNode, ids: Set<string>): void {
     ids.add(node.id)
-    const children = (node as any).children as EngineNode[] | undefined
+    const children = (node as { children?: EngineNode[] }).children
     if (children) {
       for (const child of children) this.collectNodeIds(child, ids)
     }
@@ -1014,7 +1014,7 @@ export class Engine {
         ...node.event,
       }
       const ownerPlayerId = node.event.ownerPlayerId as string | undefined
-      const result = executeCardListener(listener, listenerContext as any, {
+      const result = executeCardListener(listener, listenerContext as import('../cards/card-listeners').CardListenerContext, {
         ownerPlayerId,
       })
       const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>

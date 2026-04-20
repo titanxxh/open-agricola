@@ -17,7 +17,7 @@ import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
 import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
-import type { ActionSpace, GameState, PlayerState } from '../game/types'
+import type { ActionSpace, CropStack, Field, GameState, PlayerState } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
 import {
@@ -208,7 +208,12 @@ export const normalizeState = (raw: GameState): GameState => {
       },
     )
     normalized.stableTiles = normalizedStableTiles
-    const migrateField = (field: any) => {
+    type LegacyField = Partial<Field> & {
+      crop?: CropStack['kind']
+      remaining?: number
+      [key: string]: unknown
+    }
+    const migrateField = (field: LegacyField): Field => {
       if (field.stacks === undefined) {
         const legacyCrop = field.crop
         const legacyRemaining = field.remaining ?? 0
@@ -219,10 +224,10 @@ export const normalizeState = (raw: GameState): GameState => {
         delete field.crop
         delete field.remaining
       }
-      return field
+      return field as Field
     }
     const normalizedFields = (normalized.fields ?? []).flatMap((rawField) => {
-      const field = migrateField(rawField as any)
+      const field = migrateField(rawField as unknown as LegacyField)
       const row = Number.isFinite(field.row) ? field.row : -1
       const col = Number.isFinite(field.col) ? field.col : -1
       const validRow = row >= 0 && row < FARM_ROWS
