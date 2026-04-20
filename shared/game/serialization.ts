@@ -30,6 +30,60 @@ export const serializeState = (state: GameState): SerializedGameState => {
   }
 }
 
+/**
+ * Per-viewer snapshot. Identical to `serializeState` except that secret
+ * information belonging to non-viewer players is replaced with same-length
+ * arrays of '?' placeholders so the shape stays stable for the client.
+ *
+ * Currently filters:
+ *   - `players[i].occupationHand` and `players[i].minorHand` for every
+ *     player other than the viewer.
+ *   - `draft.pools[pid].occ` and `draft.pools[pid].minor` for every player
+ *     other than the viewer (public data like `draft.kept`, `draft.round`,
+ *     `draft.pendingPicks`, `draft.seatOrder` is preserved verbatim).
+ *
+ * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
+ * view where every player's hand and pool is masked.
+ */
+export const serializeStateForPlayer = (
+  state: GameState,
+  viewerPlayerId: string | null,
+): SerializedGameState => {
+  const base = serializeState(state)
+  const filteredPlayers = base.players.map((p) =>
+    p.id === viewerPlayerId
+      ? p
+      : {
+          ...p,
+          occupationHand: Array(p.occupationHand.length).fill('?'),
+          minorHand: Array(p.minorHand.length).fill('?'),
+        },
+  )
+  const filteredDraft = !base.draft
+    ? base.draft
+    : {
+        ...base.draft,
+        pools: Object.fromEntries(
+          Object.entries(base.draft.pools).map(([pid, pool]) =>
+            pid === viewerPlayerId
+              ? [pid, pool]
+              : [
+                  pid,
+                  {
+                    occ: Array(pool.occ.length).fill('?'),
+                    minor: Array(pool.minor.length).fill('?'),
+                  },
+                ],
+          ),
+        ),
+      }
+  return {
+    ...base,
+    players: filteredPlayers,
+    draft: filteredDraft,
+  }
+}
+
 export const rebuildActiveModifiers = (state: GameState): GameState => {
   state.players.forEach((player) => {
     const existing = player.activeModifiers ?? []
