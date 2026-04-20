@@ -24,7 +24,7 @@ import type {
   CustomCodeListenerInvocation,
   CustomCodeListenerResult,
   CustomCodeValidateResult,
-} from '../../shared/cards/custom-code-types.ts'
+} from '../../shared/custom-code/types.ts'
 
 const WORKER_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

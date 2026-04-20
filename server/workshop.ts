@@ -3,7 +3,7 @@ import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
 import { validateAndCompileCustomCodeRemote } from './custom-code-executor/client.ts'
-import type { CustomCodeValidateResult } from '../shared/cards/custom-code-types.ts'
+import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 
