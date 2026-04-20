@@ -33,7 +33,7 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.phase !== 'work') return
+    if (context.state.roundPhase !== 'work') return
     if (!isUnconditionalSow(context)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     return {
@@ -61,7 +61,7 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.phase !== 'work') return
+    if (context.state.roundPhase !== 'work') return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
     if (workersAvailable(context.state, context.player) <= 0) return

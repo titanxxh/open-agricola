@@ -16,7 +16,7 @@ const mkState = (seed: number): GameState => ({
   gameSeed: seed,
   rngTick: 0,
   round: 1,
-  phase: 'work',
+  roundPhase: 'work',
   players: [],
 } as unknown as GameState)
 

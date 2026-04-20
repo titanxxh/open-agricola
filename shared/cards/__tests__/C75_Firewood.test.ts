@@ -56,7 +56,7 @@ const createState = (player: PlayerState): GameState => ({
   pendingFutureMeeples: [],
   gameOver: false,
   workPhaseObtainedResources: {},
-  phase: 'work',
+  roundPhase: 'work',
 }) as GameState
 
 describe('C75_Firewood', () => {

@@ -27,7 +27,7 @@ describe('B115_TinsmithMaster session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
-    state.phase = 'work'
+    state.roundPhase = 'work'
     state.roundActionOrder = state.roundActionOrder.map(() => null)
     state.roundActionOrder[0] = 'grain-utilization'
 

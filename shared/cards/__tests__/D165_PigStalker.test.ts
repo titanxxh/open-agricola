@@ -54,7 +54,7 @@ describe('D165_PigStalker', () => {
       null, null, null, null, null, null, null, null, null, null,
     ]
     const state: GameState = {
-      round: 4, phase: 'work', currentPlayerIndex: 0,
+      round: 4, roundPhase: 'work', currentPlayerIndex: 0,
       players: [player],
       actionSpaces: [
         createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
@@ -91,7 +91,7 @@ describe('D165_PigStalker', () => {
       null, null, null, null, null, null, null, null, null, null,
     ]
     const state: GameState = {
-      round: 4, phase: 'work', currentPlayerIndex: 0,
+      round: 4, roundPhase: 'work', currentPlayerIndex: 0,
       players: [player],
       actionSpaces: [
         createSpace('sheep-market', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
@@ -120,7 +120,7 @@ describe('D165_PigStalker', () => {
   it('does not trigger for non-animal-market spaces', () => {
     const player = createPlayer()
     const state: GameState = {
-      round: 4, phase: 'work', currentPlayerIndex: 0,
+      round: 4, roundPhase: 'work', currentPlayerIndex: 0,
       players: [player],
       actionSpaces: [],
       log: [], roundStartSnapshot: null,

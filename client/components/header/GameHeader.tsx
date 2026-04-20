@@ -51,7 +51,7 @@ export const GameHeader = ({
         <span className="header-round">R{state.round}/14</span>
         <span className="header-phase-pills">
           {phases.map((phase) => (
-            <span key={phase} className={`header-phase-pill${phase === state.phase ? ' active' : ''}`}>
+            <span key={phase} className={`header-phase-pill${phase === state.roundPhase ? ' active' : ''}`}>
               {PHASE_LABELS[phase][locale]}
             </span>
           ))}

@@ -56,6 +56,7 @@ export type StateUpdateCause =
   | 'undo'
   | 'dev'
   | 'reconnect'
+  | 'draftSubmit'
 
 export type StateUpdateEnvelope = {
   type: 'stateUpdate'

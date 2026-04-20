@@ -11,6 +11,50 @@ import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
 
+/** Default pool size for simultaneous draft when the client doesn't specify one. */
+const DRAFT_POOL_SIZE_DEFAULT = 7
+const DRAFT_POOL_SIZE_MIN = 7
+const DRAFT_POOL_SIZE_MAX = 10
+
+type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
+
+/**
+ * Validate and normalize the draft-related fields of a `createRoom` payload.
+ *
+ * Returns `{ ok: true, value: null }` when no draft is requested (classic mode);
+ * `{ ok: true, value: DraftRoomOptions }` when a valid simultaneous draft is requested;
+ * `{ ok: false, error }` on malformed input (invalid mode or out-of-range pool size).
+ */
+export function parseDraftOptions(
+  payload: Record<string, unknown>,
+): { ok: true; value: DraftRoomOptions | null } | { ok: false; error: string } {
+  const rawMode = payload.draftMode
+  if (rawMode === undefined || rawMode === null || rawMode === 'none') {
+    return { ok: true, value: null }
+  }
+  if (rawMode !== 'simultaneous') {
+    return { ok: false, error: `invalid draftMode: ${String(rawMode)}` }
+  }
+  let poolSize = DRAFT_POOL_SIZE_DEFAULT
+  const rawPool = payload.draftPoolSize
+  if (rawPool !== undefined && rawPool !== null) {
+    if (
+      typeof rawPool !== 'number' ||
+      !Number.isFinite(rawPool) ||
+      !Number.isInteger(rawPool) ||
+      rawPool < DRAFT_POOL_SIZE_MIN ||
+      rawPool > DRAFT_POOL_SIZE_MAX
+    ) {
+      return {
+        ok: false,
+        error: `invalid draftPoolSize: must be an integer in [${DRAFT_POOL_SIZE_MIN}, ${DRAFT_POOL_SIZE_MAX}]`,
+      }
+    }
+    poolSize = rawPool
+  }
+  return { ok: true, value: { draftMode: 'simultaneous', draftPoolSize: poolSize } }
+}
+
 /** Load custom card data from DB by workshop_cards.id list. Allows published + author's drafts. */
 function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
   if (!cardDbIds.length) return []
@@ -663,8 +707,21 @@ export const createWsServer = (server: import('node:http').Server) => {
         const customCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
           ? (msg as Record<string, unknown>).customCardIds as string[]
           : []
+        // Simultaneous card-draft opt-in.
+        const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
+        if (!draftOptions.ok) { sendCommandError(draftOptions.error); return }
         const customCards = loadCustomCardsFromDb(customCardDbIds, currentUserId)
-        const session = new GameSession(undefined, customCards.length > 0 ? customCards : undefined)
+        const session = new GameSession(
+          undefined,
+          customCards.length > 0 ? customCards : undefined,
+          draftOptions.value
+            ? {
+                playerCount: maxPlayers,
+                draftMode: draftOptions.value.draftMode,
+                draftPoolSize: draftOptions.value.draftPoolSize,
+              }
+            : undefined,
+        )
         const room: Room = {
           id: roomId,
           session,
@@ -684,6 +741,13 @@ export const createWsServer = (server: import('node:http').Server) => {
         room.session.updatePlayerName(0, name)
         // Persist room creation in SQLite
         ensureRoomRowSqlite(room)
+        // Persist the initial state right away so that the draft seed (and any
+        // custom card loadout) survives a mid-setup server restart. Without
+        // this, a restart before the room fills would drop back to a fresh
+        // default session and lose `state.draft` / `phase`.
+        if (PERSIST_ROOMS === 'sqlite' || isFixedDevRoom(room.id)) {
+          savePersistedState(room.id, serializeState(room.session.getState().state), room)
+        }
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, 0)
         sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0, maxPlayers })
         return
@@ -905,6 +969,12 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (msg.type === 'devCreatePasture') {
         const resp = callRoom(s => s.startDevFenceSelect(currentPlayerIndex))
         broadcastState(room, resp, 'action', msg.requestId)
+        return
+      }
+
+      if (msg.type === 'draftSubmit') {
+        const resp = callRoom(s => s.submitDraftPick(msg.playerId, msg.pick))
+        broadcastState(room, resp, 'draftSubmit', msg.requestId)
         return
       }
     })

@@ -1,6 +1,7 @@
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/protocol/game'
 import type { Resource } from '../../shared/game/types'
 import type { ClientCommand, ServerEvent } from '../../shared/protocol/ws'
+import type { DraftPickPayload } from '../../shared/draft/types'
 
 export type ValidateResult = {
   valid: boolean
@@ -38,12 +39,36 @@ export interface GameTransport {
   devDrawCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devPlayCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
+  draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
   onSnapshot(cb: SnapshotListener): () => void
   destroy(): void
 }
 
 import { API_BASE, WS_BASE } from '../config'
+
+/**
+ * Parse `draftMode` / `draftPoolSize` URL query params into the shape accepted by
+ * `sendRoomCommand('createRoom', …)`. Returns `undefined` when draft is disabled
+ * (so the payload stays backward compatible with servers that don't know the field).
+ *
+ * - Unknown/missing `draftMode` → returns `undefined` (classic hand-deal).
+ * - `draftMode=simultaneous` without a valid `draftPoolSize` → returns
+ *   `{ draftMode: 'simultaneous' }` (server will clamp/apply default).
+ * - `draftPoolSize` must be integer in [7, 10]; out-of-range values are dropped.
+ */
+export function parseDraftParamsFromQuery(
+  search: string,
+): { draftMode: 'simultaneous'; draftPoolSize?: number } | undefined {
+  const params = new URLSearchParams(search)
+  if (params.get('draftMode') !== 'simultaneous') return undefined
+  const raw = params.get('draftPoolSize')
+  const parsed = raw != null ? Number(raw) : NaN
+  if (Number.isInteger(parsed) && parsed >= 7 && parsed <= 10) {
+    return { draftMode: 'simultaneous', draftPoolSize: parsed }
+  }
+  return { draftMode: 'simultaneous' }
+}
 
 const TOKEN_KEY = 'open-agricola-token'
 
@@ -169,6 +194,10 @@ export class HttpGameTransport implements GameTransport {
 
   devCreatePasture(playerIndex: number) {
     return this.send(() => post('/api/game/dev/create-pasture', { playerIndex }))
+  }
+
+  draftSubmit(playerId: string, pick: DraftPickPayload) {
+    return this.send(() => post('/api/game/draft-submit', { playerId, pick }))
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
@@ -385,6 +414,10 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'devCreatePasture', playerIndex })
   }
 
+  async draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'draftSubmit', playerId, pick })
+  }
+
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
     const resp = await fetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
@@ -399,7 +432,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.listeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[] }): void
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
   sendRoomCommand(type: 'joinRoom', opts: { roomId: string; name?: string; requestedPlayerIndex?: number }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {

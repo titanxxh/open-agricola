@@ -41,7 +41,7 @@ const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
-  state.phase = 'work'
+  state.roundPhase = 'work'
 
   const p0 = state.players[0]!
   setActiveWorkerCount(p0, 2)

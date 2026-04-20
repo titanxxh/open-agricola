@@ -72,7 +72,7 @@ describe('D129_LumberVirtuoso session', () => {
     const resp = session.performRoundEnd()
     // Round 3 is not a harvest round — goes to next round
     expect(resp.state.round).toBe(4)
-    expect(resp.state.phase).toBe('work')
+    expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.wood).toBe(8)
   })
 

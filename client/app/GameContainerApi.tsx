@@ -9,7 +9,7 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/
 import { parsePositionKey, positionKey } from '../../shared/game/farm'
 import { emptyResources, resourceKeyList } from '../../shared/logic/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
-import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
+import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { useFarmSelection } from '../hooks/useFarmSelection'
@@ -24,6 +24,7 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
+import { DraftOverlay } from './draft/DraftOverlay'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -109,11 +110,18 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             } catch { /* skip */ }
           }
           rawWs.addEventListener('message', handler)
-          const customCardsParam = new URLSearchParams(window.location.search).get('customCards')
+          const searchParams = new URLSearchParams(window.location.search)
+          const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          const maxPlayersParam = new URLSearchParams(window.location.search).get('maxPlayers')
+          const maxPlayersParam = searchParams.get('maxPlayers')
           const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
-          ws.sendRoomCommand('createRoom', { maxPlayers, name: displayName ?? playerParam ?? 'Player 1', customCardIds })
+          const draftParams = parseDraftParamsFromQuery(window.location.search)
+          ws.sendRoomCommand('createRoom', {
+            maxPlayers,
+            name: displayName ?? playerParam ?? 'Player 1',
+            customCardIds,
+            ...(draftParams ?? {}),
+          })
         })
 
         if ('error' in resp) {
@@ -1281,6 +1289,30 @@ export const GameContainerApi = () => {
 
   if (!state || !currentPlayer || !displayPlayer) {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
+  }
+
+  // Card-draft phase — render the draft overlay instead of the game board.
+  // The locked URL-pinned player wins in WS mode; otherwise fall back to the
+  // sandbox "self" (current player) so HTTP debugging still works.
+  if (state.phase === 'draft' && state.draft) {
+    const meId = (isWs && lockedViewPlayerId) ? lockedViewPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        <DraftOverlay
+          state={state}
+          meId={meId}
+          locale={locale}
+          onSubmit={async (pick) => {
+            try {
+              await transport.draftSubmit(meId, pick)
+              // State update arrives via onSnapshot subscription — no manual refresh.
+            } catch (e) {
+              console.error('draftSubmit error', e)
+            }
+          }}
+        />
+      </div>
+    )
   }
 
   return (

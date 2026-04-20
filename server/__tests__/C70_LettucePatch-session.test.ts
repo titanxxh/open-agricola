@@ -20,7 +20,7 @@ const setup = (options?: {
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = options?.round ?? 1
-  state.phase = 'work'
+  state.roundPhase = 'work'
   // Ensure grain-utilization is available
   state.roundActionOrder = state.roundActionOrder.map(() => null)
   state.roundActionOrder[0] = 'grain-utilization'

@@ -53,7 +53,7 @@ const createPlayer = (): PlayerState =>
 const createState = (player: PlayerState): GameState =>
   ({
     round: 3,
-    phase: 'work',
+    roundPhase: 'work',
     currentPlayerIndex: 0,
     players: [player],
     actionSpaces: [],

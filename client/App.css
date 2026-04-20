@@ -5547,3 +5547,100 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   overflow-y: auto;
   color: #444;
 }
+
+/* ============================================================
+ * Draft overlay (PR-5 simultaneous card draft)
+ * Keep rules minimal — functional layout only. Visual polish is future work.
+ * ============================================================ */
+.draft-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 32, 18, 0.72);
+  z-index: 40;
+  overflow: auto;
+  padding: 24px 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+.draft-overlay-panel {
+  background: #fffaf0;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.draft-overlay-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid #e6d7bf;
+  padding-bottom: 12px;
+}
+.draft-overlay-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #3b2a10);
+}
+.draft-overlay-status {
+  font-size: 13px;
+  color: #7a5a3a;
+}
+.draft-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.draft-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #3b2a10;
+}
+.draft-pool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.draft-pool-empty {
+  font-size: 12px;
+  color: #8a7858;
+  font-style: italic;
+}
+.draft-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.draft-confirm-btn {
+  min-width: 160px;
+}
+.draft-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.draft-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.draft-history-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a4428;
+}
+.draft-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.draft-history-empty {
+  font-size: 12px;
+  color: #8a7858;
+  font-style: italic;
+}
+
