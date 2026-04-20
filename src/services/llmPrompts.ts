@@ -8,7 +8,7 @@
  * sync. CI runs `pnpm run check:prompt-sync` which compares both files against
  * the underlying source code:
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
- *   - server/custom-code-executor/engine.ts (isActionHookPhase, isCardListenerScope)
+ *   - server/custom-code/engine.ts (isActionHookPhase, isCardListenerScope)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
  *
  * Other relevant context:
@@ -129,7 +129,7 @@ registerCardListener({
 
 ### 可用 phases
 
-> 沙盒接受的 phase 与 \`server/custom-code-executor/engine.ts\` 中的 \`isActionHookPhase\` 一致。其它 phase（如 \`computeChoiceCandidates\`、\`anytime\`）目前**不会**被沙盒注册，写了也不会触发。
+> 沙盒接受的 phase 与 \`server/custom-code/engine.ts\` 中的 \`isActionHookPhase\` 一致。其它 phase（如 \`computeChoiceCandidates\`、\`anytime\`）目前**不会**被沙盒注册，写了也不会触发。
 
 | phase | 说明 | 典型用途 |
 |-------|------|----------|

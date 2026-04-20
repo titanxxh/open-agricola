@@ -21,7 +21,7 @@
 import Database from 'better-sqlite3'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compileCardCode } from '../server/card-compiler.ts'
+import { compileCardCode } from '../server/custom-code/compiler.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

@@ -1,10 +1,10 @@
-import { registerCardEffect, type CardEffect } from '../shared/cards/card-effects.ts'
-import { registerCardListener } from '../shared/cards/card-listeners.ts'
-import type { PaymentInfo } from '../shared/cards/card-effects.ts'
-import type { CardListenerContext } from '../shared/cards/card-listeners.ts'
-import type { GameState, PlayerState } from '../shared/game/types.ts'
-import { getCurrentSessionContext, type CustomCardData } from '../shared/cards/session-card-context.ts'
-import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './custom-code-executor/client.ts'
+import { registerCardEffect, type CardEffect } from '../../shared/cards/card-effects.ts'
+import { registerCardListener } from '../../shared/cards/card-listeners.ts'
+import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
+import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
+import type { GameState, PlayerState } from '../../shared/game/types.ts'
+import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
+import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
 export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void => {
   const { cardJson, compiledCode, codeManifest } = cardData
