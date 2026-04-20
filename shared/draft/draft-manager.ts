@@ -124,17 +124,30 @@ export function tryAdvanceRound(draft: DraftState): {
   return { draft: next, advanced: true, finished }
 }
 
+/**
+ * Writes each player's `kept` hands back to a fresh PlayerState, flips
+ * `phase='playing'`, and clears `state.draft`. The input state is not mutated:
+ * a new top-level object is returned with new `players`, new `phase`, and
+ * `draft=null`. All other fields are aliased (shallow copy) — notably
+ * `actionSpaces` which carries function refs that cannot be `structuredClone`d.
+ * Callers that need deeper isolation should clone upstream.
+ */
 export function finalizeDraft(state: GameState): GameState {
   if (!state.draft) throw new Error('no draft to finalize')
-  const next = structuredClone(state)
-  const draft = next.draft!
-  for (const player of next.players) {
+  const draft = state.draft
+  const nextPlayers = state.players.map((player) => {
     const k = draft.kept[player.id]
-    if (!k) continue
-    player.occupationHand = [...k.occ]
-    player.minorHand = [...k.minor]
+    if (!k) return { ...player }
+    return {
+      ...player,
+      occupationHand: [...k.occ],
+      minorHand: [...k.minor],
+    }
+  })
+  return {
+    ...state,
+    players: nextPlayers,
+    phase: 'playing',
+    draft: null,
   }
-  next.phase = 'playing'
-  next.draft = null
-  return next
 }

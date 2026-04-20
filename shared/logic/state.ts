@@ -15,6 +15,8 @@ import { createRng, createSeed, shuffleWithRng } from './rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
 import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
+import { initDraftState } from '../draft/draft-manager'
+import type { DraftPool } from '../draft/types'
 import type { ActionSpace, GameState, PlayerState } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
@@ -47,6 +49,7 @@ export const dealHands = (
   extraMinorIds: string[] = [],
   extraOccupationIds: string[] = [],
   deckIds?: string[],
+  handSize = 7,
 ) => {
   const rng = createRng(seed)
   const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
@@ -67,8 +70,8 @@ export const dealHands = (
   const minorHands: string[][] = []
   const occupationHands: string[][] = []
   for (let index = 0; index < playerCount; index += 1) {
-    minorHands.push(shuffledMinor.slice(index * 7, index * 7 + 7))
-    occupationHands.push(shuffledOccupation.slice(index * 7, index * 7 + 7))
+    minorHands.push(shuffledMinor.slice(index * handSize, index * handSize + handSize))
+    occupationHands.push(shuffledOccupation.slice(index * handSize, index * handSize + handSize))
   }
   return { minorHands, occupationHands }
 }
@@ -113,11 +116,14 @@ export const normalizeState = (raw: GameState): GameState => {
       takenBy: normalizeTakenBy(stored.takenBy),
     } as ActionSpace)
   }
-  const needsHands = raw.players.some(
-    (player) =>
-      (player.minorHand?.length ?? 0) === 0 ||
-      (player.occupationHand?.length ?? 0) === 0,
-  )
+  const inDraftPhase = raw.phase === 'draft' && raw.draft != null
+  const needsHands =
+    !inDraftPhase &&
+    raw.players.some(
+      (player) =>
+        (player.minorHand?.length ?? 0) === 0 ||
+        (player.occupationHand?.length ?? 0) === 0,
+    )
   const dealtHands = needsHands ? dealHands(raw.players.length, seed) : null
   const players = raw.players.map((player, index) => {
     const improvements = player.improvements ?? []
@@ -319,9 +325,15 @@ export const createInitialPlayers = (
     extraOccupationIds = [],
     deckIds,
     playerNames = [],
+    draftMode,
   } = options
   const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
-  const dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds)
+  // In draft mode, leave hands empty — createInitialState will seed state.draft
+  // with per-player pools separately, and finalizeDraft will populate hands later.
+  const dealtHands =
+    draftMode === 'simultaneous'
+      ? { minorHands: [] as string[][], occupationHands: [] as string[][] }
+      : dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds)
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -391,13 +403,46 @@ export const createInitialState = (
       ? Math.floor(seed)
       : createSeed()
   const roundActionOrder = generateRoundActionOrder(gameSeed)
+  const useDraft = options.draftMode === 'simultaneous'
+  const players = createInitialPlayers(gameSeed, options)
+
+  let phase: GameState['phase'] = 'playing'
+  let draft: GameState['draft'] = null
+  if (useDraft) {
+    const poolSize = Math.floor(options.draftPoolSize ?? 7)
+    if (poolSize < 7 || poolSize > 10) {
+      throw new Error(
+        `createInitialState: draftPoolSize must be between 7 and 10, got ${poolSize}`,
+      )
+    }
+    const playerCount = players.length
+    const draftDeal = dealHands(
+      playerCount,
+      gameSeed,
+      options.extraMinorIds ?? [],
+      options.extraOccupationIds ?? [],
+      options.deckIds,
+      poolSize,
+    )
+    const seatOrder = players.map((p) => p.id)
+    const hands: Record<string, DraftPool> = {}
+    seatOrder.forEach((pid, i) => {
+      hands[pid] = {
+        occ: draftDeal.occupationHands[i] ?? [],
+        minor: draftDeal.minorHands[i] ?? [],
+      }
+    })
+    draft = initDraftState(seatOrder, hands, poolSize)
+    phase = 'draft'
+  }
+
   const initialState: GameState = {
     round: 1,
-    phase: 'playing',
+    phase,
     roundPhase: 'work',
-    draft: null,
+    draft,
     currentPlayerIndex: 0,
-    players: createInitialPlayers(gameSeed, options),
+    players,
     actionSpaces: createActionSpaces(options.playerCount ?? 2),
     log: [{ key: 'log.startGame' }],
     roundStartSnapshot: null,
