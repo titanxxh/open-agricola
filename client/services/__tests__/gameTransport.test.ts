@@ -128,4 +128,74 @@ describe('WsGameTransport request correlation', () => {
 
     transport.destroy()
   })
+
+  it('sends draftSubmit with playerId and pick payload', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const pick = { occCardId: 'occ-12', minorCardId: 'min-34' }
+    const submitPromise = transport.draftSubmit('p1', pick)
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'draftSubmit',
+      playerId: 'p1',
+      pick,
+    })
+    expect(socket.sent[0]?.requestId).toBeTypeOf('string')
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 5))
+    await expect(submitPromise).resolves.toMatchObject({ historyLength: 5 })
+
+    transport.destroy()
+  })
+})
+
+describe('HttpGameTransport draftSubmit', () => {
+  it('POSTs to /api/game/draft-submit with playerId and pick', async () => {
+    const fakePayload = {
+      state: serializeState(createInitialState(42)),
+      pending: { type: 'none' },
+      interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+      scores: null,
+      historyLength: 7,
+      hasActionStartSnapshot: false,
+      ok: true,
+    }
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+    const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      return {
+        ok: true,
+        json: async () => fakePayload,
+      } as unknown as Response
+    })
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+    vi.stubGlobal('fetch', fakeFetch)
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    })
+
+    try {
+      const { HttpGameTransport } = await import('../gameTransport')
+      const transport = new HttpGameTransport()
+      const pick = { occCardId: 'occ-99', minorCardId: 'min-11' }
+      const payload = await transport.draftSubmit('p2', pick)
+
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toMatch(/\/api\/game\/draft-submit$/)
+      expect(calls[0]?.init?.method).toBe('POST')
+      const body = JSON.parse(String(calls[0]?.init?.body)) as unknown
+      expect(body).toEqual({ playerId: 'p2', pick })
+      expect(payload).toEqual(fakePayload)
+
+      transport.destroy()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
 })

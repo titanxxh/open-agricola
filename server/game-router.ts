@@ -490,5 +490,25 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/draft-submit') {
+    const body = JSON.parse(await readBody(req)) as {
+      playerId?: string
+      pick?: { occCardId?: unknown; minorCardId?: unknown }
+    }
+    if (
+      typeof body.playerId !== 'string' ||
+      !body.pick ||
+      typeof body.pick.occCardId !== 'string' ||
+      typeof body.pick.minorCardId !== 'string'
+    ) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const pick = { occCardId: body.pick.occCardId, minorCardId: body.pick.minorCardId }
+    const { resp, result } = callAndRespond(req, s => s.submitDraftPick(body.playerId!, pick))
+    sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
 return false
 }
