@@ -20,14 +20,14 @@
         │
         │ WebSocket /ws   ← 主链路
         ▼
-server/room-manager.ts
+server/game/room-manager.ts
   ├─ 房间路由
   ├─ 连接管理
   ├─ 玩家绑定
   └─ 广播 stateUpdate
         │
         ▼
-server/game-session.ts
+server/game/authoritative-session.ts
   ├─ 权威 GameState
   ├─ PendingAction
   ├─ Engine / HookDispatcher
@@ -42,7 +42,7 @@ shared/
   ├─ cards/    卡牌与扩展
   └─ game/     核心类型
 
-custom-code-executor sidecar
+server/custom-code/ 隔离执行链（同机/sidecar）
   ├─ 玩家代码校验 / 编译
   ├─ effect/listener manifest 提取
   └─ 自定义代码隔离执行
@@ -67,20 +67,29 @@ shared/ (前后端共用，零 React 依赖)
   └─ i18n/            多语言文案键
 
 server/ (后端运行时)
-  ├─ index.ts         HTTP + WS 服务器装配入口
-  ├─ room-manager.ts  房间管理、连接绑定、消息路由、广播
-  ├─ game-session.ts  权威状态容器，命令执行中心
-  ├─ game-router.ts   HTTP 兼容接口、调试接口、快照接口
-  ├─ custom-code-executor/  自定义代码隔离执行器
-  └─ *-validation.ts  纯规则校验模块
+  ├─ index.ts                         HTTP + WS 服务器装配入口
+  ├─ game/
+  │   ├─ room-manager.ts              房间管理、连接绑定、消息路由、广播
+  │   └─ authoritative-session.ts     权威状态容器，命令执行中心（原 game-session.ts）
+  ├─ game-router.ts                   HTTP 兼容接口、调试接口、快照接口
+  ├─ custom-code/                     自定义代码执行链集中目录
+  │   ├─ compiler.ts                  TypeScript → JS 编译
+  │   ├─ runtime.ts                   沙盒运行时容器
+  │   ├─ engine.ts                    hook / phase / scope 校验与调度
+  │   ├─ isolate-runner.ts            隔离执行入口
+  │   ├─ executor-worker.ts           worker/sidecar 入口
+  │   └─ client.ts                    主进程 → executor 的 RPC 客户端
+  └─ *-validation.ts                  纯规则校验模块
 
-src/ (前端)
+client/ (前端，原 src/)
   ├─ app/             顶层容器，房间接入、玩家视角、页面编排
   ├─ hooks/           WS 连接、状态同步、临时选择状态、UI 编排
   ├─ services/        传输层封装（WS 为主，HTTP 为辅）
   ├─ components/      纯渲染组件
   └─ types/           UI 层临时类型
 ```
+
+> 三层边界（`shared/` / `server/` / `client/`）从 PR-3 起已由 ESLint `no-restricted-imports` 以 **warn** 级别强制：`shared/` 不得引用 `server/` 或 `client/`，`server/` 不得引用 `client/`，`client/` 不得引用 `server/`。`package.json` 已声明 `sideEffects`，为 bundler 提供 tree-shaking 基线。
 
 注：卡牌的“职业 / 小改良”类型归属以 `shared/cards/catalog.ts` 中对应注册表为准；例如 `A92_AdoptiveParents` 当前应属于职业卡注册表，而不是小改良注册表。
 
@@ -90,7 +99,7 @@ src/ (前端)
 - Sandbox 配置（玩家人数、A/B/C/D/E 默认牌组、自定义卡列表）由 `server/workshop.ts` + SQLite `sandbox_settings` / `sandbox_cards` 持久化；再次进入“我的沙盒”时沿用上次配置。
 - Sandbox 开局会把 `playerCount`、`deckIds`、`customCardIds` 下沉到 `createInitialState()`，因此人数、默认命名、基础牌组过滤都由领域层统一生成。
 - 自定义 `effect_code` 不再被主后端动态 `import()` 或直接执行。主后端只保存 `compiled_code + code_manifest`，运行时注册代理 hook / listener，并通过内部 RPC 调用同机 `custom-code-executor` sidecar 返回纯数据结果。
-- **沙盒内可用的 hook / phase / scope / actionId、AST 禁用清单、`PlayerState` 字段口径、`cardStates` 写入位置等约束，全部以 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md) 为唯一真源。** 该文件含若干 `prompt-sync:begin/end` 标记块，通过 `pnpm run check:prompt-sync` 与 `shared/cards/card-effects.ts` / `server/custom-code-executor/engine.ts` / `server/ast-validator.ts` 自动同源校验。Workshop AI Designer 系统提示词（`src/services/llmPrompts.ts`）必须与之一致，CI 兜底。
+- **沙盒内可用的 hook / phase / scope / actionId、AST 禁用清单、`PlayerState` 字段口径、`cardStates` 写入位置等约束，全部以 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md) 为唯一真源。** 该文件含若干 `prompt-sync:begin/end` 标记块，通过 `pnpm run check:prompt-sync` 与 `shared/cards/card-effects.ts` / `server/custom-code/engine.ts` / `shared/custom-code/ast-validator.ts` 自动同源校验。Workshop AI Designer 系统提示词（`client/services/llmPrompts.ts`）必须与之一致，CI 兜底。
 
 ## 4. 核心设计原则
 
@@ -1195,7 +1204,7 @@ type ActionHookResult = {
 
 - 对 `ActionHookResult.flow`，引擎会在插入节点前递归把顶层 `sourceCard` 补到缺失的 child leaf，但不会覆盖 child 自己显式写的 `sourceCard`。
 - 对 `followUpActions`，统一推荐对象形式 `{ actionId, sourceCard }`；若 listener 顶层有 `sourceCard` 且 follow-up 仍是字符串，引擎会做兜底转换。
-- 对 `OptionalNode` / `OrNode` / `XorNode` / `ChoiceNode` 的 choice 构建路径，引擎会把统一来源写入 `pendingChoiceContext.sourceCard`，供 `server/game-session.ts` 透传到 `pending` / `interaction`。
+- 对 `OptionalNode` / `OrNode` / `XorNode` / `ChoiceNode` 的 choice 构建路径，引擎会把统一来源写入 `pendingChoiceContext.sourceCard`，供 `server/game/authoritative-session.ts` 透传到 `pending` / `interaction`。
 
 这样可以覆盖常见卡牌能力：
 
