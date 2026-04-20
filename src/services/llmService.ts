@@ -278,12 +278,13 @@ async function* streamAnthropic(
 // ── Card extraction from LLM response ────────────────────────────────────────
 
 /**
- * Extract card metadata + effects from a TypeScript code block in LLM response.
- * Falls back to JSON extraction for backwards compatibility.
+ * Extract card metadata from a TypeScript code block in LLM response.
+ * TS-only — the LLM system prompt requires a ```typescript fenced block that
+ * calls `registerCardEffect` / `registerCardListener` and instantiates either
+ * `new Occupation({...})` or `new MinorImprovement({...})`.
  */
 export function extractCardFromResponse(text: string): {
   card: Record<string, unknown>
-  effects: Record<string, unknown> | null
   sourceCode: string
 } | null {
   // Try TypeScript code blocks first
@@ -303,12 +304,6 @@ export function extractCardFromResponse(text: string): {
       const parsed = parseCardFromTs(block)
       if (parsed) return parsed
     }
-    // Try JSON
-    try {
-      const json = JSON.parse(block) as Record<string, unknown>
-      if (json.card) return { card: json.card as Record<string, unknown>, effects: (json.effects as Record<string, unknown>) ?? null, sourceCode: '' }
-      return null
-    } catch { /* not JSON */ }
   }
 
   return null
@@ -363,7 +358,6 @@ Important:
  */
 function parseCardFromTs(code: string): {
   card: Record<string, unknown>
-  effects: Record<string, unknown> | null
   sourceCode: string
 } | null {
   // Extract card_type from class constructor
@@ -399,9 +393,6 @@ function parseCardFromTs(code: string): {
   const cost = extractObjectField(objStr, 'cost') ?? {}
   const modifiers = extractModifiers(objStr)
 
-  // Check if registerCardEffect exists → has effects
-  const hasEffects = /registerCardEffect\s*\(/.test(code)
-
   const card: Record<string, unknown> = {
     id: cardId,
     name,
@@ -414,7 +405,6 @@ function parseCardFromTs(code: string): {
 
   return {
     card,
-    effects: hasEffects ? { _hasCode: true } : null,
     sourceCode: code,
   }
 }
@@ -479,7 +469,7 @@ function extractModifiers(objStr: string): unknown[] {
 export function extractCardJson(text: string): Record<string, unknown> | null {
   const result = extractCardFromResponse(text)
   if (!result) return null
-  return { card: result.card, effects: result.effects }
+  return { card: result.card }
 }
 
 // ── Image generation ──────────────────────────────────────────────────────────
