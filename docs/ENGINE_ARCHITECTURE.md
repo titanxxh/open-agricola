@@ -1648,7 +1648,20 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 - 组件与视图正确性：以前端渲染测试为主
 - 多端实时同步与关键主流程：以 E2E 为主
 
-## 14. 当前结论
+## 14. Draft Phase（PR-5）
+
+开局可选进入 card draft 阶段（lobby 选 `draftMode: 'simultaneous'`，`poolSize: 7..10`）。
+
+- `GameState.phase: 'draft' | 'playing'`（新）、`GameState.draft: DraftState | null`（新）。默认 `'playing'` / `null`，对既有房间零破坏。
+- `DraftManager`（`shared/draft/draft-manager.ts`）独立于主引擎，纯函数实现：`initDraftState`、`processSubmit`、`tryAdvanceRound`、`finalizeDraft`。
+- 并行玩家提交：每个玩家调用 `GameSession.submitDraftPick(pid, pick)`，server 等全员提交后原子推进一轮（kept += pick，pools 顺时针旋转，round++）。不使用 `PlayerSwitchNode`，也不走 `Engine.step`——draft 与主引擎解耦。
+- 7 轮后 `finalizeDraft` 把 kept 灌回 `player.occupationHand` / `player.minorHand`，`phase` 切到 `'playing'`，主引擎走 round 1。
+- 协议：`ClientCommand.draftSubmit`（WS 与 HTTP `/api/game/draft-submit` 两条路径）；UI 侧用 `PendingAction.cardDraft` 携带当前池与已提交状态。
+- 持久化：`phase` / `draft` 通过现有 `serializeState` 自动 passthrough；SQLite / JSON 房间存档无 schema 改动。
+- 隐私：当前信任式同步（广播 full state），对手池技术上可见。per-connection 视角过滤留给 issue #7 单独跟进。
+- Bundle 影响：draft 相关的 UI（`DraftOverlay` / `DraftPoolRow` / `DraftHistoryPanel`）随 main bundle 发货，落地后 main 为 ~477KB raw / ~145KB gzip，仍在预算内（550KB raw / 170KB gzip）。
+
+## 15. 当前结论
 
 项目的主设计应明确为：
 

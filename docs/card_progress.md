@@ -266,6 +266,20 @@
   - `scripts/check-bundle-size.ts` 默认 strict（main ≤ 550KB raw / ≤ 170KB gzip，当前 buffer ~17%）
   - `scripts/check-reaches.ts` 已 strict（PR-1 遗留，PR-4 CI 一并收紧）
 
+### 卡牌 draft 玩法（PR-5）
+
+- 2026-04-20 PR-5 卡牌 draft（Simultaneous）落地：
+  - 新增 `GameState.phase: 'draft' | 'playing'` 与 `GameState.draft: DraftState | null`（默认 `playing`/`null`，向后兼容）
+  - DraftManager 纯函数（`shared/draft/`）+ 27 unit tests
+  - GameSession `submitDraftPick` + 13 session tests；2/3/4 人局、partial submit、持久化 round-trip
+  - 协议 `ClientCommand.draftSubmit` + HTTP `/api/game/draft-submit` + WS 路由
+  - 房间创建接受 `draftMode`/`draftPoolSize`（默认 `none`；存量房间零破坏）
+  - Client `DraftOverlay` + `DraftPoolRow` + `DraftHistoryPanel`；当 `phase='draft'` 覆盖游戏板
+  - Lobby URL 参数支持 `draftMode` + `draftPoolSize`
+  - E2E Playwright 双浏览器 7 轮全流程，~6.4s 确定性
+  - 主 bundle 477KB raw / 145KB gzip（仍在 550KB / 170KB 预算内）
+  - 隐私信任式（issue #7 单独跟进）
+
 ---
 
 ## 4. 实现进度时间线
