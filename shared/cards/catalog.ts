@@ -1851,8 +1851,10 @@ const allCards = [...allMinorImprovementCards, ...allOccupationCards]
 registerCardLookups({
   minor: (id) =>
     allCards.find((c) => c.id === id && cardMatchesMinor(c))
-    ?? getCustomMinorImprovement(id),
+    ?? getCustomMinorImprovement(id)
+    ?? undefined,
   occupation: (id) =>
     allCards.find((c) => c.id === id && cardMatchesOccupation(c))
-    ?? getCustomOccupation(id),
+    ?? getCustomOccupation(id)
+    ?? undefined,
 })
