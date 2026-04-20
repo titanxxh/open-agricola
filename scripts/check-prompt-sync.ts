@@ -9,7 +9,7 @@
  * Sources of truth this script reads:
  *   - shared/cards/card-effects.ts        → cardEffectHooks array
  *   - server/custom-code-executor/engine.ts → isActionHookPhase + isCardListenerScope
- *   - server/ast-validator.ts             → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
+ *   - shared/custom-code/ast-validator.ts → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
  *
  * Targets it cross-checks against:
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
@@ -31,7 +31,7 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
   engine: 'server/custom-code-executor/engine.ts',
-  astValidator: 'server/ast-validator.ts',
+  astValidator: 'shared/custom-code/ast-validator.ts',
 }
 
 const TARGETS = {
