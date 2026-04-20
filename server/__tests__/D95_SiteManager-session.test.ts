@@ -14,12 +14,22 @@ if (!occupations.some((c) => c.id === CARD_ID)) {
 }
 
 describe('D95_SiteManager session', () => {
+  // Deterministic setup: fixed seed + explicit non-card placeholder hands so the
+  // dealt-hand randomness from `new GameSession()` never leaks into the test.
+  // See the equivalent comment in `worker-identity-fg.test.ts` for the rationale.
+  const FILLER = '__test_filler__'
+
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(/* seed */ 1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
+
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
@@ -73,11 +83,15 @@ describe('D95_SiteManager session', () => {
   })
 
   it('substitutes food for lacking building resource via computeCosts', () => {
-    const session = new GameSession()
+    const session = new GameSession(/* seed */ 1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID, 'A85_Homekeeper']
