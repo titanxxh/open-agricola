@@ -1,4 +1,10 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
+import {
+  registerCardLookups,
+  MinorImprovement,
+  Occupation,
+  PlayerActionCard,
+} from './types'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
 import { A11_MudPatch } from './A/A11_MudPatch'
 import { A102_Grocer } from './A/A102_Grocer'
@@ -1826,3 +1832,27 @@ export const getOccupationCard = (id: string) => {
   return allOccupationCards.find((card) => card.id === id)
     ?? getCustomOccupation(id)
 }
+
+// Install the lookups on `types.ts` so `getRegisteredMinorImprovement` /
+// `getRegisteredOccupation` work without module-level side effects in the card
+// constructors. This runs once when catalog.ts is first imported.
+//
+// Class-type filters replicate the previous `CardBase` constructor side effect
+// (which keyed by `this instanceof MinorImprovement | Occupation | PlayerActionCard`).
+// Some cards are placed in the "wrong" array (e.g. MinorImprovements listed under
+// `occupationCards`) for historical reasons; the old per-instance registration
+// papered over that. Scanning both arrays and filtering by class preserves the
+// old semantics without touching the arrays.
+const cardMatchesMinor = (c: unknown): c is MinorImprovement =>
+  c instanceof MinorImprovement || c instanceof PlayerActionCard
+const cardMatchesOccupation = (c: unknown): c is Occupation =>
+  c instanceof Occupation
+const allCards = [...allMinorImprovementCards, ...allOccupationCards]
+registerCardLookups({
+  minor: (id) =>
+    allCards.find((c) => c.id === id && cardMatchesMinor(c))
+    ?? getCustomMinorImprovement(id),
+  occupation: (id) =>
+    allCards.find((c) => c.id === id && cardMatchesOccupation(c))
+    ?? getCustomOccupation(id),
+})

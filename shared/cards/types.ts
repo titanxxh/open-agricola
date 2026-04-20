@@ -49,8 +49,33 @@ export type CardDefinition = {
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
-const registeredMinorImprovements = new Map<string, CardBase>()
-const registeredOccupations = new Map<string, CardBase>()
+// Late-bound lookup hooks — catalog.ts installs these after its arrays are
+// built. Constructors stay side-effect-free (no module-level mutation).
+let minorLookup: ((id: string) => CardBase | undefined) | undefined
+let occupationLookup: ((id: string) => CardBase | undefined) | undefined
+
+export const registerCardLookups = (lookups: {
+  minor: (id: string) => CardBase | undefined
+  occupation: (id: string) => CardBase | undefined
+}) => {
+  minorLookup = lookups.minor
+  occupationLookup = lookups.occupation
+}
+
+// Ad-hoc test-only registration: tests that construct `new MinorImprovement(...)`
+// or `new Occupation(...)` with fabricated fixture ids (e.g. `TEST_FieldProvider`,
+// `__TEST_OCC_VP__`) can push them here so lookups resolve without depending on
+// the catalog arrays. Not used by production code paths.
+const adHocMinors = new Map<string, CardBase>()
+const adHocOccupations = new Map<string, CardBase>()
+
+export const registerAdHocMinorImprovement = (card: CardBase): void => {
+  adHocMinors.set(card.id, card)
+}
+
+export const registerAdHocOccupation = (card: CardBase): void => {
+  adHocOccupations.set(card.id, card)
+}
 
 export class CardBase {
   id!: string
@@ -88,12 +113,6 @@ export class CardBase {
 
   constructor(data: CardDefinition) {
     Object.assign(this, data)
-    if (this instanceof MinorImprovement || this instanceof PlayerActionCard) {
-      registeredMinorImprovements.set(this.id, this)
-    }
-    if (this instanceof Occupation) {
-      registeredOccupations.set(this.id, this)
-    }
   }
 
   /** Serialize back to a plain CardDefinition for transmission to the frontend. */
@@ -142,8 +161,8 @@ export class Occupation extends CardBase {}
 
 export class PlayerActionCard extends CardBase {}
 
-export const getRegisteredMinorImprovement = (id: string) =>
-  registeredMinorImprovements.get(id)
+export const getRegisteredMinorImprovement = (id: string): CardBase | undefined =>
+  minorLookup?.(id) ?? adHocMinors.get(id)
 
-export const getRegisteredOccupation = (id: string) =>
-  registeredOccupations.get(id)
+export const getRegisteredOccupation = (id: string): CardBase | undefined =>
+  occupationLookup?.(id) ?? adHocOccupations.get(id)
