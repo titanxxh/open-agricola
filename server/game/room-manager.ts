@@ -3,7 +3,12 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
-import { serializeState, rehydrateState, type SerializedGameState } from '../../shared/game/serialization.ts'
+import {
+  rehydrateState,
+  serializeState,
+  serializeStateForPlayer,
+  type SerializedGameState,
+} from '../../shared/game/serialization.ts'
 import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../../shared/protocol/game.ts'
 import type { ClientCommand, ServerEvent, RoomSummary } from '../../shared/protocol/ws.ts'
 import { validateSession } from '../auth.ts'
@@ -562,6 +567,34 @@ const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPa
   return payload
 }
 
+/**
+ * Build a {@link GameSyncPayload} tailored to one viewer. The state portion is
+ * masked via {@link serializeStateForPlayer}; everything else (pending,
+ * scores, availability, custom defs …) is shared verbatim.
+ *
+ * Pass `viewerPlayerId = null` for spectator-style masking (all hands/pools
+ * redacted).
+ */
+const toSyncPayloadForViewer = (
+  resp: SessionResponse,
+  session: GameSession | undefined,
+  viewerPlayerId: string | null,
+): GameSyncPayload => {
+  const base = toSyncPayload(resp, session)
+  return {
+    ...base,
+    state: serializeStateForPlayer(resp.state, viewerPlayerId),
+  }
+}
+
+const viewerIdForSeat = (
+  resp: SessionResponse,
+  seated: RoomPlayer | undefined,
+): string | null => {
+  if (!seated) return null
+  return resp.state.players[seated.playerIndex]?.id ?? null
+}
+
 const broadcastState = (
   room: Room,
   resp: SessionResponse,
@@ -569,18 +602,23 @@ const broadcastState = (
   requestId?: string,
 ) => {
   room.version += 1
-  const envelope: StateUpdateEnvelope = {
-    type: 'stateUpdate',
-    roomId: room.id,
-    version: room.version,
-    sync: 'snapshot',
-    cause,
-    requestId,
-    payload: toSyncPayload(resp, room.session),
-    emittedAt: Date.now(),
+  const emittedAt = Date.now()
+  for (const seated of room.players) {
+    if (seated.ws.readyState !== seated.ws.OPEN) continue
+    const viewerId = viewerIdForSeat(resp, seated)
+    const envelope: StateUpdateEnvelope = {
+      type: 'stateUpdate',
+      roomId: room.id,
+      version: room.version,
+      sync: 'snapshot',
+      cause,
+      requestId,
+      payload: toSyncPayloadForViewer(resp, room.session, viewerId),
+      emittedAt,
+    }
+    sendTo(seated.ws, envelope)
   }
-  broadcast(room, envelope)
-  // Persist on every state change for sqlite, only dev room for json
+  // Persist unfiltered authoritative state on every change for sqlite, only dev room for json
   if (PERSIST_ROOMS === 'sqlite' || isFixedDevRoom(room.id)) {
     savePersistedState(room.id, serializeState(resp.state), room)
   }
@@ -599,6 +637,8 @@ const sendStateTo = (
   resp: SessionResponse,
   requestId?: string,
 ) => {
+  const seated = room.players.find((p) => p.ws === ws)
+  const viewerId = viewerIdForSeat(resp, seated)
   const envelope: StateUpdateEnvelope = {
     type: 'stateUpdate',
     roomId: room.id,
@@ -606,7 +646,7 @@ const sendStateTo = (
     sync: 'snapshot',
     cause: 'reconnect',
     requestId,
-    payload: toSyncPayload(resp, room.session),
+    payload: toSyncPayloadForViewer(resp, room.session, viewerId),
     emittedAt: Date.now(),
   }
   sendTo(ws, envelope)
