@@ -33,7 +33,7 @@ const afterOccupationListener: CardListenerRegistration = {
     }
     // Apply modifier discounts (B109_PaperMaker etc.)
     for (const mod of context.player.activeModifiers ?? []) {
-      if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+      if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
         if (mod.discount.food && food > 0) {
           food = Math.max(0, food - mod.discount.food)
         }
