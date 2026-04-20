@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-20 — A123 FrameBuilder 迁移到 `bonus.choices` + `room-payment.ts` 扩展 `choices` 语义**：把 A123 的 4 条独立 `TradeModifier`（construct × clay/stone + renovation × clay/stone）重写为 2 条 `BonusModifier`（construct + renovation），每条携带 `choices: [{wood:-1, clay:2}, {wood:-1, stone:2}]` + `optional:true`，对齐 BGA `addBonusChoices(..., optional:true)` 语义——同一次 action 至多触发一次资源替换（clay / stone 二选一）。旧实现允许同一 action 同时触发 clay 替换和 stone 替换（4 clay + 4 stone → 2 wood），是实现偏差，本次纠正。配套扩展 `shared/actions/effects/room-payment.ts` 的 `buildRoomCostPerUnit` 与 `applyRoomCountBonuses` 处理 `modifier.choices`：每条 choice 展开为独立 fee 候选（per-room 与 total 两条路径都覆盖），与 BGA 每个 room 独立决策的语义一致。新增 `server/__tests__/A123_FrameBuilder-session.test.ts`（4 例：注册形状、互斥不可叠加、clay 单选、renovation 单选）。
 - **2026-04-19 — A3 + B3 BGA 对齐**：A3 PaperKnife 改为"展示手牌 → 玩家选 3 → 引擎随机从 3 中取 1 免费打出"（不再整手随机直接打出）；B3 Moonshine 改为"服务端随机选 1 张手牌 → 玩家选 play/pass 二选一"（不再自动 XOR 折叠）。新基础设施：`CardEffect.resolveChoice` hook、`rollAndCacheCardPick` + `state.rngTick`（`shared/cards/helpers/card-random.ts`）、`state.pendingUndoBoundary`（`server/game-session.ts` 的 `pushHistory` 消费）、`InteractionSelection.kind: 'occupation-hand'` + `buildOccupationHandSelectionInteraction`（`server/occupation-hand-interaction.ts`）、`ActionChoiceOption.disabled / .disabledReasonKey`（server 拒绝 disabled 选项）、`passOccupationToNextPlayer`（`shared/cards/helpers/pass-occupation.ts`）、`emit-choice` action（`shared/actions/effects/emit-choice.ts`）。§2.2 移除 A3 和 B3 条目。
 - **2026-04-19 — C22 BasketChair BGA 对齐**：引入 `card-held-workers` 原语（`shared/cards/helpers/card-held-workers.ts`），允许卡牌通过 `player.cardStates[cardId].extraData.heldWorkerId` 持有一个工人；`workersAvailable` 排除被卡持有的工人；回家阶段（`server/game-session.ts` returnHome）在清空行动格 `takenBy` 之后以 for 循环遍历所有玩家 cardStates，对每个 cardId 调用 `releaseWorkerFromCard(p, cardId)` 释放持有工人；`recall-placed-worker` 新增 `forceFirst` 与 `targetCardHold` 参数。C22 从简化实现（额外 place-farmer）重写为：`onBuy` hook 在本工作阶段已有首置 farmer 且首置格不是 Meeting Place 时，(a) 用 `recall-placed-worker forceFirst+targetCardHold` 把该工人从行动格撤回到卡持有态，(b) 再提供一次额外 `place-farmer` 让玩家补放另一个在家工人——净消耗 2 个在家工人，释放 1 个格位。若当时尚未放过 farmer 或首置格是 Meeting Place，onBuy seq 直接跳过。回家时工人随 for 循环释放。刻意偏离：(a) 不支持同轮再激活，(b) JobContract 的假人 meeple 清理未实现。新增 `server/__tests__/C22_BasketChair-session.test.ts`。
 - **2026-04-19 — A48 ShavingHorse + B143 ClayWarden BGA 对齐**：A48 删除 `WOOD_SPACES` 过滤（BGA 不按空间过滤），合并为两个 `after` listener——`gain/collect/receive` + `anytime-exchange`——复用同一 `checkAndExchange(context)` 检查木头净获得与当前总量；cost 从 `{}` 改为 `{ wood: 1 }` 与 BGA 对齐。B143 `HOLLOW_SPACES` 加入 `'hollow'`（3 人版空间），在 3 人局也能触发 opponent 钩子。新增 `server/__tests__/A48_ShavingHorse-session.test.ts`（7 例）、扩展 `server/__tests__/B143_ClayWarden-session.test.ts`（+1 例 3P）。
@@ -236,6 +237,7 @@
 | **`onAllWorkersPlaced` 阶段 hook + 阶段 flow**（2026-04-18） | ✅ | `CardEffect.onAllWorkersPlaced?: CardEffectHook`：在所有玩家本轮在家工人都用完之后、`performRoundEnd` 之前触发；可返回 `ActionFlow` 走与普通行动一致的引擎链路（`continueAllWorkersPlacedHooks` 维护 stage resume cursor）。首个消费者：`E125 DelayedWayfarer`（本轮所有人放完后，从 supply 激活并放置一个 worker，对齐 BGA 时序）。 |
 | **`place-farmer` `fromSupply` 模式**（2026-04-18） | ✅ | `place-farmer` 接受 `params.fromSupply: true`：在执行前从 `player.workers` 里激活一个 inactive supply worker（标记 `isActive=true`），再走标准放置流程；专为 `onAllWorkersPlaced` 阶段“现激活、现放置”的卡牌（E125 DelayedWayfarer）服务，不影响普通工作阶段路径。 |
 | **`dispatchReapListener` + `'reap'` 合成 action**（2026-04-18） | ✅ | `shared/actions/effects/reap.ts` 导出 `dispatchReapListener(state, player, crop, amount)`：每次 base reap 与额外 reap 卡（D25/C70/E69/E70/E68/E72）产出作物后调用，分发 `'reap'` 合成 action 事件（`extraData = { crop: 'grain'\|'vegetable', amount }`）。卡牌可通过 `registerCardListener({actions: ['reap'], phases: ['immediatelyAfter']})` 订阅。首个消费者：B132 EstateMaster（满栏后每次蔬菜 reap +1 VP）。 |
+| **`Bonus.choices` + `BonusModifier.choices` + bonus accumulation 修正**（2026-04-20） | ✅ | `shared/game/types.ts` 在 `Bonus` / `BonusModifier` 新增 `choices?: BonusChoice[]` 字段，表达"一组互斥折扣，按 optional 展开为选用/跳过 + 每条 choice 各一个候选"。`computeAllBuyableCombinations` 的 bonus iteration 重写为 BGA 风格（非 optional 累积、optional 展开、`choices` 展开为多个候选）。`shared/actions/effects/room-payment.ts` 的 `buildRoomCostPerUnit` 与 `applyRoomCountBonuses` 同步处理 `modifier.choices`（per-room 与 total 两条路径都覆盖）。修正了原本把多 bonus 误当互斥的 bug。首个消费者：A123 FrameBuilder（迁移自 4 条独立 TradeModifier，见 §2.0 2026-04-20 条目）。 |
 
 ### 目录重组（PR-3）
 
@@ -306,6 +308,7 @@
 | E96 Elder BGA 对齐 + handHooks 机制 | 04-19 | 0 | 821 | 92.0% |
 | C22 BasketChair BGA 对齐 + card-held-workers 原语 | 04-19 | 0 | 821 | 92.0% |
 | A3+B3 BGA 对齐 via hand-picker infra | 04-19 | 0 | 821 | 92.0% |
+| A123 FrameBuilder → bonus.choices + pay 系统 Bonus.choices 能力 | 04-20 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
