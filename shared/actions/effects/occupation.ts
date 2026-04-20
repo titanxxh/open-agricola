@@ -107,7 +107,7 @@ export const getOccupationCost = (
   if (!occupation) return null
   const cost = { ...occupation.cost }
   for (const mod of player.activeModifiers ?? []) {
-    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
       for (const [key, discount] of Object.entries(mod.discount)) {
         const rk = key as keyof typeof cost
         if ((cost[rk] ?? 0) > 0) {
@@ -133,7 +133,7 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
         : 1
   let food = base
   for (const mod of player.activeModifiers ?? []) {
-    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation')) {
+    if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
       if (mod.discount.food && food > 0) {
         food = Math.max(0, food - mod.discount.food)
       }

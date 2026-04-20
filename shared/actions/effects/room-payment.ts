@@ -31,6 +31,7 @@ const applyBonusToFee = (
   bonus: Bonus,
 ) => {
   const result = { ...cost }
+  if (!bonus.discount) return sanitizeCost(result)
   Object.entries(bonus.discount).forEach(([key, value]) => {
     if (typeof value !== 'number') return
     result[key as keyof Resource] = Math.max(0, (result[key as keyof Resource] ?? 0) - value)
@@ -182,9 +183,11 @@ export const buildRoomCostPerUnit = (
         if (modifier.conditions && Object.keys(modifier.conditions).length > 0) {
           return
         }
+        if (!modifier.discount) return
+        const discount = modifier.discount
         const discounted = fees.map((fee) =>
           sanitizeCost(
-            Object.entries(modifier.discount).reduce<Partial<Resource>>(
+            Object.entries(discount).reduce<Partial<Resource>>(
               (acc, [key, value]) => ({
                 ...acc,
                 [key]: Math.max(0, (acc[key as keyof Resource] ?? 0) - (value ?? 0)),
@@ -227,6 +230,7 @@ const applyRoomCountBonuses = (
     .filter((modifier) => bonusAppliesToRoomCount(player, modifier.conditions, roomCount))
     .map((modifier) => ({
       discount: modifier.discount,
+      choices: modifier.choices,
       optional: modifier.optional ?? true,
       sources: [modifier.cardId],
       conditions: modifier.conditions,
