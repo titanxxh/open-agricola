@@ -237,6 +237,16 @@
 | **`place-farmer` `fromSupply` 模式**（2026-04-18） | ✅ | `place-farmer` 接受 `params.fromSupply: true`：在执行前从 `player.workers` 里激活一个 inactive supply worker（标记 `isActive=true`），再走标准放置流程；专为 `onAllWorkersPlaced` 阶段“现激活、现放置”的卡牌（E125 DelayedWayfarer）服务，不影响普通工作阶段路径。 |
 | **`dispatchReapListener` + `'reap'` 合成 action**（2026-04-18） | ✅ | `shared/actions/effects/reap.ts` 导出 `dispatchReapListener(state, player, crop, amount)`：每次 base reap 与额外 reap 卡（D25/C70/E69/E70/E68/E72）产出作物后调用，分发 `'reap'` 合成 action 事件（`extraData = { crop: 'grain'\|'vegetable', amount }`）。卡牌可通过 `registerCardListener({actions: ['reap'], phases: ['immediatelyAfter']})` 订阅。首个消费者：B132 EstateMaster（满栏后每次蔬菜 reap +1 VP）。 |
 
+### 目录重组（PR-3）
+
+- 2026-04-20 PR-3 目录重组落地：
+  - src/ → client/
+  - server/custom-code/ 集中自定义代码执行链（compiler + runtime + engine + isolate + client + worker）
+  - server/game/ 集中对局链（authoritative-session + room-manager）
+  - 删除 PR-1 遗留的 7 个 farm re-export + ast-validator + custom-code-types 兼容 stub
+  - package.json.sideEffects 声明完成（主 bundle 基线 ~834KB / gzip ~234KB，PR-4 继续缩减）
+  - ESLint no-restricted-imports 三层边界（warn）已启用，零跨界违反
+
 ### PR-3 Task 10 审计遗留（待未来 PR 处理）
 
 - TODO(PR-future): `collectLockedFarmTileKeys` in `shared/cards/card-effects.ts` 是 rule-ish（遍历 `getCardEffect` mutable 注册表、调用卡牌 `computeLockedFarmTiles` handler，主要消费者在 `shared/session/game-core.ts` / `shared/logic/farm/farm-interaction.ts` / `shared/logic/farm/farm-choice.ts` 规则路径上，`client/components/board/FarmBoard.tsx` 只是顺带复用）。不适合迁到 `shared/cards/view-helpers/`；evaluate 在后续 PR 中将前端使用的那份改为消费 server 预先计算的 `lockedTileKeys` 快照字段，或包成显式输入的 shared helper。Tracked during PR-3 Task 10 audit.
