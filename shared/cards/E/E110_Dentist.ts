@@ -1,11 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E110_Dentist'
 
-registerCardEffect({
+export const E110_Dentist = new Occupation({
+  id: CARD_ID,
+  name: 'Dentist',
+  deck: 'E',
+  number: 110,
+  category: 'FOOD_PROVIDER',
+  desc: ['At the start of each harvest, you can place 1 <WOOD> from your supply on this card, irretrievably. In each feeding phase, you get 1 <FOOD> for each <WOOD> on this card.'],
+  cost: {},
+  players: '1+',
+})
+
+export const E110_Dentist_impl = {
+  effect: {
   id: CARD_ID,
   // At start of each harvest: optionally pay 1 wood to place on card
   onStartHarvest: (_state, player) => {
@@ -26,15 +38,6 @@ registerCardEffect({
     if (woodCount <= 0) return
     return gainLeaf(CARD_ID, { food: woodCount })
   },
-})
-
-export const E110_Dentist = new Occupation({
-  id: CARD_ID,
-  name: 'Dentist',
-  deck: 'E',
-  number: 110,
-  category: 'FOOD_PROVIDER',
-  desc: ['At the start of each harvest, you can place 1 <WOOD> from your supply on this card, irretrievably. In each feeding phase, you get 1 <FOOD> for each <WOOD> on this card.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

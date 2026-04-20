@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B55_MaintenancePremium'
 
@@ -44,17 +43,6 @@ const renovationListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(woodCollectListener)
-registerCardListener(renovationListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'foodCount', 3)
-    updateInfobox(player, 3)
-  },
-})
-
 export const B55_MaintenancePremium = new MinorImprovement({
   id: CARD_ID,
   name: 'Maintenance Premium',
@@ -67,3 +55,15 @@ export const B55_MaintenancePremium = new MinorImprovement({
   occupationPrerequisites: { min: 2 },
   newSet: true,
 })
+
+export const B55_MaintenancePremium_impl = {
+  listeners: [woodCollectListener, renovationListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'foodCount', 3)
+    updateInfobox(player, 3)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,11 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B151_LittlePeasant'
 
@@ -57,9 +57,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onPlayListener)
-registerCardListener(computeArgsListener)
-
 export const B151_LittlePeasant = new Occupation({
   id: CARD_ID,
   name: "Little Peasant",
@@ -71,3 +68,8 @@ export const B151_LittlePeasant = new Occupation({
   players: "4+",
   newSet: true,
 })
+
+export const B151_LittlePeasant_impl = {
+  listeners: [onPlayListener, computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

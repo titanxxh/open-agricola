@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B60_BrewingWater'
 
@@ -37,8 +37,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B60_BrewingWater = new MinorImprovement({
   id: CARD_ID,
   name: 'Brewing Water',
@@ -49,3 +47,8 @@ export const B60_BrewingWater = new MinorImprovement({
   cost: {},
   newSet: true,
 })
+
+export const B60_BrewingWater_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

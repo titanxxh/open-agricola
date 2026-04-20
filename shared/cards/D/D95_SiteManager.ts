@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 import { getMajorCardEffect } from '../major'
 import { getMinorImprovement } from '../../game/minor-improvements'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D95_SiteManager'
 
@@ -104,9 +104,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(computeCostsListener)
-
 export const D95_SiteManager = new Occupation({
   id: CARD_ID,
   name: 'Site Manager',
@@ -120,3 +117,8 @@ export const D95_SiteManager = new Occupation({
   players: '1+',
   evenMoreSet: true,
 })
+
+export const D95_SiteManager_impl = {
+  listeners: [onBuyListener, computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

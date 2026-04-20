@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D8_FernSeeds'
 
-registerCardEffect({
+export const D8_FernSeeds = new MinorImprovement({
+  id: CARD_ID,
+  name: "Fern Seeds",
+  deck: "D",
+  number: 8,
+  category: "CROP_PROVIDER",
+  desc: ["You get 2 <FOOD> and 1 <GRAIN>, which you must sow immediately."],
+  passing: true,
+  prerequisite: "1 Empty and 2 Planted Fields",
+})
+
+export const D8_FernSeeds_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: () => {
     return {
@@ -20,15 +32,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D8_FernSeeds = new MinorImprovement({
-  id: CARD_ID,
-  name: "Fern Seeds",
-  deck: "D",
-  number: 8,
-  category: "CROP_PROVIDER",
-  desc: ["You get 2 <FOOD> and 1 <GRAIN>, which you must sow immediately."],
-  passing: true,
-  prerequisite: "1 Empty and 2 Planted Fields",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

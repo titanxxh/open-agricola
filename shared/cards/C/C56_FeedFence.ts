@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
 import type { TradeModifier } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C56_FeedFence'
 
@@ -29,8 +29,6 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterListener)
-
 export const C56_FeedFence = new MinorImprovement({
   id: CARD_ID,
   name: 'Feed Fence',
@@ -52,3 +50,8 @@ export const C56_FeedFence = new MinorImprovement({
     max: 1,
   } as TradeModifier,
 })
+
+export const C56_FeedFence_impl = {
+  listeners: [afterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

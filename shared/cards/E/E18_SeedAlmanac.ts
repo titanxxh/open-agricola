@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E18_SeedAlmanac'
 
@@ -33,8 +33,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E18_SeedAlmanac = new MinorImprovement({
   id: CARD_ID,
   name: 'Seed Almanac',
@@ -48,3 +46,8 @@ export const E18_SeedAlmanac = new MinorImprovement({
   prerequisite: '4 Occupations',
   occupationPrerequisites: { min: 4 },
 })
+
+export const E18_SeedAlmanac_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

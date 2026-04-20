@@ -1,13 +1,24 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E112_GrainThief'
 const PROTECTED_KEY = 'protectedFields'
 
-registerCardEffect({
+export const E112_GrainThief = new Occupation({
+  id: "E112_GrainThief",
+  name: "Grain Thief",
+  deck: "E",
+  number: 112,
+  desc: ["Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."],
+  cost: {},
+  players: "1+",
+})
+
+export const E112_GrainThief_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
     // Clear stale data
@@ -56,14 +67,6 @@ registerCardEffect({
       }
     }
   },
-})
-
-export const E112_GrainThief = new Occupation({
-  id: "E112_GrainThief",
-  name: "Grain Thief",
-  deck: "E",
-  number: 112,
-  desc: ["Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

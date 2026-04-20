@@ -1,11 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 // Inline harvest rounds to avoid circular dependency with logic/state
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
@@ -13,13 +12,6 @@ const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
 const CARD_ID = 'C84_PerennialRye'
 
 const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C84-perennial-rye-anytime',
@@ -50,8 +42,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C84_PerennialRye = new MinorImprovement({
   id: CARD_ID,
   name: 'Perennial Rye',
@@ -64,3 +54,14 @@ export const C84_PerennialRye = new MinorImprovement({
   occupationPrerequisites: { min: 2 },
   newSet: true,
 })
+
+export const C84_PerennialRye_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

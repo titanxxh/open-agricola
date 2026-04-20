@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E40_BeeStatue'
 
@@ -12,13 +11,6 @@ const CARD_ID = 'E40_BeeStatue'
  * Each time the owner uses Day Laborer, automatically take the top good.
  */
 const STACK_ITEMS = ['vegetable', 'stone', 'grain', 'stone', 'grain']
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, STACK_ITEMS)
-  },
-})
 
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'E40-bee-statue-after-place-farmer',
@@ -36,8 +28,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-
 export const E40_BeeStatue = new MinorImprovement({
   id: CARD_ID,
   name: 'Bee Statue',
@@ -48,3 +38,14 @@ export const E40_BeeStatue = new MinorImprovement({
   cost: { clay: 2 },
   players: '1+',
 })
+
+export const E40_BeeStatue_impl = {
+  listeners: [afterPlaceFarmerListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, STACK_ITEMS)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

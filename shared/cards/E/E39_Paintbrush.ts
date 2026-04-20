@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E39_Paintbrush'
 
-registerCardEffect({
+export const E39_Paintbrush = new MinorImprovement({
+  id: CARD_ID,
+  name: "Paintbrush",
+  deck: "E",
+  number: 39,
+  category: "POINTS_PROVIDER",
+  desc: ["Each harvest, you can exchange exactly 1 <CLAY> for your choice of 2 <FOOD> or 1 bonus <SCORE>."],
+  cost: { wood: 1 },
+  prerequisite: "1 Pig",
+})
+
+export const E39_Paintbrush_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     if (player.resources.clay < 1) return
@@ -36,15 +48,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const E39_Paintbrush = new MinorImprovement({
-  id: CARD_ID,
-  name: "Paintbrush",
-  deck: "E",
-  number: 39,
-  category: "POINTS_PROVIDER",
-  desc: ["Each harvest, you can exchange exactly 1 <CLAY> for your choice of 2 <FOOD> or 1 bonus <SCORE>."],
-  cost: { wood: 1 },
-  prerequisite: "1 Pig",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

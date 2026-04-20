@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A73_AgriculturalFertilizers'
 
@@ -43,9 +43,6 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
-
 export const A73_AgriculturalFertilizers = new MinorImprovement({
   id: CARD_ID,
   name: 'Agricultural Fertilizers',
@@ -58,3 +55,8 @@ export const A73_AgriculturalFertilizers = new MinorImprovement({
   cost: {},
   prerequisite: '1 Pasture',
 })
+
+export const A73_AgriculturalFertilizers_impl = {
+  listeners: [beforeListener, afterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

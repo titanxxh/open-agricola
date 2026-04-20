@@ -1,19 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B52_GrowingFarm'
-
-// BGA: gain food equal to the current round number.
-// Prerequisite: pasture spaces >= completed rounds (enforced by isBuyable).
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const turn = state.round
-    if (turn <= 0) return
-    return gainLeaf(CARD_ID, { food: turn })
-  },
-})
 
 export const B52_GrowingFarm = new MinorImprovement({
   id: CARD_ID,
@@ -26,3 +15,15 @@ export const B52_GrowingFarm = new MinorImprovement({
   vp: 2,
   prerequisite: 'see below',
 })
+
+export const B52_GrowingFarm_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const turn = state.round
+    if (turn <= 0) return
+    return gainLeaf(CARD_ID, { food: turn })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

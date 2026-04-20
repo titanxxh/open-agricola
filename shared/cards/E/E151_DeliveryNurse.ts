@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E151_DeliveryNurse'
 
@@ -44,8 +44,6 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-
 export const E151_DeliveryNurse = new Occupation({
   id: CARD_ID,
   name: 'Delivery Nurse',
@@ -55,3 +53,8 @@ export const E151_DeliveryNurse = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const E151_DeliveryNurse_impl = {
+  listeners: [computeReplaceListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

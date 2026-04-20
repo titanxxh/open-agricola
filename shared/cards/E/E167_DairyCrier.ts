@@ -1,15 +1,24 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E167_DairyCrier'
 
-/**
- * onBuy: each player (including owner) chooses 2 sheep or 2 food.
- * Owner also gets 1 cattle.
- */
-registerCardEffect({
+export const E167_DairyCrier = new Occupation({
+  id: CARD_ID,
+  name: 'Dairy Crier',
+  deck: 'E',
+  number: 167,
+  desc: [
+    'When you play this card, each player (including you) can choose to get 2 <SHEEP> or 2 <FOOD>; you also get 1 <CATTLE>.',
+  ],
+  cost: {},
+  players: '4+',
+})
+
+export const E167_DairyCrier_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const children: ActionFlow[] = [gainLeaf(CARD_ID, { cattle: 1 })]
@@ -49,16 +58,6 @@ registerCardEffect({
 
     return { type: 'seq', children }
   },
-})
-
-export const E167_DairyCrier = new Occupation({
-  id: CARD_ID,
-  name: 'Dairy Crier',
-  deck: 'E',
-  number: 167,
-  desc: [
-    'When you play this card, each player (including you) can choose to get 2 <SHEEP> or 2 <FOOD>; you also get 1 <CATTLE>.',
-  ],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

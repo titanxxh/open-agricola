@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, writeCardInfobox } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C115_Sower'
 
@@ -37,8 +37,6 @@ const afterImprovementListener: CardListenerRegistration = {
     writeCardInfobox(context.player, CARD_ID, `${newCount} Reed`)
   },
 }
-
-registerCardListener(afterImprovementListener)
 
 /**
  * Listener 2: Anytime — take reed OR exchange for sow action.
@@ -85,8 +83,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C115_Sower = new Occupation({
   id: CARD_ID,
   name: 'Sower',
@@ -97,3 +93,8 @@ export const C115_Sower = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C115_Sower_impl = {
+  listeners: [afterImprovementListener, anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

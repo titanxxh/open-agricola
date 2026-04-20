@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C94_StableCleaner'
 
@@ -43,8 +43,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C94_StableCleaner = new Occupation({
   id: CARD_ID,
   name: 'Stable Cleaner',
@@ -56,3 +54,8 @@ export const C94_StableCleaner = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const C94_StableCleaner_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

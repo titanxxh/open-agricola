@@ -1,11 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../game/farm'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import type { ActionFlow } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E71_CowPatty'
 
@@ -104,8 +104,6 @@ const afterSowListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterSowListener)
-
 export const E71_CowPatty = new MinorImprovement({
   id: 'E71_CowPatty',
   name: 'Cow Patty',
@@ -117,3 +115,8 @@ export const E71_CowPatty = new MinorImprovement({
   prerequisite: '1 Cattle',
   implemented: true,
 })
+
+export const E71_CowPatty_impl = {
+  listeners: [afterSowListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

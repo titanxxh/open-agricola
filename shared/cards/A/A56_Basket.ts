@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A56_Basket'
 
@@ -27,8 +27,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A56_Basket = new MinorImprovement({
   id: CARD_ID,
   name: 'Basket',
@@ -38,3 +36,8 @@ export const A56_Basket = new MinorImprovement({
   desc: ['Immediately after each time you use a wood accumulation space, you can exchange 2 <WOOD> for 3 <FOOD>. If you do, place those 2 <WOOD> on the accumulation space.'],
   cost: { reed: 1 },
 })
+
+export const A56_Basket_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

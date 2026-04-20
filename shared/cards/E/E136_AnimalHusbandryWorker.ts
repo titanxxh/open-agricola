@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E136_AnimalHusbandryWorker'
 
@@ -12,7 +12,19 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   return 0
 }
 
-registerCardEffect({
+export const E136_AnimalHusbandryWorker = new Occupation({
+  id: CARD_ID,
+  name: "Animal Husbandry Worker",
+  deck: "E",
+  number: 136,
+  category: "POINTS_PROVIDER",
+  desc: ['If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD> and a __Build Fences__ action. During scoring, each player with the most pastures gets 2 <SCORE>.'],
+  cost: {},
+  players: "3+",
+})
+
+export const E136_AnimalHusbandryWorker_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state) => {
     const wood = roundsLeftWoodBonus(state)
@@ -30,15 +42,6 @@ registerCardEffect({
     const maxPastures = Math.max(...state.players.map((p) => p.pastures.length))
     return myPastures === maxPastures && myPastures > 0 ? 2 : 0
   },
-})
-
-export const E136_AnimalHusbandryWorker = new Occupation({
-  id: CARD_ID,
-  name: "Animal Husbandry Worker",
-  deck: "E",
-  number: 136,
-  category: "POINTS_PROVIDER",
-  desc: ['If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD> and a __Build Fences__ action. During scoring, each player with the most pastures gets 2 <SCORE>.'],
-  cost: {},
-  players: "3+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize, workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E116_FirCutter'
 
@@ -54,9 +54,6 @@ const animalMarketListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(animalMarketListener)
-
 export const E116_FirCutter = new Occupation({
   id: CARD_ID,
   name: 'Fir Cutter',
@@ -70,3 +67,8 @@ export const E116_FirCutter = new Occupation({
   players: '1+',
   evenMoreSet: true,
 })
+
+export const E116_FirCutter_impl = {
+  listeners: [onBuyListener, animalMarketListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

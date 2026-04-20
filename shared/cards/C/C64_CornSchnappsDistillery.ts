@@ -1,20 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C64_CornSchnappsDistillery'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C64-corn-schnapps-distillery-anytime',
@@ -45,8 +37,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C64_CornSchnappsDistillery = new MinorImprovement({
   id: CARD_ID,
   name: 'Corn Schnapps Distillery',
@@ -57,3 +47,14 @@ export const C64_CornSchnappsDistillery = new MinorImprovement({
   cost: { wood: 1, clay: 2 },
   vp: 1,
 })
+
+export const C64_CornSchnappsDistillery_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

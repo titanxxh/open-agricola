@@ -1,12 +1,24 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A85_Homekeeper'
 
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1
 
-registerCardEffect({
+export const A85_Homekeeper = new Occupation({
+  id: CARD_ID,
+  name: "Homekeeper",
+  deck: "A",
+  number: 85,
+  category: "FARM_PLANNER",
+  desc: ["Exactly one clay or stone room in your house can hold an additional person if the room is adjacent to both a field and a pasture."],
+  cost: {},
+  players: "1+",
+})
+
+export const A85_Homekeeper_impl = {
+  effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
     if (player.houseType === 'wood') return 0
@@ -20,15 +32,6 @@ registerCardEffect({
 
     return hasQualifyingRoom ? 1 : 0
   },
-})
-
-export const A85_Homekeeper = new Occupation({
-  id: CARD_ID,
-  name: "Homekeeper",
-  deck: "A",
-  number: 85,
-  category: "FARM_PLANNER",
-  desc: ["Exactly one clay or stone room in your house can hold an additional person if the room is adjacent to both a field and a pasture."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B24_Lasso'
 
@@ -37,8 +37,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B24_Lasso = new MinorImprovement({
   id: CARD_ID,
   name: 'Lasso',
@@ -48,3 +46,8 @@ export const B24_Lasso = new MinorImprovement({
   desc: ['You can place exactly two people immediately after one another if at least one of them uses the __Sheep Market__, __Pig Market__, or __Cattle Market__ accumulation space.'],
   cost: { reed: 1 },
 })
+
+export const B24_Lasso_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

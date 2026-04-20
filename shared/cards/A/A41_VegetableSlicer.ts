@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A41_VegetableSlicer'
 const COOKING_HEARTH_IDS = new Set(['Major_CookingHearth1', 'Major_CookingHearth2'])
@@ -32,8 +32,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A41_VegetableSlicer = new MinorImprovement({
   id: CARD_ID,
   name: 'Vegetable Slicer',
@@ -43,3 +41,8 @@ export const A41_VegetableSlicer = new MinorImprovement({
   desc: ['Each time you upgrade a Fireplace to a Cooking Hearth, you immediately get 2 <WOOD> and 1 <VEGETABLE> (not retroactively).'],
   cost: { wood: 1 },
 })
+
+export const A41_VegetableSlicer_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

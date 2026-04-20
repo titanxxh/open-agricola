@@ -1,21 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A5_ClayEmbankment'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const clay = player.resources.clay
-    if (clay < 2) return
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { clay: Math.floor(clay / 2) },
-    }
-  },
-})
 
 export const A5_ClayEmbankment = new MinorImprovement({
   id: CARD_ID,
@@ -27,3 +13,20 @@ export const A5_ClayEmbankment = new MinorImprovement({
   cost: { food: 1 },
   passing: true,
 })
+
+export const A5_ClayEmbankment_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const clay = player.resources.clay
+    if (clay < 2) return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { clay: Math.floor(clay / 2) },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

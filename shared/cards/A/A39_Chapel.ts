@@ -1,7 +1,7 @@
 import { PlayerActionCard } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { incCounter } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A39_Chapel'
 
@@ -31,18 +31,6 @@ registerPlayerActionSpace({
   }),
 })
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const newSpaces = createPlayerActionSpaces(state)
-    for (const space of newSpaces) {
-      if (!state.actionSpaces.some((s) => s.id === space.id)) {
-        state.actionSpaces.push(space)
-      }
-    }
-  },
-})
-
 export const A39_Chapel = new PlayerActionCard({
   id: "A39_Chapel",
   name: "Chapel",
@@ -54,3 +42,18 @@ export const A39_Chapel = new PlayerActionCard({
   prerequisite: "2 Occupations",
   occupationPrerequisites: {"min":2},
 })
+
+export const A39_Chapel_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const newSpaces = createPlayerActionSpaces(state)
+    for (const space of newSpaces) {
+      if (!state.actionSpaces.some((s) => s.id === space.id)) {
+        state.actionSpaces.push(space)
+      }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

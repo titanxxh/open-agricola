@@ -1,10 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D57_WholesaleMarket'
 
-registerCardEffect({
+export const D57_WholesaleMarket = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Wholesale Market',
+  deck: 'D',
+  number: 57,
+  category: 'FOOD_PROVIDER',
+  desc: ['Place 1 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.'],
+  cost: { wood: 2, vegetable: 2 },
+  vp: 3,
+  newSet: true,
+})
+
+export const D57_WholesaleMarket_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     // Place 1 food on each remaining round space (all remaining rounds up to 14)
@@ -18,16 +31,6 @@ registerCardEffect({
       resources: { food: 1 },
     })
   },
-})
-
-export const D57_WholesaleMarket = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Wholesale Market',
-  deck: 'D',
-  number: 57,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 1 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.'],
-  cost: { wood: 2, vegetable: 2 },
-  vp: 3,
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

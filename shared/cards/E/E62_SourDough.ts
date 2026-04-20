@@ -1,32 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E62_SourDough'
-
-/**
- * E62 Sour Dough — Once per round, if all players have at least 1 person left
- * to place, you can skip placing a person and take a __Bake Bread__ action instead.
- *
- * BGA: canBeActivated → !isFlagged && allPlayersCanPlace.
- * onPlayerStartOfTurn → unflagCardNode.
- *
- * Implementation: anytime listener (flag-gated, once per round).
- * Check all players still have workersAvailable > 0.
- * Effect: bake-bread action (player must have a baking improvement).
- *
- * Prerequisite: 3 Occupations and 1 Baking Improvement.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E62-sour-dough-anytime',
@@ -53,8 +32,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E62_SourDough = new MinorImprovement({
   id: CARD_ID,
   name: 'Sour Dough',
@@ -66,3 +43,14 @@ export const E62_SourDough = new MinorImprovement({
   prerequisite: '3 Occupations and 1 Baking Improvement',
   occupationPrerequisites: { min: 3 },
 })
+
+export const E62_SourDough_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

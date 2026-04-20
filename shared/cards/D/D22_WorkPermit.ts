@@ -1,5 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 import {
   isCardFlagged,
@@ -9,26 +8,27 @@ import {
   writeCardInfobox,
 } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D22_WorkPermit'
 const TARGET_ROUND_KEY = 'targetRound'
 
-/**
- * D22 Work Permit (Minor, D, 22):
- * - onBuy: target round = current round + (wood + clay + stone + reed) in supply.
- *   If target round <= 14, mark that round with a future meeple entry and offer
- *   the player a bonus person at that round.
- * - onRoundStart (at target round): offer an optional `place-farmer` leaf so
- *   the player can place one extra person.
- *
- * Mirrors A22 Telegram exactly, but counts building resources (wood/clay/stone/reed)
- * instead of fences.
- *
- * BGA: see D22_WorkPermit.php lines 44-63 (onBuy counts reserve resources;
- * placeFutureFarmer moves a farmer to the target round's space) and lines 86-90
- * (activate flags the card to allow an extra placement in that round).
- */
-registerCardEffect({
+export const D22_WorkPermit = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Work Permit',
+  deck: 'D',
+  number: 22,
+  category: 'ACTIONS_BOOSTER',
+  desc: [
+    'Add 1 to the current round for each building resource you have and place 1 person from your supply on the corresponding round space. In that round, you can use the person.',
+  ],
+  cost: { food: 1 },
+  prerequisite: 'At Least 1 Building Resource',
+  evenMoreSet: true,
+})
+
+export const D22_WorkPermit_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const buildingResources =
@@ -68,18 +68,6 @@ registerCardEffect({
       ],
     } as ActionFlow
   },
-})
-
-export const D22_WorkPermit = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Work Permit',
-  deck: 'D',
-  number: 22,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Add 1 to the current round for each building resource you have and place 1 person from your supply on the corresponding round space. In that round, you can use the person.',
-  ],
-  cost: { food: 1 },
-  prerequisite: 'At Least 1 Building Resource',
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

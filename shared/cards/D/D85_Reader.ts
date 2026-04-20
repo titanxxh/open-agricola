@@ -1,17 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D85_Reader'
-
-// D85 Reader: once the player has 6+ occupations in play (including this one),
-// this card provides room for one person. (Draft-mode 7-occupation variant is not
-// modeled here; we follow the default 6-occupation rule.)
-registerCardEffect({
-  id: CARD_ID,
-  computeExtraRoomCapacity: (player) => {
-    return player.occupationPlayed.length >= 6 ? 1 : 0
-  },
-})
 
 export const D85_Reader = new Occupation({
   id: CARD_ID,
@@ -26,3 +16,13 @@ export const D85_Reader = new Occupation({
   players: '1+',
   evenMoreSet: true,
 })
+
+export const D85_Reader_impl = {
+  effect: {
+  id: CARD_ID,
+  computeExtraRoomCapacity: (player) => {
+    return player.occupationPlayed.length >= 6 ? 1 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

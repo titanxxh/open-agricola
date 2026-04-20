@@ -1,7 +1,7 @@
 import { returnCardToBoard } from '../../actions/effects/pay'
-import { registerCardEffect } from '../card-effects'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { MinorImprovement } from '../types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D60_LargePottery'
 
@@ -18,22 +18,6 @@ const CARD_ID = 'D60_LargePottery'
 
 registerPrerequisite('Return the Pottery', (player) =>
   player.improvements.includes('Major_Pottery'))
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    if (!player.improvements.includes('Major_Pottery')) return
-    returnCardToBoard(player, 'Major_Pottery', state)
-  },
-  computeBonusScore: (_state, player) => {
-    const clay = player.resources.clay
-    if (clay >= 7) return 4
-    if (clay >= 6) return 3
-    if (clay >= 5) return 2
-    if (clay >= 3) return 1
-    return 0
-  },
-})
 
 export const D60_LargePottery = new MinorImprovement({
   id: CARD_ID,
@@ -57,3 +41,22 @@ export const D60_LargePottery = new MinorImprovement({
     { from: { clay: 1 }, to: { food: 2 }, trigger: 'anytime' },
   ],
 })
+
+export const D60_LargePottery_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    if (!player.improvements.includes('Major_Pottery')) return
+    returnCardToBoard(player, 'Major_Pottery', state)
+  },
+  computeBonusScore: (_state, player) => {
+    const clay = player.resources.clay
+    if (clay >= 7) return 4
+    if (clay >= 6) return 3
+    if (clay >= 5) return 2
+    if (clay >= 3) return 1
+    return 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

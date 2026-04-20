@@ -1,28 +1,26 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C22_BasketChair'
 
-/**
- * C22 Basket Chair (Minor Improvement, Even More set).
- *
- * BGA behavior (C22_BasketChair.php):
- *   When bought in the work phase, if the player has already placed a farmer
- *   this phase and that first farmer is on an action space other than Meeting
- *   Place, offer an optional sequence: (a) move that farmer to this card, then
- *   (b) place another at-home farmer on any available space.
- *
- * Net result per buy: 2 at-home farmers consumed (one held on this card, one on
- * the newly chosen space). The original space is freed for reuse.
- *
- * Deliberate deviations from BGA (tracked in docs/card_progress.md §6):
- *   - No same-turn reactivation of the card's private space (BGA's canBePlayed
- *     turnId gate is not replicated; skipping the onBuy seq forfeits the effect).
- *   - No JobContract fake-meeple cleanup (that mechanism is not modelled yet).
- */
-registerCardEffect({
+export const C22_BasketChair = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Basket Chair',
+  deck: 'C',
+  number: 22,
+  category: 'ACTIONS_BOOSTER',
+  desc: [
+    'When you play this card, you can immediately move the first person you placed this work phase to this card (unless it is on __Meeting Place__). If you do, immediately afterward, you can place another person.',
+  ],
+  cost: { reed: 1 },
+  vp: 1,
+  evenMoreSet: true,
+})
+
+export const C22_BasketChair_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const first = getRoundPlacementDetails(player)[0]
@@ -57,18 +55,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C22_BasketChair = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Basket Chair',
-  deck: 'C',
-  number: 22,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card, you can immediately move the first person you placed this work phase to this card (unless it is on __Meeting Place__). If you do, immediately afterward, you can place another person.',
-  ],
-  cost: { reed: 1 },
-  vp: 1,
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

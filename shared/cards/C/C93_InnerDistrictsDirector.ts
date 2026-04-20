@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C93_InnerDistrictsDirector'
 
@@ -63,8 +63,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C93_InnerDistrictsDirector = new Occupation({
   id: CARD_ID,
   name: 'Inner Districts Director',
@@ -78,3 +76,8 @@ export const C93_InnerDistrictsDirector = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const C93_InnerDistrictsDirector_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

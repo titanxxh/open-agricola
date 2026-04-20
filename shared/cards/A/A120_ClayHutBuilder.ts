@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A120_ClayHutBuilder'
 
@@ -36,11 +35,6 @@ const placeClay = (
   return futureMeeplesNode()
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => placeClay(state, player),
-})
-
 const listener: CardListenerRegistration = {
   id: 'A120-clay-hut-builder-after-renovation',
   cardIds: [CARD_ID],
@@ -52,8 +46,6 @@ const listener: CardListenerRegistration = {
     return { flow, sourceCard: CARD_ID }
   },
 }
-
-registerCardListener(listener)
 
 export const A120_ClayHutBuilder = new Occupation({
   id: CARD_ID,
@@ -67,3 +59,12 @@ export const A120_ClayHutBuilder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A120_ClayHutBuilder_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => placeClay(state, player),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

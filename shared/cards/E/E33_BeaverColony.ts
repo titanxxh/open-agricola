@@ -1,42 +1,15 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerCardEffect } from '../card-effects'
 import { enforceAnimalCapacity, getPastureCapacity } from '../../actions/effects/animals'
 import type { AnimalZone } from '../../actions/effects/animals'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E33_BeaverColony'
 
 // Reed-producing action spaces (accumulation + gain-type).
 // BGA also checks ActionResourceMarket and specific cards (C104_Collector, E81_AlchemistsLab).
 const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    enforceAnimalCapacity(player)
-  },
-  onComputeAnimalZones: (player, zones) => {
-    const stabledPastures = zones.filter(
-      (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
-        zone.zoneType === 'pasture' &&
-        typeof zone.pastureIndex === 'number' &&
-        !!player.pastures[zone.pastureIndex] &&
-        player.pastures[zone.pastureIndex]!.stables > 0,
-    )
-    if (stabledPastures.length === 0) return
-    const blocked = stabledPastures.reduce((smallest, zone) => {
-      const smallestPasture = player.pastures[smallest.pastureIndex]!
-      const currentPasture = player.pastures[zone.pastureIndex]!
-      return getPastureCapacity(currentPasture) < getPastureCapacity(smallestPasture)
-        ? zone
-        : smallest
-    })
-    blocked.blocked = true
-    blocked.capacity = 0
-  },
-})
 
 const afterCollectListener: CardListenerRegistration = {
   id: 'E33-beaver-colony-after-collect',
@@ -69,9 +42,6 @@ const afterGainListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-registerCardListener(afterGainListener)
-
 export const E33_BeaverColony = new MinorImprovement({
   id: CARD_ID,
   name: "Beaver Colony",
@@ -83,3 +53,33 @@ export const E33_BeaverColony = new MinorImprovement({
   cost: {},
   prerequisite: "1 Fenced Stable",
 })
+
+export const E33_BeaverColony_impl = {
+  listeners: [afterCollectListener, afterGainListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    enforceAnimalCapacity(player)
+  },
+  onComputeAnimalZones: (player, zones) => {
+    const stabledPastures = zones.filter(
+      (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
+        zone.zoneType === 'pasture' &&
+        typeof zone.pastureIndex === 'number' &&
+        !!player.pastures[zone.pastureIndex] &&
+        player.pastures[zone.pastureIndex]!.stables > 0,
+    )
+    if (stabledPastures.length === 0) return
+    const blocked = stabledPastures.reduce((smallest, zone) => {
+      const smallestPasture = player.pastures[smallest.pastureIndex]!
+      const currentPasture = player.pastures[zone.pastureIndex]!
+      return getPastureCapacity(currentPasture) < getPastureCapacity(smallestPasture)
+        ? zone
+        : smallest
+    })
+    blocked.blocked = true
+    blocked.capacity = 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

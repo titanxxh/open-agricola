@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B62_Pitchfork'
 
@@ -20,8 +20,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B62_Pitchfork = new MinorImprovement({
   id: CARD_ID,
   name: 'Pitchfork',
@@ -31,3 +29,8 @@ export const B62_Pitchfork = new MinorImprovement({
   desc: ['Each time you use the __Grain Seeds__ action space, if the __Farmland__ action space is occupied you also get 3 <FOOD>.'],
   cost: { wood: 1 },
 })
+
+export const B62_Pitchfork_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

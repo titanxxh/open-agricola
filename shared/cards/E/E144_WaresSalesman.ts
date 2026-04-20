@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E144_WaresSalesman'
 
@@ -112,16 +112,6 @@ const makeListener = (
   },
 })
 
-registerCardListener(
-  makeListener(
-    ['improvement-any', 'minor-improvement'],
-    'E144-wares-salesman-after-improvement',
-  ),
-)
-registerCardListener(
-  makeListener(['play-occupation'], 'E144-wares-salesman-after-occupation'),
-)
-
 export const E144_WaresSalesman = new Occupation({
   id: CARD_ID,
   name: 'Wares Salesman',
@@ -134,3 +124,11 @@ export const E144_WaresSalesman = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const E144_WaresSalesman_impl = {
+  listeners: [makeListener(
+    ['improvement-any', 'minor-improvement'],
+    'E144-wares-salesman-after-improvement',
+  ), makeListener(['play-occupation'], 'E144-wares-salesman-after-occupation')],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,12 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 import { getMajorCardEffect } from '../major'
 import { canAffordCost } from '../../actions/effects/pay-helpers'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C60_SmallPottersOven'
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
@@ -57,23 +56,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeBakeListener)
-registerCardListener(isDoableListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player, paymentInfo) => {
-    if (!paymentInfo?.returnedCardId) return
-    if (!OVEN_IDS.includes(paymentInfo.returnedCardId as (typeof OVEN_IDS)[number])) {
-      return
-    }
-    return {
-      type: 'seq',
-      children: [gainLeaf(CARD_ID, { food: 5 })],
-    }
-  },
-})
-
 export const C60_SmallPottersOven = new MinorImprovement({
   id: CARD_ID,
   name: "Small Potter's Oven",
@@ -89,3 +71,21 @@ export const C60_SmallPottersOven = new MinorImprovement({
   isMajorImprovement: true,
   returnCards: ['Major_ClayOven', 'Major_StoneOven'],
 })
+
+export const C60_SmallPottersOven_impl = {
+  listeners: [beforeBakeListener, isDoableListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player, paymentInfo) => {
+    if (!paymentInfo?.returnedCardId) return
+    if (!OVEN_IDS.includes(paymentInfo.returnedCardId as (typeof OVEN_IDS)[number])) {
+      return
+    }
+    return {
+      type: 'seq',
+      children: [gainLeaf(CARD_ID, { food: 5 })],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

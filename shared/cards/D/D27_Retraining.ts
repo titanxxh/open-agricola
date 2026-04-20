@@ -1,5 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnCardToBoard } from '../../actions/effects/pay'
@@ -11,6 +10,7 @@ import {
   readCardExtraData,
 } from '../helpers/card-state'
 import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D27_Retraining'
 const SWAP_KEY = 'pendingSwap'
@@ -162,9 +162,6 @@ const placeFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(renovationListener)
-registerCardListener(placeFarmerListener)
-
 export const D27_Retraining = new MinorImprovement({
   id: CARD_ID,
   name: 'Retraining',
@@ -180,3 +177,8 @@ export const D27_Retraining = new MinorImprovement({
   occupationPrerequisites: { min: 1 },
   evenMoreSet: true,
 })
+
+export const D27_Retraining_impl = {
+  listeners: [renovationListener, placeFarmerListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

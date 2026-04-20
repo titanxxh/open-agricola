@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CostModifier } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D82_HuntingTrophy'
 const FARM_REDEV = 'farm-redevelopment'
@@ -71,9 +71,6 @@ const afterFarmRedev: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeFarmRedev)
-registerCardListener(afterFarmRedev)
-
 export const D82_HuntingTrophy = new MinorImprovement({
   id: CARD_ID,
   name: 'Hunting Trophy',
@@ -86,3 +83,8 @@ export const D82_HuntingTrophy = new MinorImprovement({
   cost: { boar: 1 },
   vp: 1,
 })
+
+export const D82_HuntingTrophy_impl = {
+  listeners: [beforeFarmRedev, afterFarmRedev],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

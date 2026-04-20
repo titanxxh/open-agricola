@@ -1,26 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C116_FurnitureMaker'
-
-/**
- * C116 Furniture Maker:
- * onBuy: gain 1 wood.
- * Each time you play an occupation after this one, you get 1 WOOD for each FOOD
- * paid as occupation cost.
- *
- * BGA: Listens to Pay event with sourceAction == 'Occupation'.
- * We listen to 'play-occupation' after phase and compute the food cost from
- * the lessons cost formula.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
-})
 
 const afterOccupationListener: CardListenerRegistration = {
   id: 'C116-furniture-maker-after-occupation',
@@ -60,8 +44,6 @@ const afterOccupationListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterOccupationListener)
-
 export const C116_FurnitureMaker = new Occupation({
   id: CARD_ID,
   name: 'Furniture Maker',
@@ -74,3 +56,12 @@ export const C116_FurnitureMaker = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C116_FurnitureMaker_impl = {
+  listeners: [afterOccupationListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

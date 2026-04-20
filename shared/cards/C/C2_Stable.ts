@@ -1,19 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C2_Stable'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return {
-      type: 'leaf' as const,
-      actionId: 'stables',
-      sourceCard: CARD_ID,
-      params: { max: 1, freeCost: true },
-    }
-  },
-})
 
 export const C2_Stable = new MinorImprovement({
   id: CARD_ID,
@@ -25,3 +13,18 @@ export const C2_Stable = new MinorImprovement({
   cost: { wood: 1 },
   passing: true,
 })
+
+export const C2_Stable_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'leaf' as const,
+      actionId: 'stables',
+      sourceCard: CARD_ID,
+      params: { max: 1, freeCost: true },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

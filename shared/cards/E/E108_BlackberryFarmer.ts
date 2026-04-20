@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E108_BlackberryFarmer'
 
@@ -36,8 +36,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E108_BlackberryFarmer = new Occupation({
   id: CARD_ID,
   name: 'Blackberry Farmer',
@@ -50,3 +48,8 @@ export const E108_BlackberryFarmer = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E108_BlackberryFarmer_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

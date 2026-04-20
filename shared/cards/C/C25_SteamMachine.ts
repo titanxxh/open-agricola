@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean => {
   return Object.keys(space.gainPerRound).length > 0
@@ -34,8 +34,6 @@ const steamMachineListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(steamMachineListener)
-
 export const C25_SteamMachine = new MinorImprovement({
   id: "C25_SteamMachine",
   name: "Steam Machine",
@@ -46,3 +44,8 @@ export const C25_SteamMachine = new MinorImprovement({
   vp: 1,
   cost: {"wood":2},
 })
+
+export const C25_SteamMachine_impl = {
+  listeners: [steamMachineListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

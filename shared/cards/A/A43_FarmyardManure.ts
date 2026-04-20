@@ -1,6 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
@@ -13,6 +11,7 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A43_FarmyardManure'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
@@ -39,12 +38,6 @@ const queueFoodNextThree = (state: GameState, player: PlayerState) => {
   })
 }
 
-// If a player buys this card after already building a stable this turn, fire immediately.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => queueFoodNextThree(state, player),
-})
-
 const listener: CardListenerRegistration = {
   id: 'A43-farmyard-manure-after-stables',
   cardIds: [CARD_ID],
@@ -57,8 +50,6 @@ const listener: CardListenerRegistration = {
     return { flow, sourceCard: CARD_ID }
   },
 }
-
-registerCardListener(listener)
 
 // Prerequisite: the player must have at least 1 animal on their farm.
 registerPrerequisite('1 Animal', (player) => {
@@ -86,3 +77,12 @@ export const A43_FarmyardManure = new MinorImprovement({
   prerequisite: '1 Animal',
   evenMoreSet: true,
 })
+
+export const A43_FarmyardManure_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => queueFoodNextThree(state, player),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

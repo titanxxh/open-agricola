@@ -1,23 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B167_StableSergeant'
-
-// BGA: complex check if farm can accommodate sheep+pig+cattle. If so, optional pay 2 food for all 3.
-// Simplified: optional pay 2 food to get 1 sheep, 1 pig, 1 cattle.
-// TODO: verify farm can accommodate all 3 animals before offering.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => ({
-    type: 'seq' as const,
-    optional: true,
-    children: [
-      payLeaf({ cardId: CARD_ID, cost: { food: 2 } }),
-      gainLeaf(CARD_ID, { sheep: 1, boar: 1, cattle: 1 }),
-    ],
-  }),
-})
 
 export const B167_StableSergeant = new Occupation({
   id: CARD_ID,
@@ -29,3 +14,18 @@ export const B167_StableSergeant = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const B167_StableSergeant_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => ({
+    type: 'seq' as const,
+    optional: true,
+    children: [
+      payLeaf({ cardId: CARD_ID, cost: { food: 2 } }),
+      gainLeaf(CARD_ID, { sheep: 1, boar: 1, cattle: 1 }),
+    ],
+  }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

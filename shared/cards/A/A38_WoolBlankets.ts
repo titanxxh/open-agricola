@@ -1,16 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A38_WoolBlankets'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    if (player.houseType === 'wood') return 3
-    if (player.houseType === 'clay') return 2
-    return 0
-  },
-})
 
 export const A38_WoolBlankets = new MinorImprovement({
   id: CARD_ID,
@@ -22,3 +13,15 @@ export const A38_WoolBlankets = new MinorImprovement({
   cost: { wood: 1, sheep: 1 },
   prerequisite: "Wooden House",
 })
+
+export const A38_WoolBlankets_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    if (player.houseType === 'wood') return 3
+    if (player.houseType === 'clay') return 2
+    return 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

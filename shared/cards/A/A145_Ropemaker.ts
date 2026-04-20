@@ -1,15 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A145_Ropemaker'
-
-registerCardEffect({
-  id: CARD_ID,
-  onEndHarvest: (_state, _player) => {
-    return gainLeaf(CARD_ID, { reed: 1 })
-  },
-})
 
 export const A145_Ropemaker = new Occupation({
   id: CARD_ID,
@@ -21,3 +14,13 @@ export const A145_Ropemaker = new Occupation({
   cost: {},
   players: "3+",
 })
+
+export const A145_Ropemaker_impl = {
+  effect: {
+  id: CARD_ID,
+  onEndHarvest: (_state, _player) => {
+    return gainLeaf(CARD_ID, { reed: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C20_MolePlow'
 
@@ -25,8 +25,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C20_MolePlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Mole Plow',
@@ -38,3 +36,8 @@ export const C20_MolePlow = new MinorImprovement({
   prerequisite: 'Play in Round 9 or Later',
   newSet: true,
 })
+
+export const C20_MolePlow_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

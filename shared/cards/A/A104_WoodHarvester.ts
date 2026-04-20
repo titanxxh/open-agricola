@@ -1,9 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A104_WoodHarvester'
 
-registerCardEffect({
+export const A104_WoodHarvester = new Occupation({
+  id: CARD_ID,
+  name: "Wood Harvester",
+  deck: "A",
+  number: 104,
+  category: "GOODS_PROVIDER",
+  desc: ["In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each wood accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."],
+  cost: {},
+  players: "1+",
+})
+
+export const A104_WoodHarvester_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (state, _player) => {
 
@@ -30,15 +42,6 @@ registerCardEffect({
       sourceCard: CARD_ID,
     }
   },
-})
-
-export const A104_WoodHarvester = new Occupation({
-  id: CARD_ID,
-  name: "Wood Harvester",
-  deck: "A",
-  number: 104,
-  category: "GOODS_PROVIDER",
-  desc: ["In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each wood accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

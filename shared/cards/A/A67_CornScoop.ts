@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A67_CornScoop'
 
@@ -18,8 +18,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A67_CornScoop = new MinorImprovement({
   id: CARD_ID,
   name: 'Corn Scoop',
@@ -29,3 +27,8 @@ export const A67_CornScoop = new MinorImprovement({
   desc: ['Each time you use the __Grain Seeds__ action space, you get 1 additional <GRAIN>.'],
   cost: { wood: 1 },
 })
+
+export const A67_CornScoop_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

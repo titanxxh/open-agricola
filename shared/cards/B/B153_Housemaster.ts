@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getMajorCardEffect } from '../major'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B153_Housemaster'
 
-registerCardEffect({
+export const B153_Housemaster = new Occupation({
+  id: CARD_ID,
+  name: "Housemaster",
+  deck: "B",
+  number: 153,
+  category: "POINTS_PROVIDER",
+  desc: ['During scoring, total the base point values of your major improvements. The smallest value counts double. If the total is at least 5/7/9/11, you get 1/2/3/4 bonus <SCORE>.'],
+  cost: {},
+  players: "1+",
+})
+
+export const B153_Housemaster_impl = {
+  effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     const majorVps = player.improvements
@@ -24,15 +36,6 @@ registerCardEffect({
     if (total >= 5) return 1
     return 0
   },
-})
-
-export const B153_Housemaster = new Occupation({
-  id: CARD_ID,
-  name: "Housemaster",
-  deck: "B",
-  number: 153,
-  category: "POINTS_PROVIDER",
-  desc: ['During scoring, total the base point values of your major improvements. The smallest value counts double. If the total is at least 5/7/9/11, you get 1/2/3/4 bonus <SCORE>.'],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

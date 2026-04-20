@@ -1,22 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E117_PipeSmoker'
-
-registerCardEffect({
-  id: CARD_ID,
-  onStartHarvest: (_state, player) => {
-
-    const grainFieldCount = player.fields.filter(
-      (f) => fieldHasCrop(f, 'grain'),
-    ).length
-    if (grainFieldCount < 1) return
-
-    return gainLeaf(CARD_ID, { wood: 2 })
-  },
-})
 
 export const E117_PipeSmoker = new Occupation({
   id: CARD_ID,
@@ -28,3 +15,19 @@ export const E117_PipeSmoker = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const E117_PipeSmoker_impl = {
+  effect: {
+  id: CARD_ID,
+  onStartHarvest: (_state, player) => {
+
+    const grainFieldCount = player.fields.filter(
+      (f) => fieldHasCrop(f, 'grain'),
+    ).length
+    if (grainFieldCount < 1) return
+
+    return gainLeaf(CARD_ID, { wood: 2 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

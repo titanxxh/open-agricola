@@ -1,14 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D97_BeggingStudent'
 
-/**
- * D97 Begging Student:
- * - onBuy: gain 1 begging marker.
- * - onStartHarvest: can play 1 occupation without cost (optional).
- */
-registerCardEffect({
+export const D97_BeggingStudent = new Occupation({
+  id: CARD_ID,
+  name: 'Begging Student',
+  deck: 'D',
+  number: 97,
+  category: 'ACTIONS_BOOSTER',
+  desc: [
+    'When you play this card, you must immediately take 1 <BEGGING> marker. At the start of each harvest, you can play 1 occupation without paying an occupation cost.',
+  ],
+  cost: {},
+  players: '1+',
+})
+
+export const D97_BeggingStudent_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     player.resources.begging += 1
@@ -28,17 +37,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D97_BeggingStudent = new Occupation({
-  id: CARD_ID,
-  name: 'Begging Student',
-  deck: 'D',
-  number: 97,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card, you must immediately take 1 <BEGGING> marker. At the start of each harvest, you can play 1 occupation without paying an occupation cost.',
-  ],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
 import type { BonusModifier } from '../../game/types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B15_CarpentersBench'
 
@@ -38,8 +38,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-
 export const B15_CarpentersBench = new MinorImprovement({
   id: CARD_ID,
   name: "Carpenter's Bench",
@@ -56,3 +54,8 @@ export const B15_CarpentersBench = new MinorImprovement({
     discount: { wood: 1 },
   } as BonusModifier,
 })
+
+export const B15_CarpentersBench_impl = {
+  listeners: [afterCollectListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

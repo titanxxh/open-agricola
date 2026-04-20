@@ -1,16 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { TradeModifier } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A16_RammedClay'
-
-// A16 Rammed Clay: When you play this card, you immediately get 1 clay.
-// You can use clay instead of wood to build fences (1 clay : 1 wood substitution).
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { clay: 1 }),
-})
 
 export const A16_RammedClay = new MinorImprovement({
   id: CARD_ID,
@@ -31,3 +24,11 @@ export const A16_RammedClay = new MinorImprovement({
     to: { wood: 1 },
   } as TradeModifier,
 })
+
+export const A16_RammedClay_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { clay: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

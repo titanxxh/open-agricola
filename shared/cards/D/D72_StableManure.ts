@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D72_StableManure'
 
@@ -32,7 +32,20 @@ const countUnfencedStables = (player: PlayerState): number => {
   return player.stableTiles.filter(s => !pastureTileKeys.has(positionKey(s))).length
 }
 
-registerCardEffect({
+export const D72_StableManure = new MinorImprovement({
+  id: CARD_ID,
+  name: "Stable Manure",
+  deck: "D",
+  number: 72,
+  category: "CROP_PROVIDER",
+  desc: ["In the field phase of each harvest, you can harvest 1 additional good from a number of fields equal to the number of unfenced stables you have."],
+  cost: {},
+  prerequisite: "At Most 1 Occupation",
+  occupationPrerequisites: {"max":1},
+})
+
+export const D72_StableManure_impl = {
+  effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
     const unfencedCount = countUnfencedStables(player)
@@ -55,16 +68,6 @@ registerCardEffect({
       },
     }
   },
-})
-
-export const D72_StableManure = new MinorImprovement({
-  id: CARD_ID,
-  name: "Stable Manure",
-  deck: "D",
-  number: 72,
-  category: "CROP_PROVIDER",
-  desc: ["In the field phase of each harvest, you can harvest 1 additional good from a number of fields equal to the number of unfenced stables you have."],
-  cost: {},
-  prerequisite: "At Most 1 Occupation",
-  occupationPrerequisites: {"max":1},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

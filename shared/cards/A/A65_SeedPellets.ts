@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A65_SeedPellets'
 
@@ -38,9 +38,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeSowListener)
-registerCardListener(isDoableListener)
-
 export const A65_SeedPellets = new MinorImprovement({
   id: CARD_ID,
   name: "Seed Pellets",
@@ -51,3 +48,8 @@ export const A65_SeedPellets = new MinorImprovement({
   cost: {},
   prerequisite: "3 Fields",
 })
+
+export const A65_SeedPellets_impl = {
+  listeners: [beforeSowListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

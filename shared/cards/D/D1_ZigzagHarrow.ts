@@ -1,18 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D1_ZigzagHarrow'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'leaf' as const,
-    actionId: 'plow',
-    sourceCard: CARD_ID,
-    optional: true,
-    // TODO: restrict to zigzag-completing field locations (requires board geometry support)
-  }),
-})
 
 export const D1_ZigzagHarrow = new MinorImprovement({
   id: CARD_ID,
@@ -25,3 +14,17 @@ export const D1_ZigzagHarrow = new MinorImprovement({
   passing: true,
   prerequisite: '3 Fields in an "L" Shape',
 })
+
+export const D1_ZigzagHarrow_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => ({
+    type: 'leaf' as const,
+    actionId: 'plow',
+    sourceCard: CARD_ID,
+    optional: true,
+    // TODO: restrict to zigzag-completing field locations (requires board geometry support)
+  }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

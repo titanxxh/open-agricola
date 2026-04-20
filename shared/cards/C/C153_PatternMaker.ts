@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C153_PatternMaker'
 
@@ -46,8 +46,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C153_PatternMaker = new Occupation({
   id: CARD_ID,
   name: 'Pattern Maker',
@@ -60,3 +58,8 @@ export const C153_PatternMaker = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const C153_PatternMaker_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

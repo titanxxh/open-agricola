@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E13_StoneHouseReconstruction'
 
@@ -38,8 +38,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E13_StoneHouseReconstruction = new MinorImprovement({
   id: CARD_ID,
   name: 'Stone House Reconstruction',
@@ -50,3 +48,8 @@ export const E13_StoneHouseReconstruction = new MinorImprovement({
   cost: { stone: 1 },
   vp: 1,
 })
+
+export const E13_StoneHouseReconstruction_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

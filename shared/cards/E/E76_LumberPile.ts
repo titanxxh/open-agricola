@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { addCardResourceGained } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { removeStableAtTile } from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E76_LumberPile'
 const FIELD_EFFECT = 'lumber-pile-return-stables'
@@ -38,7 +38,19 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   }
 })
 
-registerCardEffect({
+export const E76_LumberPile = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Lumber Pile',
+  deck: 'E',
+  number: 76,
+  category: 'RESOURCE_WOOD',
+  desc: [
+    'When you play this card, you can immediately return up to 3 <STABLE> from your farmyard board to your supply and get 3 <WOOD> for each.',
+  ],
+})
+
+export const E76_LumberPile_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     if (player.stableTiles.length === 0) return
@@ -65,15 +77,6 @@ registerCardEffect({
     }
     return flow
   },
-})
-
-export const E76_LumberPile = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lumber Pile',
-  deck: 'E',
-  number: 76,
-  category: 'RESOURCE_WOOD',
-  desc: [
-    'When you play this card, you can immediately return up to 3 <STABLE> from your farmyard board to your supply and get 3 <WOOD> for each.',
-  ],
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

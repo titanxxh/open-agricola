@@ -1,9 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A96_TaskArtisan'
 
@@ -44,18 +43,6 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-
-// onRoundStart: check if the revealed action for this round is a quarry
-registerCardEffect({
-  id: CARD_ID,
-  onRoundStart: (state, _player) => {
-    const revealedAction = state.roundActionOrder[state.round - 1]
-    if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
-    return buildTaskArtisanFlow()
-  },
-})
-
 export const A96_TaskArtisan = new Occupation({
   id: CARD_ID,
   name: 'Task Artisan',
@@ -69,3 +56,16 @@ export const A96_TaskArtisan = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const A96_TaskArtisan_impl = {
+  listeners: [onBuyListener],
+  effect: {
+  id: CARD_ID,
+  onRoundStart: (state, _player) => {
+    const revealedAction = state.roundActionOrder[state.round - 1]
+    if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
+    return buildTaskArtisanFlow()
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B154_SheepKeeper'
 
@@ -34,8 +34,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const B154_SheepKeeper = new Occupation({
   id: CARD_ID,
   name: 'Sheep Keeper',
@@ -47,3 +45,8 @@ export const B154_SheepKeeper = new Occupation({
   players: '4+',
   prerequisite: 'Less Than 7 Sheep',
 })
+
+export const B154_SheepKeeper_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

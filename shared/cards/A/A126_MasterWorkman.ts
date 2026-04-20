@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState, Resource } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A126_MasterWorkman'
 const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
@@ -47,9 +47,6 @@ const masterWorkmanIsDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(masterWorkmanBeforeListener)
-registerCardListener(masterWorkmanIsDoableListener)
-
 export const A126_MasterWorkman = new Occupation({
   id: "A126_MasterWorkman",
   name: "Master Workman",
@@ -61,3 +58,8 @@ export const A126_MasterWorkman = new Occupation({
   players: "1+",
   newSet: true,
 })
+
+export const A126_MasterWorkman_impl = {
+  listeners: [masterWorkmanBeforeListener, masterWorkmanIsDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

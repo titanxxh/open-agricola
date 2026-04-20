@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A135_AnimalReeve'
 
@@ -8,21 +8,6 @@ const CARD_ID = 'A135_AnimalReeve'
 const WOOD_MAP: Record<number, number> = {
   0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4,
 }
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state) => {
-    const remainingTurns = 14 - state.round
-    const toGain = remainingTurns >= 9 ? 4 : (WOOD_MAP[remainingTurns] ?? 0)
-    if (toGain <= 0) return
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { wood: toGain },
-    }
-  },
-})
 
 export const A135_AnimalReeve = new Occupation({
   id: CARD_ID,
@@ -36,3 +21,21 @@ export const A135_AnimalReeve = new Occupation({
   extraVp: true,
   newSet: true,
 })
+
+export const A135_AnimalReeve_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state) => {
+    const remainingTurns = 14 - state.round
+    const toGain = remainingTurns >= 9 ? 4 : (WOOD_MAP[remainingTurns] ?? 0)
+    if (toGain <= 0) return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { wood: toGain },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

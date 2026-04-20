@@ -1,9 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E96_Elder'
 
-registerCardEffect({
+export const E96_Elder = new Occupation({
+  id: CARD_ID,
+  name: 'Elder',
+  deck: 'E',
+  number: 96,
+  category: 'ACTION_SPACE_EXTENDER',
+  desc: ['You can play this card at the start of the work phase of round 1 without placing a person. (This card has no effect other than counting as a played occupation.)'],
+  cost: {},
+  players: '1+',
+})
+
+export const E96_Elder_impl = {
+  effect: {
   id: CARD_ID,
   handHooks: ['onBeforeStartOfTurn'],
   onBeforeStartOfTurn: (state, _player) => {
@@ -21,15 +33,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E96_Elder = new Occupation({
-  id: CARD_ID,
-  name: 'Elder',
-  deck: 'E',
-  number: 96,
-  category: 'ACTION_SPACE_EXTENDER',
-  desc: ['You can play this card at the start of the work phase of round 1 without placing a person. (This card has no effect other than counting as a played occupation.)'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerCardEffect } from '../card-effects'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C51_FishingNet'
 
@@ -40,25 +39,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
-/**
- * Part 2: During the returning-home phase, if the card is flagged
- * (meaning an opponent used Fishing this round), place 2 food
- * on the Fishing action space and unflag the card.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onReturnHome: (state, player) => {
-    if (!isCardFlagged(player, CARD_ID)) return
-    setCardFlag(player, CARD_ID, false)
-    const fishingSpace = state.actionSpaces.find(s => s.id === 'fishing')
-    if (fishingSpace) {
-      fishingSpace.resources.food = (fishingSpace.resources.food ?? 0) + 2
-    }
-  },
-})
-
 export const C51_FishingNet = new MinorImprovement({
   id: CARD_ID,
   name: "Fishing Net",
@@ -69,3 +49,19 @@ export const C51_FishingNet = new MinorImprovement({
   cost: {"reed":1},
   vp: 1,
 })
+
+export const C51_FishingNet_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onReturnHome: (state, player) => {
+    if (!isCardFlagged(player, CARD_ID)) return
+    setCardFlag(player, CARD_ID, false)
+    const fishingSpace = state.actionSpaces.find(s => s.id === 'fishing')
+    if (fishingSpace) {
+      fishingSpace.resources.food = (fishingSpace.resources.food ?? 0) + 2
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

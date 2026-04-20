@@ -1,11 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B21_HayloftBarn'
 
@@ -37,9 +36,22 @@ const grainGainListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(grainGainListener)
+export const B21_HayloftBarn = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Hayloft Barn',
+  deck: 'B',
+  number: 21,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['Place 4 <FOOD> on this card. Each time you obtain at least 1 <GRAIN>, you also get 1 <FOOD> from this card. Once it is empty, you get a __Family Growth Even without Room__ action.'],
+  cost: { wood: 3 },
+  prerequisite: '1 Occupation',
+  occupationPrerequisites: { min: 1 },
+  newSet: true,
+})
 
-registerCardEffect({
+export const B21_HayloftBarn_impl = {
+  listeners: [grainGainListener],
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'foodCount', 4)
@@ -57,17 +69,6 @@ registerCardEffect({
     updateInfobox(player, newCount)
     return gainLeaf(CARD_ID, { food: 1 })
   },
-})
-
-export const B21_HayloftBarn = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Hayloft Barn',
-  deck: 'B',
-  number: 21,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Place 4 <FOOD> on this card. Each time you obtain at least 1 <GRAIN>, you also get 1 <FOOD> from this card. Once it is empty, you get a __Family Growth Even without Room__ action.'],
-  cost: { wood: 3 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

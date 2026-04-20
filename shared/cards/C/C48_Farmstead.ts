@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C48_Farmstead'
 
@@ -44,9 +44,6 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
-
 export const C48_Farmstead = new MinorImprovement({
   id: CARD_ID,
   name: 'Farmstead',
@@ -60,3 +57,8 @@ export const C48_Farmstead = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
 })
+
+export const C48_Farmstead_impl = {
+  listeners: [beforeListener, afterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

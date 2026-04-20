@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B26_AgrarianFences'
 
@@ -135,11 +135,6 @@ const isDoableBakeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-registerCardListener(computeReplaceBakeListener)
-registerCardListener(isDoableListener)
-registerCardListener(isDoableBakeListener)
-
 export const B26_AgrarianFences = new MinorImprovement({
   id: CARD_ID,
   name: 'Agrarian Fences',
@@ -151,3 +146,8 @@ export const B26_AgrarianFences = new MinorImprovement({
   ],
   cost: { wood: 1 },
 })
+
+export const B26_AgrarianFences_impl = {
+  listeners: [computeReplaceListener, computeReplaceBakeListener, isDoableListener, isDoableBakeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

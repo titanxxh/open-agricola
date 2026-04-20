@@ -1,10 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D79_CarrotMuseum'
 
-registerCardEffect({
+export const D79_CarrotMuseum = new MinorImprovement({
+  id: CARD_ID,
+  name: "Carrot Museum",
+  deck: "D",
+  number: 79,
+  category: "BUILDING_RESOURCE_PROVIDER",
+  desc: ["At the end of rounds 8, 10, and 12, you get 1 <STONE> for each vegetable field you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."],
+  vp: 2,
+  cost: { wood: 1, clay: 2 },
+  prerequisite: "Play in Round 8 or Before",
+})
+
+export const D79_CarrotMuseum_impl = {
+  effect: {
   id: CARD_ID,
   onAfterRoundEnd: (state, player) => {
     if (![8, 10, 12].includes(state.round)) return
@@ -27,16 +40,6 @@ registerCardEffect({
       sourceCard: CARD_ID,
     }
   },
-})
-
-export const D79_CarrotMuseum = new MinorImprovement({
-  id: CARD_ID,
-  name: "Carrot Museum",
-  deck: "D",
-  number: 79,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["At the end of rounds 8, 10, and 12, you get 1 <STONE> for each vegetable field you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."],
-  vp: 2,
-  cost: { wood: 1, clay: 2 },
-  prerequisite: "Play in Round 8 or Before",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

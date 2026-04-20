@@ -1,24 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B33_Mantlepiece'
-
-// BGA: gain 1 bonus score per complete round remaining (14 - turn). vp: -3, extraVp: true.
-// Note: ignoring the "may no longer renovate" restriction for now (TODO: hook to block renovation).
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const roundsLeft = Math.max(0, 14 - state.round)
-    if (roundsLeft <= 0) return
-    // Gain score tokens as food equivalent; TODO: implement bonus-vp leaf for score
-    const children = Array.from({ length: roundsLeft }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }))
-    return { type: 'seq' as const, children }
-  },
-})
 
 export const B33_Mantlepiece = new MinorImprovement({
   id: CARD_ID,
@@ -31,3 +14,21 @@ export const B33_Mantlepiece = new MinorImprovement({
   vp: -3,
   prerequisite: 'Clay or Stone House',
 })
+
+export const B33_Mantlepiece_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const roundsLeft = Math.max(0, 14 - state.round)
+    if (roundsLeft <= 0) return
+    // Gain score tokens as food equivalent; TODO: implement bonus-vp leaf for score
+    const children = Array.from({ length: roundsLeft }, () => ({
+      type: 'leaf' as const,
+      actionId: 'bonus-vp',
+      sourceCard: CARD_ID,
+    }))
+    return { type: 'seq' as const, children }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

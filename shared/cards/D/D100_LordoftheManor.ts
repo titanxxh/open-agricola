@@ -1,16 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D100_LordoftheManor'
-
-registerCardEffect({
-  id: CARD_ID,
-  computePostScore: (_state, _player, categories) => {
-    // 1 VP per standard category where score = 4 (max in standard range)
-    const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles']
-    return categories.filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length
-  },
-})
 
 export const D100_LordoftheManor = new Occupation({
   id: CARD_ID,
@@ -23,3 +14,15 @@ export const D100_LordoftheManor = new Occupation({
   players: "1+",
   newSet: true,
 })
+
+export const D100_LordoftheManor_impl = {
+  effect: {
+  id: CARD_ID,
+  computePostScore: (_state, _player, categories) => {
+    // 1 VP per standard category where score = 4 (max in standard range)
+    const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles']
+    return categories.filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

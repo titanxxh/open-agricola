@@ -1,15 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E32_Nave'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const cols = new Set(player.roomTiles.map((t) => t.col))
-    return cols.size
-  },
-})
 
 export const E32_Nave = new MinorImprovement({
   id: CARD_ID,
@@ -21,3 +13,14 @@ export const E32_Nave = new MinorImprovement({
   cost: { clay: 2, reed: 1 },
   vp: 0,
 })
+
+export const E32_Nave_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const cols = new Set(player.roomTiles.map((t) => t.col))
+    return cols.size
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

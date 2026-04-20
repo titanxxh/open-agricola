@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C85_DenBuilder'
 
@@ -30,8 +30,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C85_DenBuilder = new Occupation({
   id: CARD_ID,
   name: 'Den Builder',
@@ -43,3 +41,8 @@ export const C85_DenBuilder = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const C85_DenBuilder_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

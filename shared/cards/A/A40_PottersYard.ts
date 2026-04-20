@@ -1,11 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A40_PottersYard'
 
@@ -154,26 +153,6 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
   },
 })
 
-registerCardListener(beforePlowListener)
-registerCardListener(beforeConstructListener)
-registerCardListener(beforeFencingListener)
-registerCardListener(beforeStablesListener)
-registerCardListener(createAfterHandler('plow'))
-registerCardListener(createAfterHandler('construct'))
-registerCardListener(createAfterHandler('fencing'))
-registerCardListener(createAfterHandler('stables'))
-
-// onBuy: place clay on free spaces
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const freeCount = countFreeTiles(player)
-    if (freeCount > 0) {
-      setClayRemaining(player, freeCount)
-    }
-  },
-})
-
 export const A40_PottersYard = new MinorImprovement({
   id: CARD_ID,
   name: "Potter's Yard",
@@ -185,3 +164,17 @@ export const A40_PottersYard = new MinorImprovement({
   prerequisite: 'At Most 7 Unused Farmyard Spaces',
   evenMoreSet: true,
 })
+
+export const A40_PottersYard_impl = {
+  listeners: [beforePlowListener, beforeConstructListener, beforeFencingListener, beforeStablesListener, createAfterHandler('plow'), createAfterHandler('construct'), createAfterHandler('fencing'), createAfterHandler('stables')],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const freeCount = countFreeTiles(player)
+    if (freeCount > 0) {
+      setClayRemaining(player, freeCount)
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

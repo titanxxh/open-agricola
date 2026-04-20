@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C55_Studio'
 
-registerCardEffect({
+export const C55_Studio = new MinorImprovement({
+  id: CARD_ID,
+  name: "Studio",
+  deck: "C",
+  number: 55,
+  category: "FOOD_PROVIDER",
+  desc: ["In the feeding phase of each harvest, you can use this card to turn exactly 1 <WOOD>/<CLAY>/<STONE> into 2/2/3 <FOOD>."],
+  vp: 1,
+  cost: { clay: 1, reed: 1 },
+})
+
+export const C55_Studio_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, _player) => {
 
@@ -44,15 +56,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const C55_Studio = new MinorImprovement({
-  id: CARD_ID,
-  name: "Studio",
-  deck: "C",
-  number: 55,
-  category: "FOOD_PROVIDER",
-  desc: ["In the feeding phase of each harvest, you can use this card to turn exactly 1 <WOOD>/<CLAY>/<STONE> into 2/2/3 <FOOD>."],
-  vp: 1,
-  cost: { clay: 1, reed: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

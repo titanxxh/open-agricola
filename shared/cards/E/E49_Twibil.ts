@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E49_Twibil'
 
@@ -33,8 +33,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E49_Twibil = new MinorImprovement({
   id: CARD_ID,
   name: 'Twibil',
@@ -47,3 +45,8 @@ export const E49_Twibil = new MinorImprovement({
   cost: { stone: 1 },
   vp: 1,
 })
+
+export const E49_Twibil_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

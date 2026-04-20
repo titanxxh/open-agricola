@@ -1,12 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../actions/effects/animals'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import type { ActionFlow, PlayerState } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B115_TinsmithMaster'
 
@@ -47,23 +46,6 @@ registerSelectionEffect('tinsmith-master-bonus-crop', ({ player, positions }) =>
   }
 })
 
-// --- Card Effect: pasture capacity ---
-registerCardEffect({
-  id: CARD_ID,
-  onComputeAnimalZones: (player: PlayerState, zones: AnimalZone[]) => {
-    for (const zone of zones) {
-      if (zone.zoneType !== 'pasture') continue
-      const pastureIndex = zone.pastureIndex
-      if (pastureIndex === undefined) continue
-      const pasture = player.pastures[pastureIndex]
-      if (!pasture) continue
-      if (pasture.stables === 0) {
-        zone.capacity += 1
-      }
-    }
-  },
-})
-
 // --- After sow: find freshly sown fields, add 1 bonus crop to one ---
 const afterSowListener: CardListenerRegistration = {
   id: 'B115-tinsmith-master-after-sow',
@@ -100,8 +82,6 @@ const afterSowListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterSowListener)
-
 export const B115_TinsmithMaster = new Occupation({
   id: CARD_ID,
   name: 'Tinsmith Master',
@@ -113,3 +93,23 @@ export const B115_TinsmithMaster = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const B115_TinsmithMaster_impl = {
+  listeners: [afterSowListener],
+  effect: {
+  id: CARD_ID,
+  onComputeAnimalZones: (player: PlayerState, zones: AnimalZone[]) => {
+    for (const zone of zones) {
+      if (zone.zoneType !== 'pasture') continue
+      const pastureIndex = zone.pastureIndex
+      if (pastureIndex === undefined) continue
+      const pasture = player.pastures[pastureIndex]
+      if (!pasture) continue
+      if (pasture.stables === 0) {
+        zone.capacity += 1
+      }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

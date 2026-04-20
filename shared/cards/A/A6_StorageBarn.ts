@@ -1,9 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A6_StorageBarn'
 
-registerCardEffect({
+export const A6_StorageBarn = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Storage Barn',
+  deck: 'A',
+  number: 6,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ["If you have the Well, Joinery, Pottery, and/or Basketmaker's Workshop, you immediately get 1 <STONE>, 1 <WOOD>, 1 <CLAY>, and/or 1 <REED>, respectively."],
+  cost: {},
+  passing: true,
+  newSet: true,
+})
+
+export const A6_StorageBarn_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const gains: Record<string, number> = {}
@@ -19,16 +32,6 @@ registerCardEffect({
       params: gains,
     }
   },
-})
-
-export const A6_StorageBarn = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Storage Barn',
-  deck: 'A',
-  number: 6,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ["If you have the Well, Joinery, Pottery, and/or Basketmaker's Workshop, you immediately get 1 <STONE>, 1 <WOOD>, 1 <CLAY>, and/or 1 <REED>, respectively."],
-  cost: {},
-  passing: true,
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

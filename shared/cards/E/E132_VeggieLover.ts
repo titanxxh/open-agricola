@@ -1,10 +1,27 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E132_VeggieLover'
 
-registerCardEffect({
+export const E132_VeggieLover = new Occupation({
+  id: CARD_ID,
+  name: "Veggie Lover",
+  deck: "E",
+  number: 132,
+  category: "POINTS_PROVIDER",
+  desc: [
+    '[Harvest]',
+    '<GRAIN_VEG_STACK> <ARROW-1X> 6<FOOD>',
+    '[Scoring]',
+    '1/2/3 <GRAIN_VEG_STACK> <ARROW-1X> 2/4/6 <SCORE>',
+  ],
+  cost: {},
+  players: "3+",
+})
+
+export const E132_VeggieLover_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     if (player.resources.grain < 1 || player.resources.vegetable < 1) return
@@ -27,20 +44,6 @@ registerCardEffect({
     }
     return sets * 2
   },
-})
-
-export const E132_VeggieLover = new Occupation({
-  id: CARD_ID,
-  name: "Veggie Lover",
-  deck: "E",
-  number: 132,
-  category: "POINTS_PROVIDER",
-  desc: [
-    '[Harvest]',
-    '<GRAIN_VEG_STACK> <ARROW-1X> 6<FOOD>',
-    '[Scoring]',
-    '1/2/3 <GRAIN_VEG_STACK> <ARROW-1X> 2/4/6 <SCORE>',
-  ],
-  cost: {},
-  players: "3+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,11 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { spaceOccupantCount } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C129_SecondSpouse'
 
@@ -59,8 +59,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export const C129_SecondSpouse = new Occupation({
   id: CARD_ID,
   name: 'Second Spouse',
@@ -73,3 +71,8 @@ export const C129_SecondSpouse = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const C129_SecondSpouse_impl = {
+  listeners: [computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

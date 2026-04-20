@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMinorImprovementCard } from '../catalog'
 import { getMajorCardEffect } from '../major'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D117_WoodExpert'
 
@@ -35,11 +34,6 @@ const getImprovementWoodCost = (cardId: string): number => {
   return 0
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
-})
-
 const computeCostsListener: CardListenerRegistration = {
   id: 'D117-wood-expert-compute-costs-improvement',
   cardIds: [CARD_ID],
@@ -55,8 +49,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const D117_WoodExpert = new Occupation({
   id: CARD_ID,
   name: 'Wood Expert',
@@ -69,3 +61,12 @@ export const D117_WoodExpert = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D117_WoodExpert_impl = {
+  listeners: [computeCostsListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

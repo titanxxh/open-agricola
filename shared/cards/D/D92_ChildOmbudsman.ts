@@ -1,9 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D92_ChildOmbudsman'
 
@@ -19,15 +18,6 @@ const afterFamilyGrowthListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterFamilyGrowthListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return -(readCardExtraData<number>(player, CARD_ID, 'growthCount') ?? 0) * 2
-  },
-})
-
 export const D92_ChildOmbudsman = new Occupation({
   id: CARD_ID,
   name: "Child Ombudsman",
@@ -38,3 +28,14 @@ export const D92_ChildOmbudsman = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const D92_ChildOmbudsman_impl = {
+  listeners: [afterFamilyGrowthListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return -(readCardExtraData<number>(player, CARD_ID, 'growthCount') ?? 0) * 2
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

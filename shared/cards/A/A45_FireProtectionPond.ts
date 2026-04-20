@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A45_FireProtectionPond'
 
@@ -38,8 +38,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A45_FireProtectionPond = new MinorImprovement({
   id: CARD_ID,
   name: 'Fire Protection Pond',
@@ -51,3 +49,8 @@ export const A45_FireProtectionPond = new MinorImprovement({
   prerequisite: 'Still in Wooden House',
   newSet: true,
 })
+
+export const A45_FireProtectionPond_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

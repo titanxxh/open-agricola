@@ -1,20 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C59_SchnappsDistillery'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const veg = player.resources.vegetable + player.fields
-      .filter((f) => fieldHasCrop(f, 'vegetable'))
-      .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)
-    if (veg >= 6) return 2
-    if (veg >= 5) return 1
-    return 0
-  },
-})
 
 export const C59_SchnappsDistillery = new MinorImprovement({
   id: CARD_ID,
@@ -29,3 +17,18 @@ export const C59_SchnappsDistillery = new MinorImprovement({
     { from: { vegetable: 1 }, to: { food: 5 }, max: 1, trigger: 'harvest' },
   ],
 })
+
+export const C59_SchnappsDistillery_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const veg = player.resources.vegetable + player.fields
+      .filter((f) => fieldHasCrop(f, 'vegetable'))
+      .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)
+    if (veg >= 6) return 2
+    if (veg >= 5) return 1
+    return 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

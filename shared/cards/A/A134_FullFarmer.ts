@@ -1,18 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { computeAnimalZones } from '../../actions/effects/animals'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A134_FullFarmer'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
-  computeBonusScore: (_state, player) => {
-    const zones = computeAnimalZones(player)
-    return zones.filter((z) => z.zoneType === 'pasture' && z.capacity > 0 && (z.animalCount ?? 0) >= z.capacity).length
-  },
-})
 
 export const A134_FullFarmer = new Occupation({
   id: CARD_ID,
@@ -24,3 +15,15 @@ export const A134_FullFarmer = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A134_FullFarmer_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
+  computeBonusScore: (_state, player) => {
+    const zones = computeAnimalZones(player)
+    return zones.filter((z) => z.zoneType === 'pasture' && z.capacity > 0 && (z.animalCount ?? 0) >= z.capacity).length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

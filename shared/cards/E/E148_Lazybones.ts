@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E148_Lazybones'
 const MAX_STABLES = 4
@@ -19,20 +18,6 @@ const countStablesInReserve = (player: import('../../game/types').PlayerState): 
   const onSpaces = (readCardExtraData<string[]>(player, CARD_ID, 'spaces') ?? []).length
   return Math.max(0, MAX_STABLES - onFarm - onSpaces)
 }
-
-/**
- * onBuy: auto-place stables on the 4 target action spaces (up to reserve count).
- * Stables leave the player's reserve and are tracked in cardStates extraData.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const reserve = countStablesInReserve(player)
-    if (reserve === 0) return
-    const placedSpaces = TRIGGER_SPACES.slice(0, Math.min(TRIGGER_SPACES.length, reserve))
-    writeCardExtraData(player, CARD_ID, 'spaces', placedSpaces)
-  },
-})
 
 /**
  * Opponent listener: when another player uses one of the marked action spaces,
@@ -75,8 +60,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E148_Lazybones = new Occupation({
   id: CARD_ID,
   name: 'Lazybones',
@@ -86,3 +69,17 @@ export const E148_Lazybones = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const E148_Lazybones_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const reserve = countStablesInReserve(player)
+    if (reserve === 0) return
+    const placedSpaces = TRIGGER_SPACES.slice(0, Math.min(TRIGGER_SPACES.length, reserve))
+    writeCardExtraData(player, CARD_ID, 'spaces', placedSpaces)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

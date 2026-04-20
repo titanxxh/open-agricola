@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C95_BasketWeaver'
 const TARGET_MAJOR = 'Major_Basket'
@@ -67,9 +67,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(computeCostsListener)
-
 export const C95_BasketWeaver = new Occupation({
   id: CARD_ID,
   name: 'Basket Weaver',
@@ -83,3 +80,8 @@ export const C95_BasketWeaver = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const C95_BasketWeaver_impl = {
+  listeners: [onBuyListener, computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

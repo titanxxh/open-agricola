@@ -1,21 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B84_AcornsBasket'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: 2,
-      resources: { boar: 1 },
-    })
-  },
-})
 
 export const B84_AcornsBasket = new MinorImprovement({
   id: CARD_ID,
@@ -28,3 +15,19 @@ export const B84_AcornsBasket = new MinorImprovement({
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },
 })
+
+export const B84_AcornsBasket_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    return queueFutureMeeplesFlow(state, {
+      cardId: CARD_ID,
+      playerId: player.id,
+      startRound: state.round + 1,
+      count: 2,
+      resources: { boar: 1 },
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

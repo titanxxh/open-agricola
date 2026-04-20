@@ -1,11 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C47_GardenClaw'
 
-registerCardEffect({
+export const C47_GardenClaw = new MinorImprovement({
+  id: CARD_ID,
+  name: "Garden Claw",
+  deck: "C",
+  number: 47,
+  category: "FOOD_PROVIDER",
+  desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
+  cost: { wood: 1 },
+  newSet: true,
+})
+
+export const C47_GardenClaw_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const plantedFields = player.fields.filter((f) => !fieldIsEmpty(f)).length
@@ -20,15 +32,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const C47_GardenClaw = new MinorImprovement({
-  id: CARD_ID,
-  name: "Garden Claw",
-  deck: "C",
-  number: 47,
-  category: "FOOD_PROVIDER",
-  desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
-  cost: { wood: 1 },
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

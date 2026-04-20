@@ -1,19 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D12_MilkingPlace'
-
-registerCardEffect({
-  id: CARD_ID,
-  onHarvestFeedingPhase: (_state, _player) => {
-    return gainLeaf(CARD_ID, { food: 1 })
-  },
-  onComputeAnimalZones: (_player, zones) => {
-    const houseIdx = zones.findIndex(z => z.zoneType === 'house')
-    if (houseIdx !== -1) zones.splice(houseIdx, 1)
-  },
-})
 
 export const D12_MilkingPlace = new MinorImprovement({
   id: CARD_ID,
@@ -25,3 +14,17 @@ export const D12_MilkingPlace = new MinorImprovement({
   cost: { grain: 1 },
   vp: 1,
 })
+
+export const D12_MilkingPlace_impl = {
+  effect: {
+  id: CARD_ID,
+  onHarvestFeedingPhase: (_state, _player) => {
+    return gainLeaf(CARD_ID, { food: 1 })
+  },
+  onComputeAnimalZones: (_player, zones) => {
+    const houseIdx = zones.findIndex(z => z.zoneType === 'house')
+    if (houseIdx !== -1) zones.splice(houseIdx, 1)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

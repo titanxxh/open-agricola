@@ -1,14 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A99_FellowGrazer'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return player.pastures.filter((p) => p.size >= 3).length * 2
-  },
-})
 
 export const A99_FellowGrazer = new Occupation({
   id: CARD_ID,
@@ -20,3 +13,13 @@ export const A99_FellowGrazer = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A99_FellowGrazer_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return player.pastures.filter((p) => p.size >= 3).length * 2
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

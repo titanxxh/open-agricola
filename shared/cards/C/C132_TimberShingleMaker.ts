@@ -1,28 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C132_TimberShingleMaker'
-
-/**
- * C132 Timber Shingle Maker:
- * When you renovate to stone, you can place up to 1 WOOD from your supply in each
- * of your rooms. During scoring, each such WOOD is worth 1 bonus VP.
- *
- * BGA: After renovation, if roomStone, offer XOR choices: pay 1..N wood for 1..N VP.
- * We present XOR options to pay 1..rooms wood, and grant bonus VP per wood paid.
- * Track wood placed via counter for computeBonusScore.
- */
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return player.cardStates?.[CARD_ID]?.counters?.woodPlaced ?? 0
-  },
-})
 
 const afterRenovateListener: CardListenerRegistration = {
   id: 'C132-timber-shingle-maker-after-renovate',
@@ -64,8 +47,6 @@ const afterRenovateListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterRenovateListener)
-
 export const C132_TimberShingleMaker = new Occupation({
   id: CARD_ID,
   name: 'Timber Shingle Maker',
@@ -80,3 +61,14 @@ export const C132_TimberShingleMaker = new Occupation({
   extraVp: true,
   evenMoreSet: true,
 })
+
+export const C132_TimberShingleMaker_impl = {
+  listeners: [afterRenovateListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return player.cardStates?.[CARD_ID]?.counters?.woodPlaced ?? 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

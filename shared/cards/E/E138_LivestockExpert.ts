@@ -1,10 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E138_LivestockExpert'
 
-registerCardEffect({
+export const E138_LivestockExpert = new Occupation({
+  id: CARD_ID,
+  name: 'Livestock Expert',
+  deck: 'E',
+  number: 138,
+  category: 'ANIMAL_HANDLER',
+  desc: ['If you play this card in round 11 or before, choose an animal type: you immediately get a number of animals of that type equal to the number you already have on your farm.'],
+  players: '3+',
+})
+
+export const E138_LivestockExpert_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     if (state.round > 11) return
@@ -40,14 +51,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const E138_LivestockExpert = new Occupation({
-  id: CARD_ID,
-  name: 'Livestock Expert',
-  deck: 'E',
-  number: 138,
-  category: 'ANIMAL_HANDLER',
-  desc: ['If you play this card in round 11 or before, choose an animal type: you immediately get a number of animals of that type equal to the number you already have on your farm.'],
-  players: '3+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

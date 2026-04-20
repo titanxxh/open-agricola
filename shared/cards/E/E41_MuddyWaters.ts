@@ -1,13 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E41_MuddyWaters'
 
-// BGA: alternate placing 1 food and 1 clay on even-numbered rounds starting with food (if played on odd),
-// or starting differently if played on even round.
-registerCardEffect({
+export const E41_MuddyWaters = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Muddy Waters',
+  deck: 'E',
+  number: 41,
+  category: 'FOOD_MISC',
+  desc: ['Alternate placing 1 <FOOD> and 1 <CLAY> on each remaining even-numbered round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
+  vp: 1,
+  prerequisite: '5 Cards in Play',
+})
+
+export const E41_MuddyWaters_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const currentRound = state.round
@@ -46,15 +56,6 @@ registerCardEffect({
     if (children.length === 1) return children[0]
     return { type: 'seq' as const, children }
   },
-})
-
-export const E41_MuddyWaters = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Muddy Waters',
-  deck: 'E',
-  number: 41,
-  category: 'FOOD_MISC',
-  desc: ['Alternate placing 1 <FOOD> and 1 <CLAY> on each remaining even-numbered round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
-  vp: 1,
-  prerequisite: '5 Cards in Play',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

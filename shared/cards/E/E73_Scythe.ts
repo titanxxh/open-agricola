@@ -1,11 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
 import { fieldIsEmpty, fieldTopStack } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E73_Scythe'
 
-registerCardEffect({
+export const E73_Scythe = new MinorImprovement({
+  id: "E73_Scythe",
+  name: "Scythe",
+  deck: "E",
+  number: 73,
+  desc: ["During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."],
+  cost: {"wood":1},
+})
+
+export const E73_Scythe_impl = {
+  effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
     const harvestable = player.fields
@@ -31,13 +41,6 @@ registerCardEffect({
     })
     return { type: 'xor', children }
   },
-})
-
-export const E73_Scythe = new MinorImprovement({
-  id: "E73_Scythe",
-  name: "Scythe",
-  deck: "E",
-  number: 73,
-  desc: ["During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."],
-  cost: {"wood":1},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerCardEffect } from '../card-effects'
 import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A144_Sequestrator'
 
@@ -54,17 +53,6 @@ const plowListener = createStorageReleaseListener({
   shouldTrigger: (player) => player.fields.length >= 5,
 })
 
-registerCardListener(fencingListener)
-registerCardListener(plowListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    setStoredResource(player, CARD_ID, 'reed', 3)
-    setStoredResource(player, CARD_ID, 'clay', 4)
-  },
-})
-
 export const A144_Sequestrator = new Occupation({
   id: CARD_ID,
   name: "Sequestrator",
@@ -76,3 +64,15 @@ export const A144_Sequestrator = new Occupation({
   players: "3+",
   newSet: true,
 })
+
+export const A144_Sequestrator_impl = {
+  listeners: [fencingListener, plowListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    setStoredResource(player, CARD_ID, 'reed', 3)
+    setStoredResource(player, CARD_ID, 'clay', 4)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

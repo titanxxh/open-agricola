@@ -1,13 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B149_OpenAirFarmer'
 
-// BGA: pay 3 stables then take a fencing action at no fence cost.
-// Simplified: pay 3 wood (stables supply proxy) then take fencing action.
-// TODO: proper stable removal from supply (stables in supply are not tracked as resources).
-registerCardEffect({
+export const B149_OpenAirFarmer = new Occupation({
+  id: CARD_ID,
+  name: "Open Air Farmer",
+  deck: "B",
+  number: 149,
+  category: "FARM_PLANNER",
+  desc: ['When you play this card, you remove exactly 3 <STABLE> in your supply from play to build a pasture covering 2 farmyard spaces. You only need to pay a total of 2 <WOOD> for fences'],
+  cost: {},
+  players: "4+",
+})
+
+export const B149_OpenAirFarmer_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => ({
     type: 'seq' as const,
@@ -20,15 +29,6 @@ registerCardEffect({
       },
     ],
   }),
-})
-
-export const B149_OpenAirFarmer = new Occupation({
-  id: CARD_ID,
-  name: "Open Air Farmer",
-  deck: "B",
-  number: 149,
-  category: "FARM_PLANNER",
-  desc: ['When you play this card, you remove exactly 3 <STABLE> in your supply from play to build a pasture covering 2 farmyard spaces. You only need to pay a total of 2 <WOOD> for fences'],
-  cost: {},
-  players: "4+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

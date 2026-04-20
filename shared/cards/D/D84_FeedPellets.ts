@@ -1,13 +1,24 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D84_FeedPellets'
 
 const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 
-registerCardEffect({
+export const D84_FeedPellets = new MinorImprovement({
+  id: CARD_ID,
+  name: "Feed Pellets",
+  deck: "D",
+  number: 84,
+  category: "FOOD_PROVIDER",
+  desc: ['When you play this card, you immediately get 1 <SHEEP>. In the feeding phase of each harvest, you can exchange exactly 1 <VEGETABLE> for 1 animal of a type you already have.'],
+  cost: {},
+})
+
+export const D84_FeedPellets_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
   onHarvestFeedingPhase: (_state, player) => {
@@ -35,14 +46,6 @@ registerCardEffect({
       children,
     } as ActionFlow
   },
-})
-
-export const D84_FeedPellets = new MinorImprovement({
-  id: CARD_ID,
-  name: "Feed Pellets",
-  deck: "D",
-  number: 84,
-  category: "FOOD_PROVIDER",
-  desc: ['When you play this card, you immediately get 1 <SHEEP>. In the feeding phase of each harvest, you can exchange exactly 1 <VEGETABLE> for 1 animal of a type you already have.'],
-  cost: {},
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

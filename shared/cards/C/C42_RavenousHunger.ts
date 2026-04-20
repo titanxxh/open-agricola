@@ -1,11 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, Resource } from '../../game/types'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C42_RavenousHunger'
 
@@ -75,9 +75,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-registerCardListener(afterCollectListener)
-
 export const C42_RavenousHunger = new MinorImprovement({
   id: CARD_ID,
   name: 'Ravenous Hunger',
@@ -90,3 +87,8 @@ export const C42_RavenousHunger = new MinorImprovement({
   cost: { grain: 1 },
   players: '1+',
 })
+
+export const C42_RavenousHunger_impl = {
+  listeners: [afterPlaceFarmerListener, afterCollectListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

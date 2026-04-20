@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D87_MasterBuilder'
 
@@ -26,7 +26,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-registerCardListener(anytimeListener)
 
 export const D87_MasterBuilder = new Occupation({
   id: CARD_ID,
@@ -39,3 +38,8 @@ export const D87_MasterBuilder = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const D87_MasterBuilder_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

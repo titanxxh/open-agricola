@@ -1,9 +1,20 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E6_Recount'
 
-registerCardEffect({
+export const E6_Recount = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Recount',
+  deck: 'E',
+  number: 6,
+  category: 'RESOURCE_WOOD',
+  desc: ['You immediately get 1 building resource of each type of which you have 4 or more resources in your supply already.'],
+  passing: true,
+})
+
+export const E6_Recount_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const types: Array<[keyof typeof player.resources, string]> = [
@@ -26,14 +37,6 @@ registerCardEffect({
       params: gains,
     }
   },
-})
-
-export const E6_Recount = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Recount',
-  deck: 'E',
-  number: 6,
-  category: 'RESOURCE_WOOD',
-  desc: ['You immediately get 1 building resource of each type of which you have 4 or more resources in your supply already.'],
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

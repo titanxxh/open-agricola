@@ -1,35 +1,13 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D53_TeaHouse'
-
-/**
- * D53 Tea House — Once per round, you can skip placing your second person and
- * get 1 <FOOD> instead. (You can place the person later that round.)
- *
- * BGA: canBeActivated → !isFlagged && countPlacedFarmers == 1.
- * onPlayerStartOfTurn → unflagCardNode (resets once per round).
- *
- * Implementation: anytime listener (flag-gated, once per round).
- * Available when: card not flagged, player has exactly 1 placed farmer this round.
- * Effect: gain 1 food, flag the card (prevent repeat this round).
- * onBeforeStartOfTurn resets the flag.
- *
- * Prerequisite: Play in Round 6 or Later.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D53-tea-house-anytime',
@@ -56,8 +34,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const D53_TeaHouse = new MinorImprovement({
   id: CARD_ID,
   name: 'Tea House',
@@ -69,3 +45,14 @@ export const D53_TeaHouse = new MinorImprovement({
   vp: 2,
   prerequisite: 'Play in Round 6 or Later',
 })
+
+export const D53_TeaHouse_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

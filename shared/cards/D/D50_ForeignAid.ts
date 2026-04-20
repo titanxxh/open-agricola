@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D50_ForeignAid'
 
@@ -29,14 +28,6 @@ const getBlockedSpaceIds = (state: { roundActionOrder: (string | null)[] }): Set
   return blocked
 }
 
-// onBuy: gain 6 food
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => {
-    return gainLeaf(CARD_ID, { food: 6 })
-  },
-})
-
 // computeArgs: filter out rounds 12-14 action spaces from place-farmer choices
 const computeArgsListener: CardListenerRegistration = {
   id: 'D50-foreign-aid-compute-args-place-farmer',
@@ -56,8 +47,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export { getBlockedSpaceIds }
 
 export const D50_ForeignAid = new MinorImprovement({
@@ -71,3 +60,14 @@ export const D50_ForeignAid = new MinorImprovement({
   maxRound: 11,
   players: '1+',
 })
+
+export const D50_ForeignAid_impl = {
+  listeners: [computeArgsListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => {
+    return gainLeaf(CARD_ID, { food: 6 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

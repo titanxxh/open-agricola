@@ -1,22 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B5_StoreofExperience'
 
 // rewards[0..4] => stone, [5] => reed, [6] => clay, [7] => wood
 const REWARDS: (keyof Resource)[] = ['stone', 'stone', 'stone', 'stone', 'stone', 'reed', 'clay', 'wood']
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const occsInHand = player.occupationHand.length
-    const resource = REWARDS[Math.min(occsInHand, 7)]
-    if (!resource) return
-    return gainLeaf(CARD_ID, { [resource]: 1 })
-  },
-})
 
 export const B5_StoreofExperience = new MinorImprovement({
   id: CARD_ID,
@@ -28,3 +18,16 @@ export const B5_StoreofExperience = new MinorImprovement({
   cost: { food: 1 },
   passing: true,
 })
+
+export const B5_StoreofExperience_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const occsInHand = player.occupationHand.length
+    const resource = REWARDS[Math.min(occsInHand, 7)]
+    if (!resource) return
+    return gainLeaf(CARD_ID, { [resource]: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

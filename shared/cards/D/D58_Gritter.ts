@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D58_Gritter'
 
@@ -33,8 +33,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D58_Gritter = new MinorImprovement({
   id: CARD_ID,
   name: 'Gritter',
@@ -48,3 +46,8 @@ export const D58_Gritter = new MinorImprovement({
   prerequisite: 'Play in Round 5 or Later',
   newSet: true,
 })
+
+export const D58_Gritter_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

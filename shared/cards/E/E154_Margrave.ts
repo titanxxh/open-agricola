@@ -1,19 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E154_Margrave'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (state, player) => {
-    if (player.houseType !== 'stone') return 0
-    return state.players.filter((p) => p.id !== player.id && p.houseType !== 'stone').length
-  },
-})
 
 const renovateListener: CardListenerRegistration = {
   id: 'E154-margrave-opponent-renovate',
@@ -27,8 +18,6 @@ const renovateListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(renovateListener)
-
 export const E154_Margrave = new Occupation({
   id: CARD_ID,
   name: "Margrave",
@@ -39,3 +28,15 @@ export const E154_Margrave = new Occupation({
   cost: {},
   players: "3+",
 })
+
+export const E154_Margrave_impl = {
+  listeners: [renovateListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (state, player) => {
+    if (player.houseType !== 'stone') return 0
+    return state.players.filter((p) => p.id !== player.id && p.houseType !== 'stone').length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

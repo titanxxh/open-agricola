@@ -1,9 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D133_BeerTentOperator'
 
-registerCardEffect({
+export const D133_BeerTentOperator = new Occupation({
+  id: CARD_ID,
+  name: "Beer Tent Operator",
+  deck: "D",
+  number: 133,
+  category: "POINTS_PROVIDER",
+  desc: ["In the feeding phase of each harvest, you can use this card to turn 1 <WOOD> plus 1 <GRAIN> into 1 bonus <SCORE> and 2 <FOOD>."],
+  cost: {},
+  players: "3+",
+})
+
+export const D133_BeerTentOperator_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
     if (player.resources.wood < 1 || player.resources.grain < 1) return
@@ -18,15 +30,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D133_BeerTentOperator = new Occupation({
-  id: CARD_ID,
-  name: "Beer Tent Operator",
-  deck: "D",
-  number: 133,
-  category: "POINTS_PROVIDER",
-  desc: ["In the feeding phase of each harvest, you can use this card to turn 1 <WOOD> plus 1 <GRAIN> into 1 bonus <SCORE> and 2 <FOOD>."],
-  cost: {},
-  players: "3+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A30_BakingSheet'
 
@@ -24,8 +24,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A30_BakingSheet = new MinorImprovement({
   id: CARD_ID,
   name: 'Baking Sheet',
@@ -37,3 +35,8 @@ export const A30_BakingSheet = new MinorImprovement({
   prerequisite: 'No Grain Field',
   newSet: true,
 })
+
+export const A30_BakingSheet_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

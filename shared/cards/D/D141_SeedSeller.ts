@@ -1,22 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D141_SeedSeller'
-
-/**
- * D141 Seed Seller — On buy: gain 1 grain.
- * Each time you use the Grain Seeds action space, you get 1 additional grain.
- *
- * BGA reference: D_141_SeedSeller.php
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'D141-seed-seller-after-grain-seeds',
@@ -28,8 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-registerCardListener(listener)
 
 export const D141_SeedSeller = new Occupation({
   id: CARD_ID,
@@ -43,3 +29,12 @@ export const D141_SeedSeller = new Occupation({
   cost: {},
   players: "3+",
 })
+
+export const D141_SeedSeller_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,6 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
-import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
@@ -8,17 +6,10 @@ import {
   clearPendingFenceBonus,
 } from '../helpers/pending-fence-bonus'
 import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E74_AshTrees'
 const MAX_FREE_FENCES = 5
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const counters = initCardState(player, CARD_ID)
-    counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
-  },
-})
 
 const isDoableListener: CardListenerRegistration = {
   id: 'E74-ash-trees-isdoable-fence',
@@ -88,10 +79,6 @@ const afterFenceListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(isDoableListener)
-registerCardListener(beforeFenceListener)
-registerCardListener(afterFenceListener)
-
 export const E74_AshTrees = new MinorImprovement({
   id: CARD_ID,
   name: "Ash Trees",
@@ -101,3 +88,15 @@ export const E74_AshTrees = new MinorImprovement({
   cost: {},
   prerequisite: "2 Planted Fields",
 })
+
+export const E74_AshTrees_impl = {
+  listeners: [isDoableListener, beforeFenceListener, afterFenceListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const counters = initCardState(player, CARD_ID)
+    counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
 import type { PlayerState, Pasture } from '../../game/types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B51_DiggingSpade'
 
@@ -43,8 +43,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B51_DiggingSpade = new MinorImprovement({
   id: CARD_ID,
   name: 'Digging Spade',
@@ -58,3 +56,8 @@ export const B51_DiggingSpade = new MinorImprovement({
   prerequisite: 'Play in Round 7 or Later',
   newSet: true,
 })
+
+export const B51_DiggingSpade_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

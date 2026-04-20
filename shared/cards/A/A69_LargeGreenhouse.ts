@@ -1,11 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A69_LargeGreenhouse'
 
-// BGA: Add 4, 7, and 9 to the current round and place 1 VEGETABLE on each corresponding round space.
-registerCardEffect({
+export const A69_LargeGreenhouse = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Large Greenhouse',
+  deck: 'A',
+  number: 69,
+  category: 'CROP_PROVIDER',
+  desc: ['Add 4, 7, and 9 to the current round and place 1 <VEGETABLE> on each corresponding round space. At the start of these rounds, you get the <VEGETABLE>.'],
+  cost: { wood: 2 },
+  prerequisite: '2 Occupations',
+  occupationPrerequisites: { min: 2 },
+})
+
+export const A69_LargeGreenhouse_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const offsets = [4, 7, 9]
@@ -19,16 +31,6 @@ registerCardEffect({
       entries,
     })
   },
-})
-
-export const A69_LargeGreenhouse = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Large Greenhouse',
-  deck: 'A',
-  number: 69,
-  category: 'CROP_PROVIDER',
-  desc: ['Add 4, 7, and 9 to the current round and place 1 <VEGETABLE> on each corresponding round space. At the start of these rounds, you get the <VEGETABLE>.'],
-  cost: { wood: 2 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

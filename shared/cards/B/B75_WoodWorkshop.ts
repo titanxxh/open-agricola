@@ -1,5 +1,4 @@
 import { MinorImprovement, getRegisteredMinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, PlayerState } from '../../game/types'
@@ -12,6 +11,7 @@ import {
 } from '../../actions/effects/pay-helpers'
 import { computeAllBuyableCombinations, isComplexCost } from '../../actions/effects/pay'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B75_WoodWorkshop'
 
@@ -120,9 +120,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(isDoableListener)
-
 export const B75_WoodWorkshop = new MinorImprovement({
   id: CARD_ID,
   name: "Wood Workshop",
@@ -134,3 +131,8 @@ export const B75_WoodWorkshop = new MinorImprovement({
   prerequisite: "1 Occupation",
   occupationPrerequisites: {"min":1},
 })
+
+export const B75_WoodWorkshop_impl = {
+  listeners: [beforeListener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

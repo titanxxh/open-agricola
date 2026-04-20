@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B83_MuddyPuddles'
 
@@ -13,13 +12,6 @@ const CARD_ID = 'B83_MuddyPuddles'
  * Player pays 1 clay to take the top good at any time.
  */
 const STACK_ITEMS = ['boar', 'food', 'cattle', 'food', 'sheep']
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, STACK_ITEMS)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'B83-muddy-puddles-anytime',
@@ -43,8 +35,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const B83_MuddyPuddles = new MinorImprovement({
   id: CARD_ID,
   name: 'Muddy Puddles',
@@ -55,3 +45,14 @@ export const B83_MuddyPuddles = new MinorImprovement({
   cost: { clay: 2 },
   players: '1+',
 })
+
+export const B83_MuddyPuddles_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, STACK_ITEMS)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

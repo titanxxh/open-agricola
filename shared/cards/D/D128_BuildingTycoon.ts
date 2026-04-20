@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D128_BuildingTycoon'
 
@@ -57,8 +57,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D128_BuildingTycoon = new Occupation({
   id: CARD_ID,
   name: 'Building Tycoon',
@@ -71,3 +69,8 @@ export const D128_BuildingTycoon = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const D128_BuildingTycoon_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

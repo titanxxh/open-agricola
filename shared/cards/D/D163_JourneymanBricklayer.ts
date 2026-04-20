@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D163_JourneymanBricklayer'
 
@@ -52,10 +52,6 @@ const constructListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(renovateListener)
-registerCardListener(constructListener)
-
 export const D163_JourneymanBricklayer = new Occupation({
   id: CARD_ID,
   name: 'Journeyman Bricklayer',
@@ -68,3 +64,8 @@ export const D163_JourneymanBricklayer = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const D163_JourneymanBricklayer_impl = {
+  listeners: [onBuyListener, renovateListener, constructListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

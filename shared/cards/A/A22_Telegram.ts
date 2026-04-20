@@ -1,29 +1,25 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A22_Telegram'
 
-/**
- * A22 Telegram:
- * - onBuy: Calculate target round = current round + fences in supply. Store it.
- *          If target round <= 14, mark that round. Show infobox.
- * - onBeforeStartOfTurn (at target round): if player has a farmer in reserve
- *   (familySize > workersAvailable scenario won't work — this is about extra placement from supply).
- *   The BGA version flags the card, which allows placing an extra person.
- *   In our system, the closest is granting an extra place-farmer action.
- *
- * BGA:
- * - onBuy: triggerRound = current turn + fences in supply (capped at 14)
- * - StartOfTurn at triggerRound: flag card → allows extra placement
- * - activate → independent action that adds place-farmer node
- *
- * Implementation: onBuy stores triggerRound in extraData.
- * onBeforeStartOfTurn at that round returns an optional place-farmer leaf flow.
- */
+export const A22_Telegram = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Telegram',
+  deck: 'A',
+  number: 22,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply.'],
+  cost: { food: 2 },
+  prerequisite: 'At Least 1 Fence in Supply',
+  vp: 1,
+  evenMoreSet: true,
+})
 
-registerCardEffect({
+export const A22_Telegram_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const fencesInSupply = getFenceCount(player)
@@ -60,17 +56,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const A22_Telegram = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Telegram',
-  deck: 'A',
-  number: 22,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply.'],
-  cost: { food: 2 },
-  prerequisite: 'At Least 1 Fence in Supply',
-  vp: 1,
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

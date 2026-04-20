@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, TradeModifier } from '../../game/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A28_ForestSchool'
 const FOREST_SCHOOL_MAX_TRADES = 8
@@ -33,8 +33,6 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(lessonsComputeArgsListener)
-
 export const A28_ForestSchool = new MinorImprovement({
   id: "A28_ForestSchool",
   name: "Forest School",
@@ -54,3 +52,8 @@ export const A28_ForestSchool = new MinorImprovement({
     max: FOREST_SCHOOL_MAX_TRADES,
   } as TradeModifier,
 })
+
+export const A28_ForestSchool_impl = {
+  listeners: [lessonsComputeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

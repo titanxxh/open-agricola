@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { futureMeeplesNode } from '../../actions/effects/future-meeples'
 import type { FutureMeepleRequest } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E47_SyrupTap'
 
@@ -40,8 +40,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-
 export const E47_SyrupTap = new MinorImprovement({
   id: CARD_ID,
   name: 'Syrup Tap',
@@ -51,3 +49,8 @@ export const E47_SyrupTap = new MinorImprovement({
   cost: { wood: 1, stone: 1 },
   vp: 1,
 })
+
+export const E47_SyrupTap_impl = {
+  listeners: [afterCollectListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

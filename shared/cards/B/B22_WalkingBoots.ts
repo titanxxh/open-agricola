@@ -1,15 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B22_WalkingBoots'
-
-// BGA: get 2 food, then immediately place a person from supply who will be removed at next return home.
-// Simplified: gain 2 food only. TODO: implement temporary farmer placement with removal.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 2 }),
-})
 
 export const B22_WalkingBoots = new MinorImprovement({
   id: CARD_ID,
@@ -22,3 +15,11 @@ export const B22_WalkingBoots = new MinorImprovement({
   prerequisite: 'At Most 4 People',
   passing: true,
 })
+
+export const B22_WalkingBoots_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

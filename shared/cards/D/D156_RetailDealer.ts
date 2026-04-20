@@ -1,27 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D156_RetailDealer'
-
-/**
- * Place 3 grain and 3 food on this card. Each time you use the
- * Resource Market action space, you also get 1 grain and 1 food
- * from this card.
- *
- * Uses a counter (remaining: 3) in extraData. Each Resource Market
- * use decrements the counter and grants 1 grain + 1 food.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'remaining', 3)
-  },
-})
 
 const listener: CardListenerRegistration = {
   id: 'D156-retail-dealer-after-place-farmer',
@@ -40,8 +24,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D156_RetailDealer = new Occupation({
   id: CARD_ID,
   name: 'Retail Dealer',
@@ -52,3 +34,14 @@ export const D156_RetailDealer = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const D156_RetailDealer_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'remaining', 3)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

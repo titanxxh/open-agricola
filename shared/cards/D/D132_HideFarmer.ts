@@ -1,9 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D132_HideFarmer'
 
-registerCardEffect({
+export const D132_HideFarmer = new Occupation({
+  id: CARD_ID,
+  name: "Hide Farmer",
+  deck: "D",
+  number: 132,
+  category: "POINTS_PROVIDER",
+  desc: ['During scoring, you can pay 1 <FOOD> each for any number of unused farmyard spaces. You do not lose points for these spaces.'],
+  cost: {},
+  players: "3+",
+})
+
+export const D132_HideFarmer_impl = {
+  effect: {
   id: CARD_ID,
   computePostScore: (_state, player, categories) => {
     // Find the 'empty' scoring category (unused farmyard spaces)
@@ -16,15 +28,6 @@ registerCardEffect({
     player.resources.food -= canPay
     return canPay // offset penalty
   },
-})
-
-export const D132_HideFarmer = new Occupation({
-  id: CARD_ID,
-  name: "Hide Farmer",
-  deck: "D",
-  number: 132,
-  category: "POINTS_PROVIDER",
-  desc: ['During scoring, you can pay 1 <FOOD> each for any number of unused farmyard spaces. You do not lose points for these spaces.'],
-  cost: {},
-  players: "3+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

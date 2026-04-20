@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D105_Sculptor'
 
@@ -23,8 +23,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D105_Sculptor = new Occupation({
   id: CARD_ID,
   name: 'Sculptor',
@@ -36,3 +34,8 @@ export const D105_Sculptor = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const D105_Sculptor_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

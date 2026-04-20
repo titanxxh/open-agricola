@@ -1,11 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState } from '../../game/types'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { countPeopleOnSpace } from '../helpers/space-occupancy'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A25_Bassinet'
 const MEETING_PLACE_ID = 'meeting-place'
@@ -51,8 +51,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export const A25_Bassinet = new MinorImprovement({
   id: CARD_ID,
   name: 'Bassinet',
@@ -65,3 +63,8 @@ export const A25_Bassinet = new MinorImprovement({
   cost: {},
   vp: 0,
 })
+
+export const A25_Bassinet_impl = {
+  listeners: [computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

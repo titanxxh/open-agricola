@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C36_ClayDeposit'
 
@@ -25,8 +25,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C36_ClayDeposit = new MinorImprovement({
   id: CARD_ID,
   name: 'Clay Deposit',
@@ -41,3 +39,8 @@ export const C36_ClayDeposit = new MinorImprovement({
   occupationPrerequisites: { min: 1 },
   newSet: true,
 })
+
+export const C36_ClayDeposit_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

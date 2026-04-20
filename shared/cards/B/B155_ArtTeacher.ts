@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B155_ArtTeacher'
 
@@ -95,9 +95,6 @@ const beforeLessonsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(beforeLessonsListener)
-
 export const B155_ArtTeacher = new Occupation({
   id: CARD_ID,
   name: 'Art Teacher',
@@ -111,3 +108,8 @@ export const B155_ArtTeacher = new Occupation({
   players: '4+',
   evenMoreSet: true,
 })
+
+export const B155_ArtTeacher_impl = {
+  listeners: [onBuyListener, beforeLessonsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

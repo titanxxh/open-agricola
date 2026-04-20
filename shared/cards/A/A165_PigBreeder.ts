@@ -1,15 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A165_PigBreeder'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return gainLeaf(CARD_ID, { boar: 1 })
-  },
-})
 
 export const A165_PigBreeder = new Occupation({
   id: "A165_PigBreeder",
@@ -21,3 +14,13 @@ export const A165_PigBreeder = new Occupation({
   cost: {},
   players: "4+",
 })
+
+export const A165_PigBreeder_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return gainLeaf(CARD_ID, { boar: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

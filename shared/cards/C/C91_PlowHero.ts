@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C91_PlowHero'
 
@@ -32,8 +32,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C91_PlowHero = new Occupation({
   id: CARD_ID,
   name: 'Plow Hero',
@@ -45,3 +43,8 @@ export const C91_PlowHero = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const C91_PlowHero_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

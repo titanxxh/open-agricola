@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D70_StrawManure'
 
@@ -17,7 +17,19 @@ registerSelectionEffect('add-vegetable', ({ player, positions }) => {
   }
 })
 
-registerCardEffect({
+export const D70_StrawManure = new MinorImprovement({
+  id: CARD_ID,
+  name: "Straw Manure",
+  deck: "D",
+  number: 70,
+  category: "CROP_PROVIDER",
+  desc: ["Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 vegetable fields."],
+  cost: {},
+  prerequisite: "2 Fields",
+})
+
+export const D70_StrawManure_impl = {
+  effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
     // Need grain to pay and at least one vegetable field with crops
@@ -51,15 +63,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const D70_StrawManure = new MinorImprovement({
-  id: CARD_ID,
-  name: "Straw Manure",
-  deck: "D",
-  number: 70,
-  category: "CROP_PROVIDER",
-  desc: ["Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 vegetable fields."],
-  cost: {},
-  prerequisite: "2 Fields",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

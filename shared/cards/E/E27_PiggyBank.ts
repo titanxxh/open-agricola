@@ -1,51 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E27_PiggyBank'
 const FOOD_KEY = 'food'
 const FOOD_THRESHOLD = 6
-
-/**
- * E27 Piggy Bank (Minor Improvement, E, 27)
- * At the end of each work phase, you can place 1 food on this card, irretrievably.
- * At any time, you can discard 6 food from this card to build a major improvement
- * at no cost.
- *
- * BGA: EndWorkPhase → place 1 food on card (optional).
- * Anytime → if 6+ food on card, discard 6 and build a free major.
- * onPlayerComputeCardCosts → when flagged, zero out all major improvement costs.
- */
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeReturnHome: (_state, player) => {
-    if ((player.resources.food ?? 0) < 1) return
-
-    // Offer to place 1 food on card (pay 1 food from supply, store on card counter)
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'pay-resources',
-          params: { food: 1 },
-          sourceCard: CARD_ID,
-        },
-        {
-          type: 'leaf',
-          actionId: 'store-on-card',
-          params: { [FOOD_KEY]: 1 },
-          sourceCard: CARD_ID,
-        },
-      ],
-    }
-  },
-})
 
 /**
  * Anytime listener: when 6+ food on card, offer to discard 6 and build a free major.
@@ -96,8 +57,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 /**
  * computeCosts listener: when card is flagged, zero out costs for major improvements.
  */
@@ -113,8 +72,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const E27_PiggyBank = new MinorImprovement({
   id: CARD_ID,
   name: 'Piggy Bank',
@@ -123,3 +80,34 @@ export const E27_PiggyBank = new MinorImprovement({
   desc: ['At the end of each work phase, you can place 1 <FOOD> on this card, irretrievably. At any time, you can discard 6 <FOOD> from this card to build a major improvement at no cost.'],
   cost: {},
 })
+
+export const E27_PiggyBank_impl = {
+  listeners: [anytimeListener, computeCostsListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeReturnHome: (_state, player) => {
+    if ((player.resources.food ?? 0) < 1) return
+
+    // Offer to place 1 food on card (pay 1 food from supply, store on card counter)
+    return {
+      type: 'seq',
+      optional: true,
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'pay-resources',
+          params: { food: 1 },
+          sourceCard: CARD_ID,
+        },
+        {
+          type: 'leaf',
+          actionId: 'store-on-card',
+          params: { [FOOD_KEY]: 1 },
+          sourceCard: CARD_ID,
+        },
+      ],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl
