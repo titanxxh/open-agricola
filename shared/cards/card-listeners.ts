@@ -1,6 +1,7 @@
 import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
+import { getActiveCardRegistry } from './active-registry'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -40,6 +41,14 @@ const cardListeners: CardListenerRegistration[] = []
  * See `shared/cards/registry.ts` for the new per-session approach.
  */
 export const registerCardListener = (registration: CardListenerRegistration) => {
+  const active = getActiveCardRegistry()
+  if (active && registration.cardIds && registration.cardIds.length > 0) {
+    for (const cardId of registration.cardIds) {
+      active.loadImpl(cardId, { listeners: [registration] })
+    }
+    return
+  }
+  // else fall through to legacy global push below
   cardListeners.push(registration)
 }
 
