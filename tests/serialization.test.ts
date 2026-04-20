@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState, type SerializedGameState } from '../shared/game/serialization'
 import { createInitialState } from '../shared/logic/state'
 import { getCardModifiers } from '../shared/cards/card-modifiers'
-import { GameSession } from '../server/game-session'
+import { GameSession } from '../server/game/authoritative-session'
 
 describe('shared/game/serialization', () => {
   const state = createInitialState(42)

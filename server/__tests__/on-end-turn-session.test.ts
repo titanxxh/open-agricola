@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { clearActionHooks } from '../../shared/actions/hooks'
 import { registerCardEffect } from '../../shared/cards/card-effects'
 import { incCounter } from '../../shared/cards/__stubs__/helpers'

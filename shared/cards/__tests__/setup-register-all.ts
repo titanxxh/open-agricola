@@ -15,7 +15,7 @@
  * `shared/game/minor-improvements.ts`). The cycle resolves correctly only when
  * `minor-improvements.ts` is pulled in before `catalog.ts` reaches its first
  * card import. Constructing the GameSession import path here forces the same
- * load order that `server/game-session.ts` would establish at first-use, so
+ * load order that `server/game/authoritative-session.ts` would establish at first-use, so
  * `catalog.ts`'s top-level array is fully populated by the time
  * `register-all.ts`'s `import './catalog'` runs.
  *
@@ -28,6 +28,6 @@
 // Pull in GameSession first — this walks the real game-core import graph,
 // which loads `minor-improvements.ts` before `catalog.ts` and avoids the
 // D95_SiteManager <-> catalog TDZ bomb.
-import '../../../server/game-session'
+import '../../../server/game/authoritative-session'
 // Now load register-all for its bootstrap side effect.
 import '../register-all'

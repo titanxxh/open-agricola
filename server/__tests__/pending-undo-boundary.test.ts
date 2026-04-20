@@ -15,7 +15,7 @@
  *     history entry is an undo boundary.
  */
 import { describe, expect, it, beforeEach } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 describe('state.pendingUndoBoundary consumed by pushHistory', () => {
   let session: GameSession

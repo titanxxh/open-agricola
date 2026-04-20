@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/game/types.ts'
 

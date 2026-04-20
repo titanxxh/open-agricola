@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
 
 // Force card modules to register their effects.
