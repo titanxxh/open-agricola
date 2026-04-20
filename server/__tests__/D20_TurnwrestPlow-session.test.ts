@@ -130,7 +130,7 @@ describe('D20_TurnwrestPlow session', () => {
     const session = setup()
 
     // Use grain-seeds instead
-    let resp = session.takeAction(0, 'grain-seeds')
+    const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
 
     // No choice offered from card (grain-seeds may have its own choices though)

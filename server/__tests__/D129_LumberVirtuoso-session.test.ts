@@ -138,7 +138,7 @@ describe('D129_LumberVirtuoso session', () => {
 
   it('with exactly 5 wood, no excess to pay — still offers action', () => {
     const session = setup({ wood: 5 })
-    let resp = session.performRoundEnd()
+    const resp = session.performRoundEnd()
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 

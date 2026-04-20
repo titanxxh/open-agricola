@@ -154,7 +154,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
         }
         rawWs.addEventListener('message', handler)
       } else {
-        let roomId = roomParam
+        const roomId = roomParam
         const requestedPlayerIndex = toRequestedPlayerIndex(playerParam)
         if (!roomId) {
           setWsStatus({
