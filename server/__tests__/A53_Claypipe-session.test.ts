@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'

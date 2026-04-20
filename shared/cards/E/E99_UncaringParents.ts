@@ -1,20 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E99_UncaringParents'
-
-registerCardEffect({
-  id: CARD_ID,
-  onEndHarvest: (_state, player) => {
-    if (player.houseType !== 'stone') return
-
-    return {
-      type: 'leaf',
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }
-  },
-})
 
 export const E99_UncaringParents = new Occupation({
   id: CARD_ID,
@@ -26,3 +13,19 @@ export const E99_UncaringParents = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const E99_UncaringParents_impl = {
+  effect: {
+  id: CARD_ID,
+  onEndHarvest: (_state, player) => {
+    if (player.houseType !== 'stone') return
+
+    return {
+      type: 'leaf',
+      actionId: 'bonus-vp',
+      sourceCard: CARD_ID,
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E107_LandSurveyor'
 
-registerCardEffect({
+export const E107_LandSurveyor = new Occupation({
+  id: CARD_ID,
+  name: "Land Surveyor",
+  deck: "E",
+  number: 107,
+  category: "FOOD_PROVIDER",
+  desc: ["In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 <FOOD>."],
+  cost: {},
+  players: "1+",
+})
+
+export const E107_LandSurveyor_impl = {
+  effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
 
@@ -18,15 +30,6 @@ registerCardEffect({
     if (food === 0) return
     return gainLeaf(CARD_ID, { food })
   },
-})
-
-export const E107_LandSurveyor = new Occupation({
-  id: CARD_ID,
-  name: "Land Surveyor",
-  deck: "E",
-  number: 107,
-  category: "FOOD_PROVIDER",
-  desc: ["In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 <FOOD>."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

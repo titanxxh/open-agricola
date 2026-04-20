@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A18_WheelPlow'
 
@@ -47,8 +47,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A18_WheelPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Wheel Plow',
@@ -61,3 +59,8 @@ export const A18_WheelPlow = new MinorImprovement({
   occupationPrerequisites: { min: 2 },
   newSet: true,
 })
+
+export const A18_WheelPlow_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

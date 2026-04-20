@@ -1,19 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B99_Tutor'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'playedAtCount', player.occupationPlayed.length)
-  },
-  computeBonusScore: (_state, player) => {
-    const playedAt = readCardExtraData<number>(player, CARD_ID, 'playedAtCount') ?? 0
-    return Math.max(0, player.occupationPlayed.length - playedAt)
-  },
-})
 
 export const B99_Tutor = new Occupation({
   id: CARD_ID,
@@ -25,3 +14,17 @@ export const B99_Tutor = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const B99_Tutor_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'playedAtCount', player.occupationPlayed.length)
+  },
+  computeBonusScore: (_state, player) => {
+    const playedAt = readCardExtraData<number>(player, CARD_ID, 'playedAtCount') ?? 0
+    return Math.max(0, player.occupationPlayed.length - playedAt)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

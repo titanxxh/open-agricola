@@ -1,11 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B53_SculptureCourse'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-registerCardEffect({
+export const B53_SculptureCourse = new MinorImprovement({
+  id: CARD_ID,
+  name: "Sculpture Course",
+  deck: "B",
+  number: 53,
+  category: "FOOD_PROVIDER",
+  desc: ["At the end of each round that does not end with a harvest, you can use this card to exchange your choice of 1 <WOOD> for 2 <FOOD>, or 1 <STONE> for 4 <FOOD>."],
+  cost: { grain: 1 },
+})
+
+export const B53_SculptureCourse_impl = {
+  effect: {
   id: CARD_ID,
   onAfterRoundEnd: (state, _player) => {
     if (harvestRounds.includes(state.round)) return
@@ -37,14 +48,6 @@ registerCardEffect({
       children,
     }
   },
-})
-
-export const B53_SculptureCourse = new MinorImprovement({
-  id: CARD_ID,
-  name: "Sculpture Course",
-  deck: "B",
-  number: 53,
-  category: "FOOD_PROVIDER",
-  desc: ["At the end of each round that does not end with a harvest, you can use this card to exchange your choice of 1 <WOOD> for 2 <FOOD>, or 1 <STONE> for 4 <FOOD>."],
-  cost: { grain: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

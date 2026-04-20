@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B71_HarvestHouse'
 
@@ -15,16 +15,6 @@ const HARVEST_MAP: Record<number, number> = {
   14: 5,
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    const occs = player.occupationPlayed.length
-    const harvests = HARVEST_MAP[state.round] ?? 0
-    if (occs !== harvests) return
-    return gainLeaf(CARD_ID, { food: 1, grain: 1, vegetable: 1 })
-  },
-})
-
 export const B71_HarvestHouse = new MinorImprovement({
   id: CARD_ID,
   name: 'Harvest House',
@@ -35,3 +25,16 @@ export const B71_HarvestHouse = new MinorImprovement({
   cost: { wood: 1, clay: 1, reed: 1 },
   vp: 2,
 })
+
+export const B71_HarvestHouse_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    const occs = player.occupationPlayed.length
+    const harvests = HARVEST_MAP[state.round] ?? 0
+    if (occs !== harvests) return
+    return gainLeaf(CARD_ID, { food: 1, grain: 1, vegetable: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

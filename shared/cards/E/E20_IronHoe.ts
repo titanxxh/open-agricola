@@ -1,13 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E20_IronHoe'
 
-// E20 Iron Hoe: At the end of each work phase, if you occupy both the Grain Seeds and
-// Vegetable Seeds action spaces, you can plow 1 field.
-// BGA fires at StartReturnHome; we use onStartReturnHome.
-registerCardEffect({
+export const E20_IronHoe = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Iron Hoe',
+  deck: 'E',
+  number: 20,
+  category: 'FARMYARD_PLOWING',
+  desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field.'],
+  cost: { wood: 1 },
+})
+
+export const E20_IronHoe_impl = {
+  effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
@@ -22,14 +30,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E20_IronHoe = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Iron Hoe',
-  deck: 'E',
-  number: 20,
-  category: 'FARMYARD_PLOWING',
-  desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field.'],
-  cost: { wood: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

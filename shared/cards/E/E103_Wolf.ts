@@ -1,23 +1,12 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, popFromCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E103_Wolf'
-
-/**
- * onBuy: push stack ['clay', 'wood', 'grain'] (grain on top)
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, ['clay', 'wood', 'grain'])
-  },
-})
 
 /**
  * After gain/collect: if the gained resources include the top-of-stack resource,
@@ -45,8 +34,6 @@ const afterGainCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterGainCollectListener)
-
 export const E103_Wolf = new Occupation({
   id: CARD_ID,
   name: 'Wolf',
@@ -58,3 +45,14 @@ export const E103_Wolf = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E103_Wolf_impl = {
+  listeners: [afterGainCollectListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, ['clay', 'wood', 'grain'])
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

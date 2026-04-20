@@ -1,25 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../game/types'
 import { computeScores } from '../scoring'
-import { Occupation } from '../../cards/types'
+import { Occupation, registerAdHocOccupation } from '../../cards/types'
 
 // Self-register the minor we use as a fixture
 import '../../cards/B/B68_Beanfield'
 
-// In-test fixture occupation: the Occupation constructor self-registers
-// into registeredOccupations as a side effect (see shared/cards/types.ts).
-// At time of writing, no Occupation in our codebase has vp >= 1, so we
-// fabricate one to exercise the printed-vp wiring on the occupation path.
-new Occupation({
-  id: '__TEST_OCC_VP__',
-  name: 'Test Occupation',
-  deck: 'A',
-  number: 0,
-  desc: ['test fixture'],
-  cost: {},
-  vp: 1,
-  players: '1+',
-})
+// In-test fixture occupation: tests register an ad-hoc occupation so
+// `getRegisteredOccupation('__TEST_OCC_VP__')` resolves. At time of writing no
+// Occupation in our codebase has `vp >= 1`, so we fabricate one to exercise
+// the printed-vp wiring on the occupation path.
+registerAdHocOccupation(
+  new Occupation({
+    id: '__TEST_OCC_VP__',
+    name: 'Test Occupation',
+    deck: 'A',
+    number: 0,
+    desc: ['test fixture'],
+    cost: {},
+    vp: 1,
+    players: '1+',
+  }),
+)
 
 const emptyResources = (): Resource => ({
   wood: 0,

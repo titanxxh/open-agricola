@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D101_SugarBaker'
 
@@ -23,8 +23,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D101_SugarBaker = new Occupation({
   id: CARD_ID,
   name: 'Sugar Baker',
@@ -35,3 +33,8 @@ export const D101_SugarBaker = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D101_SugarBaker_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,17 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E134_Omnifarmer'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const stored = (player.cardStates?.[CARD_ID]?.extraData?.storedTypes as number | undefined)
-    if (!stored || stored < 2) return 0
-    const vpMap = [0, 0, 3, 5, 7, 9]
-    return vpMap[Math.min(stored, 5)] ?? 9
-  },
-})
 
 export const E134_Omnifarmer = new Occupation({
   id: CARD_ID,
@@ -23,3 +13,16 @@ export const E134_Omnifarmer = new Occupation({
   cost: {},
   players: "3+",
 })
+
+export const E134_Omnifarmer_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const stored = (player.cardStates?.[CARD_ID]?.extraData?.storedTypes as number | undefined)
+    if (!stored || stored < 2) return 0
+    const vpMap = [0, 0, 3, 5, 7, 9]
+    return vpMap[Math.min(stored, 5)] ?? 9
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

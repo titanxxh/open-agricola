@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A68_AsparagusGift'
 const FENCES_BEFORE_KEY = 'fencesBefore'
@@ -36,9 +36,6 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
-
 export const A68_AsparagusGift = new MinorImprovement({
   id: CARD_ID,
   name: 'Asparagus Gift',
@@ -50,3 +47,8 @@ export const A68_AsparagusGift = new MinorImprovement({
   prerequisite: '1 Unplanted Field',
   newSet: true,
 })
+
+export const A68_AsparagusGift_impl = {
+  listeners: [beforeListener, afterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

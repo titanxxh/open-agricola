@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A128_RiparianBuilder'
 
@@ -45,9 +45,6 @@ const constructDiscountListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(triggerBuildListener)
-registerCardListener(constructDiscountListener)
-
 export const A128_RiparianBuilder = new Occupation({
   id: CARD_ID,
   name: "Riparian Builder",
@@ -59,3 +56,8 @@ export const A128_RiparianBuilder = new Occupation({
   players: "3+",
   newSet: true,
 })
+
+export const A128_RiparianBuilder_impl = {
+  listeners: [triggerBuildListener, constructDiscountListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,17 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A98_StableArchitect'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const pastureStableTiles = new Set(
-      player.pastures.flatMap((p) => p.tiles.map((t) => `${t.row},${t.col}`))
-    )
-    return player.stableTiles.filter((t) => !pastureStableTiles.has(`${t.row},${t.col}`)).length
-  },
-})
 
 export const A98_StableArchitect = new Occupation({
   id: CARD_ID,
@@ -23,3 +13,16 @@ export const A98_StableArchitect = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A98_StableArchitect_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const pastureStableTiles = new Set(
+      player.pastures.flatMap((p) => p.tiles.map((t) => `${t.row},${t.col}`))
+    )
+    return player.stableTiles.filter((t) => !pastureStableTiles.has(`${t.row},${t.col}`)).length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

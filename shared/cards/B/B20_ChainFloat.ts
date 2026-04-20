@@ -1,13 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B20_ChainFloat'
 
-// BGA: add rounds current+7, +8, +9 and place 1 field on each. At start of those rounds, player can plow.
-// Simplified: place future plow actions on next 3 rounds (relative +7/+8/+9).
-// TODO: implement field-plow future effect properly.
-registerCardEffect({
+export const B20_ChainFloat = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Chain Float',
+  deck: 'B',
+  number: 20,
+  category: 'FARM_PLANNER',
+  desc: ['Add 7, 8, and 9 to the current round and place 1 field on each corresponding round space. At the start of these rounds, you can plow the field.'],
+  cost: { wood: 3 },
+})
+
+export const B20_ChainFloat_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const base = state.round
@@ -21,14 +29,6 @@ registerCardEffect({
       ],
     })
   },
-})
-
-export const B20_ChainFloat = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Chain Float',
-  deck: 'B',
-  number: 20,
-  category: 'FARM_PLANNER',
-  desc: ['Add 7, 8, and 9 to the current round and place 1 field on each corresponding round space. At the start of these rounds, you can plow the field.'],
-  cost: { wood: 3 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

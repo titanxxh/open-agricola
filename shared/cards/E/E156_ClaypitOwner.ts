@@ -1,10 +1,10 @@
 import { Occupation, getRegisteredMinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCardEffect } from '../major'
 import { isComplexCost } from '../../actions/effects/pay'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E156_ClaypitOwner'
 
@@ -60,8 +60,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E156_ClaypitOwner = new Occupation({
   id: CARD_ID,
   name: 'Claypit Owner',
@@ -75,3 +73,8 @@ export const E156_ClaypitOwner = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const E156_ClaypitOwner_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

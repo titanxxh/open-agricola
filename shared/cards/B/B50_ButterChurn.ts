@@ -1,21 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B50_ButterChurn'
-
-registerCardEffect({
-  id: CARD_ID,
-  onHarvestFieldPhase: (_state, player) => {
-
-    const sheep = player.resources.sheep ?? 0
-    const cattle = player.resources.cattle ?? 0
-    const gain = Math.floor(sheep / 3) + Math.floor(cattle / 2)
-    if (gain <= 0) return
-
-    return gainLeaf(CARD_ID, { food: gain })
-  },
-})
 
 export const B50_ButterChurn = new MinorImprovement({
   id: CARD_ID,
@@ -29,3 +16,19 @@ export const B50_ButterChurn = new MinorImprovement({
   prerequisite: "At Most 3 Occupations",
   occupationPrerequisites: { max: 3 },
 })
+
+export const B50_ButterChurn_impl = {
+  effect: {
+  id: CARD_ID,
+  onHarvestFieldPhase: (_state, player) => {
+
+    const sheep = player.resources.sheep ?? 0
+    const cattle = player.resources.cattle ?? 0
+    const gain = Math.floor(sheep / 3) + Math.floor(cattle / 2)
+    if (gain <= 0) return
+
+    return gainLeaf(CARD_ID, { food: gain })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

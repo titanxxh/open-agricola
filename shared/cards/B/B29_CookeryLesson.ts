@@ -1,11 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
-import { registerCardEffect } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B29_CookeryLesson'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
@@ -85,11 +84,24 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterExchangeListener)
-registerCardListener(afterPlaceFarmerListener)
+export const B29_CookeryLesson = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Cookery Lesson',
+  deck: 'B',
+  number: 29,
+  category: 'POINTS_PROVIDER',
+  desc: [
+    'Each time you use a __Lessons__ action space and a cooking improvement on the same turn, you get 1 bonus <SCORE>.',
+  ],
+  cost: { food: 2 },
+  extraVp: true,
+  evenMoreSet: true,
+  implemented: true,
+})
 
-// Reset cooking flag at the start of each round
-registerCardEffect({
+export const B29_CookeryLesson_impl = {
+  listeners: [afterExchangeListener, afterPlaceFarmerListener],
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'cookedThisRound', false)
@@ -110,19 +122,6 @@ registerCardEffect({
       }
     }
   },
-})
-
-export const B29_CookeryLesson = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cookery Lesson',
-  deck: 'B',
-  number: 29,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Each time you use a __Lessons__ action space and a cooking improvement on the same turn, you get 1 bonus <SCORE>.',
-  ],
-  cost: { food: 2 },
-  extraVp: true,
-  evenMoreSet: true,
-  implemented: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

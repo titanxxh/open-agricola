@@ -24,10 +24,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "shared"],
+  "include": ["client", "shared"],
   "exclude": [
-    "src/**/__tests__/**",
-    "src/services/__tests__/**",
+    "client/**/__tests__/**",
+    "client/services/__tests__/**",
     "shared/**/__tests__/**",
     "shared/cards/__stubs__/Stub_*.ts",
     "shared/cards/__stubs__/index.ts",

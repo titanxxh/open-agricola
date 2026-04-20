@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A72_CalciumFertilizers'
 
@@ -47,8 +47,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A72_CalciumFertilizers = new MinorImprovement({
   id: CARD_ID,
   name: "Calcium Fertilizers",
@@ -60,3 +58,8 @@ export const A72_CalciumFertilizers = new MinorImprovement({
   prerequisite: "No Field Tiles",
   newSet: true,
 })
+
+export const A72_CalciumFertilizers_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

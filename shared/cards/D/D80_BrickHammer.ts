@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMinorImprovementCard } from '../catalog'
 import { getMajorCardEffect } from '../major'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D80_BrickHammer'
 
@@ -37,8 +37,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D80_BrickHammer = new MinorImprovement({
   id: CARD_ID,
   name: 'Brick Hammer',
@@ -50,3 +48,8 @@ export const D80_BrickHammer = new MinorImprovement({
   altCosts: [{ food: 1 }],
   newSet: true,
 })
+
+export const D80_BrickHammer_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

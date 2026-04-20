@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../game/types'
 import { isSpaceOccupied } from '../../game/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E21_SheepRug'
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
@@ -31,8 +31,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeArgsListener)
-
 export const E21_SheepRug = new MinorImprovement({
   id: CARD_ID,
   name: 'Sheep Rug',
@@ -44,3 +42,8 @@ export const E21_SheepRug = new MinorImprovement({
   cost: { sheep: 1 },
   prerequisite: '4 Sheep',
 })
+
+export const E21_SheepRug_impl = {
+  listeners: [computeArgsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,25 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B25_BreadPaddle'
-
-/**
- * B25 Bread Paddle:
- * When you play this card, you immediately get 1 Food.
- * For each occupation you play, you get an additional Bake Bread action.
- *
- * BGA: onBuy → gain 1 food.
- *      isListeningTo → isActionEvent(Occupation).
- *      onPlayerAfterOccupation → bakeBreadNode().
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),
-})
 
 const listener: CardListenerRegistration = {
   id: 'B25-bread-paddle-after-occupation',
@@ -42,8 +27,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B25_BreadPaddle = new MinorImprovement({
   id: CARD_ID,
   name: 'Bread Paddle',
@@ -55,3 +38,12 @@ export const B25_BreadPaddle = new MinorImprovement({
   ],
   cost: { wood: 1 },
 })
+
+export const B25_BreadPaddle_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

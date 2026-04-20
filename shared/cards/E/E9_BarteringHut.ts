@@ -1,11 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E9_BarteringHut'
 
-// BGA: Up to 2 times, pay 2/3/4 building resources (1 each, chosen as XOR) to gain 1 sheep/pig/cattle.
-registerCardEffect({
+export const E9_BarteringHut = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Bartering Hut',
+  deck: 'E',
+  number: 9,
+  category: 'ANIMAL_HANDLER',
+  desc: ['Up to two times: Immediately spend any 2/3/4 building resources for 1 <SHEEP>/<PIG>/<CATTLE> from the general supply.'],
+  passing: true,
+})
+
+export const E9_BarteringHut_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: () => {
     const makeAnimalOption = (animal: 'sheep' | 'boar' | 'cattle', cost: number): ActionFlow => {
@@ -43,14 +53,6 @@ registerCardEffect({
       children: [oneTime, oneTime],
     }
   },
-})
-
-export const E9_BarteringHut = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Bartering Hut',
-  deck: 'E',
-  number: 9,
-  category: 'ANIMAL_HANDLER',
-  desc: ['Up to two times: Immediately spend any 2/3/4 building resources for 1 <SHEEP>/<PIG>/<CATTLE> from the general supply.'],
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

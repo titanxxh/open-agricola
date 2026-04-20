@@ -1,27 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C143_StoneBuyer'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'seq' as const,
-    children: [
-      payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-      gainLeaf(CARD_ID, { stone: 2 }),
-      { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
-    ],
-  }),
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C143-stone-buyer-anytime',
@@ -45,8 +29,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C143_StoneBuyer = new Occupation({
   id: CARD_ID,
   name: 'Stone Buyer',
@@ -57,3 +39,22 @@ export const C143_StoneBuyer = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const C143_StoneBuyer_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => ({
+    type: 'seq' as const,
+    children: [
+      payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+      gainLeaf(CARD_ID, { stone: 2 }),
+      { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
+    ],
+  }),
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { buildCardsManifest } from '../build-cards-manifest'
 
 const fixturesRoot = path.resolve(__dirname, 'fixtures/cards')
+const extendedFixturesRoot = path.resolve(__dirname, 'fixtures/manifest-fixtures')
 
 describe('buildCardsManifest', () => {
   it('extracts meta from a single Occupation card', () => {
@@ -13,6 +14,7 @@ describe('buildCardsManifest', () => {
       name: 'Test Card',
       deck: 'A',
       number: 999,
+      type: 'occupation',
       category: 'FOOD_PROVIDER',
       desc: ['A test card for unit tests.'],
       cost: {},
@@ -34,5 +36,52 @@ describe('buildCardsManifest', () => {
     for (const id of Object.keys(manifest)) {
       expect(manifest[id].reaches).toEqual([])
     }
+  })
+})
+
+describe('buildCardsManifest — extended patterns', () => {
+  it('extracts PlayerActionCard meta and resolves CARD_ID const references', () => {
+    const manifest = buildCardsManifest(extendedFixturesRoot)
+    expect(manifest['E999_FakeActionCard']).toBeDefined()
+    const meta = manifest['E999_FakeActionCard'].meta
+    expect(meta.id).toBe('E999_FakeActionCard')
+    expect(meta.name).toBe('Fake Action Card')
+    expect(meta.deck).toBe('E')
+    expect(meta.number).toBe(999)
+    expect(meta.cost).toEqual({ wood: 1 })
+    expect(meta.desc).toEqual(['A fake PlayerActionCard used only in unit-test fixtures.'])
+    expect(manifest['E999_FakeActionCard'].module).toMatch(/E\/E999_FakeActionCard$/)
+  })
+
+  it('extracts base MajorCardEffect literal', () => {
+    const manifest = buildCardsManifest(extendedFixturesRoot)
+    expect(manifest['Major_FakeOven1']).toBeDefined()
+    const meta = manifest['Major_FakeOven1'].meta
+    expect(meta.id).toBe('Major_FakeOven1')
+    expect(meta.deck).toBe('major')
+    expect(meta.number).toBe(1)
+    expect(meta.cost).toEqual({ clay: 2 })
+    expect(meta.vp).toBe(1)
+    expect(meta.desc).toEqual([
+      '[Baking action:]',
+      '<GRAIN> <ARROW> 2<FOOD>',
+    ])
+  })
+
+  it('resolves spread-based MajorCardEffect variant and overrides', () => {
+    const manifest = buildCardsManifest(extendedFixturesRoot)
+    expect(manifest['Major_FakeOven2']).toBeDefined()
+    const meta = manifest['Major_FakeOven2'].meta
+    expect(meta.id).toBe('Major_FakeOven2')
+    expect(meta.deck).toBe('major')
+    expect(meta.number).toBe(2)
+    // Overrides applied:
+    expect(meta.cost).toEqual({ clay: 3 })
+    expect(meta.vp).toBe(2)
+    // Inherited via spread:
+    expect(meta.desc).toEqual([
+      '[Baking action:]',
+      '<GRAIN> <ARROW> 2<FOOD>',
+    ])
   })
 })

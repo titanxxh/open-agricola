@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 describe('A55_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {

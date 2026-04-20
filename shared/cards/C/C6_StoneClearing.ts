@@ -1,24 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C6_StoneClearing'
-
-// BGA: Immediately place 1 stone on each empty field (complex SPECIAL_EFFECT).
-// Simplified: gain 1 stone per empty field tile the player has.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
-    if (emptyFields === 0) return
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { stone: emptyFields },
-    }
-  },
-})
 
 export const C6_StoneClearing = new MinorImprovement({
   id: CARD_ID,
@@ -30,3 +14,20 @@ export const C6_StoneClearing = new MinorImprovement({
   cost: { food: 1 },
   passing: true,
 })
+
+export const C6_StoneClearing_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
+    if (emptyFields === 0) return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { stone: emptyFields },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

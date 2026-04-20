@@ -1,5 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow, Pasture, PlayerState } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -8,6 +7,7 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
@@ -139,9 +139,6 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeListener)
-registerCardListener(afterListener)
-
 export const B34_SpecialFood = new MinorImprovement({
   id: CARD_ID,
   name: "Special Food",
@@ -152,3 +149,8 @@ export const B34_SpecialFood = new MinorImprovement({
   cost: {},
   prerequisite: "No Animal",
 })
+
+export const B34_SpecialFood_impl = {
+  listeners: [beforeListener, afterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

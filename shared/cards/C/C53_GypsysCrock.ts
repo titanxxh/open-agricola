@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C53_GypsysCrock'
 
@@ -41,9 +41,6 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeExchangeListener)
-registerCardListener(afterExchangeListener)
-
 export const C53_GypsysCrock = new MinorImprovement({
   id: CARD_ID,
   name: "Gypsy's Crock",
@@ -54,3 +51,8 @@ export const C53_GypsysCrock = new MinorImprovement({
   cost: { clay: 2 },
   vp: 1,
 })
+
+export const C53_GypsysCrock_impl = {
+  listeners: [beforeExchangeListener, afterExchangeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState, Resource } from '../../game/types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B152_JuniorArtist'
 
@@ -123,9 +123,6 @@ const zeroSpaceListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-registerCardListener(zeroSpaceListener)
-
 export const B152_JuniorArtist = new Occupation({
   id: CARD_ID,
   name: 'Junior Artist',
@@ -139,3 +136,8 @@ export const B152_JuniorArtist = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const B152_JuniorArtist_impl = {
+  listeners: [listener, zeroSpaceListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

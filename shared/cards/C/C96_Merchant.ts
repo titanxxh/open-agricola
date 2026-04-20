@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C96_Merchant'
 
@@ -30,8 +30,6 @@ const immediatelyAfterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(immediatelyAfterListener)
-
 export const C96_Merchant = new Occupation({
   id: CARD_ID,
   name: "Merchant",
@@ -42,3 +40,8 @@ export const C96_Merchant = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const C96_Merchant_impl = {
+  listeners: [immediatelyAfterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

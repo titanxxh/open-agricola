@@ -1,12 +1,23 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C9_AutomaticWaterTrough'
 
-// BGA: XOR — choose to buy 1 sheep (free), 1 pig (1 food), or 1 cattle (2 food),
-// only if you can accommodate that animal. Simplified: offer all three choices as xor.
-registerCardEffect({
+export const C9_AutomaticWaterTrough = new MinorImprovement({
+  id: CARD_ID,
+  name: "Automatic Water Trough",
+  deck: "C",
+  number: 9,
+  category: "ANIMAL_HANDLER",
+  desc: ["If you can accommodate the animal, you can immediately buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>."],
+  cost: { wood: 1 },
+  passing: true,
+  newSet: true,
+})
+
+export const C9_AutomaticWaterTrough_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => {
     return {
@@ -31,16 +42,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C9_AutomaticWaterTrough = new MinorImprovement({
-  id: CARD_ID,
-  name: "Automatic Water Trough",
-  deck: "C",
-  number: 9,
-  category: "ANIMAL_HANDLER",
-  desc: ["If you can accommodate the animal, you can immediately buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>."],
-  cost: { wood: 1 },
-  passing: true,
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

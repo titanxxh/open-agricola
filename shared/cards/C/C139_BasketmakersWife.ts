@@ -1,19 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C139_BasketmakersWife'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { reed: 1, food: 1 },
-    }
-  },
-})
 
 export const C139_BasketmakersWife = new Occupation({
   id: CARD_ID,
@@ -28,3 +16,18 @@ export const C139_BasketmakersWife = new Occupation({
   ],
   newSet: true,
 })
+
+export const C139_BasketmakersWife_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { reed: 1, food: 1 },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

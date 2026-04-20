@@ -1,22 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C79_StoneCart'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    const evenRounds = [2, 4, 6, 8, 10, 12, 14].filter((r) => r > state.round)
-    if (evenRounds.length === 0) return
-    queueFutureMeeples(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      entries: evenRounds.map((round) => ({ round, resources: { stone: 1 } })),
-    })
-    return futureMeeplesNode()
-  },
-})
 
 export const C79_StoneCart = new MinorImprovement({
   id: CARD_ID,
@@ -29,3 +15,20 @@ export const C79_StoneCart = new MinorImprovement({
   prerequisite: "2 Occupations",
   occupationPrerequisites: { min: 2 },
 })
+
+export const C79_StoneCart_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    const evenRounds = [2, 4, 6, 8, 10, 12, 14].filter((r) => r > state.round)
+    if (evenRounds.length === 0) return
+    queueFutureMeeples(state, {
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: evenRounds.map((round) => ({ round, resources: { stone: 1 } })),
+    })
+    return futureMeeplesNode()
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,22 +1,29 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B18_GrasslandHarrow'
 const TARGET_ROUND_KEY = 'targetRound'
 
-// B18 Grassland Harrow: Add 1 to the current round for each building resource
-// (WOOD, STONE, CLAY, REED) in your supply (after payment) and place 1 field
-// on the corresponding round space. At the start of the round, you can plow
-// the field.
-//
-// BGA source: onPlayerAfterPay fires after paying for this card, counts the
-// remaining building resources (+1 per resource) and calls futureMeeplesNode
-// with ['+N']. Payment is completed in our onBuy hook before it runs, so we
-// look at player.resources at onBuy time.
-registerCardEffect({
+export const B18_GrasslandHarrow = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Grassland Harrow',
+  deck: 'B',
+  number: 18,
+  category: 'FARM_PLANNER',
+  desc: [
+    'Add 1 to the current round for each building resource in your supply and place 1 field on the corresponding round space. At the start of the round, you can plow the field.',
+  ],
+  cost: { wood: 2 },
+  prerequisite: '2 Occupations',
+  occupationPrerequisites: { min: 2 },
+  evenMoreSet: true,
+})
+
+export const B18_GrasslandHarrow_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const buildingResources =
@@ -45,19 +52,6 @@ registerCardEffect({
       ],
     } as ActionFlow
   },
-})
-
-export const B18_GrasslandHarrow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Grassland Harrow',
-  deck: 'B',
-  number: 18,
-  category: 'FARM_PLANNER',
-  desc: [
-    'Add 1 to the current round for each building resource in your supply and place 1 field on the corresponding round space. At the start of the round, you can plow the field.',
-  ],
-  cost: { wood: 2 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

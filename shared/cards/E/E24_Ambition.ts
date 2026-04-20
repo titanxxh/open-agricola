@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E24_Ambition'
 
@@ -35,8 +35,6 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-
 export const E24_Ambition = new MinorImprovement({
   id: CARD_ID,
   name: 'Ambition',
@@ -48,3 +46,8 @@ export const E24_Ambition = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
 })
+
+export const E24_Ambition_impl = {
+  listeners: [computeReplaceListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

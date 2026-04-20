@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
-import { GameSession } from '../../../../server/game-session'
+import { GameSession } from '../../../../server/game/authoritative-session'
 import { computeAllowedPlacementSpaces } from '../placement-availability'
 import { registerCardListener, clearCustomCardListeners } from '../../../cards/card-listeners'
 import type { ActionHookPhase } from '../../hooks'

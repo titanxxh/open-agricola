@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D90_PlowMaker'
 
@@ -29,8 +29,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D90_PlowMaker = new Occupation({
   id: CARD_ID,
   name: 'Plow Maker',
@@ -41,3 +39,8 @@ export const D90_PlowMaker = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const D90_PlowMaker_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

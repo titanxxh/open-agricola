@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D126_FieldCultivator'
 
@@ -18,7 +18,20 @@ const updateInfobox = (player: { cardStates?: Record<string, any> }) => {
   }
 }
 
-registerCardEffect({
+export const D126_FieldCultivator = new Occupation({
+  id: CARD_ID,
+  name: 'Field Cultivator',
+  deck: 'D',
+  number: 126,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['Pile 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <REED>, 1 <CLAY>, and 1 <WOOD> on this card. Each time you harvest a field tile, you can also take the top good from the pile.'],
+  cost: {},
+  players: '1+',
+  newSet: true,
+})
+
+export const D126_FieldCultivator_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     pushToCardStack(player, CARD_ID, STACK_ITEMS)
@@ -52,16 +65,6 @@ registerCardEffect({
 
     return { type: 'seq', children }
   },
-})
-
-export const D126_FieldCultivator = new Occupation({
-  id: CARD_ID,
-  name: 'Field Cultivator',
-  deck: 'D',
-  number: 126,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Pile 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <REED>, 1 <CLAY>, and 1 <WOOD> on this card. Each time you harvest a field tile, you can also take the top good from the pile.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

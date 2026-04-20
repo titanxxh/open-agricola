@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D86_SheepAgent'
 
@@ -17,7 +17,19 @@ const OTHER_ANIMAL_HOLDER_OCCUPATIONS = [
   'C86_LivestockFeeder',
 ]
 
-registerCardEffect({
+export const D86_SheepAgent = new Occupation({
+  id: CARD_ID,
+  name: 'Sheep Agent',
+  deck: 'D',
+  number: 86,
+  category: 'FARM_PLANNER',
+  desc: ['You can keep 1 <SHEEP> on this card for each occupation card in front of you (including this one), unless it is already able to hold animals.'],
+  cost: {},
+  players: '1+',
+})
+
+export const D86_SheepAgent_impl = {
+  effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
     let capacity = player.occupationPlayed.length
@@ -35,15 +47,6 @@ registerCardEffect({
       animalCount: 0,
     })
   },
-})
-
-export const D86_SheepAgent = new Occupation({
-  id: CARD_ID,
-  name: 'Sheep Agent',
-  deck: 'D',
-  number: 86,
-  category: 'FARM_PLANNER',
-  desc: ['You can keep 1 <SHEEP> on this card for each occupation card in front of you (including this one), unless it is already able to hold animals.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

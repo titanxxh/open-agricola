@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E91_PlowBuilder'
 
@@ -13,13 +12,6 @@ const JOINERY_CARDS = ['Major_Joinery']
 
 // Inline harvest rounds to avoid circular dependency with logic/state
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
-
-registerCardEffect({
-  id: CARD_ID,
-  onAfterHarvest: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E91-plow-builder-anytime',
@@ -47,8 +39,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E91_PlowBuilder = new Occupation({
   id: CARD_ID,
   name: 'Plow Builder',
@@ -58,3 +48,14 @@ export const E91_PlowBuilder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E91_PlowBuilder_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onAfterHarvest: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

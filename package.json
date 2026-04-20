@@ -3,6 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "sideEffects": [
+    "**/*.css",
+    "client/main.tsx",
+    "shared/cards/register-all.ts",
+    "shared/cards/catalog.ts"
+  ],
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
@@ -17,9 +23,12 @@
     "check:bundle-size": "tsx scripts/check-bundle-size.ts",
     "build:cards-manifest": "tsx scripts/build-cards-manifest.ts",
     "prebuild": "pnpm run build:cards-manifest",
+    "pretest": "pnpm run build:cards-manifest",
     "check:prompt-sync": "tsx scripts/check-prompt-sync.ts",
     "sync-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts",
     "probe-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts --probe-only",
+    "migrate:dsl-to-code": "tsx scripts/migrate-dsl-to-code.ts",
+    "generate:register-all": "tsx scripts/generate-register-all.ts",
     "preview": "vite preview",
     "server": "tsx server/index.ts"
   },

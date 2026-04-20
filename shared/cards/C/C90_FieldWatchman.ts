@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C90_FieldWatchman'
 
@@ -24,8 +24,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C90_FieldWatchman = new Occupation({
   id: CARD_ID,
   name: 'Field Watchman',
@@ -36,3 +34,8 @@ export const C90_FieldWatchman = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C90_FieldWatchman_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

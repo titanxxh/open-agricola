@@ -1,19 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E34_LandRegister'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.fields.forEach((f) => usedTiles.add(`${f.row},${f.col}`))
-    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.pastures.flatMap((p) => p.tiles).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    return usedTiles.size >= 15 ? 2 : 0
-  },
-})
 
 export const E34_LandRegister = new MinorImprovement({
   id: CARD_ID,
@@ -25,3 +13,18 @@ export const E34_LandRegister = new MinorImprovement({
   cost: {},
   vp: 0,
 })
+
+export const E34_LandRegister_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const usedTiles = new Set<string>()
+    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
+    player.fields.forEach((f) => usedTiles.add(`${f.row},${f.col}`))
+    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
+    player.pastures.flatMap((p) => p.tiles).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
+    return usedTiles.size >= 15 ? 2 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

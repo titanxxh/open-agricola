@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B102_Consultant'
 
@@ -13,16 +13,6 @@ const REWARD_BY_PLAYER_COUNT: Record<number, Partial<Resource>> = {
   4: { sheep: 2 },
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const count = state.players.length
-    const reward = REWARD_BY_PLAYER_COUNT[count]
-    if (!reward) return
-    return gainLeaf(CARD_ID, reward)
-  },
-})
-
 export const B102_Consultant = new Occupation({
   id: CARD_ID,
   name: 'Consultant',
@@ -33,3 +23,16 @@ export const B102_Consultant = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const B102_Consultant_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    const count = state.players.length
+    const reward = REWARD_BY_PLAYER_COUNT[count]
+    if (!reward) return
+    return gainLeaf(CARD_ID, reward)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

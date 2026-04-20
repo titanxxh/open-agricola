@@ -1,13 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E168_AnimalTamersApprentice'
 
-// E168 Animal Tamer's Apprentice: At the start of each round, you get 1 sheep/pig/cattle
-// for each unoccupied wood/clay/stone room in your house.
-registerCardEffect({
+export const E168_AnimalTamersApprentice = new Occupation({
+  id: CARD_ID,
+  name: "Animal Tamer's Apprentice",
+  deck: 'E',
+  number: 168,
+  category: 'ANIMALS_ALL',
+  desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house.'],
+  cost: {},
+  players: '4+',
+})
+
+export const E168_AnimalTamersApprentice_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     const roomCount = player.roomTiles.length
@@ -26,15 +36,6 @@ registerCardEffect({
       return gainLeaf(CARD_ID, { cattle: unoccupied })
     }
   },
-})
-
-export const E168_AnimalTamersApprentice = new Occupation({
-  id: CARD_ID,
-  name: "Animal Tamer's Apprentice",
-  deck: 'E',
-  number: 168,
-  category: 'ANIMALS_ALL',
-  desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house.'],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

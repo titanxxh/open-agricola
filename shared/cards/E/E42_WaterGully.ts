@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E42_WaterGully'
 
-registerCardEffect({
+export const E42_WaterGully = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Water Gully',
+  deck: 'E',
+  number: 42,
+  category: 'ANIMAL_HANDLER',
+  desc: ['Place 1 <CATTLE>, 1 <GRAIN>, and 1 <CATTLE> on the next 3 round spaces (in that order). At the start of these rounds, you get the respective good.'],
+  cost: { stone: 1 },
+  prerequisite: 'Major Well',
+})
+
+export const E42_WaterGully_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const r = state.round
@@ -37,15 +49,6 @@ registerCardEffect({
 
     return futureMeeplesNode()
   },
-})
-
-export const E42_WaterGully = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Water Gully',
-  deck: 'E',
-  number: 42,
-  category: 'ANIMAL_HANDLER',
-  desc: ['Place 1 <CATTLE>, 1 <GRAIN>, and 1 <CATTLE> on the next 3 round spaces (in that order). At the start of these rounds, you get the respective good.'],
-  cost: { stone: 1 },
-  prerequisite: 'Major Well',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

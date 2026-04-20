@@ -1,12 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ExtraSowableField } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B68_Beanfield'
 
@@ -24,19 +23,37 @@ const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 68 }
 const tileMatches = (tile: FarmTilePosition) =>
   tile.row === VIRTUAL_TILE.row && tile.col === VIRTUAL_TILE.col
 
-/**
- * B68 Beanfield (Minor Improvement):
- * This card is a field that can only grow vegetables. Worth 1 VP.
- *
- * BGA reference:
- * - field: true, holder: true
- * - getFieldDetails: constraints => VEGETABLE
- * - cost: 1 food, prerequisite: 2 occupations
- *
- * Uses the ExtraSowableField pattern (like E69_MelonPatch).
- */
+// isDoable listener: make sow doable when card is empty + player has vegetable
+const isDoableListener: CardListenerRegistration = {
+  id: 'B68-beanfield-isdoable-sow',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (canSow(context.player)) return
+    const cardCrop = getCardCrop(context.player)
+    if (cardCrop) return // card field occupied
+    if (context.player.resources.vegetable <= 0) return
+    return { doable: true }
+  },
+}
 
-registerCardEffect({
+export const B68_Beanfield = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Beanfield',
+  deck: 'B',
+  number: 68,
+  category: 'CROP_PROVIDER',
+  desc: ['This card is a field that can only grow vegetables.'],
+  cost: { food: 1 },
+  vp: 1,
+  prerequisite: '2 Occupations',
+  occupationPrerequisites: { min: 2 },
+})
+
+export const B68_Beanfield_impl = {
+  listeners: [isDoableListener],
+  effect: {
   id: CARD_ID,
 
   onComputeSowableFields: (player): ExtraSowableField[] => {
@@ -73,34 +90,6 @@ registerCardEffect({
       setCardCrop(player, cardCrop)
     }
   },
-})
-
-// isDoable listener: make sow doable when card is empty + player has vegetable
-const isDoableListener: CardListenerRegistration = {
-  id: 'B68-beanfield-isdoable-sow',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (canSow(context.player)) return
-    const cardCrop = getCardCrop(context.player)
-    if (cardCrop) return // card field occupied
-    if (context.player.resources.vegetable <= 0) return
-    return { doable: true }
-  },
-}
-
-registerCardListener(isDoableListener)
-
-export const B68_Beanfield = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Beanfield',
-  deck: 'B',
-  number: 68,
-  category: 'CROP_PROVIDER',
-  desc: ['This card is a field that can only grow vegetables.'],
-  cost: { food: 1 },
-  vp: 1,
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

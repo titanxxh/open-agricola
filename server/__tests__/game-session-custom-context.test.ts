@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session.ts'
+import { GameSession } from '../game/authoritative-session.ts'
 import {
   clearCustomCards,
   getCustomMinorImprovement,

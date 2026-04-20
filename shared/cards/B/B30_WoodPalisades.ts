@@ -1,15 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getPalisadeCount } from '../../actions/effects/fencing'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B30_WoodPalisades'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return getPalisadeCount(player)
-  },
-})
 
 export const B30_WoodPalisades = new MinorImprovement({
   id: CARD_ID,
@@ -21,3 +14,13 @@ export const B30_WoodPalisades = new MinorImprovement({
   cost: { food: 1 },
   vp: 0,
 })
+
+export const B30_WoodPalisades_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return getPalisadeCount(player)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,6 +1,4 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
@@ -9,6 +7,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A74_StableTree'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
@@ -32,11 +31,6 @@ const queueStableTreeWood = (
   })
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, player) => queueStableTreeWood(state, player),
-})
-
 const listener: CardListenerRegistration = {
   id: 'A74-stable-tree-after-stables',
   cardIds: [CARD_ID],
@@ -49,8 +43,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A74_StableTree = new MinorImprovement({
   id: CARD_ID,
   name: "Stable Tree",
@@ -60,3 +52,12 @@ export const A74_StableTree = new MinorImprovement({
   desc: ["Each time you build 1 or more stables on your turn, place 1 <WOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <WOOD>."],
   cost: {"wood":1},
 })
+
+export const A74_StableTree_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => queueStableTreeWood(state, player),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

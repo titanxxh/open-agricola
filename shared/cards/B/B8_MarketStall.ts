@@ -1,13 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B8_MarketStall'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { vegetable: 1 }),
-})
 
 export const B8_MarketStall = new MinorImprovement({
   id: CARD_ID,
@@ -19,3 +14,11 @@ export const B8_MarketStall = new MinorImprovement({
   cost: { grain: 1 },
   passing: true,
 })
+
+export const B8_MarketStall_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { vegetable: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

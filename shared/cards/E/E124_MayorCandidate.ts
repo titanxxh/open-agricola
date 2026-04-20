@@ -1,14 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E124_MayorCandidate'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
-  },
-})
 
 export const E124_MayorCandidate = new Occupation({
   id: CARD_ID,
@@ -19,3 +12,13 @@ export const E124_MayorCandidate = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const E124_MayorCandidate_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

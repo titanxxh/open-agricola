@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 

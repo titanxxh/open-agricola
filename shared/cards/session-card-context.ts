@@ -15,15 +15,13 @@ import type { CardEffect } from './card-effects.ts'
 import type { CardListenerRegistration } from './card-listeners.ts'
 import type { CardBase, CardDefinition } from './types.ts'
 import { MinorImprovement, Occupation } from './types.ts'
-import { dslToCardEffect, type CardDslEffects } from './custom-dsl-runner.ts'
-import type { CustomCodeManifest } from './custom-code-types.ts'
+import type { CustomCodeManifest } from '../custom-code/types.ts'
 
 // ── Custom card data type (moved from custom-registry.ts) ───────────────────
 
 export type CustomCardData = {
   cardType: 'minor' | 'occupation'
   cardJson: CardDefinition
-  effectDsl?: CardDslEffects | null
   effectCode?: string | null
   compiledCode?: string | null
   codeManifest?: CustomCodeManifest | null
@@ -49,7 +47,7 @@ export class SessionCardContext {
   }
 
   registerCard(data: CustomCardData): void {
-    const { cardType, cardJson, effectDsl, artUrl } = data
+    const { cardType, cardJson, artUrl } = data
     const card = cardType === 'minor'
       ? new MinorImprovement(cardJson)
       : new Occupation(cardJson)
@@ -62,15 +60,6 @@ export class SessionCardContext {
 
     if (artUrl) {
       this.customArtUrls.set(cardJson.id, artUrl)
-    }
-
-    if (effectDsl) {
-      try {
-        const effect = dslToCardEffect(cardJson.id, effectDsl)
-        this.registerEffect(effect)
-      } catch (err) {
-        console.warn(`[session-card-context] failed to register DSL effect for ${cardJson.id}:`, err)
-      }
     }
   }
 

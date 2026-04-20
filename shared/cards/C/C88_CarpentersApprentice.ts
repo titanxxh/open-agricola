@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
 import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C88_CarpentersApprentice'
 
@@ -84,12 +84,6 @@ const fenceAfterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(constructCostListener)
-registerCardListener(stablesCostListener)
-registerCardListener(fenceIsDoableListener)
-registerCardListener(fenceBeforeListener)
-registerCardListener(fenceAfterListener)
-
 export const C88_CarpentersApprentice = new Occupation({
   id: CARD_ID,
   name: "Carpenter's Apprentice",
@@ -100,3 +94,8 @@ export const C88_CarpentersApprentice = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const C88_CarpentersApprentice_impl = {
+  listeners: [constructCostListener, stablesCostListener, fenceIsDoableListener, fenceBeforeListener, fenceAfterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

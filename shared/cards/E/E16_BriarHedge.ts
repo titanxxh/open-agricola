@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { registerCardEffect } from '../card-effects'
 import { isBorderEdge } from '../../game/farm'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E16_BriarHedge'
 const countAllAnimalsOfType = (player: { resources: { sheep: number; boar: number; cattle: number }; pastures: Array<{ animalType: string | null; animalCount: number }>; houseAnimalType: string | null; houseAnimalCount: number; stableAnimals?: Record<string, string | null> }) => {
@@ -25,13 +25,6 @@ registerPrerequisite('1 Animal of Each Type', (player) => {
   return (totals.sheep ?? 0) >= 1 && (totals.boar ?? 0) >= 1 && (totals.cattle ?? 0) >= 1
 })
 
-registerCardEffect({
-  id: CARD_ID,
-  computeFenceDiscount: (_state, _player, ctx) => {
-    return ctx.newFenceEdges.filter(isBorderEdge).length
-  },
-})
-
 export const E16_BriarHedge = new MinorImprovement({
   id: CARD_ID,
   name: 'Briar Hedge',
@@ -41,3 +34,13 @@ export const E16_BriarHedge = new MinorImprovement({
   cost: {},
   prerequisite: '1 Animal of Each Type',
 })
+
+export const E16_BriarHedge_impl = {
+  effect: {
+  id: CARD_ID,
+  computeFenceDiscount: (_state, _player, ctx) => {
+    return ctx.newFenceEdges.filter(isBorderEdge).length
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

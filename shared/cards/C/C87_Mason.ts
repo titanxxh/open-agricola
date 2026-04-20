@@ -1,21 +1,12 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { writeCardInfobox } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C87_Mason'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'hasRoom', true)
-    writeCardInfobox(player, CARD_ID, '1 Stone Room')
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C87-mason-anytime',
@@ -40,7 +31,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-registerCardListener(anytimeListener)
 
 export const C87_Mason = new Occupation({
   id: CARD_ID,
@@ -53,3 +43,15 @@ export const C87_Mason = new Occupation({
   players: '1+',
   implemented: true,
 })
+
+export const C87_Mason_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    writeCardExtraData(player, CARD_ID, 'hasRoom', true)
+    writeCardInfobox(player, CARD_ID, '1 Stone Room')
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

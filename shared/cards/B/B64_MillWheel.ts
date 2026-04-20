@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B64_MillWheel'
 
@@ -20,8 +20,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B64_MillWheel = new MinorImprovement({
   id: CARD_ID,
   name: 'Mill Wheel',
@@ -33,3 +31,8 @@ export const B64_MillWheel = new MinorImprovement({
   cost: { wood: 2 },
   newSet: true,
 })
+
+export const B64_MillWheel_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

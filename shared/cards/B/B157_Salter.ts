@@ -1,35 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B157_Salter'
-
-/**
- * B157 Salter — At any time, you can pay 1 <SHEEP>/<PIG>/<CATTLE> from your farm.
- * If you do, place 1 <FOOD> on each of the next 3/5/7 round spaces.
- * At the start of these rounds, you get the <FOOD>.
- *
- * BGA: isListeningTo returns false if player has animals in reserve (animals unassigned).
- * XOR: pay sheep→3 pending food, pay boar→5 pending food, pay cattle→7 pending food.
- *
- * Implementation: use cardStates.pending counter per-animal type action taken.
- * Each roundStart awards 1 food per pending count.
- * Players: 4+.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
-    if (pending <= 0) return
-    const counters = initCardState(player, CARD_ID)
-    counters.pending = pending - 1
-    return gainLeaf(CARD_ID, { food: 1 })
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'B157-salter-anytime',
@@ -85,8 +61,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const B157_Salter = new Occupation({
   id: CARD_ID,
   name: 'Salter',
@@ -98,3 +72,18 @@ export const B157_Salter = new Occupation({
   players: '4+',
   newSet: true,
 })
+
+export const B157_Salter_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onRoundStart: (_state, player) => {
+    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
+    if (pending <= 0) return
+    const counters = initCardState(player, CARD_ID)
+    counters.pending = pending - 1
+    return gainLeaf(CARD_ID, { food: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

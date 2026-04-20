@@ -1,10 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getPlowableTiles } from '../../actions/effects/plow'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E90_DungCollector'
 
-registerCardEffect({
+export const E90_DungCollector = new Occupation({
+  id: CARD_ID,
+  name: "Dung Collector",
+  deck: "E",
+  number: 90,
+  desc: ["Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 field."],
+  cost: {},
+  players: "1+",
+})
+
+export const E90_DungCollector_impl = {
+  effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
 
@@ -22,14 +33,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E90_DungCollector = new Occupation({
-  id: CARD_ID,
-  name: "Dung Collector",
-  deck: "E",
-  number: 90,
-  desc: ["Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 field."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

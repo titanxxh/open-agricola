@@ -1,16 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C10_BunkBeds'
-
-// C10 Bunk Beds: once the player has 4+ rooms, the house holds 5 people
-// (1 extra over the normal per-room capacity).
-registerCardEffect({
-  id: CARD_ID,
-  computeExtraRoomCapacity: (player) => {
-    return player.rooms >= 4 ? 1 : 0
-  },
-})
 
 export const C10_BunkBeds = new MinorImprovement({
   id: CARD_ID,
@@ -23,3 +14,13 @@ export const C10_BunkBeds = new MinorImprovement({
   prerequisite: '2 Major Improvements',
   evenMoreSet: true,
 })
+
+export const C10_BunkBeds_impl = {
+  effect: {
+  id: CARD_ID,
+  computeExtraRoomCapacity: (player) => {
+    return player.rooms >= 4 ? 1 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

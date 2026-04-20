@@ -1,9 +1,9 @@
 import { Occupation, getRegisteredMinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCardEffect } from '../major'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C137_CharcoalBurner'
 
@@ -50,8 +50,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C137_CharcoalBurner = new Occupation({
   id: CARD_ID,
   name: 'Charcoal Burner',
@@ -65,3 +63,8 @@ export const C137_CharcoalBurner = new Occupation({
   players: '3+',
   newSet: true,
 })
+
+export const C137_CharcoalBurner_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C144_ReedRoofRenovator'
 
@@ -18,17 +17,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    if (state.players.length === 3) {
-      return { type: 'seq', children: [gainLeaf(CARD_ID, { reed: 1 })] }
-    }
-  },
-})
-
 export const C144_ReedRoofRenovator = new Occupation({
   id: CARD_ID,
   name: "Reed Roof Renovator",
@@ -40,3 +28,16 @@ export const C144_ReedRoofRenovator = new Occupation({
   ],
   players: "3+",
 })
+
+export const C144_ReedRoofRenovator_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, _player) => {
+    if (state.players.length === 3) {
+      return { type: 'seq', children: [gainLeaf(CARD_ID, { reed: 1 })] }
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

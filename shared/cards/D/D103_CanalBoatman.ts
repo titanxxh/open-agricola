@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D103_CanalBoatman'
 const TRIGGER_SPACE_IDS = new Set(['fishing', 'reed-bank'])
@@ -49,8 +49,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const D103_CanalBoatman = new Occupation({
   id: CARD_ID,
   name: 'Canal Boatman',
@@ -64,3 +62,8 @@ export const D103_CanalBoatman = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const D103_CanalBoatman_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

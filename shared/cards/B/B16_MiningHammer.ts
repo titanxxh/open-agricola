@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B16_MiningHammer'
 
@@ -45,9 +45,6 @@ const afterRenovateListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onBuyListener)
-registerCardListener(afterRenovateListener)
-
 export const B16_MiningHammer = new MinorImprovement({
   id: CARD_ID,
   name: 'Mining Hammer',
@@ -59,3 +56,8 @@ export const B16_MiningHammer = new MinorImprovement({
   ],
   cost: { wood: 1 },
 })
+
+export const B16_MiningHammer_impl = {
+  listeners: [onBuyListener, afterRenovateListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,9 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E36_HerbalGarden'
 
-registerCardEffect({
+export const E36_HerbalGarden = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Herbal Garden',
+  deck: 'E',
+  number: 36,
+  category: 'POINTS_PROVIDER',
+  desc: ['From now on, at least one of your pastures must contain no animals.'],
+  cost: { wood: 1 },
+  vp: 2,
+  prerequisite: '1 Pasture',
+})
+
+export const E36_HerbalGarden_impl = {
+  effect: {
   id: CARD_ID,
   onComputeAnimalZones: (_player, zones) => {
     // At least one pasture must contain no animals.
@@ -21,16 +34,6 @@ registerCardEffect({
     const sorted = [...pastures].sort((a, b) => a.capacity - b.capacity)
     sorted[0]!.capacity = 0
   },
-})
-
-export const E36_HerbalGarden = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Herbal Garden',
-  deck: 'E',
-  number: 36,
-  category: 'POINTS_PROVIDER',
-  desc: ['From now on, at least one of your pastures must contain no animals.'],
-  cost: { wood: 1 },
-  vp: 2,
-  prerequisite: '1 Pasture',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

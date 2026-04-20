@@ -1,12 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A90_PlowDriver'
 
-// A90 Plow Driver: Once you live in a stone house, at the start of each round,
-// you can pay 1 food to plow 1 field.
-registerCardEffect({
+export const A90_PlowDriver = new Occupation({
+  id: CARD_ID,
+  name: 'Plow Driver',
+  deck: 'A',
+  number: 90,
+  category: 'FARM_PLANNER',
+  desc: ['Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 field.'],
+  cost: {},
+  players: '1+',
+})
+
+export const A90_PlowDriver_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     if (player.houseType !== 'stone') return
@@ -20,15 +30,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const A90_PlowDriver = new Occupation({
-  id: CARD_ID,
-  name: 'Plow Driver',
-  deck: 'A',
-  number: 90,
-  category: 'FARM_PLANNER',
-  desc: ['Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 field.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

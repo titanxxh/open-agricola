@@ -1,11 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E120_ScrapCollector'
 
-registerCardEffect({
+export const E120_ScrapCollector = new Occupation({
+  id: CARD_ID,
+  name: 'Scrap Collector',
+  deck: 'E',
+  number: 120,
+  category: 'RESOURCE_CLAY',
+  desc: ['Alternate placing 1 <WOOD> and 1 <CLAY> on each of the next 6 round spaces, starting with <WOOD>. At the start of these rounds, you get the respective resource.'],
+  players: '1+',
+})
+
+export const E120_ScrapCollector_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const r = state.round
@@ -35,14 +46,6 @@ registerCardEffect({
     if (children.length === 1) return children[0]
     return { type: 'seq' as const, children }
   },
-})
-
-export const E120_ScrapCollector = new Occupation({
-  id: CARD_ID,
-  name: 'Scrap Collector',
-  deck: 'E',
-  number: 120,
-  category: 'RESOURCE_CLAY',
-  desc: ['Alternate placing 1 <WOOD> and 1 <CLAY> on each of the next 6 round spaces, starting with <WOOD>. At the start of these rounds, you get the respective resource.'],
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

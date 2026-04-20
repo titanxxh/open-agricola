@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B35_HookKnife'
 
@@ -32,8 +32,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const B35_HookKnife = new MinorImprovement({
   id: CARD_ID,
   name: 'Hook Knife',
@@ -43,3 +41,8 @@ export const B35_HookKnife = new MinorImprovement({
   desc: ['Once this game, when you have 9/8/7/6/5/5 <SHEEP> on your farm in a 1-/2-/3-/4-/5-/6- player game, you immediately get 2 bonus <SCORE>.'],
   cost: { wood: 1 },
 })
+
+export const B35_HookKnife_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

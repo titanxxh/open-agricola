@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C58_Woodcraft'
 
@@ -22,8 +22,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C58_Woodcraft = new MinorImprovement({
   id: CARD_ID,
   name: 'Woodcraft',
@@ -37,3 +35,8 @@ export const C58_Woodcraft = new MinorImprovement({
   occupationPrerequisites: { min: 1 },
   newSet: true,
 })
+
+export const C58_Woodcraft_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

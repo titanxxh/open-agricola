@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B9_BeatingRod'
 
-registerCardEffect({
+export const B9_BeatingRod = new MinorImprovement({
+  id: CARD_ID,
+  name: "Beating Rod",
+  deck: "B",
+  number: 9,
+  category: "ANIMAL_HANDLER",
+  desc: ["You can immediately choose to either get 1 <REED> or exchange 1 <REED> for 1 <CATTLE>."],
+  cost: { wood: 1 },
+  passing: true,
+})
+
+export const B9_BeatingRod_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => ({
     type: 'xor' as const,
@@ -19,15 +31,6 @@ registerCardEffect({
       },
     ],
   }),
-})
-
-export const B9_BeatingRod = new MinorImprovement({
-  id: CARD_ID,
-  name: "Beating Rod",
-  deck: "B",
-  number: 9,
-  category: "ANIMAL_HANDLER",
-  desc: ["You can immediately choose to either get 1 <REED> or exchange 1 <REED> for 1 <CATTLE>."],
-  cost: { wood: 1 },
-  passing: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

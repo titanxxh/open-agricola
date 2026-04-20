@@ -46,9 +46,8 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Lint (informational — pre-existing warnings, see CLAUDE.md)
+      - name: Lint
         run: pnpm run lint
-        continue-on-error: true
 
       - name: Unit tests
         run: pnpm test
@@ -56,11 +55,11 @@ jobs:
       - name: Build (includes cards manifest)
         run: pnpm run build
 
-      - name: Check reaches (warn-only in PR-1)
-        run: pnpm run check:reaches
+      - name: Check reaches (strict)
+        run: pnpm run check:reaches -- --strict
 
-      - name: Check no-DSL (warn-only in PR-1)
-        run: pnpm run check:no-dsl
+      - name: Check no-DSL (strict — DSL path fully removed)
+        run: pnpm run check:no-dsl -- --strict
 
-      - name: Check bundle size (print-only in PR-1)
+      - name: Check bundle size (strict)
         run: pnpm run check:bundle-size

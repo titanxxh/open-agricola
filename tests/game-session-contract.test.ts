@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { GameSession } from '../server/game-session'
+import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
 
 describe('GameSession contract', () => {

@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { getLooseStableKeys } from '../../actions/effects/animals'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E83_ShepherdsWhistle'
 
@@ -19,14 +19,6 @@ const hasEmptyUnfencedStable = (player: import('../../game/types').PlayerState):
   return looseStableKeys.some((key) => !player.stableAnimals?.[key])
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onEndHarvestFeedingPhase: (_state, player) => {
-    if (!hasEmptyUnfencedStable(player)) return
-    return gainLeaf(CARD_ID, { sheep: 1 })
-  },
-})
-
 export const E83_ShepherdsWhistle = new MinorImprovement({
   id: CARD_ID,
   name: "Shepherd's Whistle",
@@ -36,3 +28,14 @@ export const E83_ShepherdsWhistle = new MinorImprovement({
   desc: ['At the start of the breeding phase of each harvest, if you have at least 1 unfenced stable without an animal, you get 1 <SHEEP>.'],
   cost: { wood: 1 },
 })
+
+export const E83_ShepherdsWhistle_impl = {
+  effect: {
+  id: CARD_ID,
+  onEndHarvestFeedingPhase: (_state, player) => {
+    if (!hasEmptyUnfencedStable(player)) return
+    return gainLeaf(CARD_ID, { sheep: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

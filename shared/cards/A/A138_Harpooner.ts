@@ -1,9 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A138_Harpooner'
 
@@ -31,8 +31,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A138_Harpooner = new Occupation({
   id: CARD_ID,
   name: 'Harpooner',
@@ -43,3 +41,8 @@ export const A138_Harpooner = new Occupation({
   cost: {},
   players: '3+',
 })
+
+export const A138_Harpooner_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

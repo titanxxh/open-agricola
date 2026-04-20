@@ -1,10 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C98_CubeCutter'
 
-registerCardEffect({
+export const C98_CubeCutter = new Occupation({
+  id: CARD_ID,
+  name: 'Cube Cutter',
+  deck: 'C',
+  number: 98,
+  category: 'POINTS_PROVIDER',
+  desc: ['When you play this card, you immediately get 1 <WOOD>. In the field phase of each harvest, you can use this card to exchange exactly 1 <WOOD> and 1 <FOOD> for 1 bonus <SCORE>.'],
+  cost: {},
+  players: '1+',
+})
+
+export const C98_CubeCutter_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
   onHarvestFieldPhase: (_state, player) => {
@@ -18,15 +30,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C98_CubeCutter = new Occupation({
-  id: CARD_ID,
-  name: 'Cube Cutter',
-  deck: 'C',
-  number: 98,
-  category: 'POINTS_PROVIDER',
-  desc: ['When you play this card, you immediately get 1 <WOOD>. In the field phase of each harvest, you can use this card to exchange exactly 1 <WOOD> and 1 <FOOD> for 1 bonus <SCORE>.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

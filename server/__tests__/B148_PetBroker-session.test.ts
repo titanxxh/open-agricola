@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
 import '../../shared/cards/B/B148_PetBroker'

@@ -8,12 +8,12 @@
  *
  * Sources of truth this script reads:
  *   - shared/cards/card-effects.ts        → cardEffectHooks array
- *   - server/custom-code-executor/engine.ts → isActionHookPhase + isCardListenerScope
+ *   - server/custom-code/engine.ts → isActionHookPhase + isCardListenerScope
  *   - shared/custom-code/ast-validator.ts → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
  *
  * Targets it cross-checks against:
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
- *   - src/services/llmPrompts.ts          → table-row substring search
+ *   - client/services/llmPrompts.ts       → table-row substring search
  *
  * If a hook / phase / denylist entry exists in the source but is missing from
  * a target — drift detected. By default this prints a warning; pass --strict
@@ -30,13 +30,13 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 
 const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
-  engine: 'server/custom-code-executor/engine.ts',
+  engine: 'server/custom-code/engine.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
 }
 
 const TARGETS = {
   sandboxDoc: 'docs/CUSTOM_CARD_SANDBOX.md',
-  llmPrompt: 'src/services/llmPrompts.ts',
+  llmPrompt: 'client/services/llmPrompts.ts',
 }
 
 type DriftReport = {
@@ -241,7 +241,7 @@ function main() {
   const verb = strict ? 'FAIL' : 'WARN'
   console.log(`${verb}: ${driftCount} drift(s) detected.`)
   console.log(`Update docs/CUSTOM_CARD_SANDBOX.md (machine-checkable blocks)`)
-  console.log(`and src/services/llmPrompts.ts to match the source files above.`)
+  console.log(`and client/services/llmPrompts.ts to match the source files above.`)
   if (strict) process.exit(1)
 }
 

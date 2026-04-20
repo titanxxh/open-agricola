@@ -1,6 +1,7 @@
 import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
+import { getActiveCardRegistry, setActiveCardRegistry } from './active-registry'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -40,11 +41,25 @@ const cardListeners: CardListenerRegistration[] = []
  * See `shared/cards/registry.ts` for the new per-session approach.
  */
 export const registerCardListener = (registration: CardListenerRegistration) => {
+  const active = getActiveCardRegistry()
+  if (active && registration.cardIds && registration.cardIds.length > 0) {
+    for (const cardId of registration.cardIds) {
+      active.loadImpl(cardId, { listeners: [registration] })
+    }
+    // Fall through to also mirror into the legacy global so tests registering
+    // listeners *before* the next `new GameSession()` (which builds a fresh
+    // CardRegistry) don't lose them. `getBaseListeners` dedupes by id so the
+    // same listener doesn't run twice.
+  }
   cardListeners.push(registration)
 }
 
 export const clearCardListeners = () => {
   cardListeners.length = 0
+  // Also detach any session-owned active registry so subsequent test setup
+  // re-registers into the legacy global by default. A new GameSession will
+  // reattach its own registry on construction.
+  setActiveCardRegistry(null)
 }
 
 export const clearCustomCardListeners = () => {
@@ -55,7 +70,17 @@ export const clearCustomCardListeners = () => {
   }
 }
 
-export const getRegisteredCardListeners = () => [...cardListeners]
+export const getRegisteredCardListeners = (): CardListenerRegistration[] => {
+  const active = getActiveCardRegistry()
+  if (active) {
+    const fromRegistry = active.getAllListeners()
+    if (cardListeners.length === 0) return fromRegistry
+    const seen = new Set(fromRegistry.map((l) => l.id))
+    const extras = cardListeners.filter((l) => !seen.has(l.id))
+    return extras.length === 0 ? fromRegistry : [...fromRegistry, ...extras]
+  }
+  return [...cardListeners]
+}
 
 const getPlayerCardIds = (player: PlayerState) => [
   ...(player.improvements ?? []),
@@ -99,10 +124,30 @@ const matchesListener = (
   return true
 }
 
+const getBaseListeners = (): CardListenerRegistration[] => {
+  const active = getActiveCardRegistry()
+  if (active) {
+    // Registry is the authoritative source when a session is active.
+    // Legacy globals may also hold entries from the register-all bootstrap
+    // (populated once per process for backward-compat with non-session test
+    // call sites) or from test stubs registered after `clearCardListeners()`.
+    // De-duplicate by listener id so registry entries take precedence and
+    // stubs/custom additions still run.
+    const fromRegistry = active.getAllListeners()
+    if (cardListeners.length === 0) return fromRegistry
+    const seen = new Set(fromRegistry.map((l) => l.id))
+    const extras = cardListeners.filter((l) => !seen.has(l.id))
+    if (extras.length === 0) return fromRegistry
+    return [...fromRegistry, ...extras]
+  }
+  return cardListeners
+}
+
 const getAllListeners = (): CardListenerRegistration[] => {
+  const base = getBaseListeners()
   const sessionCtx = getCurrentSessionContext()
-  if (!sessionCtx || sessionCtx.customListeners.length === 0) return cardListeners
-  return [...cardListeners, ...sessionCtx.customListeners]
+  if (!sessionCtx || sessionCtx.customListeners.length === 0) return base
+  return [...base, ...sessionCtx.customListeners]
 }
 
 const getOrderedListeners = (context: CardListenerContext) =>
@@ -250,6 +295,11 @@ export const getListenerById = (listenerId: string): CardListenerRegistration | 
   if (sessionCtx) {
     const custom = sessionCtx.customListeners.find((l) => l.id === listenerId)
     if (custom) return custom
+  }
+  const active = getActiveCardRegistry()
+  if (active) {
+    const found = active.getAllListeners().find((l) => l.id === listenerId)
+    if (found) return found
   }
   return cardListeners.find((l) => l.id === listenerId)
 }

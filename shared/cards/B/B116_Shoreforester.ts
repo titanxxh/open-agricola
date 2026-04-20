@@ -1,26 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B116_Shoreforester'
-
-/**
- * B116 Shoreforester (Occupation):
- * When you play this card, you immediately get 1 Wood.
- * Each round during the preparation phase (when reed is placed on Reed Bank),
- * you get 1 Wood.
- *
- * We use onRoundStart which fires each round — effectively granting 1 Wood
- * every round.
- */
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
-  onRoundStart: (_state, _player) => {
-    return gainLeaf(CARD_ID, { wood: 1 })
-  },
-})
 
 export const B116_Shoreforester = new Occupation({
   id: CARD_ID,
@@ -35,3 +17,14 @@ export const B116_Shoreforester = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const B116_Shoreforester_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
+  onRoundStart: (_state, _player) => {
+    return gainLeaf(CARD_ID, { wood: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

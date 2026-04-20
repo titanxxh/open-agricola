@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C18_RollOverPlow'
 
@@ -52,8 +52,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C18_RollOverPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Roll-Over Plow',
@@ -63,3 +61,8 @@ export const C18_RollOverPlow = new MinorImprovement({
   desc: ['At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field.'],
   cost: { wood: 2 },
 })
+
+export const C18_RollOverPlow_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,11 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B164_SheepWhisperer'
 
-// BGA: place 1 sheep on rounds current+2, +5, +8, +10.
-registerCardEffect({
+export const B164_SheepWhisperer = new Occupation({
+  id: CARD_ID,
+  name: 'Sheep Whisperer',
+  deck: 'B',
+  number: 164,
+  category: 'ANIMAL_HANDLER',
+  desc: ['Add 2, 5, 8, and 10 to the current round and place 1 <SHEEP> on each corresponding round space. At the start of these rounds, you get the <SHEEP>.'],
+  cost: {},
+  players: '4+',
+})
+
+export const B164_SheepWhisperer_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const base = state.round
@@ -19,15 +30,6 @@ registerCardEffect({
       entries,
     })
   },
-})
-
-export const B164_SheepWhisperer = new Occupation({
-  id: CARD_ID,
-  name: 'Sheep Whisperer',
-  deck: 'B',
-  number: 164,
-  category: 'ANIMAL_HANDLER',
-  desc: ['Add 2, 5, 8, and 10 to the current round and place 1 <SHEEP> on each corresponding round space. At the start of these rounds, you get the <SHEEP>.'],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,18 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E30_ChildsToy'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeFeed: (_state, player) => {
-    // Remove newborn discount by treating newborns as adults
-    // This makes newborns cost 2 food like adults
-    for (const w of player.workers) {
-      if (w.isActive) w.isNewborn = false
-    }
-  },
-})
 
 export const E30_ChildsToy = new MinorImprovement({
   id: CARD_ID,
@@ -26,3 +15,17 @@ export const E30_ChildsToy = new MinorImprovement({
   vp: 2,
   prerequisite: 'Exactly 2 Adults',
 })
+
+export const E30_ChildsToy_impl = {
+  effect: {
+  id: CARD_ID,
+  onBeforeFeed: (_state, player) => {
+    // Remove newborn discount by treating newborns as adults
+    // This makes newborns cost 2 food like adults
+    for (const w of player.workers) {
+      if (w.isActive) w.isNewborn = false
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

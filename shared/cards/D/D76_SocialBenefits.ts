@@ -1,17 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D76_SocialBenefits'
-
-registerCardEffect({
-  id: CARD_ID,
-  onEndHarvestFeedingPhase: (_state, player) => {
-    if (player.resources.food !== 0) return
-
-    return gainLeaf(CARD_ID, { wood: 1, clay: 1 })
-  },
-})
 
 export const D76_SocialBenefits = new MinorImprovement({
   id: CARD_ID,
@@ -24,3 +15,15 @@ export const D76_SocialBenefits = new MinorImprovement({
   prerequisite: "At Most 1 Occupation",
   occupationPrerequisites: { max: 1 },
 })
+
+export const D76_SocialBenefits_impl = {
+  effect: {
+  id: CARD_ID,
+  onEndHarvestFeedingPhase: (_state, player) => {
+    if (player.resources.food !== 0) return
+
+    return gainLeaf(CARD_ID, { wood: 1, clay: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

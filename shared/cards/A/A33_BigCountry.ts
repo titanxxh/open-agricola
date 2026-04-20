@@ -1,11 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A33_BigCountry'
 
-// BGA: prerequisite = all farmyard spaces used.
-// For each complete round left to play, get 1 bonus SCORE and 2 FOOD.
-registerCardEffect({
+export const A33_BigCountry = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Big Country',
+  deck: 'A',
+  number: 33,
+  category: 'POINTS_PROVIDER',
+  desc: ['For each complete round left to play, you immediately get 1 bonus <SCORE> and 2 <FOOD>.'],
+  cost: {},
+  prerequisite: 'All Farmyard Spaces Used',
+  extraVp: true,
+})
+
+export const A33_BigCountry_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state) => {
     const nb = 14 - state.round
@@ -28,16 +39,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const A33_BigCountry = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Big Country',
-  deck: 'A',
-  number: 33,
-  category: 'POINTS_PROVIDER',
-  desc: ['For each complete round left to play, you immediately get 1 bonus <SCORE> and 2 <FOOD>.'],
-  cost: {},
-  prerequisite: 'All Farmyard Spaces Used',
-  extraVp: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

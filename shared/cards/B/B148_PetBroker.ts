@@ -1,10 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B148_PetBroker'
 
-registerCardEffect({
+export const B148_PetBroker = new Occupation({
+  id: CARD_ID,
+  name: 'Pet Broker',
+  deck: 'B',
+  number: 148,
+  desc: ['When you play this card, you immediately get 1 <SHEEP>. You can keep 1 <SHEEP> on this card for each occupation in front of you.'],
+  cost: {},
+  players: '4+',
+})
+
+export const B148_PetBroker_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
   onComputeAnimalZones: (player, zones) => {
@@ -18,14 +29,6 @@ registerCardEffect({
       animalCount: 0,
     })
   },
-})
-
-export const B148_PetBroker = new Occupation({
-  id: CARD_ID,
-  name: 'Pet Broker',
-  deck: 'B',
-  number: 148,
-  desc: ['When you play this card, you immediately get 1 <SHEEP>. You can keep 1 <SHEEP> on this card for each occupation in front of you.'],
-  cost: {},
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

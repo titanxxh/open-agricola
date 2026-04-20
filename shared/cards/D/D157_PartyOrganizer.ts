@@ -1,17 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D157_PartyOrganizer'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (state, player) => {
-    if (familySize(player) < 5) return 0
-    const othersWithFive = state.players.filter((p) => p.id !== player.id && familySize(p) >= 5)
-    return othersWithFive.length === 0 ? 3 : 0
-  },
-})
 
 export const D157_PartyOrganizer = new Occupation({
   id: CARD_ID,
@@ -24,3 +15,15 @@ export const D157_PartyOrganizer = new Occupation({
   players: "4+",
   newSet: true,
 })
+
+export const D157_PartyOrganizer_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (state, player) => {
+    if (familySize(player) < 5) return 0
+    const othersWithFive = state.players.filter((p) => p.id !== player.id && familySize(p) >= 5)
+    return othersWithFive.length === 0 ? 3 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

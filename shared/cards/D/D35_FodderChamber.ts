@@ -1,17 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D35_FodderChamber'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (state, player) => {
-    const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
-    const divisors = [7, 5, 4, 3, 3, 3]
-    const divisor = divisors[state.players.length - 1] ?? 3
-    return Math.floor(totalAnimals / divisor)
-  },
-})
 
 export const D35_FodderChamber = new MinorImprovement({
   id: CARD_ID,
@@ -23,3 +13,16 @@ export const D35_FodderChamber = new MinorImprovement({
   cost: { stone: 3, grain: 3 },
   vp: 2,
 })
+
+export const D35_FodderChamber_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (state, player) => {
+    const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
+    const divisors = [7, 5, 4, 3, 3, 3]
+    const divisor = divisors[state.players.length - 1] ?? 3
+    return Math.floor(totalAnimals / divisor)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

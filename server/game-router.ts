@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { GameSession } from './game-session.ts'
+import { GameSession } from './game/authoritative-session.ts'
 import { serializeState } from '../shared/game/serialization.ts'
-import { normalizePlayerFarm } from './fence-validation.ts'
-import { applyFarmChoice } from './farm-choice.ts'
+import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
+import { applyFarmChoice } from '../shared/logic/farm/farm-choice.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
-import type { CustomCodeManifest } from '../shared/cards/custom-code-types.ts'
+import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/logic/state.ts'
 
 /**
@@ -59,7 +59,7 @@ const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): 
 }
 
 /** Call a session method and build the respondWith payload (including custom card defs). */
-const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game-session.ts').SessionResponse) => {
+const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse) => {
   const session = getSessionForRequest(req)
   const resp = session.withCtx(() => fn(session))
   return { resp, result: respondWith(resp, session) }
@@ -85,7 +85,7 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(JSON.stringify(payload))
 }
 
-const respondWith = (resp: import('./game-session.ts').SessionResponse, session?: GameSession) => {
+const respondWith = (resp: import('./game/authoritative-session.ts').SessionResponse, session?: GameSession) => {
   const result: Record<string, unknown> = {
     ...resp,
     state: serializeState(resp.state),
@@ -362,12 +362,11 @@ export const handleGameRoute = async (
       const db = getDb()
       for (const dbId of customCardDbIds) {
         const row = db.prepare(
-          `SELECT card_type, card_json, effect_dsl, effect_code, compiled_code, code_manifest, art_url, status, author_id
+          `SELECT card_type, card_json, effect_code, compiled_code, code_manifest, art_url, status, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
           card_type: string
           card_json: string
-          effect_dsl: string | null
           effect_code: string | null
           compiled_code: string | null
           code_manifest: string | null
@@ -384,7 +383,6 @@ export const handleGameRoute = async (
           customCards.push({
             cardType: row.card_type as 'minor' | 'occupation',
             cardJson: JSON.parse(row.card_json),
-            effectDsl: row.effect_dsl ? JSON.parse(row.effect_dsl) : null,
             effectCode: row.effect_code ?? null,
             compiledCode: row.compiled_code ?? null,
             codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,

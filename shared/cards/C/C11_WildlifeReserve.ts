@@ -1,26 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C11_WildlifeReserve'
-
-/**
- * C11 Wildlife Reserve — This card can hold up to 1 sheep, 1 pig, and 1 cattle.
- *
- * Uses a single zone with capacity 3 and any animal type. The per-type limit
- * (max 1 of each) is a validation concern during animal reorganization.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onComputeAnimalZones: (_player, zones) => {
-    zones.push({
-      id: `card:${CARD_ID}`,
-      zoneType: 'card',
-      capacity: 3,
-      animalType: null,
-      animalCount: 0,
-    })
-  },
-})
 
 export const C11_WildlifeReserve = new MinorImprovement({
   id: CARD_ID,
@@ -34,3 +15,19 @@ export const C11_WildlifeReserve = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
 })
+
+export const C11_WildlifeReserve_impl = {
+  effect: {
+  id: CARD_ID,
+  onComputeAnimalZones: (_player, zones) => {
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      capacity: 3,
+      animalType: null,
+      animalCount: 0,
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { BonusModifier } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A143_Stonecutter'
 
@@ -25,8 +25,6 @@ const improvementCostListener: CardListenerRegistration = {
     return { costs: { stone: -1 } }
   },
 }
-
-registerCardListener(improvementCostListener)
 
 export const A143_Stonecutter = new Occupation({
   id: CARD_ID,
@@ -52,3 +50,8 @@ export const A143_Stonecutter = new Occupation({
     },
   ] as BonusModifier[],
 })
+
+export const A143_Stonecutter_impl = {
+  listeners: [improvementCostListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

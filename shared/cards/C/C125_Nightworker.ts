@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C125_Nightworker'
 
@@ -20,7 +20,20 @@ const CARD_ID = 'C125_Nightworker'
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-registerCardEffect({
+export const C125_Nightworker = new Occupation({
+  id: CARD_ID,
+  name: 'Nightworker',
+  deck: 'C',
+  number: 125,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['Before the start of each work phase, you can place a person on an accumulation space of a building resource not in your supply. (Then proceed with the start player.)'],
+  cost: {},
+  players: '1+',
+  evenMoreSet: true,
+})
+
+export const C125_Nightworker_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (state, player) => {
 
@@ -55,16 +68,6 @@ registerCardEffect({
       children: choices,
     }
   },
-})
-
-export const C125_Nightworker = new Occupation({
-  id: CARD_ID,
-  name: 'Nightworker',
-  deck: 'C',
-  number: 125,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Before the start of each work phase, you can place a person on an accumulation space of a building resource not in your supply. (Then proceed with the start player.)'],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

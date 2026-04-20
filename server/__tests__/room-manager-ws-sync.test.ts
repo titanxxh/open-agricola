@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { createWsServer } from '../room-manager.ts'
+import { createWsServer } from '../game/room-manager.ts'
 import type { ServerEvent } from '../../shared/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/protocol/game.ts'
 

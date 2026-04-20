@@ -1,13 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D162_ClayFirer'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { clay: 2 }),
-})
 
 export const D162_ClayFirer = new Occupation({
   id: CARD_ID,
@@ -25,3 +20,11 @@ export const D162_ClayFirer = new Occupation({
     { from: { clay: 3 }, to: { stone: 2 }, trigger: 'anytime' },
   ],
 })
+
+export const D162_ClayFirer_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { clay: 2 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

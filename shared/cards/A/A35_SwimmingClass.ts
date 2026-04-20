@@ -1,13 +1,25 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { spaceHasPlayer } from '../../game/space'
 import { newbornCount } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A35_SwimmingClass'
 
-// A35 Swimming Class: In the returning home phase of each round, if you return a person
-// from the Fishing accumulation space, you get 2 bonus VP for each newborn you return home.
-registerCardEffect({
+export const A35_SwimmingClass = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Swimming Class',
+  deck: 'A',
+  number: 35,
+  category: 'POINTS_PROVIDER',
+  desc: ['In the returning home phase of each round, if you return a person from the __Fishing__ accumulation space, you get 2 bonus <SCORE> for each newborn that you return home.'],
+  cost: { food: 1 },
+  prerequisite: '2 Occupations',
+  occupationPrerequisites: { min: 2 },
+  newSet: true,
+})
+
+export const A35_SwimmingClass_impl = {
+  effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
     // Check if this player has a farmer on the Fishing space
@@ -22,17 +34,6 @@ registerCardEffect({
     )
     return { type: 'seq', children: vpChildren }
   },
-})
-
-export const A35_SwimmingClass = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Swimming Class',
-  deck: 'A',
-  number: 35,
-  category: 'POINTS_PROVIDER',
-  desc: ['In the returning home phase of each round, if you return a person from the __Fishing__ accumulation space, you get 2 bonus <SCORE> for each newborn that you return home.'],
-  cost: { food: 1 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  newSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

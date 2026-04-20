@@ -7,7 +7,7 @@ import {
   getCustomOccupationIds,
   clearCustomCards,
 } from '../custom-registry'
-import { getCardEffect, clearCardEffects } from '../card-effects'
+import { clearCardEffects } from '../card-effects'
 import type { CardDefinition } from '../types'
 import type { CustomCardData } from '../session-card-context'
 
@@ -64,40 +64,6 @@ describe('registerCustomCard', () => {
   it('returns null for unregistered cards', () => {
     expect(getCustomMinorImprovement('CUSTOM_Unknown')).toBeNull()
     expect(getCustomOccupation('CUSTOM_Unknown')).toBeNull()
-  })
-
-  it('registers card effect when DSL is provided', () => {
-    registerLegacyGlobalCard({
-      cardType: 'minor',
-      cardJson: minorJson,
-      effectDsl: {
-        onReturnHome: {
-          flow: [{ action: 'gain', params: { food: 2 } }],
-        },
-      },
-    })
-    const effect = getCardEffect('CUSTOM_TestMinor')
-    expect(effect).not.toBeNull()
-    expect(effect!.onReturnHome).toBeDefined()
-  })
-
-  it('warns but does not throw on malformed DSL', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    registerLegacyGlobalCard({
-      cardType: 'minor',
-      cardJson: minorJson,
-      effectDsl: {
-        onReturnHome: {
-          flow: [{ action: 'illegal-action', params: {} }],
-        },
-      },
-    })
-    // Card should still be registered even if DSL fails
-    expect(getCustomMinorImprovement('CUSTOM_TestMinor')).not.toBeNull()
-    // Note: DSL error is thrown at execution time, not registration time,
-    // so the effect is registered but will throw when called.
-    // The try-catch in card-effects.ts handles this at runtime.
-    warnSpy.mockRestore()
   })
 
   it('warns when global fallback is used without explicit allowGlobal', () => {

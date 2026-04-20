@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ActionFlow, Resource } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B81_Handcart'
 
@@ -18,7 +18,19 @@ const THRESHOLDS: Record<string, number> = {
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-registerCardEffect({
+export const B81_Handcart = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Handcart',
+  deck: 'B',
+  number: 81,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['Before each work phase, you can take 1 building resource from at most one <WOOD>/<CLAY>/<REED>/<STONE> accumulation space containing at least 6/5/4/4 building resources of the same type.'],
+  cost: { wood: 1 },
+  evenMoreSet: true,
+})
+
+export const B81_Handcart_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (state, _player) => {
 
@@ -48,15 +60,6 @@ registerCardEffect({
       children: choices,
     }
   },
-})
-
-export const B81_Handcart = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Handcart',
-  deck: 'B',
-  number: 81,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Before each work phase, you can take 1 building resource from at most one <WOOD>/<CLAY>/<REED>/<STONE> accumulation space containing at least 6/5/4/4 building resources of the same type.'],
-  cost: { wood: 1 },
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

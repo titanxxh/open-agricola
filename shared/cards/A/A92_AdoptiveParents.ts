@@ -1,11 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { findFirstNewborn, newbornCount } from '../../game/player'
 import { removeWorkerRef } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A92_AdoptiveParents'
 
@@ -118,10 +118,6 @@ const immediatelyAfterGainActivation: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-registerCardListener(immediatelyAfterGainActivation)
-registerCardListener(beforePlaceFarmerListener)
-
 export const A92_AdoptiveParents = new Occupation({
   id: CARD_ID,
   name: 'Adoptive Parents',
@@ -132,3 +128,8 @@ export const A92_AdoptiveParents = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A92_AdoptiveParents_impl = {
+  listeners: [afterPlaceFarmerListener, immediatelyAfterGainActivation, beforePlaceFarmerListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

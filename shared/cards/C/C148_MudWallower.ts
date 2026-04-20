@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C148_MudWallower'
 
@@ -29,27 +28,6 @@ const isAccumulationSpace = (context: CardListenerContext): boolean => {
   return Object.values(gainPerRound).some((v) => (v ?? 0) > 0)
 }
 
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const counters = initCardState(player, CARD_ID)
-    counters.counter = 0
-    counters.held = 0
-    writeCardInfobox(player, CARD_ID, '0 / 4')
-  },
-  onComputeAnimalZones: (player, zones) => {
-    const held = player.cardStates?.[CARD_ID]?.counters?.held ?? 0
-    if (held <= 0) return
-    zones.push({
-      id: `card:${CARD_ID}`,
-      zoneType: 'card',
-      capacity: held,
-      animalType: 'boar',
-      animalCount: 0,
-    })
-  },
-})
-
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C148-mud-wallower-after-place-farmer',
   cardIds: [CARD_ID],
@@ -71,8 +49,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterPlaceFarmerListener)
-
 export const C148_MudWallower = new Occupation({
   id: CARD_ID,
   name: 'Mud Wallower',
@@ -85,3 +61,28 @@ export const C148_MudWallower = new Occupation({
   evenMoreSet: true,
   extraVp: true,
 })
+
+export const C148_MudWallower_impl = {
+  listeners: [afterPlaceFarmerListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const counters = initCardState(player, CARD_ID)
+    counters.counter = 0
+    counters.held = 0
+    writeCardInfobox(player, CARD_ID, '0 / 4')
+  },
+  onComputeAnimalZones: (player, zones) => {
+    const held = player.cardStates?.[CARD_ID]?.counters?.held ?? 0
+    if (held <= 0) return
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      capacity: held,
+      animalType: 'boar',
+      animalCount: 0,
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

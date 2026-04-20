@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A58_AsparagusKnife'
 
@@ -33,7 +33,19 @@ registerSelectionEffect('asparagus-knife-harvest', ({ player, positions }) => {
   }
 })
 
-registerCardEffect({
+export const A58_AsparagusKnife = new MinorImprovement({
+  id: 'A58_AsparagusKnife',
+  name: 'Asparagus Knife',
+  deck: 'A',
+  number: 58,
+  category: 'FOOD_PROVIDER',
+  desc: ['In the returning home phase of rounds 8, 10, and 12, you can take 1 <VEGETABLE> from exactly 1 vegetable field. You can immediately exchange it for 3 <FOOD> and 1 bonus <SCORE>.'],
+  cost: { wood: 1 },
+  implemented: true,
+})
+
+export const A58_AsparagusKnife_impl = {
+  effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
     if (!TRIGGER_ROUNDS.includes(state.round)) return
@@ -64,15 +76,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const A58_AsparagusKnife = new MinorImprovement({
-  id: 'A58_AsparagusKnife',
-  name: 'Asparagus Knife',
-  deck: 'A',
-  number: 58,
-  category: 'FOOD_PROVIDER',
-  desc: ['In the returning home phase of rounds 8, 10, and 12, you can take 1 <VEGETABLE> from exactly 1 vegetable field. You can immediately exchange it for 3 <FOOD> and 1 bonus <SCORE>.'],
-  cost: { wood: 1 },
-  implemented: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,7 +1,7 @@
 import { Occupation, getRegisteredMinorImprovement, getRegisteredOccupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B100_Clutterer'
 
@@ -53,9 +53,6 @@ const afterOccupationListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterImprovementListener)
-registerCardListener(afterOccupationListener)
-
 export const B100_Clutterer = new Occupation({
   id: CARD_ID,
   name: "Clutterer",
@@ -66,3 +63,8 @@ export const B100_Clutterer = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const B100_Clutterer_impl = {
+  listeners: [afterImprovementListener, afterOccupationListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

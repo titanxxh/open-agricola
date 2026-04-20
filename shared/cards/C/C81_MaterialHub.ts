@@ -1,10 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import type { Resource, PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C81_MaterialHub'
 
@@ -16,30 +15,6 @@ const THRESHOLDS: Record<string, number> = {
 }
 
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
-
-/**
- * C81 Material Hub — Immediately place 2 of each building resource on this card.
- * Each time any player (including you) takes at least 5 wood, 4 clay, 3 reed, or 3 stone,
- * you get 1 of that building resource from this card.
- *
- * BGA reference: onBuy stores 2 of each. Collect listener (scope=any) checks thresholds.
- */
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    // Place 2 of each building resource on the card
-    return {
-      type: 'seq',
-      children: BUILDING_RESOURCES.map((resource) => ({
-        type: 'leaf' as const,
-        actionId: 'store-on-card',
-        params: { [resource]: 2 },
-        sourceCard: CARD_ID,
-      })),
-    }
-  },
-})
 
 const findOwner = (state: import('../../game/types').GameState): PlayerState | undefined =>
   state.players?.find((p) => p.minorPlayed.includes(CARD_ID))
@@ -89,8 +64,6 @@ const collectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(collectListener)
-
 export const C81_MaterialHub = new MinorImprovement({
   id: CARD_ID,
   name: 'Material Hub',
@@ -104,3 +77,23 @@ export const C81_MaterialHub = new MinorImprovement({
   prerequisite: '1 reed and 1 stone in your supply',
   newSet: true,
 })
+
+export const C81_MaterialHub_impl = {
+  listeners: [collectListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    // Place 2 of each building resource on the card
+    return {
+      type: 'seq',
+      children: BUILDING_RESOURCES.map((resource) => ({
+        type: 'leaf' as const,
+        actionId: 'store-on-card',
+        params: { [resource]: 2 },
+        sourceCard: CARD_ID,
+      })),
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

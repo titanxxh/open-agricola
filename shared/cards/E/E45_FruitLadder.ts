@@ -1,10 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E45_FruitLadder'
 
-registerCardEffect({
+export const E45_FruitLadder = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Fruit Ladder',
+  deck: 'E',
+  number: 45,
+  category: 'FOOD_MISC',
+  desc: ['Place 1 <FOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <FOOD>.'],
+  vp: 1,
+  cost: { wood: 2 },
+})
+
+export const E45_FruitLadder_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const evenRounds = [2, 4, 6, 8, 10, 12, 14].filter((r) => r > state.round)
@@ -17,15 +29,6 @@ registerCardEffect({
     })
     return futureMeeplesNode()
   },
-})
-
-export const E45_FruitLadder = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Fruit Ladder',
-  deck: 'E',
-  number: 45,
-  category: 'FOOD_MISC',
-  desc: ['Place 1 <FOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <FOOD>.'],
-  vp: 1,
-  cost: { wood: 2 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

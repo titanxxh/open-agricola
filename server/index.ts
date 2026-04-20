@@ -5,7 +5,7 @@ import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
-import { createWsServer, getRooms, dissolveRoomById } from './room-manager.ts'
+import { createWsServer, getRooms, dissolveRoomById } from './game/room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 

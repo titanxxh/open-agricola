@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/logic/scoring'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'

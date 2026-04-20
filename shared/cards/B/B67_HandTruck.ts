@@ -1,9 +1,9 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../game/space'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B67_HandTruck'
 
@@ -45,9 +45,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-registerCardListener(isDoableListener)
-
 export const B67_HandTruck = new MinorImprovement({
   id: CARD_ID,
   name: "Hand Truck",
@@ -58,3 +55,8 @@ export const B67_HandTruck = new MinorImprovement({
   cost: {"wood":1},
   newSet: true,
 })
+
+export const B67_HandTruck_impl = {
+  listeners: [listener, isDoableListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

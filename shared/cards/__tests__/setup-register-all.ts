@@ -1,0 +1,72 @@
+/**
+ * Vitest setup file — ensures the PR-2 transitional bootstrap in
+ * `shared/cards/register-all.ts` runs once per worker before any test module
+ * executes.
+ *
+ * Without this, tests that import a single card file for its side effects and
+ * then read the legacy `getCardEffect` / `getRegisteredCardListeners` global
+ * accessors (without constructing a `GameSession` first) would observe empty
+ * registries — because after the `_impl`-export migration card files no longer
+ * self-register at module load. The bootstrap at the bottom of `register-all.ts`
+ * backfills the legacy maps from `ALL_CARD_IMPLS`.
+ *
+ * Why `GameSession` first: there is a pre-existing module cycle between
+ * `shared/cards/catalog.ts` and `shared/cards/D/D95_SiteManager.ts` (via
+ * `shared/game/minor-improvements.ts`). The cycle resolves correctly only when
+ * `minor-improvements.ts` is pulled in before `catalog.ts` reaches its first
+ * card import. Constructing the GameSession import path here forces the same
+ * load order that `server/game/authoritative-session.ts` would establish at first-use, so
+ * `catalog.ts`'s top-level array is fully populated by the time
+ * `register-all.ts`'s `import './catalog'` runs.
+ *
+ * Consumed via `vitest.config.ts` -> `test.setupFiles`.
+ *
+ * Removed in PR-3 once the legacy maps are deleted and every test that relied
+ * on their auto-populated state has been updated to read through an explicit
+ * `CardRegistry` (per-session).
+ */
+// Pull in GameSession first — this walks the real game-core import graph,
+// which loads `minor-improvements.ts` before `catalog.ts` and avoids the
+// D95_SiteManager <-> catalog TDZ bomb.
+import '../../../server/game/authoritative-session'
+// Now load register-all for its bootstrap side effect.
+import '../register-all'
+
+// PR-4: preload cards-manifest.json so client components that call
+// `getCardMeta()` (PlayerCard, cardText, ActionBoard) have synchronous data
+// under test, matching the runtime `App.tsx` pre-render bootstrap.
+import fs from 'node:fs'
+import path from 'node:path'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+} from '../../../client/services/card-meta'
+
+const manifestPath = path.resolve(__dirname, '../../../public/cards-manifest.json')
+if (fs.existsSync(manifestPath)) {
+  const raw = fs.readFileSync(manifestPath, 'utf8')
+  const payload = JSON.parse(raw)
+  const existingFetch =
+    typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined
+  // Stub fetch for the manifest URL; delegate everything else to any existing
+  // fetch implementation (tests that need real fetches can still override).
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url
+    if (url.endsWith('cards-manifest.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => payload,
+      } as unknown as Response
+    }
+    if (existingFetch) return existingFetch(input as never, init)
+    throw new Error(`[test-setup] fetch(${url}) unmocked`)
+  }) as typeof fetch
+  __resetCardsManifestCache()
+  await loadCardsManifest()
+}

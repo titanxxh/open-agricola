@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 describe('C52_HuntsmansHat server session', () => {
   it('adds food and logs cardEffectGain when collecting boar from pig-market', () => {

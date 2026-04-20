@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C114_SoilScientist'
 
@@ -35,8 +35,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C114_SoilScientist = new Occupation({
   id: CARD_ID,
   name: 'Soil Scientist',
@@ -50,3 +48,8 @@ export const C114_SoilScientist = new Occupation({
   players: '1+',
   newSet: true,
 })
+
+export const C114_SoilScientist_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

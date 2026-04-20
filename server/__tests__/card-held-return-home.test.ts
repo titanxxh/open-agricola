@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { holdWorkerOnCard, getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
 
 describe('GameSession return-home releases card-held workers', () => {

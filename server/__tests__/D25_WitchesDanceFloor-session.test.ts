@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry'

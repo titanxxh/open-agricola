@@ -1,0 +1,100 @@
+/**
+ * Client-side card metadata service.
+ *
+ * Fetches `public/cards-manifest.json` at app startup (see `App.tsx`) and
+ * exposes synchronous lookups for UI components. Replaces direct imports of
+ * `shared/cards/catalog.ts` / `shared/cards/major` from the client, which
+ * would otherwise pull 886 card instances (~260KB gzip) into the main bundle.
+ *
+ * The manifest is built by `scripts/build-cards-manifest.ts` — keep the
+ * `CardMeta` type in sync with that script's output.
+ */
+
+export type CardMeta = {
+  id: string
+  name: string
+  deck: string
+  number: number
+  /** Construction type: mirrors the backing card class. */
+  type?: 'occupation' | 'minor' | 'major' | 'playerAction'
+  category?: string
+  desc?: string[]
+  cost?: Record<string, number>
+  altCosts?: Record<string, number>[]
+  players?: string
+  newSet?: boolean
+  prerequisite?: unknown
+  vp?: number
+  isCookery?: boolean
+  isBaking?: boolean
+  passing?: boolean
+  returnCards?: string[]
+  alsoCountsAs?: string[]
+}
+
+export type CardManifestEntry = {
+  meta: CardMeta
+  module: string
+  reaches: string[]
+}
+
+export type CardsManifestPayload = Record<string, CardManifestEntry>
+
+const resolveManifestUrl = (): string => {
+  const base =
+    (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
+  const normalised = base.endsWith('/') ? base : `${base}/`
+  return `${normalised}cards-manifest.json`
+}
+
+let manifestPromise: Promise<Record<string, CardMeta>> | null = null
+let manifestCache: Record<string, CardMeta> | null = null
+
+export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
+  if (manifestCache) return Promise.resolve(manifestCache)
+  if (!manifestPromise) {
+    const url = resolveManifestUrl()
+    manifestPromise = fetch(url)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(
+            `[card-meta] manifest fetch failed ${res.status} ${res.statusText}`,
+          )
+        }
+        return res.json() as Promise<CardsManifestPayload>
+      })
+      .then((payload) => {
+        const flat: Record<string, CardMeta> = {}
+        for (const [id, entry] of Object.entries(payload)) {
+          if (entry?.meta) flat[id] = entry.meta
+        }
+        manifestCache = flat
+        return flat
+      })
+      .catch((err) => {
+        // Reset so a subsequent call can retry.
+        manifestPromise = null
+        throw err
+      })
+  }
+  return manifestPromise
+}
+
+/**
+ * Synchronous lookup; returns undefined if the manifest hasn't finished
+ * loading yet. Call `loadCardsManifest()` at app startup before relying on
+ * this.
+ */
+export const getCardMeta = (id: string): CardMeta | undefined =>
+  manifestCache?.[id]
+
+export const isCardsManifestReady = (): boolean => manifestCache !== null
+
+export const getAllCardMetas = (): Record<string, CardMeta> | null =>
+  manifestCache
+
+/** Test-only helper: discard cache + in-flight promise. Do not call from runtime. */
+export const __resetCardsManifestCache = (): void => {
+  manifestCache = null
+  manifestPromise = null
+}

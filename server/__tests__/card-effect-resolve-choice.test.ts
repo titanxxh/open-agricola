@@ -11,7 +11,7 @@
  *  4. When the handler returns an ActionFlow (gain 5 food), verify the resource was granted.
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { registerCardEffect, getCardEffect } from '../../shared/cards/card-effects'
 import type { ResolveChoiceHandler } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'

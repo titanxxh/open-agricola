@@ -1,10 +1,21 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { fieldTotalRemaining } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D32_WoodRake'
 
-registerCardEffect({
+export const D32_WoodRake = new MinorImprovement({
+  id: CARD_ID,
+  name: "Wood Rake",
+  deck: "D",
+  number: 32,
+  category: "POINTS_PROVIDER",
+  desc: ["During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."],
+  cost: { wood: 1 },
+})
+
+export const D32_WoodRake_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeHarvest: (state, player) => {
     if (state.round !== 14) return
@@ -24,14 +35,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D32_WoodRake = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wood Rake",
-  deck: "D",
-  number: 32,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."],
-  cost: { wood: 1 },
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

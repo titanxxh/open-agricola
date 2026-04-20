@@ -1,15 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C31_WritingChamber'
-
-registerCardEffect({
-  id: CARD_ID,
-  computePostScore: (_state, _player, categories) => {
-    const negativeTotal = categories.reduce((sum, cat) => sum + Math.min(0, cat.total), 0)
-    return Math.min(7, Math.abs(negativeTotal))
-  },
-})
 
 export const C31_WritingChamber = new MinorImprovement({
   id: CARD_ID,
@@ -20,3 +12,14 @@ export const C31_WritingChamber = new MinorImprovement({
   desc: ["During scoring, you get a number of bonus <SCORE> equal to the total of negative points you have, to a maximum of 7 <SCORE>."],
   cost: {"wood":2},
 })
+
+export const C31_WritingChamber_impl = {
+  effect: {
+  id: CARD_ID,
+  computePostScore: (_state, _player, categories) => {
+    const negativeTotal = categories.reduce((sum, cat) => sum + Math.min(0, cat.total), 0)
+    return Math.min(7, Math.abs(negativeTotal))
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

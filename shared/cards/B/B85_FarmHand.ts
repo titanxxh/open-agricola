@@ -1,12 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { FARM_ROWS, FARM_COLS, positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B85_FarmHand'
 
@@ -64,12 +63,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
-registerCardEffect({
-  id: CARD_ID,
-})
-
 export const B85_FarmHand = new Occupation({
   id: CARD_ID,
   name: 'Farm Hand',
@@ -83,3 +76,11 @@ export const B85_FarmHand = new Occupation({
   newSet: true,
   implemented: true,
 })
+
+export const B85_FarmHand_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,19 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D150_GodlySpouse'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, _player) => {
-    return { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID }
-  },
-})
 
 const afterWishChildrenListener: CardListenerRegistration = {
   id: 'D150-godly-spouse-after-wish-children',
@@ -50,8 +42,6 @@ const afterWishChildrenListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterWishChildrenListener)
-
 export const D150_GodlySpouse = new Occupation({
   id: CARD_ID,
   name: "Godly Spouse",
@@ -64,3 +54,14 @@ export const D150_GodlySpouse = new Occupation({
   cost: {},
   players: "4+",
 })
+
+export const D150_GodlySpouse_impl = {
+  listeners: [afterWishChildrenListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, _player) => {
+    return { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

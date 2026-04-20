@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C67_MineralFeeder'
 
@@ -20,15 +20,6 @@ const hasSheepInPasture = (player: import('../../game/types').PlayerState): bool
     (pasture) => pasture.animalType === 'sheep' && pasture.animalCount > 0,
   )
 
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
-    if (harvestRounds.includes(state.round)) return
-    if (!hasSheepInPasture(player)) return
-    return gainLeaf(CARD_ID, { grain: 1 })
-  },
-})
-
 export const C67_MineralFeeder = new MinorImprovement({
   id: CARD_ID,
   name: 'Mineral Feeder',
@@ -40,3 +31,15 @@ export const C67_MineralFeeder = new MinorImprovement({
   vp: 1,
   newSet: true,
 })
+
+export const C67_MineralFeeder_impl = {
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (state, player) => {
+    if (harvestRounds.includes(state.round)) return
+    if (!hasSheepInPasture(player)) return
+    return gainLeaf(CARD_ID, { grain: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,12 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E100_MuseumCaretaker'
 
-// E100 Museum Caretaker: At the start of each work phase, if you have at least 1 wood,
-// 1 clay, 1 reed, 1 stone, 1 grain, and 1 vegetable in your supply, you get 1 bonus VP.
-// BGA: startOfWork → we use onRoundStart
-registerCardEffect({
+export const E100_MuseumCaretaker = new Occupation({
+  id: CARD_ID,
+  name: 'Museum Caretaker',
+  deck: 'E',
+  number: 100,
+  category: 'BONUS_POINTS_GET',
+  desc: ['At the start of each work phase, if you have at least 1 <WOOD>, 1 <CLAY>, 1\u00a0<REED>, 1 <STONE>, 1 <GRAIN>, and 1 <VEGETABLE> in your supply, you get 1\u00a0bonus <SCORE>.'],
+  cost: {},
+  players: '1+',
+})
+
+export const E100_MuseumCaretaker_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     const r = player.resources
@@ -21,15 +30,6 @@ registerCardEffect({
       return { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID }
     }
   },
-})
-
-export const E100_MuseumCaretaker = new Occupation({
-  id: CARD_ID,
-  name: 'Museum Caretaker',
-  deck: 'E',
-  number: 100,
-  category: 'BONUS_POINTS_GET',
-  desc: ['At the start of each work phase, if you have at least 1 <WOOD>, 1 <CLAY>, 1\u00a0<REED>, 1 <STONE>, 1 <GRAIN>, and 1 <VEGETABLE> in your supply, you get 1\u00a0bonus <SCORE>.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

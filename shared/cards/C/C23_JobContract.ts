@@ -1,10 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 import { addWorkerRef, isSpaceOccupied } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C23_JobContract'
 const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
@@ -92,8 +92,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const C23_JobContract = new MinorImprovement({
   id: CARD_ID,
   name: 'Job Contract',
@@ -107,3 +105,8 @@ export const C23_JobContract = new MinorImprovement({
   prerequisite: 'No Occupations',
   occupationPrerequisites: { max: 0 },
 })
+
+export const C23_JobContract_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

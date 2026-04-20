@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B36_Bottles'
 
@@ -29,8 +29,6 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeCostsListener)
-
 export const B36_Bottles = new MinorImprovement({
   id: CARD_ID,
   name: 'Bottles',
@@ -41,3 +39,8 @@ export const B36_Bottles = new MinorImprovement({
   cost: {},
   vp: 4,
 })
+
+export const B36_Bottles_impl = {
+  listeners: [computeCostsListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/D/D20_TurnwrestPlow'
@@ -130,7 +130,7 @@ describe('D20_TurnwrestPlow session', () => {
     const session = setup()
 
     // Use grain-seeds instead
-    let resp = session.takeAction(0, 'grain-seeds')
+    const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
 
     // No choice offered from card (grain-seeds may have its own choices though)

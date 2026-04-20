@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A73_AgriculturalFertilizers'
 
@@ -135,7 +135,7 @@ describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
 
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'meeting-place')
+    const resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { validateSowSelection } from '../sow-validation'
+import { validateSowSelection } from '../../shared/logic/farm/sow-validation'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 const CARD_ID = 'E68_CherryOrchard'

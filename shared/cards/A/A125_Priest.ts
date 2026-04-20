@@ -1,21 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A125_Priest'
-
-// BGA: If you live in a clay house with exactly 2 rooms, get 3 CLAY, 2 REED, 2 STONE.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    if (player.rooms !== 2 || player.houseType !== 'clay') return
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain',
-      sourceCard: CARD_ID,
-      params: { clay: 3, reed: 2, stone: 2 },
-    }
-  },
-})
 
 export const A125_Priest = new Occupation({
   id: CARD_ID,
@@ -27,3 +13,19 @@ export const A125_Priest = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const A125_Priest_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    if (player.rooms !== 2 || player.houseType !== 'clay') return
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { clay: 3, reed: 2, stone: 2 },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

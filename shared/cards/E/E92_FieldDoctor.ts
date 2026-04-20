@@ -1,10 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { familySize } from '../../game/player'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E92_FieldDoctor'
 
@@ -59,8 +59,6 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(computeReplaceListener)
-
 export const E92_FieldDoctor = new Occupation({
   id: CARD_ID,
   name: 'Field Doctor',
@@ -70,3 +68,8 @@ export const E92_FieldDoctor = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E92_FieldDoctor_impl = {
+  listeners: [computeReplaceListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

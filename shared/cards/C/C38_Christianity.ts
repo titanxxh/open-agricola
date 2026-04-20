@@ -1,19 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C38_Christianity'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return {
-      type: 'leaf' as const,
-      actionId: 'gain-other-players',
-      sourceCard: CARD_ID,
-      params: { food: 1 },
-    }
-  },
-})
 
 export const C38_Christianity = new MinorImprovement({
   id: CARD_ID,
@@ -26,3 +14,18 @@ export const C38_Christianity = new MinorImprovement({
   prerequisite: "Exactly 1 Sheep",
   newSet: true,
 })
+
+export const C38_Christianity_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'leaf' as const,
+      actionId: 'gain-other-players',
+      sourceCard: CARD_ID,
+      params: { food: 1 },
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

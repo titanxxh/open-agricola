@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E38_RodCollection'
 
@@ -20,19 +19,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterCollectListener)
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const wood = readCardExtraData<number>(player, CARD_ID, 'woodCount') ?? 0
-    // 1 VP per wood except at positions 1, 4, 7, 10 (1-indexed)
-    // i.e. no VP at 0-indexed positions 0, 3, 6, 9
-    // VP = wood - floor((wood + 2) / 3)
-    return wood - Math.floor((wood + 2) / 3)
-  },
-})
-
 export const E38_RodCollection = new MinorImprovement({
   id: CARD_ID,
   name: "Rod Collection",
@@ -43,3 +29,18 @@ export const E38_RodCollection = new MinorImprovement({
   cost: { wood: 1 },
   vp: 1,
 })
+
+export const E38_RodCollection_impl = {
+  listeners: [afterCollectListener],
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const wood = readCardExtraData<number>(player, CARD_ID, 'woodCount') ?? 0
+    // 1 VP per wood except at positions 1, 4, 7, 10 (1-indexed)
+    // i.e. no VP at 0-indexed positions 0, 3, 6, 9
+    // VP = wood - floor((wood + 2) / 3)
+    return wood - Math.floor((wood + 2) / 3)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

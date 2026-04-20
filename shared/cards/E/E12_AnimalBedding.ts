@@ -1,20 +1,22 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E12_AnimalBedding'
 
-/**
- * E12 Animal Bedding — You can keep 1 additional animal (of the same type) in
- * each of your unfenced stables, and 2 additional animals (of the same type)
- * in each pasture with stable.
- *
- * BGA: onPlayerComputeDropZones modifies existing stable and stabled-pasture zones.
- * - Unfenced stables: capacity += 1
- * - Pastures with stables: capacity += 2
- *
- * Prerequisite: 1 Grain Field.
- */
-registerCardEffect({
+export const E12_AnimalBedding = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Animal Bedding',
+  deck: 'E',
+  number: 12,
+  category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+  desc: ['You can keep 1 additional animal (of the same type) in each of your unfenced stables, and 2 additional animals (of the same type) in each pasture with stable.'],
+  cost: {},
+  vp: 1,
+  prerequisite: '1 Grain Field',
+})
+
+export const E12_AnimalBedding_impl = {
+  effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
     // Collect pasture IDs that have stables
@@ -35,16 +37,6 @@ registerCardEffect({
       }
     }
   },
-})
-
-export const E12_AnimalBedding = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Animal Bedding',
-  deck: 'E',
-  number: 12,
-  category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
-  desc: ['You can keep 1 additional animal (of the same type) in each of your unfenced stables, and 2 additional animals (of the same type) in each pasture with stable.'],
-  cost: {},
-  vp: 1,
-  prerequisite: '1 Grain Field',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

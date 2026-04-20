@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B124_Trimmer'
 
@@ -56,9 +55,21 @@ const afterFencingListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterFencingListener)
+export const B124_Trimmer = new Occupation({
+  id: CARD_ID,
+  name: 'Trimmer',
+  deck: 'B',
+  number: 124,
+  category: 'BUILDING_RESOURCE_PROVIDER',
+  desc: ['In each work phase, after you enclose at least one farmyard space, you get 2 <STONE>. (Subdividing an existing pasture does not count.)'],
+  cost: {},
+  players: '1+',
+  evenMoreSet: true,
+})
 
-registerCardEffect({
+export const B124_Trimmer_impl = {
+  listeners: [afterFencingListener],
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const area = countPastureTiles(player)
@@ -76,16 +87,6 @@ registerCardEffect({
     // Flag at return home to prevent triggering outside work phase
     setCardFlag(player, CARD_ID, true)
   },
-})
-
-export const B124_Trimmer = new Occupation({
-  id: CARD_ID,
-  name: 'Trimmer',
-  deck: 'B',
-  number: 124,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['In each work phase, after you enclose at least one farmyard space, you get 2 <STONE>. (Subdividing an existing pasture does not count.)'],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

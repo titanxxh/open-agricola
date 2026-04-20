@@ -1,13 +1,23 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E102_Acquirer'
 
-// E102 Acquirer: At the start of each round, you can pay food equal to the number of
-// people you have to buy 1 good of your choice from the general supply.
-registerCardEffect({
+export const E102_Acquirer = new Occupation({
+  id: CARD_ID,
+  name: 'Acquirer',
+  deck: 'E',
+  number: 102,
+  category: 'GOODS_GET',
+  desc: ['At the start of each round, you can pay <FOOD> equal to the number of people you have to buy 1 good of your choice from the general supply.'],
+  cost: {},
+  players: '1+',
+})
+
+export const E102_Acquirer_impl = {
+  effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
     const n = familySize(player)
@@ -33,15 +43,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const E102_Acquirer = new Occupation({
-  id: CARD_ID,
-  name: 'Acquirer',
-  deck: 'E',
-  number: 102,
-  category: 'GOODS_GET',
-  desc: ['At the start of each round, you can pay <FOOD> equal to the number of people you have to buy 1 good of your choice from the general supply.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

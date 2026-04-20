@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/future-meeples'
 import { applyFutureMeeples } from '../../shared/logic/state'
 

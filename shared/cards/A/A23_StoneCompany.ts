@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A23_StoneCompany'
 
@@ -34,8 +34,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const A23_StoneCompany = new MinorImprovement({
   id: CARD_ID,
   name: "Stone Company",
@@ -46,3 +44,8 @@ export const A23_StoneCompany = new MinorImprovement({
   cost: { clay: 2, reed: 1 },
   vp: 1,
 })
+
+export const A23_StoneCompany_impl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

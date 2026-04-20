@@ -1,18 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E82_Profiteering'
 
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
-
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
-})
 
 /**
  * Each time you use Day Laborer, exchange 1 building resource for another.
@@ -50,8 +44,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const E82_Profiteering = new MinorImprovement({
   id: "E82_Profiteering",
   name: "Profiteering",
@@ -60,3 +52,12 @@ export const E82_Profiteering = new MinorImprovement({
   desc: ["When you play this card, you immediately get 1 <FOOD>. Each time you use the __Day Laborer__ action space, you can exchange 1 building resource for another building resource."],
   cost: {},
 })
+
+export const E82_Profiteering_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

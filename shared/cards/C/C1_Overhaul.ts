@@ -1,26 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C1_Overhaul'
-
-// TODO: Full BGA implementation razes all existing fences and lets player rebuild them
-// (getting back the wood). Simplified: just grant an optional fencing action.
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, _player) => {
-    return {
-      type: 'seq' as const,
-      optional: true,
-      children: [
-        {
-          type: 'leaf' as const,
-          actionId: 'fencing',
-          sourceCard: CARD_ID,
-        },
-      ],
-    }
-  },
-})
 
 export const C1_Overhaul = new MinorImprovement({
   id: CARD_ID,
@@ -35,3 +16,23 @@ export const C1_Overhaul = new MinorImprovement({
   passing: true,
   newSet: true,
 })
+
+export const C1_Overhaul_impl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, _player) => {
+    return {
+      type: 'seq' as const,
+      optional: true,
+      children: [
+        {
+          type: 'leaf' as const,
+          actionId: 'fencing',
+          sourceCard: CARD_ID,
+        },
+      ],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

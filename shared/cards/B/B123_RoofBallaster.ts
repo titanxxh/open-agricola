@@ -1,11 +1,22 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B123_RoofBallaster'
 
-// BGA: optional: pay 1 food to get 1 stone per room.
-registerCardEffect({
+export const B123_RoofBallaster = new Occupation({
+  id: CARD_ID,
+  name: 'Roof Ballaster',
+  deck: 'B',
+  number: 123,
+  category: 'RESOURCE_STONE',
+  desc: ['When you play this card, you can immediately pay 1 <FOOD> to get 1 <STONE> for each room you have.'],
+  cost: {},
+  players: '1+',
+})
+
+export const B123_RoofBallaster_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const rooms = player.rooms
@@ -19,15 +30,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const B123_RoofBallaster = new Occupation({
-  id: CARD_ID,
-  name: 'Roof Ballaster',
-  deck: 'B',
-  number: 123,
-  category: 'RESOURCE_STONE',
-  desc: ['When you play this card, you can immediately pay 1 <FOOD> to get 1 <STONE> for each room you have.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

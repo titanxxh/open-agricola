@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { GameSession } from '../../../../server/game-session'
+import { GameSession } from '../../../../server/game/authoritative-session'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as BEFORE_RETURN_HOME_ID } from '../Stub_BeforeReturnHome'
 import { CARD_ID as START_RETURN_HOME_ID } from '../Stub_StartReturnHome'

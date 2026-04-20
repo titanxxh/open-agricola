@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A108_MushroomCollector'
 
@@ -25,8 +25,6 @@ const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(mushroomCollectorImmediatelyAfterListener)
-
 export const A108_MushroomCollector = new Occupation({
   id: CARD_ID,
   name: "Mushroom Collector",
@@ -37,3 +35,8 @@ export const A108_MushroomCollector = new Occupation({
   cost: {},
   players: "1+",
 })
+
+export const A108_MushroomCollector_impl = {
+  listeners: [mushroomCollectorImmediatelyAfterListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

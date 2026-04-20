@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B27_Toolbox'
 
@@ -26,30 +26,6 @@ const handler = (context: CardListenerContext): ActionHookResult | void => {
   return makeToolboxFlow()
 }
 
-registerCardListener({
-  id: 'B27-toolbox-after-construct',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['construct'],
-  handler,
-})
-
-registerCardListener({
-  id: 'B27-toolbox-after-stables',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['build-stables'],
-  handler,
-})
-
-registerCardListener({
-  id: 'B27-toolbox-after-fencing',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['fencing'],
-  handler,
-})
-
 export const B27_Toolbox = new MinorImprovement({
   id: CARD_ID,
   name: 'Toolbox',
@@ -61,3 +37,26 @@ export const B27_Toolbox = new MinorImprovement({
   ],
   cost: { wood: 1 },
 })
+
+export const B27_Toolbox_impl = {
+  listeners: [{
+  id: 'B27-toolbox-after-construct',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['construct'],
+  handler,
+}, {
+  id: 'B27-toolbox-after-stables',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['build-stables'],
+  handler,
+}, {
+  id: 'B27-toolbox-after-fencing',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['fencing'],
+  handler,
+}],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

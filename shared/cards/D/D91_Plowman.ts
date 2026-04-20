@@ -1,15 +1,24 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D91_Plowman'
 
-// D91 Plowman: On buy, place future field tiles on round spaces (current + 4), (current + 7), (current + 10).
-// At the start of those rounds, the player can plow the field for 1 food.
+export const D91_Plowman = new Occupation({
+  id: CARD_ID,
+  name: 'Plowman',
+  deck: 'D',
+  number: 91,
+  category: 'FARM_PLANNER',
+  desc: ['Add 4, 7, and 10 to the current round and place a field tile on each corresponding round space. At the start of these rounds, you can plow the field for 1 <FOOD>.'],
+  cost: {},
+  players: '1+',
+})
 
-registerCardEffect({
+export const D91_Plowman_impl = {
+  effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
     const offsets = [4, 7, 10]
@@ -38,15 +47,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const D91_Plowman = new Occupation({
-  id: CARD_ID,
-  name: 'Plowman',
-  deck: 'D',
-  number: 91,
-  category: 'FARM_PLANNER',
-  desc: ['Add 4, 7, and 10 to the current round and place a field tile on each corresponding round space. At the start of these rounds, you can plow the field for 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

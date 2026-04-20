@@ -1,11 +1,10 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E85_MasterTanner'
 
@@ -53,19 +52,6 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(beforeExchangeListener)
-registerCardListener(afterExchangeListener)
-
-// ── Part 2: Room provision ──
-
-registerCardEffect({
-  id: CARD_ID,
-  computeExtraRoomCapacity: (player) => {
-    const foodOnCard = getCardStack(player, CARD_ID).length
-    return foodOnCard > 0 && foodOnCard === player.rooms ? 1 : 0
-  },
-})
-
 export const E85_MasterTanner = new Occupation({
   id: CARD_ID,
   name: 'Master Tanner',
@@ -75,3 +61,15 @@ export const E85_MasterTanner = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const E85_MasterTanner_impl = {
+  listeners: [beforeExchangeListener, afterExchangeListener],
+  effect: {
+  id: CARD_ID,
+  computeExtraRoomCapacity: (player) => {
+    const foodOnCard = getCardStack(player, CARD_ID).length
+    return foodOnCard > 0 && foodOnCard === player.rooms ? 1 : 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,20 +1,12 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { getLooseStableKeys } from '../../actions/effects/animals'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C101_StallHolder'
-
-registerCardEffect({
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C101-stall-holder-anytime',
@@ -41,8 +33,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const C101_StallHolder = new Occupation({
   id: CARD_ID,
   name: 'Stall Holder',
@@ -53,3 +43,14 @@ export const C101_StallHolder = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C101_StallHolder_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

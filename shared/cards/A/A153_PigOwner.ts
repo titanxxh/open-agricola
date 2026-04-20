@@ -1,8 +1,8 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A153_PigOwner'
 
@@ -41,8 +41,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const A153_PigOwner = new Occupation({
   id: CARD_ID,
   name: 'Pig Owner',
@@ -53,3 +51,8 @@ export const A153_PigOwner = new Occupation({
   cost: {},
   players: '4+',
 })
+
+export const A153_PigOwner_impl = {
+  listeners: [anytimeListener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl

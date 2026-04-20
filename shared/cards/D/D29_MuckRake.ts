@@ -1,19 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D29_MuckRake'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const types = new Set(Object.values(player.stableAnimals ?? {}).filter(Boolean))
-    let bonus = 0
-    if (types.has('sheep')) bonus++
-    if (types.has('boar')) bonus++
-    if (types.has('cattle')) bonus++
-    return bonus
-  },
-})
 
 export const D29_MuckRake = new MinorImprovement({
   id: CARD_ID,
@@ -26,3 +14,18 @@ export const D29_MuckRake = new MinorImprovement({
   ],
   cost: {},
 })
+
+export const D29_MuckRake_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const types = new Set(Object.values(player.stableAnimals ?? {}).filter(Boolean))
+    let bonus = 0
+    if (types.has('sheep')) bonus++
+    if (types.has('boar')) bonus++
+    if (types.has('cattle')) bonus++
+    return bonus
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

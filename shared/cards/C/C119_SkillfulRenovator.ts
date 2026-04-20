@@ -1,26 +1,11 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C119_SkillfulRenovator'
-
-/**
- * C119 Skillful Renovator:
- * onBuy: gain 1 wood + 1 clay.
- * Each time after you renovate, you get a number of WOOD equal to the number of
- * people you placed that round.
- *
- * BGA: countPlacedFarmers() counts farmers placed in the current round.
- * We use getRoundPlacementOrder which tracks placements per round.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
-})
 
 const afterRenovateListener: CardListenerRegistration = {
   id: 'C119-skillful-renovator-after-renovate',
@@ -34,8 +19,6 @@ const afterRenovateListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(afterRenovateListener)
-
 export const C119_SkillfulRenovator = new Occupation({
   id: CARD_ID,
   name: 'Skillful Renovator',
@@ -48,3 +31,12 @@ export const C119_SkillfulRenovator = new Occupation({
   cost: {},
   players: '1+',
 })
+
+export const C119_SkillfulRenovator_impl = {
+  listeners: [afterRenovateListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

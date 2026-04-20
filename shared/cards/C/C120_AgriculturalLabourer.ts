@@ -1,10 +1,9 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { fieldHasCrop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C120_AgriculturalLabourer'
 
@@ -60,10 +59,20 @@ const gainListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(onPlayListener)
-registerCardListener(gainListener)
+export const C120_AgriculturalLabourer = new Occupation({
+  id: CARD_ID,
+  name: "Agricultural Labourer",
+  deck: "C",
+  number: 120,
+  category: "BUILDING_RESOURCE_PROVIDER",
+  desc: ["Place 8 <CLAY> on this card. For each <GRAIN> you obtain, you also get 1 <CLAY> from this card."],
+  cost: {},
+  players: "1+",
+})
 
-registerCardEffect({
+export const C120_AgriculturalLabourer_impl = {
+  listeners: [onPlayListener, gainListener],
+  effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
@@ -84,15 +93,6 @@ registerCardEffect({
       ],
     }
   },
-})
-
-export const C120_AgriculturalLabourer = new Occupation({
-  id: CARD_ID,
-  name: "Agricultural Labourer",
-  deck: "C",
-  number: 120,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Place 8 <CLAY> on this card. For each <GRAIN> you obtain, you also get 1 <CLAY> from this card."],
-  cost: {},
-  players: "1+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

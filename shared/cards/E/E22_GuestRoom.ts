@@ -1,9 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E22_GuestRoom'
 
@@ -11,34 +10,6 @@ const updateInfobox = (player: { cardStates?: Record<string, any> }) => {
   const stack = getCardStack(player as any, CARD_ID)
   writeCardInfobox(player as any, CARD_ID, `${stack.length} Food`)
 }
-
-/**
- * E22 Guest Room: Immediately place any amount of food from your supply on this card.
- * Once per round, you can discard 1 food from this card to place a person
- * from your supply in that round (grow-family-without-room).
- *
- * Implementation:
- * - onBuy: store all player food on the card stack as 'food' items, set food to 0.
- * - anytime (once per round): if card stack has food and not flagged,
- *   return flow: pop-card-stack (gives food to player) → pay-resources (discards it)
- *   → flag-card → grow-family-without-room → set-card-infobox
- * - onBeforeStartOfTurn: reset flag for once-per-round.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const foodToStore = player.resources.food
-    if (foodToStore > 0) {
-      const items = Array.from({ length: foodToStore }, () => 'food')
-      pushToCardStack(player, CARD_ID, items)
-      player.resources.food = 0
-    }
-    updateInfobox(player)
-  },
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E22-guest-room-anytime',
@@ -74,8 +45,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const E22_GuestRoom = new MinorImprovement({
   id: CARD_ID,
   name: 'Guest Room',
@@ -84,3 +53,23 @@ export const E22_GuestRoom = new MinorImprovement({
   desc: ['Immediately place any amount of <FOOD> from your supply on this card. Once per round, you can discard 1 <FOOD> from this card to place a person from your supply in that round.'],
   cost: { wood: 4, reed: 1 },
 })
+
+export const E22_GuestRoom_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    const foodToStore = player.resources.food
+    if (foodToStore > 0) {
+      const items = Array.from({ length: foodToStore }, () => 'food')
+      pushToCardStack(player, CARD_ID, items)
+      player.resources.food = 0
+    }
+    updateInfobox(player)
+  },
+  onBeforeStartOfTurn: (_state, player) => {
+    setCardFlag(player, CARD_ID, false)
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

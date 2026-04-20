@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D63_Lynchet'
 
@@ -20,7 +20,21 @@ const CARD_ID = 'D63_Lynchet'
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1
 
-registerCardEffect({
+export const D63_Lynchet = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Lynchet',
+  deck: 'D',
+  number: 63,
+  category: 'FOOD_PROVIDER',
+  desc: [
+    'In the field phase of each harvest, you get 1 <FOOD> for each harvested field tile that is orthogonally adjacent to your house.',
+  ],
+  cost: {},
+  evenMoreSet: true,
+})
+
+export const D63_Lynchet_impl = {
+  effect: {
   id: CARD_ID,
   onAfterReap: (state, player) => {
 
@@ -66,17 +80,6 @@ registerCardEffect({
     if (adjacentHarvested <= 0) return
     return gainLeaf(CARD_ID, { food: adjacentHarvested })
   },
-})
-
-export const D63_Lynchet = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lynchet',
-  deck: 'D',
-  number: 63,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'In the field phase of each harvest, you get 1 <FOOD> for each harvested field tile that is orthogonally adjacent to your house.',
-  ],
-  cost: {},
-  evenMoreSet: true,
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

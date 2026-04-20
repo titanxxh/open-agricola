@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B165_GameProvider'
 
@@ -21,7 +21,19 @@ registerSelectionEffect('discard-grain-for-pigs', ({ player, positions }) => {
   player.resources.boar = (player.resources.boar ?? 0) + pigs
 })
 
-registerCardEffect({
+export const B165_GameProvider = new Occupation({
+  id: "B165_GameProvider",
+  name: "Game Provider",
+  deck: "B",
+  number: 165,
+  category: "LIVESTOCK_PROVIDER",
+  desc: ["Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different fields to get 1/2/3 <PIG>."],
+  cost: {},
+  players: "4+",
+})
+
+export const B165_GameProvider_impl = {
+  effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
     const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
@@ -40,15 +52,6 @@ registerCardEffect({
       },
     }
   },
-})
-
-export const B165_GameProvider = new Occupation({
-  id: "B165_GameProvider",
-  name: "Game Provider",
-  deck: "B",
-  number: 165,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different fields to get 1/2/3 <PIG>."],
-  cost: {},
-  players: "4+",
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

@@ -1,32 +1,11 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B69_PottersMarket'
-
-/**
- * B69 Potters Market — At any time, you can pay 3 <CLAY> and 2 <FOOD>.
- * Place 1 <VEGETABLE> on each of the next 2 round spaces.
- * At the start of those rounds, you get the <VEGETABLE>.
- *
- * Implementation: store pending vegetable count in cardStates.
- * onRoundStart awards 1 vegetable per pending count and decrements.
- * The anytime flow pays and increments the counter by 2.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
-    if (pending <= 0) return
-    const counters = initCardState(player, CARD_ID)
-    counters.pending = pending - 1
-    return gainLeaf(CARD_ID, { vegetable: 1 })
-  },
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'B69-potters-market-anytime',
@@ -56,8 +35,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(anytimeListener)
-
 export const B69_PottersMarket = new MinorImprovement({
   id: CARD_ID,
   name: "Potter's Market",
@@ -69,3 +46,18 @@ export const B69_PottersMarket = new MinorImprovement({
   vp: 1,
   newSet: true,
 })
+
+export const B69_PottersMarket_impl = {
+  listeners: [anytimeListener],
+  effect: {
+  id: CARD_ID,
+  onRoundStart: (_state, player) => {
+    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
+    if (pending <= 0) return
+    const counters = initCardState(player, CARD_ID)
+    counters.pending = pending - 1
+    return gainLeaf(CARD_ID, { vegetable: 1 })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

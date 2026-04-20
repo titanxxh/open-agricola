@@ -1,13 +1,12 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import type { ExtraSowableField } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E68_CherryOrchard'
 const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 68 }
@@ -23,7 +22,33 @@ const setCardCrop = (player: PlayerState, crop: CardCrop | null) =>
 const tileMatches = (tile: FarmTilePosition) =>
   tile.row === VIRTUAL_TILE.row && tile.col === VIRTUAL_TILE.col
 
-registerCardEffect({
+const isDoableListener: CardListenerRegistration = {
+  id: 'E68-cherry-orchard-isdoable-sow',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['sow'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (canSow(context.player)) return
+    if (getCardCrop(context.player)) return
+    if (context.player.resources.wood <= 0) return
+    return { doable: true }
+  },
+}
+
+export const E68_CherryOrchard = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Cherry Orchard',
+  deck: 'E',
+  number: 68,
+  category: 'CROP_PROVIDER',
+  desc: [
+    'This card is a field that can only grow <WOOD>. During each harvest, you receive 1 <WOOD> from this card. When you harvest the last <WOOD>, you also receive 1 <VEGETABLE>.',
+  ],
+})
+
+export const E68_CherryOrchard_impl = {
+  listeners: [isDoableListener],
+  effect: {
   id: CARD_ID,
 
   onComputeSowableFields: (player): ExtraSowableField[] => {
@@ -66,30 +91,6 @@ registerCardEffect({
 
     setCardCrop(player, cardCrop)
   },
-})
-
-const isDoableListener: CardListenerRegistration = {
-  id: 'E68-cherry-orchard-isdoable-sow',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (canSow(context.player)) return
-    if (getCardCrop(context.player)) return
-    if (context.player.resources.wood <= 0) return
-    return { doable: true }
-  },
-}
-
-registerCardListener(isDoableListener)
-
-export const E68_CherryOrchard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cherry Orchard',
-  deck: 'E',
-  number: 68,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'This card is a field that can only grow <WOOD>. During each harvest, you receive 1 <WOOD> from this card. When you harvest the last <WOOD>, you also receive 1 <VEGETABLE>.',
-  ],
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

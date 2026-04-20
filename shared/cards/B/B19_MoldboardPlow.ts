@@ -1,26 +1,10 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
-import { registerCardListener } from '../card-listeners'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B19_MoldboardPlow'
-
-/**
- * Place 2 field tiles on this card. Twice this game, when you use the
- * Farmland action space, you can also plow 1 field from this card.
- *
- * Stack items are 'field' tokens (not real resources). pop-card-stack
- * will add a harmless { field: 1 } to resources, but correctly decrements
- * the stack so the card tracks remaining uses.
- */
-registerCardEffect({
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, ['field', 'field'])
-  },
-})
 
 const listener: CardListenerRegistration = {
   id: 'B19-moldboard-plow-after-place-farmer',
@@ -45,8 +29,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerCardListener(listener)
-
 export const B19_MoldboardPlow = new MinorImprovement({
   id: CARD_ID,
   name: 'Moldboard Plow',
@@ -58,3 +40,14 @@ export const B19_MoldboardPlow = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
 })
+
+export const B19_MoldboardPlow_impl = {
+  listeners: [listener],
+  effect: {
+  id: CARD_ID,
+  onBuy: (_state, player) => {
+    pushToCardStack(player, CARD_ID, ['field', 'field'])
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

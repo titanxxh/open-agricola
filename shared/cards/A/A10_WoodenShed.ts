@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A10_WoodenShed'
 
@@ -10,11 +10,6 @@ const CARD_ID = 'A10_WoodenShed'
 // and room-capacity aspects here. ("No renovation" is also BGA-specific bookkeeping; the card
 // naturally becomes redundant once the house leaves wood.)
 registerPrerequisite('Still in Wooden House', (player) => player.houseType === 'wood')
-
-registerCardEffect({
-  id: CARD_ID,
-  computeExtraRoomCapacity: () => 1,
-})
 
 export const A10_WoodenShed = new MinorImprovement({
   id: CARD_ID,
@@ -27,3 +22,11 @@ export const A10_WoodenShed = new MinorImprovement({
   prerequisite: 'Still in Wooden House',
   evenMoreSet: true,
 })
+
+export const A10_WoodenShed_impl = {
+  effect: {
+  id: CARD_ID,
+  computeExtraRoomCapacity: () => 1,
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

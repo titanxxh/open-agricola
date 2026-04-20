@@ -1,19 +1,8 @@
 import { MinorImprovement } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E35_Misanthropy'
-
-registerCardEffect({
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const size = familySize(player)
-    if (size === 2) return 5
-    if (size === 3) return 3
-    if (size === 4) return 2
-    return 0
-  },
-})
 
 export const E35_Misanthropy = new MinorImprovement({
   id: CARD_ID,
@@ -25,3 +14,17 @@ export const E35_Misanthropy = new MinorImprovement({
   cost: {},
   vp: 0,
 })
+
+export const E35_Misanthropy_impl = {
+  effect: {
+  id: CARD_ID,
+  computeBonusScore: (_state, player) => {
+    const size = familySize(player)
+    if (size === 2) return 5
+    if (size === 3) return 3
+    if (size === 4) return 2
+    return 0
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl

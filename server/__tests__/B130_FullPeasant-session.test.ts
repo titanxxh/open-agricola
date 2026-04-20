@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/game/player'
@@ -120,7 +120,7 @@ describe('B130_FullPeasant session', () => {
     state.players[0]!.resources.wood = 10
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'fencing')
+    const resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     // fencing immediately goes into fence-selection UI (not a pre-placement choice).
     // We can't easily complete fence-selection here; just verify takeAction succeeded.

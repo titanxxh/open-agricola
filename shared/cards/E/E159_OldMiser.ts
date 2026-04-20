@@ -1,25 +1,21 @@
 import { Occupation } from '../types'
-import { registerCardEffect } from '../card-effects'
 import { familySize } from '../../game/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E159_OldMiser'
 
-/**
- * E159 Old Miser (Occupation, E, 159)
- * In the feeding phase of each harvest, each of your people requires 1 less food.
- * During scoring, your people are worth 2 points each instead of 3.
- *
- * BGA: onBuy triggers a harvest cost notification and score recompute.
- * Main effects are in Player.php getHarvestCost() and Scores.php computeFarmers().
- *
- * Implementation:
- * - onBeforeFeed: give the player familySize extra food to simulate -1 food per person.
- *   Normal formula: familySize * 2 - newborn. With familySize extra food the effective
- *   cost becomes familySize - newborn (adults need 1, newborns need 0).
- * - computePostScore: subtract familySize VP (changing 3 VP/person to 2 VP/person).
- */
+export const E159_OldMiser = new Occupation({
+  id: CARD_ID,
+  name: 'Old Miser',
+  deck: 'E',
+  number: 159,
+  category: 'FOOD_MISC',
+  desc: ['In the feeding phase of each harvest, each of your people requires 1\u00a0less <FOOD>. During scoring, your people are worth 2 points each instead of 3.'],
+  players: '4+',
+})
 
-registerCardEffect({
+export const E159_OldMiser_impl = {
+  effect: {
   id: CARD_ID,
   onBeforeFeed: (_state, player) => {
     // Give familySize extra food to offset the -1 food per person reduction.
@@ -33,14 +29,6 @@ registerCardEffect({
     // Difference: -familySize (i.e., -1 per person).
     return -familySize(player)
   },
-})
-
-export const E159_OldMiser = new Occupation({
-  id: CARD_ID,
-  name: 'Old Miser',
-  deck: 'E',
-  number: 159,
-  category: 'FOOD_MISC',
-  desc: ['In the feeding phase of each harvest, each of your people requires 1\u00a0less <FOOD>. During scoring, your people are worth 2 points each instead of 3.'],
-  players: '4+',
-})
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl
