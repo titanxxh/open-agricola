@@ -9,7 +9,7 @@ import type {
   Resource,
 } from '../../../shared/game/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
-import { emptyResources } from '../../../shared/logic/state'
+import { emptyResources } from '../../../shared/logic/state-constants'
 import { familySize } from '../../../shared/game/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'

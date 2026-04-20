@@ -5,7 +5,7 @@ import type { ComplexCost, Resource } from '../../../shared/game/types'
 import { getMajorCardEffect } from '../../../shared/cards/major'
 import { getMinorImprovement } from '../../../shared/game/minor-improvements'
 import { getOccupation } from '../../../shared/game/occupations'
-import { emptyResources } from '../../../shared/logic/state'
+import { emptyResources } from '../../../shared/logic/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { CardWithCopy } from './CardWithCopy'
 
