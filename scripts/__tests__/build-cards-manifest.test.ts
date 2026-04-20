@@ -14,6 +14,7 @@ describe('buildCardsManifest', () => {
       name: 'Test Card',
       deck: 'A',
       number: 999,
+      type: 'occupation',
       category: 'FOOD_PROVIDER',
       desc: ['A test card for unit tests.'],
       cost: {},

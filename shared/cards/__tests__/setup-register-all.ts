@@ -31,3 +31,42 @@
 import '../../../server/game/authoritative-session'
 // Now load register-all for its bootstrap side effect.
 import '../register-all'
+
+// PR-4: preload cards-manifest.json so client components that call
+// `getCardMeta()` (PlayerCard, cardText, ActionBoard) have synchronous data
+// under test, matching the runtime `App.tsx` pre-render bootstrap.
+import fs from 'node:fs'
+import path from 'node:path'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+} from '../../../client/services/card-meta'
+
+const manifestPath = path.resolve(__dirname, '../../../public/cards-manifest.json')
+if (fs.existsSync(manifestPath)) {
+  const raw = fs.readFileSync(manifestPath, 'utf8')
+  const payload = JSON.parse(raw)
+  const existingFetch =
+    typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined
+  // Stub fetch for the manifest URL; delegate everything else to any existing
+  // fetch implementation (tests that need real fetches can still override).
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url
+    if (url.endsWith('cards-manifest.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => payload,
+      } as unknown as Response
+    }
+    if (existingFetch) return existingFetch(input as never, init)
+    throw new Error(`[test-setup] fetch(${url}) unmocked`)
+  }) as typeof fetch
+  __resetCardsManifestCache()
+  await loadCardsManifest()
+}
