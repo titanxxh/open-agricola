@@ -36,7 +36,7 @@ const afterImprovementListener: CardListenerRegistration = {
             actionContext: { trueAction: false },
             params: {
               allowedPurchases: [otherCard],
-            } as any,
+            },
           },
         ],
       },

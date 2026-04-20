@@ -29,7 +29,7 @@ import { collectFenceDiscount, collectLockedFarmTileKeys } from '../../cards/car
 
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
-type FarmChoicePayloadMap = {
+export type FarmChoicePayloadMap = {
   fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
   room: { rooms: FarmTilePosition[] }
   stable: { stables: FarmTilePosition[] }

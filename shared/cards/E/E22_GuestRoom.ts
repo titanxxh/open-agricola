@@ -3,12 +3,13 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import type { PlayerState } from '../../game/types'
 
 const CARD_ID = 'E22_GuestRoom'
 
-const updateInfobox = (player: { cardStates?: Record<string, any> }) => {
-  const stack = getCardStack(player as any, CARD_ID)
-  writeCardInfobox(player as any, CARD_ID, `${stack.length} Food`)
+const updateInfobox = (player: PlayerState) => {
+  const stack = getCardStack(player, CARD_ID)
+  writeCardInfobox(player, CARD_ID, `${stack.length} Food`)
 }
 
 const anytimeListener: CardListenerRegistration = {

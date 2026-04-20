@@ -26,7 +26,7 @@ const computeReplaceListener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'play-occupation',
             sourceCard: CARD_ID,
-            params: { costOverride: {} } as any,
+            params: { costOverride: {} },
           },
         ],
       },

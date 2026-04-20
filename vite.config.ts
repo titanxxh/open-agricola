@@ -1,7 +1,8 @@
-import { defineConfig, type PluginOption } from 'vite'
+import { defineConfig, type PluginOption, type ViteDevServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 
 const BGA_IMAGE_DIR = process.env.BGA_IMAGE_DIR || '../bga-agricola/img'
 const bgaImagePath = path.resolve(__dirname, BGA_IMAGE_DIR)
@@ -9,8 +10,8 @@ const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.n
 
 const serveBgaImages = (imageDir: string) => ({
   name: 'serve-bga-images',
-  configureServer(server: any) {
-    server.middlewares.use('/bga-img', async (req: any, res: any, next: any) => {
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use('/bga-img', async (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
       const filePath = path.join(imageDir, req.url || '')
       // Local first
       if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

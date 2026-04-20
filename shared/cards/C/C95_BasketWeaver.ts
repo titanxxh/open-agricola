@@ -47,7 +47,7 @@ const onBuyListener: CardListenerRegistration = {
         actionContext: { trueAction: false },
         params: {
           allowedPurchases: [TARGET_MAJOR],
-        } as any,
+        },
       },
       sourceCard: CARD_ID,
     }

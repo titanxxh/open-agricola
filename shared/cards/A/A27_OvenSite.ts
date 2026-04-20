@@ -61,7 +61,7 @@ export const A27_OvenSite_impl = {
         actionContext: { trueAction: false },
         params: {
           allowedPurchases: [...OVEN_IDS],
-        } as any,
+        },
       },
     ],
   }),
