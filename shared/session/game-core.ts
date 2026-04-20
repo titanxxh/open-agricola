@@ -16,6 +16,8 @@ import type { ActionDetailParts } from '../protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
+import { processSubmit, tryAdvanceRound, finalizeDraft } from '../draft/draft-manager.ts'
+import type { DraftPickPayload } from '../draft/types.ts'
 import {
   ActionNode,
   ActionRegistry,
@@ -905,19 +907,45 @@ export class GameCore {
     }
   }
 
+  private computeCardDraftPending(): Extract<PendingAction, { type: 'cardDraft' }> | null {
+    if (this.state.phase !== 'draft' || !this.state.draft) return null
+    const draft = this.state.draft
+    const allSubmitted = draft.seatOrder.every(
+      (pid) =>
+        draft.pendingPicks[pid] != null &&
+        draft.pendingPicks[pid].occ !== null &&
+        draft.pendingPicks[pid].minor !== null,
+    )
+    return {
+      type: 'cardDraft',
+      round: draft.round,
+      totalRounds: draft.totalRounds,
+      allSubmitted,
+    }
+  }
+
   private respond(ok = true, error?: string): SessionResponse {
+    // While the top-level game phase is 'draft', surface a cardDraft pending
+    // regardless of `this.pending` — the engine/interaction paths are paused.
+    const draftPending = this.computeCardDraftPending()
+    const effectivePending: PendingAction = draftPending ?? this.pending
+    // Keep the interaction computation aligned with the effective pending.
+    const prevPending = this.pending
+    if (draftPending) this.pending = draftPending
+    const interaction = this.buildInteraction()
+    if (draftPending) this.pending = prevPending
     const resp: SessionResponse = {
       ok,
       state: this.state,
-      pending: this.pending,
-      interaction: this.buildInteraction(),
+      pending: effectivePending,
+      interaction,
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
       scores: computeScores(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
     // Include backend-computed availability for current player
-    if (!this.state.gameOver && this.pending.type === 'none') {
+    if (!this.state.gameOver && effectivePending.type === 'none') {
       const actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
       resp.actionAvailability = actionAvailability
       resp.cardAvailability = this.getCardAvailability(
@@ -1917,6 +1945,7 @@ export class GameCore {
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
+    if (this.state.phase === 'draft') return this.respond(false, 'draft in progress')
     if (this.pending.type !== 'none') return this.respond(false, 'interaction in progress')
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
@@ -2456,6 +2485,35 @@ export class GameCore {
       return this.respond()
     }
     return this.continueBeforeStartOfTurn()
+  }
+
+  /**
+   * Record a single player's card pick for the current draft round. When all
+   * seated players have submitted, the round advances (pools rotate) and, once
+   * the final round is complete, `finalizeDraft` copies each player's `kept`
+   * cards back to `occupationHand` / `minorHand` and flips `phase='playing'`.
+   *
+   * No-op for non-draft phases, unknown players, out-of-pool picks, or double
+   * submits in the same round — each returns `ok:false` with an error message.
+   */
+  submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
+    if (this.state.phase !== 'draft' || !this.state.draft) {
+      return this.respond(false, 'not in draft phase')
+    }
+    const sub = processSubmit(this.state.draft, playerId, pick)
+    if (sub.error) {
+      return this.respond(false, sub.error)
+    }
+    this.state.draft = sub.draft
+    const advance = tryAdvanceRound(this.state.draft)
+    this.state.draft = advance.draft
+    if (advance.finished) {
+      this.state = finalizeDraft(this.state)
+      // Refresh round-start snapshot so that subsequent takeAction / undo logic
+      // sees the post-draft hands rather than the initial empty-handed snapshot.
+      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    }
+    return this.respond()
   }
 
   loadState(raw: unknown): SessionResponse {

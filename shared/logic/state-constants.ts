@@ -10,6 +10,7 @@
 // reaches card implementations. Type-only imports from pure modules are fine.
 
 import type { ActionSpace, FenceSegment, GameState, PlayerState, Resource } from '../game/types'
+import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from './rng'
 
 export { createSeed, createRng, shuffleWithRng } from './rng'
@@ -108,6 +109,15 @@ export type InitialStateOptions = {
   extraOccupationIds?: string[]
   deckIds?: string[]
   playerNames?: string[]
+  /**
+   * Optional simultaneous-draft configuration. When `draftMode='simultaneous'`,
+   * `createInitialState` seeds `state.draft` with per-player card pools instead
+   * of dealing cards directly into `player.occupationHand` / `player.minorHand`,
+   * and sets `state.phase='draft'`. See `shared/draft/`.
+   */
+  draftMode?: DraftMode
+  /** Draft pool size per card type (7..10). Required when `draftMode='simultaneous'`. */
+  draftPoolSize?: number
 }
 
 export const generateRoundActionOrder = (seed: number) => {
