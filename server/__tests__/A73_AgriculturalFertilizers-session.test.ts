@@ -21,8 +21,9 @@ const edgesForOneTile = [
   'V-1-2',
 ]
 
-// retry: the "cannot play A73 without pasture" test is occasionally flaky under
-// parallel test execution due to shared module-level card listener state.
+// TODO(flaky): A73 test still intermittently fails (~20-25% rate) under parallel
+// test execution; root cause likely shared module-level card listener state.
+// Tracked separately; keep retry marker until deterministic fix.
 describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
   const setupFencing = () => {
     const session = new GameSession()
