@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
-// Registers card definitions with the in-memory catalog.
-import '../../../../shared/cards/catalog'
+// Cards-manifest is preloaded by `shared/cards/__tests__/setup-register-all.ts`
+// (listed in `vitest.config.ts` -> `setupFiles`), so `getCardMeta()` resolves
+// synchronously during render.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   it('marks D60_LargePottery with data-also-counts-as="major"', () => {

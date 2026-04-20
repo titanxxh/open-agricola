@@ -2,11 +2,9 @@ import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ComplexCost, Resource } from '../../../shared/game/types'
-import { getMajorCardEffect } from '../../../shared/cards/major'
-import { getMinorImprovement } from '../../../shared/game/minor-improvements'
-import { getOccupation } from '../../../shared/game/occupations'
 import { emptyResources } from '../../../shared/logic/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
+import { getCardMeta } from '../../services/card-meta'
 import { CardWithCopy } from './CardWithCopy'
 
 export type CardType = 'major' | 'minor' | 'occupation'
@@ -117,66 +115,62 @@ export const PlayerCard = ({
   className = '',
 }: PlayerCardProps) => {
   const cardData = useMemo(() => {
+    const meta = getCardMeta(cardId)
     if (cardType === 'major') {
-      const major = getMajorCardEffect(cardId)
-      if (!major) return null
-      const { baseCost } = extractMajorDisplayCost(major.cost)
+      if (!meta) return null
+      const rawCost = (meta.cost ?? {}) as Partial<Resource> | ComplexCost
+      const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
         name: t(locale, `improvements.${cardId}.name`),
-        description: major.description.join('\n'),
+        description: (meta.desc ?? []).join('\n'),
         cost: { ...emptyResources, ...baseCost },
-        returnCards: major.returnCards,
-        vp: major.vp,
-        isCookery: major.isCookery,
-        isBaking: major.isBaking,
+        returnCards: meta.returnCards,
+        vp: meta.vp,
+        isCookery: meta.isCookery,
+        isBaking: meta.isBaking,
       }
     } else if (cardType === 'minor') {
-      const minor = getMinorImprovement(cardId)
-      if (!minor) return null
+      if (!meta) return null
       const i18nKey = `minorImprovements.${cardId}`
       const i18nName = t(locale, `${i18nKey}.name`)
       const i18nDesc = t(locale, `${i18nKey}.description`)
-      const locContent = minor.locales?.[locale]
-      // Use i18n if available (returns the key itself when missing), then card locales, then default
       const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : (locContent?.name ?? minor.name),
+        name: hasI18n ? i18nName : meta.name,
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
-          : (locContent?.desc ?? minor.desc).join('\n'),
-        cost: { ...emptyResources, ...minor.cost },
-        altCosts: minor.altCosts,
-        deck: minor.deck,
-        category: minor.category,
-        vp: minor.vp,
-        prerequisite: locContent?.prerequisite ?? minor.prerequisite,
-        players: minor.players,
-        isCookery: minor.isCookery,
-        isBaking: minor.isBaking,
-        passing: minor.passing,
-        returnCards: minor.returnCards,
-        alsoCountsAs: minor.alsoCountsAs,
+          : (meta.desc ?? []).join('\n'),
+        cost: { ...emptyResources, ...(meta.cost ?? {}) },
+        altCosts: meta.altCosts,
+        deck: meta.deck,
+        category: meta.category,
+        vp: meta.vp,
+        prerequisite: meta.prerequisite,
+        players: meta.players,
+        isCookery: meta.isCookery,
+        isBaking: meta.isBaking,
+        passing: meta.passing,
+        returnCards: meta.returnCards,
+        alsoCountsAs: meta.alsoCountsAs,
       }
     } else {
-      const occupation = getOccupation(cardId)
-      if (!occupation) return null
+      if (!meta) return null
       const i18nKey = `occupations.${cardId}`
       const i18nName = t(locale, `${i18nKey}.name`)
       const i18nDesc = t(locale, `${i18nKey}.description`)
-      const locContent = occupation.locales?.[locale]
       const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : (locContent?.name ?? occupation.name),
+        name: hasI18n ? i18nName : meta.name,
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
-          : (locContent?.desc ?? occupation.desc).join('\n'),
-        cost: { ...emptyResources, ...occupation.cost },
-        deck: occupation.deck,
-        category: occupation.category,
-        prerequisite: locContent?.prerequisite ?? occupation.prerequisite,
-        players: occupation.players,
-        isCookery: occupation.isCookery,
-        isBaking: occupation.isBaking,
+          : (meta.desc ?? []).join('\n'),
+        cost: { ...emptyResources, ...(meta.cost ?? {}) },
+        deck: meta.deck,
+        category: meta.category,
+        prerequisite: meta.prerequisite,
+        players: meta.players,
+        isCookery: meta.isCookery,
+        isBaking: meta.isBaking,
       }
     }
   }, [cardId, cardType, locale])
@@ -262,7 +256,7 @@ export const PlayerCard = ({
         )}
         <div className="card-icon" style={iconStyle} />
         
-        {'prerequisite' in cardData && cardData.prerequisite && (
+        {'prerequisite' in cardData && typeof cardData.prerequisite === 'string' && cardData.prerequisite && (
           <div className="card-prerequisite">
             <div className="prerequisite-text">{cardData.prerequisite}</div>
           </div>

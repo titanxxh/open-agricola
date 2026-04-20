@@ -4,7 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
 import { PlayerCard } from '../common/PlayerCard'
-import { getOccupation } from '../../../shared/game/occupations'
+import { getCardMeta } from '../../services/card-meta'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -671,8 +671,21 @@ export const ActionBoard = ({
           <div className="hand-row">
             {baseActions.filter((s) => !basePositions[s.id]).map((space) => {
               const canTake = canTakeAction(space, currentPlayer)
-              const isOccupation = !!getOccupation(space.id)
-              const cardType = isOccupation ? 'occupation' as const : 'minor' as const
+              const meta = getCardMeta(space.id)
+              // PlayerActionCards can render as either occupation or minor
+              // depending on which catalog array they historically live in.
+              // Probe i18n (both prefixes are translated, exactly one matches
+              // for each card id) to pick the right style without re-encoding
+              // the catalog membership in the manifest.
+              let cardType: 'occupation' | 'minor'
+              if (meta?.type === 'playerAction') {
+                const occKey = `occupations.${space.id}.name`
+                cardType = t(locale, occKey) !== occKey
+                  ? 'occupation'
+                  : 'minor'
+              } else {
+                cardType = meta?.type === 'occupation' ? 'occupation' : 'minor'
+              }
               const owner = players.find((p) =>
                 p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
               )

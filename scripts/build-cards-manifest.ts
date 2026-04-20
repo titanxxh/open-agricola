@@ -21,13 +21,21 @@ export type CardMeta = {
   name: string
   deck: string
   number: number
+  /** Construction type: which card class/literal produced this entry. */
+  type: 'occupation' | 'minor' | 'major' | 'playerAction'
   category?: string
   desc?: string[]
   cost?: Record<string, number>
+  altCosts?: Record<string, number>[]
   players?: string
   newSet?: boolean
   prerequisite?: unknown
   vp?: number
+  isCookery?: boolean
+  isBaking?: boolean
+  passing?: boolean
+  returnCards?: string[]
+  alsoCountsAs?: string[]
 }
 
 export type CardManifestEntry = {
@@ -40,7 +48,8 @@ export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
   'id', 'name', 'deck', 'number', 'category', 'desc',
-  'cost', 'players', 'newSet', 'prerequisite',
+  'cost', 'altCosts', 'players', 'newSet', 'prerequisite', 'vp',
+  'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs',
 ])
 
 const CARD_CLASSES = new Set([
@@ -49,6 +58,13 @@ const CARD_CLASSES = new Set([
   'MajorImprovement',
   'PlayerActionCard',
 ])
+
+const CARD_CLASS_TO_TYPE: Record<string, CardMeta['type']> = {
+  Occupation: 'occupation',
+  MinorImprovement: 'minor',
+  MajorImprovement: 'major',
+  PlayerActionCard: 'playerAction',
+}
 
 function extractValueFromExpr(expr: ts.Expression): unknown {
   if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) return expr.text
@@ -164,6 +180,7 @@ function majorEffectObjectToMeta(
     name: typeof obj.name === 'string' ? (obj.name as string) : '',
     deck: 'major',
     number,
+    type: 'major',
   }
   if (obj.cost && typeof obj.cost === 'object') {
     meta.cost = obj.cost as Record<string, number>
@@ -174,6 +191,9 @@ function majorEffectObjectToMeta(
     meta.desc = obj.desc as string[]
   }
   if (typeof obj.vp === 'number') meta.vp = obj.vp
+  if (typeof obj.isCookery === 'boolean') meta.isCookery = obj.isCookery
+  if (typeof obj.isBaking === 'boolean') meta.isBaking = obj.isBaking
+  if (Array.isArray(obj.returnCards)) meta.returnCards = obj.returnCards as string[]
   return meta
 }
 
@@ -209,6 +229,7 @@ export function parseCardFile(filePath: string): ParsedCardFile {
       ts.isIdentifier(node.expression) &&
       CARD_CLASSES.has(node.expression.text)
     ) {
+      const className = node.expression.text
       const arg = node.arguments?.[0]
       if (arg && ts.isObjectLiteralExpression(arg)) {
         const meta: Record<string, unknown> = {}
@@ -225,6 +246,7 @@ export function parseCardFile(filePath: string): ParsedCardFile {
           meta[keyName] = value
         }
         if (typeof meta.id === 'string') {
+          meta.type = CARD_CLASS_TO_TYPE[className]
           metas.push(meta as unknown as CardMeta)
         }
       }
