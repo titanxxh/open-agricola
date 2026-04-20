@@ -1,27 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../../game/types'
 import { meetsCardPrerequisites } from '../prerequisites'
-import { MinorImprovement } from '../../types'
+import { MinorImprovement, registerAdHocMinorImprovement } from '../../types'
 import { C70_LettucePatch } from '../../C/C70_LettucePatch'
 
 // Register a throwaway field-providing minor for this test file only
-new MinorImprovement({
-  id: 'TEST_FieldProvider',
-  name: 'Test Field Provider',
-  deck: 'X',
-  number: 999,
-  desc: [],
-  providesField: true,
-})
+registerAdHocMinorImprovement(
+  new MinorImprovement({
+    id: 'TEST_FieldProvider',
+    name: 'Test Field Provider',
+    deck: 'X',
+    number: 999,
+    desc: [],
+    providesField: true,
+  }),
+)
 
 // Register a plain minor without providesField for regression check
-new MinorImprovement({
-  id: 'TEST_PlainMinor',
-  name: 'Test Plain Minor',
-  deck: 'X',
-  number: 998,
-  desc: [],
-})
+registerAdHocMinorImprovement(
+  new MinorImprovement({
+    id: 'TEST_PlainMinor',
+    name: 'Test Plain Minor',
+    deck: 'X',
+    number: 998,
+    desc: [],
+  }),
+)
 
 type MinimalPlayer = Pick<
   PlayerState,
