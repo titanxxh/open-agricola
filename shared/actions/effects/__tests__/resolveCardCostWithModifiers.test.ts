@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import {
-  registerCardListener,
-  getRegisteredCardListeners,
-  clearCardListeners,
-  type CardListenerRegistration,
-} from '../../../cards/card-listeners'
+import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../cards/card-listeners'
+import { registerCardListener, clearCardListeners } from '../../../cards/registry-ops'
 import { resolveCardCostWithModifiers } from '../pay-helpers'
 import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
 

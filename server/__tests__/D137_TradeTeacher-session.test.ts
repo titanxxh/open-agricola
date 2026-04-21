@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type {
   ActionFlow,
   ActionSpace,

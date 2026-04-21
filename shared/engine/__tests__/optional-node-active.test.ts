@@ -6,7 +6,7 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { clearCardListeners } from '../../cards/registry-ops'
 
 beforeEach(() => {
   clearActionHooks()

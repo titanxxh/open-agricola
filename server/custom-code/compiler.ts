@@ -6,8 +6,10 @@
  */
 import ts from 'typescript'
 import vm from 'node:vm'
-import { registerCardEffect, type CardEffect } from '../../shared/cards/card-effects.ts'
-import { registerCardListener, type CardListenerRegistration } from '../../shared/cards/card-listeners.ts'
+import { type CardEffect } from '../../shared/cards/card-effects.ts'
+import { registerCardEffect } from '../../shared/cards/registry-ops.ts'
+import { type CardListenerRegistration } from '../../shared/cards/card-listeners.ts'
+import { registerCardListener } from '../../shared/cards/registry-ops.ts'
 
 const VM_TIMEOUT_MS = 100
 

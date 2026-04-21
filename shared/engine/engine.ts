@@ -25,11 +25,7 @@ import {
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
-import {
-  getListenerById,
-  executeCardListener,
-  shouldSkipImmediateListenerLog,
-} from '../cards/card-listeners'
+import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 

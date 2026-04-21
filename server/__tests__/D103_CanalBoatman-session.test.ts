@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/game/types'
 

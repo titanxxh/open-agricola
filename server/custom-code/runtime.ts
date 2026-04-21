@@ -1,5 +1,6 @@
-import { registerCardEffect, type CardEffect } from '../../shared/cards/card-effects.ts'
-import { registerCardListener } from '../../shared/cards/card-listeners.ts'
+import { type CardEffect } from '../../shared/cards/card-effects.ts'
+import { registerCardEffect } from '../../shared/cards/registry-ops.ts'
+import { registerCardListener } from '../../shared/cards/registry-ops.ts'
 import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/game/types.ts'

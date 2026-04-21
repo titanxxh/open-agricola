@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 

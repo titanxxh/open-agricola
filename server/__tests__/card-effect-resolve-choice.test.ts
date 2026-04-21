@@ -12,7 +12,8 @@
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { registerCardEffect, getCardEffect } from '../../shared/cards/card-effects'
+import { getCardEffect } from '../../shared/cards/card-effects'
+import { registerCardEffect } from '../../shared/cards/registry-ops'
 import type { ResolveChoiceHandler } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'

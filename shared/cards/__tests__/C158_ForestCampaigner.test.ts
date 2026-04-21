@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../C/C158_ForestCampaigner'

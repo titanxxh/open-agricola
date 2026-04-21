@@ -1,12 +1,7 @@
 import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
-import { CardRegistry } from './registry'
-import {
-  getActiveCardRegistry,
-  requireActiveCardRegistry,
-  setActiveCardRegistry,
-} from './active-registry'
+import { getActiveCardRegistry } from './active-registry'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -33,38 +28,6 @@ export type CardListenerRegistration = {
   order?: number
   scope?: CardListenerScope
   handler: (context: CardListenerContext) => ActionHookResult | void
-}
-
-/**
- * Register a card listener against the currently active `CardRegistry`.
- *
- * Production: `GameCore` publishes its per-session registry before any card
- * code runs. Tests: the setup file `shared/cards/__tests__/setup-register-all.ts`
- * publishes a default registry pre-loaded with every card's impl.
- *
- * Listeners without explicit `cardIds` are stored under a synthetic
- * `__global__` bucket so `getAllListeners()` still returns them.
- */
-export const registerCardListener = (registration: CardListenerRegistration) => {
-  const active = requireActiveCardRegistry('registerCardListener')
-  const cardIds = registration.cardIds && registration.cardIds.length > 0
-    ? registration.cardIds
-    : ['__global__']
-  for (const cardId of cardIds) {
-    active.addListener(cardId, registration)
-  }
-}
-
-/** Replace the active registry with a fresh empty one (test reset). */
-export const clearCardListeners = () => {
-  setActiveCardRegistry(new CardRegistry())
-}
-
-/** Remove listeners whose id starts with `CUSTOM_` from the active registry. */
-export const clearCustomCardListeners = () => {
-  const active = getActiveCardRegistry()
-  if (!active) return
-  active.removeListenersWhere((reg) => reg.id.startsWith('CUSTOM_'))
 }
 
 export const getRegisteredCardListeners = (): CardListenerRegistration[] => {

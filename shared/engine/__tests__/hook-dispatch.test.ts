@@ -15,10 +15,7 @@ import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 import { constructAction } from '../../actions/effects/construct'
 import { plowAction } from '../../actions/effects/plow'
 import { stablesAction } from '../../actions/effects/stables'
-import {
-  clearCardListeners,
-  registerCardListener,
-} from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
