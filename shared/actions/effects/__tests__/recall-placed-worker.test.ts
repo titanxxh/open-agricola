@@ -4,6 +4,7 @@ import { recallPlacedWorkerAction } from '../recall-placed-worker'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { getWorkerHeldOnCard } from '../../../cards/helpers/card-held-workers'
 import { workersAvailable } from '../../../game/player'
+import type { ActionExecutionContext } from '../../../game/types'
 
 const mkSpace = (id: string, takenBy: { playerId: string; workerId: string }[] = []): ActionSpace =>
   ({
@@ -62,7 +63,7 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       player: p,
       space: forest,
       params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('ok')
     expect(forest.takenBy).toEqual([])
@@ -80,7 +81,7 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       player: p,
       space: { id: 'dummy' } as ActionSpace,
       params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('fail')
   })
@@ -96,7 +97,7 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       player: p,
       space: mp,
       params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('fail')
     // No recall happened.
@@ -115,7 +116,7 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       player: p,
       space: forest,
       params: { forceFirst: true },
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('ok')
     expect(forest.takenBy).toEqual([])

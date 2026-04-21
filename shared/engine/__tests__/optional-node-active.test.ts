@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { EngineTree } from '../tree'
 import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 beforeEach(() => {
   clearActionHooks()
-  clearCardListeners()
+  setActiveCardRegistry(new CardRegistry())
 })
 
 describe('optional node active', () => {
@@ -76,7 +78,7 @@ describe('optional node active', () => {
         activeModifiers: [],
         cardStates: {},
       } as any,
-      space: {} as any,
+      space: mkActionSpace({ id: 'noop' }),
     })
     expect(step.type).not.toBe('blocked')
   })

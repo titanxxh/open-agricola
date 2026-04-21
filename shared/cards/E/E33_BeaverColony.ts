@@ -17,7 +17,7 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const gained = (context.result as any)?.resourcesGained?.reed ?? 0
+    const gained = context.result?.type === 'ok' ? (context.result.resourcesGained?.reed ?? 0) : 0
     if (gained <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },
@@ -33,7 +33,7 @@ const afterGainListener: CardListenerRegistration = {
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !REED_ACTION_SPACES.has(context.space.id)) return
-    const gained = (context.result as any)?.resourcesGained?.reed ?? 0
+    const gained = context.result?.type === 'ok' ? (context.result.resourcesGained?.reed ?? 0) : 0
     if (gained <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },

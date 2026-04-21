@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-} from '../card-listeners'
+import { getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 // Import card to register its effects/listeners
 import '../C/C75_Firewood'
+import type { ActionFlow } from '../../game/types'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'C75_Firewood'
 
@@ -91,12 +91,12 @@ describe('C75_Firewood', () => {
         actionId: 'improvement-any',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeDefined()
       expect(result?.flow?.type).toBe('xor')
       expect(result?.flow?.promptKey).toBe('ui.interactionFirewoodExchange')
-      const children = (result?.flow as any)?.children
+      const children = (result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children
       expect(children).toHaveLength(2)
       expect(children[0].actionId).toBe('take-from-card')
       expect(children[0].params).toEqual({ wood: 1 })
@@ -119,9 +119,9 @@ describe('C75_Firewood', () => {
         actionId: 'improvement-any',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
-      } as any)
+      } as unknown as CardListenerContext)
 
-      const children = (result?.flow as any)?.children
+      const children = (result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children
       expect(children).toHaveLength(4)
       expect(children[3].params).toEqual({ wood: 4 })
     })
@@ -141,7 +141,7 @@ describe('C75_Firewood', () => {
         actionId: 'improvement-any',
         phase: 'after',
         choice: 'major:Major_Well',
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -161,7 +161,7 @@ describe('C75_Firewood', () => {
         actionId: 'improvement-any',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })

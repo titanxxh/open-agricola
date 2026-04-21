@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
 import '../../shared/cards/E/E30_ChildsToy'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 const CARD_ID = 'E30_ChildsToy'
 
@@ -42,7 +43,7 @@ describe('E30_ChildsToy session', () => {
       } else if (resp.pending.type === 'animalReorg') {
         resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {
@@ -94,7 +95,7 @@ describe('E30_ChildsToy session', () => {
       } else if (resp.pending.type === 'animalReorg') {
         resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {
@@ -145,7 +146,7 @@ describe('E30_ChildsToy session', () => {
       } else if (resp.pending.type === 'animalReorg') {
         resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {

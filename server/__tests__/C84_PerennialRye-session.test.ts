@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C84_PerennialRye'
+import type { AnytimeAction } from '../../shared/game/types';
 
 describe('C84_PerennialRye session', () => {
   const setup = (round = 2) => {
@@ -43,7 +44,7 @@ describe('C84_PerennialRye session', () => {
     const session = setup(2)
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('C84-perennial-rye-anytime')
   })
 
@@ -51,7 +52,7 @@ describe('C84_PerennialRye session', () => {
     const session = setup(4)
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C84-perennial-rye-anytime')
   })
 
@@ -85,7 +86,7 @@ describe('C84_PerennialRye session', () => {
     state.players[0]!.resources.grain = 0
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C84-perennial-rye-anytime')
   })
 })

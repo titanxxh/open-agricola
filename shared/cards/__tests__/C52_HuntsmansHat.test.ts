@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../game/types'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 
 const CARD_ID = 'C52_HuntsmansHat'
 
@@ -88,15 +90,19 @@ describe('C52_HuntsmansHat', () => {
   beforeEach(async () => {
     vi.resetModules()
     cardApi = await import('../card-listeners')
-    cardApi.clearCardListeners()
+    // After vi.resetModules(), the freshly-imported `card-listeners` reads
+    // from a freshly-imported `active-registry`. Publish + register via the
+    // same fresh instance so reads line up.
+    const registryMod = await import('../registry')
+    const activeMod = await import('../active-registry')
+    activeMod.setActiveCardRegistry(new registryMod.CardRegistry())
     // Post PR-2 _impl migration: card files no longer self-register at import
-    // time. Pull the `_impl` export and push its listeners into the legacy
-    // map so the existing test reads via `getRegisteredCardListeners()` still
-    // see them.
+    // time. Pull the `_impl` export and push its listeners into the active
+    // registry so `getRegisteredCardListeners()` returns them.
     const mod = await import('../C/C52_HuntsmansHat')
-    const impl = (mod as { C52_HuntsmansHat_impl?: { listeners?: Array<Parameters<typeof cardApi.registerCardListener>[0]> } }).C52_HuntsmansHat_impl
+    const impl = mod.C52_HuntsmansHat_impl
     for (const listener of impl?.listeners ?? []) {
-      cardApi.registerCardListener(listener)
+      activeMod.requireActiveCardRegistry('C52_HuntsmansHat').registerListener(listener)
     }
   })
 
@@ -113,7 +119,7 @@ describe('C52_HuntsmansHat', () => {
       phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
-    const result = listener?.handler(context as any)
+    const result = listener?.handler(context as unknown as ActionHookContext)
     expect(result?.flow).toBeDefined()
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -136,7 +142,7 @@ describe('C52_HuntsmansHat', () => {
       phase: 'before',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
-    const result = listener?.handler(context as any)
+    const result = listener?.handler(context as unknown as ActionHookContext)
     expect(result).toBeUndefined()
   })
 })

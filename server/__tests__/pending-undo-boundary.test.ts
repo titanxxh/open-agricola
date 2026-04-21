@@ -26,36 +26,36 @@ describe('state.pendingUndoBoundary consumed by pushHistory', () => {
 
   it('flag is cleared and history entry gets undoBoundary:true', () => {
     // Inject the one-shot flag before calling an action.
-    ;(session as any).state.pendingUndoBoundary = true
+    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
 
     // Take an action — this calls pushHistory internally.
     const result = session.takeAction(0, 'forest')
     expect(result.ok).toBe(true)
 
     // The flag must be cleared from live state.
-    expect((session as any).state.pendingUndoBoundary).toBeFalsy()
+    expect((session as unknown as { state: GameState }).state.pendingUndoBoundary).toBeFalsy()
 
     // The most recent history entry must carry undoBoundary: true.
-    const history: { undoBoundary?: boolean }[] = (session as any).history
+    const history = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
     expect(history.length).toBeGreaterThan(0)
     const lastEntry = history[history.length - 1]
     expect(lastEntry?.undoBoundary).toBe(true)
   })
 
   it('persisted history entry does NOT carry a lingering pendingUndoBoundary', () => {
-    ;(session as any).state.pendingUndoBoundary = true
+    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
 
     session.takeAction(0, 'forest')
 
     // The snapshot inside the history entry should not have pendingUndoBoundary=true
     // (it must have been cleared BEFORE cloneState was called).
-    const history: { state: { pendingUndoBoundary?: boolean } }[] = (session as any).history
+    const history: { state: { pendingUndoBoundary?: boolean } }[] = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
     const lastEntry = history[history.length - 1]
     expect(lastEntry?.state?.pendingUndoBoundary).toBeFalsy()
   })
 
   it('undoStep is blocked when the last history entry is an undo boundary', () => {
-    ;(session as any).state.pendingUndoBoundary = true
+    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
 
     session.takeAction(0, 'forest')
 
@@ -74,12 +74,12 @@ describe('state.pendingUndoBoundary consumed by pushHistory', () => {
   })
 
   it('flag is one-shot: only the first pushHistory call gets undoBoundary:true', () => {
-    ;(session as any).state.pendingUndoBoundary = true
+    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
 
     // First action consumes the flag.
     session.takeAction(0, 'forest')
 
-    const history: { undoBoundary?: boolean }[] = (session as any).history
+    const history = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
     const entryCountAfterFirst = history.length
     expect(history[entryCountAfterFirst - 1]?.undoBoundary).toBe(true)
 
@@ -90,7 +90,7 @@ describe('state.pendingUndoBoundary consumed by pushHistory', () => {
 
     session.takeAction(1, 'clay-pit')
 
-    const historyAfterSecond: { undoBoundary?: boolean }[] = (session as any).history
+    const historyAfterSecond: { undoBoundary?: boolean }[] = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
     const lastEntry = historyAfterSecond[historyAfterSecond.length - 1]
     // This new entry was NOT preceded by pendingUndoBoundary, so it must be falsy.
     expect(lastEntry?.undoBoundary).toBeFalsy()

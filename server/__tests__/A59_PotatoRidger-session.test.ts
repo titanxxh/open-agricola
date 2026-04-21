@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/A/A59_PotatoRidger'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'A59_PotatoRidger'
 
@@ -56,7 +57,7 @@ describe('A59_PotatoRidger session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true) // 3 veg = optional
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true) // 3 veg = optional
   })
 
   it('with 4 veg after harvest → mandatory exchange', () => {
@@ -74,7 +75,7 @@ describe('A59_PotatoRidger session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(false) // 4 veg = mandatory
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(false) // 4 veg = mandatory
   })
 
   it('with 2 veg after harvest → no trigger', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C64_CornSchnappsDistillery'
+import type { FutureMeeple } from '../../shared/game/types'
 
 describe('C64_CornSchnappsDistillery session', () => {
   const setup = () => {
@@ -30,7 +31,7 @@ describe('C64_CornSchnappsDistillery session', () => {
     const p = resp2.state.players[0]!
     expect(p.resources.grain).toBe(2)
     expect(isCardFlagged(p, 'C64_CornSchnappsDistillery')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: any) => m.cardId === 'C64_CornSchnappsDistillery')
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C64_CornSchnappsDistillery')
     expect(fm).toHaveLength(4)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)
@@ -44,7 +45,7 @@ describe('C64_CornSchnappsDistillery session', () => {
     state.players[0]!.resources.grain = 0
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C64-corn-schnapps-distillery-anytime')
   })
 })

@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
 import '../../shared/cards/E/E86_PenBuilder'
+import type { AnytimeAction } from '../../shared/game/types';
+import type { AnimalZone } from '../../shared/actions/effects/animals'
 
 describe('E86_PenBuilder session', () => {
   const setup = () => {
@@ -36,7 +38,7 @@ describe('E86_PenBuilder session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('E86-pen-builder-anytime')
   })
 
@@ -49,7 +51,7 @@ describe('E86_PenBuilder session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('E86-pen-builder-anytime')
   })
 
@@ -86,7 +88,7 @@ describe('E86_PenBuilder session', () => {
     expect(resp1.state.players[0]!.cardStates?.['E86_PenBuilder']?.counters?.discards).toBe(1)
 
     // Second use - should still be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('E86-pen-builder-anytime')
 
     const resp2 = session.takeAnytimeAction(0, 'E86-pen-builder-anytime')
@@ -110,7 +112,7 @@ describe('E86_PenBuilder session', () => {
 
     // Before any discards - no card zone
     let zones = computeAnimalZones(player)
-    const cardZoneBefore = zones.find((z: any) => z.id === 'card:E86_PenBuilder')
+    const cardZoneBefore = zones.find((z: InteractionAnimalReorgZone) => z.id === 'card:E86_PenBuilder')
     expect(cardZoneBefore).toBeUndefined()
 
     // Enter interaction and discard wood twice
@@ -122,7 +124,7 @@ describe('E86_PenBuilder session', () => {
 
     const updatedPlayer = resp2.state.players[0]!
     zones = computeAnimalZones(updatedPlayer)
-    const cardZone = zones.find((z: any) => z.id === 'card:E86_PenBuilder')
+    const cardZone = zones.find((z: AnimalZone) => z.id === 'card:E86_PenBuilder')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(4) // 2 discards * 2 = 4

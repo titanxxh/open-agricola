@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C93_InnerDistrictsDirector'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C93_InnerDistrictsDirector'
 
@@ -72,14 +70,14 @@ describe('C93_InnerDistrictsDirector', () => {
     const result = executeCardListener(listener!, {
       state, player, space: forestSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Stone should be placed on clay-pit
     expect(clayPitSpace.resources.stone).toBe(1)
     // Should offer place-farmer
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('place-farmer')
   })
 
@@ -97,7 +95,7 @@ describe('C93_InnerDistrictsDirector', () => {
     executeCardListener(listener!, {
       state, player, space: clayPitSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(forestSpace.resources.stone).toBe(1)
   })
@@ -113,7 +111,7 @@ describe('C93_InnerDistrictsDirector', () => {
     const result = executeCardListener(listener!, {
       state, player, space: state.actionSpaces.find(s => s.id === 'forest')!,
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Stone still placed but no farmer flow returned
     expect(result).toBeUndefined()
@@ -130,7 +128,7 @@ describe('C93_InnerDistrictsDirector', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('farmland'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

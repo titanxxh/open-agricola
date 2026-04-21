@@ -4,6 +4,10 @@ import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B72_LoveforAgriculture'
+import type { AnimalZone } from '../../shared/actions/effects/animals'
+import type { PendingAction } from '../../shared/game/types'
+
+type PastureCrop = { pastureId: string; crop: 'grain' | 'vegetable'; remaining: number }
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -78,7 +82,7 @@ describe('B72_LoveforAgriculture session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as any).promptKey).toBe('ui.interactionSowSelect')
+      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
       expect(resp.interaction.stateId).toBe('farmSelect')
 
       // The interaction should include the pasture tile as sowable
@@ -102,7 +106,7 @@ describe('B72_LoveforAgriculture session', () => {
       // Pasture crops should be stored in cardStates
       const cardState = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']
       expect(cardState?.extraData?.pastureCrops).toBeDefined()
-      const crops = cardState?.extraData?.pastureCrops as any[]
+      const crops = cardState?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].pastureId).toBe('p1')
       expect(crops[0].crop).toBe('grain')
@@ -135,7 +139,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.vegetable).toBe(0)
 
-      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
+      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].crop).toBe('vegetable')
       expect(crops[0].remaining).toBe(2)
@@ -200,7 +204,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
 
       // Pasture should have grain in cardStates
-      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
+      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].crop).toBe('grain')
     })
@@ -227,7 +231,7 @@ describe('B72_LoveforAgriculture session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as any).promptKey).toBe('ui.interactionSowSelect')
+      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Should only show the pasture tile as sowable
       if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {
@@ -263,7 +267,7 @@ describe('B72_LoveforAgriculture session', () => {
       // The pasture should no longer appear as sowable
       const state = session.getState().state
       const player = state.players[0]!
-      const crops = player.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
+      const crops = player.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
     })
   })
@@ -311,7 +315,7 @@ describe('B72_LoveforAgriculture session', () => {
       // After harvest, grain should have been reaped from pasture
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1)
-      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
+      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].remaining).toBe(2)
     })
@@ -355,7 +359,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1)
-      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as any[]
+      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(0) // exhausted, removed
     })
   })
@@ -392,7 +396,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: InteractionAnimalReorgZone) => z.id === 'p1')
       // Size-1 pasture normally has capacity 2, should be reduced by 1 (pastureSize)
       expect(pastureZone?.capacity).toBe(1)
     })
@@ -428,7 +432,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       // Size-2 pasture normally has capacity 4, reduced by 2
       expect(pastureZone?.capacity).toBe(2)
     })
@@ -452,7 +456,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       expect(pastureZone?.capacity).toBe(4) // unchanged
     })
   })

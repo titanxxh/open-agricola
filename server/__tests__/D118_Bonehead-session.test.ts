@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/D/D118_Bonehead'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('D118_Bonehead session', () => {
   /**
@@ -56,7 +57,7 @@ describe('D118_Bonehead session', () => {
     if (resp.pending.type !== 'choice') throw new Error('expected occupation choice')
 
     // Select A102_Grocer
-    const grocerOption = resp.pending.options?.find((o: any) => o.value === 'A102_Grocer')
+    const grocerOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
     expect(grocerOption).toBeDefined()
     resp = session.resolveChoice(0, 'A102_Grocer')
     expect(resp.ok).toBe(true)
@@ -79,7 +80,7 @@ describe('D118_Bonehead session', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
 
-    const grocerOption = resp.pending.options?.find((o: any) => o.value === 'A102_Grocer')
+    const grocerOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
     expect(grocerOption).toBeDefined()
     resp = session.resolveChoice(0, 'A102_Grocer')
     expect(resp.ok).toBe(true)

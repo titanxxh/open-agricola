@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B110_Pavior'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B110_Pavior'
 
@@ -25,7 +26,7 @@ describe('B110_Pavior session', () => {
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
   it('onRoundStart does not trigger when player has no stone', () => {
@@ -63,8 +64,8 @@ describe('B110_Pavior session', () => {
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.vegetable).toBe(1)
-    expect((flow as any).params?.food).toBeUndefined()
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBeUndefined()
   })
 
   it('onRoundStart gives food (not vegetable) in rounds other than 14', () => {
@@ -82,8 +83,8 @@ describe('B110_Pavior session', () => {
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
-    expect((flow as any).params?.food).toBe(1)
-    expect((flow as any).params?.vegetable).toBeUndefined()
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBeUndefined()
   })
 
 })

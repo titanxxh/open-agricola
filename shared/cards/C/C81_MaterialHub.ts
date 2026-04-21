@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
-import type { Resource, PlayerState } from '../../game/types'
+import type { PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C81_MaterialHub'
@@ -29,7 +29,7 @@ const collectListener: CardListenerRegistration = {
     const owner = findOwner(context.state)
     if (!owner) return
 
-    const gained = (context.result as any)?.resourcesGained as Partial<Resource> | undefined
+    const gained = context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     if (!gained) return
 
     const takeChildren: import('../../game/types').ActionFlow[] = []

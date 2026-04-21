@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../D/D50_ForeignAid'
 import { getBlockedSpaceIds } from '../D/D50_ForeignAid'
+import type { ActionFlow } from '../../game/types'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D50_ForeignAid'
 
@@ -78,8 +77,8 @@ describe('D50_ForeignAid', () => {
       const state = createState(player)
       const flow = effect!.onBuy!(state, player)
       expect(flow).toBeDefined()
-      expect((flow as any)?.actionId).toBe('gain')
-      expect((flow as any)?.params?.food).toBe(6)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>)?.actionId).toBe('gain')
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>)?.params?.food).toBe(6)
     })
   })
 
@@ -123,7 +122,7 @@ describe('D50_ForeignAid', () => {
         state, player,
         actionId: 'place-farmer', phase: 'computeArgs',
         result,
-      } as any)
+      } as unknown as CardListenerContext)
       // Only non-blocked spaces remain
       expect(result.options).toHaveLength(2)
       expect(result.options.map(o => o.value)).toEqual(['forest', 'farmland'])
@@ -140,7 +139,7 @@ describe('D50_ForeignAid', () => {
         state, player,
         actionId: 'place-farmer', phase: 'computeArgs',
         result,
-      } as any)
+      } as unknown as CardListenerContext)
     })
 
     it('does not filter early-round spaces', () => {
@@ -158,7 +157,7 @@ describe('D50_ForeignAid', () => {
         state, player,
         actionId: 'place-farmer', phase: 'computeArgs',
         result,
-      } as any)
+      } as unknown as CardListenerContext)
       // Both options remain (neither is in rounds 12-14)
       expect(result.options).toHaveLength(2)
     })

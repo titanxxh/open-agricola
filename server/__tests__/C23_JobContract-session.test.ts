@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/game/types'
 
 import '../../shared/cards/C/C23_JobContract'
 
@@ -78,7 +75,7 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: otherSpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
     expect(lessonsSpace.takenBy).toEqual([])
@@ -95,7 +92,7 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
     expect(lessonsSpace.takenBy[0]?.playerId).toBe('p2')
@@ -111,7 +108,7 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
     expect(lessonsSpace.takenBy).toEqual([])
@@ -128,11 +125,11 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('play-occupation')
@@ -153,8 +150,8 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
-    const flow = result!.flow as any
+    } as unknown as CardListenerContext)
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.costOverride).toEqual({})
   })
 
@@ -170,8 +167,8 @@ describe('C23_JobContract listener', () => {
 
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as any)
-    const flow = result!.flow as any
+    } as unknown as CardListenerContext)
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.costOverride).toEqual({ food: 1 })
   })
 })

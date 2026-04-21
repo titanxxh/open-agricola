@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C140_PackagingArtist'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C140_PackagingArtist'
 
@@ -23,9 +21,9 @@ describe('C140_PackagingArtist session', () => {
     expect(effect).toBeDefined()
     const flow = effect!.onBuy!(state, state.players[0]!)
     expect(flow).toBeDefined()
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ grain: 1 })
-    expect((flow as any).sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ grain: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
   it('before minor-improvement offers optional bake-bread', () => {
@@ -43,9 +41,9 @@ describe('C140_PackagingArtist session', () => {
       player,
       actionId: 'minor-improvement',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('bake-bread')
     expect(leaf.optional).toBe(true)
     expect(leaf.sourceCard).toBe(CARD_ID)

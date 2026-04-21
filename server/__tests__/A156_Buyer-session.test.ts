@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A156_Buyer'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('A156_Buyer session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -53,7 +54,7 @@ describe('A156_Buyer session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type === 'choice') {
       // Find the non-skip option (accept)
-      const acceptOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+      const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
@@ -127,7 +128,7 @@ describe('A156_Buyer session', () => {
     // Accept the optional exchange
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type === 'choice') {
-      const acceptOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+      const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }

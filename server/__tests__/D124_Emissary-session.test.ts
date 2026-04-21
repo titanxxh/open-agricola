@@ -55,7 +55,7 @@ describe('D124_Emissary session', () => {
     const resp1 = session.takeAnytimeAction(0, 'D124-emissary-wood')
     expect(resp1.ok).toBe(true)
 
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D124-emissary-wood')
     expect(anytimeIds).toContain('D124-emissary-clay')
   })
@@ -85,7 +85,7 @@ describe('D124_Emissary session', () => {
     const resp = enterActiveInteraction(session)
 
     // Player has 0 reed, 0 grain, 0 vegetable, 0 sheep, 0 boar, 0 cattle
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('D124-emissary-wood')
     expect(anytimeIds).toContain('D124-emissary-clay')
     expect(anytimeIds).toContain('D124-emissary-food')

@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
+import type { ActionFlow, ActionSpace } from '../../shared/game/types'
 import '../../shared/cards/C/C154_TwinResearcher'
+
 
 const CARD_ID = 'C154_TwinResearcher'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-const setResource = (space: any, key: string, value: number) => {
+const setResource = (space: ActionSpace, key: string, value: number) => {
   space.resources[key] = value
 }
 
@@ -40,13 +39,13 @@ describe('C154_TwinResearcher session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     // Expect a pay-gain flow (sequence with pay-resources then bonus-vp)
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    const childActionIds = flow.children.map((c: any) => c.actionId)
+    const childActionIds = flow.children.map((c: ActionFlow) => c.actionId)
     expect(childActionIds).toContain('pay-resources')
     expect(childActionIds).toContain('bonus-vp')
   })
@@ -72,7 +71,7 @@ describe('C154_TwinResearcher session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -98,7 +97,7 @@ describe('C154_TwinResearcher session', () => {
       space: clayPit,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
   })
 
@@ -119,7 +118,7 @@ describe('C154_TwinResearcher session', () => {
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -144,7 +143,7 @@ describe('C154_TwinResearcher session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

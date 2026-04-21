@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C160_Outrider'
+import type { ActionFlow } from '../../shared/game/types'
+
 
 const CARD_ID = 'C160_Outrider'
 
@@ -36,9 +35,9 @@ describe('C160_Outrider session', () => {
       space: cultivation,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ grain: 1 })
     expect(leaf.sourceCard).toBe(CARD_ID)
@@ -62,7 +61,7 @@ describe('C160_Outrider session', () => {
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -84,7 +83,7 @@ describe('C160_Outrider session', () => {
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

@@ -76,7 +76,7 @@ describe('E22_GuestRoom session', () => {
     const resp = enterActiveInteraction(session)
 
     // Anytime should not be listed
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('E22-guest-room-anytime')
   })
 

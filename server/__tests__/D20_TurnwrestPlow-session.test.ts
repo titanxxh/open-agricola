@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/D/D20_TurnwrestPlow'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('D20_TurnwrestPlow session', () => {
   const setup = (round = 1) => {
@@ -41,7 +42,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     // First optional plow
     expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
@@ -53,7 +54,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     // Second optional plow
     expect(resp.pending.type).toBe('choice')
-    const accept2 = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const accept2 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept2).toBeDefined()
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
@@ -87,13 +88,13 @@ describe('D20_TurnwrestPlow session', () => {
 
     // After cultivation plow, may get sow choice or card plow choice
     // Walk through sow if offered (decline it)
-    if (resp.pending.type === 'choice' && resp.pending.options?.some((o: any) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
+    if (resp.pending.type === 'choice' && resp.pending.options?.some((o: ActionChoiceOption) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
       resp = session.resolveChoice(0, '__skip__')
     }
 
     // Card should offer optional plow
     expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)

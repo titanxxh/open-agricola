@@ -103,8 +103,8 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect((resp.pending as any).sourceCard).toBeUndefined()
-    expect((resp.interaction as any).sourceCard).toBeUndefined()
+    expect(resp.pending.sourceCard).toBeUndefined()
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
     const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
@@ -124,8 +124,8 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect((resp.pending as any).sourceCard).toBeUndefined()
-    expect((resp.interaction as any).sourceCard).toBeUndefined()
+    expect(resp.pending.sourceCard).toBeUndefined()
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
     expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
     const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()

@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D65_GrainSieve'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D65_GrainSieve'
 
@@ -51,7 +52,7 @@ describe('D65_GrainSieve session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    const children = (flow as any).children
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(1)
     expect(children[0].actionId).toBe('gain')
     expect(children[0].params).toEqual({ grain: 1 })

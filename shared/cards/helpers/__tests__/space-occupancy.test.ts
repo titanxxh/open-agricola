@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState } from '../../../game/types'
+import type { GameState, WorkerRef } from '../../../game/types'
 import { countPeopleOnSpace } from '../space-occupancy'
+import { mkActionSpace } from '../../__tests__/fixtures'
 
-const mkState = (takenBy: any[]): GameState => ({
-  actionSpaces: [{ id: 'farmland', takenBy } as any],
+const mkState = (takenBy: WorkerRef[]): GameState => ({
+  actionSpaces: [mkActionSpace({ id: 'farmland', takenBy })],
   players: [],
   round: 1, roundPhase: 'work', currentPlayerIndex: 0,
   log: [], roundStartSnapshot: null, roundActionOrder: [],

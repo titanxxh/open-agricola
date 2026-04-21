@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../E/E105_Pioneer'
 import { getMostRecentlyRevealedSpaceId } from '../E/E105_Pioneer'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E105_Pioneer'
 
@@ -70,7 +68,7 @@ describe('E105_Pioneer', () => {
       expect(effect).toBeDefined()
       const player = createPlayer()
       const state = createState(player)
-      const flow = effect!.onBuy!(state, player) as any
+      const flow = effect!.onBuy!(state, player) as Extract<ActionFlow, { type: 'seq' }>
       expect(flow).toBeDefined()
       expect(flow.type).toBe('xor')
       expect(flow.children).toHaveLength(4)
@@ -119,9 +117,9 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('wish-children'),
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
-      const flow = result!.flow as any
+      const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
       expect(flow.type).toBe('xor')
       expect(flow.children).toHaveLength(4)
       expect(flow.children[0].params).toEqual({ wood: 1, food: 1 })
@@ -135,7 +133,7 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('sheep-market'),
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
 
@@ -148,7 +146,7 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'), // forest is base, not round-action
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
   })

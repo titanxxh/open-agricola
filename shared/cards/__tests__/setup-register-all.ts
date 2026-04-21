@@ -1,36 +1,38 @@
 /**
- * Vitest setup file — ensures the PR-2 transitional bootstrap in
- * `shared/cards/register-all.ts` runs once per worker before any test module
- * executes.
+ * Vitest setup file — runs once per worker before any test module executes.
  *
- * Without this, tests that import a single card file for its side effects and
- * then read the legacy `getCardEffect` / `getRegisteredCardListeners` global
- * accessors (without constructing a `GameSession` first) would observe empty
- * registries — because after the `_impl`-export migration card files no longer
- * self-register at module load. The bootstrap at the bottom of `register-all.ts`
- * backfills the legacy maps from `ALL_CARD_IMPLS`.
+ * Two responsibilities:
  *
- * Why `GameSession` first: there is a pre-existing module cycle between
- * `shared/cards/catalog.ts` and `shared/cards/D/D95_SiteManager.ts` (via
- * `shared/game/minor-improvements.ts`). The cycle resolves correctly only when
- * `minor-improvements.ts` is pulled in before `catalog.ts` reaches its first
- * card import. Constructing the GameSession import path here forces the same
- * load order that `server/game/authoritative-session.ts` would establish at first-use, so
- * `catalog.ts`'s top-level array is fully populated by the time
- * `register-all.ts`'s `import './catalog'` runs.
+ * 1. **Module load order**: there is a pre-existing TDZ cycle between
+ *    `shared/cards/catalog.ts` and `shared/cards/D/D95_SiteManager.ts` (via
+ *    `shared/game/minor-improvements.ts`). The cycle resolves correctly only
+ *    when `minor-improvements.ts` is loaded before `catalog.ts` reaches its
+ *    first card import. Importing `GameSession` here forces the same load
+ *    order the server uses at runtime.
+ *
+ * 2. **Default active `CardRegistry`**: tests that don't construct a
+ *    `GameSession` still need every card's listeners / effects reachable via
+ *    `getRegisteredCardListeners()` / `getCardEffect()`. We build one
+ *    registry, load every card's impl, and publish it as the active
+ *    registry. Tests that want an isolated slate publish a fresh registry
+ *    via `setActiveCardRegistry(new CardRegistry())`; tests that construct
+ *    a `GameSession` get their own fresh registry (GameCore publishes one
+ *    in its constructor).
  *
  * Consumed via `vitest.config.ts` -> `test.setupFiles`.
- *
- * Removed in PR-3 once the legacy maps are deleted and every test that relied
- * on their auto-populated state has been updated to read through an explicit
- * `CardRegistry` (per-session).
  */
-// Pull in GameSession first — this walks the real game-core import graph,
-// which loads `minor-improvements.ts` before `catalog.ts` and avoids the
-// D95_SiteManager <-> catalog TDZ bomb.
+// Pull in GameSession first — walks the real game-core import graph so
+// minor-improvements.ts loads before catalog.ts.
 import '../../../server/game/authoritative-session'
-// Now load register-all for its bootstrap side effect.
-import '../register-all'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry } from '../active-registry'
+import { ALL_CARD_IMPLS } from '../register-all'
+
+const defaultRegistry = new CardRegistry()
+for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+  defaultRegistry.loadImpl(cardId, impl)
+}
+setActiveCardRegistry(defaultRegistry)
 
 // PR-4: preload cards-manifest.json so client components that call
 // `getCardMeta()` (PlayerCard, cardText, ActionBoard) have synchronous data

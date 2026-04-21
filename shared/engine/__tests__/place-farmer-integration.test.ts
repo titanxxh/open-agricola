@@ -3,11 +3,15 @@ import type { ActionDefinition, ActionSpace, GameState, PlayerState } from '../.
 import { actionDefinitions } from '../../actions'
 import { createActionSpaces } from '../../actions'
 import { HookDispatcher } from '../dispatcher'
-import { clearCardListeners, registerCardListener, executeCardListener } from '../../cards/card-listeners'
+import { executeCardListener } from '../../cards/card-listeners'
+import type { CardListenerContext } from '../../cards/card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
 import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../game/player'
+import { CardRegistry } from '../../../shared/cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
+import type { CardListenerContext } from '../../cards/card-listeners'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -94,7 +98,7 @@ describe('PlaceFarmer card integration', () => {
   let player: PlayerState
 
   beforeEach(() => {
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
     dispatcher = new HookDispatcher()
     state = createState()
     player = createPlayer()
@@ -106,7 +110,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-A126-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, space } = context
           const round = state.round
           if (round >= 1 && round <= 4 && space.roundAvailable) {
@@ -115,7 +119,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -125,7 +129,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'during', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'during', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result?.costs).toBeDefined()
       expect(result?.costs?.clay).toBe(-1)
     })
@@ -134,7 +138,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-A126-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, space } = context
           const round = state.round
           if (round >= 1 && round <= 4 && space.roundAvailable) {
@@ -143,7 +147,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -153,7 +157,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'during', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'during', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
   })
@@ -163,7 +167,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, player, space } = context
           if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
@@ -171,7 +175,7 @@ describe('PlaceFarmer card integration', () => {
           return { followUpActions: ['bake-bread'] }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -181,7 +185,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'immediatelyAfter', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'immediatelyAfter', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result?.followUpActions).toContain('bake-bread')
     })
 
@@ -189,7 +193,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, player, space } = context
           if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
@@ -197,7 +201,7 @@ describe('PlaceFarmer card integration', () => {
           return { followUpActions: ['bake-bread'] }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -207,7 +211,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'immediatelyAfter', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'immediatelyAfter', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
   })
@@ -217,7 +221,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C52-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { actionId } = context
           if (actionId === 'sheep-market') {
             return {
@@ -231,7 +235,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const sheepMarket = actionDefinitions.find(a => a.id === 'sheep-market')!
       const space = createSpace(sheepMarket)
@@ -240,7 +244,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'sheep-market', phase: 'during', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'sheep-market', phase: 'during', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result?.flow).toBeDefined()
     })
   })
@@ -250,7 +254,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C75-after',
         phases: ['after' as ActionHookPhase],
-        handler: (_context: any) => {
+        handler: (_context: CardListenerContext) => {
           return {
             flow: {
               type: 'seq',
@@ -261,7 +265,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -270,7 +274,7 @@ describe('PlaceFarmer card integration', () => {
       const matched = phase.matchedListeners
       expect(matched.length).toBeGreaterThan(0)
 
-      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'after', result: { type: 'ok' } } as any)
+      const result = executeCardListener(matched[0].registration, { state, player, space, actionId: 'forest', phase: 'after', result: { type: 'ok' } } as unknown as CardListenerContext)
       expect(result?.flow).toBeDefined()
     })
   })

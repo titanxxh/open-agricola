@@ -12,11 +12,11 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { registerCardEffect } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -47,7 +47,7 @@ beforeEach(() => {
     occupations.push(testCard)
     occupationRegistered = true
   }
-  registerCardEffect({
+  requireActiveCardRegistry('choice-disabled-option').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),
   })
@@ -86,7 +86,7 @@ describe('disabled option in pending choice', () => {
     expect(firstOption).toBeDefined()
 
     // Mutate the session's pending state to mark the option disabled
-    ;(session as any).pending.options[0].disabled = true
+    ;(session as unknown as { pending: { options: { disabled?: boolean }[] } }).pending.options[0].disabled = true
 
     // Attempt to resolve with the disabled option → should be rejected
     resp = session.resolveChoice(0, firstOption.value)
@@ -109,7 +109,7 @@ describe('disabled option in pending choice', () => {
     expect(secondOption).toBeDefined()
 
     // Mutate the session's pending state to disable the first option
-    ;(session as any).pending.options[0].disabled = true
+    ;(session as unknown as { pending: { options: { disabled?: boolean }[] } }).pending.options[0].disabled = true
 
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)

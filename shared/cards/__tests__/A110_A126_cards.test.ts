@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 
 import '../A/A110_Roughcaster'
 import '../A/A126_MasterWorkman'
+import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -66,7 +64,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 3 })
@@ -82,7 +80,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -94,7 +92,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -107,7 +105,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 3 })
@@ -122,7 +120,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -145,7 +143,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('sheep-market'),
       actionId: 'sheep-market', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ wood: 1 })
@@ -161,7 +159,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('grain-utilization'),
       actionId: 'grain-utilization', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ clay: 1 })
@@ -176,7 +174,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('fencing'),
       actionId: 'fencing', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ reed: 1 })
@@ -191,7 +189,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('major-improvement'),
       actionId: 'major-improvement', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ stone: 1 })
@@ -206,7 +204,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('wish-children'),
       actionId: 'wish-children', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -218,7 +216,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('day-laborer'),
       actionId: 'day-laborer', phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -232,12 +230,12 @@ describe('A126_MasterWorkman', () => {
     const state = createRoundState(player, 'construct', 0)
     // canBeExecutedByPlayer returns true only if player has wood >= 1
     const space = createSpace('construct', {
-      canBeExecutedByPlayer: (_s: any, p: PlayerState) => (p.resources.wood ?? 0) >= 1,
+      canBeExecutedByPlayer: (_s: GameState, p: PlayerState) => (p.resources.wood ?? 0) >= 1,
     } as any)
     const result = executeCardListener(listener, {
       state, player, space,
       actionId: 'construct', phase: 'isDoable', doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.doable).toBe(true)
   })
 
@@ -249,7 +247,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('construct'),
       actionId: 'construct', phase: 'isDoable', doable: true,
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -265,7 +263,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space,
       actionId: 'construct', phase: 'isDoable', doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -280,7 +278,7 @@ describe('A126_MasterWorkman', () => {
     const result = executeCardListener(listener, {
       state, player, space,
       actionId: 'wish-children', phase: 'isDoable', doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 })

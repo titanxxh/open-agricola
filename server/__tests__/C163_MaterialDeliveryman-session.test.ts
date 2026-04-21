@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/C/C163_MaterialDeliveryman'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C163_MaterialDeliveryman'
 
@@ -83,12 +84,12 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 5 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('gives 1 clay when any player collects exactly 6 goods', () => {
@@ -106,10 +107,10 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 6 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ clay: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
   })
 
   it('gives 1 reed when any player collects exactly 7 goods', () => {
@@ -127,10 +128,10 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 7 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ reed: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
   })
 
   it('gives 1 stone when any player collects 8+ goods', () => {
@@ -148,10 +149,10 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 8 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ stone: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('gives 1 stone when any player collects 10 goods (mixed resources)', () => {
@@ -169,10 +170,10 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 3, clay: 3, reed: 2, stone: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ stone: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('does not trigger when total goods < 5', () => {
@@ -190,7 +191,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 4 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -210,7 +211,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

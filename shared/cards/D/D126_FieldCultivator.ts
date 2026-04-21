@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D126_FieldCultivator'
@@ -11,10 +11,10 @@ const CARD_ID = 'D126_FieldCultivator'
  */
 const STACK_ITEMS = ['wood', 'clay', 'reed', 'stone', 'reed', 'clay', 'wood']
 
-const updateInfobox = (player: { cardStates?: Record<string, any> }) => {
-  const stack = getCardStack(player as any, CARD_ID)
+const updateInfobox = (player: PlayerState) => {
+  const stack = getCardStack(player, CARD_ID)
   if (stack.length > 0) {
-    writeCardInfobox(player as any, CARD_ID, `${stack.length} goods`)
+    writeCardInfobox(player, CARD_ID, `${stack.length} goods`)
   }
 }
 

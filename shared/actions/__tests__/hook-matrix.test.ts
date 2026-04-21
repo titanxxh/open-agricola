@@ -7,16 +7,14 @@ import {
   registerActionHook,
   type ActionHookRegistration,
 } from '../hooks'
-import {
-  clearCardListeners,
-  registerCardListener,
-  type CardListenerRegistration,
-} from '../../cards/card-listeners'
+import { type CardListenerRegistration } from '../../cards/card-listeners'
+import { CardRegistry } from '../../../shared/cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
 
 describe('hook matrix', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('collects phases from action hooks only', () => {
@@ -32,7 +30,7 @@ describe('hook matrix', () => {
   })
 
   it('collects phases from card listeners', () => {
-    registerCardListener({
+    requireActiveCardRegistry('hook-matrix').registerListener({
       id: 'listener-compute-args',
       actions: ['day-laborer'],
       phases: ['computeArgs'],
@@ -64,13 +62,13 @@ describe('hook matrix', () => {
       handler: () => undefined,
     }
     registerActionHook(hook)
-    registerCardListener(listener)
+    requireActiveCardRegistry('hook-matrix').registerListener(listener)
     const withHooks = buildHookMatrix(actionDefinitions)
     const beforeClear = withHooks.find((entry) => entry.actionId === 'day-laborer')
     expect(beforeClear?.phases).toEqual(['before', 'after'])
 
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
     const withoutHooks = buildHookMatrix(actionDefinitions)
     const afterClear = withoutHooks.find((entry) => entry.actionId === 'day-laborer')
     expect(afterClear?.phases).toEqual([])
@@ -89,7 +87,7 @@ describe('hook matrix', () => {
       phases: ['before'],
       handler: () => undefined,
     })
-    registerCardListener({
+    requireActiveCardRegistry('hook-matrix').registerListener({
       id: 'order-listener',
       actions: ['day-laborer'],
       phases: ['computeArgs'],

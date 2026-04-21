@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/A/A142_Cordmaker'
 
@@ -82,21 +82,21 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
     // When owner triggers, it's mandatory (optional: false)
-    expect((result!.flow as any).optional).toBe(false)
-    const children = (result!.flow as any).children
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(false)
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
     expect(children[0].actionId).toBe('gain')
     expect(children[0].params).toEqual({ grain: 1 })
     // Second branch: pay 2 food, then gain 1 vegetable (BGA: buy 1 vegetable for 2 food)
     expect(children[1].type).toBe('seq')
     const payGainChildren = children[1].children
-    const payLeaf = payGainChildren.find((c: any) => c.actionId === 'pay-resources')
-    const gainLeaf = payGainChildren.find((c: any) => c.actionId === 'gain')
+    const payLeaf = payGainChildren.find((c: ActionFlow) => c.actionId === 'pay-resources')
+    const gainLeaf = payGainChildren.find((c: ActionFlow) => c.actionId === 'gain')
     expect(payLeaf.params).toEqual({ food: 2 })
     expect(gainLeaf.params).toEqual({ vegetable: 1 })
   })
@@ -117,13 +117,13 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 3 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
     // When opponent triggers, it's optional for the card owner
-    expect((result!.flow as any).optional).toBe(true)
-    const children = (result!.flow as any).children
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
   })
 
@@ -141,7 +141,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 1 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -160,7 +160,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -179,7 +179,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

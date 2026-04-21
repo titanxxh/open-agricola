@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C28_TeachersDesk'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C28_TeachersDesk'
 
@@ -31,9 +29,9 @@ describe('C28_TeachersDesk session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('play-occupation')
     expect(leaf.optional).toBe(true)
     expect(leaf.params).toEqual({ costOverride: { food: 1 } })
@@ -59,9 +57,9 @@ describe('C28_TeachersDesk session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    expect((result!.flow as any).actionId).toBe('play-occupation')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('play-occupation')
   })
 
   it('does not trigger when occupation hand is empty', () => {
@@ -81,7 +79,7 @@ describe('C28_TeachersDesk session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -102,7 +100,7 @@ describe('C28_TeachersDesk session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

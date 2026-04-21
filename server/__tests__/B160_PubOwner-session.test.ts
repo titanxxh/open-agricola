@@ -4,6 +4,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B160_PubOwner'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B160_PubOwner'
 
@@ -21,7 +23,7 @@ describe('B160_PubOwner session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.grain).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.grain).toBe(1)
   })
 
   it('onBeforeReturnHome gives 1 grain when forest, clay-pit, reed-bank all occupied', () => {
@@ -49,7 +51,7 @@ describe('B160_PubOwner session', () => {
     const flow = effect!.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.grain).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.grain).toBe(1)
   })
 
   it('onBeforeReturnHome does not trigger when forest is not occupied', () => {
@@ -124,7 +126,7 @@ describe('B160_PubOwner session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {

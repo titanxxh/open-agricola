@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C132_TimberShingleMaker'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C132_TimberShingleMaker'
 
@@ -67,11 +65,11 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     // Should have 3 options (1 wood for 1VP, 2 for 2VP, 3 for 3VP)
     expect(children).toHaveLength(3)
 
@@ -97,7 +95,7 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -114,10 +112,10 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     // Should only have 2 options (limited by wood)
     expect(children).toHaveLength(2)
   })

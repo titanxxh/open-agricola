@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../B/B81_Handcart'
 
@@ -65,7 +65,7 @@ describe('B81_Handcart', () => {
     const state = createState(player)
     const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
     expect(flow).not.toBeNull()
-    const xor = flow as any
+    const xor = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(xor.type).toBe('xor')
     expect(xor.optional).toBe(true)
     // Only wood qualifies (9 >= 6), clay doesn't (3 < 5)
@@ -83,7 +83,7 @@ describe('B81_Handcart', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
     expect(flow).not.toBeNull()
-    const xor = flow as any
+    const xor = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(xor.children).toHaveLength(2)
   })
 

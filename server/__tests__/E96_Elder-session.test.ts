@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E96_Elder'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E96_Elder'
 
@@ -19,13 +20,13 @@ describe('E96_Elder session', () => {
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
     if (flow!.type === 'seq') {
-      expect((flow as any).optional).toBe(true)
-      const children = (flow as any).children as any[]
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+      const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children as Extract<ActionFlow, { type: 'leaf' }>[]
       expect(children).toHaveLength(1)
       expect(children[0].actionId).toBe('play-occupation')
       expect(children[0].sourceCard).toBe(CARD_ID)
-      expect(children[0].params.costOverride).toEqual({})
-      expect(children[0].params.allowedCards).toEqual([CARD_ID])
+      expect(children[0].params?.costOverride).toEqual({})
+      expect(children[0].params?.allowedCards).toEqual([CARD_ID])
     }
   })
 

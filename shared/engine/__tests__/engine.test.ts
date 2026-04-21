@@ -6,13 +6,14 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -112,7 +113,7 @@ const buildEngine = (action: ActionDefinition, withChoice: boolean) => {
 describe('Engine tree flow', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('handles action with choice and resolves to done', () => {

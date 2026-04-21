@@ -21,7 +21,15 @@ describe('ActionFlow playerSwitch', () => {
   }
 
   const startFlowEngine = (session: GameSession, flow: ActionFlow, playerIndex: number) => {
-    const s = session as any
+    const s = session as unknown as {
+      activePlayerIndex: number | null
+      activeSpaceId: string | null
+      engine: unknown
+      engineSource: unknown
+      pending: { type: string }
+      createFlowEngine: (flow: ActionFlow) => unknown
+      runEngineSteps: () => void
+    }
     const state = session.getState().state
     // Set up a stage-like action space so runEngineSteps can proceed
     const spaceId = '__stage:test'

@@ -1,5 +1,5 @@
-import { registerCardListener, clearCardListeners } from '../card-listeners'
-import { registerCardEffect, clearCardEffects } from '../card-effects'
+import { CardRegistry } from '../registry'
+import { requireActiveCardRegistry, setActiveCardRegistry } from '../active-registry'
 
 import { listener as immediatelyAfterGainFlow } from './Stub_ImmediatelyAfter_GainFlow'
 import { listener as computeCostsBuildDiscount } from './Stub_ComputeCosts_BuildDiscount'
@@ -50,11 +50,11 @@ const allEffects = [
 ]
 
 export const registerStubCards = () => {
-  allListeners.forEach((l) => registerCardListener(l))
-  allEffects.forEach((e) => registerCardEffect(e))
+  const registry = requireActiveCardRegistry('registerStubCards')
+  allListeners.forEach((l) => registry.registerListener(l))
+  allEffects.forEach((e) => registry.setEffect(e))
 }
 
 export const clearStubCards = () => {
-  clearCardListeners()
-  clearCardEffects()
+  setActiveCardRegistry(new CardRegistry())
 }

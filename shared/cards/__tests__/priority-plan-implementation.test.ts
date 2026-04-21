@@ -20,6 +20,7 @@ import '../E/E101_Blighter'
 import { canRenovate, renovateHouseAction } from '../../actions/effects/renovation'
 import { playImprovement } from '../../actions/effects/improvement'
 import { setFencesForTest } from './__fixtures__/fence'
+import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -82,7 +83,7 @@ describe('priority plan implementations', () => {
       space,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -124,7 +125,7 @@ describe('priority plan implementations', () => {
       space: createSpace('construct'),
       actionId: 'construct',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -188,7 +189,7 @@ describe('priority plan implementations', () => {
       space: createSpace('sheep-market'),
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     const result = executeCardListener(afterListener!, {
       state: createState(player),
@@ -200,7 +201,7 @@ describe('priority plan implementations', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { sheep: 1 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type !== 'seq') return
@@ -220,7 +221,7 @@ describe('priority plan implementations', () => {
       actionId: 'play-occupation',
       phase: 'after',
       choice: 'B103_FieldMerchant',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -241,7 +242,7 @@ describe('priority plan implementations', () => {
       actionId: 'play-occupation',
       phase: 'isDoable',
       doable: true,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(false)
   })
@@ -260,7 +261,7 @@ describe('priority plan implementations', () => {
       actionId: 'play-occupation',
       phase: 'after',
       choice: 'E101_Blighter',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type === 'seq') {
@@ -282,7 +283,7 @@ describe('priority plan implementations', () => {
       actionId: 'fence',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(true)
   })
@@ -315,7 +316,7 @@ describe('priority plan implementations', () => {
       space: createSpace('fence'),
       actionId: 'fence',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -423,7 +424,7 @@ describe('priority plan implementations', () => {
       space: createSpace('grain-utilization'),
       actionId: 'bake-bread',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -448,7 +449,7 @@ describe('priority plan implementations', () => {
       actionId: 'play-occupation',
       phase: 'after',
       choice: 'C120_AgriculturalLabourer',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -470,7 +471,7 @@ describe('priority plan implementations', () => {
       actionId: 'gain',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { grain: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',

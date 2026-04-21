@@ -49,7 +49,7 @@ const onBuyListener: CardListenerRegistration = {
         actionContext: { trueAction: false },
         params: {
           allowedPurchases: BAKING_IMPROVEMENT_IDS,
-        } as any,
+        },
       },
       sourceCard: CARD_ID,
     }

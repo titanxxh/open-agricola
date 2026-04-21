@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B156_StorehouseKeeper'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 const CARD_ID = 'B156_StorehouseKeeper'
 
@@ -35,7 +36,7 @@ describe('B156_StorehouseKeeper session', () => {
     let safety = 10
     while (safety-- > 0 && resp.pending?.type === 'choice') {
       const opts = resp.pending.options ?? []
-      const clayOpt = opts.find((o: any) =>
+      const clayOpt = opts.find((o: ActionChoiceOption) =>
         JSON.stringify(o).toLowerCase().includes('clay'),
       )
       if (clayOpt) {

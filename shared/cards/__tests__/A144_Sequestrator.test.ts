@@ -5,6 +5,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { readCardResourceStats } from '../helpers/card-state'
 
 import '../A/A144_Sequestrator'
+import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -79,7 +80,7 @@ describe('A144_Sequestrator', () => {
       actionId: 'fence',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Resources go directly to the triggering player (no flow returned)
     expect(result?.flow).toBeUndefined()
@@ -109,7 +110,7 @@ describe('A144_Sequestrator', () => {
       actionId: 'plow',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Resources go directly to the triggering player (no flow returned)
     expect(result?.flow).toBeUndefined()

@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C26_Flail'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C26_Flail'
 
@@ -23,9 +21,9 @@ describe('C26_Flail session', () => {
     expect(effect).toBeDefined()
     const flow = effect!.onBuy!(state, state.players[0]!)
     expect(flow).toBeDefined()
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ food: 2 })
-    expect((flow as any).sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
   it('after-place-farmer on farmland offers optional bake-bread', () => {
@@ -45,9 +43,9 @@ describe('C26_Flail session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
     expect(leaf.actionId).toBe('bake-bread')
     expect(leaf.optional).toBe(true)
@@ -72,9 +70,9 @@ describe('C26_Flail session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    expect((result!.flow as any).actionId).toBe('bake-bread')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
   })
 
   it('does not trigger on non-trigger spaces', () => {
@@ -93,7 +91,7 @@ describe('C26_Flail session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

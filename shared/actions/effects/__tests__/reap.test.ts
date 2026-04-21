@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { reap } from '../reap'
+import type { GameState, PlayerState, Field } from '../../../game/types'
 import * as cardListeners from '../../../cards/card-listeners'
 
-const mkState = (): any => ({ players: [] })
+const mkState = (): Pick<GameState, 'players'> => ({ players: [] as PlayerState[] })
 
-const mkPlayer = (fields: any[]): any => ({
+const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({
   fields,
   resources: { grain: 0, vegetable: 0 },
 })

@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  clearCardListeners,
-  getRegisteredCardListeners,
-  registerCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners } from '../card-listeners'
+import type { CardListenerContext } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace, Resource } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../game/types'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 
 describe('Collect action card listeners', () => {
   beforeEach(() => {
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   const createMockContext = (
@@ -91,10 +91,10 @@ describe('Collect action card listeners', () => {
     }
   }
 
-  const boarSpearDuringListener: any = {
+  const boarSpearDuringListener: Record<string, unknown> = {
     id: 'E53-boar-spear-during',
     phases: ['during' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result } = context
       
       if (actionId !== 'collect') return
@@ -113,10 +113,10 @@ describe('Collect action card listeners', () => {
     },
   }
 
-  const mushroomCollectorImmediatelyAfterListener: any = {
+  const mushroomCollectorImmediatelyAfterListener: Record<string, unknown> = {
     id: 'A108-mushroom-collector-immediately-after',
     phases: ['immediatelyAfter' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result } = context
       
       if (actionId !== 'collect') return
@@ -135,10 +135,10 @@ describe('Collect action card listeners', () => {
     },
   }
 
-  const reclamationPlowAfterListener: any = {
+  const reclamationPlowAfterListener: Record<string, unknown> = {
     id: 'A17-reclamation-plow-after',
     phases: ['after' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result, player } = context
       
       if (actionId !== 'collect') return
@@ -170,7 +170,7 @@ describe('Collect action card listeners', () => {
 
   describe('E53_BoarSpear', () => {
     beforeEach(() => {
-      registerCardListener(boarSpearDuringListener)
+      requireActiveCardRegistry('collect-cards').registerListener(boarSpearDuringListener)
     })
 
     it('registers during listener', () => {
@@ -190,11 +190,11 @@ describe('Collect action card listeners', () => {
         result: { resourcesGained: { boar: 1 } },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
       expect(result?.flow?.type).toBe('xor')
-      expect((result?.flow as any)?.children?.[0]?.actionId).toBe('exchange')
+      expect((result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children?.[0]?.actionId).toBe('exchange')
     })
 
     it('does not trigger when no boar obtained', () => {
@@ -207,7 +207,7 @@ describe('Collect action card listeners', () => {
         result: { resourcesGained: { wood: 3 } },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
 
@@ -221,14 +221,14 @@ describe('Collect action card listeners', () => {
         result: { resourcesGained: { boar: 1 } },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
   })
 
   describe('A108_MushroomCollector', () => {
     beforeEach(() => {
-      registerCardListener(mushroomCollectorImmediatelyAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(mushroomCollectorImmediatelyAfterListener)
     })
 
     it('registers immediatelyAfter listener', () => {
@@ -248,11 +248,11 @@ describe('Collect action card listeners', () => {
         result: { resourcesGained: { wood: 1 } },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
       expect(result?.flow?.type).toBe('xor')
-      expect((result?.flow as any)?.children?.[0]?.actionId).toBe('exchange')
+      expect((result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children?.[0]?.actionId).toBe('exchange')
     })
 
     it('does not trigger when no wood obtained', () => {
@@ -265,14 +265,14 @@ describe('Collect action card listeners', () => {
         result: { resourcesGained: { sheep: 1 } },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
   })
 
   describe('A17_ReclamationPlow', () => {
     beforeEach(() => {
-      registerCardListener(reclamationPlowAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(reclamationPlowAfterListener)
     })
 
     it('registers after listener', () => {
@@ -298,11 +298,11 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
       expect(result?.flow?.type).toBe('xor')
-      expect((result?.flow as any)?.children?.[0]?.actionId).toBe('plow')
+      expect((result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children?.[0]?.actionId).toBe('plow')
     })
 
     it('allows plow when animals obtained and can accommodate in stable', () => {
@@ -321,7 +321,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
     })
@@ -341,7 +341,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
 
@@ -361,17 +361,17 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
   })
 
   describe('A53_Claypipe', () => {
-    const claypipeImmediatelyAfterListener: any = {
+    const claypipeImmediatelyAfterListener: Record<string, unknown> = {
       id: 'A53-claypipe-immediately-after',
       phases: ['immediatelyAfter' as ActionHookPhase],
       actions: ['collect', 'gain'],
-      handler: (context: any): ActionHookResult | void => {
+      handler: (context: CardListenerContext): ActionHookResult | void => {
         const { player, result } = context
         
         if (!player.minorPlayed?.includes('A53_Claypipe')) return
@@ -392,11 +392,11 @@ describe('Collect action card listeners', () => {
       },
     }
 
-    const claypipeAfterListener: any = {
+    const claypipeAfterListener: Record<string, unknown> = {
       id: 'A53-claypipe-after',
       phases: ['after' as ActionHookPhase],
       actions: ['collect', 'gain'],
-      handler: (context: any): ActionHookResult | void => {
+      handler: (context: CardListenerContext): ActionHookResult | void => {
         const { player } = context
         
         if (!player.minorPlayed?.includes('A53_Claypipe')) return
@@ -418,8 +418,8 @@ describe('Collect action card listeners', () => {
     }
 
     beforeEach(() => {
-      registerCardListener(claypipeImmediatelyAfterListener)
-      registerCardListener(claypipeAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(claypipeImmediatelyAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(claypipeAfterListener)
     })
 
     it('registers immediatelyAfter and after listeners', () => {
@@ -444,7 +444,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.extraData?.incrementBuildingCount).toBe(5)
     })
@@ -463,7 +463,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
 
@@ -483,7 +483,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
       expect(result?.flow?.type).toBe('seq')
@@ -505,7 +505,7 @@ describe('Collect action card listeners', () => {
         },
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
   })

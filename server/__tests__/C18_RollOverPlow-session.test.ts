@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/C/C18_RollOverPlow'
+import type { AnytimeAction } from '../../shared/game/types';
 
 const CARD_ID = 'C18_RollOverPlow'
 
@@ -38,7 +39,7 @@ describe('C18_RollOverPlow session', () => {
   it('available with 3+ planted fields', () => {
     const session = setup()
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('C18-roll-over-plow-anytime')
   })
 
@@ -53,9 +54,9 @@ describe('C18_RollOverPlow session', () => {
     // Should be in selection choice
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('selection')
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Select field 0-2 (grain with remaining 3)
     resp = session.resolveChoice(0, '0-2')
@@ -65,10 +66,10 @@ describe('C18_RollOverPlow session', () => {
     // Plow shows a farm interaction for tile selection
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected plow choice')
-    expect((resp.pending as any).promptKey).toBe('ui.interactionPlowSelect')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('farmSelect')
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Verify the field was discarded
     const p = resp.state.players[0]!
@@ -105,7 +106,7 @@ describe('C18_RollOverPlow session', () => {
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C18-roll-over-plow-anytime')
   })
 })

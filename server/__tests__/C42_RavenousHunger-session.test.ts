@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C42_RavenousHunger'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C42_RavenousHunger'
 
@@ -66,11 +64,11 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(3)
     expect(children[0].actionId).toBe('flag-card')
     expect(children[1].actionId).toBe('place-farmer')
@@ -87,7 +85,7 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('grain-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -103,7 +101,7 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -120,12 +118,12 @@ describe('C42_RavenousHunger', () => {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'collect', phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('after collect when not flagged: no bonus', () => {
@@ -140,7 +138,7 @@ describe('C42_RavenousHunger', () => {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'collect', phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

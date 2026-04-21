@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../game/types'
 
 import '../D/D18_SteamPlow'
 import { D18_SteamPlow as D18Card } from '../D/D18_SteamPlow'
@@ -57,7 +57,7 @@ describe('D18_SteamPlow', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).not.toBeNull()
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children).toHaveLength(3)

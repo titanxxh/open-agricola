@@ -4,6 +4,8 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/B/B58_CrackWeeder'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B58_CrackWeeder'
 
@@ -21,7 +23,7 @@ describe('B58_CrackWeeder session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
   it('onAfterReap gives 1 food per vegetable field harvested', () => {
@@ -42,7 +44,7 @@ describe('B58_CrackWeeder session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(2)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
 
   it('onAfterReap does not trigger when no vegetable fields harvested', () => {
@@ -97,7 +99,7 @@ describe('B58_CrackWeeder session', () => {
       } else if (resp.pending.type === 'animalReorg') {
         resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E74_AshTrees'
 import '../../shared/cards/B/B30_WoodPalisades'
@@ -41,7 +41,7 @@ describe('E74_AshTrees session flow', () => {
       actionId: 'fence',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
     expect(direct?.doable).toBe(true)
 
     let resp = session.takeAction(0, 'fencing')

@@ -63,3 +63,6 @@ jobs:
 
       - name: Check bundle size (strict)
         run: pnpm run check:bundle-size
+
+      - name: Check catalog types (issue #10)
+        run: pnpm run check:catalog-types

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/game/types'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/D/D103_CanalBoatman'
@@ -125,12 +122,12 @@ describe('D103_CanalBoatman listener', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('seq')
 
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(3)
     expect(flow.children[0].actionId).toBe('pay-resources')

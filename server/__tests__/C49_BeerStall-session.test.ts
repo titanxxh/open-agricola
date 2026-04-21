@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C49_BeerStall'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C49_BeerStall'
 
@@ -28,7 +29,7 @@ describe('C49_BeerStall session', () => {
     expect(flow).toBeDefined()
     // With 1 empty stable, should be a single seq
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
   })
 
   it('returns undefined when player has no grain', () => {
@@ -114,9 +115,9 @@ describe('C49_BeerStall session', () => {
     const flow = effect!.onHarvestFeedingPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     // 3 empty stables, 5 grain → min(3,5) = 3 options
-    expect((flow as any).children.length).toBe(3)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBe(3)
   })
 
   it('caps exchanges at grain count when less grain than empty stables', () => {
@@ -138,6 +139,6 @@ describe('C49_BeerStall session', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     // min(3 stables, 2 grain) = 2 options
-    expect((flow as any).children.length).toBe(2)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBe(2)
   })
 })

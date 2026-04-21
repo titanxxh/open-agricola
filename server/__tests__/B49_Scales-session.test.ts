@@ -4,6 +4,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/B/B49_Scales'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B49_Scales'
 
@@ -38,7 +39,7 @@ describe('B49_Scales session', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as any).params).toEqual({ food: 2 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
   })
 
   it('does NOT gain food when counts differ after playing occupation', () => {
@@ -77,7 +78,7 @@ describe('B49_Scales session', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as any).params).toEqual({ food: 2 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
   })
 
   it('does NOT gain food when counts differ after playing improvement', () => {
@@ -138,6 +139,6 @@ describe('B49_Scales session', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as any).params).toEqual({ food: 2 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
   })
 })

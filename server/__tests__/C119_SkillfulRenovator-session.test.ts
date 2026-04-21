@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import '../../shared/cards/C/C119_SkillfulRenovator'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C119_SkillfulRenovator'
 
@@ -65,8 +63,8 @@ describe('C119_SkillfulRenovator', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1, clay: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1, clay: 1 })
   })
 
   it('gains wood equal to farmers placed this round after renovation', () => {
@@ -83,12 +81,12 @@ describe('C119_SkillfulRenovator', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 3 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 3 })
   })
 
   it('returns undefined when no farmers placed this round', () => {
@@ -101,7 +99,7 @@ describe('C119_SkillfulRenovator', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

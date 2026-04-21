@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
+import { registerCardListener } from '../registry-ops'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'

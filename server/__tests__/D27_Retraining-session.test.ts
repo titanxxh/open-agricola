@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged, readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
@@ -71,7 +68,7 @@ describe('D27_Retraining listeners', () => {
     executeCardListener(listener, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
@@ -88,7 +85,7 @@ describe('D27_Retraining listeners', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('seq')
@@ -111,7 +108,7 @@ describe('D27_Retraining listeners', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const pending = readCardExtraData<{ from: string; to: string }>(player, CARD_ID, 'pendingSwap')
@@ -128,7 +125,7 @@ describe('D27_Retraining listeners', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
     // Flag is unset even when no swap was possible
@@ -145,7 +142,7 @@ describe('D27_Retraining listeners', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
     expect(state.availableMajorImprovements).toContain('Major_Pottery')

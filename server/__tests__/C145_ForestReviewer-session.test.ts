@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/C/C145_ForestReviewer'
+import type { ActionFlow } from '../../shared/game/types'
+import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'C145_ForestReviewer'
 
@@ -101,12 +103,12 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ reed: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
   })
 
   it('owner gets 1 reed when forest is used and grove is occupied', () => {
@@ -130,11 +132,11 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).params).toEqual({ reed: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
   })
 
   it('does not trigger when grove is used and forest is NOT occupied', () => {
@@ -158,7 +160,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -175,11 +177,11 @@ describe('C145_ForestReviewer', () => {
 
     const state = createState([owner, trigger], [forestSpace, groveSpace])
 
-    const reedBankSpace = {
+    const reedBankSpace = mkActionSpace({
       id: 'reed-bank',
       resources: {},
       takenBy: [],
-    } as any
+    })
 
     const result = executeCardListener(listener, {
       state,
@@ -190,7 +192,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -215,7 +217,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

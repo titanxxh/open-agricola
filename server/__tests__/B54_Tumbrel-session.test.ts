@@ -5,6 +5,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/B/B54_Tumbrel'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B54_Tumbrel'
 
@@ -22,7 +23,7 @@ describe('B54_Tumbrel session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(2)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
 
   it('sow listener fires and gains food per stable', () => {
@@ -56,7 +57,7 @@ describe('B54_Tumbrel session', () => {
     const result = executeCardListener(listener!, context)
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    expect((result!.flow as any).params?.food).toBe(2)
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
 
   it('sow listener does not fire with 0 stables', () => {
@@ -118,6 +119,6 @@ describe('B54_Tumbrel session', () => {
 
     const result = executeCardListener(listener!, context)
     expect(result).toBeDefined()
-    expect((result!.flow as any).params?.food).toBe(3)
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(3)
   })
 })

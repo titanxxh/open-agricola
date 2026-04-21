@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D113_FoodMerchant'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D113_FoodMerchant'
 
@@ -28,9 +29,9 @@ describe('D113_FoodMerchant session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     // Check that the pay leaf is for 2 food (depleted field → cheaper cost)
-    const payChild = (flow as any).children[0]
+    const payChild = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]
     expect(payChild.params.food).toBe(2)
   })
 
@@ -55,9 +56,9 @@ describe('D113_FoodMerchant session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     // Cost should be 3 food (field not depleted)
-    const payChild = (flow as any).children[0]
+    const payChild = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]
     expect(payChild.params.food).toBe(3)
   })
 

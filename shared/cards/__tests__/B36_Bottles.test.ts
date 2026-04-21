@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../B/B36_Bottles'
 import { B36_Bottles as B36Card } from '../B/B36_Bottles'
 
 import { setActiveWorkerCount } from '../../game/player'
+import type { CardListenerContext } from '../card-listeners'
 const CARD_ID = 'B36_Bottles'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -72,7 +70,7 @@ describe('B36_Bottles', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ clay: 2, food: 2 })
@@ -88,7 +86,7 @@ describe('B36_Bottles', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ clay: 3, food: 3 })
@@ -104,7 +102,7 @@ describe('B36_Bottles', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ clay: 5, food: 5 })
@@ -119,7 +117,7 @@ describe('B36_Bottles', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: 'SomeOtherCard',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

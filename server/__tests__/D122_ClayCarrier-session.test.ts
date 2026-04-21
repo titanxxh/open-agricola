@@ -4,6 +4,8 @@ import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-stat
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D122_ClayCarrier'
+import type { AnytimeAction } from '../../shared/game/types';
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('D122_ClayCarrier session', () => {
   const setup = () => {
@@ -43,8 +45,8 @@ describe('D122_ClayCarrier session', () => {
     const flow = runCardEffectHook(state, player, 'D122_ClayCarrier', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ clay: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 2 })
   })
 
   it('anytime action appears during active interaction with food', () => {
@@ -56,7 +58,7 @@ describe('D122_ClayCarrier session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('D122-clay-carrier-anytime')
   })
 
@@ -69,7 +71,7 @@ describe('D122_ClayCarrier session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D122-clay-carrier-anytime')
   })
 
@@ -112,7 +114,7 @@ describe('D122_ClayCarrier session', () => {
     expect(resp2.state.players[0]!.cardStates?.['D122_ClayCarrier']?.flagged).toBe(true)
 
     // Verify anytime action is no longer available
-    const anytimeIds = resp2.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp2.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D122-clay-carrier-anytime')
   })
 

@@ -55,23 +55,14 @@ import {
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
-import { setActiveCardRegistry } from '../cards/active-registry.ts'
+import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import {
-  runRoundEndHooks,
-  runBeforeFeedHooks,
-  runAfterFeedHooks,
-  runCardEffectHook,
-} from '../cards/card-effects.ts'
+import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
-import {
-  getMatchingListeners,
-  executeCardListener,
-  shouldSkipImmediateListenerLog,
-} from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
 import { computeAnimalZones } from '../actions/effects/animals.ts'
 import { reap } from '../actions/effects/reap.ts'
@@ -84,7 +75,7 @@ import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards
 import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
-import { applyFarmChoice } from '../logic/farm/farm-choice.ts'
+import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
 import {
   applyCostOverride,
 } from '../actions/effects/pay.ts'
@@ -289,12 +280,23 @@ export class GameCore {
     // Build or accept a per-session card registry, then publish it as the
     // "active" registry so any subsequent `registerCardListener` /
     // `registerCardEffect` calls (e.g. from custom-code cards) forward into it.
+    //
+    // If an active registry already exists (e.g. test harness with
+    // pre-registered stub listeners / effects), clone it so those entries
+    // survive into the session without leaking mutations back to the outer
+    // registry. Fall back to a fresh registry loaded with ALL_CARD_IMPLS
+    // when no outer registry is active (production startup path).
     if (options.cardRegistry) {
       this.cardRegistry = options.cardRegistry
     } else {
-      this.cardRegistry = new CardRegistry()
-      for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
-        this.cardRegistry.loadImpl(cardId, impl as CardImpl)
+      const existing = getActiveCardRegistry()
+      if (existing) {
+        this.cardRegistry = existing.clone()
+      } else {
+        this.cardRegistry = new CardRegistry()
+        for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+          this.cardRegistry.loadImpl(cardId, impl as CardImpl)
+        }
       }
     }
     setActiveCardRegistry(this.cardRegistry)
@@ -2619,7 +2621,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player)
-    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as any, {
+    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
       costOverride: this.pending.costOverride,
       maxUnits:
         farmPayment.farmType === 'room' && typeof this.pending.actionContext?.maxRooms === 'number'
@@ -2903,7 +2905,7 @@ export class GameCore {
         const extraAllowedCrops = new Map(
           extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
         )
-        const result = applyFarmChoice(normalized, 'sow', payload as any, {
+        const result = applyFarmChoice(normalized, 'sow', payload as FarmChoicePayloadMap['sow'], {
           sowOptions: {
             maxSelections,
             excludedFields,

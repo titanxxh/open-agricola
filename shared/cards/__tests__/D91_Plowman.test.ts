@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../game/types'
 
 import '../D/D91_Plowman'
 
@@ -77,7 +77,7 @@ describe('D91_Plowman', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
     expect(flow).not.toBeNull()
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children).toHaveLength(2)

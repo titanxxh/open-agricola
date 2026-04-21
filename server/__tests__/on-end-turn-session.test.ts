@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { clearActionHooks } from '../../shared/actions/hooks'
-import { registerCardEffect } from '../../shared/cards/card-effects'
 import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 
 const registerCounterEffect = () => {
-  registerCardEffect({
+  requireActiveCardRegistry('on-end-turn-session').setEffect({
     id: TEST_END_TURN_CARD,
     onEndTurn: (_state, player) => {
       if (!player.minorPlayed.includes(TEST_END_TURN_CARD)) return

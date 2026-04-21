@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
@@ -124,7 +121,7 @@ describe('A41_VegetableSlicer improvement listener', () => {
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
       result,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
     expect(player.improvements).not.toContain(FIREPLACE_ID)
@@ -156,7 +153,7 @@ describe('A41_VegetableSlicer improvement listener', () => {
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
       result,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
     expect(hookResult).toBeUndefined()

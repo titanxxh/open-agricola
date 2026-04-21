@@ -4,6 +4,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E165_MasterHuntsman'
+import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'E165_MasterHuntsman'
 
@@ -24,7 +25,7 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'meeting-place' } as any,
+      space: mkActionSpace({ id: 'meeting-place' }),
       actionId: 'play-occupation',
       phase: 'after',
       choice: CARD_ID,
@@ -51,7 +52,7 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'meeting-place' } as any,
+      space: mkActionSpace({ id: 'meeting-place' }),
       actionId: 'play-occupation',
       phase: 'after',
       choice: 'A114_SeasonalWorker', // Different card
@@ -74,7 +75,7 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'improvement-any' } as any,
+      space: mkActionSpace({ id: 'improvement-any' }),
       actionId: 'improvement-any',
       phase: 'after',
       choice: 'major:Major_Well',
@@ -101,7 +102,7 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'improvement-any' } as any,
+      space: mkActionSpace({ id: 'improvement-any' }),
       actionId: 'improvement-any',
       phase: 'after',
       choice: 'minor:A55_JunkRoom',

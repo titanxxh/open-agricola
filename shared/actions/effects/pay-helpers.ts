@@ -23,11 +23,7 @@ import {
   payResources,
   sortPaymentSolutions,
 } from './pay'
-import {
-  executeCardListener,
-  getMatchingListeners,
-  type CardListenerContext,
-} from '../../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, type CardListenerContext } from '../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (
   state: GameState,
@@ -495,7 +491,7 @@ export const payCardPreviewCostByProvider = (
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
-): Record<string, any> => {
+): Record<string, unknown> => {
   return {
     resourcesPaid: solution.resourcesPaid,
     cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined

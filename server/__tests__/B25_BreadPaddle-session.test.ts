@@ -4,6 +4,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B25_BreadPaddle'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B25_BreadPaddle'
 
@@ -21,7 +23,7 @@ describe('B25_BreadPaddle session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
   it('after playing occupation, triggers optional bake-bread', () => {
@@ -60,7 +62,7 @@ describe('B25_BreadPaddle session', () => {
     if (resp.pending.type !== 'choice') return
 
     // Choose the occupation
-    const occOption = resp.pending.options.find((o: any) => o.value === occId)
+    const occOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === occId)
     expect(occOption).toBeDefined()
     resp = session.resolveChoice(0, occId)
     expect(resp.ok).toBe(true)

@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C121_ClayKneader'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C121_ClayKneader'
 
@@ -31,8 +32,8 @@ describe('C121_ClayKneader session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1, clay: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1, clay: 2 })
   })
 
   it('gains 1 clay when using grain-seeds', () => {

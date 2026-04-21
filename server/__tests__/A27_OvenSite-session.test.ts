@@ -156,8 +156,8 @@ describe('A27_OvenSite session', () => {
 
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect((resp.pending as any).sourceCard).toBe('Major_ClayOven')
-    expect((resp.interaction as any).sourceCard).toBe('Major_ClayOven')
+    expect(resp.pending.sourceCard).toBe('Major_ClayOven')
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe('Major_ClayOven')
     expect(resp.pending.options.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
   })
 })

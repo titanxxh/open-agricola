@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../game/types'
 import { setCardInfoboxAction } from '../set-card-infobox'
 import { clearCardInfoboxAction } from '../clear-card-infobox'
+import { mkActionSpace } from '../../../cards/__tests__/fixtures'
+import type { ActionExecutionContext } from '../../../game/types'
 
 const createState = (): GameState => ({
   round: 1,
@@ -65,9 +67,9 @@ describe('card infobox actions', () => {
     const result = setCardInfoboxAction.execute({
       state,
       player,
-      space: {} as any,
+      space: mkActionSpace({ id: 'noop' }),
       sourceCard: 'A17_ReclamationPlow',
-      params: { text: '✓' } as any,
+      params: { text: '✓' } as unknown as ActionExecutionContext,
     })
 
     expect(result.type).toBe('ok')
@@ -86,7 +88,7 @@ describe('card infobox actions', () => {
     const result = clearCardInfoboxAction.execute({
       state,
       player,
-      space: {} as any,
+      space: mkActionSpace({ id: 'noop' }),
       sourceCard: 'A17_ReclamationPlow',
     })
 

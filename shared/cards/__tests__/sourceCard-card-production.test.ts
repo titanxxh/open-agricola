@@ -12,6 +12,8 @@ import '../D/D23_PioneeringSpirit'
 import '../E/E53_BoarSpear'
 import '../E/E73_Scythe'
 import '../E/E74_AshTrees'
+import type { CardListenerContext } from '../card-listeners'
+import type { ActionExecutionContext } from '../../game/types'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -153,7 +155,7 @@ describe('sourceCard card production contract', () => {
       space: createSpace('fence'),
       actionId: 'fence',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.sourceCard).toBe('E74_AshTrees')
     expect(result?.flow?.type).toBe('xor')
@@ -177,7 +179,7 @@ describe('sourceCard card production contract', () => {
       actionId: 'gain',
       phase: 'during',
       result: { type: 'ok', resourcesGained: { boar: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(during?.extraOptions?.map((option) => option.sourceCard)).toEqual([
       'E53_BoarSpear',
@@ -192,7 +194,7 @@ describe('sourceCard card production contract', () => {
       phase: 'after',
       choice: '1',
       result: { type: 'ok', resourcesGained: { boar: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(after?.sourceCard).toBe('E53_BoarSpear')
     expect(after?.flow).toMatchObject({
@@ -212,7 +214,7 @@ describe('sourceCard card production contract', () => {
       state,
       player,
       space: createSpace('D23_PioneeringSpirit'),
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('choice')
     if (result.type !== 'choice') return
@@ -235,7 +237,7 @@ describe('sourceCard card production contract', () => {
       state,
       player,
       space: createSpace('C104_Collector'),
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(first.type).toBe('choice')
     if (first.type !== 'choice') return
@@ -263,7 +265,7 @@ describe('sourceCard card production contract', () => {
       state,
       player,
       space: createSpace('B42_ForestInn'),
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('choice')
     if (result.type !== 'choice') return

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C80_RockyTerrain'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C80_RockyTerrain'
 
@@ -65,11 +63,11 @@ describe('C80_RockyTerrain', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('plow'),
       actionId: 'plow', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('pay-resources')
     expect(children[0].params).toEqual({ food: 1 })
     expect(children[1].actionId).toBe('gain')
@@ -87,7 +85,7 @@ describe('C80_RockyTerrain', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('plow'),
       actionId: 'plow', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

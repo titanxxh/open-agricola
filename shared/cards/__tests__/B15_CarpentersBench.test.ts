@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../B/B15_CarpentersBench'
 
@@ -71,7 +68,7 @@ describe('B15_CarpentersBench', () => {
       phase: 'after',
     })
     expect(result).toBeDefined()
-    const flow = (result as any).flow
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('fence')

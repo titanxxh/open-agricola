@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../D/D96_Furnisher'
+import type { ActionFlow } from '../../game/types'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D96_Furnisher'
 
@@ -63,8 +62,8 @@ describe('D96_Furnisher', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
   })
 
   it('after construct with 1 room built, offers 1 optional improvement', () => {
@@ -79,10 +78,10 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(1)
@@ -100,10 +99,10 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children).toHaveLength(2)
   })
 
@@ -117,7 +116,7 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -130,7 +129,7 @@ describe('D96_Furnisher', () => {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ wood: -1 })
@@ -144,7 +143,7 @@ describe('D96_Furnisher', () => {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: 'improvement-any',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

@@ -1,0 +1,328 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import WebSocket from 'ws'
+import { createWsServer } from '../game/room-manager.ts'
+import type { ServerEvent } from '../../shared/protocol/ws.ts'
+import type { StateUpdateEnvelope } from '../../shared/protocol/game.ts'
+
+/**
+ * WebSocket broadcast privacy: every `stateUpdate` envelope must be filtered
+ * per viewer — the receiving player's own hand is visible, every other
+ * player's hand is masked to same-length '?' arrays (see
+ * `serializeStateForPlayer`).
+ *
+ * Mirrors the harness used in `room-manager-ws-sync.test.ts`.
+ */
+
+type TestSocket = WebSocket & { received: ServerEvent[] }
+
+const attachCollector = (ws: TestSocket) => {
+  ws.on('message', (raw: WebSocket.RawData) => {
+    ws.received.push(JSON.parse(raw.toString()) as ServerEvent)
+  })
+}
+
+const waitForEvent = async <T extends ServerEvent>(
+  ws: TestSocket,
+  predicate: (event: ServerEvent) => event is T,
+): Promise<T> => {
+  const existing = ws.received.find(predicate)
+  if (existing) return existing
+  return new Promise<T>((resolve, reject) => {
+    const onMessage = () => {
+      const event = ws.received.find(predicate)
+      if (!event) return
+      ws.off('message', onMessage)
+      ws.off('error', onError)
+      resolve(event)
+    }
+    const onError = (err: Error) => {
+      ws.off('message', onMessage)
+      ws.off('error', onError)
+      reject(err)
+    }
+    ws.on('message', onMessage)
+    ws.on('error', onError)
+  })
+}
+
+const isStateUpdate = (event: ServerEvent): event is StateUpdateEnvelope =>
+  event.type === 'stateUpdate'
+
+const isReconnectState = (event: ServerEvent): event is StateUpdateEnvelope =>
+  isStateUpdate(event) && event.cause === 'reconnect'
+
+describe('WS broadcast per-viewer filter', () => {
+  let server: ReturnType<typeof createServer>
+  let wsServer: ReturnType<typeof createWsServer>
+  let baseUrl: string
+  const sockets: TestSocket[] = []
+
+  beforeEach(async () => {
+    server = createServer()
+    wsServer = createWsServer(server)
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve())
+    })
+    const address = server.address() as AddressInfo
+    baseUrl = `ws://127.0.0.1:${address.port}/ws`
+  })
+
+  afterEach(async () => {
+    await Promise.all(
+      sockets.map(
+        (ws) =>
+          new Promise<void>((resolve) => {
+            if (ws.readyState === WebSocket.CLOSED) {
+              resolve()
+              return
+            }
+            const timeout = setTimeout(() => resolve(), 1000)
+            ws.once('close', () => {
+              clearTimeout(timeout)
+              resolve()
+            })
+            if (ws.readyState === WebSocket.CONNECTING) {
+              ws.once('open', () => ws.close())
+              return
+            }
+            ws.close()
+          }),
+      ),
+    )
+    sockets.length = 0
+    await new Promise<void>((resolve, reject) => {
+      wsServer.close((err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+    })
+  })
+
+  const connectSocket = async (): Promise<TestSocket> => {
+    const ws = new WebSocket(baseUrl) as TestSocket
+    ws.received = []
+    attachCollector(ws)
+    sockets.push(ws)
+    await new Promise<void>((resolve) => ws.once('open', () => resolve()))
+    return ws
+  }
+
+  const openTwoPlayerRoom = async (
+    extraCreate: Record<string, unknown> = {},
+  ): Promise<{
+    p1: TestSocket
+    p2: TestSocket
+    initialP1: StateUpdateEnvelope
+    initialP2: StateUpdateEnvelope
+  }> => {
+    const p1 = await connectSocket()
+    p1.send(
+      JSON.stringify({
+        type: 'createRoom',
+        name: 'P1',
+        maxPlayers: 2,
+        ...extraCreate,
+      }),
+    )
+    const roomCreated = await waitForEvent(
+      p1,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
+        event.type === 'roomCreated',
+    )
+
+    const p2 = await connectSocket()
+    p2.send(
+      JSON.stringify({
+        type: 'joinRoom',
+        roomId: roomCreated.roomId,
+        requestedPlayerIndex: 1,
+        name: 'P2',
+      }),
+    )
+
+    const initialP1 = await waitForEvent(p1, isReconnectState)
+    const initialP2 = await waitForEvent(p2, isReconnectState)
+    return { p1, p2, initialP1, initialP2 }
+  }
+
+  it('each ws receives its own hand; the opponent hand is masked with same-length ?', async () => {
+    const { initialP1, initialP2 } = await openTwoPlayerRoom()
+
+    const p1AsP1 = initialP1.payload.state.players[0]!
+    const p2AsP1 = initialP1.payload.state.players[1]!
+    const p1AsP2 = initialP2.payload.state.players[0]!
+    const p2AsP2 = initialP2.payload.state.players[1]!
+
+    // Sanity: both envelopes saw the same player count and ids.
+    expect(p1AsP1.id).toBe('p1')
+    expect(p2AsP1.id).toBe('p2')
+    expect(p1AsP2.id).toBe('p1')
+    expect(p2AsP2.id).toBe('p2')
+
+    // Viewer = p1 → own hand is the real string payload (no '?')
+    expect(p1AsP1.occupationHand.length).toBeGreaterThan(0)
+    expect(p1AsP1.minorHand.length).toBeGreaterThan(0)
+    expect(p1AsP1.occupationHand.every((c) => c !== '?')).toBe(true)
+    expect(p1AsP1.minorHand.every((c) => c !== '?')).toBe(true)
+
+    // Viewer = p1 → opponent p2's hand is masked to same-length '?'
+    expect(p2AsP1.occupationHand.length).toBe(p2AsP2.occupationHand.length)
+    expect(p2AsP1.minorHand.length).toBe(p2AsP2.minorHand.length)
+    expect(p2AsP1.occupationHand.every((c) => c === '?')).toBe(true)
+    expect(p2AsP1.minorHand.every((c) => c === '?')).toBe(true)
+
+    // Viewer = p2 → own hand visible
+    expect(p2AsP2.occupationHand.every((c) => c !== '?')).toBe(true)
+    expect(p2AsP2.minorHand.every((c) => c !== '?')).toBe(true)
+
+    // Viewer = p2 → opponent p1's hand masked
+    expect(p1AsP2.occupationHand.length).toBe(p1AsP1.occupationHand.length)
+    expect(p1AsP2.minorHand.length).toBe(p1AsP1.minorHand.length)
+    expect(p1AsP2.occupationHand.every((c) => c === '?')).toBe(true)
+    expect(p1AsP2.minorHand.every((c) => c === '?')).toBe(true)
+
+    // The two sockets must genuinely see DIFFERENT card strings for each own
+    // hand — otherwise both players would know both hands.
+    expect(p1AsP1.occupationHand).not.toEqual(p1AsP2.occupationHand)
+    expect(p2AsP2.occupationHand).not.toEqual(p2AsP1.occupationHand)
+  })
+
+  it('action broadcast keeps per-viewer filtering', async () => {
+    const { p1, p2, initialP1 } = await openTwoPlayerRoom()
+
+    const freeSpace = initialP1.payload.state.actionSpaces.find(
+      (s) => s.takenBy.length === 0,
+    )?.id
+    expect(freeSpace).toBeTruthy()
+
+    p1.send(
+      JSON.stringify({
+        type: 'action',
+        spaceId: freeSpace,
+        requestId: 'action-1',
+      }),
+    )
+
+    const actionP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'action-1',
+    )
+    const actionP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'action-1',
+    )
+
+    // p1 sees own hand, p2 masked
+    expect(
+      actionP1.payload.state.players[0]!.occupationHand.every((c) => c !== '?'),
+    ).toBe(true)
+    expect(
+      actionP1.payload.state.players[1]!.occupationHand.every((c) => c === '?'),
+    ).toBe(true)
+
+    // p2 sees own hand, p1 masked
+    expect(
+      actionP2.payload.state.players[1]!.occupationHand.every((c) => c !== '?'),
+    ).toBe(true)
+    expect(
+      actionP2.payload.state.players[0]!.occupationHand.every((c) => c === '?'),
+    ).toBe(true)
+
+    // Public mutation (action taken) is identical across viewers
+    const spaceP1 = actionP1.payload.state.actionSpaces.find(
+      (s) => s.id === freeSpace,
+    )!
+    const spaceP2 = actionP2.payload.state.actionSpaces.find(
+      (s) => s.id === freeSpace,
+    )!
+    expect(spaceP1.takenBy.length).toBe(1)
+    expect(spaceP2.takenBy.length).toBe(1)
+    expect(spaceP1.takenBy[0]?.playerId).toBe('p1')
+    expect(spaceP2.takenBy[0]?.playerId).toBe('p1')
+  })
+
+  it('draft room: each player sees only own pool; opponent pool masked', async () => {
+    const { initialP1, initialP2 } = await openTwoPlayerRoom({
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+
+    expect(initialP1.payload.state.phase).toBe('draft')
+    expect(initialP2.payload.state.phase).toBe('draft')
+    expect(initialP1.payload.state.draft).not.toBeNull()
+    expect(initialP2.payload.state.draft).not.toBeNull()
+
+    const p1Draft = initialP1.payload.state.draft!
+    const p2Draft = initialP2.payload.state.draft!
+
+    // p1 sees its own pool as real strings
+    expect(p1Draft.pools.p1.occ.length).toBe(7)
+    expect(p1Draft.pools.p1.minor.length).toBe(7)
+    expect(p1Draft.pools.p1.occ.every((c) => c !== '?')).toBe(true)
+    expect(p1Draft.pools.p1.minor.every((c) => c !== '?')).toBe(true)
+
+    // p1 sees p2's pool masked to same-length '?'
+    expect(p1Draft.pools.p2.occ.length).toBe(7)
+    expect(p1Draft.pools.p2.minor.length).toBe(7)
+    expect(p1Draft.pools.p2.occ.every((c) => c === '?')).toBe(true)
+    expect(p1Draft.pools.p2.minor.every((c) => c === '?')).toBe(true)
+
+    // p2 sees its own pool as real strings
+    expect(p2Draft.pools.p2.occ.every((c) => c !== '?')).toBe(true)
+    expect(p2Draft.pools.p2.minor.every((c) => c !== '?')).toBe(true)
+    // p2 sees p1's pool masked
+    expect(p2Draft.pools.p1.occ.every((c) => c === '?')).toBe(true)
+    expect(p2Draft.pools.p1.minor.every((c) => c === '?')).toBe(true)
+
+    // Public draft fields identical across viewers
+    expect(p1Draft.round).toBe(p2Draft.round)
+    expect(p1Draft.totalRounds).toBe(p2Draft.totalRounds)
+    expect(p1Draft.poolSize).toBe(p2Draft.poolSize)
+    expect(p1Draft.seatOrder).toEqual(p2Draft.seatOrder)
+    expect(p1Draft.mode).toBe(p2Draft.mode)
+  })
+
+  it('reconnect getState returns the viewer-specific filter for that ws', async () => {
+    const { p1, p2 } = await openTwoPlayerRoom()
+
+    p1.send(JSON.stringify({ type: 'getState', requestId: 'state-p1' }))
+    const stateP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'state-p1',
+    )
+
+    p2.send(JSON.stringify({ type: 'getState', requestId: 'state-p2' }))
+    const stateP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'state-p2',
+    )
+
+    // p1 getState reply: own hand visible, p2 masked
+    expect(
+      stateP1.payload.state.players[0]!.occupationHand.every((c) => c !== '?'),
+    ).toBe(true)
+    expect(
+      stateP1.payload.state.players[1]!.occupationHand.every((c) => c === '?'),
+    ).toBe(true)
+
+    // p2 getState reply: own hand visible, p1 masked
+    expect(
+      stateP2.payload.state.players[1]!.occupationHand.every((c) => c !== '?'),
+    ).toBe(true)
+    expect(
+      stateP2.payload.state.players[0]!.occupationHand.every((c) => c === '?'),
+    ).toBe(true)
+  })
+})

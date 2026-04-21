@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C130_OutskirtsDirector'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C130_OutskirtsDirector'
 
@@ -71,12 +69,12 @@ describe('C130_OutskirtsDirector', () => {
     const result = executeCardListener(listener!, {
       state, player, space: groveSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(hollowSpace.resources.reed).toBe(2)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('place-farmer')
   })
 
@@ -94,7 +92,7 @@ describe('C130_OutskirtsDirector', () => {
     executeCardListener(listener!, {
       state, player, space: hollowSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(groveSpace.resources.reed).toBe(2)
   })
@@ -109,7 +107,7 @@ describe('C130_OutskirtsDirector', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('forest'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

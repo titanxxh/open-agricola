@@ -1,17 +1,23 @@
 /**
- * Thread-local (module-scoped) reference to the "currently active" CardRegistry.
+ * Module-scoped reference to the "currently active" CardRegistry.
  *
- * Global registry functions (`registerCardListener`, `registerCardEffect`,
- * `registerCardModifier`) delegate to the active registry when one is set, else
- * fall back to the legacy module-level Maps.
+ * The engine is synchronous, so a single module-level variable is sufficient
+ * (no AsyncLocalStorage needed). Every card-lookup / registration helper in
+ * `card-listeners.ts` / `card-effects.ts` reads this pointer and operates on
+ * the registry it points to.
  *
- * Used during PR-2 migration so that:
- *   - Cards restructured to `_impl` shape register into a per-session CardRegistry
- *   - Unmigrated cards still use legacy global path until their file is updated
- *
- * Removed in PR-3 once all cards are migrated.
+ * Lifecycle:
+ *   - `GameCore` constructor builds a fresh `CardRegistry` loaded with
+ *     `ALL_CARD_IMPLS` and publishes it here.
+ *   - Test setup (`shared/cards/__tests__/setup-register-all.ts`) publishes a
+ *     shared default registry pre-loaded with `ALL_CARD_IMPLS` so any test
+ *     that reads listeners/effects without constructing a `GameSession` still
+ *     sees every card's implementation.
+ *   - Tests that want an empty slate publish a fresh registry via
+ *     `setActiveCardRegistry(new CardRegistry())`, or scope the reset with
+ *     `removeListenersWhere` / `removeEffectsWhere`.
  */
-import type { CardRegistry } from './registry'
+import { CardRegistry } from './registry'
 
 let active: CardRegistry | null = null
 
@@ -20,6 +26,17 @@ export function setActiveCardRegistry(r: CardRegistry | null): void {
 }
 
 export function getActiveCardRegistry(): CardRegistry | null {
+  return active
+}
+
+/** Return the active registry or throw with a helpful message. */
+export function requireActiveCardRegistry(context: string): CardRegistry {
+  if (!active) {
+    throw new Error(
+      `${context}: no active CardRegistry. Construct a GameSession, ` +
+      `or call setActiveCardRegistry(new CardRegistry()).`,
+    )
+  }
   return active
 }
 

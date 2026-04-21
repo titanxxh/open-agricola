@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionSpace } from '../types'
+import type { ActionSpace, WorkerRef } from '../types'
 import {
   addWorkerRef,
   isSpaceOccupied,
@@ -7,8 +7,9 @@ import {
   spaceHasPlayer,
   spaceOccupantCount,
 } from '../space'
+import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
-const mkSpace = (takenBy: any = []): ActionSpace => ({ id: 'x', takenBy } as any)
+const mkSpace = (takenBy: WorkerRef[] = []): ActionSpace => mkActionSpace({ id: 'x', takenBy })
 
 describe('space helpers', () => {
   it('isSpaceOccupied returns true iff takenBy non-empty', () => {

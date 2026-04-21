@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C116_FurnitureMaker'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C116_FurnitureMaker'
 
@@ -64,8 +62,8 @@ describe('C116_FurnitureMaker', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('gains wood equal to food paid for second occupation on lessons', () => {
@@ -84,12 +82,12 @@ describe('C116_FurnitureMaker', () => {
       state, player, space: createSpace('lessons'),
       actionId: 'play-occupation', phase: 'after',
       choice: 'SomeOcc',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('gains 2 wood for lessons-4 with 2+ occupations', () => {
@@ -105,10 +103,10 @@ describe('C116_FurnitureMaker', () => {
       state, player, space: createSpace('lessons-4'),
       actionId: 'play-occupation', phase: 'after',
       choice: 'NewOcc',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ wood: 2 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
   })
 
   it('does not trigger when playing C116 itself', () => {
@@ -122,7 +120,7 @@ describe('C116_FurnitureMaker', () => {
       state, player, space: createSpace('lessons'),
       actionId: 'play-occupation', phase: 'after',
       choice: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -152,10 +150,10 @@ describe('C116_FurnitureMaker', () => {
       state, player, space: createSpace('lessons'),
       actionId: 'play-occupation', phase: 'after',
       choice: 'NewOcc',
-    } as any)
+    } as unknown as CardListenerContext)
 
     // occCountBefore = 1 → lessons cost = 1 food → gain 1 wood
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ wood: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 })

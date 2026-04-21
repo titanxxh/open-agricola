@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/A/A58_AsparagusKnife'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 const CARD_ID = 'A58_AsparagusKnife'
 
@@ -186,8 +187,8 @@ describe('A58_AsparagusKnife session', () => {
     // Should get an optional choice for the card effect
     // Walk through choices: accept the optional, select the field, etc.
     while (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options.find((o: any) => o.value === '__skip__')
-      const acceptOption = resp.pending.options.find((o: any) => o.value !== '__skip__')
+      const skipOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (skipOption && acceptOption) {
         // This is the optional choice — accept it
         resp = session.resolveChoice(resp.pending.playerIndex, acceptOption.value)
@@ -229,7 +230,7 @@ describe('A58_AsparagusKnife session', () => {
 
     // Skip the optional effect
     while (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options.find((o: any) => o.value === '__skip__')
+      const skipOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
         resp = session.resolveChoice(resp.pending.playerIndex, skipOption.value)
       } else {

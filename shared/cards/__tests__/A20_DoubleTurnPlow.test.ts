@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../A/A20_DoubleTurnPlow'
 import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
 
@@ -70,7 +68,7 @@ describe('A20_DoubleTurnPlow', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.optional).toBe(true)
     expect(seq.children).toHaveLength(2)
     expect(seq.children[0].actionId).toBe('plow')
@@ -92,7 +90,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ food: 1 })
@@ -108,7 +106,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -123,7 +121,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: 'SomeOtherCard',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

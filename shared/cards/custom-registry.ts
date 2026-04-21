@@ -12,8 +12,7 @@
  * the id starts with "CUSTOM_".
  */
 import { MinorImprovement, Occupation, type CardBase } from './types.ts'
-import { clearCustomCardEffects } from './card-effects.ts'
-import { clearCustomCardListeners } from './card-listeners.ts'
+import { getActiveCardRegistry } from './active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
 
 // Re-export for backward compatibility
@@ -117,8 +116,11 @@ export function clearCustomCards(): void {
   customNumbering.clear()
   nextMinorNumber = 1
   nextOccupationNumber = 500
-  clearCustomCardEffects()
-  clearCustomCardListeners()
+  const active = getActiveCardRegistry()
+  if (active) {
+    active.removeEffectsWhere((id) => id.startsWith('CUSTOM_'))
+    active.removeListenersWhere((reg) => reg.id.startsWith('CUSTOM_'))
+  }
 }
 
 export function getCustomMinorImprovementIds(): string[] {

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D144_WaterWorker'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D144_WaterWorker'
 
@@ -63,10 +61,10 @@ describe('D144_WaterWorker', () => {
       state: createState(player), player, space,
       actionId: 'collect', phase: 'after',
       result: { type: 'ok', resourcesGained: { food: 3 } },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -78,9 +76,9 @@ describe('D144_WaterWorker', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('day-laborer'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -91,9 +89,9 @@ describe('D144_WaterWorker', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('reed-bank'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -106,9 +104,9 @@ describe('D144_WaterWorker', () => {
     const result = executeCardListener(listener, {
       state, player, space: createSpace('eastern-quarry'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -119,7 +117,7 @@ describe('D144_WaterWorker', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('farmland'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

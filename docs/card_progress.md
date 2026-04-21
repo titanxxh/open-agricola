@@ -280,6 +280,16 @@
   - 主 bundle 477KB raw / 145KB gzip（仍在 550KB / 170KB 预算内）
   - 隐私信任式（issue #7 单独跟进）
 
+### 协议层安全（PR-6）
+
+- 2026-04-20 PR-6 协议层安全落地：
+  - Issue #7 手牌隐私修复：`serializeStateForPlayer` per-viewer filter + per-connection broadcast；对手手牌与 draft 池以 `'?'` 占位
+  - WS 命令 seat binding：防止认证用户伪装为其他玩家（`assertOwnSeat` / `assertOwnPlayerId`）
+  - HTTP `/api/game/*` opt-in filter via `X-Viewer-Player`；认证用户 playerIndex 校验
+  - A73 flaky 测试登记 issue #9（retry 标记保留）
+  - 新增测试：serialization-filter (9) + privacy-broadcast (4) + privacy-http (10) + ws-seat-binding (7) = 30 新测试
+  - 详见 `docs/ENGINE_ARCHITECTURE.md §15 Hand Privacy & Seat Binding`
+
 ---
 
 ## 4. 实现进度时间线

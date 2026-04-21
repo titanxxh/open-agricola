@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { registerCardListener } from '../card-listeners'
+import { registerCardListener } from '../registry-ops'
 
 registerCardListener({
   id: 'test-listener',
