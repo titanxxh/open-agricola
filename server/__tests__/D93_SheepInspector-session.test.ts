@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 

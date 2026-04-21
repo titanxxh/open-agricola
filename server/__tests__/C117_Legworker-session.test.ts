@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'

@@ -12,7 +12,7 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { clearCardListeners } from '../../cards/registry-ops'
 
 const createState = (): GameState =>
   ({

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState } from '../../shared/game/types'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 

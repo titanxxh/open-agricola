@@ -9,7 +9,7 @@ import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 import type { CardListenerContext } from '../../cards/card-listeners'
 
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({

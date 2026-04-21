@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-} from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C26_Flail'
 import type { ActionFlow } from '../../shared/game/types'

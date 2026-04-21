@@ -7,11 +7,8 @@ import {
   registerActionHook,
   type ActionHookRegistration,
 } from '../hooks'
-import {
-  clearCardListeners,
-  registerCardListener,
-  type CardListenerRegistration,
-} from '../../cards/card-listeners'
+import { type CardListenerRegistration } from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 describe('hook matrix', () => {
   beforeEach(() => {

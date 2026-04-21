@@ -135,7 +135,7 @@ function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): string {
 
   lines.push(`import { ${classType} } from '../../shared/cards/types'`)
   if (dsl && Object.keys(dsl).length > 0) {
-    lines.push(`import { registerCardEffect } from '../../shared/cards/card-effects'`)
+    lines.push(`import { registerCardEffect } from '../../shared/cards/registry-ops'`)
     lines.push(`import { familySize } from '../../shared/game/player'`)
   }
   lines.push('')

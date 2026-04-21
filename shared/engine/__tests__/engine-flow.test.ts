@@ -20,7 +20,7 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/card-listeners'
+import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 const createState = () =>
   ({

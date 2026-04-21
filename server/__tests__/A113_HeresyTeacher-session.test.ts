@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-} from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import { reap } from '../../shared/actions/effects/reap'
 import { computeScores } from '../../shared/logic/scoring'
 import type { Field } from '../../shared/game/types'

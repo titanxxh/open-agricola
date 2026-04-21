@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import {
-  registerCardListener,
-  getRegisteredCardListeners,
-  clearCardListeners,
-  type CardListenerRegistration,
-} from '../../card-listeners'
+import { getRegisteredCardListeners, type CardListenerRegistration } from '../../card-listeners'
+import { registerCardListener, clearCardListeners } from '../../registry-ops'
 import {
   STUB_BONUS_CHOICES_CARD,
   stubBonusChoicesListener,

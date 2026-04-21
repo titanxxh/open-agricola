@@ -12,8 +12,8 @@
  * the id starts with "CUSTOM_".
  */
 import { MinorImprovement, Occupation, type CardBase } from './types.ts'
-import { clearCustomCardEffects } from './card-effects.ts'
-import { clearCustomCardListeners } from './card-listeners.ts'
+import { clearCustomCardEffects } from './registry-ops.ts'
+import { clearCustomCardListeners } from './registry-ops.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
 
 // Re-export for backward compatibility

@@ -23,11 +23,7 @@ import {
   payResources,
   sortPaymentSolutions,
 } from './pay'
-import {
-  executeCardListener,
-  getMatchingListeners,
-  type CardListenerContext,
-} from '../../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, type CardListenerContext } from '../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (
   state: GameState,

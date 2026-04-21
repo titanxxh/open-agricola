@@ -3,12 +3,7 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
-import { CardRegistry } from './registry'
-import {
-  getActiveCardRegistry,
-  requireActiveCardRegistry,
-  setActiveCardRegistry,
-} from './active-registry'
+import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../game/farm'
 
 /**
@@ -155,30 +150,6 @@ export type CardEffect = {
    * and into the played arrays, and only the normal hook path applies.
    */
   handHooks?: CardEffectHook[]
-}
-
-/**
- * Register a card effect against the currently active `CardRegistry`.
- *
- * `GameCore` publishes its per-session registry before any card code runs.
- * Tests use the default registry published by `setup-register-all.ts`, or
- * reset to an empty one via `clearCardEffects()`.
- */
-export const registerCardEffect = (effect: CardEffect) => {
-  const active = requireActiveCardRegistry('registerCardEffect')
-  active.setEffect(effect)
-}
-
-/** Replace the active registry with a fresh empty one (test reset). */
-export const clearCardEffects = () => {
-  setActiveCardRegistry(new CardRegistry())
-}
-
-/** Remove effects whose id starts with `CUSTOM_` from the active registry. */
-export const clearCustomCardEffects = () => {
-  const active = getActiveCardRegistry()
-  if (!active) return
-  active.removeEffectsWhere((id) => id.startsWith('CUSTOM_'))
 }
 
 export const getCardEffect = (id: string): CardEffect | null => {

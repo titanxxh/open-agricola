@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { registerCardEffect } from '../../shared/cards/card-effects'
+import { registerCardEffect } from '../../shared/cards/registry-ops'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'

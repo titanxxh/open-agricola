@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getRegisteredCardListeners,
-} from '../card-listeners'
+import { getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 

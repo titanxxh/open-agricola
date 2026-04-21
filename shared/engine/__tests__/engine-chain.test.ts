@@ -9,7 +9,7 @@ import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/card-listeners'
+import { clearCardListeners } from '../../cards/registry-ops'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',

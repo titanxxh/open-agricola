@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import { computeAllowedPlacementSpaces } from '../placement-availability'
-import { registerCardListener, clearCustomCardListeners } from '../../../cards/card-listeners'
+import { registerCardListener, clearCustomCardListeners } from '../../../cards/registry-ops'
 import type { ActionHookPhase } from '../../hooks'
 
 afterEach(() => {

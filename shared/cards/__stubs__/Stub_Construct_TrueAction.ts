@@ -1,5 +1,5 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { registerCardListener } from '../card-listeners'
+import { registerCardListener } from '../registry-ops'
 import { incCounter } from './helpers'
 
 export const CARD_ID = 'Stub_Construct_TrueAction'

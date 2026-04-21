@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { clearActionHooks } from '../../shared/actions/hooks'
-import { registerCardEffect } from '../../shared/cards/card-effects'
+import { registerCardEffect } from '../../shared/cards/registry-ops'
 import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'

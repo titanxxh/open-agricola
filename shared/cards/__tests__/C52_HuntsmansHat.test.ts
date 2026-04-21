@@ -84,19 +84,20 @@ const createState = (): GameState => ({
 
 describe('C52_HuntsmansHat', () => {
   let cardApi: typeof import('../card-listeners')
+  let ops: typeof import('../registry-ops')
 
   beforeEach(async () => {
     vi.resetModules()
     cardApi = await import('../card-listeners')
-    cardApi.clearCardListeners()
+    ops = await import('../registry-ops')
+    ops.clearCardListeners()
     // Post PR-2 _impl migration: card files no longer self-register at import
-    // time. Pull the `_impl` export and push its listeners into the legacy
-    // map so the existing test reads via `getRegisteredCardListeners()` still
-    // see them.
+    // time. Pull the `_impl` export and push its listeners into the active
+    // registry so `getRegisteredCardListeners()` returns them.
     const mod = await import('../C/C52_HuntsmansHat')
-    const impl = (mod as { C52_HuntsmansHat_impl?: { listeners?: Array<Parameters<typeof cardApi.registerCardListener>[0]> } }).C52_HuntsmansHat_impl
+    const impl = (mod as { C52_HuntsmansHat_impl?: { listeners?: Array<Parameters<typeof ops.registerCardListener>[0]> } }).C52_HuntsmansHat_impl
     for (const listener of impl?.listeners ?? []) {
-      cardApi.registerCardListener(listener)
+      ops.registerCardListener(listener)
     }
   })
 

@@ -1,5 +1,5 @@
-import { registerCardListener, clearCardListeners } from '../card-listeners'
-import { registerCardEffect, clearCardEffects } from '../card-effects'
+import { registerCardListener, clearCardListeners } from '../registry-ops'
+import { registerCardEffect, clearCardEffects } from '../registry-ops'
 
 import { listener as immediatelyAfterGainFlow } from './Stub_ImmediatelyAfter_GainFlow'
 import { listener as computeCostsBuildDiscount } from './Stub_ComputeCosts_BuildDiscount'

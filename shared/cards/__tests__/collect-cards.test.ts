@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  clearCardListeners,
-  getRegisteredCardListeners,
-  registerCardListener,
-} from '../card-listeners'
+import { getRegisteredCardListeners } from '../card-listeners'
+import { clearCardListeners, registerCardListener } from '../registry-ops'
 import type { CardListenerContext } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace, Resource } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
