@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { ActionNode, ChoiceNode, OptionalNode, OrNode, SequenceNode, XorNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
@@ -9,7 +11,6 @@ import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/registry-ops'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -90,7 +91,7 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
 describe('engine follow-up actions', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('inserts follow-up actions after hooks', () => {

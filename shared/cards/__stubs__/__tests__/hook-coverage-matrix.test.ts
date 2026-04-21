@@ -12,7 +12,6 @@ import { HookDispatcher } from '../../../engine/dispatcher'
 import { LogStore } from '../../../engine/log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../../../engine/nodes'
 import { clearActionHooks } from '../../../actions/hooks'
-import { registerCardListener } from '../../registry-ops'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as IMMEDIATELY_AFTER_ID } from '../Stub_ImmediatelyAfter_GainFlow'
 import { CARD_ID as COMPUTE_COSTS_ID } from '../Stub_ComputeCosts_BuildDiscount'
@@ -25,6 +24,7 @@ import { CARD_A as ORDER_LOW_ID, CARD_B as ORDER_HIGH_ID } from '../Stub_Order_P
 import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
 import { getFenceCount } from '../../../actions/effects/fencing'
+import { requireActiveCardRegistry } from '../../active-registry'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const markCardObservedAction = internalActionDefinitions.find(a => a.id === 'mark-card-observed')!
@@ -461,7 +461,7 @@ describe('Stub card: Stub_Order_Priority', () => {
     const triggerOrder: string[] = []
     clearStubCards()
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-coverage-matrix').registerListener({
       id: 'stub-order-low',
       cardIds: [ORDER_LOW_ID],
       phases: ['immediatelyAfter'],
@@ -474,7 +474,7 @@ describe('Stub card: Stub_Order_Priority', () => {
       },
     })
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-coverage-matrix').registerListener({
       id: 'stub-order-high',
       cardIds: [ORDER_HIGH_ID],
       phases: ['immediatelyAfter'],

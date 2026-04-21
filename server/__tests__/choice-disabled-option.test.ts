@@ -12,11 +12,11 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { registerCardEffect } from '../../shared/cards/registry-ops'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -47,7 +47,7 @@ beforeEach(() => {
     occupations.push(testCard)
     occupationRegistered = true
   }
-  registerCardEffect({
+  requireActiveCardRegistry('choice-disabled-option').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),
   })

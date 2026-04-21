@@ -1,16 +1,17 @@
 import { beforeEach, describe, it, expect } from 'vitest'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { EngineTree } from '../tree'
 import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 beforeEach(() => {
   clearActionHooks()
-  clearCardListeners()
+  setActiveCardRegistry(new CardRegistry())
 })
 
 describe('OptionalNode passes actionContext to isDoable', () => {
@@ -68,7 +69,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     })
 
     let receivedActionContext: Record<string, unknown> | undefined
-    registerCardListener({
+    requireActiveCardRegistry('optional-node-context').registerListener({
       id: 'test-isdoable',
       cardIds: ['TestCard'],
       phases: ['isDoable'],
@@ -114,7 +115,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     })
 
     let receivedSourceCard: string | undefined
-    registerCardListener({
+    requireActiveCardRegistry('optional-node-context').registerListener({
       id: 'test-isdoable-source',
       cardIds: ['TestCard'],
       phases: ['isDoable'],

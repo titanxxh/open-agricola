@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { EngineTree } from '../tree'
 import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/registry-ops'
 
 beforeEach(() => {
   clearActionHooks()
-  clearCardListeners()
+  setActiveCardRegistry(new CardRegistry())
 })
 
 describe('optional node active', () => {

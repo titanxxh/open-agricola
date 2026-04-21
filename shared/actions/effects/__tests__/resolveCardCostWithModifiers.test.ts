@@ -1,8 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../cards/card-listeners'
-import { registerCardListener, clearCardListeners } from '../../../cards/registry-ops'
 import { resolveCardCostWithModifiers } from '../pay-helpers'
 import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
+import { CardRegistry } from '../../../../shared/cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../../shared/cards/active-registry'
 
 // Snapshot + restore approach: avoid blowing away module-level listeners
 // registered by other cards (e.g. D95_SiteManager) when this test file runs
@@ -12,8 +13,9 @@ const snapshotListeners = () => {
   snapshot = getRegisteredCardListeners()
 }
 const restoreListeners = () => {
-  clearCardListeners()
-  snapshot.forEach(registerCardListener)
+  const fresh = new CardRegistry()
+  setActiveCardRegistry(fresh)
+  snapshot.forEach((l) => fresh.registerListener(l))
 }
 
 const createPlayer = (): PlayerState =>
@@ -76,12 +78,12 @@ describe('resolveCardCostWithModifiers', () => {
     player.occupationPlayed = ['HookA', 'HookB']
     const state = createState(player)
 
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-a', cardIds: ['HookA'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({ costs: { stone: -1 } }),
     })
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-b', cardIds: ['HookB'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({ costs: { reed: -1 } }),
@@ -98,7 +100,7 @@ describe('resolveCardCostWithModifiers', () => {
     player.occupationPlayed = ['HookTrade']
     const state = createState(player)
 
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-trade', cardIds: ['HookTrade'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({ trades: [{ from: { wood: 1 }, to: { clay: 2 }, max: 1 }] }),
@@ -117,7 +119,7 @@ describe('resolveCardCostWithModifiers', () => {
     player.occupationPlayed = ['HookBonus']
     const state = createState(player)
 
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-bonus', cardIds: ['HookBonus'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({ bonuses: [{ discount: { stone: 1 }, sources: ['HookBonus'] }] }),
@@ -135,7 +137,7 @@ describe('resolveCardCostWithModifiers', () => {
     player.occupationPlayed = ['HookChoices']
     const state = createState(player)
 
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-choices', cardIds: ['HookChoices'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({
@@ -163,7 +165,7 @@ describe('resolveCardCostWithModifiers', () => {
     player.occupationPlayed = ['HookMulti']
     const state = createState(player)
 
-    registerCardListener({
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-multi', cardIds: ['HookMulti'], phases: ['computeCosts'],
       actions: ['improvement-any'],
       handler: () => ({

@@ -7,9 +7,10 @@ import {
   getCustomOccupationIds,
   clearCustomCards,
 } from '../custom-registry'
-import { clearCardEffects } from '../registry-ops'
 import type { CardDefinition } from '../types'
 import type { CustomCardData } from '../session-card-context'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry } from '../active-registry'
 
 const minorJson: CardDefinition = {
   id: 'CUSTOM_TestMinor',
@@ -35,7 +36,7 @@ const occupationJson: CardDefinition = {
 
 beforeEach(() => {
   clearCustomCards()
-  clearCardEffects()
+  setActiveCardRegistry(new CardRegistry())
 })
 
 const registerCustomCardWithOptions = registerCustomCard as unknown as (

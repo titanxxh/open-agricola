@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration } from '../../card-listeners'
-import { registerCardListener, clearCardListeners } from '../../registry-ops'
 import {
   STUB_BONUS_CHOICES_CARD,
   stubBonusChoicesListener,
@@ -11,6 +10,8 @@ import {
 import { resolveCardCostWithModifiers } from '../../../actions/effects/pay-helpers'
 import { computeAllBuyableCombinations, clearPaymentCache } from '../../../actions/effects/pay'
 import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
+import { CardRegistry } from '../../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../active-registry'
 
 // Snapshot + restore approach: avoid blowing away module-level listeners
 // registered by other cards (e.g. D95_SiteManager) when this test file runs
@@ -20,8 +21,9 @@ const snapshotListeners = () => {
   snapshot = getRegisteredCardListeners()
 }
 const restoreListeners = () => {
-  clearCardListeners()
-  snapshot.forEach(registerCardListener)
+  const fresh = new CardRegistry()
+  setActiveCardRegistry(fresh)
+  snapshot.forEach((l) => fresh.registerListener(l))
 }
 
 const createPlayer = (): PlayerState =>
@@ -75,7 +77,7 @@ describe('bonus.choices multi-path matrix', () => {
     const player = createPlayer()
     player.occupationPlayed = [STUB_BONUS_CHOICES_CARD]
     const state = createState(player)
-    registerCardListener(stubBonusChoicesListener)
+    requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
     const cost = resolveCardCostWithModifiers(
       state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },
@@ -121,7 +123,7 @@ describe('bonus.choices multi-path matrix', () => {
       max: 1,
     }]
     const state = createState(player)
-    registerCardListener(stubBonusChoicesListener)
+    requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
     const cost = resolveCardCostWithModifiers(
       state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },

@@ -14,10 +14,10 @@
  *    `GameSession` still need every card's listeners / effects reachable via
  *    `getRegisteredCardListeners()` / `getCardEffect()`. We build one
  *    registry, load every card's impl, and publish it as the active
- *    registry. Tests that call `clearCardListeners()` / `clearCardEffects()`
- *    replace this default with an empty registry; tests that construct a
- *    `GameSession` get their own fresh registry (GameCore publishes one in
- *    its constructor).
+ *    registry. Tests that want an isolated slate publish a fresh registry
+ *    via `setActiveCardRegistry(new CardRegistry())`; tests that construct
+ *    a `GameSession` get their own fresh registry (GameCore publishes one
+ *    in its constructor).
  *
  * Consumed via `vitest.config.ts` -> `test.setupFiles`.
  */

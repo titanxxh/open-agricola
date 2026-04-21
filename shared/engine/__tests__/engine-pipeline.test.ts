@@ -6,13 +6,14 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners } from '../../cards/registry-ops'
 
 const createState = (): GameState =>
   ({
@@ -86,7 +87,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 describe('Engine pipeline phase order', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('calls phases in correct order for simple action', () => {

@@ -1,9 +1,8 @@
 import { type CardEffect } from '../../shared/cards/card-effects.ts'
-import { registerCardEffect } from '../../shared/cards/registry-ops.ts'
-import { registerCardListener } from '../../shared/cards/registry-ops.ts'
 import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/game/types.ts'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
@@ -35,13 +34,14 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
     }
   }
 
-  // Register into session context if active, otherwise global (for tests)
+  // Register into session context when one is active; otherwise write
+  // directly to the active CardRegistry (test-only path).
   const sessionCtx = getCurrentSessionContext()
   if (codeManifest.effectHooks.length > 0) {
     if (sessionCtx) {
       sessionCtx.registerEffect(effect)
     } else {
-      registerCardEffect(effect)
+      requireActiveCardRegistry('registerExecutorBackedCustomCard').setEffect(effect)
     }
   }
 
@@ -70,7 +70,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
     if (sessionCtx) {
       sessionCtx.registerListener(reg)
     } else {
-      registerCardListener(reg)
+      requireActiveCardRegistry('registerExecutorBackedCustomCard').registerListener(reg)
     }
   }
 }

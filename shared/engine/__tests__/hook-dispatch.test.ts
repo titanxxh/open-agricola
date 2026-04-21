@@ -6,6 +6,8 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
@@ -15,7 +17,6 @@ import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 import { constructAction } from '../../actions/effects/construct'
 import { plowAction } from '../../actions/effects/plow'
 import { stablesAction } from '../../actions/effects/stables'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -74,7 +75,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 describe('Hook dispatch merge order', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('action hooks run before card listeners in same phase', () => {
@@ -92,7 +93,7 @@ describe('Hook dispatch merge order', () => {
       },
     })
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'card-listener',
       cardIds: ['card-A'],
       actions: ['test-action'],
@@ -140,7 +141,7 @@ describe('Hook dispatch merge order', () => {
 describe('Card listener order field', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('card listeners execute in ascending order', () => {
@@ -148,7 +149,7 @@ describe('Card listener order field', () => {
     const player = createPlayer()
     player.minorPlayed = ['card-A', 'card-B']
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'listener-high',
       cardIds: ['card-B'],
       actions: ['test-action'],
@@ -160,7 +161,7 @@ describe('Card listener order field', () => {
       },
     })
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'listener-low',
       cardIds: ['card-A'],
       actions: ['test-action'],
@@ -202,7 +203,7 @@ describe('Card listener order field', () => {
 describe('Card listener scope filtering', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('scope player: triggers only when active player has card', () => {
@@ -211,7 +212,7 @@ describe('Card listener scope filtering', () => {
     p1.minorPlayed = ['scope-card']
     const p2 = createPlayer('p2', 'P2')
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-player-test',
       cardIds: ['scope-card'],
       actions: ['test-action'],
@@ -267,7 +268,7 @@ describe('Card listener scope filtering', () => {
     const p2 = createPlayer('p2', 'P2')
     p2.minorPlayed = ['opp-card']
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-opponent-test',
       cardIds: ['opp-card'],
       actions: ['test-action'],
@@ -304,8 +305,8 @@ describe('Card listener scope filtering', () => {
     expect(triggered).toBe(true)
 
     triggered = false
-    clearCardListeners()
-    registerCardListener({
+    setActiveCardRegistry(new CardRegistry())
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-opponent-test2',
       cardIds: ['opp-card'],
       actions: ['test-action'],
@@ -335,7 +336,7 @@ describe('Card listener scope filtering', () => {
     const p2 = createPlayer('p2', 'P2')
     p1.minorPlayed = ['any-card']
 
-    registerCardListener({
+    requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-any-test',
       cardIds: ['any-card'],
       actions: ['test-action'],
@@ -388,7 +389,7 @@ describe('Card listener scope filtering', () => {
 describe('Multiple hooks overriding doable', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('later hook doable overrides earlier', () => {
@@ -434,7 +435,7 @@ describe('Multiple hooks overriding doable', () => {
 describe('Cost preview doable', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('construct can become doable after computeCosts discount', () => {
