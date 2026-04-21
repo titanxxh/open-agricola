@@ -55,7 +55,7 @@ import {
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
-import { setActiveCardRegistry } from '../cards/active-registry.ts'
+import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
@@ -289,12 +289,23 @@ export class GameCore {
     // Build or accept a per-session card registry, then publish it as the
     // "active" registry so any subsequent `registerCardListener` /
     // `registerCardEffect` calls (e.g. from custom-code cards) forward into it.
+    //
+    // If an active registry already exists (e.g. test harness with
+    // pre-registered stub listeners / effects), clone it so those entries
+    // survive into the session without leaking mutations back to the outer
+    // registry. Fall back to a fresh registry loaded with ALL_CARD_IMPLS
+    // when no outer registry is active (production startup path).
     if (options.cardRegistry) {
       this.cardRegistry = options.cardRegistry
     } else {
-      this.cardRegistry = new CardRegistry()
-      for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
-        this.cardRegistry.loadImpl(cardId, impl as CardImpl)
+      const existing = getActiveCardRegistry()
+      if (existing) {
+        this.cardRegistry = existing.clone()
+      } else {
+        this.cardRegistry = new CardRegistry()
+        for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+          this.cardRegistry.loadImpl(cardId, impl as CardImpl)
+        }
       }
     }
     setActiveCardRegistry(this.cardRegistry)

@@ -3,7 +3,12 @@ import type { AnimalZone } from '../actions/effects/animals'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
-import { getActiveCardRegistry, setActiveCardRegistry } from './active-registry'
+import { CardRegistry } from './registry'
+import {
+  getActiveCardRegistry,
+  requireActiveCardRegistry,
+  setActiveCardRegistry,
+} from './active-registry'
 import { positionKey } from '../game/farm'
 
 /**
@@ -152,44 +157,28 @@ export type CardEffect = {
   handHooks?: CardEffectHook[]
 }
 
-const cardEffectOverrides = new Map<string, CardEffect>()
-
 /**
- * @deprecated Use `CardRegistry.loadImpl(cardId, { effect })` instead.
- * This module-level global registry is kept for backward compatibility during
- * PR-1 → PR-3 migration; it will be removed once all cards adopt the
- * `_impl` export pattern and `GameCore` wires into per-session `CardRegistry`.
+ * Register a card effect against the currently active `CardRegistry`.
  *
- * See `shared/cards/registry.ts` for the new per-session approach.
+ * `GameCore` publishes its per-session registry before any card code runs.
+ * Tests use the default registry published by `setup-register-all.ts`, or
+ * reset to an empty one via `clearCardEffects()`.
  */
 export const registerCardEffect = (effect: CardEffect) => {
-  const active = getActiveCardRegistry()
-  if (active && effect.id) {
-    active.loadImpl(effect.id, { effect })
-  }
-  // Also mirror into the legacy global map so that:
-  //  - Tests registering a synthetic card effect *before* constructing a new
-  //    GameSession (which would build a fresh CardRegistry) still find the
-  //    effect via the legacy fallback inside `getCardEffect`.
-  //  - Repeated `registerCardEffect` calls overwrite the entry for a given id,
-  //    matching pre-migration behaviour.
-  cardEffectOverrides.set(effect.id, effect)
+  const active = requireActiveCardRegistry('registerCardEffect')
+  active.setEffect(effect)
 }
 
+/** Replace the active registry with a fresh empty one (test reset). */
 export const clearCardEffects = () => {
-  cardEffectOverrides.clear()
-  // Also detach any session-owned active registry so subsequent test setup
-  // re-registers into the legacy global by default. A new GameSession will
-  // reattach its own registry on construction.
-  setActiveCardRegistry(null)
+  setActiveCardRegistry(new CardRegistry())
 }
 
+/** Remove effects whose id starts with `CUSTOM_` from the active registry. */
 export const clearCustomCardEffects = () => {
-  for (const id of [...cardEffectOverrides.keys()]) {
-    if (id.startsWith('CUSTOM_')) {
-      cardEffectOverrides.delete(id)
-    }
-  }
+  const active = getActiveCardRegistry()
+  if (!active) return
+  active.removeEffectsWhere((id) => id.startsWith('CUSTOM_'))
 }
 
 export const getCardEffect = (id: string): CardEffect | null => {
@@ -197,9 +186,7 @@ export const getCardEffect = (id: string): CardEffect | null => {
   const custom = sessionCtx?.customEffects.get(id)
   if (custom) return custom
   const active = getActiveCardRegistry()
-  const fromActive = active?.getEffect(id)
-  if (fromActive) return fromActive
-  return cardEffectOverrides.get(id) ?? getMajorCardEffect(id) ?? null
+  return active?.getEffect(id) ?? getMajorCardEffect(id) ?? null
 }
 
 const isCustomCard = (id: string) => id.startsWith('CUSTOM_')
