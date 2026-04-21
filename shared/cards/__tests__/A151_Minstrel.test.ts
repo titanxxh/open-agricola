@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../A/A151_Minstrel'
 
@@ -65,7 +65,7 @@ describe('A151_Minstrel', () => {
     const state = createState(player)
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).not.toBeNull()
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children[0].actionId).toBe('improvement-any')
@@ -104,7 +104,7 @@ describe('A151_Minstrel', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     expect(flow).not.toBeNull()
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children[0].actionId).toBe('gain')

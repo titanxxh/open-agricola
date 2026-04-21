@@ -73,7 +73,7 @@ describe('C101_StallHolder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C101-stall-holder-anytime')
   })
 
@@ -87,7 +87,7 @@ describe('C101_StallHolder session', () => {
     expect(isCardFlagged(resp.state.players[0]!, 'C101_StallHolder')).toBe(true)
 
     // Verify anytime action is no longer available
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C101-stall-holder-anytime')
   })
 })

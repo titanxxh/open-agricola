@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B116_Shoreforester'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B116_Shoreforester'
 
@@ -20,7 +21,7 @@ describe('B116_Shoreforester session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.wood).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
   })
 
   it('onRoundStart gives 1 wood when card is played', () => {
@@ -40,7 +41,7 @@ describe('B116_Shoreforester session', () => {
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.wood).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
   })
 
 
@@ -61,7 +62,7 @@ describe('B116_Shoreforester session', () => {
       state.round = round
       const flow = effect!.onRoundStart!(state, player)
       expect(flow).toBeDefined()
-      expect((flow as any).params?.wood).toBe(1)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
     }
   })
 })

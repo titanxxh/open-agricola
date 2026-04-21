@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C113_WinterCaretaker'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C113_WinterCaretaker'
 
@@ -20,8 +21,8 @@ describe('C113_WinterCaretaker session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ grain: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ grain: 1 })
   })
 
   it('onEndHarvest returns optional pay 2 food + gain 1 vegetable', () => {
@@ -41,8 +42,8 @@ describe('C113_WinterCaretaker session', () => {
     const flow = effect!.onEndHarvest!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    const children = (flow as any).children
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
     // First child: pay 2 food
     expect(children[0].type).toBe('leaf')

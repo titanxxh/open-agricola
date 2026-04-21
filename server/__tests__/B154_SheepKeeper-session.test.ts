@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B154_SheepKeeper'
+import type { AnytimeAction } from '../../shared/game/types';
 
 const CARD_ID = 'B154_SheepKeeper'
 
@@ -31,7 +32,7 @@ describe('B154_SheepKeeper session', () => {
   it('not available with < 7 sheep', () => {
     const session = setup(6)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B154-sheep-keeper-anytime')
   })
 
@@ -41,7 +42,7 @@ describe('B154_SheepKeeper session', () => {
     const initialFood = state.players[0]!.resources.food
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('B154-sheep-keeper-anytime')
 
     const resp2 = session.takeAnytimeAction(0, 'B154-sheep-keeper-anytime')
@@ -59,7 +60,7 @@ describe('B154_SheepKeeper session', () => {
     expect(isCardFlagged(resp2.state.players[0]!, CARD_ID)).toBe(true)
 
     // Should no longer appear in anytime actions
-    const anytimeIds = resp2.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp2.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B154-sheep-keeper-anytime')
   })
 })

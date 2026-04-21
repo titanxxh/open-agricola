@@ -5,6 +5,7 @@ import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 import { computeScores } from '../../shared/logic/scoring'
 
 import '../../shared/cards/E/E132_VeggieLover'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E132_VeggieLover'
 
@@ -61,7 +62,7 @@ describe('E132_VeggieLover session', () => {
     const flow = effect!.onHarvestFeedingPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
   })
 
   it('returns undefined when player has no grain', () => {

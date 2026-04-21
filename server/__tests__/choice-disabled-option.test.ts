@@ -86,7 +86,7 @@ describe('disabled option in pending choice', () => {
     expect(firstOption).toBeDefined()
 
     // Mutate the session's pending state to mark the option disabled
-    ;(session as any).pending.options[0].disabled = true
+    ;(session as unknown as { pending: { options: { disabled?: boolean }[] } }).pending.options[0].disabled = true
 
     // Attempt to resolve with the disabled option → should be rejected
     resp = session.resolveChoice(0, firstOption.value)
@@ -109,7 +109,7 @@ describe('disabled option in pending choice', () => {
     expect(secondOption).toBeDefined()
 
     // Mutate the session's pending state to disable the first option
-    ;(session as any).pending.options[0].disabled = true
+    ;(session as unknown as { pending: { options: { disabled?: boolean }[] } }).pending.options[0].disabled = true
 
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)

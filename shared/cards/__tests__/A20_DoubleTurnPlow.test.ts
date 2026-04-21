@@ -4,7 +4,7 @@ import {
   executeCardListener,
 } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../A/A20_DoubleTurnPlow'
 import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'
@@ -70,7 +70,7 @@ describe('A20_DoubleTurnPlow', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.optional).toBe(true)
     expect(seq.children).toHaveLength(2)
     expect(seq.children[0].actionId).toBe('plow')

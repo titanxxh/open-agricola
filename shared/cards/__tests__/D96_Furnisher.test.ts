@@ -8,6 +8,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../D/D96_Furnisher'
+import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'D96_Furnisher'
 
@@ -63,8 +64,8 @@ describe('D96_Furnisher', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
   })
 
   it('after construct with 1 room built, offers 1 optional improvement', () => {
@@ -82,7 +83,7 @@ describe('D96_Furnisher', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(1)
@@ -103,7 +104,7 @@ describe('D96_Furnisher', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children).toHaveLength(2)
   })
 

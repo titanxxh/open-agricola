@@ -11,6 +11,8 @@ import type {
 
 import '../../shared/cards/B/B146_Illusionist'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import type { ActionFlow } from '../../shared/game/types'
+
 
 const CARD_ID = 'B146_Illusionist'
 
@@ -180,7 +182,7 @@ describe('B146_Illusionist listener handler', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
@@ -209,7 +211,7 @@ describe('B146_Illusionist listener handler', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[1].params).toEqual({ clay: 1 })
   })
 
@@ -231,7 +233,7 @@ describe('B146_Illusionist listener handler', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[1].params).toEqual({ reed: 1 })
   })
 
@@ -253,7 +255,7 @@ describe('B146_Illusionist listener handler', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[1].params).toEqual({ stone: 1 })
   })
 

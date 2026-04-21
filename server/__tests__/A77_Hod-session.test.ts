@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A77_Hod'
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('A77_Hod session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -48,8 +49,8 @@ describe('A77_Hod session', () => {
     const flow = runCardEffectHook(state, player, 'A77_Hod', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ clay: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
   })
 
   it('owner gets 2 clay when owner uses pig-market', () => {

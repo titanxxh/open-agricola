@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A150_Stagehand'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('A150_Stagehand session', () => {
   const setup = () => {
@@ -73,18 +74,18 @@ describe('A150_Stagehand session', () => {
     if (resp.pending.type !== 'choice') return
 
     // First choice: optional wrapping — pick any non-skip to activate the XOR
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
     // Second choice: the XOR with fence, stables, construct
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    const xorOptions = resp.pending.options?.filter((o: any) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(3) // fence, stables, construct
 
     // Choose construct (find it by label)
-    const constructOption = xorOptions.find((o: any) => o.labelKey?.includes('construct'))
+    const constructOption = xorOptions.find((o: ActionChoiceOption) => o.labelKey?.includes('construct'))
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('farmSelect')

@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A102_Grocer'
+import type { AnytimeAction } from '../../shared/game/types';
+import type { SessionResponse } from '../../shared/session/game-core'
 
 describe('A102_Grocer session', () => {
   const setup = () => {
@@ -47,7 +49,7 @@ describe('A102_Grocer session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('A102-grocer-anytime')
   })
 
@@ -60,7 +62,7 @@ describe('A102_Grocer session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A102-grocer-anytime')
   })
 
@@ -75,7 +77,7 @@ describe('A102_Grocer session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A102-grocer-anytime')
   })
 
@@ -140,7 +142,7 @@ describe('A102_Grocer session', () => {
     enterActiveInteraction(session)
 
     // Take all 8 items
-    let lastResp: any
+    let lastResp: SessionResponse | undefined
     for (let i = 0; i < 8; i++) {
       lastResp = session.takeAnytimeAction(0, 'A102-grocer-anytime')
       expect(lastResp.ok).toBe(true)
@@ -152,7 +154,7 @@ describe('A102_Grocer session', () => {
     expect(stack.length).toBe(0)
 
     // Verify anytime is no longer available after stack is drained
-    const anytimeIds = lastResp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = lastResp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A102-grocer-anytime')
   })
 })

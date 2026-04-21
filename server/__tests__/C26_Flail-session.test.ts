@@ -7,6 +7,7 @@ import {
 } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C26_Flail'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C26_Flail'
 
@@ -23,9 +24,9 @@ describe('C26_Flail session', () => {
     expect(effect).toBeDefined()
     const flow = effect!.onBuy!(state, state.players[0]!)
     expect(flow).toBeDefined()
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ food: 2 })
-    expect((flow as any).sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
   it('after-place-farmer on farmland offers optional bake-bread', () => {
@@ -47,7 +48,7 @@ describe('C26_Flail session', () => {
       phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
     expect(leaf.actionId).toBe('bake-bread')
     expect(leaf.optional).toBe(true)
@@ -74,7 +75,7 @@ describe('C26_Flail session', () => {
       phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    expect((result!.flow as any).actionId).toBe('bake-bread')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
   })
 
   it('does not trigger on non-trigger spaces', () => {

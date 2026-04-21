@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C115_Sower'
+import type { AnytimeAction } from '../../shared/game/types';
 
 describe('C115_Sower session', () => {
   const setup = () => {
@@ -90,7 +91,7 @@ describe('C115_Sower session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('C115-sower-anytime')
   })
 
@@ -99,7 +100,7 @@ describe('C115_Sower session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C115-sower-anytime')
   })
 
@@ -240,7 +241,7 @@ describe('C115_Sower session', () => {
     expect(getCardStack(updatedPlayer, 'C115_Sower').length).toBe(0)
 
     // Anytime should no longer be available
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C115-sower-anytime')
   })
 })

@@ -6,6 +6,7 @@ import {
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C130_OutskirtsDirector'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C130_OutskirtsDirector'
 
@@ -76,7 +77,7 @@ describe('C130_OutskirtsDirector', () => {
     expect(hollowSpace.resources.reed).toBe(2)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('place-farmer')
   })
 

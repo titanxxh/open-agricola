@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C107_Baker'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C107_Baker'
 
@@ -22,9 +23,9 @@ describe('C107_Baker session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('bake-bread')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
   it('onBuy returns undefined when player has no grain', () => {
@@ -60,9 +61,9 @@ describe('C107_Baker session', () => {
     const flow = effect!.onStartHarvestFeedingPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('bake-bread')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
   it('onStartHarvestFeedingPhase returns undefined when player has no grain', () => {

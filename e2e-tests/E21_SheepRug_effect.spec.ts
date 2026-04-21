@@ -112,7 +112,7 @@ test.describe('E21_SheepRug Effect', () => {
     }
 
     const afterWishAction = await getJson(request, `${BACKEND_URL}/api/game/state`)
-    const wishSpace = afterWishAction.state.actionSpaces.find((s: any) => s.id === 'wish-children')
+    const wishSpace = afterWishAction.state.actionSpaces.find((s: Record<string, unknown>) => s.id === 'wish-children')
     console.log('After P1 Wish for Children, wish-children takenBy:', wishSpace?.takenBy)
     saveState('E21_SheepRug_05_wish_occupied.json', afterWishAction.state)
     await saveScreenshot(page, 'E21_SheepRug_05_wish_occupied', 'output')
@@ -224,7 +224,7 @@ test.describe('E21_SheepRug Effect', () => {
     const afterWish = await getJson(request, `${BACKEND_URL}/api/game/state`)
     saveState('E21_SheepRug_control_03_wish_occupied.json', afterWish.state)
     console.log('Control - wish-children takenBy:',
-      afterWish.state.actionSpaces.find((s: any) => s.id === 'wish-children')?.takenBy)
+      afterWish.state.actionSpaces.find((s: Record<string, unknown>) => s.id === 'wish-children')?.takenBy)
     await saveScreenshot(page, 'E21_SheepRug_control_03_wish_occupied', 'output')
 
     // P2's turn - WITHOUT SheepRug card

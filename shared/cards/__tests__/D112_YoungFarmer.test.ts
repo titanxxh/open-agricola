@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D112_YoungFarmer'
 
@@ -66,7 +66,7 @@ describe('D112_YoungFarmer', () => {
       actionId: 'place-farmer', phase: 'during',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ grain: 1 })
   })
@@ -80,7 +80,7 @@ describe('D112_YoungFarmer', () => {
       actionId: 'place-farmer', phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('sow')
     expect(leaf.optional).toBe(true)
   })

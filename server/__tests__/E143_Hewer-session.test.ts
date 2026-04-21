@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E143_Hewer'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E143_Hewer'
 
@@ -31,8 +32,8 @@ describe('E143_Hewer session', () => {
     const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ stone: 1, food: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1, food: 1 })
   })
 
   it('does not trigger when round < 3', () => {

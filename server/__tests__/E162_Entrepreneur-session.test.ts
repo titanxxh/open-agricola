@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E162_Entrepreneur'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E162_Entrepreneur'
 
@@ -40,9 +41,9 @@ describe('E162_Entrepreneur session', () => {
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
-      expect((flow as any).optional).toBe(true)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
       // Option A: pay food + push to stack + gain wood
-      expect((flow as any).children.length).toBeGreaterThanOrEqual(1)
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBeGreaterThanOrEqual(1)
     }
   })
 
@@ -94,7 +95,7 @@ describe('E162_Entrepreneur session', () => {
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
       // Only option B since player has no food
-      expect((flow as any).children.length).toBe(1)
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBe(1)
     }
   })
 
@@ -113,7 +114,7 @@ describe('E162_Entrepreneur session', () => {
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
-      expect((flow as any).children.length).toBe(2)
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBe(2)
     }
   })
 })

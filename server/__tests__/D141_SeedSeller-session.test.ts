@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D141_SeedSeller'
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('D141_SeedSeller session', () => {
   const setup = () => {
@@ -32,8 +33,8 @@ describe('D141_SeedSeller session', () => {
     const flow = runCardEffectHook(state, player, 'D141_SeedSeller', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ grain: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ grain: 1 })
   })
 
   it('gains 1 extra grain when using grain-seeds', () => {

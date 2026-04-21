@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B63_Tasting'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { SessionResponse } from '../../shared/session/game-core'
 
 const CARD_ID = 'B63_Tasting'
 
@@ -27,7 +29,7 @@ describe('B63_Tasting session', () => {
     return session
   }
 
-  const drainSwitches = (session: GameSession, resp: any) => {
+  const drainSwitches = (session: GameSession, resp: SessionResponse) => {
     let r = resp
     let safety = 30
     while (safety-- > 0 && r.pending?.type === 'confirmPlayerSwitch') {
@@ -47,12 +49,12 @@ describe('B63_Tasting session', () => {
     while (safety-- > 0 && resp.pending?.type === 'choice') {
       const options = resp.pending.options ?? []
       // Look for the grain-pay option
-      const payOpt = options.find((o: any) =>
+      const payOpt = options.find((o: ActionChoiceOption) =>
         o.value?.startsWith?.('pay-resources') ||
         o.value?.startsWith?.('exchange') ||
         o.value === '__accept__',
       )
-      const occOpt = options.find((o: any) => o.value === 'A93_BedMaker')
+      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       if (payOpt) {
         resp = session.resolveChoice(0, payOpt.value)
       } else if (occOpt) {
@@ -82,8 +84,8 @@ describe('B63_Tasting session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending?.type === 'choice') {
       const options = resp.pending.options ?? []
-      const skipOpt = options.find((o: any) => o.value === '__skip__')
-      const occOpt = options.find((o: any) => o.value === 'A93_BedMaker')
+      const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (occOpt) {

@@ -8,6 +8,7 @@ import { computeAnimalZones } from '../../shared/actions/effects/animals'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C148_MudWallower'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C148_MudWallower'
 
@@ -109,8 +110,8 @@ describe('C148_MudWallower', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ boar: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ boar: 1 })
 
     // Counter should reset, held should increase
     expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)

@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/game/types'
 
 import '../../shared/cards/C/C23_JobContract'
 
@@ -132,7 +132,7 @@ describe('C23_JobContract listener', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('play-occupation')
@@ -154,7 +154,7 @@ describe('C23_JobContract listener', () => {
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
     } as any)
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.costOverride).toEqual({})
   })
 
@@ -171,7 +171,7 @@ describe('C23_JobContract listener', () => {
     const result = executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
     } as any)
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.costOverride).toEqual({ food: 1 })
   })
 })

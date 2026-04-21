@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/logic/scoring'
-import type { GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/game/types'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
 import '../../shared/cards/E/E159_OldMiser'
@@ -79,7 +79,7 @@ describe('E159_OldMiser session', () => {
         } else if (resp.pending.type === 'animalReorg') {
           resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
         } else if (resp.pending.type === 'choice') {
-          const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+          const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
           if (skipOpt) {
             resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
           } else {
@@ -131,7 +131,7 @@ describe('E159_OldMiser session', () => {
         } else if (resp.pending.type === 'animalReorg') {
           resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
         } else if (resp.pending.type === 'choice') {
-          const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+          const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
           if (skipOpt) {
             resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
           } else {
@@ -177,7 +177,7 @@ describe('E159_OldMiser session', () => {
         } else if (resp.pending.type === 'animalReorg') {
           resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
         } else if (resp.pending.type === 'choice') {
-          const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+          const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
           if (skipOpt) {
             resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
           } else {

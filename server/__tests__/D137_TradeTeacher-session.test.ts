@@ -6,12 +6,15 @@ import {
   executeCardListener,
 } from '../../shared/cards/card-listeners'
 import type {
+  ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
 } from '../../shared/game/types'
 
 import '../../shared/cards/D/D137_TradeTeacher'
+import type { SessionResponse } from '../../shared/session/game-core'
+
 
 const CARD_ID = 'D137_TradeTeacher'
 
@@ -126,7 +129,7 @@ describe('D137_TradeTeacher listener', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('xor')
     expect(flow.optional).toBe(true)
     // 6 singles + C(6,2) = 15 pairs = 21 options.
@@ -173,10 +176,10 @@ describe('D137_TradeTeacher listener', () => {
       phase: 'after',
     } as any)
 
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     // Find the combo that gains only cattle.
     const cattleOnly = flow.children.find(
-      (c: any) =>
+      (c: ActionFlow) =>
         c.children[1].params?.cattle === 1 &&
         Object.keys(c.children[1].params).length === 1,
     )
@@ -185,7 +188,7 @@ describe('D137_TradeTeacher listener', () => {
 
     // grain only → 1 food.
     const grainOnly = flow.children.find(
-      (c: any) =>
+      (c: ActionFlow) =>
         c.children[1].params?.grain === 1 &&
         Object.keys(c.children[1].params).length === 1,
     )
@@ -194,7 +197,7 @@ describe('D137_TradeTeacher listener', () => {
 
     // grain + cattle pair → 3 food, gain both.
     const grainCattle = flow.children.find(
-      (c: any) =>
+      (c: ActionFlow) =>
         c.children[1].params?.grain === 1 &&
         c.children[1].params?.cattle === 1,
     )
@@ -224,7 +227,7 @@ describe('D137_TradeTeacher end-to-end via GameSession', () => {
     return session
   }
 
-  const walk = (session: GameSession, resp: any) => {
+  const walk = (session: GameSession, resp: SessionResponse) => {
     let r = resp
     let safety = 50
     while (safety-- > 0) {

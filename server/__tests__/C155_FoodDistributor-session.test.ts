@@ -3,6 +3,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C155_FoodDistributor'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C155_FoodDistributor'
 
@@ -69,8 +70,8 @@ describe('C155_FoodDistributor', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ grain: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ grain: 1 })
 
     // Check purchase round was recorded
     expect(player.cardStates?.[CARD_ID]?.extraData?.purchaseRound).toBe(5)
@@ -91,8 +92,8 @@ describe('C155_FoodDistributor', () => {
     const flow = effect!.onStartReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ food: 5 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 5 })
   })
 
   it('onStartReturnHome does not fire on different round', () => {

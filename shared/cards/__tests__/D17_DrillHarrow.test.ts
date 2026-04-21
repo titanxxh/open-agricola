@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D17_DrillHarrow'
 import { D17_DrillHarrow as D17Card } from '../D/D17_DrillHarrow'
@@ -71,7 +71,7 @@ describe('D17_DrillHarrow', () => {
       } as any)
 
       expect(result).toBeDefined()
-      const flow = result!.flow as any
+      const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
       expect(flow.type).toBe('seq')
       expect(flow.optional).toBe(true)
       expect(flow.children).toHaveLength(2)

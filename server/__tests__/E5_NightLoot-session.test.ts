@@ -4,6 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace, Resource } from '../../shared/game/types'
 
 import '../../shared/cards/E/E5_NightLoot'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E5_NightLoot'
 
@@ -68,8 +69,8 @@ describe('E5_NightLoot session', () => {
     if (woodSpace) {
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('leaf')
-      expect((flow as any).actionId).toBe('gain')
-      expect((flow as any).params.wood).toBe(1)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.wood).toBe(1)
     }
   })
 
@@ -122,7 +123,7 @@ describe('E5_NightLoot session', () => {
     if (woodSpace && stoneSpace) {
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('xor')
-      const children = (flow as any).children
+      const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
       // Should have exactly 1 pair: wood+stone
       expect(children.length).toBe(1)
       const params = children[0].params

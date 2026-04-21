@@ -184,7 +184,7 @@ describe('E70_CropRotationField session', () => {
       const player = session.getState().state.players[0]!
       writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
 
-      ;(session as any).pending = {
+      ;(session as unknown as { pending: PendingAction }).pending = {
         type: 'choice',
         playerIndex: 0,
         spaceId: 'grain-utilization',
@@ -195,7 +195,7 @@ describe('E70_CropRotationField session', () => {
           sourceCard: CARD_ID,
         },
       }
-      ;(session as any).activeSpaceId = 'grain-utilization'
+      ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
 
       const resp = session.commitFarmChoice(0, 'sow', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],

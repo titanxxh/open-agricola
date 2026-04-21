@@ -14,6 +14,8 @@ import type {
 } from '../../shared/game/types'
 
 import '../../shared/cards/D/D93_SheepInspector'
+import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
+import type { SessionResponse } from '../../shared/session/game-core'
 
 const CARD_ID = 'D93_SheepInspector'
 
@@ -175,7 +177,7 @@ describe('D93_SheepInspector listener', () => {
     } as any)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(3)
@@ -228,7 +230,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     return session
   }
 
-  const walkToChoice = (session: GameSession, resp: any) => {
+  const walkToChoice = (session: GameSession, resp: SessionResponse) => {
     let r = resp
     let safety = 30
     while (safety-- > 0) {
@@ -255,7 +257,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // Should now be at the optional-seq prompt (choice with skip / accept).
     expect(resp.pending?.type).toBe('choice')
     const options = resp.pending?.options ?? []
-    const acceptOption = options.find((o: any) => o.value !== '__skip__')
+    const acceptOption = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
     resp = walkToChoice(session, resp)
@@ -265,7 +267,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // helper auto-resolves. But if it pops a choice for recall, resolve it.
     if (resp.pending?.type === 'choice') {
       const opts = resp.pending.options ?? []
-      const forestOption = opts.find((o: any) => String(o.value) === 'forest')
+      const forestOption = opts.find((o: ActionChoiceOption) => String(o.value) === 'forest')
       expect(forestOption).toBeDefined()
       resp = session.resolveChoice(0, forestOption!.value)
       resp = walkToChoice(session, resp)

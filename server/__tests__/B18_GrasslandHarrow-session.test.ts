@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B18_GrasslandHarrow'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B18_GrasslandHarrow'
 
@@ -76,9 +77,9 @@ describe('B18_GrasslandHarrow session', () => {
     state.round = 5
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
-    expect((flow as any).type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).children[0].actionId).toBe('plow')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('seq')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('plow')
   })
 
   it('onRoundStart returns nothing when it is not the target round', () => {

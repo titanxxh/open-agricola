@@ -46,7 +46,7 @@ describe('D87_MasterBuilder session', () => {
     const session = setup({ rooms: 4 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D87-master-builder-anytime')
   })
 
@@ -59,7 +59,7 @@ describe('D87_MasterBuilder session', () => {
     expect(resp1.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D87-master-builder-anytime')
   })
 })

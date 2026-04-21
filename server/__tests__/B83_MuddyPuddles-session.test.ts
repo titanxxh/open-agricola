@@ -66,7 +66,7 @@ describe('B83_MuddyPuddles session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B83-muddy-puddles-anytime')
   })
 
@@ -80,7 +80,7 @@ describe('B83_MuddyPuddles session', () => {
 
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B83-muddy-puddles-anytime')
   })
 })

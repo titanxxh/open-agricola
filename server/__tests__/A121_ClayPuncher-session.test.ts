@@ -4,6 +4,8 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A121_ClayPuncher'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('A121_ClayPuncher session', () => {
   const setup = () => {
@@ -37,8 +39,8 @@ describe('A121_ClayPuncher session', () => {
     const flow = runCardEffectHook(state, player, 'A121_ClayPuncher', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ clay: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
   })
 
   it('gains 1 extra clay when using clay-pit', () => {
@@ -70,7 +72,7 @@ describe('A121_ClayPuncher session', () => {
     // lessons action prompts for occupation choice
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type === 'choice') {
-      const option = resp.pending.options?.find((o: any) => o.value === 'A93_BedMaker')
+      const option = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

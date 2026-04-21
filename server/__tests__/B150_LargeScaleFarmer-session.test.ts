@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
+import type { ActionFlow } from '../../shared/game/types'
+
 
 const CARD_ID = 'B150_LargeScaleFarmer'
 
@@ -185,7 +187,7 @@ describe('B150_LargeScaleFarmer session', () => {
     } as any)
     expect(result).toBeDefined()
     expect(result!.sourceCard).toBe(CARD_ID)
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     // First child is pay-resources 1 food

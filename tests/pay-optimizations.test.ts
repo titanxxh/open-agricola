@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
 
+type MockPlayer = {
+  resources: Record<string, number>
+  getExchangeResources: () => Record<string, number>
+  getCards: () => { getIds: () => string[] }
+}
+type CostSpec = Record<string, unknown>
+type Combination = Record<string, unknown>
+
 const benchmarkIt = process.env.RUN_BENCHMARKS === '1' ? it : it.skip
 
 const createMockPlayer = (resources: Record<string, number>) => ({
@@ -8,7 +16,7 @@ const createMockPlayer = (resources: Record<string, number>) => ({
   getCards: () => ({ getIds: () => [] }),
 })
 
-function baseline(player: any, costs: any, target: number | null = null, ignoreResources = false) {
+function baseline(player: MockPlayer, costs: CostSpec, target: number | null = null, ignoreResources = false) {
   const reserve = player.getExchangeResources()
   const maxReserve = { ...reserve }
   const bonuses = costs.bonuses ?? []
@@ -23,7 +31,7 @@ function baseline(player: any, costs: any, target: number | null = null, ignoreR
     }
   }
 
-  const combinations: any[] = []
+  const combinations: unknown[] = []
   const fees = costs.fees ?? [costs.fee ?? {}]
   for (const baseCost of fees) {
     baseCost.nb = 0
@@ -93,7 +101,7 @@ function baseline(player: any, costs: any, target: number | null = null, ignoreR
   return combinations
 }
 
-function pushBaseline(combination: any, combinations: any[], reserve: any, checkNonNegative = false, ignoreResources = false) {
+function pushBaseline(combination: Combination, combinations: Combination[], reserve: Record<string, number>, checkNonNegative = false, ignoreResources = false) {
   for (const c of combinations) {
     const d = { ...combination }
     const c1 = { ...c }
@@ -112,7 +120,7 @@ function pushBaseline(combination: any, combinations: any[], reserve: any, check
   return true
 }
 
-function addCostBaseline(combination: any, unitCost: any, times = 1) {
+function addCostBaseline(combination: Combination, unitCost: Combination, times = 1) {
   combination.sources = [...new Set([...(combination.sources ?? []), ...(unitCost.sources ?? [])])]
   const conditions = unitCost.conditions ?? {}
   for (const [resource, cost] of Object.entries(unitCost)) {
@@ -125,7 +133,7 @@ function addCostBaseline(combination: any, unitCost: any, times = 1) {
   }
 }
 
-function canApply(combination: any, bonus: any) {
+function canApply(combination: Combination, bonus: Combination) {
   if (bonus.conditions) {
     for (const [requirement, amt] of Object.entries(bonus.conditions)) {
       if (requirement === 'minNumRooms' && (combination.nb ?? 0) < (amt as number)) return false
@@ -137,7 +145,7 @@ function canApply(combination: any, bonus: any) {
   return true
 }
 
-function eq(a: any, b: any) {
+function eq(a: Combination, b: Combination) {
   const a1 = { ...a }; const b1 = { ...b }
   delete a1.sources; delete b1.sources
   delete a1.bonusChoiceIndex; delete b1.bonusChoiceIndex
@@ -146,7 +154,7 @@ function eq(a: any, b: any) {
 
 const RESOURCE_ID: Record<string, number> = { wood: 1, food: 2, reed: 3, clay: 4, stone: 5, sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10 }
 
-function fastHash(combination: any) {
+function fastHash(combination: Combination) {
   let h = ((combination.nb ?? 0) * 31) >>> 0
   for (const [res, n] of Object.entries(combination)) {
     if (res === 'nb' || res === 'sources' || res === 'bonusChoiceIndex') continue
@@ -156,7 +164,7 @@ function fastHash(combination: any) {
   return h
 }
 
-function optimized(player: any, costs: any, target: number | null = null, ignoreResources = false) {
+function optimized(player: MockPlayer, costs: CostSpec, target: number | null = null, ignoreResources = false) {
   const reserve = player.getExchangeResources()
   const maxReserve = { ...reserve }
   const bonuses = costs.bonuses ?? []
@@ -171,7 +179,7 @@ function optimized(player: any, costs: any, target: number | null = null, ignore
     }
   }
 
-  const combinations: any[] = []
+  const combinations: unknown[] = []
   const hashes = new Set<number>()
 
   const fees = costs.fees ?? [costs.fee ?? {}]
@@ -207,7 +215,7 @@ function optimized(player: any, costs: any, target: number | null = null, ignore
     const optional = bonus.optional ?? false
     const bonusData = { ...bonus }
     delete bonusData.optional
-    const newCombinations: any[] = []
+    const newCombinations: unknown[] = []
     const newHashes = new Set<number>()
     if (optional) { newCombinations.push(...combinations); hashes.forEach(h => newHashes.add(h)) }
     for (const comb of combinations) {
@@ -230,7 +238,7 @@ function optimized(player: any, costs: any, target: number | null = null, ignore
     hashes.clear(); newHashes.forEach(h => hashes.add(h))
   }
 
-  const result: any[] = []
+  const result: unknown[] = []
   const resultHashes = new Set<number>()
   for (const combination of combinations) {
     let valid = true
@@ -246,7 +254,7 @@ function optimized(player: any, costs: any, target: number | null = null, ignore
   return result
 }
 
-function pushOptimized(combination: any, combinations: any[], hashes: Set<number>, reserve: any, checkNonNegative = false, ignoreResources = false) {
+function pushOptimized(combination: Combination, combinations: Combination[], hashes: Set<number>, reserve: Record<string, number>, checkNonNegative = false, ignoreResources = false) {
   const hash = fastHash(combination)
   if (hashes.has(hash)) return false
   if (!ignoreResources) {
@@ -261,7 +269,7 @@ function pushOptimized(combination: any, combinations: any[], hashes: Set<number
   return true
 }
 
-function addCostOptimized(combination: any, unitCost: any, times = 1) {
+function addCostOptimized(combination: Combination, unitCost: Combination, times = 1) {
   combination.sources = [...new Set([...(combination.sources ?? []), ...(unitCost.sources ?? [])])]
   const conditions = unitCost.conditions ?? {}
   for (const resource of Object.keys(unitCost)) {
@@ -277,7 +285,7 @@ function addCostOptimized(combination: any, unitCost: any, times = 1) {
   }
 }
 
-function isDominated(combination: any, combinations: any[]) {
+function isDominated(combination: Combination, combinations: Combination[]) {
   const nb = combination.nb ?? 0
   for (const existing of combinations) {
     const existingNb = existing.nb ?? 0
@@ -293,7 +301,7 @@ function isDominated(combination: any, combinations: any[]) {
   return false
 }
 
-const COST_PRESETS: Record<string, any> = {
+const COST_PRESETS: Record<string, unknown> = {
   'room-wood': { wood: 5, reed: 2 },
   'room-clay': { clay: 5, reed: 2 },
   'room-stone': { stone: 5, reed: 2 },
@@ -305,7 +313,7 @@ const COST_PRESETS: Record<string, any> = {
   'sow': { food: 1 },
 }
 
-function withPresets(player: any, costs: any, target: number | null = null, ignoreResources = false) {
+function withPresets(player: MockPlayer, costs: CostSpec, target: number | null = null, ignoreResources = false) {
   const resolvedCosts = { ...costs }
   if (resolvedCosts.fee) {
     const feeKey = Object.keys(COST_PRESETS).find(k =>
@@ -329,9 +337,9 @@ class LRUCache<K, V> {
   }
 }
 
-const cache = new LRUCache<string, any[]>(100)
+const cache = new LRUCache<string, unknown[]>(100)
 
-function withCache(player: any, costs: any, target: number | null = null, ignoreResources = false) {
+function withCache(player: MockPlayer, costs: CostSpec, target: number | null = null, ignoreResources = false) {
   const reserve = player.getExchangeResources()
   const reserveKey = Object.entries(reserve).sort((a, b) => a[0].localeCompare(b[0])).map(x => `${x[0]}:${x[1]}`).join(',')
   const costKey = JSON.stringify(costs)
@@ -343,8 +351,8 @@ function withCache(player: any, costs: any, target: number | null = null, ignore
   return result
 }
 
-function normalize(c: any) { const n = { ...c }; delete n.sources; delete n.bonusChoiceIndex; return n }
-function equal(a: any[], b: any[]) {
+function normalize(c: Record<string, unknown>) { const n = { ...c }; delete n.sources; delete n.bonusChoiceIndex; return n }
+function equal(a: unknown[], b: unknown[]) {
   if (a.length !== b.length) return false
   const aN = a.map(normalize).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)))
   const bN = b.map(normalize).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)))

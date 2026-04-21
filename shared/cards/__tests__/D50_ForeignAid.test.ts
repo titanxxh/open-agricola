@@ -8,6 +8,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../D/D50_ForeignAid'
 import { getBlockedSpaceIds } from '../D/D50_ForeignAid'
+import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'D50_ForeignAid'
 
@@ -78,8 +79,8 @@ describe('D50_ForeignAid', () => {
       const state = createState(player)
       const flow = effect!.onBuy!(state, player)
       expect(flow).toBeDefined()
-      expect((flow as any)?.actionId).toBe('gain')
-      expect((flow as any)?.params?.food).toBe(6)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>)?.actionId).toBe('gain')
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>)?.params?.food).toBe(6)
     })
   })
 

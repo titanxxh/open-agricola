@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { sowCrop, getEmptyFields, canSow } from '../sow'
+import type { Field, PlayerState } from '../../../game/types'
 
-const mkPlayer = (fields: any[], grain = 0, veg = 0): any => ({
+const mkPlayer = (fields: Field[], grain = 0, veg = 0): Partial<PlayerState> => ({
   fields,
   resources: { grain, vegetable: veg },
 })

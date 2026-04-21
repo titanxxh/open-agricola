@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D97_BeggingStudent'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D97_BeggingStudent'
 
@@ -41,8 +42,8 @@ describe('D97_BeggingStudent session', () => {
     const flow = effect!.onStartHarvest!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    const children = (flow as any).children
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(1)
     expect(children[0].actionId).toBe('play-occupation')
     expect(children[0].sourceCard).toBe(CARD_ID)

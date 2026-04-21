@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/E/E91_PlowBuilder'
+import type { AnytimeAction } from '../../shared/game/types';
 
 describe('E91_PlowBuilder session', () => {
   const setup = (round = 4) => {
@@ -37,7 +38,7 @@ describe('E91_PlowBuilder session', () => {
   it('available during harvest round with Joinery + food', () => {
     const session = setup(4) // round 4 is a harvest round
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('E91-plow-builder-anytime')
   })
 
@@ -71,7 +72,7 @@ describe('E91_PlowBuilder session', () => {
   it('NOT available in non-harvest round', () => {
     const session = setup(3) // round 3 is not a harvest round
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('E91-plow-builder-anytime')
   })
 
@@ -82,7 +83,7 @@ describe('E91_PlowBuilder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('E91-plow-builder-anytime')
   })
 
@@ -95,7 +96,7 @@ describe('E91_PlowBuilder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('E91-plow-builder-anytime')
   })
 
@@ -117,7 +118,7 @@ describe('E91_PlowBuilder session', () => {
     expect(resp.state.players[0]!.cardStates?.['E91_PlowBuilder']?.flagged).toBe(true)
 
     // The anytime action should no longer appear
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('E91-plow-builder-anytime')
   })
 })

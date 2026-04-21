@@ -4,6 +4,7 @@ import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B72_LoveforAgriculture'
+import type { AnimalZone } from '../../shared/actions/effects/animals'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -392,7 +393,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: InteractionAnimalReorgZone) => z.id === 'p1')
       // Size-1 pasture normally has capacity 2, should be reduced by 1 (pastureSize)
       expect(pastureZone?.capacity).toBe(1)
     })
@@ -428,7 +429,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       // Size-2 pasture normally has capacity 4, reduced by 2
       expect(pastureZone?.capacity).toBe(2)
     })
@@ -452,7 +453,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // Check capacity via imported computeAnimalZones
       const zones = computeAnimalZones(player)
-      const pastureZone = zones.find((z: any) => z.id === 'p1')
+      const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       expect(pastureZone?.capacity).toBe(4) // unchanged
     })
   })

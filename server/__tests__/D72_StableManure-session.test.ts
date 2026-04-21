@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D72_StableManure'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('D72_StableManure session', () => {
   const setupHarvest = (unfencedStableCount: number) => {
@@ -58,7 +59,7 @@ describe('D72_StableManure session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected choice')
 
-    const acceptOption = resp.pending.options.find((o: any) => o.value !== '__skip__')
+    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
@@ -93,7 +94,7 @@ describe('D72_StableManure session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected choice')
 
-    const acceptOption = resp.pending.options.find((o: any) => o.value !== '__skip__')
+    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 

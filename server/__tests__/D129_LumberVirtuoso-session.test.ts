@@ -3,6 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/D/D129_LumberVirtuoso'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { SessionResponse } from '../../shared/session/game-core'
+import type { GameState } from '../../shared/game/types'
 
 describe('D129_LumberVirtuoso session', () => {
   /**
@@ -41,7 +44,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     // Should have __skip__ option (optional) and real options
-    const skipOption = resp.pending.options?.find((o: any) => o.value === '__skip__')
+    const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
     expect(skipOption).toBeDefined()
   })
 
@@ -83,14 +86,14 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.pending.type !== 'choice') return
 
     // Activate the optional flow (choose non-skip option)
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
     // With wood house, we get XOR: stables (first) vs construct (second)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    const xorOptions = resp.pending.options?.filter((o: any) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose first option (stables)
@@ -116,13 +119,13 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.pending.type !== 'choice') return
 
     // Activate the optional flow
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    const xorOptions = resp.pending.options?.filter((o: any) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose second option (construct)
@@ -143,7 +146,7 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.pending.type !== 'choice') return
 
     // Should present the optional choice
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
   })
 
@@ -154,7 +157,7 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.pending.type !== 'choice') return
 
     // Activate the optional flow
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
@@ -170,7 +173,7 @@ describe('D129_LumberVirtuoso session', () => {
  * Helper: drain through remaining harvest phases (feeding, breeding, etc.)
  * to reach the end of the round. Returns the final response state.
  */
-function drainHarvest(session: GameSession, resp: any): any {
+function drainHarvest(session: GameSession, resp: SessionResponse): SessionResponse | GameState {
   let current = resp
   let safety = 50
   while (safety-- > 0) {
@@ -184,7 +187,7 @@ function drainHarvest(session: GameSession, resp: any): any {
       )
     } else if (current.pending.type === 'choice') {
       // Skip any remaining choices
-      const skipOpt = current.pending.options?.find((o: any) => o.value === '__skip__')
+      const skipOpt = current.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
         current = session.resolveChoice(current.pending.playerIndex ?? 0, '__skip__')
       } else {

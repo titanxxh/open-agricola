@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../game/types'
 
 import '../D/D69_SmallGreenhouse'
 
@@ -78,13 +78,13 @@ describe('D69_SmallGreenhouse', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
     expect(flow).not.toBeNull()
-    const seq = flow as any
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
-    const payLeaf = seq.children.find((c: any) => c.actionId === 'pay-resources')
+    const payLeaf = seq.children.find((c: ActionFlow) => c.actionId === 'pay-resources')
     expect(payLeaf).toBeDefined()
     expect(payLeaf.params).toEqual({ food: 1 })
-    const gainLeaf = seq.children.find((c: any) => c.actionId === 'gain')
+    const gainLeaf = seq.children.find((c: ActionFlow) => c.actionId === 'gain')
     expect(gainLeaf).toBeDefined()
     expect(gainLeaf.params).toEqual({ vegetable: 1 })
   })

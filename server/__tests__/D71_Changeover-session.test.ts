@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D71_Changeover'
+import type { ActionChoiceOption,  AnytimeAction } from '../../shared/game/types';
 
 describe('D71_Changeover session', () => {
   const setup = () => {
@@ -36,7 +37,7 @@ describe('D71_Changeover session', () => {
   it('available when field has exactly 1 remaining', () => {
     const session = setup()
     const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('D71-changeover-anytime')
   })
 
@@ -70,7 +71,7 @@ describe('D71_Changeover session', () => {
       const promptKey = (resp.pending as any).promptKey
       if (promptKey === 'ui.interactionOptionalAction') {
         // Accept the optional sow
-        const acceptOption = resp.pending.options.find((o: any) => o.value !== '__skip__')
+        const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (acceptOption) {
           resp = session.resolveChoice(0, acceptOption.value)
         }
@@ -111,7 +112,7 @@ describe('D71_Changeover session', () => {
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('D71-changeover-anytime')
   })
 })

@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D63_Lynchet'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D63_Lynchet'
 
@@ -36,7 +37,7 @@ describe('D63_Lynchet session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(2)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
 
   it('gives food only for fields adjacent to rooms', () => {
@@ -66,7 +67,7 @@ describe('D63_Lynchet session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
   it('handles depleted fields (remaining went to 0) adjacent to rooms', () => {
@@ -98,7 +99,7 @@ describe('D63_Lynchet session', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     // 1 depleted field adjacent to room + 0 still-sown fields adjacent to room = 1
-    expect((flow as any).params?.food).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
   it('does not trigger when no fields were harvested', () => {

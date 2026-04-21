@@ -3,6 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/C/C163_MaterialDeliveryman'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C163_MaterialDeliveryman'
 
@@ -87,8 +88,8 @@ describe('C163_MaterialDeliveryman', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('gives 1 clay when any player collects exactly 6 goods', () => {
@@ -109,7 +110,7 @@ describe('C163_MaterialDeliveryman', () => {
     } as any)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ clay: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
   })
 
   it('gives 1 reed when any player collects exactly 7 goods', () => {
@@ -130,7 +131,7 @@ describe('C163_MaterialDeliveryman', () => {
     } as any)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ reed: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
   })
 
   it('gives 1 stone when any player collects 8+ goods', () => {
@@ -151,7 +152,7 @@ describe('C163_MaterialDeliveryman', () => {
     } as any)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ stone: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('gives 1 stone when any player collects 10 goods (mixed resources)', () => {
@@ -172,7 +173,7 @@ describe('C163_MaterialDeliveryman', () => {
     } as any)
 
     expect(result).toBeDefined()
-    expect((result!.flow as any).params).toEqual({ stone: 1 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('does not trigger when total goods < 5', () => {

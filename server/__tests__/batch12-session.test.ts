@@ -7,6 +7,7 @@ import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/B/B16_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A82_WorkCertificate'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 // ===== A54 Credit session tests =====
 describe('A54_Credit session', () => {
@@ -112,7 +113,7 @@ describe('A129_Swagman session', () => {
     // Walk through all pending choices, skipping optional ones
     let safety = 20
     while (resp.pending.type === 'choice' && safety > 0) {
-      const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+      const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
       } else {
@@ -137,7 +138,7 @@ describe('A129_Swagman session', () => {
     // Walk through choices - should have construct/stables then swagman grain
     let safety = 20
     while (resp.pending.type === 'choice' && safety > 0) {
-      const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+      const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
       } else {
@@ -191,7 +192,7 @@ describe('A82_WorkCertificate session', () => {
     let safety = 10
     while (safety > 0) {
       if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           foundChoice = true
           resp = session.resolveChoice(0, '__skip__')
@@ -222,12 +223,12 @@ describe('A82_WorkCertificate session', () => {
       if (resp.pending.type === 'choice') {
         const options = resp.pending.options ?? []
         // Try to find a non-skip option (take wood)
-        const woodOpt = options.find((o: any) => o.value !== '__skip__')
+        const woodOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (woodOpt) {
           resp = session.resolveChoice(0, woodOpt.value)
           break
         }
-        const skipOpt = options.find((o: any) => o.value === '__skip__')
+        const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(0, '__skip__')
           break

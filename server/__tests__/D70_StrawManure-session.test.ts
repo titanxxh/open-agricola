@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D70_StrawManure'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('D70_StrawManure session', () => {
   const setupHarvest = () => {
@@ -40,7 +41,7 @@ describe('D70_StrawManure session', () => {
     if (resp.pending.type !== 'choice') throw new Error('expected choice')
 
     // Accept the optional sequence
-    const acceptOption = resp.pending.options.find((o: any) => o.value !== '__skip__')
+    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 

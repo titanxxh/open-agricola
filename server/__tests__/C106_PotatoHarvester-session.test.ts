@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/C/C106_PotatoHarvester'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C106_PotatoHarvester'
 
@@ -47,8 +48,8 @@ describe('C106_PotatoHarvester session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ food: 3 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 3 })
   })
 
   it('onAfterReap grants 1 food per vegetable harvested', () => {
@@ -65,7 +66,7 @@ describe('C106_PotatoHarvester session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    const children = (flow as any).children
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(1)
     expect(children[0].actionId).toBe('gain')
     expect(children[0].params).toEqual({ food: 3 })

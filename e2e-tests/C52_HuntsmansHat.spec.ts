@@ -39,7 +39,7 @@ test('C52_HuntsmansHat pig-market grants food per boar', async ({ page, request 
     const playerIndex = stateResp.state.currentPlayerIndex
     const actionsResp = await getJson(request, `${BACKEND_URL}/api/game/actions?playerIndex=${playerIndex}`)
     saveState(`c52-huntsmans-hat-r9-04-${String(i).padStart(2, '0')}-actions.json`, actionsResp)
-    const available = (actionsResp.actions ?? []).map((a: any) => a.spaceId)
+    const available = (actionsResp.actions ?? []).map((a: Record<string, unknown>) => a.spaceId)
     const preferred = ['forest', 'copse', 'clay-pit', 'reed-bank', 'fishing', 'day-laborer', 'grove']
     const chosen = preferred.find((id) => available.includes(id)) ?? available[0]
 
@@ -82,7 +82,7 @@ test('C52_HuntsmansHat pig-market grants food per boar', async ({ page, request 
   await saveScreenshot(page, 'c52-huntsmans-hat-r9-07-pig-market')
 
   const logEntries = pigActionResp.state.log
-  const hasCardLog = logEntries.some((entry: any) =>
+  const hasCardLog = logEntries.some((entry: Record<string, unknown>) =>
     entry.key === 'log.cardEffectGain' &&
     entry.params?.cardId === CARD_ID &&
     entry.params?.gain?.includes('FOOD')
