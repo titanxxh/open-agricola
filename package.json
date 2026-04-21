@@ -21,6 +21,7 @@
     "check:reaches": "tsx scripts/check-reaches.ts",
     "check:no-dsl": "tsx scripts/check-no-dsl.ts",
     "check:bundle-size": "tsx scripts/check-bundle-size.ts",
+    "check:catalog-types": "tsx scripts/check-catalog-types.ts",
     "build:cards-manifest": "tsx scripts/build-cards-manifest.ts",
     "prebuild": "pnpm run build:cards-manifest",
     "pretest": "pnpm run build:cards-manifest",
