@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'
@@ -71,7 +71,7 @@ describe('C117_Legworker session', () => {
       space: farmland,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -95,7 +95,7 @@ describe('C117_Legworker session', () => {
       space: farmland,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

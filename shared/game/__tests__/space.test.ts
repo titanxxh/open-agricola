@@ -7,8 +7,9 @@ import {
   spaceHasPlayer,
   spaceOccupantCount,
 } from '../space'
+import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
-const mkSpace = (takenBy: WorkerRef[] = []): ActionSpace => ({ id: 'x', takenBy } as any)
+const mkSpace = (takenBy: WorkerRef[] = []): ActionSpace => mkActionSpace({ id: 'x', takenBy })
 
 describe('space helpers', () => {
   it('isSpaceOccupied returns true iff takenBy non-empty', () => {

@@ -6,6 +6,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { setFencesForTest } from './__fixtures__/fence'
 
 import '../E/E74_AshTrees'
+import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -75,7 +76,7 @@ describe('E74_AshTrees', () => {
       space: createSpace('fence'),
       actionId: 'fence',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow?.type).toBe('xor')
     if (result?.flow?.type !== 'xor') return
@@ -100,7 +101,7 @@ describe('E74_AshTrees', () => {
       actionId: 'fence',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(true)
   })
@@ -122,7 +123,7 @@ describe('E74_AshTrees', () => {
       phase: 'after',
       choice: 'cancel',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(readPendingFenceBonus(player)).toBeUndefined()
   })

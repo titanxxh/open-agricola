@@ -68,7 +68,7 @@ describe('D71_Changeover session', () => {
     // so sow should be offered.
     if (resp.pending.type === 'choice') {
       // Could be sow select or an optional skip
-      const promptKey = (resp.pending as any).promptKey
+      const promptKey = resp.pending.promptKey
       if (promptKey === 'ui.interactionOptionalAction') {
         // Accept the optional sow
         const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
@@ -76,7 +76,7 @@ describe('D71_Changeover session', () => {
           resp = session.resolveChoice(0, acceptOption.value)
         }
       }
-      if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionSowSelect') {
+      if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionSowSelect') {
         expect(resp.interaction.stateId).toBe('farmSelect')
         // Sow grain into the empty field 0-2
         resp = session.commitFarmChoice(0, 'sow', {

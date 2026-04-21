@@ -49,7 +49,7 @@ describe('E24_Ambition session', () => {
     if (resp.pending.type !== 'choice') return
 
     expect(resp.pending.promptKey).toBe('ui.interactionChooseImprovement')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
   })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C26_Flail'
 import type { ActionFlow } from '../../shared/game/types'
@@ -43,7 +43,7 @@ describe('C26_Flail session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -70,7 +70,7 @@ describe('C26_Flail session', () => {
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
   })
@@ -91,7 +91,7 @@ describe('C26_Flail session', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

@@ -5,6 +5,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../B/B68_Beanfield'
 import { B68_Beanfield as B68Card } from '../B/B68_Beanfield'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'B68_Beanfield'
 
@@ -165,7 +166,7 @@ describe('B68_Beanfield', () => {
       const result = executeCardListener(listener, {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
       expect(result!.doable).toBe(true)
     })
@@ -177,7 +178,7 @@ describe('B68_Beanfield', () => {
       const result = executeCardListener(listener, {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
 
@@ -190,7 +191,7 @@ describe('B68_Beanfield', () => {
       const result = executeCardListener(listener, {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
   })

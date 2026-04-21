@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C80_RockyTerrain'
@@ -63,7 +63,7 @@ describe('C80_RockyTerrain', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('plow'),
       actionId: 'plow', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
@@ -85,7 +85,7 @@ describe('C80_RockyTerrain', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('plow'),
       actionId: 'plow', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

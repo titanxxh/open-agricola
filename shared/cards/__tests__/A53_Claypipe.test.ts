@@ -7,6 +7,7 @@ import { getCardEffect } from '../card-effects'
 import { getWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 import '../A/A53_Claypipe'
+import type { ActionExecutionContext } from '../../game/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -98,7 +99,7 @@ describe('A53_Claypipe', () => {
       player,
       space,
       params: { wood: 3, clay: 2, reed: 1, stone: 1 },
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(gainResult.type).toBe('ok')
     expect(getWorkPhaseBuildingResources(state, player.id)).toBe(7)
 
@@ -129,7 +130,7 @@ describe('A53_Claypipe', () => {
       player,
       space,
       params: { wood: 3, clay: 2, reed: 1 },
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(gainResult.type).toBe('ok')
     expect(getWorkPhaseBuildingResources(state, player.id)).toBe(6)
 

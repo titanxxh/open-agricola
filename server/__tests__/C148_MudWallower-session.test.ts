@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
@@ -80,7 +80,7 @@ describe('C148_MudWallower', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(1)
     expect(result).toBeUndefined() // Not 4th placement yet
@@ -103,7 +103,7 @@ describe('C148_MudWallower', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -128,7 +128,7 @@ describe('C148_MudWallower', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('farmland', {}),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Counter should not increment
     expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)

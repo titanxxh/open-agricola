@@ -41,12 +41,12 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
   let safety = 30
   while (safety-- > 0) {
     if (resp.pending.type === 'choice') {
-      const playerIdx = (resp.pending as any).playerIndex ?? 0
+      const playerIdx = resp.pending.playerIndex ?? 0
       resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
     } else if (resp.pending.type === 'confirmPlayerSwitch') {
       resp = session.confirmPlayerSwitch()
     } else if (resp.pending.type === 'animalReorg') {
-      const playerIdx = (resp.pending as any).playerIndex ?? 0
+      const playerIdx = resp.pending.playerIndex ?? 0
       const player = resp.state.players[playerIdx]!
       const zones: { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] = []
 

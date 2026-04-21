@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { scytheHarvestFieldAction } from '../scythe-harvest-field'
 import type { Field, PlayerState } from '../../../game/types'
+import type { ActionExecutionContext } from '../../../game/types'
 
 const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({
   fields,
@@ -11,9 +12,9 @@ const invoke = (player: Partial<PlayerState>, fieldIndex: number) =>
   scytheHarvestFieldAction.execute({
     player,
     params: { fieldIndex },
-    state: {} as any,
+    state: {} as unknown as ActionExecutionContext,
     sourceCard: 'E73_Scythe',
-  } as any)
+  } as unknown as ActionExecutionContext)
 
 describe('scytheHarvestField', () => {
   it('harvests entire top stack at once, leaves buried stack untouched', () => {

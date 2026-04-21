@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
@@ -109,7 +109,7 @@ describe('D93_SheepInspector listener', () => {
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -129,7 +129,7 @@ describe('D93_SheepInspector listener', () => {
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -149,7 +149,7 @@ describe('D93_SheepInspector listener', () => {
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     // Only Meeting Place is a candidate — which is excluded — so no flow.
     expect(result).toBeUndefined()
@@ -171,7 +171,7 @@ describe('D93_SheepInspector listener', () => {
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>

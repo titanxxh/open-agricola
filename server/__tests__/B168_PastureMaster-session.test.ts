@@ -4,6 +4,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/B/B168_PastureMaster'
+import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'B168_PastureMaster'
 
@@ -30,7 +31,7 @@ describe('B168_PastureMaster session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'renovate-house' } as any,
+      space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
@@ -64,7 +65,7 @@ describe('B168_PastureMaster session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'renovate-house' } as any,
+      space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
@@ -114,7 +115,7 @@ describe('B168_PastureMaster session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'renovate-house' } as any,
+      space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
@@ -151,7 +152,7 @@ describe('B168_PastureMaster session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'renovate-house' } as any,
+      space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },

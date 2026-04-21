@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { swapFieldGrainToVegAction } from '../swap-field-crop'
 import type { Field, PlayerState } from '../../../game/types'
+import type { ActionExecutionContext } from '../../../game/types'
 
 const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({ fields, resources: {} as PlayerState['resources'] })
 
@@ -8,9 +9,9 @@ const invoke = (player: Partial<PlayerState>, row: number, col: number) =>
   swapFieldGrainToVegAction.execute({
     player,
     params: { row, col },
-    state: {} as any,
+    state: {} as unknown as ActionExecutionContext,
     sourceCard: 'C69_LandConsolidation',
-  } as any)
+  } as unknown as ActionExecutionContext)
 
 describe('swapFieldGrainToVeg', () => {
   it('single grain stack remaining=3 becomes vegetable remaining=1', () => {

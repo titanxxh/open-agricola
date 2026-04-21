@@ -40,7 +40,7 @@ describe('B94_StockProtector session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionStockProtectorPlace')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('choice')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
   })

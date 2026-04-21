@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/D/D21_Recruitment'
 
@@ -38,7 +38,7 @@ describe('D21_Recruitment session', () => {
       player,
       actionId: 'minor-improvement',
       phase: 'computeReplace',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.decline).toBe(true)
     expect(result?.sourceCard).toBe(CARD_ID)
@@ -66,7 +66,7 @@ describe('D21_Recruitment session', () => {
       player,
       actionId: 'minor-improvement',
       phase: 'computeReplace',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -82,7 +82,7 @@ describe('D21_Recruitment session', () => {
       player,
       actionId: 'minor-improvement',
       phase: 'computeReplace',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -98,7 +98,7 @@ describe('D21_Recruitment session', () => {
       player,
       actionId: 'improvement-any',
       phase: 'computeReplace',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.decline).toBe(true)
   })
@@ -116,7 +116,7 @@ describe('D21_Recruitment session', () => {
       actionId: 'minor-improvement',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(true)
   })
@@ -133,7 +133,7 @@ describe('D21_Recruitment session', () => {
       actionId: 'minor-improvement',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -150,7 +150,7 @@ describe('D21_Recruitment session', () => {
       actionId: 'minor-improvement',
       phase: 'computeReplace',
       actionContext: { trueAction: false },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

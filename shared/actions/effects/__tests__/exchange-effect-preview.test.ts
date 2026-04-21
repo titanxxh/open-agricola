@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { anytimeExchangeAction } from '../exchange'
 import type { GameState, PlayerState, ActionSpace } from '../../../game/types'
+import type { ActionExecutionContext } from '../../../game/types'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -103,7 +104,7 @@ describe('anytimeExchangeAction effectPreview', () => {
       state,
       player,
       space: createSpace(),
-    } as any)
+    } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('choice')
     if (result.type !== 'choice') return

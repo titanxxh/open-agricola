@@ -4,6 +4,7 @@ import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../gam
 
 import '../D/D17_DrillHarrow'
 import { D17_DrillHarrow as D17Card } from '../D/D17_DrillHarrow'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D17_DrillHarrow'
 
@@ -65,7 +66,7 @@ describe('D17_DrillHarrow', () => {
       const result = executeCardListener(listener, {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'before',
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeDefined()
       const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -88,7 +89,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'before',
         actionContext: { maxSelections: 1 },
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -100,7 +101,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'before',
         actionContext: { cropType: 'grain' },
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -112,7 +113,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'before',
         actionContext: { checkedReplaceAction: true },
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -129,7 +130,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
         doable: false,
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeDefined()
       expect(result!.doable).toBe(true)
@@ -143,7 +144,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
         doable: false,
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -156,7 +157,7 @@ describe('D17_DrillHarrow', () => {
         state: createState(player), player, space: createSpace('sow'),
         actionId: 'sow', phase: 'isDoable',
         doable: true,
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })
@@ -170,7 +171,7 @@ describe('D17_DrillHarrow', () => {
         actionId: 'sow', phase: 'isDoable',
         doable: false,
         actionContext: { maxSelections: 1 },
-      } as any)
+      } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
     })

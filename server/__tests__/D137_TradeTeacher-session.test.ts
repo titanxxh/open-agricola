@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type {
   ActionFlow,
   ActionSpace,
@@ -105,7 +105,7 @@ describe('D137_TradeTeacher listener', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -123,7 +123,7 @@ describe('D137_TradeTeacher listener', () => {
       space: lessons,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -153,7 +153,7 @@ describe('D137_TradeTeacher listener', () => {
       space: lessons4,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
   })
@@ -171,7 +171,7 @@ describe('D137_TradeTeacher listener', () => {
       space: lessons,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     // Find the combo that gains only cattle.
