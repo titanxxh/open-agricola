@@ -11,6 +11,7 @@ import { moveFarmerToSpaceAction } from '../../actions/effects/move-farmer-to-sp
 import '../A/A28_ForestSchool'
 import '../D/D51_Archway'
 import '../E/E10_StrawHat'
+import type { ActionFlow } from '../../game/types'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -134,9 +135,9 @@ describe('D51_Archway', () => {
     const flow = effect.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('move-farmer-to-space')
-    expect((flow as any).params.excludeSpaceId).toBe('D51_Archway')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('D51_Archway')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
   })
 
   it('onBeforeReturnHome does not trigger when different player on D51', () => {
@@ -187,9 +188,9 @@ describe('E10_StrawHat', () => {
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
       expect(flow!.children.length).toBe(2)
-      expect((flow!.children[0] as any).actionId).toBe('move-farmer-to-space')
-      expect((flow!.children[0] as any).params.excludeSpaceId).toBe('farmland')
-      expect((flow!.children[1] as any).actionId).toBe('gain')
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('farmland')
+      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
     }
   })
 
@@ -252,7 +253,7 @@ describe('E10_StrawHat', () => {
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
       expect(flow!.children.length).toBe(1)
-      expect((flow!.children[0] as any).actionId).toBe('gain')
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
     }
   })
 

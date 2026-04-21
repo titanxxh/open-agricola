@@ -7,6 +7,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../shared/game/type
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C93_InnerDistrictsDirector'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C93_InnerDistrictsDirector'
 
@@ -79,7 +80,7 @@ describe('C93_InnerDistrictsDirector', () => {
     // Should offer place-farmer
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as any).children
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('place-farmer')
   })
 

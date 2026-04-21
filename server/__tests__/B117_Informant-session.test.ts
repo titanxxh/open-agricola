@@ -4,6 +4,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B117_Informant'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B117_Informant'
 
@@ -21,7 +23,7 @@ describe('B117_Informant session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.wood).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
   })
 
   it('onBeforeReturnHome gives 1 wood when stone > clay', () => {
@@ -43,7 +45,7 @@ describe('B117_Informant session', () => {
     const flow = effect!.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).params?.wood).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
   })
 
   it('onBeforeReturnHome does not trigger when stone <= clay', () => {
@@ -109,7 +111,7 @@ describe('B117_Informant session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {

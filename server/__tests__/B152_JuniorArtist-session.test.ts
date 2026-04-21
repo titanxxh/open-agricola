@@ -3,7 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import type { ActionFlow } from '../../shared/game/types'
 import '../../shared/cards/B/B152_JuniorArtist'
+
 
 const CARD_ID = 'B152_JuniorArtist'
 
@@ -120,18 +122,18 @@ describe('B152_JuniorArtist session', () => {
       phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const flow = result!.flow as any
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('pay-resources')
     // The chain child should be either a leaf (if only 1 option) or an xor
     const chain = flow.children[1]
     // Find a traveling-players gain leaf somewhere
-    const findTp = (node: any): boolean => {
+    const findTp = (node: ActionFlow): boolean => {
       if (!node) return false
       if (node.actionId === 'gain' && node.params?.food === 3) return true
       if (Array.isArray(node.children)) {
-        return node.children.some((c: any) => findTp(c))
+        return node.children.some((c: ActionFlow) => findTp(c))
       }
       return false
     }
@@ -160,12 +162,12 @@ describe('B152_JuniorArtist session', () => {
     // May or may not produce a flow depending on whether occupation is registered
     // If result is undefined, the test passes trivially (no options)
     if (result) {
-      const flow = result.flow as any
-      const findPlayOcc = (node: any): boolean => {
+      const flow = result.flow as ActionFlow
+      const findPlayOcc = (node: ActionFlow): boolean => {
         if (!node) return false
         if (node.actionId === 'play-occupation') return true
         if (Array.isArray(node.children)) {
-          return node.children.some((c: any) => findPlayOcc(c))
+          return node.children.some((c: ActionFlow) => findPlayOcc(c))
         }
         return false
       }

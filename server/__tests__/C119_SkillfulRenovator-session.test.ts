@@ -8,6 +8,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../shared/game/type
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import '../../shared/cards/C/C119_SkillfulRenovator'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C119_SkillfulRenovator'
 
@@ -65,8 +66,8 @@ describe('C119_SkillfulRenovator', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1, clay: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1, clay: 1 })
   })
 
   it('gains wood equal to farmers placed this round after renovation', () => {
@@ -87,8 +88,8 @@ describe('C119_SkillfulRenovator', () => {
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as any).actionId).toBe('gain')
-    expect((result!.flow as any).params).toEqual({ wood: 3 })
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 3 })
   })
 
   it('returns undefined when no farmers placed this round', () => {

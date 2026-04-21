@@ -4,6 +4,7 @@ import { actionDefinitions } from '../../actions'
 import { createActionSpaces } from '../../actions'
 import { HookDispatcher } from '../dispatcher'
 import { clearCardListeners, registerCardListener, executeCardListener } from '../../cards/card-listeners'
+import type { CardListenerContext } from '../../cards/card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
@@ -106,7 +107,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-A126-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, space } = context
           const round = state.round
           if (round >= 1 && round <= 4 && space.roundAvailable) {
@@ -134,7 +135,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-A126-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, space } = context
           const round = state.round
           if (round >= 1 && round <= 4 && space.roundAvailable) {
@@ -163,7 +164,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, player, space } = context
           if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
@@ -189,7 +190,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C25-after',
         phases: ['immediatelyAfter' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { state, player, space } = context
           if (workersAvailable(state, player) > 0) return
           const hasAccumulation = Object.keys(space.gainPerRound).length > 0
@@ -217,7 +218,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C52-during',
         phases: ['during' as ActionHookPhase],
-        handler: (context: any) => {
+        handler: (context: CardListenerContext) => {
           const { actionId } = context
           if (actionId === 'sheep-market') {
             return {
@@ -250,7 +251,7 @@ describe('PlaceFarmer card integration', () => {
       const listener = {
         id: 'test-C75-after',
         phases: ['after' as ActionHookPhase],
-        handler: (_context: any) => {
+        handler: (_context: CardListenerContext) => {
           return {
             flow: {
               type: 'seq',

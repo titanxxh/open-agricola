@@ -6,6 +6,7 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/game/types'
 
 import '../../shared/cards/E/E27_PiggyBank'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E27_PiggyBank'
 
@@ -66,8 +67,8 @@ describe('E27_PiggyBank session', () => {
     const flow = effect!.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    const children = (flow as any).children
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children[0].actionId).toBe('pay-resources')
     expect(children[1].actionId).toBe('store-on-card')
   })

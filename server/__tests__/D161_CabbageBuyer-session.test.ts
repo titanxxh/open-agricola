@@ -218,7 +218,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.pending.playerIndex).toBe(0)
     expect((resp.pending as any).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('choice')
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Accept the offer (non-skip option)
     const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')

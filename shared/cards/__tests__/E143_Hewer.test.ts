@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 import '../E/E143_Hewer'
+import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'E143_Hewer'
 
@@ -66,8 +67,8 @@ describe('E143_Hewer', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ stone: 1, food: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1, food: 1 })
   })
 
   it('does not trigger when round < 3', () => {

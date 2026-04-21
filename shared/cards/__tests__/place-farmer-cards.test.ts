@@ -4,6 +4,7 @@ import {
   getRegisteredCardListeners,
   registerCardListener,
   type CardListenerRegistration,
+  type CardListenerContext,
 } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -17,7 +18,7 @@ describe('PlaceFarmer card listeners', () => {
   const steamMachineListener: CardListenerRegistration = {
     id: 'C25-steam-machine-immediately-after',
     phases: ['immediatelyAfter' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       const { player, space } = context
       
       if (player.workersAvailable > 0) {
@@ -38,7 +39,7 @@ describe('PlaceFarmer card listeners', () => {
   const huntsmansHatListener: CardListenerRegistration = {
     id: 'C52-huntsmans-hat-during',
     phases: ['during' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId } = context
       
       if (actionId === 'sheep-market') {
@@ -58,7 +59,7 @@ describe('PlaceFarmer card listeners', () => {
   const firewoodReturnHomeListener: CardListenerRegistration = {
     id: 'C75-firewood-return-home',
     phases: ['after' as ActionHookPhase],
-    handler: (context: any): ActionHookResult | void => {
+    handler: (context: CardListenerContext): ActionHookResult | void => {
       return {
         flow: {
           type: 'seq',
@@ -170,7 +171,7 @@ describe('PlaceFarmer card listeners', () => {
         phase: 'immediatelyAfter',
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.followUpActions).toContain('bake-bread')
     })
@@ -185,7 +186,7 @@ describe('PlaceFarmer card listeners', () => {
         phase: 'immediatelyAfter',
       })
 
-      const result = listener?.handler(context as any)
+      const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeUndefined()
     })
   })

@@ -7,6 +7,8 @@ import {
 
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'
+import type { ActionFlow } from '../../shared/game/types'
+
 
 const CARD_ID = 'C117_Legworker'
 
@@ -74,7 +76,7 @@ describe('C117_Legworker session', () => {
       phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ wood: 1 })
     expect(leaf.sourceCard).toBe(CARD_ID)

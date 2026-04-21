@@ -49,7 +49,7 @@ describe('C85_DenBuilder session', () => {
     const session = setup({ houseType: 'stone', grain: 2, food: 5 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('C85-den-builder-anytime')
   })
 
@@ -57,7 +57,7 @@ describe('C85_DenBuilder session', () => {
     const session = setup({ houseType: 'wood', grain: 2, food: 5 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -70,7 +70,7 @@ describe('C85_DenBuilder session', () => {
     expect(resp1.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -78,7 +78,7 @@ describe('C85_DenBuilder session', () => {
     const session = setup({ houseType: 'clay', grain: 0, food: 5 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -86,7 +86,7 @@ describe('C85_DenBuilder session', () => {
     const session = setup({ houseType: 'clay', grain: 2, food: 1 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 })

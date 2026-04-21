@@ -4,6 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 
 import '../../shared/cards/E/E127_DiligentFarmer'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E127_DiligentFarmer'
 
@@ -49,8 +50,8 @@ describe('E127_DiligentFarmer session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).children[0].actionId).toBe('build-farmhand-room')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('build-farmhand-room')
   })
 
   it('onBuy returns undefined when player has fewer than 3 categories at max score', () => {

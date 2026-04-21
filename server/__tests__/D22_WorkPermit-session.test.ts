@@ -3,6 +3,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/D/D22_WorkPermit'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D22_WorkPermit'
 
@@ -91,10 +92,10 @@ describe('D22_WorkPermit card effect', () => {
     state.round = 5
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
-    expect((flow as any).type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).children[0].actionId).toBe('place-farmer')
-    expect((flow as any).children[0].sourceCard).toBe(CARD_ID)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('seq')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('place-farmer')
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].sourceCard).toBe(CARD_ID)
   })
 
   it('onRoundStart does nothing when not at target round', () => {

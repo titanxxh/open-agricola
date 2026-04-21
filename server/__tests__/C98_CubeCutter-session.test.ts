@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C98_CubeCutter'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C98_CubeCutter'
 
@@ -21,8 +22,8 @@ describe('C98_CubeCutter session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('onHarvestFieldPhase returns optional pay wood+food for 1 VP', () => {
@@ -43,8 +44,8 @@ describe('C98_CubeCutter session', () => {
     const flow = effect!.onHarvestFieldPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
-    const children = (flow as any).children
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
     // First child: pay wood+food
     expect(children[0].type).toBe('leaf')

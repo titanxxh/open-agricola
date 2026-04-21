@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D165_PigStalker'
 
@@ -79,7 +79,7 @@ describe('D165_PigStalker', () => {
       phase: 'after',
     })
     expect(result).toBeDefined()
-    const flow = (result as any).flow
+    const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(flow.actionId).toBe('gain')
     expect(flow.params.boar).toBe(1)
   })

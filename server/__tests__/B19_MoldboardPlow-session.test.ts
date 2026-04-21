@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B19_MoldboardPlow'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('B19_MoldboardPlow session', () => {
   const setup = () => {
@@ -48,7 +49,7 @@ describe('B19_MoldboardPlow session', () => {
     // After farmland plow, B19 after-hook offers optional extra plow
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected optional choice')
-    const acceptOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
 
     // Accept the optional plow from card
@@ -118,7 +119,7 @@ describe('B19_MoldboardPlow session', () => {
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
     resp = session.commitFarmChoice(0, 'plow', { tile: tile1 })
-    const accept1 = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.commitFarmChoice(0, 'plow', { tile: tile2 })

@@ -1,6 +1,13 @@
 import { describe, it } from 'vitest'
 
-function dynamicProgrammingWithTrace(player: any, costs: any, target: number | null = null, ignoreResources = false) {
+type MockPlayer = {
+  resources: Record<string, number>
+  getExchangeResources: () => Record<string, number>
+  getCards: () => { getIds: () => string[] }
+}
+type CostSpec = Record<string, unknown>
+
+function dynamicProgrammingWithTrace(player: MockPlayer, costs: CostSpec, target: number | null = null, ignoreResources = false) {
   const reserve = player.getExchangeResources()
   
   const fees = costs.fees ?? [costs.fee ?? {}]
@@ -78,7 +85,7 @@ function dynamicProgrammingWithTrace(player: any, costs: any, target: number | n
     for (const [k, v] of newDp) dp.set(k, v)
   }
   
-  const result: any[] = []
+  const result: unknown[] = []
   for (const state of dp.values()) {
     let valid = true
     for (const [res, amount] of Object.entries(state.resources)) {
@@ -94,7 +101,7 @@ function dynamicProgrammingWithTrace(player: any, costs: any, target: number | n
       tradeUsageMap[tradeName] = usage.times
     }
     
-    const combo: any = {
+    const combo: Record<string, unknown> = {
       nb: state.nb,
       ...state.resources,
       _tradeUsage: tradeUsageMap

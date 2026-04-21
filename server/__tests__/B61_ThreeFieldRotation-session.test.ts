@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B61_ThreeFieldRotation'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B61_ThreeFieldRotation'
 
@@ -28,8 +29,8 @@ describe('B61_ThreeFieldRotation session', () => {
     const flow = effect!.onStartHarvestFieldPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ food: 3 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 3 })
   })
 
   it('does NOT gain food if missing grain field', () => {

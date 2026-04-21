@@ -247,7 +247,7 @@ describe('A87_Conservator session sourceCard', () => {
 
     expect(resp.pending.promptKey).toBe('ui.interactionChooseRenovationTarget')
     expect((resp.pending as any).sourceCard).toBeUndefined()
-    expect((resp.interaction as any).sourceCard).toBeUndefined()
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
     expect(resp.pending.options.find((option) => option.value === 'clay')?.sourceCard).toBeUndefined()
     expect(resp.pending.options.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)
   })

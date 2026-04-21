@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A153_PigOwner'
+import type { AnytimeAction } from '../../shared/game/types';
 
 const CARD_ID = 'A153_PigOwner'
 
@@ -45,14 +46,14 @@ describe('A153_PigOwner session', () => {
   it('not available with < 5 boar', () => {
     const session = setup(4)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A153-pig-owner-anytime')
   })
 
   it('available with >= 5 boar, grants 3 VP', () => {
     const session = setup(5)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('A153-pig-owner-anytime')
 
     const resp2 = session.takeAnytimeAction(0, 'A153-pig-owner-anytime')
@@ -69,7 +70,7 @@ describe('A153_PigOwner session', () => {
     expect(isCardFlagged(resp2.state.players[0]!, CARD_ID)).toBe(true)
 
     // Should no longer appear in anytime actions
-    const anytimeIds = resp2.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp2.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A153-pig-owner-anytime')
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeScores } from '../../shared/logic/scoring'
-import type { FarmTilePosition } from '../../shared/game/types'
+import { computeScores , ScoreEntry } from '../../shared/logic/scoring'
+import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/game/types'
 import { positionKey } from '../../shared/game/farm'
 
 import { B38_FutureBuildingSite } from '../../shared/cards/B/B38_FutureBuildingSite'
@@ -157,7 +157,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Select room building
     if (resp.pending.type === 'choice') {
-      const roomOpt = resp.pending.options?.find((o: any) => o.value === 'construct')
+      const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'construct')
       if (roomOpt) {
         resp = session.resolveChoice(0, roomOpt.value)
       }
@@ -184,7 +184,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Select stable building
     if (resp.pending.type === 'choice') {
-      const stableOpt = resp.pending.options?.find((o: any) => o.value === 'stables')
+      const stableOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'stables')
       if (stableOpt) {
         resp = session.resolveChoice(0, stableOpt.value)
       }
@@ -278,7 +278,7 @@ describe('B38 FutureBuildingSite — session', () => {
     const summary = scores.find((s) => s.playerId === state.players[0]!.id)!
     const cardsCat = summary.categories.find((c) => c.key === 'cards')!
     const b38Entry = cardsCat.entries.find(
-      (e: any) => e.cardId === CARD_ID,
+      (e: ScoreEntry) => 'cardId' in e && e.cardId === CARD_ID,
     )
     expect(b38Entry).toBeDefined()
     expect(b38Entry!.score).toBe(3)

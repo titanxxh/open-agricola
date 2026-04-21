@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { Resource } from '../../shared/game/types'
+import type { ActionFlow, Resource } from '../../shared/game/types'
 
 import '../../shared/cards/E/E78_SleightofHand'
 
@@ -29,10 +29,10 @@ describe('E78_SleightofHand session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
 
     // Should have 4 exchange children (up to 4 exchanges)
-    const children = (flow as any).children
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children.length).toBe(4)
 
     // Each child is an XOR of pay-gain combos
@@ -72,12 +72,12 @@ describe('E78_SleightofHand session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
 
-    const firstExchange = (flow as any).children[0]
+    const firstExchange = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]
     expect(firstExchange.type).toBe('xor')
 
     // Check one option: pay 1 wood, gain 1 clay
     const woodToClayOption = firstExchange.children.find(
-      (c: any) =>
+      (c: ActionFlow) =>
         c.type === 'seq' &&
         c.children[0].params?.wood === 1 &&
         c.children[1].params?.clay === 1,
@@ -98,7 +98,7 @@ describe('E78_SleightofHand session', () => {
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
 
-    const firstExchange = (flow as any).children[0]
+    const firstExchange = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]
     const combos = new Set<string>()
     for (const option of firstExchange.children) {
       const payKey = Object.keys(option.children[0].params)[0]

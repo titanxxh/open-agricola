@@ -6,6 +6,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E110_Dentist'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E110_Dentist'
 
@@ -71,7 +73,7 @@ describe('E110_Dentist session', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     // Should gain 3 food (1 per wood on card)
-    expect((flow as any).params?.food).toBe(3)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(3)
   })
 
   it('onHarvestFeedingPhase returns undefined when no wood on card', () => {
@@ -116,8 +118,8 @@ describe('E110_Dentist session', () => {
     // Should be prompted with optional choice to place wood at harvest start
     let safety = 20
     while (safety-- > 0 && resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: any) => o.value === '__skip__')
-      const acceptOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (acceptOption) {
         // Accept the first non-skip option (pay 1 wood to place on card)
         resp = session.resolveChoice(0, acceptOption.value)
@@ -136,7 +138,7 @@ describe('E110_Dentist session', () => {
       } else if (resp.pending.type === 'animalReorg') {
         resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: any) => o.value === '__skip__')
+        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
         } else {

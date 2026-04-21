@@ -113,7 +113,7 @@ describe('C52_HuntsmansHat', () => {
       phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
-    const result = listener?.handler(context as any)
+    const result = listener?.handler(context as unknown as ActionHookContext)
     expect(result?.flow).toBeDefined()
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -136,7 +136,7 @@ describe('C52_HuntsmansHat', () => {
       phase: 'before',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
-    const result = listener?.handler(context as any)
+    const result = listener?.handler(context as unknown as ActionHookContext)
     expect(result).toBeUndefined()
   })
 })

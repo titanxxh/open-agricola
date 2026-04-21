@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D84_FeedPellets'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D84_FeedPellets'
 
@@ -20,8 +21,8 @@ describe('D84_FeedPellets session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params?.sheep).toBe(1)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.sheep).toBe(1)
   })
 
   it('offers exchange during feeding when player has vegetable and sheep', () => {
@@ -41,7 +42,7 @@ describe('D84_FeedPellets session', () => {
     expect(flow).toBeDefined()
     // Only sheep owned → single seq (not xor)
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
   })
 
   it('offers xor when player has multiple animal types', () => {
@@ -61,8 +62,8 @@ describe('D84_FeedPellets session', () => {
     const flow = effect!.onHarvestFeedingPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
-    expect((flow as any).optional).toBe(true)
-    expect((flow as any).children.length).toBe(2) // sheep and boar
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children.length).toBe(2) // sheep and boar
   })
 
   it('returns undefined during feeding when no vegetable', () => {

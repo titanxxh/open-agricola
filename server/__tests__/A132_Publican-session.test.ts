@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A132_Publican'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { SessionResponse } from '../../shared/session/game-core'
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -30,7 +32,7 @@ describe('A132_Publican session', () => {
     return session
   }
 
-  const advancePastPlayerSwitches = (session: GameSession, resp: any) => {
+  const advancePastPlayerSwitches = (session: GameSession, resp: SessionResponse) => {
     while (resp.pending.type === 'confirmPlayerSwitch') {
       resp = session.confirmPlayerSwitch()
     }
@@ -52,7 +54,7 @@ describe('A132_Publican session', () => {
     // If it's a choice (sow/bake-bread), pick sow
     if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
       const sowOption = resp.pending.options?.find(
-        (o: any) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
+        (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
         resp = session.resolveChoice(1, sowOption.value)
@@ -66,7 +68,7 @@ describe('A132_Publican session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
-    const acceptOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
@@ -106,7 +108,7 @@ describe('A132_Publican session', () => {
     // If it's a choice, pick sow
     if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
       const sowOption = resp.pending.options?.find(
-        (o: any) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
+        (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
         resp = session.resolveChoice(1, sowOption.value)
@@ -162,7 +164,7 @@ describe('A132_Publican session', () => {
     // If it's a choice, pick sow
     if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
       const sowOption = resp.pending.options?.find(
-        (o: any) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
+        (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
         resp = session.resolveChoice(0, sowOption.value)

@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D96_Furnisher'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D96_Furnisher'
 
@@ -40,7 +41,7 @@ describe('D96_Furnisher session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 2 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
   })
 })

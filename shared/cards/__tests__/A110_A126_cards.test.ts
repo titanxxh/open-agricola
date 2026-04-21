@@ -232,7 +232,7 @@ describe('A126_MasterWorkman', () => {
     const state = createRoundState(player, 'construct', 0)
     // canBeExecutedByPlayer returns true only if player has wood >= 1
     const space = createSpace('construct', {
-      canBeExecutedByPlayer: (_s: any, p: PlayerState) => (p.resources.wood ?? 0) >= 1,
+      canBeExecutedByPlayer: (_s: GameState, p: PlayerState) => (p.resources.wood ?? 0) >= 1,
     } as any)
     const result = executeCardListener(listener, {
       state, player, space,

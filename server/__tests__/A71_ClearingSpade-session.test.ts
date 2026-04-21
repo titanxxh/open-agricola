@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A71_ClearingSpade'
+import type { AnytimeAction } from '../../shared/game/types';
 
 describe('A71_ClearingSpade session', () => {
   const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {
@@ -40,7 +41,7 @@ describe('A71_ClearingSpade session', () => {
     const session = setup()
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('A71-clearing-spade-anytime')
   })
 
@@ -87,7 +88,7 @@ describe('A71_ClearingSpade session', () => {
     ])
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A71-clearing-spade-anytime')
   })
 
@@ -98,7 +99,7 @@ describe('A71_ClearingSpade session', () => {
     ])
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A71-clearing-spade-anytime')
   })
 

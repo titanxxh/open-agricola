@@ -34,7 +34,7 @@ test('round end confirmation flow', async ({ page }) => {
   await page.waitForTimeout(1500);
   await saveScreenshot(page, '02-p1-fishing');
   const s2 = await logState('02');
-  console.log('Workers:', s2?.state?.players?.map((p: any) => `${p.id}:${p.workersAvailable}`).join(', '));
+  console.log('Workers:', s2?.state?.players?.map((p: Record<string, unknown>) => `${p.id}:${p.workersAvailable}`).join(', '));
 
   // Confirm P1 -> P2
   console.log('\n-- Confirm: P1 -> P2 --');
@@ -55,7 +55,7 @@ test('round end confirmation flow', async ({ page }) => {
   await page.waitForTimeout(1500);
   await saveScreenshot(page, '06-p2-clay');
   const s6 = await logState('06');
-  console.log('Workers:', s6?.state?.players?.map((p: any) => `${p.id}:${p.workersAvailable}`).join(', '));
+  console.log('Workers:', s6?.state?.players?.map((p: Record<string, unknown>) => `${p.id}:${p.workersAvailable}`).join(', '));
 
   // Confirm P2 -> P1
   console.log('\n-- Confirm: P2 -> P1 --');
@@ -74,7 +74,7 @@ test('round end confirmation flow', async ({ page }) => {
   await page.waitForTimeout(1500);
   await saveScreenshot(page, '09-p1-day-laborer');
   const s9 = await logState('09');
-  console.log('Workers after:', s9?.state?.players?.map((p: any) => `${p.id}:${p.workersAvailable}`).join(', '));
+  console.log('Workers after:', s9?.state?.players?.map((p: Record<string, unknown>) => `${p.id}:${p.workersAvailable}`).join(', '));
   console.log('Pending:', s9?.pending?.type);
 
   // Confirm P1 -> P2 (all P1 workers used)
@@ -84,7 +84,7 @@ test('round end confirmation flow', async ({ page }) => {
   await page.waitForTimeout(1500);
   await saveScreenshot(page, '11-after-confirm-p1-2nd');
   const s11 = await logState('11');
-  console.log('Workers:', s11?.state?.players?.map((p: any) => `${p.id}:${p.workersAvailable}`).join(', '));
+  console.log('Workers:', s11?.state?.players?.map((p: Record<string, unknown>) => `${p.id}:${p.workersAvailable}`).join(', '));
 
   // P2: Reed Bank (2nd worker - final action)
   console.log('\n-- P2: Reed Bank (Final action) --');
@@ -95,7 +95,7 @@ test('round end confirmation flow', async ({ page }) => {
   await page.waitForTimeout(1500);
   await saveScreenshot(page, '12-p2-reed-final');
   const s12 = await logState('12');
-  console.log('Workers after final action:', s12?.state?.players?.map((p: any) => `${p.id}:${p.workersAvailable}`).join(', '));
+  console.log('Workers after final action:', s12?.state?.players?.map((p: Record<string, unknown>) => `${p.id}:${p.workersAvailable}`).join(', '));
   console.log('Pending:', s12?.pending?.type);
 
   // FINAL CONFIRM - Should trigger round end
@@ -116,5 +116,5 @@ test('round end confirmation flow', async ({ page }) => {
 
   console.log('\n=== Test Complete ===');
   console.log('Final Round:', s15?.state?.round, '(Expected: 2)');
-  console.log('All workers reset:', s15?.state?.players?.every((p: any) => p.workersAvailable === p.familySize) ? 'YES' : 'NO');
+  console.log('All workers reset:', s15?.state?.players?.every((p: Record<string, unknown>) => p.workersAvailable === p.familySize) ? 'YES' : 'NO');
 });

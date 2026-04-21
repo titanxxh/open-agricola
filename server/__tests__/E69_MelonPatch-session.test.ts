@@ -4,6 +4,7 @@ import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/car
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E69_MelonPatch'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E69_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -156,9 +157,9 @@ describe('E69_MelonPatch session', () => {
       // Should return optional plow
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('leaf')
-      expect((flow as any).actionId).toBe('plow')
-      expect((flow as any).optional).toBe(true)
-      expect((flow as any).sourceCard).toBe(CARD_ID)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('plow')
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
     })
   })
 })

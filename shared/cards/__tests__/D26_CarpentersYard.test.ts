@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D26_CarpentersYard'
 
@@ -72,7 +72,7 @@ describe('D26_CarpentersYard', () => {
       trueAction: true,
     })
     expect(result).toBeDefined()
-    const flow = (result as any).flow
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('improvement-any')
@@ -93,7 +93,7 @@ describe('D26_CarpentersYard', () => {
       trueAction: true,
     })
     expect(result).toBeDefined()
-    const flow = (result as any).flow
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.allowedPurchases).toEqual(['Major_Well'])
   })
 

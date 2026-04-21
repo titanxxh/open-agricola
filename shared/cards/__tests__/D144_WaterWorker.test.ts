@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D144_WaterWorker'
 
@@ -66,7 +66,7 @@ describe('D144_WaterWorker', () => {
     } as any)
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -80,7 +80,7 @@ describe('D144_WaterWorker', () => {
       actionId: 'place-farmer', phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -93,7 +93,7 @@ describe('D144_WaterWorker', () => {
       actionId: 'place-farmer', phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })
@@ -108,7 +108,7 @@ describe('D144_WaterWorker', () => {
       actionId: 'place-farmer', phase: 'after',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ reed: 1 })
   })

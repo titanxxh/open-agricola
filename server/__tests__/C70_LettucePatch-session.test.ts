@@ -4,6 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/C/C70_LettucePatch'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C70_LettucePatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -147,8 +148,8 @@ describe('C70_LettucePatch session', () => {
       // Flow should be optional seq with pay+gain
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('seq')
-      expect((flow as any).optional).toBe(true)
-      const children = (flow as any).children
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+      const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
       expect(children).toHaveLength(2)
       // First child: pay 1 vegetable
       expect(children[0].type).toBe('leaf')

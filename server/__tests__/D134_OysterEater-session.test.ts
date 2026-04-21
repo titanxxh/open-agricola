@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D134_OysterEater'
+import type { SessionResponse } from '../../shared/session/game-core'
 
 describe('D134_OysterEater session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -21,7 +22,7 @@ describe('D134_OysterEater session', () => {
     return session
   }
 
-  const drainPending = (session: GameSession, resp: any) => {
+  const drainPending = (session: GameSession, resp: SessionResponse) => {
     let safety = 25
     while (
       safety-- > 0 &&

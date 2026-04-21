@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/effects/selection-effect-registry'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../shared/game/types'
 
 import '../../shared/cards/E/E76_LumberPile'
 
@@ -62,7 +62,7 @@ describe('E76_LumberPile card effect', () => {
     ]
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as any
+    const flow = effect!.onBuy!(state, player) as Extract<ActionFlow, { type: 'seq' }>
     expect(flow).toBeDefined()
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)

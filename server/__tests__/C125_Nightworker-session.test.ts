@@ -4,6 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace, Resource } from '../../shared/game/types'
 
 import '../../shared/cards/C/C125_Nightworker'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'C125_Nightworker'
 
@@ -40,7 +41,7 @@ describe('C125_Nightworker session', () => {
     if (woodSpace && woodSpace.resources.wood > 0) {
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('xor')
-      expect((flow as any).optional).toBe(true)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     }
   })
 

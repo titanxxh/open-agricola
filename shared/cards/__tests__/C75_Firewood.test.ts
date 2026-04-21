@@ -7,6 +7,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 
 // Import card to register its effects/listeners
 import '../C/C75_Firewood'
+import type { ActionFlow } from '../../game/types'
 
 const CARD_ID = 'C75_Firewood'
 
@@ -96,7 +97,7 @@ describe('C75_Firewood', () => {
       expect(result).toBeDefined()
       expect(result?.flow?.type).toBe('xor')
       expect(result?.flow?.promptKey).toBe('ui.interactionFirewoodExchange')
-      const children = (result?.flow as any)?.children
+      const children = (result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children
       expect(children).toHaveLength(2)
       expect(children[0].actionId).toBe('take-from-card')
       expect(children[0].params).toEqual({ wood: 1 })
@@ -121,7 +122,7 @@ describe('C75_Firewood', () => {
         choice: 'major:Major_Fireplace1',
       } as any)
 
-      const children = (result?.flow as any)?.children
+      const children = (result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children
       expect(children).toHaveLength(4)
       expect(children[3].params).toEqual({ wood: 4 })
     })

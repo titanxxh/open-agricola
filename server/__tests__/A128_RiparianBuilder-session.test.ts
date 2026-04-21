@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { ActionChoiceOption,  PlayerState } from '../../shared/game/types.ts'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
@@ -81,7 +81,7 @@ describe('A128_RiparianBuilder session', () => {
 
     // Choose to construct
     const constructOption = resp.pending.type === 'choice'
-      ? resp.pending.options?.find((o: any) => o.value !== '__skip__')
+      ? resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       : undefined
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
@@ -122,7 +122,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
-    const constructOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('farmSelect')
@@ -151,9 +151,9 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect((resp.pending as any).sourceCard).toBe(CARD_ID)
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
-    const constructOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
@@ -161,7 +161,7 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.pending.type !== 'choice') return
     expect((resp.pending as any).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('farmSelect')
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
@@ -175,7 +175,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.promptKey).toBe('prompt.selectPayment')
     expect((resp.pending as any).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('choice')
-    expect((resp.interaction as any).sourceCard).toBe(CARD_ID)
+    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     expect(resp.pending.options).toHaveLength(2)
   })
 })

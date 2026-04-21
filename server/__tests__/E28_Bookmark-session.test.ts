@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E28_Bookmark'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E28_Bookmark'
 
@@ -57,8 +58,8 @@ describe('E28_Bookmark session', () => {
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
     if (flow!.type === 'seq') {
-      expect((flow as any).optional).toBe(true)
-      const children = (flow as any).children as any[]
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+      const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children as any[]
       expect(children[0].actionId).toBe('play-occupation')
       expect(children[0].params.costOverride).toEqual({})
     }

@@ -43,6 +43,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'A3_PaperKnife'
 
@@ -128,15 +129,15 @@ describe('A3_PaperKnife onBuy', () => {
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
-    expect((flow as any).type).toBe('leaf')
-    expect((flow as any).actionId).toBe('selection')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('leaf')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('selection')
 
     // Hand must NOT be mutated by onBuy — mutation happens downstream via play-occupation
     expect(player.occupationPlayed).toHaveLength(0)
     expect(player.occupationHand).toHaveLength(3)
 
     // actionContext must carry occupation-hand selection params
-    const ctx = (flow as any).actionContext
+    const ctx = (flow as Extract<ActionFlow, { type: 'leaf' }>).actionContext
     expect(ctx.selectionKind).toBe('occupation-hand')
     expect(ctx.minSelections).toBe(3)
     expect(ctx.maxSelections).toBe(3)
@@ -167,8 +168,8 @@ describe('A3_PaperKnife onBuy', () => {
     const flowA = effect.onBuy!(stateA, a)
     const flowB = effect.onBuy!(stateB, b)
     // Both should produce identical selectableCards (same hand)
-    expect((flowA as any).actionContext.selectableCards).toEqual(
-      (flowB as any).actionContext.selectableCards,
+    expect((flowA as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards).toEqual(
+      (flowB as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards,
     )
   })
 })
@@ -239,7 +240,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     // TARGET: interaction.stateId must be 'selection', not 'choice' or 'idle'
     expect(resp.interaction.stateId).toBe('selection')
 
-    const interaction = resp.interaction as any
+    const interaction = resp.interaction as Extract<InteractionState, { stateId: 'selection' }>
     // kind must be occupation-hand
     expect(interaction.selection?.kind).toBe('occupation-hand')
     // selectableCards must be the player's full occupation hand in order

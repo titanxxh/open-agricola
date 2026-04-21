@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B35_HookKnife'
+import type { AnytimeAction } from '../../shared/game/types';
 
 const CARD_ID = 'B35_HookKnife'
 
@@ -31,14 +32,14 @@ describe('B35_HookKnife session', () => {
   it('2-player: not available with 7 sheep (threshold is 8)', () => {
     const session = setup(7, 2)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B35-hook-knife-anytime')
   })
 
   it('2-player: available with 8 sheep, grants 2 VP', () => {
     const session = setup(8, 2)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('B35-hook-knife-anytime')
 
     const resp2 = session.takeAnytimeAction(0, 'B35-hook-knife-anytime')
@@ -49,7 +50,7 @@ describe('B35_HookKnife session', () => {
   it('3-player: threshold is 7, available with 7 sheep', () => {
     const session = setup(7, 3)
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('B35-hook-knife-anytime')
 
     const resp2 = session.takeAnytimeAction(0, 'B35-hook-knife-anytime')
@@ -66,7 +67,7 @@ describe('B35_HookKnife session', () => {
     expect(isCardFlagged(resp2.state.players[0]!, CARD_ID)).toBe(true)
 
     // Should no longer appear in anytime actions
-    const anytimeIds = resp2.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp2.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B35-hook-knife-anytime')
   })
 })

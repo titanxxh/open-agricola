@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { scytheHarvestFieldAction } from '../scythe-harvest-field'
+import type { Field, PlayerState } from '../../../game/types'
 
-const mkPlayer = (fields: any[]): any => ({
+const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({
   fields,
   resources: { grain: 0, vegetable: 0 },
 })
 
-const invoke = (player: any, fieldIndex: number) =>
+const invoke = (player: Partial<PlayerState>, fieldIndex: number) =>
   scytheHarvestFieldAction.execute({
     player,
     params: { fieldIndex },

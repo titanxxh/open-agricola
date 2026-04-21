@@ -4,6 +4,7 @@ import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import { setActiveWorkerCount, familySize } from '../../shared/game/player'
 import '../../shared/cards/B/B85_FarmHand'
+import type { AnytimeAction } from '../../shared/game/types';
 
 describe('B85_FarmHand session', () => {
   const make2x2Fields = () => [
@@ -40,7 +41,7 @@ describe('B85_FarmHand session', () => {
     const session = setup()
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain('B85-farm-hand-anytime')
   })
 
@@ -55,7 +56,7 @@ describe('B85_FarmHand session', () => {
     })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
   })
 
@@ -63,7 +64,7 @@ describe('B85_FarmHand session', () => {
     const session = setup({ wood: 1 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
   })
 
@@ -92,7 +93,7 @@ describe('B85_FarmHand session', () => {
     expect(resp1.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
   })
 
@@ -130,7 +131,7 @@ describe('B85_FarmHand session', () => {
     })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
   })
 })

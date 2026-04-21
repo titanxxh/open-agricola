@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B89_Groom'
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('B89_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {
@@ -30,8 +31,8 @@ describe('B89_Groom session', () => {
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('onBeforeStartOfTurn returns optional stable flow in stone house', () => {
@@ -43,9 +44,9 @@ describe('B89_Groom session', () => {
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
-    expect((flow as any).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     // Should contain pay-resources and stables children
-    const children = (flow as any).children
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
     expect(children[0].actionId).toBe('pay-resources')
     expect(children[0].params).toEqual({ wood: 1 })

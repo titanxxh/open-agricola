@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E95_Miller'
+import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('E95_Miller session', () => {
   /**
@@ -54,19 +55,19 @@ describe('E95_Miller session', () => {
     expect(resp.pending.playerIndex).toBe(0)
 
     // Optional choice — pick to activate bake bread
-    const activateOption = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
     // Bake bread flow: first pick which improvement to bake with
     while (resp.pending.type === 'choice') {
       const options = resp.pending.options ?? []
-      const cancelOption = options.find((o: any) => o.value === 'cancel')
+      const cancelOption = options.find((o: ActionChoiceOption) => o.value === 'cancel')
       const fireplaceOption = options.find(
-        (o: any) => o.value === 'Major_Fireplace1',
+        (o: ActionChoiceOption) => o.value === 'Major_Fireplace1',
       )
       // Try to pick the fireplace first, or pick the first count option
-      const countOption = options.find((o: any) =>
+      const countOption = options.find((o: ActionChoiceOption) =>
         typeof o.value === 'string' && o.value.startsWith('count-'),
       )
       if (fireplaceOption) {
@@ -75,7 +76,7 @@ describe('E95_Miller session', () => {
         resp = session.resolveChoice(0, countOption.value)
       } else if (!cancelOption) {
         // Pick first non-skip option
-        const opt = options.find((o: any) => o.value !== '__skip__')
+        const opt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (opt) {
           resp = session.resolveChoice(0, opt.value)
         } else {
@@ -164,7 +165,7 @@ describe('E95_Miller session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     const millerOption = resp.pending.options?.find(
-      (o: any) => o.value === 'E95_Miller',
+      (o: ActionChoiceOption) => o.value === 'E95_Miller',
     )
     expect(millerOption).toBeDefined()
     resp = session.resolveChoice(0, millerOption!.value)
@@ -173,10 +174,10 @@ describe('E95_Miller session', () => {
     // (the onBuy flow). It may present as a choice with __skip__ option.
     if (resp.pending.type === 'choice') {
       const options = resp.pending.options ?? []
-      const hasSkip = options.some((o: any) => o.value === '__skip__')
+      const hasSkip = options.some((o: ActionChoiceOption) => o.value === '__skip__')
       if (hasSkip) {
         // Verify the optional nature
-        const nonSkipOptions = options.filter((o: any) => o.value !== '__skip__')
+        const nonSkipOptions = options.filter((o: ActionChoiceOption) => o.value !== '__skip__')
         // Should have baking improvement options available (Fireplace at least)
         expect(nonSkipOptions.length).toBeGreaterThan(0)
         // Skip the optional improvement
@@ -213,7 +214,7 @@ describe('E95_Miller session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     const millerOption = resp.pending.options?.find(
-      (o: any) => o.value === 'E95_Miller',
+      (o: ActionChoiceOption) => o.value === 'E95_Miller',
     )
     expect(millerOption).toBeDefined()
     resp = session.resolveChoice(0, millerOption!.value)
@@ -226,11 +227,11 @@ describe('E95_Miller session', () => {
       const options = resp.pending.options ?? []
       // Find fireplace option
       const fireplaceOption = options.find(
-        (o: any) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o: ActionChoiceOption) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
       )
       // Find activate (non-skip) option
       const activateOption = options.find(
-        (o: any) => o.value !== '__skip__' && o.value !== 'cancel',
+        (o: ActionChoiceOption) => o.value !== '__skip__' && o.value !== 'cancel',
       )
       if (fireplaceOption) {
         resp = session.resolveChoice(0, fireplaceOption.value)

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { swapFieldGrainToVegAction } from '../swap-field-crop'
+import type { Field, PlayerState } from '../../../game/types'
 
-const mkPlayer = (fields: any[]): any => ({ fields, resources: {} })
+const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({ fields, resources: {} as PlayerState['resources'] })
 
-const invoke = (player: any, row: number, col: number) =>
+const invoke = (player: Partial<PlayerState>, row: number, col: number) =>
   swapFieldGrainToVegAction.execute({
     player,
     params: { row, col },

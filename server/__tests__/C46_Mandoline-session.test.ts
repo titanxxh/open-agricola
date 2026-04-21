@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C46_Mandoline'
+import type { AnytimeAction } from '../../shared/game/types';
+import type { FutureMeeple } from '../../shared/game/types'
 
 describe('C46_Mandoline session', () => {
   const setup = () => {
@@ -25,7 +27,7 @@ describe('C46_Mandoline session', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
     // Anytime action should be available during plow interaction
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('C46-mandoline-anytime')
     const resp2 = session.takeAnytimeAction(0, 'C46-mandoline-anytime')
     expect(resp2.ok).toBe(true)
@@ -33,7 +35,7 @@ describe('C46_Mandoline session', () => {
     expect(p.resources.vegetable).toBe(2)
     expect(p.cardStates?.['C46_Mandoline']?.counters?.bonusVp).toBe(1)
     expect(isCardFlagged(p, 'C46_Mandoline')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: any) => m.cardId === 'C46_Mandoline')
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C46_Mandoline')
     expect(fm).toHaveLength(2)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)
@@ -45,7 +47,7 @@ describe('C46_Mandoline session', () => {
     state.players[0]!.resources.vegetable = 0
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C46-mandoline-anytime')
   })
 })

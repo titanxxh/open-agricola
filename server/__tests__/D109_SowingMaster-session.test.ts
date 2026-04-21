@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D109_SowingMaster'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D109_SowingMaster'
 
@@ -31,8 +33,8 @@ describe('D109_SowingMaster session', () => {
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ wood: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
   })
 
   it('gains 2 food when using grain-utilization', () => {
@@ -51,7 +53,7 @@ describe('D109_SowingMaster session', () => {
 
     // grain-utilization may require sowing choices — handle them
     while (resp.pending.type === 'choice') {
-      const nonSkip = resp.pending.options?.find((o: any) => o.value !== '__skip__')
+      const nonSkip = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (nonSkip) {
         resp = session.resolveChoice(0, nonSkip.value)
       } else {

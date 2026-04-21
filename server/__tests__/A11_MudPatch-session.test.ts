@@ -4,6 +4,7 @@ import { computeAnimalZones } from '../../shared/actions/effects/animals'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/A/A11_MudPatch'
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('A11_MudPatch session', () => {
   const setup = (options?: {
@@ -31,8 +32,8 @@ describe('A11_MudPatch session', () => {
     const flow = runCardEffectHook(state, player, 'A11_MudPatch', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as any).actionId).toBe('gain')
-    expect((flow as any).params).toEqual({ boar: 1 })
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ boar: 1 })
   })
 
   it('zone exists with capacity = empty field count, animalType = boar', () => {

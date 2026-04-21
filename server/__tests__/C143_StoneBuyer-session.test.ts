@@ -4,6 +4,8 @@ import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-stat
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C143_StoneBuyer'
+import type { AnytimeAction } from '../../shared/game/types';
+import type { ActionFlow } from '../../shared/game/types'
 
 describe('C143_StoneBuyer session', () => {
   const setup = () => {
@@ -35,7 +37,7 @@ describe('C143_StoneBuyer session', () => {
     const flow = runCardEffectHook(state, player, 'C143_StoneBuyer', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
-    const children = (flow as any).children
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(3)
     expect(children[0].actionId).toBe('pay-resources')
     expect(children[0].params).toEqual({ food: 1 })
@@ -53,7 +55,7 @@ describe('C143_StoneBuyer session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C143-stone-buyer-anytime')
   })
 
@@ -87,7 +89,7 @@ describe('C143_StoneBuyer session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C143-stone-buyer-anytime')
   })
 })

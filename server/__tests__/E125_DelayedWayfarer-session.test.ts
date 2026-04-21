@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/E/E125_DelayedWayfarer'
 
@@ -75,9 +75,9 @@ describe('E125_DelayedWayfarer card effect', () => {
       expect(effect).toBeDefined()
       const flow = effect!.onBuy!(state, player)
       expect(flow).toBeDefined()
-      expect((flow as any).type).toBe('xor')
-      expect((flow as any).children).toHaveLength(4)
-      const gains = (flow as any).children.map((c: any) => c.params)
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('xor')
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children).toHaveLength(4)
+      const gains = (flow as Extract<ActionFlow, { type: 'seq' }>).children.map((c: ActionFlow) => c.params)
       expect(gains).toEqual(
         expect.arrayContaining([
           { wood: 1 },
@@ -98,11 +98,11 @@ describe('E125_DelayedWayfarer card effect', () => {
       const effect = getCardEffect(CARD_ID)
       const flow = effect!.onAllWorkersPlaced!(state, player)
       expect(flow).toBeDefined()
-      expect((flow as any).type).toBe('seq')
-      expect((flow as any).optional).toBe(true)
-      expect((flow as any).children[0].actionId).toBe('place-farmer')
-      expect((flow as any).children[0].sourceCard).toBe(CARD_ID)
-      expect((flow as any).children[0].actionContext).toEqual({
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('seq')
+      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('place-farmer')
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].sourceCard).toBe(CARD_ID)
+      expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionContext).toEqual({
         trueAction: false,
         extraPlacement: true,
         fromSupply: true,

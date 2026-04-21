@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/D/D46_PelletPress'
+import type { FutureMeeple } from '../../shared/game/types'
 
 describe('D46_PelletPress session', () => {
   const setup = () => {
@@ -29,7 +30,7 @@ describe('D46_PelletPress session', () => {
     const p = resp2.state.players[0]!
     expect(p.resources.reed).toBe(2)
     expect(isCardFlagged(p, 'D46_PelletPress')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: any) => m.cardId === 'D46_PelletPress')
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'D46_PelletPress')
     expect(fm).toHaveLength(4)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)
@@ -43,7 +44,7 @@ describe('D46_PelletPress session', () => {
     state.players[0]!.resources.reed = 0
     session.loadState(state)
     const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('D46-pellet-press-anytime')
   })
 })

@@ -3,7 +3,7 @@ import {
   getRegisteredCardListeners,
   executeCardListener,
 } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../E/E77_Mattock'
 
@@ -65,7 +65,7 @@ describe('E77_Mattock', () => {
       result: { type: 'ok', resourcesGained: { reed: 2 } },
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ clay: 1 })
   })
@@ -80,7 +80,7 @@ describe('E77_Mattock', () => {
       result: { type: 'ok', resourcesGained: { stone: 2 } },
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ clay: 1 })
   })
@@ -94,7 +94,7 @@ describe('E77_Mattock', () => {
       actionId: 'place-farmer', phase: 'during',
     } as any)
     expect(result).toBeDefined()
-    const leaf = result!.flow as any
+    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ clay: 1 })
   })

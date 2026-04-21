@@ -4,6 +4,7 @@ import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-stat
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C150_ParrotBreeder'
+import type { AnytimeAction } from '../../shared/game/types';
 
 const CARD_ID = 'C150_ParrotBreeder'
 const LISTENER_ID = 'C150-parrot-breeder-anytime'
@@ -40,7 +41,7 @@ describe('C150_ParrotBreeder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).toContain(LISTENER_ID)
   })
 
@@ -53,7 +54,7 @@ describe('C150_ParrotBreeder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain(LISTENER_ID)
   })
 
@@ -66,7 +67,7 @@ describe('C150_ParrotBreeder session', () => {
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain(LISTENER_ID)
   })
 

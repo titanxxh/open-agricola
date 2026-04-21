@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
+import type { LogEntry } from '../shared/game/types'
 
 describe('A126 MasterWorkman integration', () => {
   it('grants 1 wood when using a round-1 action space', () => {
@@ -21,7 +22,7 @@ describe('A126 MasterWorkman integration', () => {
     expect(woodAfter).toBeGreaterThan(woodBefore)
 
     const cardGainLog = resp.state.log.find(
-      (e: any) => e.key === 'log.cardEffectGain'
+      (e: LogEntry) => e.key === 'log.cardEffectGain'
     )
     expect(cardGainLog).toBeTruthy()
     if (!cardGainLog?.params) {
@@ -31,7 +32,7 @@ describe('A126 MasterWorkman integration', () => {
     expect(cardGainLog.params.gain).toEqual({ wood: 1 })
 
     const actionDetailLog = resp.state.log.find(
-      (e: any) => e.key === 'log.actionDetail'
+      (e: LogEntry) => e.key === 'log.actionDetail'
     )
     if (actionDetailLog) {
       const gains = (actionDetailLog.params as {

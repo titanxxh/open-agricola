@@ -48,7 +48,7 @@ describe('C87_Mason session', () => {
     const session = setup({ houseType: 'wood', rooms: 4 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C87-mason-anytime')
   })
 
@@ -56,7 +56,7 @@ describe('C87_Mason session', () => {
     const session = setup({ houseType: 'clay', rooms: 4 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C87-mason-anytime')
   })
 
@@ -64,7 +64,7 @@ describe('C87_Mason session', () => {
     const session = setup({ houseType: 'stone', rooms: 3 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C87-mason-anytime')
   })
 
@@ -77,7 +77,7 @@ describe('C87_Mason session', () => {
     expect(resp1.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: any) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C87-mason-anytime')
   })
 
