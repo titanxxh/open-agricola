@@ -21,10 +21,7 @@ const edgesForOneTile = [
   'V-1-2',
 ]
 
-// TODO(flaky): A73 test still intermittently fails (~20-25% rate) under parallel
-// test execution; root cause likely shared module-level card listener state.
-// Tracked separately; keep retry marker until deterministic fix.
-describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
+describe('A73_AgriculturalFertilizers session', () => {
   const setupFencing = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -132,7 +129,13 @@ describe('A73_AgriculturalFertilizers session', { retry: 2 }, () => {
     const player = state.players[0]!
     // No pastures
     player.pastures = []
-    player.minorHand.push(CARD_ID)
+    // Deterministic hand: A25 (free, no prerequisite) + A73 (needs pasture).
+    // `new GameSession()` deals a random hand from RNG (Math.random seed),
+    // so the default hand occasionally contained 7 cards where none were
+    // playable — skipping the choice prompt and making this test flaky.
+    // Pinning the hand to a known-playable card plus A73 removes the RNG
+    // dependency.
+    player.minorHand = ['A25_Bassinet', CARD_ID]
 
     session.loadState(state)
 
