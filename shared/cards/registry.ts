@@ -59,6 +59,18 @@ export class CardRegistry {
     this.listenersByCard.set(cardId, filtered)
   }
 
+  /**
+   * Register a listener using its own `cardIds`. Listeners without explicit
+   * `cardIds` go under the synthetic `__global__` bucket so `getAllListeners()`
+   * still returns them.
+   */
+  registerListener(listener: CardListenerRegistration): void {
+    const ids = listener.cardIds && listener.cardIds.length > 0
+      ? listener.cardIds
+      : ['__global__']
+    for (const id of ids) this.addListener(id, listener)
+  }
+
   /** Set or replace the effect keyed by its id. */
   setEffect(effect: CardEffect): void {
     this.effectsByCard.set(effect.id, effect)

@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { ActionNode, SequenceNode, XorNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
@@ -9,7 +11,6 @@ import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 import type { CardListenerContext } from '../../cards/card-listeners'
 
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -94,7 +95,7 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
 describe('Collect action card listeners integration', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('E53_BoarSpear: registers during listener for collect action', () => {
@@ -116,7 +117,7 @@ describe('Collect action card listeners integration', () => {
         }
       },
     }
-    registerCardListener(boarSpearListener)
+    requireActiveCardRegistry('collect-cards-integration').registerListener(boarSpearListener)
 
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))
@@ -151,7 +152,7 @@ describe('Collect action card listeners integration', () => {
         },
       }),
     }
-    registerCardListener(mushroomCollectorListener)
+    requireActiveCardRegistry('collect-cards-integration').registerListener(mushroomCollectorListener)
 
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))
@@ -186,7 +187,7 @@ describe('Collect action card listeners integration', () => {
         },
       }),
     }
-    registerCardListener(reclamationPlowListener)
+    requireActiveCardRegistry('collect-cards-integration').registerListener(reclamationPlowListener)
 
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))
@@ -225,7 +226,7 @@ describe('Collect action card listeners integration', () => {
         },
       }),
     }
-    registerCardListener(boarSpearListener)
+    requireActiveCardRegistry('collect-cards-integration').registerListener(boarSpearListener)
 
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))
@@ -272,7 +273,7 @@ describe('Collect action card listeners integration', () => {
         }
       },
     }
-    registerCardListener(claypipeListener)
+    requireActiveCardRegistry('collect-cards-integration').registerListener(claypipeListener)
 
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))

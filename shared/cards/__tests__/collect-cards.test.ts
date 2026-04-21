@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners } from '../card-listeners'
-import { clearCardListeners, registerCardListener } from '../registry-ops'
 import type { CardListenerContext } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace, Resource } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 
 describe('Collect action card listeners', () => {
   beforeEach(() => {
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   const createMockContext = (
@@ -169,7 +170,7 @@ describe('Collect action card listeners', () => {
 
   describe('E53_BoarSpear', () => {
     beforeEach(() => {
-      registerCardListener(boarSpearDuringListener)
+      requireActiveCardRegistry('collect-cards').registerListener(boarSpearDuringListener)
     })
 
     it('registers during listener', () => {
@@ -227,7 +228,7 @@ describe('Collect action card listeners', () => {
 
   describe('A108_MushroomCollector', () => {
     beforeEach(() => {
-      registerCardListener(mushroomCollectorImmediatelyAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(mushroomCollectorImmediatelyAfterListener)
     })
 
     it('registers immediatelyAfter listener', () => {
@@ -271,7 +272,7 @@ describe('Collect action card listeners', () => {
 
   describe('A17_ReclamationPlow', () => {
     beforeEach(() => {
-      registerCardListener(reclamationPlowAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(reclamationPlowAfterListener)
     })
 
     it('registers after listener', () => {
@@ -417,8 +418,8 @@ describe('Collect action card listeners', () => {
     }
 
     beforeEach(() => {
-      registerCardListener(claypipeImmediatelyAfterListener)
-      registerCardListener(claypipeAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(claypipeImmediatelyAfterListener)
+      requireActiveCardRegistry('collect-cards').registerListener(claypipeAfterListener)
     })
 
     it('registers immediatelyAfter and after listeners', () => {

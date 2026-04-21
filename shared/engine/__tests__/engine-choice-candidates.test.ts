@@ -7,13 +7,14 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 const createState = () =>
   ({
@@ -104,7 +105,7 @@ const buildOptInAction = (
 describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   beforeEach(() => {
     clearActionHooks()
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   it('auto-resolves silently when only one base option is affordable (no UI prompt)', () => {
@@ -125,7 +126,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   })
 
   it('presents a choice when ≥2 affordable options after merging hook extras', () => {
-    registerCardListener({
+    requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-extra-option',
       actions: ['opt-in-choice-action'],
       phases: ['computeChoiceCandidates'],
@@ -178,7 +179,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   })
 
   it('dedups duplicate option values (first wins) so listeners cannot override base labels', () => {
-    registerCardListener({
+    requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-duplicate-option',
       actions: ['opt-in-choice-action'],
       phases: ['computeChoiceCandidates'],
@@ -202,7 +203,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   })
 
   it('filters unaffordable options out via per-option canExecute(params.selectedOption)', () => {
-    registerCardListener({
+    requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-affordable-extra',
       actions: ['opt-in-choice-action'],
       phases: ['computeChoiceCandidates'],

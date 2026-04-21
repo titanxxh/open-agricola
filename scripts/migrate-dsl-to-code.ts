@@ -22,6 +22,7 @@ import Database from 'better-sqlite3'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { compileCardCode } from '../server/custom-code/compiler.ts'
+import { requireActiveCardRegistry } from '../shared/cards/active-registry'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -135,7 +136,7 @@ function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): string {
 
   lines.push(`import { ${classType} } from '../../shared/cards/types'`)
   if (dsl && Object.keys(dsl).length > 0) {
-    lines.push(`import { registerCardEffect } from '../../shared/cards/registry-ops'`)
+    lines.push(`import { requireActiveCardRegistry } from '../../shared/cards/active-registry'`)
     lines.push(`import { familySize } from '../../shared/game/player'`)
   }
   lines.push('')
@@ -144,7 +145,7 @@ function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): string {
   lines.push('')
 
   if (dsl && Object.keys(dsl).length > 0) {
-    lines.push('registerCardEffect({')
+    lines.push(`requireActiveCardRegistry('${meta.id}').setEffect({`)
     lines.push('  id: CARD_ID,')
     for (const [hook, effect] of Object.entries(dsl)) {
       if (!effect || !effect.flow) continue

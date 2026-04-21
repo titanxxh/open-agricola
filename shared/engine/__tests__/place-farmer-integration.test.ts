@@ -4,12 +4,13 @@ import { actionDefinitions } from '../../actions'
 import { createActionSpaces } from '../../actions'
 import { HookDispatcher } from '../dispatcher'
 import { executeCardListener } from '../../cards/card-listeners'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 import type { CardListenerContext } from '../../cards/card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 
 import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../game/player'
+import { CardRegistry } from '../../../shared/cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -96,7 +97,7 @@ describe('PlaceFarmer card integration', () => {
   let player: PlayerState
 
   beforeEach(() => {
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
     dispatcher = new HookDispatcher()
     state = createState()
     player = createPlayer()
@@ -117,7 +118,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -145,7 +146,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -173,7 +174,7 @@ describe('PlaceFarmer card integration', () => {
           return { followUpActions: ['bake-bread'] }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -199,7 +200,7 @@ describe('PlaceFarmer card integration', () => {
           return { followUpActions: ['bake-bread'] }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)
@@ -233,7 +234,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const sheepMarket = actionDefinitions.find(a => a.id === 'sheep-market')!
       const space = createSpace(sheepMarket)
@@ -263,7 +264,7 @@ describe('PlaceFarmer card integration', () => {
           }
         },
       }
-      registerCardListener(listener)
+      requireActiveCardRegistry('place-farmer-integration').registerListener(listener)
 
       const forestAction = actionDefinitions.find(a => a.id === 'forest')!
       const space = createSpace(forestAction)

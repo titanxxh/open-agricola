@@ -13,12 +13,12 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { registerCardEffect } from '../../shared/cards/registry-ops'
 import type { ResolveChoiceHandler } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -53,7 +53,7 @@ beforeEach(() => {
   }
   // Register card effect with a basic onBuy (XOR choice).
   // resolveChoice is set per-test.
-  registerCardEffect({
+  requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),
   })
@@ -61,7 +61,7 @@ beforeEach(() => {
 
 afterEach(() => {
   // Re-register without resolveChoice to clean up between tests.
-  registerCardEffect({
+  requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),
   })
@@ -89,7 +89,7 @@ const makeSession = () => {
 describe('CardEffect.resolveChoice hook', () => {
   it('getCardEffect returns the registered resolveChoice handler', () => {
     const handler: ResolveChoiceHandler = () => undefined
-    registerCardEffect({
+    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: handler,
@@ -101,7 +101,7 @@ describe('CardEffect.resolveChoice hook', () => {
   it('resolveChoice handler is invoked when a pending choice with matching sourceCard is resolved', () => {
     const invocations: { choice: string; ctx: { sourceCard: string } }[] = []
 
-    registerCardEffect({
+    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (_state, _player, choice, ctx) => {
@@ -138,7 +138,7 @@ describe('CardEffect.resolveChoice hook', () => {
   it('resolveChoice handler that returns a flow causes the flow to be executed', () => {
     const BONUS_FOOD = 5
 
-    registerCardEffect({
+    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (): ActionFlow => ({
@@ -174,7 +174,7 @@ describe('CardEffect.resolveChoice hook', () => {
 
   it('resolveChoice handler is NOT called when sourceCard does not match', () => {
     let handlerCalled = false
-    registerCardEffect({
+    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: () => {

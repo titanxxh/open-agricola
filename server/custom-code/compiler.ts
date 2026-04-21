@@ -7,9 +7,8 @@
 import ts from 'typescript'
 import vm from 'node:vm'
 import { type CardEffect } from '../../shared/cards/card-effects.ts'
-import { registerCardEffect } from '../../shared/cards/registry-ops.ts'
 import { type CardListenerRegistration } from '../../shared/cards/card-listeners.ts'
-import { registerCardListener } from '../../shared/cards/registry-ops.ts'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 
 const VM_TIMEOUT_MS = 100
 
@@ -76,11 +75,12 @@ export function executeCardCode(compiledJs: string, cardId: string): void {
     filename: `${cardId}.js`,
   })
 
-  // Commit registrations to the real registries
+  // Commit registrations to the active registry
+  const registry = requireActiveCardRegistry('executeCardCode')
   for (const effect of registeredEffects) {
-    registerCardEffect(effect)
+    registry.setEffect(effect)
   }
   for (const listener of registeredListeners) {
-    registerCardListener(listener)
+    registry.registerListener(listener)
   }
 }

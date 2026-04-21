@@ -2,11 +2,11 @@ import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import { computeAllowedPlacementSpaces } from '../placement-availability'
-import { registerCardListener, clearCustomCardListeners } from '../../../cards/registry-ops'
 import type { ActionHookPhase } from '../../hooks'
+import { getActiveCardRegistry, requireActiveCardRegistry } from '../../../../shared/cards/active-registry'
 
 afterEach(() => {
-  clearCustomCardListeners()
+  getActiveCardRegistry()?.removeListenersWhere((reg) => reg.id.startsWith('CUSTOM_'))
 })
 
 describe('computeAllowedPlacementSpaces', () => {
@@ -53,7 +53,7 @@ describe('computeAllowedPlacementSpaces', () => {
     space.takenBy = [{ playerId: st.players[1]!.id, workerId: 'w1' }]
     session.loadState(st)
 
-    registerCardListener({
+    requireActiveCardRegistry('placement-availability').registerListener({
       id: 'CUSTOM_test-allow-day-laborer',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],
@@ -72,7 +72,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
   it('dedupes: base entry wins over extraOption for the same spaceId', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    registerCardListener({
+    requireActiveCardRegistry('placement-availability').registerListener({
       id: 'CUSTOM_test-dup-day-laborer',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],
@@ -91,7 +91,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
   it('filters extraOption spaces that do not exist', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    registerCardListener({
+    requireActiveCardRegistry('placement-availability').registerListener({
       id: 'CUSTOM_test-ghost-space',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],

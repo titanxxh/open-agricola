@@ -13,8 +13,9 @@
  *     shared default registry pre-loaded with `ALL_CARD_IMPLS` so any test
  *     that reads listeners/effects without constructing a `GameSession` still
  *     sees every card's implementation.
- *   - Tests that want an empty slate call `clearCardListeners()` /
- *     `clearCardEffects()` which publishes an empty fresh registry.
+ *   - Tests that want an empty slate publish a fresh registry via
+ *     `setActiveCardRegistry(new CardRegistry())`, or scope the reset with
+ *     `removeListenersWhere` / `removeEffectsWhere`.
  */
 import { CardRegistry } from './registry'
 

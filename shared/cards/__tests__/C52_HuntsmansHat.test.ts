@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../game/types'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 
 const CARD_ID = 'C52_HuntsmansHat'
 
@@ -84,20 +86,23 @@ const createState = (): GameState => ({
 
 describe('C52_HuntsmansHat', () => {
   let cardApi: typeof import('../card-listeners')
-  let ops: typeof import('../registry-ops')
 
   beforeEach(async () => {
     vi.resetModules()
     cardApi = await import('../card-listeners')
-    ops = await import('../registry-ops')
-    ops.clearCardListeners()
+    // After vi.resetModules(), the freshly-imported `card-listeners` reads
+    // from a freshly-imported `active-registry`. Publish + register via the
+    // same fresh instance so reads line up.
+    const registryMod = await import('../registry')
+    const activeMod = await import('../active-registry')
+    activeMod.setActiveCardRegistry(new registryMod.CardRegistry())
     // Post PR-2 _impl migration: card files no longer self-register at import
     // time. Pull the `_impl` export and push its listeners into the active
     // registry so `getRegisteredCardListeners()` returns them.
     const mod = await import('../C/C52_HuntsmansHat')
-    const impl = (mod as { C52_HuntsmansHat_impl?: { listeners?: Array<Parameters<typeof ops.registerCardListener>[0]> } }).C52_HuntsmansHat_impl
+    const impl = mod.C52_HuntsmansHat_impl
     for (const listener of impl?.listeners ?? []) {
-      ops.registerCardListener(listener)
+      activeMod.requireActiveCardRegistry('C52_HuntsmansHat').registerListener(listener)
     }
   })
 

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration, type CardListenerContext } from '../card-listeners'
-import { clearCardListeners, registerCardListener } from '../registry-ops'
 import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 import { markAllWorkersUsed } from '../../game/player'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 describe('PlaceFarmer card listeners', () => {
   beforeEach(() => {
-    clearCardListeners()
+    setActiveCardRegistry(new CardRegistry())
   })
 
   const steamMachineListener: CardListenerRegistration = {
@@ -146,7 +147,7 @@ describe('PlaceFarmer card listeners', () => {
 
   describe('C25_SteamMachine', () => {
     beforeEach(() => {
-      registerCardListener(steamMachineListener)
+      requireActiveCardRegistry('place-farmer-cards').registerListener(steamMachineListener)
     })
 
     it('registers immediatelyAfter listener', () => {
@@ -188,7 +189,7 @@ describe('PlaceFarmer card listeners', () => {
 
   describe('C52_HuntsmansHat', () => {
     beforeEach(() => {
-      registerCardListener(huntsmansHatListener)
+      requireActiveCardRegistry('place-farmer-cards').registerListener(huntsmansHatListener)
     })
 
     it('registers during listener', () => {
@@ -201,7 +202,7 @@ describe('PlaceFarmer card listeners', () => {
 
   describe('C75_Firewood', () => {
     beforeEach(() => {
-      registerCardListener(firewoodReturnHomeListener)
+      requireActiveCardRegistry('place-farmer-cards').registerListener(firewoodReturnHomeListener)
     })
 
     it('registers after listener', () => {
@@ -223,7 +224,7 @@ describe('PlaceFarmer card listeners', () => {
     }
 
     beforeEach(() => {
-      registerCardListener(sheepRugComputeArgsListener)
+      requireActiveCardRegistry('place-farmer-cards').registerListener(sheepRugComputeArgsListener)
     })
 
     it('registers computeArgs listener for place-farmer', () => {

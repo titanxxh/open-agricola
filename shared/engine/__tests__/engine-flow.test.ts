@@ -6,6 +6,8 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { ActionRegistry } from '../registry'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
@@ -20,7 +22,6 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { clearCardListeners, registerCardListener } from '../../cards/registry-ops'
 
 const createState = () =>
   ({
@@ -103,7 +104,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 describe('Engine flow nodes', () => {
   beforeEach(() => {
     clearActionHooks()
-  clearCardListeners()
+  setActiveCardRegistry(new CardRegistry())
   })
 
   it('or node removes completed choice and exposes done', () => {
@@ -572,7 +573,7 @@ describe('Engine flow nodes', () => {
         return { type: 'ok' }
       },
     }
-    registerCardListener({
+    requireActiveCardRegistry('engine-flow').registerListener({
       id: 'offer-replacement',
       actions: ['original'],
       phases: ['computeReplace'],
@@ -639,7 +640,7 @@ describe('Engine flow nodes', () => {
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
     }
-    registerCardListener({
+    requireActiveCardRegistry('engine-flow').registerListener({
       id: 'offer-sow-replacement',
       actions: ['sow'],
       phases: ['computeReplace'],
