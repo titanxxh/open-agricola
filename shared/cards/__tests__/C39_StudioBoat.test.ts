@@ -4,6 +4,7 @@ import { getPlayerActionSpaceConfig } from '../player-action-space'
 import type { GameState, PlayerState, ActionSpace, Resource } from '../../game/types'
 
 import '../C/C39_StudioBoat'
+import type { ActionExecutionContext } from '../../game/types'
 
 const CARD_ID = 'C39_StudioBoat'
 
@@ -82,7 +83,7 @@ describe('C39_StudioBoat', () => {
       })
       state.actionSpaces = [space]
 
-      const result = def.execute({ state, player: user, space } as any)
+      const result = def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
       expect(result.type).toBe('ok')
       expect(user.resources.food).toBe(3) // collected 3 food
       expect(space.resources.food).toBe(0) // space emptied
@@ -100,7 +101,7 @@ describe('C39_StudioBoat', () => {
       })
       state.actionSpaces = [space]
 
-      def.execute({ state, player: user, space } as any)
+      def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
       expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
     })
 
@@ -114,7 +115,7 @@ describe('C39_StudioBoat', () => {
       })
       state.actionSpaces = [space]
 
-      def.execute({ state, player: owner, space } as any)
+      def.execute({ state, player: owner, space } as unknown as ActionExecutionContext)
       expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
       expect(owner.resources.food).toBe(2)
     })
@@ -131,9 +132,9 @@ describe('C39_StudioBoat', () => {
       })
       state.actionSpaces = [space]
 
-      def.execute({ state, player: user, space } as any)
+      def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
       space.resources.food = 2 // simulate next round accumulation
-      def.execute({ state, player: owner, space } as any)
+      def.execute({ state, player: owner, space } as unknown as ActionExecutionContext)
       expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(2)
     })
   })

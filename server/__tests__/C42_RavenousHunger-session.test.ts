@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
@@ -64,7 +64,7 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
@@ -85,7 +85,7 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('grain-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -101,7 +101,7 @@ describe('C42_RavenousHunger', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -118,7 +118,7 @@ describe('C42_RavenousHunger', () => {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'collect', phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -138,7 +138,7 @@ describe('C42_RavenousHunger', () => {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'collect', phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

@@ -5,6 +5,7 @@ import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../gam
 
 import '../A/A20_DoubleTurnPlow'
 import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
 
@@ -89,7 +90,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ food: 1 })
@@ -105,7 +106,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -120,7 +121,7 @@ describe('A20_DoubleTurnPlow', () => {
       state, player, space: createSpace('minor-improvement'),
       actionId: 'minor-improvement', phase: 'computeCosts',
       cardId: 'SomeOtherCard',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

@@ -54,7 +54,7 @@ describe('C18_RollOverPlow session', () => {
     // Should be in selection choice
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('selection')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
@@ -66,8 +66,8 @@ describe('C18_RollOverPlow session', () => {
     // Plow shows a farm interaction for tile selection
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected plow choice')
-    expect((resp.pending as any).promptKey).toBe('ui.interactionPlowSelect')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('farmSelect')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 

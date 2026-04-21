@@ -9,6 +9,7 @@ import {
 import type { ActionSpace, GameState, Pasture, PlayerState } from '../../game/types'
 
 import '../E/E33_BeaverColony'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E33_BeaverColony'
 
@@ -200,7 +201,7 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('reed-bank'),
       actionId: 'collect', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('bonus-vp')
@@ -216,7 +217,7 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('reed-bank'),
       actionId: 'collect', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { wood: 3 } },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -231,7 +232,7 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('resource-market-4'),
       actionId: 'gain', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { reed: 1, stone: 1, food: 1 } },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.actionId).toBe('bonus-vp')
@@ -247,7 +248,7 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('day-laborer'),
       actionId: 'gain', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { food: 1 } },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 })

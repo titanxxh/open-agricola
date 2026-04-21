@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
-import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/A/A87_Conservator'
 
@@ -50,7 +50,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.extraOptions).toEqual([
       { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
@@ -68,7 +68,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -84,7 +84,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -104,7 +104,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.extraOptions).toEqual([
       { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
@@ -134,7 +134,7 @@ describe('A87_Conservator isDoable listener', () => {
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(true)
   })
@@ -155,7 +155,7 @@ describe('A87_Conservator isDoable listener', () => {
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: true,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -176,7 +176,7 @@ describe('A87_Conservator isDoable listener', () => {
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -197,7 +197,7 @@ describe('A87_Conservator isDoable listener', () => {
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: true,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -219,7 +219,7 @@ describe('A87_Conservator isDoable listener', () => {
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -243,7 +243,7 @@ describe('A87_Conservator session sourceCard', () => {
     if (resp.pending.type !== 'choice') return
 
     expect(resp.pending.promptKey).toBe('ui.interactionChooseRenovationTarget')
-    expect((resp.pending as any).sourceCard).toBeUndefined()
+    expect(resp.pending.sourceCard).toBeUndefined()
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
     expect(resp.pending.options.find((option) => option.value === 'clay')?.sourceCard).toBeUndefined()
     expect(resp.pending.options.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C140_PackagingArtist'
 import type { ActionFlow } from '../../shared/game/types'
@@ -41,7 +41,7 @@ describe('C140_PackagingArtist session', () => {
       player,
       actionId: 'minor-improvement',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('bake-bread')

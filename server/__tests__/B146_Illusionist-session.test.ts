@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
-import type {
-  ActionSpace,
-  GameState,
-  PlayerState,
-} from '../../shared/game/types'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/B/B146_Illusionist'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
@@ -114,7 +110,7 @@ describe('B146_Illusionist listener handler', () => {
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -134,7 +130,7 @@ describe('B146_Illusionist listener handler', () => {
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -156,7 +152,7 @@ describe('B146_Illusionist listener handler', () => {
       space: fishing,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -176,7 +172,7 @@ describe('B146_Illusionist listener handler', () => {
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -205,7 +201,7 @@ describe('B146_Illusionist listener handler', () => {
       space: clayPit,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -227,7 +223,7 @@ describe('B146_Illusionist listener handler', () => {
       space: reedBank,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -249,7 +245,7 @@ describe('B146_Illusionist listener handler', () => {
       space: quarry,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -272,7 +268,7 @@ describe('B146_Illusionist listener handler', () => {
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
   })
@@ -290,7 +286,7 @@ describe('discard-from-hand action', () => {
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
-    const result = def!.execute({ state, player, space: forest, params: {} } as any)
+    const result = def!.execute({ state, player, space: forest, params: {} } as unknown as ActionExecutionContext)
     expect(result.type).toBe('choice')
     if (result.type === 'choice') {
       expect(result.options).toHaveLength(3)
@@ -310,7 +306,7 @@ describe('discard-from-hand action', () => {
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def.resolveChoice!(
-      { state, player, space: forest, params: {} } as any,
+      { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'occ:A9_SheepFarmer',
     )
     expect(result.type).toBe('ok')
@@ -325,7 +321,7 @@ describe('discard-from-hand action', () => {
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def.resolveChoice!(
-      { state, player, space: forest, params: {} } as any,
+      { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'min:A2_Basket',
     )
     expect(result.type).toBe('ok')
@@ -340,7 +336,7 @@ describe('discard-from-hand action', () => {
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def.resolveChoice!(
-      { state, player, space: forest, params: {} } as any,
+      { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'occ:NotInHand',
     )
     expect(result.type).toBe('fail')

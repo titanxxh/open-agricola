@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
-import { executeCardListener, getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/game/types'
 
@@ -122,7 +122,7 @@ describe('D103_CanalBoatman listener', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('seq')

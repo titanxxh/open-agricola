@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/C/C163_MaterialDeliveryman'
@@ -84,7 +84,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 5 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -107,7 +107,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 6 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
@@ -128,7 +128,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 7 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
@@ -149,7 +149,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 8 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
@@ -170,7 +170,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 3, clay: 3, reed: 2, stone: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
@@ -191,7 +191,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 4 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -211,7 +211,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

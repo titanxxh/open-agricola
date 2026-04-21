@@ -12,6 +12,7 @@ import '../A/A28_ForestSchool'
 import '../D/D51_Archway'
 import '../E/E10_StrawHat'
 import type { ActionFlow } from '../../game/types'
+import type { ActionExecutionContext } from '../../game/types'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -100,7 +101,7 @@ describe('D51_Archway', () => {
       state: createState([player]),
       player,
       space: createSpace('D51_Archway'),
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(result.type).toBe('ok')
     expect(player.resources.food).toBe(1)
   })
@@ -269,7 +270,7 @@ describe('move-farmer-to-space action', () => {
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
       params: { excludeSpaceId: 'D51_Archway' },
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(result.type).toBe('choice')
     if (result.type === 'choice') {
       expect(result.options!.length).toBe(1)
@@ -285,7 +286,7 @@ describe('move-farmer-to-space action', () => {
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
       params: { excludeSpaceId: 'D51_Archway' },
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(result.type).toBe('fail')
   })
 
@@ -298,7 +299,7 @@ describe('move-farmer-to-space action', () => {
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
       params: { excludeSpaceId: 'D51_Archway' },
-    } as any)
+    } as unknown as ActionExecutionContext)
     expect(result.type).toBe('choice')
     if (result.type === 'choice') {
       expect(result.options!.some((o) => o.value === 'lessons')).toBe(true)
@@ -311,7 +312,7 @@ describe('move-farmer-to-space action', () => {
     const target = createSpace('day-laborer', { execute: executeSpy } as any)
     const state = createState([player], [target])
     const result = moveFarmerToSpaceAction.resolveChoice!(
-      { state, player, space: createSpace('source') } as any,
+      { state, player, space: createSpace('source') } as unknown as ActionExecutionContext,
       'day-laborer',
     )
     expect(result.type).toBe('ok')
@@ -323,7 +324,7 @@ describe('move-farmer-to-space action', () => {
     const player = createPlayer()
     const state = createState([player], [])
     const result = moveFarmerToSpaceAction.resolveChoice!(
-      { state, player, space: createSpace('source') } as any,
+      { state, player, space: createSpace('source') } as unknown as ActionExecutionContext,
       'nonexistent',
     )
     expect(result.type).toBe('fail')

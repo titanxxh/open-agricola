@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C132_TimberShingleMaker'
@@ -65,7 +65,7 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
@@ -95,7 +95,7 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -112,7 +112,7 @@ describe('C132_TimberShingleMaker', () => {
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children

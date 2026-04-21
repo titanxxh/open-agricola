@@ -3,6 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
 
 import '../D/D112_YoungFarmer'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D112_YoungFarmer'
 
@@ -61,7 +62,7 @@ describe('D112_YoungFarmer', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('major-improvement'),
       actionId: 'place-farmer', phase: 'during',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -75,7 +76,7 @@ describe('D112_YoungFarmer', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('major-improvement'),
       actionId: 'place-farmer', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('sow')
@@ -88,7 +89,7 @@ describe('D112_YoungFarmer', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('farmland'),
       actionId: 'place-farmer', phase: 'during',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -102,7 +103,7 @@ describe('D112_YoungFarmer', () => {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'computeArgs',
       result: { type: 'choice', options: [] },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect(result!.extraOptions).toHaveLength(1)
     expect(result!.extraOptions![0].value).toBe('allow-occupied:major-improvement')
@@ -119,7 +120,7 @@ describe('D112_YoungFarmer', () => {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'computeArgs',
       result: { type: 'choice', options: [] },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 })

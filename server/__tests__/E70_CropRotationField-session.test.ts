@@ -8,6 +8,7 @@ import { buildSowFarmInteraction } from '../../shared/logic/farm/farm-interactio
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
+import type { PendingAction } from '../../shared/game/types'
 
 const CARD_ID = 'E70_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
@@ -113,7 +114,7 @@ describe('E70_CropRotationField session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as any).promptKey).toBe('ui.interactionSowSelect')
+      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
       resp = session.commitFarmChoice(0, 'sow', {
@@ -364,7 +365,7 @@ describe('E70_CropRotationField session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as any).promptKey).toBe('ui.interactionSowSelect')
+      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
     })
 
     it('sow is not doable when card already has crop and no regular fields', () => {

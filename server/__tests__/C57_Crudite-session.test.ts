@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
 
 import '../../shared/cards/C/C57_Crudite'
@@ -119,7 +119,7 @@ describe('C57_Crudite', () => {
     const result = executeCardListener(listener!, {
       state, player,
       actionId: '', phase: 'anytime',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -139,7 +139,7 @@ describe('C57_Crudite', () => {
     const result = executeCardListener(listener!, {
       state, player,
       actionId: '', phase: 'anytime',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

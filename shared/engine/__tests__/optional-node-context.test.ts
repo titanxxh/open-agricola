@@ -8,6 +8,7 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, OptionalNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
+import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 beforeEach(() => {
   clearActionHooks()
@@ -87,7 +88,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     const step = engine.proceed({
       state: makeState(),
       player: makePlayer(),
-      space: {} as any,
+      space: mkActionSpace({ id: 'noop' }),
     })
 
     expect(receivedActionContext).toEqual({ override: true, customKey: 42 })
@@ -133,7 +134,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     const step = engine.proceed({
       state: makeState(),
       player: makePlayer(),
-      space: {} as any,
+      space: mkActionSpace({ id: 'noop' }),
     })
 
     expect(receivedSourceCard).toBe('TestCard')

@@ -6,6 +6,8 @@ import { actionDefinitions } from '../../actions'
 
 import '../A/A97_Freshman'
 import '../A/A123_FrameBuilder'
+import type { CardListenerContext } from '../card-listeners'
+import type { ActionExecutionContext } from '../../game/types'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -86,7 +88,7 @@ describe('A97_Freshman', () => {
       space: createSpace('grain-utilization'),
       actionId: 'bake-bread',
       phase: 'computeReplace',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.decline).toBe(true)
     expect(result?.alternativeFlow).toEqual({
@@ -123,7 +125,7 @@ describe('A97_Freshman', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -141,7 +143,7 @@ describe('A97_Freshman', () => {
       state: createState(player),
       player,
       space: createSpace('lessons'),
-      params: { costOverride: {} } as any,
+      params: { costOverride: {} } as unknown as ActionExecutionContext,
     })
 
     expect(result.type).toBe('choice')
@@ -152,7 +154,7 @@ describe('A97_Freshman', () => {
         state: createState(player),
         player,
         space: createSpace('lessons'),
-        params: { costOverride: {} } as any,
+        params: { costOverride: {} } as unknown as ActionExecutionContext,
       },
       'A123_FrameBuilder',
     )

@@ -5,6 +5,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import '../C/C158_ForestCampaigner'
 import { countWoodOnAccumulationSpaces } from '../C/C158_ForestCampaigner'
 import type { ActionFlow } from '../../game/types'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'C158_ForestCampaigner'
 
@@ -125,7 +126,7 @@ describe('C158_ForestCampaigner', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'),
         actionId: 'place-farmer', phase: 'before',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
       const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
       expect(leaf.actionId).toBe('gain')
@@ -146,7 +147,7 @@ describe('C158_ForestCampaigner', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'),
         actionId: 'place-farmer', phase: 'before',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
 
@@ -160,7 +161,7 @@ describe('C158_ForestCampaigner', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'),
         actionId: 'place-farmer', phase: 'before',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
       expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 1 })
     })
@@ -177,7 +178,7 @@ describe('C158_ForestCampaigner', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('farmland'),
         actionId: 'place-farmer', phase: 'before',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
     })
   })

@@ -14,6 +14,7 @@ import {
   workersAtHome,
   workersAvailable,
 } from '../player'
+import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 const makeWorker = (id: string, isActive = true, isNewborn = false): Worker => ({ id, isActive, isNewborn })
 
@@ -52,7 +53,7 @@ describe('player helpers', () => {
   it('isWorkerOnAnySpace reports presence in takenBy', () => {
     const p = makePlayer([makeWorker('1')])
     const s = emptyState([p])
-    s.actionSpaces = [{ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] } as any]
+    s.actionSpaces = [mkActionSpace({ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] })]
     expect(isWorkerOnAnySpace(s, 'p1', '1')).toBe(true)
     expect(isWorkerOnAnySpace(s, 'p1', '2')).toBe(false)
   })
@@ -60,7 +61,7 @@ describe('player helpers', () => {
   it('workersAtHome excludes those currently on a space', () => {
     const p = makePlayer([makeWorker('1'), makeWorker('2')])
     const s = emptyState([p])
-    s.actionSpaces = [{ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] } as any]
+    s.actionSpaces = [mkActionSpace({ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] })]
     expect(workersAtHome(s, p).map(w => w.id)).toEqual(['2'])
     expect(workersAvailable(s, p)).toBe(1)
   })
@@ -68,7 +69,7 @@ describe('player helpers', () => {
   it('smallestAvailableWorker returns lowest-id at-home worker', () => {
     const p = makePlayer([makeWorker('1'), makeWorker('2'), makeWorker('3')])
     const s = emptyState([p])
-    s.actionSpaces = [{ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] } as any]
+    s.actionSpaces = [mkActionSpace({ id: 'x', takenBy: [{ playerId: 'p1', workerId: '1' }] })]
     expect(smallestAvailableWorker(s, p)?.id).toBe('2')
   })
 

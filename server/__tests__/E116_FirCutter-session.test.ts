@@ -5,6 +5,7 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E116_FirCutter'
+import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'E116_FirCutter'
 
@@ -25,7 +26,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'meeting-place' } as any,
+      space: mkActionSpace({ id: 'meeting-place' }),
       actionId: 'play-occupation',
       phase: 'after',
       choice: CARD_ID,
@@ -52,7 +53,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'meeting-place' } as any,
+      space: mkActionSpace({ id: 'meeting-place' }),
       actionId: 'play-occupation',
       phase: 'after',
       choice: 'A114_SeasonalWorker',
@@ -77,7 +78,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'sheep-market' } as any,
+      space: mkActionSpace({ id: 'sheep-market' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
@@ -105,7 +106,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'pig-market' } as any,
+      space: mkActionSpace({ id: 'pig-market' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
@@ -133,7 +134,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'cattle-market' } as any,
+      space: mkActionSpace({ id: 'cattle-market' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
@@ -161,7 +162,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'sheep-market' } as any,
+      space: mkActionSpace({ id: 'sheep-market' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
@@ -188,7 +189,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'sheep-market' } as any,
+      space: mkActionSpace({ id: 'sheep-market' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
@@ -215,7 +216,7 @@ describe('E116_FirCutter session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: { id: 'forest' } as any,
+      space: mkActionSpace({ id: 'forest' }),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },

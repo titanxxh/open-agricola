@@ -150,7 +150,7 @@ describe('A128_RiparianBuilder session', () => {
     resp = session.confirmPlayerSwitch()
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
@@ -159,7 +159,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('farmSelect')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     if (resp.interaction.stateId !== 'farmSelect') return
@@ -173,7 +173,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect(resp.pending.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('choice')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     expect(resp.pending.options).toHaveLength(2)

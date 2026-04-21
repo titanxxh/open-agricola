@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { reap } from '../../shared/actions/effects/reap'
 import { computeScores } from '../../shared/logic/scoring'
 import type { Field } from '../../shared/game/types'
@@ -65,7 +65,7 @@ const fireListener = (
     space,
     actionId: 'place-farmer',
     phase: 'after',
-  } as any)
+  } as unknown as CardListenerContext)
 }
 
 describe('A113 Heresy Teacher session', () => {

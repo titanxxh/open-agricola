@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
+import type { PendingAction } from '../../shared/game/types'
 import '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A55_JunkRoom'
 
@@ -216,7 +217,7 @@ describe('D161_CabbageBuyer session', () => {
     // Now we should see the D161 offer for p0 (cost=3, optional seq)
     expect(resp.pending.type).toBe('choice')
     expect(resp.pending.playerIndex).toBe(0)
-    expect((resp.pending as any).sourceCard).toBe(CARD_ID)
+    expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('choice')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 

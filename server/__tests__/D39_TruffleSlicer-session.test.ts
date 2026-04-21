@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/D/D39_TruffleSlicer'
@@ -79,7 +79,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
@@ -102,7 +102,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
   })
@@ -117,7 +117,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
   })
@@ -132,7 +132,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -147,7 +147,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -162,7 +162,7 @@ describe('D39_TruffleSlicer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 

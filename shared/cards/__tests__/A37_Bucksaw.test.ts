@@ -7,6 +7,7 @@ import '../A/A37_Bucksaw'
 import { payResourcesAction } from '../../actions/effects/pay-resources'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { gainAction } from '../../actions/effects/gain'
+import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -60,7 +61,7 @@ describe('A37_Bucksaw', () => {
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type === 'seq') {
       expect(result.flow.optional).toBe(true)

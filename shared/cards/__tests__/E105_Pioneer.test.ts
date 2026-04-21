@@ -5,6 +5,7 @@ import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../gam
 
 import '../E/E105_Pioneer'
 import { getMostRecentlyRevealedSpaceId } from '../E/E105_Pioneer'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E105_Pioneer'
 
@@ -116,7 +117,7 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('wish-children'),
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeDefined()
       const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
       expect(flow.type).toBe('xor')
@@ -132,7 +133,7 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('sheep-market'),
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
 
@@ -145,7 +146,7 @@ describe('E105_Pioneer', () => {
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'), // forest is base, not round-action
         actionId: 'place-farmer', phase: 'after',
-      } as any)
+      } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
   })

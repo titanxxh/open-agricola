@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/A/A142_Cordmaker'
@@ -82,7 +82,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
@@ -117,7 +117,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 3 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
@@ -141,7 +141,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 1 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -160,7 +160,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })
@@ -179,7 +179,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

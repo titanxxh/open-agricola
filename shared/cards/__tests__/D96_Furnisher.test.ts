@@ -6,6 +6,7 @@ import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../D/D96_Furnisher'
 import type { ActionFlow } from '../../game/types'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D96_Furnisher'
 
@@ -77,7 +78,7 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -98,7 +99,7 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -115,7 +116,7 @@ describe('D96_Furnisher', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -128,7 +129,7 @@ describe('D96_Furnisher', () => {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: CARD_ID,
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
     expect(result!.costs).toEqual({ wood: -1 })
@@ -142,7 +143,7 @@ describe('D96_Furnisher', () => {
       state: createState(player), player, space: createSpace('improvement-any'),
       actionId: 'improvement-any', phase: 'computeCosts',
       actionCardId: 'improvement-any',
-    } as any)
+    } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
   })

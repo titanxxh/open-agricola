@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
@@ -90,7 +90,7 @@ describe('B152_JuniorArtist session', () => {
       space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -120,7 +120,7 @@ describe('B152_JuniorArtist session', () => {
       space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
@@ -158,7 +158,7 @@ describe('B152_JuniorArtist session', () => {
       space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     // May or may not produce a flow depending on whether occupation is registered
     // If result is undefined, the test passes trivially (no options)
     if (result) {
@@ -199,7 +199,7 @@ describe('B152_JuniorArtist session', () => {
       space: session.getState().state.actionSpaces.find((x) => x.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
-    } as any)
+    } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
@@ -222,7 +222,7 @@ describe('B152_JuniorArtist session', () => {
       phase: 'immediatelyAfter',
       actionContext: { fromSpace: 'traveling-players', trueAction: false },
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(tp.resources.food).toBe(0)
   })
 
@@ -242,7 +242,7 @@ describe('B152_JuniorArtist session', () => {
       phase: 'immediatelyAfter',
       actionContext: { trueAction: false }, // no fromSpace
       result: { type: 'ok' },
-    } as any)
+    } as unknown as CardListenerContext)
     expect(tp.resources.food).toBe(5)
   })
 })
