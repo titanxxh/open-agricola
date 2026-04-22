@@ -52,6 +52,8 @@ type ClientCommandBody =
       maxPlayers?: number
       name?: string
       customCardIds?: string[]
+      /** When true, include community-deck cards in the deal pool. Default false. */
+      enableCommunityDeck?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */
