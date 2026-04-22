@@ -27,20 +27,23 @@ describe('custom code executor', () => {
   it('validates code and extracts effect/listener manifest', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
-registerCardEffect({
-  id: CARD_ID,
-  onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
-    return { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID }
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: (_state: any, player: any) => {
+      if (!player.minorPlayed.includes(CARD_ID)) return
+      return { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID }
+    },
   },
-})
-registerCardListener({
-  id: CARD_ID,
-  cardIds: [CARD_ID],
-  actions: ['meeting-place'],
-  phases: ['after'],
-  handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
-})
+  listeners: [{
+    id: CARD_ID,
+    cardIds: [CARD_ID],
+    actions: ['meeting-place'],
+    phases: ['after'],
+    handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
+  }],
+}
     `, 'CUSTOM_ExecutorCard')
 
     expect(result.valid).toBe(true)
@@ -60,20 +63,23 @@ registerCardListener({
   it('executes registered effect and listener through runtime proxies', () => {
     const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
-registerCardEffect({
-  id: CARD_ID,
-  onReturnHome: (_state, player) => {
-    if (!player.minorPlayed.includes(CARD_ID)) return
-    return { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID }
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: (_state: any, player: any) => {
+      if (!player.minorPlayed.includes(CARD_ID)) return
+      return { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID }
+    },
   },
-})
-registerCardListener({
-  id: CARD_ID,
-  cardIds: [CARD_ID],
-  actions: ['meeting-place'],
-  phases: ['after'],
-  handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
-})
+  listeners: [{
+    id: CARD_ID,
+    cardIds: [CARD_ID],
+    actions: ['meeting-place'],
+    phases: ['after'],
+    handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
+  }],
+}
     `, 'CUSTOM_ExecutorCard')
     expect(compiled.valid).toBe(true)
     if (!compiled.valid) return
@@ -116,12 +122,15 @@ registerCardListener({
   it('times out runaway effect execution', () => {
     const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
-registerCardEffect({
-  id: CARD_ID,
-  onReturnHome: () => {
-    while (true) {}
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: () => {
+      while (true) {}
+    },
   },
-})
+}
     `, 'CUSTOM_ExecutorCard')
     expect(compiled.valid).toBe(true)
     if (!compiled.valid) return
@@ -136,5 +145,39 @@ registerCardEffect({
       player: state.players[0]!,
     })
     expect(result.ok).toBe(false)
+  })
+
+  it('makes helper functions available in sandbox', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_HelperCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Helper Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: (_state: any, _player: any) => {
+      return gainLeaf(CARD_ID, { food: 3 })
+    },
+  },
+}
+    `, 'CUSTOM_HelperCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const state = createInitialState(42)
+    const result = invokeCustomCodeEffect({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_HelperCard',
+      hook: 'onReturnHome',
+      state,
+      player: state.players[0]!,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.result).toEqual({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { food: 3 },
+      sourceCard: 'CUSTOM_HelperCard',
+    })
   })
 })
