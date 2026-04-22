@@ -44,7 +44,6 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     card_json TEXT NOT NULL,
-    effect_dsl TEXT,
     effect_code TEXT,
     compiled_code TEXT,
     code_manifest TEXT,
