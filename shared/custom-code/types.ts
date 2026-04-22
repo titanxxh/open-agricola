@@ -1,7 +1,7 @@
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../game/types'
 import type { CardListenerContext, CardListenerScope } from '../cards/card-listeners'
-import type { CardEffectHook, PaymentInfo } from '../cards/card-effects'
+import type { CardEffectField, PaymentInfo } from '../cards/card-effects'
 
 export type CustomCodeListenerManifest = {
   registrationId: string
@@ -13,14 +13,14 @@ export type CustomCodeListenerManifest = {
 }
 
 export type CustomCodeManifest = {
-  effectHooks: CardEffectHook[]
+  effectHooks: CardEffectField[]
   listeners: CustomCodeListenerManifest[]
 }
 
 export type CustomCodeEffectInvocation = {
   compiledCode: string
   cardId: string
-  hook: CardEffectHook
+  hook: CardEffectField
   state: GameState
   player: PlayerState
   paymentInfo?: PaymentInfo
