@@ -230,6 +230,8 @@ export type GameState = {
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
+  /** When true, community-deck cards are included in the deal pool. */
+  enableCommunityDeck: boolean
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>

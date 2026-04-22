@@ -14,7 +14,12 @@ import {
 import { createRng, createSeed, shuffleWithRng } from './rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
-import { implementedMinorImprovementCards, implementedOccupationCards } from '../cards/catalog'
+import {
+  implementedMinorImprovementCards,
+  implementedOccupationCards,
+  implementedCommunityMinors,
+  implementedCommunityOccupations,
+} from '../cards/catalog'
 import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
 import type { ActionSpace, CropStack, Field, GameState, PlayerState } from '../game/types'
@@ -50,6 +55,7 @@ export const dealHands = (
   extraOccupationIds: string[] = [],
   deckIds?: string[],
   handSize = 7,
+  enableCommunityDeck = false,
 ) => {
   const rng = createRng(seed)
   const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
@@ -57,12 +63,18 @@ export const dealHands = (
     ...implementedMinorImprovementCards
       .filter((card) => allowedDecks.has(card.deck))
       .map((card) => card.id),
+    ...(enableCommunityDeck
+      ? implementedCommunityMinors.map((card) => card.id)
+      : []),
     ...extraMinorIds,
   ]))
   const occupationPool = Array.from(new Set([
     ...implementedOccupationCards
       .filter((card) => allowedDecks.has(card.deck))
       .map((card) => card.id),
+    ...(enableCommunityDeck
+      ? implementedCommunityOccupations.map((card) => card.id)
+      : []),
     ...extraOccupationIds,
   ]))
   const shuffledMinor = shuffleWithRng(minorPool, rng)
@@ -303,6 +315,7 @@ export const normalizeState = (raw: GameState): GameState => {
     draft: raw.draft ?? null,
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
+    enableCommunityDeck: raw.enableCommunityDeck ?? false,
   }
 }
 
@@ -331,6 +344,7 @@ export const createInitialPlayers = (
     deckIds,
     playerNames = [],
     draftMode,
+    enableCommunityDeck = false,
   } = options
   const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
   // In draft mode, leave hands empty — createInitialState will seed state.draft
@@ -338,7 +352,7 @@ export const createInitialPlayers = (
   const dealtHands =
     draftMode === 'simultaneous'
       ? { minorHands: [] as string[][], occupationHands: [] as string[][] }
-      : dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds)
+      : dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -428,6 +442,7 @@ export const createInitialState = (
       options.extraOccupationIds ?? [],
       options.deckIds,
       poolSize,
+      options.enableCommunityDeck ?? false,
     )
     const seatOrder = players.map((p) => p.id)
     const hands: Record<string, DraftPool> = {}
@@ -457,6 +472,7 @@ export const createInitialState = (
     futureMeeples: [],
     pendingFutureMeeples: [],
     gameOver: false,
+    enableCommunityDeck: options.enableCommunityDeck ?? false,
     workPhaseObtainedResources: {},
   }
   applyRoundGrowth(initialState)

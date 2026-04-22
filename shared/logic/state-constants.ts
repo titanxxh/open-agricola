@@ -118,6 +118,8 @@ export type InitialStateOptions = {
   draftMode?: DraftMode
   /** Draft pool size per card type (7..10). Required when `draftMode='simultaneous'`. */
   draftPoolSize?: number
+  /** When true, include community-deck cards in the deal pool. Default false. */
+  enableCommunityDeck?: boolean
 }
 
 export const generateRoundActionOrder = (seed: number) => {
