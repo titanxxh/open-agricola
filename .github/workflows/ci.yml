@@ -66,3 +66,6 @@ jobs:
 
       - name: Check catalog types (issue #10)
         run: pnpm run check:catalog-types
+
+      - name: Check community deck consistency
+        run: pnpm run check:community-deck
