@@ -4,6 +4,7 @@ import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
 import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
 import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
+import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 
@@ -128,6 +129,20 @@ export async function handleWorkshopRoute(
   const token = extractToken(req.headers.authorization)
   const user = validateSession(token)
   const db = getDb()
+
+  // ── GET /api/workshop/github/oauth/start ────────────────────────────────
+  // Redirects to GitHub's authorize URL. Handshake must already be pending.
+  if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/start')) {
+    handleOAuthStart(req, res, new URL(url, 'http://localhost'))
+    return true
+  }
+
+  // ── GET /api/workshop/github/oauth/callback ─────────────────────────────
+  // GitHub redirects here with ?code=&state=. Exchanges code for access token.
+  if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/callback')) {
+    await handleOAuthCallback(req, res, new URL(url, 'http://localhost'))
+    return true
+  }
 
   // ── GET /api/workshop/cards ─────────────────────────────────────────────
   if (req.method === 'GET' && url.startsWith('/api/workshop/cards') && !url.includes('/comments') && !url.includes('/like')) {

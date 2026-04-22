@@ -16,8 +16,11 @@ type Pending = { userId: string; expiresAt: number }
 export class TokenCache {
   private readonly tokens = new Map<string, Entry>()
   private readonly pending = new Map<string, Pending>()
+  private readonly ttlMs: number
 
-  constructor(private readonly ttlMs = 60_000) {}
+  constructor(ttlMs = 60_000) {
+    this.ttlMs = ttlMs
+  }
 
   /** Start a handshake: allocate a handshakeId tied to userId; token bound later via callback. */
   allocateHandshakeId(userId: string): string {
