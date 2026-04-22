@@ -158,6 +158,20 @@ function runMigrations(db: Database.Database): void {
         );
       `,
     },
+    {
+      version: 5,
+      // One-time wipe of old workshop cards that used the legacy imperative
+      // registerCardEffect / registerCardListener format. The new CARD_DEF /
+      // CARD_IMPL declarative shape is incompatible, so we start fresh.
+      // Delete child tables first to satisfy FK constraints, then the parent.
+      sql: `
+        DELETE FROM workshop_card_versions;
+        DELETE FROM card_likes;
+        DELETE FROM card_comments;
+        DELETE FROM sandbox_cards;
+        DELETE FROM workshop_cards;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
