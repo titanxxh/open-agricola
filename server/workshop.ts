@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid'
 import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
 import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
+import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
 
@@ -141,6 +142,22 @@ export async function handleWorkshopRoute(
   // GitHub redirects here with ?code=&state=. Exchanges code for access token.
   if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/callback')) {
     await handleOAuthCallback(req, res, new URL(url, 'http://localhost'))
+    return true
+  }
+
+  // ── POST /api/workshop/cards/:id/propose ────────────────────────────────
+  // Opens or updates a GitHub PR against upstream from the author's fork.
+  const proposeMatch = /^\/api\/workshop\/cards\/([^/]+)\/propose$/.exec(url)
+  if (req.method === 'POST' && proposeMatch) {
+    await handleProposeRequest(req, res, proposeMatch[1]!)
+    return true
+  }
+
+  // ── POST /api/workshop/cards/:id/refresh-pr-status ──────────────────────
+  // Queries GitHub (anonymously) to sync cached PR state.
+  const refreshMatch = /^\/api\/workshop\/cards\/([^/]+)\/refresh-pr-status$/.exec(url)
+  if (req.method === 'POST' && refreshMatch) {
+    await handleRefreshPrStatus(req, res, refreshMatch[1]!)
     return true
   }
 
