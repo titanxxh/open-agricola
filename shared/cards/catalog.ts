@@ -1832,6 +1832,8 @@ const isImplemented = (card: { implemented?: boolean }) => card.implemented !== 
 
 export const implementedMinorImprovementCards = minorImprovementCards.filter(isImplemented)
 export const implementedOccupationCards = occupationCards.filter(isImplemented)
+export const implementedCommunityMinors = communityMinors.filter(isImplemented)
+export const implementedCommunityOccupations = communityOccupations.filter(isImplemented)
 
 export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
 export const occupationIds = implementedOccupationCards.map((card) => card.id)
