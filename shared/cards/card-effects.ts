@@ -36,7 +36,22 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onBeforeStartOfTurn'
   | 'onAllWorkersPlaced'
 
-export const cardEffectHooks: CardEffectHook[] = [
+/**
+ * All function-type fields on CardEffect that the custom-card sandbox is allowed
+ * to define.  This is a superset of CardEffectHook: it also includes hooks with
+ * non-standard signatures (scoring, animal zones, sowing, etc.) that cannot be
+ * invoked via the generic `runCardEffectHook()` path.
+ *
+ * `handHooks` (meta-field) and `scoringPriority` (number) are deliberately excluded.
+ */
+export type CardEffectField = CardEffectHook
+  | 'resolveChoice'
+  | 'computeBonusScore' | 'computePostScore' | 'computeSharedPostScore'
+  | 'computeExtraRoomCapacity'
+  | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
+  | 'computeLockedFarmTiles' | 'computeFenceDiscount'
+
+export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
   'onRoundStart',
   'onHarvest',
@@ -61,6 +76,16 @@ export const cardEffectHooks: CardEffectHook[] = [
   'onAfterHarvest',
   'onBeforeStartOfTurn',
   'onAllWorkersPlaced',
+  'resolveChoice',
+  'computeBonusScore',
+  'computePostScore',
+  'computeSharedPostScore',
+  'computeExtraRoomCapacity',
+  'onComputeAnimalZones',
+  'onComputeSowableFields',
+  'onSowExtraField',
+  'computeLockedFarmTiles',
+  'computeFenceDiscount',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -130,7 +155,7 @@ export type CardEffect = {
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
-  onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void
+  onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void | AnimalZone[]
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
   /** Handle sowing into an extra field returned by onComputeSowableFields. */
