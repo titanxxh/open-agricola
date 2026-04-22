@@ -205,7 +205,7 @@ export function patchRegisterAll(
   }
 
   // === Insert entry ===
-  const customEntryRe = /^  '(CUSTOM_\w+)': [^\n]*,\n/gm
+  const customEntryRe = /^ {2}'(CUSTOM_\w+)': [^\n]*,\n/gm
   const customEntries: Array<{
     full: string
     id: string
