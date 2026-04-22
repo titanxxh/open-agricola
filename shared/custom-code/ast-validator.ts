@@ -9,6 +9,8 @@
  * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
+import { cardEffectHooks } from '../cards/card-effects'
+import { actionHookPhases } from '../actions/hooks'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
 
@@ -36,6 +38,17 @@ const DENIED_PROPERTY_ACCESS = new Set([
   '__lookupGetter__',
   '__lookupSetter__',
 ])
+
+/** Allowed keys on CARD_IMPL.effect (hook names + meta fields). */
+const ALLOWED_EFFECT_KEYS = new Set<string>([
+  ...cardEffectHooks,
+  'id',
+  'handHooks',
+  'scoringPriority',
+])
+
+/** Allowed values inside listener.phases arrays. */
+const ALLOWED_LISTENER_PHASES = new Set<string>(actionHookPhases)
 
 export function validateCardCode(source: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
@@ -130,6 +143,9 @@ export function validateCardCode(source: string): ValidationResult {
 
   visit(sourceFile)
 
+  // Validate CARD_IMPL hook/phase whitelists
+  validateCardImplHooksAndPhases(sourceFile, errors)
+
   // Also check for syntax errors
   const diagnostics = ts.transpileModule(source, {
     compilerOptions: {
@@ -153,4 +169,93 @@ export function validateCardCode(source: string): ValidationResult {
 
   if (errors.length === 0) return { valid: true }
   return { valid: false, errors }
+}
+
+/**
+ * Find the CARD_IMPL variable declaration in the source and validate:
+ * 1. effect keys are in the cardEffectHooks whitelist (+ meta fields)
+ * 2. listener phases are in the actionHookPhases whitelist
+ */
+function validateCardImplHooksAndPhases(
+  sourceFile: ts.SourceFile,
+  errors: string[],
+): void {
+  function getLine(node: ts.Node): number {
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
+    return line + 1
+  }
+
+  // Walk top-level statements to find `const CARD_IMPL = { ... }`
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== 'CARD_IMPL') continue
+      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
+      validateCardImplObject(decl.initializer, errors, getLine)
+    }
+  }
+}
+
+function validateCardImplObject(
+  obj: ts.ObjectLiteralExpression,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+): void {
+  for (const prop of obj.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue
+    const propName = ts.isIdentifier(prop.name)
+      ? prop.name.text
+      : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+    if (!propName) continue
+
+    if (propName === 'effect' && ts.isObjectLiteralExpression(prop.initializer)) {
+      validateEffectKeys(prop.initializer, errors, getLine)
+    }
+
+    if (propName === 'listeners' && ts.isArrayLiteralExpression(prop.initializer)) {
+      validateListenersArray(prop.initializer, errors, getLine)
+    }
+  }
+}
+
+function validateEffectKeys(
+  effectObj: ts.ObjectLiteralExpression,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+): void {
+  for (const prop of effectObj.properties) {
+    if (ts.isSpreadAssignment(prop)) continue
+    if (!ts.isPropertyAssignment(prop) && !ts.isMethodDeclaration(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
+    const name = prop.name && ts.isIdentifier(prop.name)
+      ? prop.name.text
+      : prop.name && ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+    if (!name) continue
+    if (!ALLOWED_EFFECT_KEYS.has(name)) {
+      errors.push(`line ${getLine(prop)}: unknown effect hook '${name}' in CARD_IMPL.effect`)
+    }
+  }
+}
+
+function validateListenersArray(
+  arr: ts.ArrayLiteralExpression,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+): void {
+  for (const element of arr.elements) {
+    if (!ts.isObjectLiteralExpression(element)) continue
+    for (const prop of element.properties) {
+      if (!ts.isPropertyAssignment(prop)) continue
+      const propName = ts.isIdentifier(prop.name)
+        ? prop.name.text
+        : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+      if (propName !== 'phases') continue
+      if (!ts.isArrayLiteralExpression(prop.initializer)) continue
+      for (const phaseElement of prop.initializer.elements) {
+        if (!ts.isStringLiteral(phaseElement)) continue
+        if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
+          errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
+        }
+      }
+    }
+  }
 }
