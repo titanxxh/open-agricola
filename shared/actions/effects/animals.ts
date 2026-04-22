@@ -60,7 +60,10 @@ export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onComputeAnimalZones) {
-      effect.onComputeAnimalZones(player, zones)
+      const result = effect.onComputeAnimalZones(player, zones)
+      if (Array.isArray(result)) {
+        zones.push(...result)
+      }
     }
   }
   zones.forEach((zone) => {

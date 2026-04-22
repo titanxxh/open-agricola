@@ -33,6 +33,8 @@ export function LobbyPage() {
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
+  const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
+  const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -65,6 +67,9 @@ export function LobbyPage() {
     if (draftMode !== 'none') {
       params.draftMode = draftMode
       params.draftPoolSize = String(draftPoolSize)
+    }
+    if (enableCommunityDeck) {
+      params.enableCommunityDeck = 'true'
     }
     setPage('game', params)
   }
@@ -170,6 +175,22 @@ export function LobbyPage() {
                       ))}
                     </div>
                   </>
+                )}
+                {showCommunityDeckToggle && (
+                  <label className="community-deck-toggle">
+                    <input
+                      type="checkbox"
+                      checked={enableCommunityDeck}
+                      onChange={(e) => setEnableCommunityDeck(e.target.checked)}
+                    />
+                    <span>
+                      启用社区扩展卡（community deck）
+                      <br />
+                      <span className="community-deck-toggle-hint">
+                        这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
+                      </span>
+                    </span>
+                  </label>
                 )}
                 <div className="player-select-actions">
                   <button type="button" className="btn-primary" onClick={handleCreateGame}>

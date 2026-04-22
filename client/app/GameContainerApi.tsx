@@ -116,10 +116,12 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const maxPlayersParam = searchParams.get('maxPlayers')
           const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
           const draftParams = parseDraftParamsFromQuery(window.location.search)
+          const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
             customCardIds,
+            enableCommunityDeck,
             ...(draftParams ?? {}),
           })
         })

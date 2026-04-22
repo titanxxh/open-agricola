@@ -750,17 +750,21 @@ export const createWsServer = (server: import('node:http').Server) => {
         // Simultaneous card-draft opt-in.
         const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
         if (!draftOptions.ok) { sendCommandError(draftOptions.error); return }
+        const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
         const customCards = loadCustomCardsFromDb(customCardDbIds, currentUserId)
         const session = new GameSession(
           undefined,
           customCards.length > 0 ? customCards : undefined,
-          draftOptions.value
-            ? {
-                playerCount: maxPlayers,
-                draftMode: draftOptions.value.draftMode,
-                draftPoolSize: draftOptions.value.draftPoolSize,
-              }
-            : undefined,
+          {
+            playerCount: maxPlayers,
+            enableCommunityDeck,
+            ...(draftOptions.value
+              ? {
+                  draftMode: draftOptions.value.draftMode,
+                  draftPoolSize: draftOptions.value.draftPoolSize,
+                }
+              : {}),
+          },
         )
         const room: Room = {
           id: roomId,

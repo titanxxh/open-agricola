@@ -3,9 +3,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
+import { ProposeModal } from './workshop/ProposeModal'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { ResourceText } from '../components/common/ResourceText'
 import { API_BASE } from '../config'
+import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 
 type WorkshopCard = {
   id: string
@@ -26,6 +28,10 @@ type WorkshopCard = {
   featured?: number
   created_at: number
   updated_at: number
+  // Workshop → main-repo PR integration (nullable: filled after user clicks "Propose")
+  github_pr_url?: string | null
+  github_pr_status?: 'open' | 'merged' | 'closed' | null
+  github_pr_last_synced_at?: number | null
 }
 
 type CardVersion = {
@@ -87,8 +93,26 @@ function CardTile({ card, onSelect, onLike, mine, t }: {
   mine?: boolean
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const prNum = extractPrNumber(card.github_pr_url)
+  const prMerged = card.github_pr_status === 'merged'
   return (
-    <div className="ws-card-tile" onClick={() => onSelect(card)}>
+    <div className="ws-card-tile" style={{ position: 'relative' }} onClick={() => onSelect(card)}>
+      {card.github_pr_url && (
+        <a
+          href={card.github_pr_url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={e => e.stopPropagation()}
+          title={prMerged ? `PR #${prNum} merged` : `PR #${prNum} on GitHub`}
+          style={{
+            position: 'absolute', top: 4, right: 4, fontSize: '0.75em',
+            padding: '2px 6px', background: prMerged ? '#2da44e' : '#0969da',
+            color: '#fff', borderRadius: 3, textDecoration: 'none', zIndex: 2,
+          }}
+        >
+          PR {prMerged ? '✓' : (prNum ? `#${prNum}` : '')}
+        </a>
+      )}
       {card.art_url && (
         <img className="ws-card-art-thumb" src={card.art_url} alt={card.name} />
       )}
@@ -132,9 +156,126 @@ function CardSourceViewer({ card, t }: { card: WorkshopCard; t: (key: string, pa
   )
 }
 
+// ── Card Detail PR Section (Propose to main repo) ───────────────────────────
+
+function CardDetailPrSection({
+  card,
+  currentUserId,
+  reloadCard,
+}: {
+  card: WorkshopCard
+  currentUserId: string | undefined
+  reloadCard: () => void
+}) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
+  const enabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
+  if (!enabled) return null
+  if (!currentUserId || card.author_id !== currentUserId) return null
+  if (card.status !== 'published') return null
+
+  const prNum = extractPrNumber(card.github_pr_url)
+  const status = card.github_pr_status
+
+  let buttonLabel: string
+  let secondary: string | null = null
+  let disabled = false
+
+  if (!card.github_pr_url) {
+    buttonLabel = '发起 PR 到主仓库'
+  } else if (status === 'merged') {
+    buttonLabel = '已合并 ✓'
+    secondary = `PR #${prNum} · 社区卡已上线`
+    disabled = true
+  } else if (status === 'closed') {
+    buttonLabel = '重新发起 PR'
+    secondary = `上次 PR #${prNum} 已关闭 · 点击重开`
+  } else {
+    buttonLabel = '更新已有 PR'
+    secondary = `#${prNum} 等待 review · 点击重发最新版`
+  }
+
+  async function onRefresh() {
+    setRefreshing(true)
+    setRefreshError(null)
+    try {
+      const resp = await refreshPrStatus(card.id)
+      if (!resp.ok) {
+        setRefreshError(resp.code ?? resp.error ?? 'refresh_failed')
+      }
+      reloadCard()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        margin: '12px 0',
+        padding: 12,
+        border: '1px solid rgba(128,128,128,0.25)',
+        borderRadius: 4,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 8,
+        alignItems: 'center',
+      }}
+    >
+      <button
+        type="button"
+        className={disabled ? 'btn-secondary ws-btn-sm' : 'btn-primary ws-btn-sm'}
+        disabled={disabled}
+        onClick={() => setModalOpen(true)}
+      >
+        {buttonLabel}
+      </button>
+      {secondary && (
+        <span style={{ fontSize: '0.9em', opacity: 0.75 }}>{secondary}</span>
+      )}
+      {card.github_pr_url && (
+        <>
+          <a
+            href={card.github_pr_url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontSize: '0.9em' }}
+            title="在 GitHub 中打开 PR"
+          >
+            🔗 打开
+          </a>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            style={{ background: 'transparent', border: '1px solid rgba(128,128,128,0.3)', borderRadius: 3, cursor: 'pointer', padding: '2px 8px' }}
+            title="从 GitHub 同步 PR 状态"
+          >
+            {refreshing ? '⟳ ...' : '⟳ 刷新'}
+          </button>
+          {refreshError && (
+            <span style={{ color: 'crimson', fontSize: '0.85em' }}>
+              刷新失败：{refreshError}
+            </span>
+          )}
+        </>
+      )}
+      {modalOpen && (
+        <ProposeModal
+          card={{ id: card.id, card_id: card.card_id, name: card.name, art_url: card.art_url }}
+          onClose={() => { setModalOpen(false); reloadCard() }}
+          onSuccess={() => reloadCard()}
+        />
+      )}
+    </div>
+  )
+}
+
 // ── Card Detail Panel ────────────────────────────────────────────────────────
 
-function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh, t }: {
+function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh, currentUserId, t }: {
   card: WorkshopCard
   token: string | null
   onBack: () => void
@@ -143,6 +284,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   isOwner?: boolean
   isUserAdmin?: boolean
   onRefresh?: () => void
+  currentUserId?: string
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const [comments, setComments] = useState<Comment[]>([])
@@ -295,6 +437,12 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
               </button>
             )}
           </div>
+
+          <CardDetailPrSection
+            card={card}
+            currentUserId={currentUserId}
+            reloadCard={() => onRefresh?.()}
+          />
         </div>
       </div>
 
@@ -823,6 +971,8 @@ export function WorkshopPage() {
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
+  const communityDeckEnabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
+
   const fetchCardList = useCallback(async (params: URLSearchParams) => {
     const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
       headers: authHeaders(token),
@@ -955,6 +1105,25 @@ export function WorkshopPage() {
     setSelectedCard(prev => prev && prev.id === cardId ? updater(prev) : prev)
   }, [])
 
+  // Community cards = cards whose PR has been merged. Currently filtered
+  // client-side from the loaded browse/featured/my lists — the backend
+  // doesn't yet support a direct "merged" filter. Users wanting the full
+  // list can paginate through the main browse grid.
+  const communityCards: WorkshopCard[] = (() => {
+    if (!communityDeckEnabled) return []
+    const seen = new Set<string>()
+    const out: WorkshopCard[] = []
+    for (const list of [browseCards, featuredCards, myCards]) {
+      for (const c of list) {
+        if (c.github_pr_status === 'merged' && !seen.has(c.id)) {
+          seen.add(c.id)
+          out.push(c)
+        }
+      }
+    }
+    return out
+  })()
+
   const handleAddSandbox = async (cardDbId: string) => {
     if (!token) return
     await fetch(`${API_BASE}/api/workshop/sandbox`, {
@@ -1061,6 +1230,7 @@ export function WorkshopPage() {
           onAddSandbox={handleAddSandbox}
           isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
           isUserAdmin={!!user?.isAdmin}
+          currentUserId={user?.id}
           onRefresh={() => {
             fetch(`${API_BASE}/api/workshop/cards/${selectedCard.id}`, { headers: authHeaders(token) })
               .then(response => response.json())
@@ -1256,6 +1426,23 @@ export function WorkshopPage() {
           </div>
         )}
       </WorkshopSection>
+
+      {communityDeckEnabled && (
+        <WorkshopSection
+          title="社区卡"
+          subtitle="已合并到主仓库的社区卡（PR 已 merged）。"
+        >
+          {communityCards.length === 0 ? (
+            <p className="rooms-empty">暂无已合并的社区卡。</p>
+          ) : (
+            <div className="ws-card-grid">
+              {communityCards.map(card => (
+                <CardTile key={card.id} card={card} onSelect={selectCard} onLike={handleLike} t={t} />
+              ))}
+            </div>
+          )}
+        </WorkshopSection>
+      )}
 
       <WorkshopSection
         title={t('platform.browse')}

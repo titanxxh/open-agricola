@@ -158,6 +158,48 @@ function runMigrations(db: Database.Database): void {
         );
       `,
     },
+    {
+      version: 5,
+      // One-time wipe of old workshop cards that used the legacy imperative
+      // registerCardEffect / registerCardListener format. The new CARD_DEF /
+      // CARD_IMPL declarative shape is incompatible, so we start fresh.
+      // Delete child tables first to satisfy FK constraints, then the parent.
+      sql: `
+        DELETE FROM workshop_card_versions;
+        DELETE FROM card_likes;
+        DELETE FROM card_comments;
+        DELETE FROM sandbox_cards;
+        DELETE FROM workshop_cards;
+      `,
+    },
+    {
+      version: 6,
+      // Workshop -> GitHub PR integration: track PR state on each card,
+      // add per-user rate-limit table, and a full audit log.
+      sql: `
+        ALTER TABLE workshop_cards ADD COLUMN github_pr_url TEXT;
+        ALTER TABLE workshop_cards ADD COLUMN github_pr_status TEXT;
+        ALTER TABLE workshop_cards ADD COLUMN github_pr_last_synced_at INTEGER;
+
+        CREATE TABLE github_propose_rate_limit (
+          user_id TEXT PRIMARY KEY REFERENCES users(id),
+          last_propose_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE github_propose_audit (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id),
+          workshop_card_id TEXT NOT NULL,
+          action TEXT NOT NULL,
+          pr_url TEXT,
+          error_code TEXT,
+          error_message TEXT,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_propose_audit_user ON github_propose_audit(user_id, created_at DESC);
+        CREATE INDEX idx_propose_audit_card ON github_propose_audit(workshop_card_id);
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
