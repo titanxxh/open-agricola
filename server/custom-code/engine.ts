@@ -2,7 +2,7 @@ import ivm from 'isolated-vm'
 import type { ActionHookPhase } from '../../shared/actions/hooks.ts'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from './compiler.ts'
-import { cardEffectHooks, type CardEffectHook } from '../../shared/cards/card-effects.ts'
+import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
 import type { ActionFlow } from '../../shared/game/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
@@ -15,6 +15,7 @@ import type {
   CustomCodeManifest,
   CustomCodeValidateResult,
 } from '../../shared/custom-code/types.ts'
+import { HELPERS_INJECTION_SOURCE } from './injected-helpers.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8
@@ -29,6 +30,8 @@ const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
     'computeArgs',
     'computeReplace',
     'isDoable',
+    'anytime',
+    'computeChoiceCandidates',
   ].includes(value)
 
 const isCardListenerScope = (value: unknown): value is CardListenerScope =>
@@ -71,35 +74,27 @@ function runInIsolate(
     }))
 
     // The script:
-    // 1. Define stubs for console, registerCardEffect, registerCardListener
-    // 2. Run the compiled card code
-    // 3. Run the postlude to invoke specific hooks/listeners
-    // 4. Copy the result out as JSON
+    // 1. Define stubs for console, MinorImprovement, Occupation
+    // 2. Inject helper functions (gainLeaf, payLeaf, etc.)
+    // 3. Run the compiled card code in an IIFE to capture CARD_DEF/CARD_IMPL
+    // 4. Run the postlude to invoke specific hooks/listeners
+    // 5. Copy the result out as JSON
     const wrappedCode = `
-      const console = {
-        log: (...args) => __log.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
-        warn: (...args) => __warn.applySync(undefined, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a))),
+      var console = {
+        log: function() { var args = Array.prototype.slice.call(arguments); __log.applySync(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
+        warn: function() { var args = Array.prototype.slice.call(arguments); __warn.applySync(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
       };
-      const __capture = { effect: null, listeners: [] };
-      function registerCardEffect(effect) {
-        __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };
-      }
-      function registerCardListener(listener) {
-        const registrationId = ${JSON.stringify(cardId)} + ':listener:' + __capture.listeners.length;
-        __capture.listeners.push({
-          registrationId,
-          cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(i => typeof i === 'string') : undefined,
-          actions: Array.isArray(listener.actions) ? listener.actions.filter(i => typeof i === 'string') : undefined,
-          phases: Array.isArray(listener.phases) ? listener.phases : undefined,
-          order: typeof listener.order === 'number' ? listener.order : undefined,
-          scope: typeof listener.scope === 'string' ? listener.scope : undefined,
-          handler: typeof listener.handler === 'function' ? listener.handler : () => undefined,
-        });
-      }
       function MinorImprovement(def) { return def; }
       function Occupation(def) { return def; }
-      let __result = null;
-      ${compiledCode}
+      ${HELPERS_INJECTION_SOURCE}
+      var __captured = (function() {
+        ${compiledCode}
+        return {
+          CARD_DEF: typeof CARD_DEF !== 'undefined' ? CARD_DEF : null,
+          CARD_IMPL: typeof CARD_IMPL !== 'undefined' ? CARD_IMPL : null,
+        };
+      })();
+      var __result = null;
       ${postlude}
       JSON.stringify(__result);
     `
@@ -114,10 +109,10 @@ function runInIsolate(
 
 /**
  * Run compiled code to extract the manifest (effect hooks + listener registrations).
- * This uses a lighter execution — just runs the top-level code to capture registrations.
+ * This uses a lighter execution — just runs the top-level code to capture CARD_IMPL.
  */
 function runManifestExtraction(compiledCode: string, cardId: string): {
-  effectHooks: CardEffectHook[]
+  effectHooks: CardEffectField[]
   listeners: CustomCodeListenerManifest[]
 } {
   const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB })
@@ -127,29 +122,44 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     jail.setSync('global', jail.derefInto())
 
     const wrappedCode = `
-      const console = { log: () => {}, warn: () => {} };
+      var console = { log: function() {}, warn: function() {} };
       function MinorImprovement(def) { return def; }
       function Occupation(def) { return def; }
-      const __capture = { effect: null, listeners: [] };
-      function registerCardEffect(effect) {
-        __capture.effect = { ...(__capture.effect || {}), ...effect, id: ${JSON.stringify(cardId)} };
+      ${HELPERS_INJECTION_SOURCE}
+      var __captured = (function() {
+        ${compiledCode}
+        return {
+          CARD_DEF: typeof CARD_DEF !== 'undefined' ? CARD_DEF : null,
+          CARD_IMPL: typeof CARD_IMPL !== 'undefined' ? CARD_IMPL : null,
+        };
+      })();
+      var __effectKeys = [];
+      var __listeners = [];
+      if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
+        var eff = __captured.CARD_IMPL.effect;
+        for (var k in eff) {
+          if (Object.prototype.hasOwnProperty.call(eff, k) && typeof eff[k] === 'function') {
+            __effectKeys.push(k);
+          }
+        }
       }
-      function registerCardListener(listener) {
-        const registrationId = ${JSON.stringify(cardId)} + ':listener:' + __capture.listeners.length;
-        __capture.listeners.push({
-          registrationId,
-          cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(i => typeof i === 'string') : undefined,
-          actions: Array.isArray(listener.actions) ? listener.actions.filter(i => typeof i === 'string') : undefined,
-          phases: Array.isArray(listener.phases) ? listener.phases : undefined,
-          order: typeof listener.order === 'number' ? listener.order : undefined,
-          scope: typeof listener.scope === 'string' ? listener.scope : undefined,
-          handler: typeof listener.handler === 'function' ? listener.handler : () => undefined,
-        });
+      if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
+        for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
+          var listener = __captured.CARD_IMPL.listeners[i];
+          var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
+          __listeners.push({
+            registrationId: registrationId,
+            cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(function(x) { return typeof x === 'string'; }) : undefined,
+            actions: Array.isArray(listener.actions) ? listener.actions.filter(function(x) { return typeof x === 'string'; }) : undefined,
+            phases: Array.isArray(listener.phases) ? listener.phases : undefined,
+            order: typeof listener.order === 'number' ? listener.order : undefined,
+            scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+          });
+        }
       }
-      ${compiledCode}
       JSON.stringify({
-        effectKeys: __capture.effect ? Object.keys(__capture.effect).filter(k => typeof __capture.effect[k] === 'function') : [],
-        listeners: __capture.listeners.map(({ handler, ...rest }) => rest),
+        effectKeys: __effectKeys,
+        listeners: __listeners,
       });
     `
 
@@ -160,8 +170,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       listeners: CustomCodeListenerManifest[]
     } : { effectKeys: [], listeners: [] }
 
-    const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectHook =>
-      cardEffectHooks.includes(hook as CardEffectHook),
+    const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
+      cardEffectHooks.includes(hook as CardEffectField),
     )
     const listeners = parsed.listeners.map((l) => ({
       ...l,
@@ -212,10 +222,11 @@ export const invokeCustomCodeEffect = (
 ): CustomCodeEffectResult => {
   try {
     const postlude = `
-const __handler = __capture.effect?.[${JSON.stringify(request.hook)}]
+var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
+var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
   ? __handler(__input_state, __input_player, __input_paymentInfo)
-  : null
+  : null;
     `
     const result = runInIsolate(
       request.compiledCode,
@@ -241,10 +252,15 @@ export const invokeCustomCodeListener = (
 ): CustomCodeListenerResult => {
   try {
     const postlude = `
-const __listener = __capture.listeners.find((entry) => entry.registrationId === ${JSON.stringify(request.registrationId)})
+var __listeners = __captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners) ? __captured.CARD_IMPL.listeners : [];
+var __listenerIdx = -1;
+var __regPrefix = ${JSON.stringify(request.registrationId)};
+var __parts = __regPrefix.split(':listener:');
+if (__parts.length === 2) { __listenerIdx = parseInt(__parts[1], 10); }
+var __listener = __listenerIdx >= 0 && __listenerIdx < __listeners.length ? __listeners[__listenerIdx] : null;
 __result = __listener && typeof __listener.handler === 'function'
   ? __listener.handler(__input_context)
-  : null
+  : null;
     `
     const result = runInIsolate(
       request.compiledCode,
@@ -263,7 +279,7 @@ __result = __listener && typeof __listener.handler === 'function'
   }
 }
 
-export const parseEffectHook = (value: string): CardEffectHook | null =>
-  cardEffectHooks.includes(value as CardEffectHook)
-    ? value as CardEffectHook
+export const parseEffectHook = (value: string): CardEffectField | null =>
+  cardEffectHooks.includes(value as CardEffectField)
+    ? value as CardEffectField
     : null
