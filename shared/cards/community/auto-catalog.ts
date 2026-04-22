@@ -2,4 +2,8 @@
 // Run `pnpm run generate:register-all` after adding or removing community card definitions.
 import type { MinorImprovement, Occupation } from '../types'
 
-export const allCommunityCards: Array<MinorImprovement | Occupation> = []
+import { CUSTOM_FixtureHarvester } from './CUSTOM_FixtureHarvester'
+
+export const allCommunityCards: Array<MinorImprovement | Occupation> = [
+  CUSTOM_FixtureHarvester,
+]
