@@ -24,6 +24,12 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - ADMIN_USERS=${ADMIN_USERS:-}
       - CUSTOM_CODE_EXECUTOR_URL=http://executor:5181
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET:-}
+      - GITHUB_UPSTREAM_OWNER=${GITHUB_UPSTREAM_OWNER:-titanxxh}
+      - GITHUB_UPSTREAM_REPO=${GITHUB_UPSTREAM_REPO:-open-agricola}
+      - WORKSHOP_PR_ENABLED=${WORKSHOP_PR_ENABLED:-false}
+      - PUBLIC_API_BASE=${PUBLIC_API_BASE:-}
     volumes:
       - app-data:/app/data
       - app-output:/app/output
