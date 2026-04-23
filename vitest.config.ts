@@ -7,6 +7,9 @@ export default mergeConfig(
     test: {
       exclude: [...defaultExclude, '**/.worktree/**'],
       setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+      environmentMatchGlobs: [
+        ['client/**/*.test.tsx', 'jsdom'],
+      ],
     },
   }),
 )
