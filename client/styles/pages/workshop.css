@@ -22,7 +22,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 12px var(--app-edge-padding);
   background: #fff;
   border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
@@ -154,6 +154,66 @@
   background: var(--color-text-secondary);
   color: #fff;
   border-color: var(--color-text-secondary);
+}
+/* Segmented sort tabs (replaces .ws-sort-btn for the workshop dashboard) */
+.ws-sort-tabs {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-pill, 999px);
+  padding: 3px;
+  gap: 2px;
+}
+.ws-sort-tab {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-pill, 999px);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ws-sort-tab:hover {
+  color: var(--color-text);
+}
+.ws-sort-tab.is-active {
+  background: var(--color-accent-strong);
+  color: #fff;
+}
+/* Sandbox info chips */
+.ws-sandbox-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--bg-parchment, #fff7e6);
+  border: 1px solid var(--color-accent-border, var(--color-border));
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ws-chip-deck {
+  background: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-display, inherit);
+}
+.ws-chip-count {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+/* Sandbox section override: tighter body when only chips + empty-state */
+.ws-section-sandbox .empty-state {
+  margin-top: 4px;
 }
 .ws-btn-sm {
   padding: 6px 14px;
