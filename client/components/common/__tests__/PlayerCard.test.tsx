@@ -46,4 +46,17 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
     expect(html).not.toContain('data-also-counts-as=')
   })
+
+  it('renders desc placeholders as inline icons (no literal <WOOD> text)', () => {
+    // E76_LumberPile description contains <WOOD> and <STABLE> placeholders.
+    // The cards-manifest is preloaded by setup-register-all.ts so getCardMeta
+    // returns a real card definition synchronously.
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="zh" cardId="E76_LumberPile" cardType="minor" />,
+    )
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-barn')
+    expect(html).not.toContain('&lt;WOOD&gt;')
+    expect(html).not.toContain('<WOOD>')
+  })
 })
