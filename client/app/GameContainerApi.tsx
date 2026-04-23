@@ -22,7 +22,7 @@ import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
 import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
-import { ActionLog, type LogEntry as UiLogEntry } from '../components/board/ActionLog'
+import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
@@ -1178,37 +1178,6 @@ export const GameContainerApi = () => {
     })
   }, [state, scores, selfPlayer?.id])
 
-  // Map state.log (LogEntry { key, params? }) into UI ActionLog entries.
-  // The legacy log doesn't carry round/playerId, so we use:
-  //   - id     ← stable string from index
-  //   - round  ← state.round (current round at render time — best-effort)
-  //   - text   ← t(locale, key, params) so users see translated text
-  // Rendering caps at 50 entries to keep the panel fast.
-  const logEntries = useMemo<UiLogEntry[]>(() => {
-    if (!state) return []
-    const round = state.round ?? 1
-    const stringParams = (params: Record<string, unknown> | undefined): Record<string, string | number> => {
-      if (!params) return {}
-      const out: Record<string, string | number> = {}
-      for (const [k, v] of Object.entries(params)) {
-        if (typeof v === 'string' || typeof v === 'number') out[k] = v
-        else if (v != null) out[k] = String(v)
-      }
-      return out
-    }
-    return state.log.slice(0, 50).map((entry, index) => {
-      const text = t(locale, entry.key, stringParams(entry.params))
-      const playerName = (entry.params?.player as string | undefined) ?? ''
-      return {
-        id: `log-${index}`,
-        round,
-        playerId: '',
-        playerName,
-        text: text === entry.key ? entry.key : text,
-      }
-    })
-  }, [state, locale])
-
   const resourceKeys = resourceKeyList
 
   const applyDevResource = useCallback(async () => {
@@ -1717,13 +1686,13 @@ export const GameContainerApi = () => {
                 <ScorePanel rows={scoreRows} />
               </Section>
               <Section collapsible defaultCollapsed icon="📜" title="行动记录" variant="parchment">
-                <ActionLog entries={logEntries} />
+                <ActionLog locale={locale} log={state.log} currentRound={state.round ?? 1} />
               </Section>
             </>
           ) : (
             <>
               <ScorePanel rows={scoreRows} />
-              <ActionLog entries={logEntries} />
+              <ActionLog locale={locale} log={state.log} currentRound={state.round ?? 1} />
             </>
           )}
         </div>

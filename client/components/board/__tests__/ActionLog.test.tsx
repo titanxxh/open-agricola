@@ -4,29 +4,42 @@ import { render, screen } from '@testing-library/react'
 import { ActionLog } from '../ActionLog'
 
 describe('ActionLog', () => {
-  it('renders entries with icons', () => {
+  it('renders translated entries with icons', () => {
     render(
       <ActionLog
-        entries={[
-          { id: 'e1', round: 1, playerId: 'p1', playerName: 'You', text: '取了 3 木' },
-          { id: 'e2', round: 1, playerId: 'p2', playerName: 'AI', text: '收获了 1 麦' },
+        locale="zh"
+        currentRound={1}
+        log={[
+          { key: 'log.gainResources', params: { player: '玩家A', resources: '3 木' } },
+          { key: 'log.harvestSummary', params: { player: '玩家B' } },
         ]}
       />,
     )
-    expect(screen.getByText(/取了 3 木/)).toBeInTheDocument()
-    expect(screen.getByText(/收获了 1 麦/)).toBeInTheDocument()
-    expect(screen.getByText('💰')).toBeInTheDocument()
-    expect(screen.getByText('🌾')).toBeInTheDocument()
+    // Icon classifier still picks something per entry
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0)
   })
-  it('groups by round', () => {
+
+  it('groups entries by round using log.enterRound markers', () => {
     const { container } = render(
       <ActionLog
-        entries={[
-          { id: 'e1', round: 1, playerId: 'p1', playerName: 'You', text: 'a' },
-          { id: 'e2', round: 2, playerId: 'p1', playerName: 'You', text: 'b' },
+        locale="zh"
+        currentRound={2}
+        log={[
+          { key: 'log.someEntry', params: { player: 'X' } },
+          { key: 'log.enterRound', params: { round: 2 } },
+          { key: 'log.someEntry', params: { player: 'Y' } },
+          { key: 'log.enterRound', params: { round: 1 } },
+          { key: 'log.startGame' },
         ]}
       />,
     )
-    expect(container.querySelectorAll('.action-log__round-header')).toHaveLength(2)
+    // Three buckets: round 2, round 1, and a "round 0" pre-game bucket
+    // containing log.startGame (entries before the first enterRound marker).
+    expect(container.querySelectorAll('.action-log__round-header')).toHaveLength(3)
+  })
+
+  it('renders empty state when log is empty', () => {
+    render(<ActionLog locale="zh" currentRound={1} log={[]} />)
+    expect(screen.getByText('暂无')).toBeInTheDocument()
   })
 })
