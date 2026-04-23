@@ -1174,6 +1174,20 @@
       min-width: 0;
     }
 }
+@media (max-width: 640px) {
+  .ws-nav {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ws-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .ws-toolbar input[type="search"] {
+    min-width: 100%;
+  }
+}
 @media (max-width: 480px) {
   .ai-card-info-bar {
       padding: 8px 12px;

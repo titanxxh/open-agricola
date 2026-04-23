@@ -89,3 +89,9 @@
     gap: 8px;
   }
 }
+
+@media (max-width: 640px) {
+  .settings-page {
+    padding: 12px;
+  }
+}
