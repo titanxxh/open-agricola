@@ -1,0 +1,82 @@
+/* ══════════ DESIGN TOKENS ══════════
+ * Existing tokens preserved (back-compat). New tableau-* tokens added at bottom.
+ * Old tokens may be cleaned up after Batch 3 verifies no regressions.
+ */
+:root {
+  /* ─── existing (preserved verbatim from App.css:20-49) ─── */
+  --agricola-font: 'Dominican', 'CalibriB', serif;
+  --app-edge-padding: clamp(12px, 2vw, 24px);
+  --game-header-gap: 8px;
+  --color-primary: #3a5a2c;
+  --color-primary-hover: #2d4a21;
+  --color-accent: #d4a017;
+  --color-bg-warm: #fdf6e3;
+  --color-bg-card: #fff;
+  --color-text: #1e1e1e;
+  --color-text-secondary: #5a3a20;
+  --color-text-muted: #8a7a60;
+  --color-border: #cdb996;
+  --color-border-light: #e8d5b7;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --color-success: #2d7a1f;
+  --color-success-bg: #e8f5e0;
+  --color-error: #c0392b;
+  --color-error-bg: #fde8e8;
+  --color-danger: #d74a3a;
+  --color-danger-border: #f5c6cb;
+  --interaction-bar-max-height: 40vh;
+
+  /* ─── new: tableau atmosphere ─── */
+  --bg-wood-dark:
+    radial-gradient(ellipse at top, rgba(0,0,0,.15), transparent 60%),
+    repeating-linear-gradient(87deg, #4a2f18 0, #3a2410 6px, #4a2f18 12px, #5a3a20 18px),
+    #2b1908;
+
+  --bg-wood-light:
+    repeating-linear-gradient(90deg, #8b6f47 0, #7a5f37 8px, #8b6f47 16px),
+    #6b5337;
+
+  --bg-parchment:
+    radial-gradient(ellipse at top left, #fdf6e3, #e8d8a8 60%, #c8a878 130%);
+
+  --bg-parchment-noisy:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><filter id='n'><feTurbulence baseFrequency='0.9'/><feColorMatrix values='0 0 0 0 0.85  0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0.18 0'/></filter><rect width='80' height='80' filter='url(%23n)' opacity='0.4'/></svg>"),
+    radial-gradient(ellipse at top left, #fdf6e3, #e8d8a8 60%, #c8a878);
+
+  --shadow-paper:
+    0 0 0 1px var(--color-border) inset,
+    0 0 0 4px var(--color-bg-warm) inset,
+    0 6px 16px rgba(0,0,0,0.4);
+
+  --btn-emboss-primary:
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -2px 4px rgba(0,0,0,0.25),
+    0 2px 0 #1f3815,
+    0 4px 6px rgba(0,0,0,0.3);
+
+  --btn-emboss-secondary:
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 0 -2px 4px rgba(74,47,24,0.25),
+    0 2px 0 var(--color-border),
+    0 4px 6px rgba(0,0,0,0.2);
+
+  --color-accent-strong: #c98a0c;
+  --color-accent-bg: #fff3d6;
+  --color-accent-border: #d4a017;
+
+  --fs-display: clamp(28px, 3vw, 40px);
+  --fs-h1: clamp(22px, 2.4vw, 28px);
+  --fs-h2: clamp(18px, 2vw, 22px);
+  --fs-h3: 16px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+
+  --action-board-scale: 1;
+}
