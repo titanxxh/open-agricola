@@ -1652,15 +1652,22 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
+/* Horizontal-scroll carousel — was wrap-stack (vertical pile of 12+ cards). */
 .played-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   gap: clamp(6px, 1.2vw, 8px);
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px; /* room for scrollbar */
+  -webkit-overflow-scrolling: touch;
 }
 .played-row > * {
-  flex: 0 1 calc(33.333% - 8px);
+  flex: 0 0 188px;
   max-width: 188px;
+  scroll-snap-align: start;
 }
 .played-card {
   background: #fff;
@@ -1746,15 +1753,22 @@
 .card-copy-btn:hover {
   background: #3a6830;
 }
+/* Horizontal-scroll carousel for hand cards (occupation / minor improvement). */
 .hand-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   gap: clamp(6px, 1.2vw, 8px);
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 .hand-row > * {
-  flex: 0 1 calc(33.333% - 8px);
+  flex: 0 0 188px;
   max-width: 188px;
+  scroll-snap-align: start;
 }
 .hand-sections {
   display: flex;
