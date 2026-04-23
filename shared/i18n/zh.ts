@@ -747,6 +747,7 @@ export const zh = {
     loginTitle: 'Open Agricola',
     loginSubtitle: '登录以继续',
     registerSubtitle: '创建新账户',
+    subtitle: '一起来种地',
     username: '用户名',
     usernamePlaceholder: '2-30 字符',
     displayName: '显示名称（可选）',

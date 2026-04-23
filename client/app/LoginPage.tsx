@@ -43,22 +43,43 @@ export function LoginPage() {
         <BrandMark
           title={t('platform.loginTitle')}
           titleAs="h1"
-          className="brand-mark-centered login-brand"
+          className="login-brand"
           titleClassName="login-title"
         />
-        <p className="login-subtitle">
-          {mode === 'login' ? t('platform.loginSubtitle') : t('platform.registerSubtitle')}
-        </p>
+        <p className="login-subtitle">{t('platform.subtitle')}</p>
+
+        <div className="login-mode-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
+            className={`login-mode-tabs__tab${mode === 'login' ? ' is-active' : ''}`}
+            onClick={() => { setMode('login'); setError('') }}
+          >
+            {t('platform.loginBtn')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
+            className={`login-mode-tabs__tab${mode === 'register' ? ' is-active' : ''}`}
+            onClick={() => { setMode('register'); setError('') }}
+          >
+            {t('platform.registerBtn')}
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-field">
-            <label htmlFor="username">{t('platform.username')}</label>
+            <label htmlFor="username">
+              {t('platform.username')}
+              <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
+            </label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder={t('platform.usernamePlaceholder')}
               autoComplete="username"
               required
             />
@@ -78,13 +99,15 @@ export function LoginPage() {
           )}
 
           <div className="form-field">
-            <label htmlFor="password">{t('platform.password')}</label>
+            <label htmlFor="password">
+              {t('platform.password')}
+              <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
+            </label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={t('platform.passwordPlaceholder')}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
             />
@@ -96,24 +119,6 @@ export function LoginPage() {
             {loading ? t('platform.loading') : mode === 'login' ? t('platform.loginBtn') : t('platform.registerBtn')}
           </button>
         </form>
-
-        <div className="login-switch">
-          {mode === 'login' ? (
-            <span>
-              {t('platform.noAccount')}
-              <button type="button" className="btn-link" onClick={() => { setMode('register'); setError('') }}>
-                {t('platform.registerBtn')}
-              </button>
-            </span>
-          ) : (
-            <span>
-              {t('platform.hasAccount')}
-              <button type="button" className="btn-link" onClick={() => { setMode('login'); setError('') }}>
-                {t('platform.loginBtn')}
-              </button>
-            </span>
-          )}
-        </div>
       </div>
     </div>
   )
