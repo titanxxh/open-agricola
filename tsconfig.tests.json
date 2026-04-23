@@ -18,6 +18,8 @@
     "client/components/board/ActionLog.tsx",
     "client/components/board/action-log-icons.ts",
     "client/components/board/__tests__/ActionLog.test.tsx",
+    "client/components/board/StageBar.tsx",
+    "client/components/board/__tests__/StageBar.test.tsx",
     "shared/i18n/**/*",
     "shared/cards/registry.ts"
   ],

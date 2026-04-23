@@ -3085,3 +3085,47 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-weight: 700;
   font-size: 11px;
 }
+
+/* ══════════ StageBar ══════════ */
+.stage-bar {
+  background: var(--bg-wood-light);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-paper);
+}
+.stage-bar__cells {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 3px;
+}
+.stage-bar__cell {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-bg-warm);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+.stage-bar__cell.is-past {
+  opacity: 0.5;
+}
+.stage-bar__cell.is-harvest {
+  background: rgba(212, 160, 23, 0.4);
+  border: 1px solid var(--color-accent-strong);
+}
+.stage-bar__cell.is-current {
+  background: var(--color-accent-strong);
+  color: #3a2410;
+  font-weight: 700;
+  transform: scale(1.1);
+}
+.stage-bar__hint {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--color-bg-warm);
+}
