@@ -27,6 +27,8 @@
     "build:cards-manifest": "tsx scripts/build-cards-manifest.ts",
     "prebuild": "pnpm run build:cards-manifest",
     "pretest": "pnpm run build:cards-manifest",
+    "pretest:fast": "pnpm run build:cards-manifest",
+    "pretest:slow": "pnpm run build:cards-manifest",
     "check:prompt-sync": "tsx scripts/check-prompt-sync.ts",
     "sync-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts",
     "probe-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts --probe-only",
