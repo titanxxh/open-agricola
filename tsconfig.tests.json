@@ -8,6 +8,7 @@
     "types": ["vite/client", "@testing-library/jest-dom"]
   },
   "include": [
+    "client/__tests__/**/*",
     "client/components/common/__tests__/**/*"
   ],
   "exclude": ["e2e-tests"]
