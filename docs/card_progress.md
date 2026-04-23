@@ -46,6 +46,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-23 — D95 SiteManager 对齐 BGA（2⁴ 食物替换组合）**：把 `computeCosts` listener 从贪心 `{ costs: delta }` 改成返回 4 条 optional `Bonus`（wood/clay/stone/reed 各 1 条，`discount: { <res>: 1, food: -1 }`）。通用支付求解器自然把 4 条 optional 累乘为 2⁴ = 16 条费用变体，`keepOnlyOptimals` Pareto 剪枝掉"基础费用没该类资源却花 food 换"的支配解；剩余 Pareto 并集由 `buildPaymentChoiceResult` 作为 `prompt.selectPayment` 弹出，每个走 D95 的选项自动显示 "via Site Manager" 归因（复用 2026-04-23 早些时候落地的 payment `sourceCards` UI）。清理：去掉 listener 里死分支 `actions: ['minor-improvement']`（BGA 只给 MAJOR，onBuy 强制 `types: ['major']`），去掉 `getMajorCardEffect / getMinorImprovement / Resource` 导入，文件从 125 行缩到 ~75 行（比 BGA 92 行更短）。**刻意偏离**：BGA `orderComputeCardCosts`（D95 < A143 / C27 / B95）未实现——我们没有 listener 排序机制；bonus 展开产出的 Pareto 并集是所有顺序的超集，比单一顺序更完整。新增 `server/__tests__/D95_SiteManager-session.test.ts` 的"多选支付弹窗"用例（Joinery `{ wood:2, stone:2 }` + 充足资源 → 3 条 Pareto 不可比路径 skip / swap-wood / swap-stone，各自 `sourceCards` 如期）。§2.2 移除 D95，迁入 §2.1。设计文档：`docs/superpowers/specs/2026-04-23-d95-site-manager-design.md`。
 - **2026-04-23 — `renovate-house` 支付路径走 `resolveCostPaymentSelection` 两阶段 choice**：修复 `payTypedFlatCost` 在直接支付分支里把 `BonusModifier` 短路的 bug——当玩家可同时走直接支付与 bonus 折扣两条路径时（例如 A123 FrameBuilder 下持有 2 clay + 1 reed + 4 wood 的木屋翻修），现在会弹出 `prompt.selectPayment` 让玩家二选一，而不是静默地走直接支付。`renovateHouseAction.resolveChoice` 重构：选定翻修目标后调用 `resolveCostPaymentSelection(..., costType: 'renovation')`，多解时返回 `{ type: 'choice' }`，单解时直接 `executeResolvedTypedFlatPayment`；payment-choice 的 option value 走 `pay:renovate:<target>:<idx>` 前缀，把目标编码进去以跨 choice 回合保留（不依赖 `params.selectedOption` 被第二次 resolveChoice 覆盖）。新增 `server/__tests__/A123_FrameBuilder-renovate-choice-repro.test.ts`。既有 log 归因 / A87 Conservator / B107 Manservant / B55 MaintenancePremium / shared renovation 单测全部保持通过。
 - **2026-04-23 — `log.actionDetail` 增加 `bonusSources` 字段**：当某次 action 的支付路径走了 `BonusModifier.sources`（如 A123 FrameBuilder 的 `-2 clay / +1 wood` 替换）时，`ActionDetailParts.bonusSources` 现在记录触发卡 id；前端 log 面板渲染为“via {card}”尾缀（i18n: `log.bonusSources`），card link 可 hover 预览。实现：`PlayerState` 新增 session-transient `_activeActionBonusSources?: string[]` 标记（`shared/game/types.ts`），`GameCore` 在 action 开始 / leaf flush / finalize 三处各自 init / reset / delete；`executePaymentSolution`（`shared/actions/effects/pay.ts`）在完成扣资源后把 `PaymentSolution.bonusUsed` 的 source 写入该 scratchpad；`buildActionDetailParts` 把 scratchpad 拷进 `detailParts.bonusSources`。保留在 `shared/` 层——renovate / construct / 任何未来走 `payTypedFlatCost` / `payCardPreviewCost` 的 action 自动受益。新增 `server/__tests__/A123_FrameBuilder-renovate-log-session.test.ts`（2 例：走 bonus 路径时归因、直接支付时不归因）。
 - **2026-04-20 — A123 FrameBuilder 迁移到 `bonus.choices` + `room-payment.ts` 扩展 `choices` 语义**：把 A123 的 4 条独立 `TradeModifier`（construct × clay/stone + renovation × clay/stone）重写为 2 条 `BonusModifier`（construct + renovation），每条携带 `choices: [{wood:-1, clay:2}, {wood:-1, stone:2}]` + `optional:true`，对齐 BGA `addBonusChoices(..., optional:true)` 语义——同一次 action 至多触发一次资源替换（clay / stone 二选一）。旧实现允许同一 action 同时触发 clay 替换和 stone 替换（4 clay + 4 stone → 2 wood），是实现偏差，本次纠正。配套扩展 `shared/actions/effects/room-payment.ts` 的 `buildRoomCostPerUnit` 与 `applyRoomCountBonuses` 处理 `modifier.choices`：每条 choice 展开为独立 fee 候选（per-room 与 total 两条路径都覆盖），与 BGA 每个 room 独立决策的语义一致。新增 `shared/cards/__tests__/A123_FrameBuilder.test.ts`（4 例：注册形状、互斥不可叠加、clay 单选、renovation 单选；A123 无 pending 交互，故置于单元测试层）。
@@ -85,9 +86,9 @@
 - **2026-04-19 — E16 BriarHedge + B30 WoodPalisades border-fence 对齐 BGA**：`isBorderEdge(edgeId)` helper（`shared/game/farm.ts`）检测农场边缘格；新增 `CardEffect.computeFenceDiscount` hook + `collectFenceDiscount(state, player, ctx)` 聚合器（`shared/cards/card-effects.ts`）；E16 注册 `computeFenceDiscount`，按每条 border edge 抵扣 1 wood（最多抵 4）；B30 palisade 限制仅能放 border edge（新增 `PALISADE_NOT_ON_BORDER` 错误码，`server/fence-validation.ts`）；前端 palisade 模式自动过滤内部边缘（`useFarmSelection` hook early-return + gray-out）；5 个 session 测试场景覆盖折扣 + B30 共存；§2.2 移除 E16 简化条目，迁入 §2.1。已知偏离：`canStartFencing` 仍要求 wood ≥ 4，见 §2.5。
 - **2026-04-18 — E125 DelayedWayfarer BGA 对齐**：新增 `onAllWorkersPlaced` hook phase（所有工人放完后、round end 前触发）；`place-farmer` 增加 `fromSupply` 模式（激活 supply worker）；E125 从简化（下轮开始）改为精确时序（本轮所有人放完后）；修复引擎 OptionalNode 路径漏传 `actionContext`/`sourceCard` 的 bug。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 27 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 28 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 27 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 + D154 迁入 2026-04-19）。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 28 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 + D154 迁入 2026-04-19 + D95 迁入 2026-04-23）。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -118,17 +119,18 @@
 | D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 | D154 ChimneySweep | `renovate-house` computeCosts hook 无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；结算时每名其他玩家住石屋 +1 bonus VP | 2026-04-19：去掉 `houseType === 'clay'` 守卫、`players: '3+' → '4+'`；wood→clay 由 `applyCostOverride` 的 `Math.max(0, …)` clamp 处理——stone 不在基础 cost 中，负数不产生副作用；BGA `extraVp = true` 仅卡面 UI 标记，规则无影响 |
+| D95 SiteManager | onBuy 免费起一张 MAJOR（optional `improvement-any, types: ['major']`）；付费时为 wood/clay/stone/reed 各注入 1 条 optional `Bonus`（`discount: { <res>: 1, food: -1 }`），通用支付求解器 2⁴ 展开 + Pareto 剪枝 → `prompt.selectPayment` 让玩家在 skip / 任意子集替换中选一条 | 2026-04-23：复用 Bonus.optional + `computeAllBuyableCombinations` + `keepOnlyOptimals` + payment-choice prompt + `sourceCards` 归因；刻意偏离 BGA `orderComputeCardCosts`（见 §2.5 下方说明）；文件 ~75 行 / BGA 92 行 |
 
-### 2.2 🟡 简化实现（4 张）
+### 2.2 🟡 简化实现（3 张）
 
 > 简化原因写在各卡 `.ts` 文件顶部注释中。回归 BGA 完整规则需要的基础设施列在最后一列。
 
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
 | C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
-| D95 SiteManager | 贪心：短缺时才用食物替换建材 | 支付路径支持组合选择（2^N trade combinations） |
 | D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 | ~~E96 Elder~~ | ~~回合 1 StartOfWork 额外打出职业未实现~~ | 已实现（2026-04-19），通过 `handHooks` 机制 |
+| ~~D95 SiteManager~~ | ~~贪心：短缺时才用食物替换建材~~ | 已实现（2026-04-23）——用 4 条 optional `Bonus`（wood/clay/stone/reed → food）由通用 `computeAllBuyableCombinations` + `keepOnlyOptimals` 自动展开 |
 
 ### 2.3 ⚠ 行为偏差待修（0 张）
 

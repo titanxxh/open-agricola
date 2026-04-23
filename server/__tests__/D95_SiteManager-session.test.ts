@@ -135,6 +135,93 @@ describe('D95_SiteManager session', () => {
     expect(after.resources.food).toBe(9) // 10 - 1 food substitution
   })
 
+  it('prompts a multi-option payment choice when both direct and bonus paths are affordable', () => {
+    // BGA-aligned behaviour: with four independent optional bonuses the
+    // player must pick whether to swap wood/stone/both with food. Joinery
+    // costs { wood: 2, stone: 2 }; player stocks enough of everything so
+    // the skip-all, swap-wood, swap-stone, and swap-both paths are all
+    // Pareto-incomparable and must be offered explicitly.
+    const session = new GameSession(/* seed */ 1)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.resources = {
+      ...player.resources,
+      food: 5, wood: 2, clay: 0, stone: 2, reed: 0,
+    }
+    if (!state.availableMajorImprovements.includes('Major_Joinery')) {
+      state.availableMajorImprovements.push('Major_Joinery')
+    }
+    session.loadState(state)
+
+    let resp = playOccupation(session)
+    // Walk into the improvement flow and pick Joinery, stop at the payment prompt.
+    let steps = 0
+    let sawPaymentPrompt = false
+    while (resp.pending.type === 'choice' && steps < 12) {
+      steps++
+      if (resp.pending.promptKey === 'prompt.selectPayment') {
+        sawPaymentPrompt = true
+        break
+      }
+      const options = resp.pending.options ?? []
+      const joinery = options.find(
+        (o) => o.value === 'major:Major_Joinery' || o.value === 'Major_Joinery',
+      )
+      if (joinery) {
+        resp = session.resolveChoice(0, joinery.value)
+        continue
+      }
+      const next = options.find(
+        (o) => o.value !== '__skip__' && o.value !== 'cancel',
+      )
+      if (!next) break
+      resp = session.resolveChoice(0, next.value)
+    }
+
+    expect(sawPaymentPrompt).toBe(true)
+    if (resp.pending.type !== 'choice') return
+    const paymentOptions = resp.pending.options ?? []
+    expect(paymentOptions.length).toBeGreaterThanOrEqual(2)
+
+    type PaymentLabel = {
+      resourcesPaid?: Record<string, number>
+      sourceCards?: string[]
+    }
+    const labels = paymentOptions.map(
+      (opt) => opt.labelParams as PaymentLabel | undefined,
+    )
+    const skipPath = labels.find(
+      (l) => (l?.resourcesPaid?.wood ?? 0) === 2
+        && (l?.resourcesPaid?.stone ?? 0) === 2
+        && (l?.resourcesPaid?.food ?? 0) === 0,
+    )
+    const swapWoodPath = labels.find(
+      (l) => (l?.resourcesPaid?.wood ?? 0) === 1
+        && (l?.resourcesPaid?.stone ?? 0) === 2
+        && (l?.resourcesPaid?.food ?? 0) === 1,
+    )
+    const swapStonePath = labels.find(
+      (l) => (l?.resourcesPaid?.wood ?? 0) === 2
+        && (l?.resourcesPaid?.stone ?? 0) === 1
+        && (l?.resourcesPaid?.food ?? 0) === 1,
+    )
+    expect(skipPath).toBeDefined()
+    expect(swapWoodPath).toBeDefined()
+    expect(swapStonePath).toBeDefined()
+    expect(skipPath?.sourceCards ?? []).toEqual([])
+    expect(swapWoodPath?.sourceCards).toContain(CARD_ID)
+    expect(swapStonePath?.sourceCards).toContain(CARD_ID)
+  })
+
   it('does not substitute when player has all needed resources', () => {
     const session = setup()
     const state = session.getState().state
