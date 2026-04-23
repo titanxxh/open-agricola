@@ -16,7 +16,7 @@ import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
-import { FarmBoard } from '../components/board/FarmBoard'
+import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { LogPanel } from '../components/board/LogPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
@@ -1566,7 +1566,7 @@ export const GameContainerApi = () => {
               <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
             </section>
             <section className="board-panel board-farm">
-              <FarmBoard locale={locale} players={state.players} currentPlayer={currentPlayer} displayPlayer={displayPlayer} devMode={devMode}
+              <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
                 currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
                 nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
                 playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}

@@ -175,7 +175,7 @@ const humanizeSourceCard = (sourceCard: string) => {
 const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
   sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
 
-type Props = {
+export type FarmBoardProps = {
   locale: Locale
   players: PlayerState[]
   currentPlayer: PlayerState
@@ -549,7 +549,7 @@ export const FarmBoard = ({
   isInteractive,
   occupationHandSelection,
   onConfirmOccupationHandSelection,
-}: Props) => {
+}: FarmBoardProps) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
 
   // Multi-select state for occupation-hand selection interaction
