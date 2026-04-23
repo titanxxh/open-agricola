@@ -80,3 +80,12 @@
 
   --action-board-scale: 1;
 }
+
+/* ══════════ MOBILE & RESPONSIVE ══════════ */
+@media (max-width: 1100px) {
+  /* Reduce app padding to give board more width */
+
+  :root {
+      --app-edge-padding: 6px;
+    }
+}
