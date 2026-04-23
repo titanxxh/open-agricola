@@ -780,6 +780,9 @@ export const zh = {
     resume: '继续',
     activeRooms: '当前活跃房间',
     noActiveRooms: '暂无活跃房间',
+    noActiveRoomsTitle: '还没有人开局',
+    noActiveRoomsDesc: '创建房间邀请朋友加入，或者复制邀请链接分享',
+    copyInviteLink: '复制邀请链接',
     playerCount: '{current}/{max} 玩家',
 
     settingsTitle: '账户设置',

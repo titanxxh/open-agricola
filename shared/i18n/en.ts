@@ -800,6 +800,9 @@ export const en = {
     resume: 'Resume',
     activeRooms: 'Active Rooms',
     noActiveRooms: 'No active rooms',
+    noActiveRoomsTitle: 'No game in progress yet',
+    noActiveRoomsDesc: 'Create a room and invite friends, or share the invite link.',
+    copyInviteLink: 'Copy invite link',
     playerCount: '{current}/{max} players',
 
     settingsTitle: 'Account Settings',
