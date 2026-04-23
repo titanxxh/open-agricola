@@ -322,6 +322,7 @@ export const zh = {
     cardCopied: '已复制!',
     interactionPaymentFree: '免费',
     interactionPaymentReturn: '返还',
+    interactionPaymentVia: '触发卡牌：{cards}',
     exchangeCenterTitle: '交换中心',
     bakeBreadTitle: '烤面包',
     bakeBreadRate: '1 谷物 → {food} 食物',

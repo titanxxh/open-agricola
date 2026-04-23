@@ -335,6 +335,7 @@ export const en = {
     cardCopied: 'Copied!',
     interactionPaymentFree: 'Free',
     interactionPaymentReturn: 'Return',
+    interactionPaymentVia: 'via {cards}',
     exchangeCenterTitle: 'Exchange Center',
     bakeBreadTitle: 'Bake Bread',
     bakeBreadRate: '1 grain → {food} food',
