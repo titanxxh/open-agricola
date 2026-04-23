@@ -1,6 +1,7 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import { useLocale } from '../../contexts/LocaleContext'
+import { SelectButton } from './SelectButton'
 
 type LocaleSelectProps = {
   locale: Locale
@@ -10,15 +11,17 @@ type LocaleSelectProps = {
 
 export function LocaleSelect({ locale, setLocale, className }: LocaleSelectProps) {
   return (
-    <select
-      className={`locale-select${className ? ` ${className}` : ''}`}
+    <SelectButton<Locale>
       value={locale}
-      onChange={(e) => setLocale(e.target.value as Locale)}
-      aria-label={t(locale, 'ui.languageSelectLabel')}
-    >
-      <option value="zh">{t(locale, 'ui.languageZh')}</option>
-      <option value="en">{t(locale, 'ui.languageEn')}</option>
-    </select>
+      onChange={setLocale}
+      options={[
+        { value: 'zh', label: t(locale, 'ui.languageZh') },
+        { value: 'en', label: t(locale, 'ui.languageEn') },
+      ]}
+      size="sm"
+      ariaLabel={t(locale, 'ui.languageSelectLabel')}
+      className={className}
+    />
   )
 }
 
