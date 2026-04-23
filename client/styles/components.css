@@ -181,3 +181,44 @@
   background: #b93a2c;
   border-color: #b93a2c;
 }
+
+/* ══════════ SelectButton ══════════ */
+.select-button { position: relative; display: inline-block; }
+.select-button__trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-parchment, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--btn-emboss-secondary, none);
+}
+.select-button__trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.select-button--sm .select-button__trigger { padding: 4px 10px; font-size: var(--fs-small); }
+.select-button__caret { font-size: 10px; opacity: 0.6; }
+.select-button__popover {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  list-style: none; margin: 0; padding: 4px;
+  min-width: 100%;
+  background: var(--bg-parchment, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-paper, 0 4px 12px rgba(0,0,0,0.15));
+  z-index: 100;
+}
+.select-button__option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+.select-button__option.is-active { background: var(--color-accent-bg, var(--color-bg-warm)); }
+.select-button__option.is-selected {
+  font-weight: 600;
+  color: var(--color-accent-strong, var(--color-primary));
+}
+.select-button__icon { display: inline-flex; align-items: center; }
