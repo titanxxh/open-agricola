@@ -1,0 +1,49 @@
+name: CI Full
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # daily 18:00 UTC = 02:00 CST (Beijing) next day
+  workflow_dispatch:
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: All tests (fast + slow)
+        run: pnpm test
+
+      - name: Build (includes cards manifest)
+        run: pnpm run build
+
+      - name: Check reaches (strict)
+        run: pnpm run check:reaches -- --strict
+
+      - name: Check no-DSL (strict — DSL path fully removed)
+        run: pnpm run check:no-dsl -- --strict
+
+      - name: Check bundle size (strict)
+        run: pnpm run check:bundle-size
+
+      - name: Check catalog types (issue #10)
+        run: pnpm run check:catalog-types
+
+      - name: Check community deck consistency
+        run: pnpm run check:community-deck
