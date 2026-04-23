@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { Section } from '../components/common/Section'
+import { DangerButton } from '../components/common/DangerButton'
 import { setPage } from './PageRouter'
 
 export function SettingsPage() {
@@ -65,91 +67,103 @@ export function SettingsPage() {
     }
   }
 
+  const handleLogoutAll = () => {
+    logout()
+    setPage('lobby')
+  }
+
   return (
     <div className="settings-page">
-      <div className="settings-header">
+      <header>
         <button type="button" className="btn-link" onClick={() => setPage('lobby')}>{t('platform.backToLobby')}</button>
         <h1>{t('platform.settingsTitle')}</h1>
         <LocaleSwitcher />
-      </div>
+      </header>
 
-      <div className="settings-content">
-        <div className="settings-section">
-          <h2>{t('platform.basicInfo')}</h2>
-          <p className="settings-username">{t('platform.usernameLabel', { name: user?.username ?? '' })}</p>
-          <form onSubmit={handleSaveName} className="settings-form">
-            <div className="form-field">
-              <label>{t('platform.displayNameLabel')}</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder={t('platform.displayNameGamePlaceholder')}
-                maxLength={60}
-              />
-            </div>
-            {nameMsg && (
-              <div className={nameMsg.ok ? 'settings-success' : 'form-error'}>{nameMsg.text}</div>
-            )}
+      <Section icon="👤" title={t('platform.basicInfo')} variant="parchment">
+        <p className="settings-readonly">
+          🔒 <span className="settings-readonly-chip">{user?.username ?? ''}</span>（{t('platform.notEditable')}）
+        </p>
+        <form onSubmit={handleSaveName} className="settings-form">
+          <div className="form-field">
+            <label htmlFor="displayName">{t('platform.displayNameLabel')}</label>
+            <input
+              id="displayName"
+              type="text"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder={t('platform.displayNameGamePlaceholder')}
+              maxLength={60}
+            />
+          </div>
+          {nameMsg && (
+            <div className={nameMsg.ok ? 'settings-success' : 'form-error'}>{nameMsg.text}</div>
+          )}
+          <div className="settings-actions">
             <button type="submit" className="btn-primary" disabled={saving}>{t('platform.save')}</button>
-          </form>
-        </div>
+          </div>
+        </form>
+      </Section>
 
-        <div className="settings-section">
-          <h2>{t('platform.changePassword')}</h2>
-          <form onSubmit={handleChangePassword} className="settings-form">
-            <div className="form-field">
-              <label>{t('platform.currentPassword')}</label>
-              <input
-                type="password"
-                value={oldPassword}
-                onChange={e => setOldPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            <div className="form-field">
-              <label>{t('platform.newPassword')}</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-                placeholder={t('platform.passwordPlaceholder')}
-                required
-              />
-            </div>
-            <div className="form-field">
-              <label>{t('platform.confirmNewPassword')}</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-            {pwMsg && (
-              <div className={pwMsg.ok ? 'settings-success' : 'form-error'}>{pwMsg.text}</div>
-            )}
+      <Section icon="🔑" title={t('platform.changePassword')} variant="parchment">
+        <form onSubmit={handleChangePassword} className="settings-form">
+          <div className="form-field">
+            <label htmlFor="currentPassword">{t('platform.currentPassword')}</label>
+            <input
+              id="currentPassword"
+              type="password"
+              value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="newPassword">{t('platform.newPassword')}</label>
+            <input
+              id="newPassword"
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              placeholder={t('platform.passwordPlaceholder')}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="confirmPassword">{t('platform.confirmNewPassword')}</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+          </div>
+          {pwMsg && (
+            <div className={pwMsg.ok ? 'settings-success' : 'form-error'}>{pwMsg.text}</div>
+          )}
+          <div className="settings-actions">
             <button type="submit" className="btn-primary" disabled={saving}>{t('platform.changePasswordBtn')}</button>
-          </form>
-        </div>
+          </div>
+        </form>
+      </Section>
 
-        <div className="settings-section settings-danger">
-          <h2>{t('platform.other')}</h2>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => { logout(); setPage('lobby') }}
-          >
-            {t('platform.logoutAll')}
-          </button>
-          <p className="settings-note">
-            {t('platform.logoutNote')}
-          </p>
-        </div>
-      </div>
+      <Section
+        icon="⚠️"
+        title={t('platform.dangerZone')}
+        variant="parchment"
+        className="settings-danger"
+      >
+        <DangerButton
+          confirmText={t('platform.confirmLogoutAll')}
+          onConfirm={handleLogoutAll}
+        >
+          {t('platform.logoutAllDevices')}
+        </DangerButton>
+        <p className="settings-hint">{t('platform.logoutNote')}</p>
+      </Section>
     </div>
   )
 }
