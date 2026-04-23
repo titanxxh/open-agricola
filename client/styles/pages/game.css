@@ -506,6 +506,7 @@
     url('/bga-img/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
+  transform: scale(var(--action-board-scale, 1));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 .action-board.action-board--2p {
@@ -3210,4 +3211,12 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-size: var(--fs-small);
   color: var(--color-text-muted);
   text-align: center;
+}
+
+/* ══════════ Action board widescreen scaling ══════════ */
+@media (min-width: 1600px) {
+  :root { --action-board-scale: 1.15; }
+}
+@media (min-width: 1920px) {
+  :root { --action-board-scale: 1.25; }
 }
