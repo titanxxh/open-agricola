@@ -703,6 +703,7 @@ export const zh = {
     effectMinorImprovement: '小改良：{improvements}',
     effectStartPlayer: '成为起始玩家',
     effectBakeBread: '烤面包：{count} 谷物 → {food} 食物',
+    bonusSources: '由 {cards} 触发',
     cardEffectGain: '{player} 通过 {cardId} 获得了 {gain}',
     cardEffectPay: '{player} 为 {cardId} 支付 {cost}',
     cardEffectBonusVp: '{player} 通过 {cardId} 获得 {bonusVp}',

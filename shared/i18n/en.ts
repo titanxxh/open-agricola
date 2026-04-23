@@ -722,6 +722,7 @@ export const en = {
     effectMinorImprovement: 'Minor improvement: {improvements}',
     effectStartPlayer: 'Become start player',
     effectBakeBread: 'Bake bread: {count} grain → {food} food',
+    bonusSources: 'via {cards}',
     cardEffectGain: '{player} gains {gain} from {cardId}',
     cardEffectPay: '{player} pays {cost} for {cardId}',
     cardEffectBonusVp: '{player} gains {bonusVp} from {cardId}',

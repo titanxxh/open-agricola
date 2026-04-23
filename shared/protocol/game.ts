@@ -29,6 +29,12 @@ export type ActionDetailParts = {
   gains?: Partial<Resource>
   costs?: Partial<Resource>
   effects?: ActionDetailEffects
+  /**
+   * Card ids (e.g. `A123_FrameBuilder`) whose `BonusModifier.sources` fired
+   * during the action — rendered as a "via {card}" attribution in the log
+   * entry so the player can see which card caused a cost reduction.
+   */
+  bonusSources?: string[]
 }
 
 export type GameSyncPayload = {
