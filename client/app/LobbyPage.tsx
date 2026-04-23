@@ -4,6 +4,8 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
+import { Section } from '../components/common/Section'
+import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 
 type RoomSummary = {
@@ -96,187 +98,199 @@ export function LobbyPage() {
     } catch { /* ignore */ }
   }
 
+  const handleCopyInviteLink = () => {
+    try {
+      navigator.clipboard?.writeText(window.location.href)
+    } catch { /* ignore */ }
+  }
+
   return (
     <div className="lobby-page">
-      <div className="lobby-header">
+      <header className="lobby-header">
         <BrandMark
           title={t('platform.lobbyTitle')}
           titleAs="h1"
           className="lobby-brand"
           titleClassName="lobby-title"
         />
-        <div className="lobby-user-info">
+        <div className="lobby-header__right">
           <LocaleSwitcher />
           <button type="button" className="btn-link" onClick={() => setPage('settings')}>
             {user?.displayName || user?.username}
           </button>
           <button type="button" className="btn-link" onClick={logout}>{t('platform.logout')}</button>
         </div>
-      </div>
+      </header>
 
-      <div className="lobby-content">
-        <div className="lobby-actions">
-          <div className="lobby-section">
-            <h2>{t('platform.startGame')}</h2>
-            {!showPlayerSelect ? (
-              <>
-                <button type="button" className="btn-primary" onClick={() => setShowPlayerSelect(true)}>
-                  {t('platform.createMultiplayer')}
-                </button>
-                <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
-                  {t('platform.singlePlayer')}
-                </button>
-              </>
-            ) : (
-              <div className="player-select-panel">
-                <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
-                <div className="player-select-options">
-                  {([2, 3, 4] as const).map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
-                      onClick={() => setSelectedMaxPlayers(n)}
-                    >
-                      {t(`platform.players${n}`)}
-                    </button>
-                  ))}
-                </div>
-                <div className="player-select-label">{t('platform.draftModeLabel')}</div>
-                <div className="player-select-options">
-                  <button
-                    type="button"
-                    className={`player-select-btn${draftMode === 'none' ? ' active' : ''}`}
-                    onClick={() => setDraftMode('none')}
-                  >
-                    {t('platform.draftModeNone')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`player-select-btn${draftMode === 'simultaneous' ? ' active' : ''}`}
-                    onClick={() => setDraftMode('simultaneous')}
-                  >
-                    {t('platform.draftModeSimultaneous')}
-                  </button>
-                </div>
-                {draftMode === 'simultaneous' && (
-                  <>
-                    <div className="player-select-label">{t('platform.draftPoolSizeLabel')}</div>
-                    <div className="player-select-options">
-                      {([7, 8, 9, 10] as const).map(n => (
-                        <button
-                          key={n}
-                          type="button"
-                          className={`player-select-btn${draftPoolSize === n ? ' active' : ''}`}
-                          onClick={() => setDraftPoolSize(n)}
-                        >
-                          {t('platform.draftPoolSizeOption', { n: String(n) })}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {showCommunityDeckToggle && (
-                  <label className="community-deck-toggle">
-                    <input
-                      type="checkbox"
-                      checked={enableCommunityDeck}
-                      onChange={(e) => setEnableCommunityDeck(e.target.checked)}
-                    />
-                    <span>
-                      启用社区扩展卡（community deck）
-                      <br />
-                      <span className="community-deck-toggle-hint">
-                        这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
-                      </span>
-                    </span>
-                  </label>
-                )}
-                <div className="player-select-actions">
-                  <button type="button" className="btn-primary" onClick={handleCreateGame}>
-                    {t('platform.createGame')}
-                  </button>
-                  <button type="button" className="btn-link" onClick={() => setShowPlayerSelect(false)}>
-                    {t('platform.cancel')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="lobby-section">
-            <h2>{t('platform.joinGame')}</h2>
-            <div className="join-form">
-              <input
-                type="text"
-                value={joinRoomId}
-                onChange={e => { setJoinRoomId(e.target.value); setError('') }}
-                placeholder={t('platform.joinRoomPlaceholder')}
-                onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
-              />
-              <button type="button" className="btn-primary" onClick={handleJoinRoom}>{t('platform.joinBtn')}</button>
-            </div>
-            {error && <div className="form-error">{error}</div>}
-          </div>
-
-          <div className="lobby-section">
-            <h2>{t('platform.workshop')}</h2>
-            <button type="button" className="btn-secondary" onClick={() => setPage('workshop')}>
-              {t('platform.enterWorkshop')}
-            </button>
-          </div>
-        </div>
-
-        {myRooms.length > 0 && (
-          <div className="lobby-rooms">
-            <h2>{t('platform.myActiveGames')}</h2>
-            <ul className="room-list">
-              {myRooms.map(r => (
-                <li key={r.id} className="room-item">
-                  <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
-                  <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
-                  <span className="room-status">
-                    {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn-small"
-                    onClick={() => handleResumeRoom(r.id, r.player_index)}
-                  >
-                    {t('platform.resume')}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="lobby-rooms">
-          <h2>{t('platform.activeRooms')}</h2>
-          {rooms.length === 0 ? (
-            <p className="rooms-empty">{t('platform.noActiveRooms')}</p>
+      <div className="lobby-grid">
+        <Section variant="parchment" icon="🎮" title={t('platform.startGame')} className="lobby-hero">
+          {!showPlayerSelect ? (
+            <>
+              <button
+                type="button"
+                className="btn-primary lobby-cta-primary"
+                onClick={() => setShowPlayerSelect(true)}
+              >
+                {t('platform.createMultiplayer')}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
+                {t('platform.singlePlayer')}
+              </button>
+            </>
           ) : (
-            <ul className="room-list">
-              {rooms.map(room => (
-                <li key={room.id} className="room-item">
-                  <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
-                  <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
-                  {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
-                    <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
-                      {t('platform.joinBtn')}
-                    </button>
-                  )}
-                  {room.createdBy === user?.id && room.status === 'waiting' && (
-                    <button type="button" className="btn-small btn-danger-small" onClick={() => handleDissolveRoom(room.id)}>
-                      {t('platform.dissolveRoom')}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <div className="player-select-panel">
+              <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
+              <div className="player-select-options">
+                {([2, 3, 4] as const).map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
+                    onClick={() => setSelectedMaxPlayers(n)}
+                  >
+                    {t(`platform.players${n}`)}
+                  </button>
+                ))}
+              </div>
+              <div className="player-select-label">{t('platform.draftModeLabel')}</div>
+              <div className="player-select-options">
+                <button
+                  type="button"
+                  className={`player-select-btn${draftMode === 'none' ? ' active' : ''}`}
+                  onClick={() => setDraftMode('none')}
+                >
+                  {t('platform.draftModeNone')}
+                </button>
+                <button
+                  type="button"
+                  className={`player-select-btn${draftMode === 'simultaneous' ? ' active' : ''}`}
+                  onClick={() => setDraftMode('simultaneous')}
+                >
+                  {t('platform.draftModeSimultaneous')}
+                </button>
+              </div>
+              {draftMode === 'simultaneous' && (
+                <>
+                  <div className="player-select-label">{t('platform.draftPoolSizeLabel')}</div>
+                  <div className="player-select-options">
+                    {([7, 8, 9, 10] as const).map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`player-select-btn${draftPoolSize === n ? ' active' : ''}`}
+                        onClick={() => setDraftPoolSize(n)}
+                      >
+                        {t('platform.draftPoolSizeOption', { n: String(n) })}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {showCommunityDeckToggle && (
+                <label className="community-deck-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enableCommunityDeck}
+                    onChange={(e) => setEnableCommunityDeck(e.target.checked)}
+                  />
+                  <span>
+                    启用社区扩展卡（community deck）
+                    <br />
+                    <span className="community-deck-toggle-hint">
+                      这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
+                    </span>
+                  </span>
+                </label>
+              )}
+              <div className="player-select-actions">
+                <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                  {t('platform.createGame')}
+                </button>
+                <button type="button" className="btn-link" onClick={() => setShowPlayerSelect(false)}>
+                  {t('platform.cancel')}
+                </button>
+              </div>
+            </div>
           )}
-        </div>
+        </Section>
+
+        <Section variant="parchment" icon="🚪" title={t('platform.joinGame')}>
+          <div className="join-form">
+            <input
+              type="text"
+              value={joinRoomId}
+              onChange={e => { setJoinRoomId(e.target.value); setError('') }}
+              placeholder={t('platform.joinRoomPlaceholder')}
+              onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
+            />
+            <button type="button" className="btn-primary" onClick={handleJoinRoom}>{t('platform.joinBtn')}</button>
+          </div>
+          {error && <div className="form-error">{error}</div>}
+        </Section>
+
+        <Section variant="parchment" icon="🛠️" title={t('platform.workshop')}>
+          <button type="button" className="btn-secondary" onClick={() => setPage('workshop')}>
+            {t('platform.enterWorkshop')}
+          </button>
+        </Section>
       </div>
+
+      {myRooms.length > 0 && (
+        <Section icon="🎯" title={t('platform.myActiveGames')} variant="default" className="lobby-rooms">
+          <ul className="room-list">
+            {myRooms.map(r => (
+              <li key={r.id} className="room-item">
+                <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
+                <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
+                <span className="room-status">
+                  {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
+                </span>
+                <button
+                  type="button"
+                  className="btn-small"
+                  onClick={() => handleResumeRoom(r.id, r.player_index)}
+                >
+                  {t('platform.resume')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <Section icon="🏠" title={t('platform.activeRooms')} variant="default" className="lobby-rooms">
+        {rooms.length === 0 ? (
+          <EmptyState
+            icon="🎲"
+            title={t('platform.noActiveRoomsTitle')}
+            description={t('platform.noActiveRoomsDesc')}
+            action={
+              <button type="button" className="btn-secondary" onClick={handleCopyInviteLink}>
+                {t('platform.copyInviteLink')}
+              </button>
+            }
+          />
+        ) : (
+          <ul className="room-list">
+            {rooms.map(room => (
+              <li key={room.id} className="room-item">
+                <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
+                <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
+                  <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
+                    {t('platform.joinBtn')}
+                  </button>
+                )}
+                {room.createdBy === user?.id && room.status === 'waiting' && (
+                  <button type="button" className="btn-small btn-danger-small" onClick={() => handleDissolveRoom(room.id)}>
+                    {t('platform.dissolveRoom')}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
     </div>
   )
 }
