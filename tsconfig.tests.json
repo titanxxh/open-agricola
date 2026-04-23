@@ -11,6 +11,8 @@
     "client/__tests__/**/*",
     "client/components/common/__tests__/**/*",
     "client/components/common/*.{ts,tsx}",
+    "client/components/board/PlayerTabs.tsx",
+    "client/components/board/__tests__/PlayerTabs.test.tsx",
     "shared/i18n/**/*",
     "shared/cards/registry.ts"
   ],
