@@ -6,6 +6,8 @@ import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 import { ProposeModal } from './workshop/ProposeModal'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { ResourceText } from '../components/common/ResourceText'
+import { Section } from '../components/common/Section'
+import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 
@@ -557,38 +559,6 @@ function WorkshopSection({
       </div>
       {children}
     </section>
-  )
-}
-
-function SandboxSummaryPanel({
-  cards,
-  settings,
-  t,
-}: {
-  cards: WorkshopCard[]
-  settings: SandboxSettings
-  t: (key: string, params?: Record<string, string | number>) => string
-}) {
-  return (
-    <div className="ws-sandbox-summary">
-      <div>
-        <div className="ws-sandbox-summary-title">{t('platform.sandbox')}</div>
-        <div className="ws-sandbox-summary-text">
-          {cards.length > 0
-            ? t('platform.sandboxSummaryFilled', {
-              count: cards.length,
-              cards: `${cards.slice(0, 3).map(card => card.name).join(', ')}${cards.length > 3 ? '…' : ''}`,
-            })
-            : t('platform.sandboxSummaryEmpty')}
-        </div>
-        <div className="ws-sandbox-summary-text">
-          {t('platform.sandboxSettingsSummary', {
-            players: settings.player_count,
-            decks: settings.deck_ids.join(', '),
-          })}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -1369,17 +1339,61 @@ export function WorkshopPage() {
       />
 
       {user && (
-        <div className="ws-home-header">
-          <SandboxSummaryPanel
-            cards={sandboxCards}
-            settings={sandboxSettings}
-            t={t}
-          />
-        </div>
+        <Section
+          variant="sandbox"
+          icon="🧪"
+          title={t('platform.sandbox')}
+          className="ws-section-sandbox"
+          actions={(
+            <>
+              <button
+                type="button"
+                className="btn-secondary ws-btn-sm"
+                onClick={() => setResetSandboxOpen(true)}
+              >
+                {t('platform.adjustConfig')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary ws-btn-sm"
+                onClick={() => setView('sandbox')}
+              >
+                {t('platform.enterSandbox')}
+              </button>
+            </>
+          )}
+        >
+          <div className="ws-sandbox-info">
+            <span className="ws-chip">
+              {t('platform.sandboxPlayerCountOption', { count: sandboxSettings.player_count })}
+            </span>
+            {sandboxSettings.deck_ids.map(d => (
+              <span key={d} className="ws-chip ws-chip-deck">{d}</span>
+            ))}
+            <span className="ws-chip ws-chip-count">
+              {sandboxCards.length > 0
+                ? t('platform.sandboxSummaryFilled', {
+                  count: sandboxCards.length,
+                  cards: `${sandboxCards.slice(0, 3).map(card => card.name).join(', ')}${sandboxCards.length > 3 ? '…' : ''}`,
+                })
+                : t('platform.sandboxSummaryEmpty')}
+            </span>
+          </div>
+          {sandboxCards.length === 0 && (
+            <EmptyState
+              icon="🃏"
+              title={t('platform.sandboxEmptyTitle')}
+              description={t('platform.sandboxEmptyDesc')}
+              variant="compact"
+            />
+          )}
+        </Section>
       )}
 
       {user && (
-        <WorkshopSection
+        <Section
+          variant="parchment"
+          icon="📒"
           title={t('platform.myCards')}
           subtitle={t('platform.myCardsSubtitle')}
           actions={(
@@ -1399,7 +1413,24 @@ export function WorkshopPage() {
           {myLoading ? (
             <div className="ws-loading">{t('platform.loadingMore')}</div>
           ) : myCards.length === 0 ? (
-            <p className="rooms-empty">{t('platform.noMyCards')}</p>
+            <EmptyState
+              icon="📦"
+              title={t('platform.noMyCards')}
+              description={t('platform.myCardsSubtitle')}
+              action={(
+                <button
+                  type="button"
+                  className="btn-primary ws-btn-sm"
+                  onClick={() => {
+                    prevView.current = view
+                    setEditCard(undefined)
+                    setView('editor')
+                  }}
+                >
+                  {t('platform.createCard')}
+                </button>
+              )}
+            />
           ) : (
             <div className="ws-card-grid">
               {myCards.map(card => (
@@ -1407,17 +1438,24 @@ export function WorkshopPage() {
               ))}
             </div>
           )}
-        </WorkshopSection>
+        </Section>
       )}
 
-      <WorkshopSection
+      <Section
+        variant="parchment"
+        icon="⭐"
         title={t('platform.featured')}
         subtitle={t('platform.featuredSubtitle')}
       >
         {featuredLoading ? (
           <div className="ws-loading">{t('platform.loadingMore')}</div>
         ) : featuredCards.length === 0 ? (
-          <p className="rooms-empty">{t('platform.noFeatured')}</p>
+          <EmptyState
+            icon="⭐"
+            title={t('platform.noFeatured')}
+            description={t('platform.featuredSubtitle')}
+            variant="compact"
+          />
         ) : (
           <div className="ws-card-grid">
             {featuredCards.map(card => (
@@ -1425,7 +1463,7 @@ export function WorkshopPage() {
             ))}
           </div>
         )}
-      </WorkshopSection>
+      </Section>
 
       {communityDeckEnabled && (
         <WorkshopSection
@@ -1444,28 +1482,48 @@ export function WorkshopPage() {
         </WorkshopSection>
       )}
 
-      <WorkshopSection
+      <Section
+        variant="parchment"
+        icon="🔍"
         title={t('platform.browse')}
         subtitle={t('platform.browseSubtitle')}
         actions={(
           <div className="ws-toolbar">
             <form onSubmit={event => { event.preventDefault(); setSearch(searchInput.trim()) }} className="ws-search">
               <input
+                type="search"
                 value={searchInput}
                 onChange={event => setSearchInput(event.target.value)}
                 placeholder={t('platform.searchPlaceholder')}
               />
               <button type="submit" className="btn-primary ws-btn-sm">{t('platform.searchBtn')}</button>
             </form>
-            <div className="ws-sort">
-              <button type="button" className={`ws-sort-btn${sort === 'recent' ? ' active' : ''}`} onClick={() => setSort('recent')}>{t('platform.sortRecent')}</button>
-              <button type="button" className={`ws-sort-btn${sort === 'popular' ? ' active' : ''}`} onClick={() => setSort('popular')}>{t('platform.sortPopular')}</button>
+            <div className="ws-sort-tabs">
+              <button
+                type="button"
+                className={`ws-sort-tab${sort === 'recent' ? ' is-active' : ''}`}
+                onClick={() => setSort('recent')}
+              >
+                {t('platform.sortRecent')}
+              </button>
+              <button
+                type="button"
+                className={`ws-sort-tab${sort === 'popular' ? ' is-active' : ''}`}
+                onClick={() => setSort('popular')}
+              >
+                {t('platform.sortPopular')}
+              </button>
             </div>
           </div>
         )}
       >
         {browseCards.length === 0 && !browseLoading ? (
-          <p className="rooms-empty">{t('platform.noPublished')}</p>
+          <EmptyState
+            icon="🔍"
+            title={t('platform.noPublished')}
+            description={t('platform.browseSubtitle')}
+            variant="compact"
+          />
         ) : (
           <div className="ws-card-grid">
             {browseCards.map(card => (
@@ -1479,7 +1537,7 @@ export function WorkshopPage() {
             {t('platform.loadMore')}
           </button>
         )}
-      </WorkshopSection>
+      </Section>
 
       {resetSandboxOpen && (
         <SandboxResetModal
