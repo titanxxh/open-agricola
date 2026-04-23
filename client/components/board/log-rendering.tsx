@@ -5,6 +5,7 @@ import type { GameState, PlayerState, Resource } from '../../../shared/game/type
 import type { ActionDetailParts } from '../../../shared/protocol/game'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
+import { ResourceText } from '../common/ResourceText'
 
 export type CardRef = { id: string; type: CardType; name: string }
 
@@ -159,7 +160,7 @@ export const LogCardLink = ({
           </span>
           <span className="log-card-tooltip-meta">
             <strong>{cardRef.name}</strong>
-            <span className="log-card-tooltip-desc">{resolveCardDesc(locale, cardRef)}</span>
+            <ResourceText className="log-card-tooltip-desc" text={resolveCardDesc(locale, cardRef)} />
           </span>
         </span>
       )}
