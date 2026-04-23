@@ -88,6 +88,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
+  box-shadow: var(--btn-emboss-primary);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
@@ -106,6 +107,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
+  box-shadow: var(--btn-emboss-secondary);
 }
 .btn-secondary:hover {
   background: #f0e6d0;

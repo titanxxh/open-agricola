@@ -767,6 +767,7 @@ export const en = {
     loginTitle: 'Open Agricola',
     loginSubtitle: 'Sign in to continue',
     registerSubtitle: 'Create a new account',
+    subtitle: 'Farm together',
     username: 'Username',
     usernamePlaceholder: '2-30 characters',
     displayName: 'Display Name (optional)',
