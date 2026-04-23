@@ -1,0 +1,216 @@
+/* Migrated from client/App.css during UI overhaul Batch 1 (mechanical split, no rewrites). */
+
+/* ══════════ LOBBY PAGE ══════════ */
+.lobby-page {
+  min-height: 100vh;
+  background: var(--color-bg-warm);
+  padding: 20px clamp(20px, 4vw, 48px);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.lobby-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.lobby-brand {
+  gap: 14px;
+}
+.lobby-brand .brand-mark-image {
+  width: 42px;
+  height: 42px;
+}
+.lobby-title {
+  font-size: 24px;
+  color: var(--color-primary);
+  margin: 0;
+  font-family: var(--agricola-font);
+}
+.lobby-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.lobby-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.lobby-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.lobby-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.lobby-section:hover {
+  box-shadow: 0 6px 20px rgba(90, 58, 32, 0.14);
+  transform: translateY(-2px);
+}
+.lobby-section > .btn-primary:last-child,
+.lobby-section > .btn-secondary:last-child {
+  margin-top: auto;
+}
+.lobby-section h2 {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.join-form {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.join-form .btn-primary {
+  flex-shrink: 0;
+}
+.join-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+.join-form input:focus {
+  border-color: var(--color-primary);
+}
+.lobby-rooms {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(90, 58, 32, 0.08);
+}
+.lobby-rooms h2 {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px 0;
+}
+.rooms-empty {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+}
+.room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-warm);
+  border-radius: 8px;
+}
+.room-id {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+.room-players {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.room-status {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: #f0e6d0;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+/* ── Tablet breakpoint ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .lobby-actions {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+  .player-select-options {
+      flex-wrap: wrap;
+    }
+}
+/* ── Small phone breakpoint ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .lobby-actions {
+      grid-template-columns: 1fr;
+    }
+}
+.player-select-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.player-select-label {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.player-select-options {
+  display: flex;
+  gap: 8px;
+}
+.player-select-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.player-select-btn:hover {
+  border-color: var(--color-primary);
+}
+.player-select-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.community-deck-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.community-deck-toggle input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.community-deck-toggle-hint {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.player-select-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.lobby-page {
+  animation: fadeSlideIn 0.3s ease-out;
+}
