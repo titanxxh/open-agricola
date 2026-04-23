@@ -95,23 +95,35 @@ Expected: `10`
 pnpm add -D @testing-library/react@^16.0.0 @testing-library/user-event@^14.5.0 @testing-library/jest-dom@^6.4.0 jsdom@^25.0.0
 ```
 
-- [ ] **Step 2: Update vitest config to use jsdom for React component tests**
+- [ ] **Step 2: Document the per-file jsdom pragma convention in `vitest.config.ts`**
 
-Modify `vitest.config.ts`:
+This project uses Vitest 4, which **removed `environmentMatchGlobs`**. Instead, each
+`*.test.tsx` file under `client/` that needs DOM must opt in with a top-of-file pragma
+`// @vitest-environment jsdom`. Static-render tests using `renderToStaticMarkup` from
+`react-dom/server` do NOT need the pragma.
+
+Update `vitest.config.ts` to add a comment block (do not change `setupFiles` / `exclude`):
 
 ```ts
 import { defineConfig, defaultExclude, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config'
 
+// React component tests under client/ that touch the DOM (use @testing-library/react's
+// `render()`, expect `document`/`window`, etc.) MUST opt in to jsdom by adding this pragma
+// at the top of the .test.tsx file:
+//
+//   // @vitest-environment jsdom
+//
+// Symptom if missing: "ReferenceError: document is not defined" / "window is not defined".
+// (Vitest 4 removed `environmentMatchGlobs` — see https://vitest.dev/guide/migration .)
+// Static-render tests using `renderToStaticMarkup` from `react-dom/server` do NOT need
+// the pragma (e.g. client/components/common/__tests__/PlayerCard.test.tsx).
 export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
       exclude: [...defaultExclude, '**/.worktree/**'],
       setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
-      environmentMatchGlobs: [
-        ['client/**/*.test.tsx', 'jsdom'],
-      ],
     },
   }),
 )
@@ -120,7 +132,7 @@ export default mergeConfig(
 - [ ] **Step 3: Verify existing tests still pass**
 
 Run: `pnpm test`
-Expected: All previous tests pass (the `environmentMatchGlobs` rule only activates for `.test.tsx` under `client/`, so no behavior change for existing `.test.ts` shared tests).
+Expected: All previous tests pass (no behavior change — only a comment block was added).
 
 - [ ] **Step 4: Commit**
 
@@ -458,9 +470,10 @@ EOF
 
 - [ ] **Step 1: Write the failing test**
 
-Create `client/components/common/__tests__/SelectButton.test.tsx`:
+Create `client/components/common/__tests__/SelectButton.test.tsx`. **The first line must be the jsdom pragma** (Vitest 4 — see Task 1 step 2):
 
 ```tsx
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -534,6 +547,8 @@ setupFiles: [
   './client/__tests__/setup.ts',
 ],
 ```
+
+**Note**: Tasks 5, 6, 7 (EmptyState, Section, DangerButton tests) and Task 7 of Batch 2 (MobileTabBar test) and all `*.test.tsx` files in Batch 3 must also start with `// @vitest-environment jsdom` as their first line.
 
 - [ ] **Step 2: Run test to confirm it fails**
 
