@@ -805,6 +805,10 @@ export const en = {
     copyInviteLink: 'Copy invite link',
     playerCount: '{current}/{max} players',
 
+    tabLobby: 'Lobby',
+    tabWorkshop: 'Workshop',
+    tabSettings: 'Settings',
+
     settingsTitle: 'Account Settings',
     backToLobby: '← Back to Lobby',
     basicInfo: 'Basic Info',

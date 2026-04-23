@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
 import { SettingsPage } from './SettingsPage'
 import { GameContainerApi } from './GameContainerApi'
+import { MobileTabBar } from '../components/common/MobileTabBar'
 
 const WorkshopPage = lazy(() => import('./WorkshopPage').then(m => ({ default: m.WorkshopPage })))
 
@@ -60,19 +61,38 @@ export function PageRouter() {
 
   const page = getPage()
 
+  let pageNode: ReactElement
   switch (page) {
     case 'game':
-      return <GameContainerApi />
+      pageNode = <GameContainerApi />
+      break
     case 'workshop':
-      return (
+      pageNode = (
         <Suspense fallback={<div className="loading-screen">{t('platform.loading')}</div>}>
           <WorkshopPage />
         </Suspense>
       )
+      break
     case 'settings':
-      return <SettingsPage />
+      pageNode = <SettingsPage />
+      break
     case 'lobby':
     default:
-      return <LobbyPage />
+      pageNode = <LobbyPage />
+      break
   }
+
+  const showTabBar = page === 'lobby' || page === 'workshop' || page === 'settings'
+
+  return (
+    <>
+      {pageNode}
+      {showTabBar && (
+        <MobileTabBar
+          current={page as 'lobby' | 'workshop' | 'settings'}
+          onNavigate={(t) => setPage(t)}
+        />
+      )}
+    </>
+  )
 }

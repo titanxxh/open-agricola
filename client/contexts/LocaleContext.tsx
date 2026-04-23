@@ -19,7 +19,7 @@ type LocaleContextValue = {
   t: (key: string, params?: Record<string, string | number>) => string
 }
 
-const LocaleContext = createContext<LocaleContextValue | null>(null)
+export const LocaleContext = createContext<LocaleContextValue | null>(null)
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectInitialLocale)
