@@ -785,6 +785,10 @@ export const zh = {
     copyInviteLink: '复制邀请链接',
     playerCount: '{current}/{max} 玩家',
 
+    tabLobby: '大厅',
+    tabWorkshop: '工坊',
+    tabSettings: '设置',
+
     settingsTitle: '账户设置',
     backToLobby: '← 返回大厅',
     basicInfo: '基本信息',
