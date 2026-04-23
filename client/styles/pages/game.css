@@ -64,6 +64,21 @@
   padding-top: 8px;
   border-top: 1px solid rgba(205, 185, 150, 0.85);
 }
+/* Forward-compat aliases for utility / pending split.
+ * Existing structure already consolidates utility buttons (undo / scoring /
+ * anytime) and pending interaction inside `.interaction-bar` via
+ * `__top`/`__controls` and `__body`. These selectors make the BEM names
+ * `__utility` / `__pending` available so future markup can adopt them
+ * without changing the parent column layout. */
+.interaction-bar__utility {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.interaction-bar__pending {
+  flex: 1;
+  min-width: 0;
+}
 .anytime-bar {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 16px;
