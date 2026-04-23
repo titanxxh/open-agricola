@@ -14,7 +14,9 @@
 /* ── Workshop ───────────────────────────────────── */
 .ws-page {
   min-height: 100vh;
-  background: var(--color-bg-warm);
+  /* Let body's wood backdrop show through; Section components paint their
+   * own parchment cards on top. */
+  background: transparent;
   display: flex;
   flex-direction: column;
 }
