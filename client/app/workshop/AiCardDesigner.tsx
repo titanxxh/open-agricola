@@ -25,6 +25,7 @@ import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
 import { LocalizationModal } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
+import { Section } from '../../components/common/Section'
 import { API_BASE } from '../../config'
 
 const TOKEN_KEY = 'open-agricola-token'
@@ -418,15 +419,21 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
 
 // ── Art Panel ─────────────────────────────────────────────────────────────────
 
-function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
+function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersion }: {
   cardType: 'minor' | 'occupation'
   cardName: string
   artUrl: string | null
   setArtUrl: (url: string | null) => void
   refCache?: Map<string, ReferenceImage>
+  configVersion?: number
 }) {
-  const { locale } = useLocale()
+  const { locale, t } = useLocale()
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
+
+  // Re-read config when the parent's lifted ConfigBar updates it.
+  useEffect(() => {
+    setConfig(getLlmConfig(KEY_LLM_CONFIG_ART))
+  }, [configVersion])
   const [artSubject, setArtSubject] = useState('')
   const [generating, setGenerating] = useState(false)
   const [artPrompt, setArtPrompt] = useState('')
@@ -518,12 +525,13 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
         <span className="ai-art-border-tag">{borderLabel}</span>
       </div>
 
-      <ConfigBar
-        storageKey={KEY_LLM_CONFIG_ART}
-        config={config}
-        onConfigured={() => setConfig(getLlmConfig(KEY_LLM_CONFIG_ART))}
-        onClear={() => setConfig(null)}
-      />
+      {!config && (
+        <div className="ai-panel-needs-config">
+          {locale === 'zh'
+            ? `请先在顶部「${t('platform.aiConfig')}」中配置图片生成模型。`
+            : `Configure an image-generation model in the top "${t('platform.aiConfig')}" section first.`}
+        </div>
+      )}
 
       {artUrl && (
         <div className="ai-art-preview-area">
@@ -636,6 +644,7 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache }: {
 function AbilityPanel({
   cardType, cardName, prerequisite, costHint, extracted, setExtracted, artUrl, onImport,
   sandboxErrors, onSandboxErrorsConsumed, validationErrors, onValidationErrorsConsumed,
+  configVersion,
 }: {
   cardType: 'minor' | 'occupation'
   cardName: string
@@ -649,9 +658,15 @@ function AbilityPanel({
   onSandboxErrorsConsumed?: () => void
   validationErrors?: string | null
   onValidationErrorsConsumed?: () => void
+  configVersion?: number
 }) {
-  const { locale } = useLocale()
+  const { locale, t } = useLocale()
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig())
+
+  // Re-read config when the parent's lifted ConfigBar updates it.
+  useEffect(() => {
+    setConfig(getLlmConfig())
+  }, [configVersion])
   const [chatError, setChatError] = useState('')
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
@@ -823,11 +838,13 @@ function AbilityPanel({
         )}
       </div>
 
-      <ConfigBar
-        config={config}
-        onConfigured={() => setConfig(getLlmConfig())}
-        onClear={() => setConfig(null)}
-      />
+      {!config && (
+        <div className="ai-panel-needs-config">
+          {locale === 'zh'
+            ? `请先在顶部「${t('platform.aiConfig')}」中配置能力生成模型。`
+            : `Configure an ability-generation model in the top "${t('platform.aiConfig')}" section first.`}
+        </div>
+      )}
 
       {chatError && <div className="form-error" style={{ marginTop: 4, marginBottom: 4 }}>{chatError}</div>}
 
@@ -941,7 +958,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
 }) {
-  const { locale } = useLocale()
+  const { locale, t } = useLocale()
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
   const [cardName, setCardName] = useState('')
   const [cardIdInput, setCardIdInput] = useState('')
@@ -961,6 +978,15 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showLocalizationModal, setShowLocalizationModal] = useState(false)
   const [cardLocales, setCardLocales] = useState<Record<string, { name: string; desc: string[]; prerequisite?: string }>>({})
+
+  // Lifted ConfigBar state: AbilityPanel uses default storage key, ArtPanel uses
+  // KEY_LLM_CONFIG_ART. We hold both at the top so the configs are configured
+  // once in a single collapsible section. Bump configVersion to make the panels
+  // re-read from localStorage after the user saves/clears.
+  const [abilityConfig, setAbilityConfig] = useState<LlmConfig | null>(() => getLlmConfig())
+  const [artConfig, setArtConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
+  const [configVersion, setConfigVersion] = useState(0)
+  const bumpConfig = () => setConfigVersion((v) => v + 1)
 
   // Pre-fetch 3 random minor + 3 random occupation reference images on mount
   useEffect(() => {
@@ -1183,7 +1209,37 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     <div className="ai-designer">
       <div className="ai-designer-header">
         <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
-        <button type="button" className="btn-link" onClick={onClose}>{locale === 'zh' ? '关闭' : 'Close'}</button>
+      </div>
+
+      {/* Lifted AI provider config — collapsible, defaults collapsed once both are configured */}
+      <div className="ai-designer-config-section">
+        <Section
+          collapsible
+          defaultCollapsed={!!(abilityConfig && artConfig)}
+          icon="🤖"
+          title={t('platform.aiConfig')}
+          variant="parchment"
+        >
+          <div className="ai-config-grid">
+            <div className="ai-config-grid-col">
+              <h4 className="ai-config-grid-heading">{t('platform.aiConfigImageHeading')}</h4>
+              <ConfigBar
+                storageKey={KEY_LLM_CONFIG_ART}
+                config={artConfig}
+                onConfigured={() => { setArtConfig(getLlmConfig(KEY_LLM_CONFIG_ART)); bumpConfig() }}
+                onClear={() => { setArtConfig(null); bumpConfig() }}
+              />
+            </div>
+            <div className="ai-config-grid-col">
+              <h4 className="ai-config-grid-heading">{t('platform.aiConfigAbilityHeading')}</h4>
+              <ConfigBar
+                config={abilityConfig}
+                onConfigured={() => { setAbilityConfig(getLlmConfig()); bumpConfig() }}
+                onClear={() => { setAbilityConfig(null); bumpConfig() }}
+              />
+            </div>
+          </div>
+        </Section>
       </div>
 
       {/* Load previous designs */}
@@ -1217,88 +1273,102 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
         </div>
       )}
 
-      <div className="ai-card-info-bar">
-            <div className="ai-card-type-toggle">
+      <div className="ai-card-info-bar ai-designer-toolbar">
+            {/* Group 1: card type tabs */}
+            <div className="ai-designer-toolbar__group">
+              <div className="ai-card-type-toggle">
+                <button
+                  type="button"
+                  className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
+                  onClick={() => setCardType('minor')}
+                >
+                  {locale === 'zh' ? '小发展' : 'Minor'}
+                </button>
+                <button
+                  type="button"
+                  className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
+                  onClick={() => setCardType('occupation')}
+                >
+                  {locale === 'zh' ? '职业' : 'Occupation'}
+                </button>
+              </div>
+            </div>
+
+            {/* Group 2: name + ID */}
+            <div className="ai-designer-toolbar__group ai-designer-toolbar__group--grow">
+              <input
+                type="text"
+                className="ai-card-name-input"
+                value={cardName}
+                onChange={e => {
+                  setCardName(e.target.value)
+                  // Auto-generate card ID from name if user hasn't manually edited it
+                  const prevAuto = autoCardId(cardName)
+                  if (!cardIdInput || cardIdInput === prevAuto) {
+                    const newAuto = autoCardId(e.target.value)
+                    // Only auto-set if the name has ASCII chars; otherwise leave empty for AI to fill
+                    if (newAuto.length > 7) setCardIdInput(newAuto)
+                  }
+                }}
+                placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
+              />
+              <input
+                type="text"
+                className="ai-card-id-input"
+                value={cardIdInput}
+                onChange={e => setCardIdInput(e.target.value)}
+                placeholder={locale === 'zh' ? 'CUSTOM_英文ID（AI生成后自动填入）' : 'CUSTOM_EnglishId (auto-filled by AI)'}
+                title={locale === 'zh' ? '卡牌唯一标识，仅限英文字母、数字、下划线' : 'Unique card ID, English letters/digits/underscore only'}
+              />
+            </div>
+
+            {/* Group 3: save / sandbox / localize / close */}
+            <div className="ai-designer-toolbar__group">
               <button
                 type="button"
-                className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
-                onClick={() => setCardType('minor')}
+                className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
+                onClick={handleSaveCard}
+                disabled={saving || !cardName.trim()}
               >
-                {locale === 'zh' ? '小发展' : 'Minor'}
+                {saving
+                  ? (locale === 'zh' ? '保存中…' : 'Saving…')
+                  : saveSuccess
+                    ? (locale === 'zh' ? '已保存' : 'Saved')
+                    : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
+                }
               </button>
+              {onAddToSandboxAndRestart && (
+                <button
+                  type="button"
+                  className="btn-primary ai-save-card-btn ai-sandbox-btn"
+                  onClick={handleSaveAndAddToSandbox}
+                  disabled={saving || !extracted?.sourceCode}
+                  title={!extracted?.sourceCode ? (locale === 'zh' ? '需要先生成卡牌代码' : 'Generate card code first') : ''}
+                >
+                  {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+                </button>
+              )}
               <button
                 type="button"
-                className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
-                onClick={() => setCardType('occupation')}
+                className="btn-primary ai-save-card-btn"
+                onClick={() => setShowLocalizationModal(true)}
+                disabled={!cardName.trim()}
               >
-                {locale === 'zh' ? '职业' : 'Occupation'}
+                {locale === 'zh' ? '本地化' : 'Localize'}
+              </button>
+              <button type="button" className="btn-link ai-designer-close" onClick={onClose}>
+                {locale === 'zh' ? '关闭' : 'Close'}
               </button>
             </div>
-            <input
-              type="text"
-              className="ai-card-name-input"
-              value={cardName}
-              onChange={e => {
-                setCardName(e.target.value)
-                // Auto-generate card ID from name if user hasn't manually edited it
-                const prevAuto = autoCardId(cardName)
-                if (!cardIdInput || cardIdInput === prevAuto) {
-                  const newAuto = autoCardId(e.target.value)
-                  // Only auto-set if the name has ASCII chars; otherwise leave empty for AI to fill
-                  if (newAuto.length > 7) setCardIdInput(newAuto)
-                }
-              }}
-              placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
-            />
-            <input
-              type="text"
-              className="ai-card-id-input"
-              value={cardIdInput}
-              onChange={e => setCardIdInput(e.target.value)}
-              placeholder={locale === 'zh' ? 'CUSTOM_英文ID（AI生成后自动填入）' : 'CUSTOM_EnglishId (auto-filled by AI)'}
-              title={locale === 'zh' ? '卡牌唯一标识，仅限英文字母、数字、下划线' : 'Unique card ID, English letters/digits/underscore only'}
-            />
-            <button
-              type="button"
-              className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
-              onClick={handleSaveCard}
-              disabled={saving || !cardName.trim()}
-            >
-              {saving
-                ? (locale === 'zh' ? '保存中…' : 'Saving…')
-                : saveSuccess
-                  ? (locale === 'zh' ? '已保存' : 'Saved')
-                  : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
-              }
-            </button>
-            {onAddToSandboxAndRestart && (
-              <button
-                type="button"
-                className="btn-primary ai-save-card-btn ai-sandbox-btn"
-                onClick={handleSaveAndAddToSandbox}
-                disabled={saving || !extracted?.sourceCode}
-                title={!extracted?.sourceCode ? (locale === 'zh' ? '需要先生成卡牌代码' : 'Generate card code first') : ''}
-              >
-                {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn-primary ai-save-card-btn"
-              onClick={() => setShowLocalizationModal(true)}
-              disabled={!cardName.trim()}
-            >
-              {locale === 'zh' ? '本地化' : 'Localize'}
-            </button>
           </div>
 
-          {/* Completeness + auto-save status */}
+          {/* Completeness chips: chip-style with 👁/✏ when present, ✗ when missing */}
           <div className="ai-completeness-bar">
-            <span className={artUrl ? 'ai-complete-tag' : 'ai-missing-tag'}>
-              {artUrl ? '✓' : '✗'} {locale === 'zh' ? '图片' : 'Art'}
+            <span className={`card-asset-chip${artUrl ? ' is-active' : ''}`}>
+              {artUrl ? '👁' : '✗'} {t('platform.image')}
             </span>
-            <span className={extracted?.sourceCode ? 'ai-complete-tag' : 'ai-missing-tag'}>
-              {extracted?.sourceCode ? '✓' : '✗'} {locale === 'zh' ? '代码' : 'Code'}
+            <span className={`card-asset-chip${extracted?.sourceCode ? ' is-active' : ''}`}>
+              {extracted?.sourceCode ? '✏' : '✗'} {t('platform.code')}
             </span>
             {autoSaving && (
               <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
@@ -1310,20 +1380,28 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
 
           {cardType === 'minor' && (
             <div className="ai-minor-fields">
-              <input
-                type="text"
-                className="ai-minor-input"
-                value={prerequisite}
-                onChange={e => setPrerequisite(e.target.value)}
-                placeholder={locale === 'zh' ? '前置条件（可选，如：2 个职业、仍住木屋）' : 'Prerequisite (optional, e.g., 2 occupations)'}
-              />
-              <input
-                type="text"
-                className="ai-minor-input"
-                value={costInput}
-                onChange={e => setCostInput(e.target.value)}
-                placeholder={locale === 'zh' ? '消耗资源（可选，如：1 木 2 黏土）' : 'Cost (optional, e.g., 1 wood 2 clay)'}
-              />
+              <div className="form-field ai-minor-field">
+                <label htmlFor="ai-prerequisite-input">{t('platform.prerequisite')}</label>
+                <input
+                  id="ai-prerequisite-input"
+                  type="text"
+                  className="ai-minor-input"
+                  value={prerequisite}
+                  onChange={e => setPrerequisite(e.target.value)}
+                  placeholder={locale === 'zh' ? '可选，如：2 个职业、仍住木屋' : 'Optional, e.g., 2 occupations'}
+                />
+              </div>
+              <div className="form-field ai-minor-field">
+                <label htmlFor="ai-cost-input">{t('platform.cost')}</label>
+                <input
+                  id="ai-cost-input"
+                  type="text"
+                  className="ai-minor-input"
+                  value={costInput}
+                  onChange={e => setCostInput(e.target.value)}
+                  placeholder={locale === 'zh' ? '可选，如：1 木 2 黏土' : 'Optional, e.g., 1 wood 2 clay'}
+                />
+              </div>
             </div>
           )}
 
@@ -1334,6 +1412,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
               artUrl={artUrl}
               setArtUrl={setArtUrl}
               refCache={refCache}
+              configVersion={configVersion}
             />
             <AbilityPanel
               cardType={cardType}
@@ -1348,6 +1427,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
               onSandboxErrorsConsumed={onSandboxErrorsConsumed}
               validationErrors={validationErrors}
               onValidationErrorsConsumed={() => setValidationErrors(null)}
+              configVersion={configVersion}
             />
           </div>
 
