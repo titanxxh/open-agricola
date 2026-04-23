@@ -1257,7 +1257,10 @@ export function WorkshopPage() {
                 {t('platform.startSandbox')}
               </button>
             )}
-            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+            <details className="ai-designer-dev-help sandbox-embed-tips-details">
+              <summary>{t('platform.devHelp')}</summary>
+              <p>{t('platform.sandboxDevTips')}</p>
+            </details>
           </div>
           {sandboxActive && (
             <iframe
@@ -1315,7 +1318,10 @@ export function WorkshopPage() {
                 {t('platform.startSandbox')}
               </button>
             )}
-            <span className="sandbox-embed-tips">{t('platform.sandboxDevTips')}</span>
+            <details className="ai-designer-dev-help sandbox-embed-tips-details">
+              <summary>{t('platform.devHelp')}</summary>
+              <p>{t('platform.sandboxDevTips')}</p>
+            </details>
           </div>
           {sandboxActive && (
             <iframe

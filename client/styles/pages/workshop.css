@@ -1606,3 +1606,120 @@
   font-size: 12px;
   margin-top: 8px;
 }
+
+/* ── Batch 2 Task 5: AI Card Designer redesign ───────────────────────────── */
+
+/* Top-level lifted AI provider config — sits above the editor toolbar.       */
+.ai-designer-config-section {
+  padding: 12px 20px 0;
+}
+.ai-designer-config-section .section {
+  margin-bottom: 0;
+}
+.ai-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .ai-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.ai-config-grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-config-grid-heading {
+  margin: 0;
+  font-size: var(--fs-small, 12px);
+  font-weight: 600;
+  color: var(--color-text-muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ai-panel-needs-config {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px dashed var(--color-border, #d6c8a8);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 12px;
+  color: var(--color-text-muted, #666);
+}
+
+/* Toolbar grouping for the editor's top bar. The container (.ai-card-info-bar)
+   keeps its existing flex/wrap layout; the new __group children just add
+   visual separators. */
+.ai-designer-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+  border-right: 1px solid var(--color-border-light, #e8d5b7);
+}
+.ai-designer-toolbar__group:last-child {
+  padding-right: 0;
+  border-right: none;
+}
+.ai-designer-toolbar__group--grow {
+  flex: 1;
+  min-width: 240px;
+}
+.ai-designer-toolbar__group--grow .ai-card-name-input {
+  flex: 1;
+}
+.ai-designer-close {
+  margin-left: 4px;
+}
+
+/* Chip-style completeness badges (replaces ✓/✗ tags). Active = present. */
+.card-asset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text-muted, #666);
+  font-weight: 600;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+.card-asset-chip.is-active {
+  background: var(--bg-parchment, #fdf6e3);
+  color: var(--color-accent-strong, #5a3e1a);
+  border-color: var(--color-accent-border, #d6b87a);
+}
+
+/* Visible-label form fields inside the minor toolbar row. */
+.ai-minor-fields .ai-minor-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-minor-fields .ai-minor-field > label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Collapsed dev-help banner (replaces the always-visible long sandbox tip). */
+.ai-designer-dev-help {
+  margin-left: 12px;
+  font-size: var(--fs-small, 12px);
+  color: var(--color-text-muted, #666);
+}
+.ai-designer-dev-help summary {
+  cursor: pointer;
+  user-select: none;
+}
+.ai-designer-dev-help p {
+  margin: 8px 0 0;
+  max-width: 600px;
+  line-height: 1.5;
+}
