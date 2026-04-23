@@ -35,13 +35,13 @@
 
   /* ─── new: tableau atmosphere ─── */
   --bg-wood-dark:
-    radial-gradient(ellipse at top, rgba(0,0,0,.15), transparent 60%),
-    repeating-linear-gradient(87deg, #4a2f18 0, #3a2410 6px, #4a2f18 12px, #5a3a20 18px),
-    #2b1908;
+    radial-gradient(ellipse at top, rgba(255,255,255,.18), transparent 60%),
+    repeating-linear-gradient(87deg, #d4b078 0, #c19a64 6px, #d4b078 12px, #e6cba0 18px),
+    #c5a576;
 
   --bg-wood-light:
-    repeating-linear-gradient(90deg, #8b6f47 0, #7a5f37 8px, #8b6f47 16px),
-    #6b5337;
+    repeating-linear-gradient(90deg, #e6cba0 0, #d4b078 8px, #e6cba0 16px),
+    #d4b078;
 
   --bg-parchment:
     radial-gradient(ellipse at top left, #fdf6e3, #e8d8a8 60%, #c8a878 130%);
