@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { SelectButton } from '../common/SelectButton'
 
 export interface PlayerSummary {
   id: string
@@ -16,6 +17,36 @@ interface Props {
 }
 
 export function PlayerTabs({ players, active, onChange }: Props) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia('(max-width: 900px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+    // Older browsers / jsdom fallback
+    mq.addListener(handler)
+    return () => mq.removeListener(handler)
+  }, [])
+
+  if (isMobile) {
+    return (
+      <SelectButton
+        ariaLabel="切换玩家视角"
+        className="player-tabs__select"
+        value={active}
+        onChange={onChange}
+        options={players.map((p) => ({
+          value: p.id,
+          label: `${p.isYou ? '☆ ' : ''}${p.name} · ${p.score ?? 0}`,
+        }))}
+      />
+    )
+  }
+
   return (
     <div role="tablist" className="player-tabs">
       {players.map((p) => (

@@ -27,6 +27,7 @@ import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
+import { Section } from '../components/common/Section'
 import { DraftOverlay } from './draft/DraftOverlay'
 
 type RoundSlot = { round: number; action?: ActionSpace }
@@ -247,6 +248,19 @@ export const GameContainerApi = () => {
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
   const [devRound, setDevRound] = useState(1)
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia('(max-width: 900px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+    mq.addListener(handler)
+    return () => mq.removeListener(handler)
+  }, [])
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
@@ -1697,8 +1711,21 @@ export const GameContainerApi = () => {
           </section>
         </div>
         <div className="game-layout__right">
-          <ScorePanel rows={scoreRows} />
-          <ActionLog entries={logEntries} />
+          {isMobile ? (
+            <>
+              <Section collapsible defaultCollapsed icon="📊" title="计分" variant="parchment">
+                <ScorePanel rows={scoreRows} />
+              </Section>
+              <Section collapsible defaultCollapsed icon="📜" title="行动记录" variant="parchment">
+                <ActionLog entries={logEntries} />
+              </Section>
+            </>
+          ) : (
+            <>
+              <ScorePanel rows={scoreRows} />
+              <ActionLog entries={logEntries} />
+            </>
+          )}
         </div>
       </div>
 
