@@ -432,6 +432,9 @@ export const prepareLogEntry = (
         }),
       )
     }
+    const bonusSourceRefs = (detailParts.bonusSources ?? [])
+      .map((id) => resolveCardName(locale, id))
+      .filter((ref): ref is CardRef => ref !== null)
     const segments: ReactNode[] = []
     if (
       detailParts.gains &&
@@ -480,6 +483,16 @@ export const prepareLogEntry = (
         ),
       )
     }
+    if (bonusSourceRefs.length > 0) {
+      segments.push(
+        ...renderRichTemplate(
+          locale,
+          'log.bonusSources',
+          {},
+          { cards: joinCardRefs(locale, bonusSourceRefs) },
+        ),
+      )
+    }
     richParams.detail =
       segments.length > 0 ? (
         <>
@@ -519,6 +532,7 @@ export const prepareLogEntry = (
     const detailParts = raw.detailParts as ActionDetailParts | undefined
     detailParts?.effects?.improvements?.forEach((id) => cardIds.push(id))
     detailParts?.effects?.minorImprovements?.forEach((id) => cardIds.push(id))
+    detailParts?.bonusSources?.forEach((id) => cardIds.push(id))
   }
   const cardRefs = cardIds
     .map((id) => resolveCardName(locale, id))
