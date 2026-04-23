@@ -12,18 +12,11 @@
   box-sizing: border-box;
 }
 
-/* Page-level wood backdrop so the tableau atmosphere shows through wherever a
- * page container doesn't paint its own background. (Previously this was set on
- * `.app` in App.css, but the React tree never renders that class — the body
- * was showing through as a pale-green `#cfe6b4` instead.) */
 body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  background:
-    radial-gradient(ellipse at top, rgba(0, 0, 0, 0.15), transparent 60%),
-    repeating-linear-gradient(87deg, #4a2f18 0, #3a2410 6px, #4a2f18 12px, #5a3a20 18px),
-    #2b1908;
+  background: var(--bg-wood-dark);
 }
 
 #root {
