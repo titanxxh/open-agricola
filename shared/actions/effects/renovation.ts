@@ -7,7 +7,30 @@ import type {
   Resource,
 } from '../../game/types'
 import { canExecuteWithCostPreview } from './cost-preview'
-import { canAffordTypedFlatCost, payTypedFlatCost } from './pay-helpers'
+import {
+  canAffordTypedFlatCost,
+  executeResolvedTypedFlatPayment,
+  payTypedFlatCost,
+  resolveCostPaymentSelection,
+} from './pay-helpers'
+
+const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
+
+const renovatePaymentOptionPrefix = (target: RenovationTarget) =>
+  `${RENOVATE_PAYMENT_PREFIX}:${target}`
+
+const parseRenovatePaymentChoice = (
+  choice: string,
+): { target: RenovationTarget; value: string } | null => {
+  const head = `${RENOVATE_PAYMENT_PREFIX}:`
+  if (!choice.startsWith(head)) return null
+  const remainder = choice.slice(head.length)
+  const separator = remainder.indexOf(':')
+  if (separator < 0) return null
+  const target = remainder.slice(0, separator)
+  if (target !== 'clay' && target !== 'stone') return null
+  return { target, value: choice }
+}
 
 type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
 
@@ -155,14 +178,28 @@ export const renovateHouseAction: ActionDefinition = {
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', logKey: 'log.renovationFail' }),
   resolveChoice: ({ player, params, costs }, choice) => {
-    const target = (choice === 'clay' || choice === 'stone')
-      ? choice
-      : readSelectedTarget(params)
-    if (!target) return { type: 'fail', logKey: 'log.renovationFail' }
+    const failure: ActionExecutionResult = { type: 'fail', logKey: 'log.renovationFail' }
+    const payment = typeof choice === 'string' ? parseRenovatePaymentChoice(choice) : null
+    const target: RenovationTarget | null =
+      payment?.target
+      ?? (choice === 'clay' || choice === 'stone' ? choice : null)
+      ?? readSelectedTarget(params)
+    if (!target) return failure
     const plan = buildRenovationPlan(player, target)
-    if (!plan) return { type: 'fail', logKey: 'log.renovationFail' }
-    if (!canRenovate(player, costs, plan)) return { type: 'fail', logKey: 'log.renovationFail' }
-    if (!renovateHouse(player, costs, plan)) return { type: 'fail', logKey: 'log.renovationFail' }
+    if (!plan) return failure
+    const totalCost = mergeRenovationCost(plan.cost, costs)
+    const resolved = resolveCostPaymentSelection(
+      player,
+      totalCost,
+      renovatePaymentOptionPrefix(target),
+      payment?.value,
+      failure,
+      { costType: 'renovation' },
+    )
+    if (resolved.type === 'choice') return resolved
+    if (resolved.type !== 'selected') return failure
+    executeResolvedTypedFlatPayment(player, resolved)
+    player.houseType = plan.nextType
     return { type: 'ok' }
   },
 }

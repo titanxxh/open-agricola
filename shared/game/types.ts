@@ -299,6 +299,8 @@ export type ChoiceEffectPreview =
       kind: 'payment'
       resourcesPaid?: Partial<Resource>
       cardUsed?: string
+      /** Card ids whose modifiers contributed to this payment (bonus.sources + trade.sourceId). */
+      sourceCards?: string[]
     }
   | {
       kind: 'text'

@@ -488,24 +488,58 @@ export const payCardPreviewCostByProvider = (
     costType,
   )
 
+/**
+ * Cards whose modifier fed this payment solution. Combines `bonusUsed` (the
+ * `BonusModifier.sources` that fired) with any trade whose `sourceId` is a
+ * card id. The list is deduped, order-stable, and exposed to the UI so the
+ * payment-choice prompt can show "via {card}" next to each option instead of
+ * leaving the player to guess which card's effect a discount belongs to.
+ */
+const collectPaymentSolutionSources = (
+  solution: PaymentSolution,
+): string[] => {
+  const sources: string[] = []
+  const seen = new Set<string>()
+  const add = (id: string | undefined) => {
+    if (!id) return
+    const trimmed = id.trim()
+    if (!trimmed || seen.has(trimmed)) return
+    seen.add(trimmed)
+    sources.push(trimmed)
+  }
+  if (solution.bonusUsed) {
+    solution.bonusUsed.split(',').forEach(add)
+  }
+  solution.tradesUsed.forEach(({ trade }) => {
+    if (trade.sourceId) add(trade.sourceId)
+  })
+  return sources
+}
+
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
 ): Record<string, unknown> => {
+  const sourceCards = collectPaymentSolutionSources(solution)
   return {
     resourcesPaid: solution.resourcesPaid,
-    cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined
+    cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
+    sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
   }
 }
 
 const describePaymentEffectPreview = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
-) => ({
-  kind: 'payment' as const,
-  resourcesPaid: solution.resourcesPaid,
-  cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
-})
+) => {
+  const sourceCards = collectPaymentSolutionSources(solution)
+  return {
+    kind: 'payment' as const,
+    resourcesPaid: solution.resourcesPaid,
+    cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
+    sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
+  }
+}
 
 
 export const buildPaymentChoiceResult = (
