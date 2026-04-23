@@ -1,0 +1,196 @@
+/* Migrated from client/App.css during UI overhaul Batch 1 (mechanical split, no rewrites). */
+/* Batch 2 Task 3: tableau styling — Section + EmptyState + 2:1:1 grid hero. */
+
+/* ══════════ LOBBY PAGE ══════════ */
+.lobby-page {
+  min-height: 100vh;
+  padding: 20px clamp(20px, 4vw, 48px);
+  max-width: 1200px;
+  margin: 0 auto;
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+.lobby-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 32px;
+  background: var(--bg-parchment);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-paper);
+}
+.lobby-brand {
+  gap: 14px;
+}
+.lobby-brand .brand-mark-image {
+  width: 42px;
+  height: 42px;
+}
+.lobby-title {
+  font-size: 24px;
+  color: var(--color-primary);
+  margin: 0;
+  font-family: var(--agricola-font);
+}
+.lobby-header__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.lobby-hero { display: flex; flex-direction: column; gap: 12px; }
+.lobby-hero .lobby-cta-primary { font-size: var(--fs-h3); padding: 14px; }
+
+.join-form {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.join-form .btn-primary {
+  flex-shrink: 0;
+}
+.join-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+}
+.join-form input:focus {
+  border-color: var(--color-primary);
+}
+
+.lobby-rooms {
+  margin-bottom: 20px;
+}
+.lobby-rooms .room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lobby-rooms .room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg-warm);
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.lobby-rooms .room-item:last-child {
+  border-bottom: none;
+}
+.room-id {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+.room-players {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.room-status {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: #f0e6d0;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+/* ── Tablet breakpoint ───────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .player-select-options {
+    flex-wrap: wrap;
+  }
+}
+/* ── Small phone breakpoint ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .lobby-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .lobby-header__right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+.player-select-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.player-select-label {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.player-select-options {
+  display: flex;
+  gap: 8px;
+}
+.player-select-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.player-select-btn:hover {
+  border-color: var(--color-primary);
+}
+.player-select-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.community-deck-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.community-deck-toggle input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.community-deck-toggle-hint {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.player-select-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

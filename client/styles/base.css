@@ -1,0 +1,82 @@
+/* Migrated from client/App.css during UI overhaul Batch 1 (mechanical split, no rewrites). */
+
+@font-face {
+  font-family: 'Dominican';
+  src: url('/bga-img/fonts/Dominican.woff2') format('woff2'),
+       url('/bga-img/fonts/Dominican.woff') format('woff'),
+       url('/bga-img/fonts/Dominican.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CalibriB';
+  src: url('/bga-img/fonts/CalibriB.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+/* ══════════ FOCUS STYLES ══════════ */
+button:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.app {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--bg-wood-dark);
+  padding: var(--app-edge-padding);
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+/* Padding when interaction bar is visible (fixed bottom) */
+.app {
+  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-max-height));
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+@media (max-width: 1100px) {
+  .app {
+      padding: var(--app-edge-padding);
+    }
+}
+@media (min-width: 1600px) {
+  .app {
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+}
+/* ── Loading screen ─────────────────────────────── */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-warm);
+}
+/* ── Page transitions ─────────────────── */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* ── Embedded game mode (inside iframe) ──────────────────────────────────── */
+.app--embedded {
+  padding-top: 0;
+}

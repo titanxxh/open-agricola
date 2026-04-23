@@ -1,0 +1,29 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo",
+    "noEmit": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  "include": [
+    "client/__tests__/**/*",
+    "client/components/common/__tests__/**/*",
+    "client/components/common/*.{ts,tsx}",
+    "client/components/board/PlayerTabs.tsx",
+    "client/components/board/__tests__/PlayerTabs.test.tsx",
+    "client/components/board/ScorePanel.tsx",
+    "client/components/board/__tests__/ScorePanel.test.tsx",
+    "client/components/board/ActionLog.tsx",
+    "client/components/board/action-log-icons.ts",
+    "client/components/board/__tests__/ActionLog.test.tsx",
+    "client/components/board/StageBar.tsx",
+    "client/components/board/__tests__/StageBar.test.tsx",
+    "client/components/board/CardCarousel.tsx",
+    "client/components/board/__tests__/CardCarousel.test.tsx",
+    "shared/i18n/**/*",
+    "shared/cards/registry.ts"
+  ],
+  "exclude": ["e2e-tests"]
+}

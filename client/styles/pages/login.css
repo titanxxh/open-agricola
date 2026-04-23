@@ -1,0 +1,114 @@
+/* Login page — tableau styling per UI overhaul Batch 2 spec §6.1. */
+
+/* .login-page — wood backdrop + center card */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-wood-dark);
+  padding: 20px;
+}
+
+/* .login-card — parchment + paper shadow */
+.login-card {
+  background: var(--bg-parchment);
+  border-radius: 16px;
+  padding: 48px 56px;
+  box-shadow: var(--shadow-paper);
+  width: 100%;
+  max-width: 480px;
+  border-top: 4px solid var(--color-accent-strong); /* gold strip */
+  position: relative;
+  animation: fadeSlideIn 0.4s ease-out;
+}
+
+.login-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+/* Brand area centered (review §1 problem #1) */
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.login-brand .brand-mark-image {
+  width: 64px;
+  height: 64px;
+}
+.login-title {
+  font-size: var(--fs-display);
+  color: var(--color-primary);
+  margin: 0;
+  text-align: center;
+  font-family: var(--agricola-font);
+  letter-spacing: 1px;
+}
+.login-subtitle {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin-top: 0;
+}
+
+/* Mode segmented control (replaces bottom register link) */
+.login-mode-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin: 16px 0;
+}
+.login-mode-tabs__tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: all 0.2s;
+}
+.login-mode-tabs__tab.is-active {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--btn-emboss-primary);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.login-form .form-field label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  font-size: var(--fs-small);
+  color: var(--color-text-secondary);
+}
+.login-form .form-field .form-hint {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 0;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 24px 20px;
+    border-radius: 12px;
+  }
+}
