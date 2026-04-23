@@ -9,7 +9,10 @@
   },
   "include": [
     "client/__tests__/**/*",
-    "client/components/common/__tests__/**/*"
+    "client/components/common/__tests__/**/*",
+    "client/components/common/*.{ts,tsx}",
+    "shared/i18n/**/*",
+    "shared/cards/registry.ts"
   ],
   "exclude": ["e2e-tests"]
 }
