@@ -129,7 +129,9 @@ pnpm run server  # 后端 5175
 pnpm run dev     # 前端 5173
 
 # 测试
-pnpm test                                         # vitest 单元测试（排除 e2e 和 scripts/）
+pnpm test                                         # 全量 vitest 单元测试（fast + slow 两个 project，本地默认 / ci-full 用）
+pnpm test:fast                                    # 只跑 fast project（默认 CI 用，约 210 文件，~1-2 min）
+pnpm test:slow                                    # 只跑 slow project（254 个单卡 session 测试）
 pnpm run test:e2e                                 # Playwright E2E（需要后端 + 前端在跑）
 pnpm exec vitest run tests/path/to/file.spec.ts   # 单文件
 
@@ -336,7 +338,7 @@ gh run view <RUN_ID> --log-failed
 
 ### 常用命令
 
-- `pnpm test`：vitest 单元测试（不含 e2e）
+- `pnpm test`：vitest 全量（fast + slow）；CI 默认走 `pnpm test:fast`，每日 ci-full.yml 跑全量
 - `pnpm run lint`：ESLint
 - `pnpm run build`：类型检查 + 构建
 - `pnpm exec playwright install`：安装 Playwright 浏览器
