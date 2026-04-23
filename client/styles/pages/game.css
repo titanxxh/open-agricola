@@ -3129,3 +3129,53 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-size: var(--fs-small);
   color: var(--color-bg-warm);
 }
+
+/* ══════════ CardCarousel ══════════ */
+.card-carousel {
+  margin-top: 12px;
+  background: var(--bg-parchment);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: var(--shadow-paper);
+}
+.card-carousel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.card-carousel__title {
+  margin: 0;
+  font-size: var(--fs-h3);
+  color: var(--color-primary);
+  font-family: var(--agricola-font);
+}
+.card-carousel__nav button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--color-border-light);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.card-carousel__track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  max-height: 200px;
+  padding: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.card-carousel__item {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+}
+.card-carousel__empty {
+  margin: 8px 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+  text-align: center;
+}
