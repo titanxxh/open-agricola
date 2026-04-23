@@ -1,44 +1,87 @@
+import { useMemo } from 'react'
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import type { GameState } from '../../../shared/game/types'
+import { LogParts, prepareLogEntry } from './log-rendering'
 import { pickLogIcon } from './action-log-icons'
 
-export interface LogEntry {
-  id: string
-  round: number
-  playerId: string
-  playerName: string
-  text: string
-}
-
 interface Props {
-  entries: LogEntry[]
+  locale: Locale
+  log: GameState['log']
+  currentRound: number
+  /** Cap entries (newest first) to keep the panel snappy. Default: 80. */
+  limit?: number
 }
 
-export function ActionLog({ entries }: Props) {
-  // Group by round
-  const groups = new Map<number, LogEntry[]>()
-  for (const e of entries) {
-    if (!groups.has(e.round)) groups.set(e.round, [])
-    groups.get(e.round)!.push(e)
+type RoundBucket = {
+  round: number
+  entries: GameState['log']
+}
+
+/**
+ * Game log is `unshift`-ed (newest first). We walk it in that order; entries
+ * that appear before a `log.enterRound{round=N}` boundary belong to round N,
+ * and we step the running round down past it.
+ */
+const groupByRound = (log: GameState['log'], currentRound: number): RoundBucket[] => {
+  const buckets: RoundBucket[] = []
+  let bucket: GameState['log'] = []
+  let round = currentRound
+  for (const entry of log) {
+    if (entry.key === 'log.enterRound') {
+      const r = Number(entry.params?.round ?? round)
+      if (bucket.length > 0) {
+        buckets.push({ round: Number.isFinite(r) ? r : round, entries: bucket })
+        bucket = []
+      }
+      round = (Number.isFinite(r) ? r : round) - 1
+      continue
+    }
+    bucket.push(entry)
   }
-  const rounds = [...groups.keys()].sort((a, b) => a - b)
+  if (bucket.length > 0) {
+    buckets.push({ round, entries: bucket })
+  }
+  return buckets
+}
+
+export function ActionLog({ locale, log, currentRound, limit = 80 }: Props) {
+  const buckets = useMemo(
+    () => groupByRound(log.slice(0, limit), currentRound),
+    [log, currentRound, limit],
+  )
 
   return (
     <div className="action-log">
-      <h3 className="action-log__title">行动记录</h3>
+      <h3 className="action-log__title">{t(locale, 'ui.actionLog')}</h3>
       <div className="action-log__body">
-        {rounds.length === 0 && <p className="action-log__empty">暂无</p>}
-        {rounds.map((round) => (
-          <div key={round}>
-            <div className="action-log__round-header">第 {round} 轮</div>
+        {buckets.length === 0 && (
+          <p className="action-log__empty">{t(locale, 'ui.noLogEntries')}</p>
+        )}
+        {buckets.map((bucket, idx) => (
+          <div key={`round-${bucket.round}-${idx}`} className="action-log__round-group">
+            <div className="action-log__round-header">
+              {t(locale, 'ui.roundHeader', { round: bucket.round })}
+            </div>
             <ul className="action-log__list">
-              {groups.get(round)!.map((e) => (
-                <li key={e.id} className="action-log__entry">
-                  <span className="action-log__icon" aria-hidden>
-                    {pickLogIcon(e.text)}
-                  </span>
-                  <span className="action-log__player">{e.playerName.slice(0, 1)}</span>
-                  <span className="action-log__text">{e.text}</span>
-                </li>
-              ))}
+              {bucket.entries.map((entry, i) => {
+                const { parts, cardRefs, plainText } = prepareLogEntry(entry, locale)
+                const playerName =
+                  typeof entry.params?.player === 'string' ? entry.params.player : ''
+                return (
+                  <li key={`${entry.key}-${idx}-${i}`} className="action-log__entry">
+                    <span className="action-log__icon" aria-hidden>
+                      {pickLogIcon(plainText)}
+                    </span>
+                    {playerName ? (
+                      <span className="action-log__player">{playerName.slice(0, 1)}</span>
+                    ) : null}
+                    <span className="action-log__text">
+                      <LogParts parts={parts} cardRefs={cardRefs} locale={locale} />
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         ))}

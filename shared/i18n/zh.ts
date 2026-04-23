@@ -50,6 +50,8 @@ export const zh = {
     noEffect: '无效果',
     emptySlot: '空位',
     actionLog: '行动记录',
+    noLogEntries: '暂无',
+    roundHeader: '第 {round} 轮',
     cardStatsPaid: '支付',
     cardStatsGained: '获得',
     undoStep: '撤销上一步',

@@ -50,6 +50,8 @@ export const en = {
     noEffect: 'No effect',
     emptySlot: 'Empty',
     actionLog: 'Action Log',
+    noLogEntries: 'No entries',
+    roundHeader: 'Round {round}',
     cardStatsPaid: 'Paid',
     cardStatsGained: 'Gained',
     undoStep: 'Undo Step',
