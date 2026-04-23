@@ -20,6 +20,8 @@
     "client/components/board/__tests__/ActionLog.test.tsx",
     "client/components/board/StageBar.tsx",
     "client/components/board/__tests__/StageBar.test.tsx",
+    "client/components/board/CardCarousel.tsx",
+    "client/components/board/__tests__/CardCarousel.test.tsx",
     "shared/i18n/**/*",
     "shared/cards/registry.ts"
   ],
