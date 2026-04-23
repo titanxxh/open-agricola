@@ -28,7 +28,7 @@ const FAST_INCLUDE = [
   'server/game/__tests__/*.test.ts',
   'server/workshop-pr/__tests__/*.test.ts',
 ]
-const SHARED_EXCLUDE = [...defaultExclude, '**/.worktree/**']
+const SHARED_EXCLUDE = [...defaultExclude, '**/.worktree/**', 'tests/llm-card-gen/**']
 const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
 const SHARED_SETUP = [
   './shared/cards/__tests__/setup-register-all.ts',
