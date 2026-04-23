@@ -38,16 +38,16 @@ The slow tier glob `server/__tests__/[A-E][0-9]*_*-session.test.ts` matches **25
 Run from worktree root:
 
 ```bash
-echo "slow tier files:" && find server/__tests__ -name '[A-E][0-9]*_*-session.test.ts' | wc -l
+echo "slow tier files:" && find server/__tests__ -type f -name '[A-E][0-9]*_*-session.test.ts' | wc -l
 echo "fast tier files:" && {
-  find shared -name '*.test.ts' -o -name '*.test.tsx'
-  find client -name '*.test.ts' -o -name '*.test.tsx'
-  find tests -name '*.test.ts'
-  find scripts/__tests__ -name '*.test.ts'
-  find server/__tests__ -name '*.test.ts' ! -name '[A-E][0-9]*_*-session.test.ts'
-  find server/workshop-pr/__tests__ -name '*.test.ts'
+  find shared -type f \( -name '*.test.ts' -o -name '*.test.tsx' \)
+  find client -type f \( -name '*.test.ts' -o -name '*.test.tsx' \)
+  find tests -type f -name '*.test.ts'
+  find scripts/__tests__ -type f -name '*.test.ts'
+  find server/__tests__ -type f -name '*.test.ts' ! -name '[A-E][0-9]*_*-session.test.ts'
+  find server/workshop-pr/__tests__ -type f -name '*.test.ts'
 } | sort -u | wc -l
-echo "total tests:" && find . -name '*.test.ts' -o -name '*.test.tsx' 2>/dev/null | grep -v node_modules | grep -v '\./\.worktree/' | grep -v '\./e2e-tests' | sort -u | wc -l
+echo "total tests:" && find . -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null | grep -v node_modules | grep -v '\./\.worktree/' | grep -v '\./e2e-tests' | sort -u | wc -l
 ```
 
 Expected output:
