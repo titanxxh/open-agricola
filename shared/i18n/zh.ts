@@ -805,6 +805,10 @@ export const zh = {
     other: '其他',
     logoutAll: '登出所有设备（清除 session）',
     logoutNote: '注意：登出后需要重新登录。Token 仅存储在当前浏览器，这里的登出只清除本地 session。',
+    dangerZone: '危险操作',
+    notEditable: '不可修改',
+    confirmLogoutAll: '确定要登出所有设备吗？这将清除当前浏览器的 session。',
+    logoutAllDevices: '登出所有设备',
 
     workshopTitle: '卡牌工坊',
     backToLobbyShort: '← 大厅',
