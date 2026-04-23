@@ -825,6 +825,10 @@ export const en = {
     other: 'Other',
     logoutAll: 'Sign out all devices (clear session)',
     logoutNote: 'Note: You will need to sign in again. The token is only stored in this browser; signing out here only clears the local session.',
+    dangerZone: 'Danger Zone',
+    notEditable: 'cannot be changed',
+    confirmLogoutAll: 'Sign out all devices? This will clear the current browser session.',
+    logoutAllDevices: 'Sign out all devices',
 
     workshopTitle: 'Card Workshop',
     backToLobbyShort: '← Lobby',
