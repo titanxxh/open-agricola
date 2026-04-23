@@ -1,0 +1,48 @@
+name: CI LLM Cards
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'LLM model id (e.g. gemini-3.1-pro-preview)'
+        required: false
+        default: 'gemini-3.1-pro-preview'
+      provider:
+        description: 'Provider key (gemini | openai)'
+        required: false
+        default: 'gemini'
+
+jobs:
+  llm-cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build cards manifest
+        run: pnpm run build:cards-manifest
+
+      - name: Run LLM card-gen tests
+        env:
+          LLM_TEST_PROVIDER: ${{ github.event.inputs.provider || 'gemini' }}
+          LLM_TEST_MODEL: ${{ github.event.inputs.model || 'gemini-3.1-pro-preview' }}
+          GEMINI_API_KEY: ${{ secrets.MY_TEST_GEMINI_APIKEY }}
+        run: pnpm run test:llm
+
+      - name: Upload LLM response dumps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-card-gen-outputs
+          path: output/tmp/llm-card-gen/
+          if-no-files-found: warn

@@ -28,6 +28,7 @@ export const actionHookPhases: ActionHookPhase[] = [
   'computeChoiceCandidates',
   'computeReplace',
   'isDoable',
+  'anytime',
 ]
 
 export type ActionHookContext = ActionExecutionContext & {
