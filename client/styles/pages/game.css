@@ -475,6 +475,22 @@
 @media (max-width: 900px) {
   .game-layout {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .game-layout__left,
+  .game-layout__center,
+  .game-layout__right {
+    width: 100%;
+  }
+  .game-layout__right {
+    grid-template-rows: auto auto;
+    max-height: none;
+  }
+  .stage-bar__cells {
+    grid-template-columns: repeat(7, 1fr);
+  }
+  .stage-bar__cells > :nth-child(n+8) {
+    display: none;
   }
 }
 .board {
