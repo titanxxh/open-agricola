@@ -1043,6 +1043,9 @@ export class GameCore {
       if (delta < 0) costs[key] = Math.abs(delta)
     })
     const effects: NonNullable<ActionDetailParts['effects']> = {}
+    const bonusSources = player._activeActionBonusSources
+      ? [...player._activeActionBonusSources]
+      : undefined
     if (player.rooms > before.rooms) {
       effects.buildRoom = player.rooms - before.rooms
     }
@@ -1102,7 +1105,15 @@ export class GameCore {
     if (bakedGrain > 0 && bakedFood > 0) {
       effects.bakeBread = { count: bakedGrain, food: bakedFood }
     }
-    return { gains, costs, effects } satisfies ActionDetailParts
+    const result = { gains, costs, effects } as ActionDetailParts & {
+      gains: Resource
+      costs: Resource
+      effects: NonNullable<ActionDetailParts['effects']>
+    }
+    if (bonusSources && bonusSources.length > 0) {
+      result.bonusSources = bonusSources
+    }
+    return result
   }
 
   private logActionDetail(before: PlayerState, player: PlayerState) {
@@ -1170,10 +1181,12 @@ export class GameCore {
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
     if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) {
+      player._activeActionBonusSources = []
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
       return
     }
     if (!hasGains && !hasCosts && !hasEffects) {
+      player._activeActionBonusSources = []
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
       return
     }
@@ -1186,6 +1199,7 @@ export class GameCore {
         detailParts,
       },
     })
+    player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
 
@@ -1294,6 +1308,7 @@ export class GameCore {
       this.logBakeBreadDelta(before, player)
     }
     this.actionStartPlayerSnapshot = null
+    delete player._activeActionBonusSources
     this.usedBakeBreadThisAction = false
     this.loggedImprovementThisAction = false
     this.loggedBakeBreadThisAction = false
@@ -1778,6 +1793,7 @@ export class GameCore {
         this.pending = { type: 'none' }
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
+        delete player._activeActionBonusSources
         this.usedBakeBreadThisAction = false
         this.turnOwnerPlayerIndex = null
         return
@@ -1961,6 +1977,7 @@ export class GameCore {
 
     this.pushHistory(true)
     this.turnOwnerPlayerIndex = playerIndex
+    player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
     this.usedBakeBreadThisAction = false
@@ -2006,6 +2023,7 @@ export class GameCore {
         this.flushEngineLog()
         if (step.type !== 'ok') break
       }
+      player._activeActionBonusSources = []
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
     }
 
@@ -2126,6 +2144,7 @@ export class GameCore {
       this.stageResume = null
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
+      delete player._activeActionBonusSources
       this.usedBakeBreadThisAction = false
       this.turnOwnerPlayerIndex = null
       return this.respond()

@@ -5,6 +5,7 @@ import type { GameState, PlayerState, Resource } from '../../../shared/game/type
 import type { ActionDetailParts } from '../../../shared/protocol/game'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
+import { ResourceText } from '../common/ResourceText'
 
 export type CardRef = { id: string; type: CardType; name: string }
 
@@ -159,7 +160,7 @@ export const LogCardLink = ({
           </span>
           <span className="log-card-tooltip-meta">
             <strong>{cardRef.name}</strong>
-            <span className="log-card-tooltip-desc">{resolveCardDesc(locale, cardRef)}</span>
+            <ResourceText className="log-card-tooltip-desc" text={resolveCardDesc(locale, cardRef)} />
           </span>
         </span>
       )}
@@ -431,6 +432,9 @@ export const prepareLogEntry = (
         }),
       )
     }
+    const bonusSourceRefs = (detailParts.bonusSources ?? [])
+      .map((id) => resolveCardName(locale, id))
+      .filter((ref): ref is CardRef => ref !== null)
     const segments: ReactNode[] = []
     if (
       detailParts.gains &&
@@ -479,6 +483,16 @@ export const prepareLogEntry = (
         ),
       )
     }
+    if (bonusSourceRefs.length > 0) {
+      segments.push(
+        ...renderRichTemplate(
+          locale,
+          'log.bonusSources',
+          {},
+          { cards: joinCardRefs(locale, bonusSourceRefs) },
+        ),
+      )
+    }
     richParams.detail =
       segments.length > 0 ? (
         <>
@@ -518,6 +532,7 @@ export const prepareLogEntry = (
     const detailParts = raw.detailParts as ActionDetailParts | undefined
     detailParts?.effects?.improvements?.forEach((id) => cardIds.push(id))
     detailParts?.effects?.minorImprovements?.forEach((id) => cardIds.push(id))
+    detailParts?.bonusSources?.forEach((id) => cardIds.push(id))
   }
   const cardRefs = cardIds
     .map((id) => resolveCardName(locale, id))

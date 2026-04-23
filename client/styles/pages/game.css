@@ -79,6 +79,18 @@
   flex: 1;
   min-width: 0;
 }
+.payment-option-content {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.25;
+}
+.payment-option-sources {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.85;
+}
 .anytime-bar {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 16px;
@@ -1957,7 +1969,8 @@
 .res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
-.res-icon-bonusVp { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
+.res-icon-bonusVp,
+.res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */
 .res-icon-arrow   { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
 .res-icon-major   { width:1.1em; height:0.74em; background-position:8.08903% 15.0728%;  background-size:994.175%; }
@@ -2859,7 +2872,6 @@
       padding: 0 10px;
     }
 }
-.res-inline-score { color: #c0a030; font-size: 0.9em; }
 /* Action card hover animation enhancement */
 .action-card-holder:not(.taken):hover {
   z-index: 20;
@@ -3182,22 +3194,25 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--color-bg-warm);
+  background: var(--color-bg-warm);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--fs-small);
   font-weight: 600;
 }
 .stage-bar__cell.is-past {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 .stage-bar__cell.is-harvest {
-  background: rgba(212, 160, 23, 0.4);
+  background: var(--color-accent-bg);
   border: 1px solid var(--color-accent-strong);
+  color: #5a3a10;
 }
 .stage-bar__cell.is-current {
   background: var(--color-accent-strong);
   color: #3a2410;
+  border-color: var(--color-accent-strong);
   font-weight: 700;
   transform: scale(1.1);
 }
@@ -3205,7 +3220,7 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   margin: 6px 0 0;
   text-align: center;
   font-size: var(--fs-small);
-  color: var(--color-bg-warm);
+  color: var(--color-text-secondary);
 }
 
 /* ══════════ CardCarousel ══════════ */

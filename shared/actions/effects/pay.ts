@@ -655,6 +655,16 @@ export const executePaymentSolution = (
     const amount = solution.resourcesPaid[key] ?? 0
     player.resources[key] -= amount
   }
+  if (solution.bonusUsed && player._activeActionBonusSources) {
+    const seen = new Set(player._activeActionBonusSources)
+    for (const source of solution.bonusUsed.split(',')) {
+      const trimmed = source.trim()
+      if (trimmed && !seen.has(trimmed)) {
+        player._activeActionBonusSources.push(trimmed)
+        seen.add(trimmed)
+      }
+    }
+  }
   return solution.cardUsed
 }
 

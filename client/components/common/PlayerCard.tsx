@@ -6,6 +6,7 @@ import { emptyResources } from '../../../shared/logic/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { getCardMeta } from '../../services/card-meta'
 import { CardWithCopy } from './CardWithCopy'
+import { ResourceText } from './ResourceText'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
@@ -317,7 +318,7 @@ export const PlayerCard = ({
 
         <div className="card-desc">
           <div className="card-desc-scroller">
-            <div dangerouslySetInnerHTML={{ __html: cardData.description.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />') }} />
+            <ResourceText text={cardData.description} />
           </div>
         </div>
 

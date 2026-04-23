@@ -129,6 +129,14 @@ export type PlayerState = {
   startPlayer: boolean
   activeModifiers: CostModifier[]
   cardStates: CardStates
+  /**
+   * Session-transient scratchpad: card ids of `BonusModifier` entries whose
+   * `sources` fired during the currently-executing action. Initialised by
+   * `GameCore` at action start and cleared at action end; appended by
+   * `executePaymentSolution` when a bonus path is taken. Used only for
+   * attributing the `log.actionDetail` entry to the triggering card.
+   */
+  _activeActionBonusSources?: string[]
 }
 
 export type FarmTilePosition = {
@@ -291,6 +299,8 @@ export type ChoiceEffectPreview =
       kind: 'payment'
       resourcesPaid?: Partial<Resource>
       cardUsed?: string
+      /** Card ids whose modifiers contributed to this payment (bonus.sources + trade.sourceId). */
+      sourceCards?: string[]
     }
   | {
       kind: 'text'

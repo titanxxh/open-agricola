@@ -31,6 +31,34 @@ const renderReturnedCardName = (locale: Locale, cardId: string) =>
     ? translateCardText(locale, `improvements.${cardId}.name`)
     : translateCardText(locale, `minorImprovements.${cardId}.name`)
 
+/**
+ * Resolve a card id to its display name by trying each card-pool i18n key in
+ * turn. Falls back to the raw id so a missing translation still surfaces the
+ * source rather than silently hiding it.
+ */
+const resolveAnyCardName = (locale: Locale, cardId: string): string => {
+  const pools = ['improvements', 'minorImprovements', 'occupations'] as const
+  for (const pool of pools) {
+    const name = t(locale, `${pool}.${cardId}.name`)
+    if (!name.includes('.name')) return name.replace(/\s*[（(].*$/, '')
+  }
+  return cardId
+}
+
+const renderPaymentSourceCards = (
+  locale: Locale,
+  sourceCards: string[] | undefined,
+): ReactNode => {
+  if (!sourceCards || sourceCards.length === 0) return null
+  const names = sourceCards.map((id) => resolveAnyCardName(locale, id))
+  const joiner = locale === 'zh' ? '、' : ', '
+  return (
+    <span className="payment-option-sources">
+      {t(locale, 'ui.interactionPaymentVia', { cards: names.join(joiner) })}
+    </span>
+  )
+}
+
 const renderEffectPreview = (
   locale: Locale,
   effectPreview: ChoiceEffectPreview,
@@ -49,6 +77,7 @@ const renderEffectPreview = (
             ({t(locale, 'ui.interactionPaymentReturn')} {renderReturnedCardName(locale, effectPreview.cardUsed)})
           </span>
         )}
+        {renderPaymentSourceCards(locale, effectPreview.sourceCards)}
       </span>
     )
   }
@@ -115,6 +144,12 @@ const renderOptionLabel = (
             {' '}
             ({t(locale, 'ui.interactionPaymentReturn')} {renderReturnedCardName(locale, option.labelParams.cardUsed as string)})
           </span>
+        )}
+        {renderPaymentSourceCards(
+          locale,
+          Array.isArray(option.labelParams.sourceCards)
+            ? (option.labelParams.sourceCards as string[])
+            : undefined,
         )}
       </span>
     )

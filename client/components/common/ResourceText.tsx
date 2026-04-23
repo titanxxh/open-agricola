@@ -1,7 +1,9 @@
+import { Fragment } from 'react'
+
 /**
  * Renders card description text with inline resource icons.
- * Converts <WOOD>, <CLAY>, <FOOD> etc. to icon spans.
- * Also handles <SCORE> as a VP icon.
+ * Converts <WOOD>, <CLAY>, <FOOD>, <SCORE>, <STABLE> etc. to icon spans.
+ * Splits on \n into separate lines (<br/>).
  */
 
 const RESOURCE_TAGS: Record<string, string> = {
@@ -14,8 +16,11 @@ const RESOURCE_TAGS: Record<string, string> = {
   VEGETABLE: 'vegetable',
   SHEEP: 'sheep',
   BOAR: 'boar',
+  PIG: 'boar', // desc text uses PIG; CSS class is .res-icon-boar
   CATTLE: 'cattle',
-  SCORE: 'score',
+  STABLE: 'barn', // desc text uses STABLE; reuses .res-icon-barn (stables.png gray column)
+  BEGGING: 'begging',
+  SCORE: 'score', // CSS class .res-icon-score is an alias for .res-icon-bonusVp (game.css)
 }
 
 const TAG_RE = /<([A-Z_]+)>/g
@@ -47,16 +52,21 @@ function parseDescription(text: string): Part[] {
 }
 
 export function ResourceText({ text, className }: { text: string; className?: string }) {
-  const parts = parseDescription(text)
+  const lines = text.split('\n')
   return (
     <span className={className}>
-      {parts.map((p, i) =>
-        p.type === 'text'
-          ? <span key={i}>{p.text}</span>
-          : p.resource === 'score'
-            ? <span key={i} className="res-inline-score" title="VP">★</span>
-            : <span key={i} className={`res-icon res-icon-${p.resource}`} title={p.resource} />
-      )}
+      {lines.map((line, lineIdx) => (
+        <Fragment key={lineIdx}>
+          {lineIdx > 0 && <br />}
+          {parseDescription(line).map((p, i) =>
+            p.type === 'text' ? (
+              <span key={i}>{p.text}</span>
+            ) : (
+              <span key={i} className={`res-icon res-icon-${p.resource}`} title={p.resource} />
+            ),
+          )}
+        </Fragment>
+      ))}
     </span>
   )
 }

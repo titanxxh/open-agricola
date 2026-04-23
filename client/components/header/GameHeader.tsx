@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/game/types'
@@ -39,8 +39,30 @@ export const GameHeader = ({
   isMyTurn,
 }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const node = menuContainerRef.current
+      if (!node) return
+      if (event.target instanceof Node && node.contains(event.target)) return
+      setMenuOpen(false)
+    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [menuOpen])
 
   return (
     <header className={`header-compact ${isMyTurn ? 'my-turn' : 'not-my-turn'}`}>
@@ -65,7 +87,7 @@ export const GameHeader = ({
         ) : (
           <span className="status-badge waiting-turn">{currentPlayer.name}</span>
         )}
-        <div className="header-actions">
+        <div className="header-actions" ref={menuContainerRef}>
           <LocaleSwitcher className="header-locale-select" />
           <button
             type="button"
@@ -80,18 +102,18 @@ export const GameHeader = ({
             </span>
             <span className="header-action-btn__label">{t(locale, 'ui.headerMenu')}</span>
           </button>
+          {menuOpen && (
+            <div className="header-menu">
+              <label className="header-menu-item">
+                <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
+                {t(locale, 'ui.devMode')}
+              </label>
+              {myPlayerName && (
+                <div className="header-menu-item header-menu-identity">{locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}</div>
+              )}
+            </div>
+          )}
         </div>
-        {menuOpen && (
-          <div className="header-menu">
-            <label className="header-menu-item">
-              <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
-              {t(locale, 'ui.devMode')}
-            </label>
-            {myPlayerName && (
-              <div className="header-menu-item header-menu-identity">{locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}</div>
-            )}
-          </div>
-        )}
       </div>
     </header>
   )

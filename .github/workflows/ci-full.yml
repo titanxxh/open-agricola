@@ -1,36 +1,14 @@
-name: CI
+name: CI Full
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main, ui]
+  schedule:
+    - cron: '0 18 * * *'   # daily 18:00 UTC = 02:00 CST (Beijing) next day
   workflow_dispatch:
 
 jobs:
-  check-prompt-sync:
+  full:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check prompt sync (strict)
-        run: pnpm run check:prompt-sync -- --strict
-
-  verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
 
@@ -49,8 +27,8 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
-      - name: Unit tests (fast tier)
-        run: pnpm run test:fast
+      - name: All tests (fast + slow)
+        run: pnpm test
 
       - name: Build (includes cards manifest)
         run: pnpm run build
