@@ -8,9 +8,27 @@ BACKEND_PORT=5175
 FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
-# Local BGA image directory (sibling repo). Vite + backend will serve
-# /bga-img/* from here first, falling back to the BGA CDN if missing.
-BGA_IMAGE_DIR="${BGA_IMAGE_DIR:-../bga-agricola/img}"
+
+# Anchor persistent dev state (sqlite DB, JSON room snapshots, custom cards,
+# card art, BGA local images) to the MAIN repo even when we're running from
+# a worktree. Without this, each worktree gets its own ./data and ./output,
+# so dev2/dev3/dev4 game state diverges across worktrees.
+#
+# Override: pass the env var explicitly to escape this anchor (e.g.
+#   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-intranet.sh
+# ).
+MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")" && pwd -P)"
+SHARED_DATA_DIR="${SHARED_DATA_DIR:-$MAIN_REPO_DIR/data}"
+SHARED_OUTPUT_DIR="${SHARED_OUTPUT_DIR:-$MAIN_REPO_DIR/output}"
+
+DB_DIR="${DB_DIR:-$SHARED_DATA_DIR}"
+PERSISTED_ROOMS_DIR="${PERSISTED_ROOMS_DIR:-$SHARED_OUTPUT_DIR}"
+CUSTOM_CARD_DIR="${CUSTOM_CARD_DIR:-$SHARED_DATA_DIR/custom-cards}"
+CARD_ART_DIR="${CARD_ART_DIR:-$SHARED_DATA_DIR/card-art}"
+# BGA images live as a sibling of the MAIN repo, not the worktree.
+if [ -z "${BGA_IMAGE_DIR:-}" ]; then
+  BGA_IMAGE_DIR="$(cd "$MAIN_REPO_DIR/.." 2>/dev/null && pwd)/bga-agricola/img"
+fi
 
 if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
   echo "Error: dependencies are missing. Run: pnpm install"
@@ -233,6 +251,10 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   ALLOW_ANONYMOUS_WS=true \
   BACKEND_HOST="$LAN_IP" \
   BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
+  DB_DIR="$DB_DIR" \
+  PERSISTED_ROOMS_DIR="$PERSISTED_ROOMS_DIR" \
+  CUSTOM_CARD_DIR="$CUSTOM_CARD_DIR" \
+  CARD_ART_DIR="$CARD_ART_DIR" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
 echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
@@ -241,6 +263,13 @@ start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
   BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 
+echo ""
+echo "Persistent dev state:"
+echo "  DB_DIR             = $DB_DIR"
+echo "  PERSISTED_ROOMS_DIR= $PERSISTED_ROOMS_DIR"
+echo "  CARD_ART_DIR       = $CARD_ART_DIR"
+echo "  BGA_IMAGE_DIR      = $BGA_IMAGE_DIR"
+[ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
 echo ""
 echo "=== Open Agricola (intranet) ==="
 echo ""
