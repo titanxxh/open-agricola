@@ -17,9 +17,12 @@ import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
-import { LogPanel } from '../components/board/LogPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
+import { StageBar } from '../components/board/StageBar'
+import { PlayerTabs } from '../components/board/PlayerTabs'
+import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
+import { ActionLog, type LogEntry as UiLogEntry } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
@@ -1114,6 +1117,84 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
+  // ── Right-column data mappings (Batch 3 Task 7) ───────────────────────────
+  //
+  // Map shared/logic/scoring.ts `PlayerScoreSummary` (one entry per player)
+  // into the 5-bucket breakdown that ScorePanel expects. These are *estimates*
+  // — spec explicitly says "估算分数" is OK for the live chip — so we collapse
+  // related categories pragmatically:
+  //
+  //   fields  ← fields + grains + vegetables + pastures (everything farm-plot)
+  //   animals ← sheeps + boars + cattles + stables
+  //   food    ← cardsBonus (major-improvement food bonuses, e.g. Fireplace) + bonus VP
+  //   family  ← farmers (rooms + family count VP)
+  //   cards   ← cards (occupations + minors + majors printed VP)
+  //
+  // `scores` comes from useGameSync; falls back to empty map if absent.
+  const scoreRows = useMemo<PlayerScoreRow[]>(() => {
+    if (!state) return []
+    const summaryById = new Map((scores ?? []).map((s) => [s.playerId, s]))
+    const myId = selfPlayer?.id ?? null
+    return state.players.map((p) => {
+      const summary = summaryById.get(p.id)
+      const catTotal = (key: string): number =>
+        summary?.categories.find((c) => c.key === key)?.total ?? 0
+      const breakdown = {
+        fields:
+          catTotal('fields') +
+          catTotal('grains') +
+          catTotal('vegetables') +
+          catTotal('pastures'),
+        animals:
+          catTotal('sheeps') +
+          catTotal('boars') +
+          catTotal('cattles') +
+          catTotal('stables'),
+        food: catTotal('cardsBonus') + catTotal('cardStateBonusVp'),
+        family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
+        cards: catTotal('cards'),
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        isYou: myId !== null && p.id === myId,
+        total: summary?.total ?? 0,
+        breakdown,
+      }
+    })
+  }, [state, scores, selfPlayer?.id])
+
+  // Map state.log (LogEntry { key, params? }) into UI ActionLog entries.
+  // The legacy log doesn't carry round/playerId, so we use:
+  //   - id     ← stable string from index
+  //   - round  ← state.round (current round at render time — best-effort)
+  //   - text   ← t(locale, key, params) so users see translated text
+  // Rendering caps at 50 entries to keep the panel fast.
+  const logEntries = useMemo<UiLogEntry[]>(() => {
+    if (!state) return []
+    const round = state.round ?? 1
+    const stringParams = (params: Record<string, unknown> | undefined): Record<string, string | number> => {
+      if (!params) return {}
+      const out: Record<string, string | number> = {}
+      for (const [k, v] of Object.entries(params)) {
+        if (typeof v === 'string' || typeof v === 'number') out[k] = v
+        else if (v != null) out[k] = String(v)
+      }
+      return out
+    }
+    return state.log.slice(0, 50).map((entry, index) => {
+      const text = t(locale, entry.key, stringParams(entry.params))
+      const playerName = (entry.params?.player as string | undefined) ?? ''
+      return {
+        id: `log-${index}`,
+        round,
+        playerId: '',
+        playerName,
+        text: text === entry.key ? entry.key : text,
+      }
+    })
+  }, [state, locale])
+
   const resourceKeys = resourceKeyList
 
   const applyDevResource = useCallback(async () => {
@@ -1560,47 +1641,65 @@ export const GameContainerApi = () => {
         className="game-layout"
         style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
       >
-        <div className="game-layout__main">
-          <main className="board">
-            <section className="board-panel board-action">
-              <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
-            </section>
-            <section className="board-panel board-farm">
-              <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
-                currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-                nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-                playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
-                fieldMap={fieldMap} stablePositions={stablePositions}
-                pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-                pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-                roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-                maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-                positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
-                pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
-                pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-                stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-                hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
-                existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-                fencePlacementMode={fencePlacementMode}
-                toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-                togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-                toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-                confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-                setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-                isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-                selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-                isInteractive={isInteractive}
-                occupationHandSelection={occupationHandInteraction ?? undefined}
-                onConfirmOccupationHandSelection={(ids) => {
-                  if (!isInteractive) return
-                  const pendingPlayerIndex = interaction.stateId === 'selection' ? interaction.playerIndex : 0
-                  void transport.commitSelection(pendingPlayerIndex, { cardIds: ids }).catch((e) => console.error(e))
-                }}
-              />
-            </section>
-          </main>
+        <div className="game-layout__left">
+          <section className="board-panel board-action">
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+          </section>
         </div>
-        <LogPanel locale={locale} log={state.log} variant="sidebar" />
+        <div className="game-layout__center">
+          <StageBar currentRound={state.round ?? 1} />
+          <PlayerTabs
+            players={state.players.map((p, i) => ({
+              id: p.id,
+              name: p.name,
+              // PlayerState has no `score` field — pull live total from
+              // computeScores summary (falls back to 0 if unavailable).
+              score: scoreRows.find((r) => r.id === p.id)?.total ?? 0,
+              color: p.color,
+              isYou: selfPlayer ? p.id === selfPlayer.id : false,
+              isCurrent: i === state.currentPlayerIndex,
+            }))}
+            active={displayPlayer.id}
+            onChange={setViewPlayerIdSafe}
+          />
+          <section className="board-panel board-farm">
+            <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
+              currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+              nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
+              playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+              fieldMap={fieldMap} stablePositions={stablePositions}
+              pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
+              pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+              roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
+              maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
+              positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
+              pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
+              pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
+              stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
+              existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
+              fencePlacementMode={fencePlacementMode}
+              toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+              togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
+              toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+              confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+              setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
+              isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
+              selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
+              isInteractive={isInteractive}
+              occupationHandSelection={occupationHandInteraction ?? undefined}
+              onConfirmOccupationHandSelection={(ids) => {
+                if (!isInteractive) return
+                const pendingPlayerIndex = interaction.stateId === 'selection' ? interaction.playerIndex : 0
+                void transport.commitSelection(pendingPlayerIndex, { cardIds: ids }).catch((e) => console.error(e))
+              }}
+            />
+          </section>
+        </div>
+        <div className="game-layout__right">
+          <ScorePanel rows={scoreRows} />
+          <ActionLog entries={logEntries} />
+        </div>
       </div>
 
       <InteractionBar
