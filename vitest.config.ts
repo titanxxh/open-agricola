@@ -16,7 +16,10 @@ export default mergeConfig(
   defineConfig({
     test: {
       exclude: [...defaultExclude, '**/.worktree/**'],
-      setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+      setupFiles: [
+        './shared/cards/__tests__/setup-register-all.ts',
+        './client/__tests__/setup.ts',
+      ],
     },
   }),
 )
