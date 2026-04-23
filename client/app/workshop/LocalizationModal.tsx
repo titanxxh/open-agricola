@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llmService'
 import { useLocale } from '../../contexts/LocaleContext'
-import './LocalizationModal.css'
 
 type CardLocaleContent = {
   name: string
