@@ -101,6 +101,7 @@ const buildImprovementLogParams = (
   costResources: NonNullable<PaymentInfo['resourcesPaid']>,
   options?: {
     returnedCards?: string[]
+    bonusSources?: string[]
   },
 ) => {
   const params: Record<string, unknown> = {
@@ -110,7 +111,22 @@ const buildImprovementLogParams = (
   if (options?.returnedCards && options.returnedCards.length > 0) {
     params.returnedCards = options.returnedCards
   }
+  if (options?.bonusSources && options.bonusSources.length > 0) {
+    params.bonusSources = [...options.bonusSources]
+  }
   return params
+}
+
+/**
+ * Read-only snapshot of the session-transient bonus-source scratchpad
+ * populated by `executePaymentSolution` during this action. Returned as a
+ * copy so callers can embed it in log params without capturing a live
+ * reference.
+ */
+const readActionBonusSources = (player: PlayerState): string[] | undefined => {
+  const sources = player._activeActionBonusSources
+  if (!sources || sources.length === 0) return undefined
+  return [...sources]
 }
 
 type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
@@ -354,6 +370,7 @@ const finalizeMajorImprovementPurchase = (
       logKey: 'log.playImprovement',
       logParams: buildImprovementLogParams(improvementId, costResources, {
         returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
+        bonusSources: readActionBonusSources(player),
       }),
     }, improvementId, costResources, returnedMajorId)
   }
@@ -366,6 +383,7 @@ const finalizeMajorImprovementPurchase = (
     result.logKey = 'log.playImprovement'
     result.logParams = buildImprovementLogParams(improvementId, costResources, {
       returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
+      bonusSources: readActionBonusSources(player),
     })
   }
   return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
@@ -410,6 +428,7 @@ const finalizeMinorImprovementPurchase = (
       logKey: 'log.playMinorImprovement',
       logParams: buildImprovementLogParams(improvement.id, costResources, {
         returnedCards: returnedCardId ? [returnedCardId] : undefined,
+        bonusSources: readActionBonusSources(player),
       }),
     }, improvement.id, costResources, returnedCardId)
   }
@@ -429,6 +448,7 @@ const finalizeMinorImprovementPurchase = (
     logKey: 'log.playMinorImprovement',
     logParams: buildImprovementLogParams(improvement.id, costResources, {
       returnedCards: returnedCardId ? [returnedCardId] : undefined,
+      bonusSources: readActionBonusSources(player),
     }),
   }, improvement.id, costResources, returnedCardId)
 }
