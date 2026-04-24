@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { buildCardsManifest } from '../build-cards-manifest'
+import { buildCardsManifest, writeCardsManifest } from '../build-cards-manifest'
 
 const fixturesRoot = path.resolve(__dirname, 'fixtures/cards')
 const extendedFixturesRoot = path.resolve(__dirname, 'fixtures/manifest-fixtures')
@@ -83,5 +85,31 @@ describe('buildCardsManifest — extended patterns', () => {
       '[Baking action:]',
       '<GRAIN> <ARROW> 2<FOOD>',
     ])
+  })
+})
+
+describe('writeCardsManifest', () => {
+  it('writes public/cards-manifest.json when the repo root is missing it', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cards-manifest-test-'))
+    const cardsRoot = path.join(tmp, 'shared', 'cards')
+    const deckDir = path.join(cardsRoot, 'A')
+    fs.mkdirSync(deckDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(deckDir, 'A999_TestCard.ts'),
+      `import { Occupation } from '../../../agricola-card'\nexport const A999_TestCard = new Occupation({ id: 'A999_TestCard', name: 'Test Card', deck: 'A', number: 999, desc: ['A test card for unit tests.'], cost: {}, players: '1+' })\n`,
+      'utf8',
+    )
+
+    const outputPath = path.join(tmp, 'public', 'cards-manifest.json')
+    expect(fs.existsSync(outputPath)).toBe(false)
+
+    const writtenPath = writeCardsManifest(tmp)
+
+    expect(writtenPath).toBe(outputPath)
+    expect(fs.existsSync(outputPath)).toBe(true)
+    const parsed = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as Record<string, { meta: { id: string } }>
+    expect(parsed['A999_TestCard']?.meta.id).toBe('A999_TestCard')
+
+    fs.rmSync(tmp, { recursive: true, force: true })
   })
 })

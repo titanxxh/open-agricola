@@ -73,6 +73,54 @@ describe('B25_BreadPaddle session', () => {
     expect(p.occupationPlayed).toContain(occId)
   })
 
+  it('logs only the bake substep food when Bread Paddle triggers after a paid occupation', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 1)
+    setWorkersAtHome(state, player, 1)
+    player.resources.food = 5
+    player.resources.grain = 1
+    player.minorPlayed.push(CARD_ID)
+    player.improvements.push('Major_Fireplace1')
+    player.occupationHand.push('A114_SeasonalWorker')
+    player.occupationPlayed.push('A85_Homekeeper')
+
+    setActiveWorkerCount(state.players[1]!, 1)
+    markAllWorkersUsed(state, state.players[1]!)
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+
+    resp = session.resolveChoice(0, 'A114_SeasonalWorker')
+    expect(resp.ok).toBe(true)
+
+    let steps = 0
+    while (resp.pending.type === 'choice' && steps < 6) {
+      steps++
+      const options = resp.pending.options ?? []
+      const next = options.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+      expect(next).toBeDefined()
+      resp = session.resolveChoice(0, next!.value)
+      expect(resp.ok).toBe(true)
+    }
+
+    const bakeEntries = resp.state.log.filter((entry) => entry.key === 'log.bakeBread')
+    expect(bakeEntries).toHaveLength(1)
+    expect(bakeEntries[0]?.params).toMatchObject({
+      count: 1,
+      food: 2,
+    })
+  })
+
   it('does not trigger bake-bread if card is not played', () => {
     const session = new GameSession()
     const state = session.getState().state

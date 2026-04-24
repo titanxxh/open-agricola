@@ -130,6 +130,22 @@ const readActionBonusSources = (player: PlayerState): string[] | undefined => {
 }
 
 type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
+type ImprovementLogKind = 'major' | 'minor'
+
+const buildImprovementImmediateLogs = (
+  kind: ImprovementLogKind,
+  improvementId: string,
+  costResources: NonNullable<PaymentInfo['resourcesPaid']>,
+  options?: {
+    returnedCards?: string[]
+    bonusSources?: string[]
+  },
+) => [
+  {
+    key: kind === 'major' ? 'log.playImprovement' : 'log.playMinorImprovement',
+    params: buildImprovementLogParams(improvementId, costResources, options),
+  },
+]
 
 const attachImprovementPayment = (
   result: SuccessfulImprovementResult,
@@ -355,6 +371,16 @@ const finalizeMajorImprovementPurchase = (
   returnedMajorId?: string,
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
+  const immediateLogs = buildImprovementImmediateLogs(
+    'major',
+    improvementId,
+    costResources,
+    {
+      returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
+      bonusSources: readActionBonusSources(player),
+    },
+  )
+
   if (returnedMajorId) {
     returnCardToBoard(player, returnedMajorId, state)
   }
@@ -367,11 +393,9 @@ const finalizeMajorImprovementPurchase = (
   if (suppressOnBuyEffects) {
     return attachImprovementPayment({
       type: 'ok',
+      immediateLogs,
       logKey: 'log.playImprovement',
-      logParams: buildImprovementLogParams(improvementId, costResources, {
-        returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
-        bonusSources: readActionBonusSources(player),
-      }),
+      logParams: immediateLogs[0]?.params as Record<string, unknown>,
     }, improvementId, costResources, returnedMajorId)
   }
 
@@ -379,12 +403,11 @@ const finalizeMajorImprovementPurchase = (
   const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
 
+  result.immediateLogs = [...immediateLogs, ...(result.immediateLogs ?? [])]
+
   if (result.type === 'ok') {
     result.logKey = 'log.playImprovement'
-    result.logParams = buildImprovementLogParams(improvementId, costResources, {
-      returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
-      bonusSources: readActionBonusSources(player),
-    })
+    result.logParams = immediateLogs[0]?.params as Record<string, unknown>
   }
   return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
 }
@@ -398,6 +421,16 @@ const finalizeMinorImprovementPurchase = (
   returnedCardId?: string,
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
+  const immediateLogs = buildImprovementImmediateLogs(
+    'minor',
+    improvement.id,
+    costResources,
+    {
+      returnedCards: returnedCardId ? [returnedCardId] : undefined,
+      bonusSources: readActionBonusSources(player),
+    },
+  )
+
   if (returnedCardId) {
     returnCardToBoard(player, returnedCardId, state)
   }
@@ -425,16 +458,15 @@ const finalizeMinorImprovementPurchase = (
   if (suppressOnBuyEffects) {
     return attachImprovementPayment({
       type: 'ok',
+      immediateLogs,
       logKey: 'log.playMinorImprovement',
-      logParams: buildImprovementLogParams(improvement.id, costResources, {
-        returnedCards: returnedCardId ? [returnedCardId] : undefined,
-        bonusSources: readActionBonusSources(player),
-      }),
+      logParams: immediateLogs[0]?.params as Record<string, unknown>,
     }, improvement.id, costResources, returnedCardId)
   }
 
   const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
+    activation.immediateLogs = [...immediateLogs, ...(activation.immediateLogs ?? [])]
     return attachImprovementPayment(
       activation,
       improvement.id,
@@ -445,11 +477,9 @@ const finalizeMinorImprovementPurchase = (
 
   return attachImprovementPayment({
     type: 'ok',
+    immediateLogs,
     logKey: 'log.playMinorImprovement',
-    logParams: buildImprovementLogParams(improvement.id, costResources, {
-      returnedCards: returnedCardId ? [returnedCardId] : undefined,
-      bonusSources: readActionBonusSources(player),
-    }),
+    logParams: immediateLogs[0]?.params as Record<string, unknown>,
   }, improvement.id, costResources, returnedCardId)
 }
 

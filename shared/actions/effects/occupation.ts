@@ -40,21 +40,29 @@ const buildOccupationLogParams = (
   return params
 }
 
-const attachOccupationLog = (
-  result: Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>,
+const buildOccupationImmediateLogs = (
   occupationId: string,
-  player: PlayerState,
   costResources: Partial<Resource> | undefined,
+  bonusSources?: string[],
+) => [
+  {
+    key: 'log.playOccupation',
+    params: buildOccupationLogParams(
+      occupationId,
+      costResources,
+      bonusSources,
+    ),
+  },
+]
+
+const attachOccupationImmediateLogs = (
+  result: Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>,
+  immediateLogs: NonNullable<ActionExecutionResult['immediateLogs']>,
 ): Extract<ActionExecutionResult, { type: 'ok' | 'flow' }> => {
-  const occupationLog = buildOccupationLogParams(
-    occupationId,
-    costResources,
-    readActionBonusSources(player),
-  )
-  result.extraData = {
-    ...(result.extraData ?? {}),
-    occupationLog,
-  }
+  result.immediateLogs = [
+    ...immediateLogs,
+    ...(result.immediateLogs ?? []),
+  ]
   return result
 }
 
@@ -132,7 +140,7 @@ export const playOccupation = (
   if (!paySucceeded) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
-  const occupationLog = buildOccupationLogParams(
+  const immediateLogs = buildOccupationImmediateLogs(
     occupation.id,
     cost,
     readActionBonusSources(player),
@@ -150,13 +158,12 @@ export const playOccupation = (
   if (state) {
     const activation = activateCard(state, player, occupation.id, 'onBuy')
     if (activation.type === 'flow') {
-      return attachOccupationLog(activation, occupation.id, player, cost)
+      return attachOccupationImmediateLogs(activation, immediateLogs)
     }
   }
   return {
     type: 'ok',
-    logKey: 'log.playOccupation',
-    logParams: occupationLog,
+    immediateLogs,
   }
 }
 

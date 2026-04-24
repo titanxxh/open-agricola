@@ -234,6 +234,9 @@ if [ "$KILL_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+echo "Ensuring cards manifest..."
+"$BACKEND_BIN" "$SCRIPT_DIR/scripts/build-cards-manifest.ts" >/dev/null
+
 LAN_IP=$(get_lan_ip)
 if [ -z "$LAN_IP" ]; then
   echo "Error: could not get LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
