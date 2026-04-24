@@ -1972,7 +1972,12 @@
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */
-.res-icon-arrow   { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
+.res-icon-arrow     { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
+/* Exchange-rate arrows that carry the "1×" / "2×" badge (BGA
+ * meeple-arrow-1x / meeple-arrow-2x on meeples.png). */
+.res-icon-arrow-1x  { width:1.3em; height:0.6em;  background-position:7.09477% 26.3736%; background-size:1750.43%; }
+.res-icon-arrow-2x  { width:1.2em; height:0.6em;  background-position:0.517866% 26.4397%; background-size:1750.43%; }
+.res-icon-bake      { width:1em;   height:1em;    background-position:17.0266% 26.1905%; background-size:3592.98%; }
 .res-icon-major   { width:1.1em; height:0.74em; background-position:8.08903% 15.0728%;  background-size:994.175%; }
 .res-icon-minor   { width:1.1em; height:0.74em; background-position:19.7832% 15.0571%; background-size:1008.87%; }
 .res-icon-occupation { width:1.1em; height:0.74em; background-position:31.3279% 15.0571%; background-size:1008.87%; }
@@ -1999,6 +2004,14 @@
   background-size: 500% 100%;
   background-position-x: 100%;
   width: 0.9em; height: 0.9em;
+}
+.res-icon-grain-veg-stack {
+  background-image: url('/bga-img/grain_veg_stack.png');
+  background-size: 100% 100%;
+  background-position: 0 0;
+  width: 1em; height: 1em;
+  position: relative;
+  top: -2px;
 }
 /* Icon description styling (matches BGA's action-desc rendering) */
 .action-desc .icon-line {
