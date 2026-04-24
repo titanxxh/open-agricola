@@ -12,6 +12,25 @@ const stripHtml = (html: string) =>
     .trim()
 
 describe('LogPanel', () => {
+  it('renders translated occupation name and keeps hover link in play log', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.playOccupation',
+        params: {
+          player: 'Player A',
+          occupations: 'D95_SiteManager',
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="zh" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('工地管理员')
+    expect(text).not.toContain('occupations.D95_SiteManager.name')
+    expect(html).toContain('log-card-link')
+  })
+
   it('renders returned card in improvement log and separate card gain log', () => {
     const log: GameState['log'] = [
       {
