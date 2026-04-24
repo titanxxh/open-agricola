@@ -39,4 +39,30 @@ describe('ResourceText', () => {
     const { container } = render(<ResourceText text="<FOO>" />)
     expect(container.textContent).toBe('<FOO>')
   })
+
+  it('renders <ARROW> as res-icon-arrow sprite (not literal text)', () => {
+    const { container } = render(<ResourceText text="<GRAIN> <ARROW> 2<FOOD>" />)
+    expect(container.querySelector('.res-icon-arrow')).toBeTruthy()
+    expect(container.textContent).not.toContain('<ARROW>')
+  })
+
+  it('renders <ARROW-1X> and <ARROW-2X> variants (hyphen-aware regex)', () => {
+    const one = render(<ResourceText text="<CLAY> <ARROW-1X> 2<FOOD>" />)
+    expect(one.container.querySelector('.res-icon-arrow-1x')).toBeTruthy()
+    expect(one.container.textContent).not.toContain('<ARROW-1X>')
+
+    const two = render(<ResourceText text="<GRAIN> <ARROW-2X> 5<FOOD>" />)
+    expect(two.container.querySelector('.res-icon-arrow-2x')).toBeTruthy()
+    expect(two.container.textContent).not.toContain('<ARROW-2X>')
+  })
+
+  it('renders <BAKE>, <FIELD>, <FENCE>, <GRAIN_VEG_STACK> as sprites', () => {
+    const { container } = render(
+      <ResourceText text="<BAKE> <FIELD> <FENCE> <GRAIN_VEG_STACK>" />,
+    )
+    expect(container.querySelector('.res-icon-bake')).toBeTruthy()
+    expect(container.querySelector('.res-icon-field')).toBeTruthy()
+    expect(container.querySelector('.res-icon-fence-icon')).toBeTruthy()
+    expect(container.querySelector('.res-icon-grain-veg-stack')).toBeTruthy()
+  })
 })
