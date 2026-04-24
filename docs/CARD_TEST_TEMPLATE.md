@@ -32,6 +32,7 @@
 - 纯样式改动
 - 纯文案翻译改动
 - 与卡牌无关的通用 UI 组件测试
+- **Workshop / AI Designer 自定义卡的"LLM 生成代码能否跑通"测试** —— 那套独立框架见 `docs/test/llm-card-gen.md`
 
 ## 3. 测试分层约定
 
