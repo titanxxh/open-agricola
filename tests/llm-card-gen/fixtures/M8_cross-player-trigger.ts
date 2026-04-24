@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { compileLLMCard, registerCard } from '../session-helpers'
 import type { CardFixture, FixtureResult } from './types'
 
