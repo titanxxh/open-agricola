@@ -26,8 +26,12 @@ export const bakeBread = (
   player.resources.food += foodGained
   return {
     type: 'ok',
-    logKey: 'log.bakeBreadResult',
-    logParams: { grainUsed: bakeTimes, foodGained, improvement: cardId },
+    immediateLogs: [
+      {
+        key: 'log.bakeBread',
+        params: { count: bakeTimes, food: foodGained },
+      },
+    ],
   }
 }
 
@@ -51,6 +55,7 @@ const resolveBakeBreadChoice = (
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
+    const immediateLogs: NonNullable<ActionExecutionResult['immediateLogs']> = []
     payload.split(',').forEach((entry) => {
       const [cardId, countText] = entry.split('=')
       const rate = rateMap.get(cardId!)
@@ -59,9 +64,12 @@ const resolveBakeBreadChoice = (
       if (!Number.isFinite(count) || count <= 0) return
       const allowed = Math.min(count, rate.max)
       if (allowed <= 0) return
-      bakeBread(player, cardId!, allowed)
+      const result = bakeBread(player, cardId!, allowed)
+      if (result.type === 'ok' && result.immediateLogs) {
+        immediateLogs.push(...result.immediateLogs)
+      }
     })
-    return { type: 'ok' }
+    return immediateLogs.length > 0 ? { type: 'ok', immediateLogs } : { type: 'ok' }
   }
 
   if (choice.startsWith('count-')) {

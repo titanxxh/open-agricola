@@ -68,6 +68,15 @@ describe('improvement logging', () => {
     const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          improvements: 'A53_Claypipe',
+          costResources: { clay: 1 },
+        },
+      },
+    ])
     expect(result.logKey).toBe('log.playMinorImprovement')
     expect(result.logParams).toEqual({
       improvements: 'A53_Claypipe',
@@ -81,11 +90,42 @@ describe('improvement logging', () => {
     const result = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.playImprovement',
+        params: {
+          improvements: 'Major_Fireplace1',
+          costResources: { clay: 2 },
+        },
+      },
+    ])
     expect(result.logKey).toBe('log.playImprovement')
     expect(result.logParams).toEqual({
       improvements: 'Major_Fireplace1',
       costResources: { clay: 2 },
     })
+  })
+
+  it('emits immediateLogs for major improvement when onBuy returns flow', () => {
+    const state = createState()
+    state.availableMajorImprovements = ['Major_ClayOven']
+    const player = createPlayer()
+    player.resources.clay = 3
+    player.resources.stone = 1
+
+    const result = playImprovement(state, player, 'major:Major_ClayOven', 'any')
+
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.playImprovement',
+        params: {
+          improvements: 'Major_ClayOven',
+          costResources: { clay: 3, stone: 1 },
+        },
+      },
+    ])
   })
 
   it('returns stable improvementPayment for Fireplace upgrade to Cooking Hearth', () => {
@@ -133,6 +173,16 @@ describe('improvement logging', () => {
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          improvements: 'C60_SmallPottersOven',
+          costResources: { clay: 2 },
+          returnedCards: ['Major_ClayOven'],
+        },
+      },
+    ])
     expect(result.extraData?.improvementPayment).toEqual({
       improvementId: 'C60_SmallPottersOven',
       resourcesPaid: { clay: 2 },

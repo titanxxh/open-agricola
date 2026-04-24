@@ -177,6 +177,11 @@ export type LogEntry = {
   params?: Record<string, unknown>
 }
 
+export type ImmediateLogEntry = {
+  key: string
+  params?: Record<string, unknown>
+}
+
 export type FutureMeeple = {
   id: string
   cardId: string
@@ -320,11 +325,11 @@ export type ActionChoiceOption = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; extraData?: Record<string, unknown> }
+  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[] }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
-  | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
+  | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
       type: 'leaf'
