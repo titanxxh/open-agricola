@@ -238,6 +238,32 @@ export interface BuildResult {
   manifest: any
 }
 
+/**
+ * Auto-wrap every method call on `session` with `session.withCtx(...)`.
+ *
+ * Background: GameSession's constructor registers custom-card listeners into
+ * `sessionCardContext` rather than the global card registry (because RoomManager
+ * uses sessionCtx for per-session isolation). Listener dispatch only sees
+ * sessionCtx listeners when `withSessionContext` is active. RoomManager wraps
+ * every public call in `session.withCtx(...)`; fixtures need the same — without
+ * the wrap, custom-card listeners silently never fire.
+ *
+ * Returns a Proxy that forwards every method through withCtx and every
+ * property read straight through. Non-method properties stay live.
+ */
+function wrapSessionWithCtx(session: GameSession): GameSession {
+  return new Proxy(session, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value !== 'function') return value
+      // withCtx itself + dispose + any internals starting with _ pass through
+      if (prop === 'withCtx' || prop === 'dispose') return value.bind(target)
+      return (...args: unknown[]) =>
+        target.withCtx(() => (value as (...a: unknown[]) => unknown).apply(target, args))
+    },
+  })
+}
+
 export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): BuildResult {
   const compiled = compileLLMCard({
     llmGeneratedCode: llmCode,
@@ -247,16 +273,17 @@ export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): Build
     cardCost: opts.cardCost,
     cardPrerequisite: opts.cardPrerequisite,
   })
-  const session = new GameSession(undefined, [compiled.cardData], {
+  const rawSession = new GameSession(undefined, [compiled.cardData], {
     playerCount: opts.playerCount ?? 2,
   })
   // Force determinism on every fixture's session.
   // getState().state returns the live this.state reference — mutating it
   // mutates the session directly. Do NOT call loadState here: normalizeState
   // re-deals hands when any minorHand/occupationHand is empty.
-  const state = session.getState().state
+  const state = rawSession.getState().state
   clearAllHands(state)
   fixRoundActionOrder(state)
+  const session = wrapSessionWithCtx(rawSession)
   return { session, cardData: compiled.cardData, manifest: compiled.manifest }
 }
 
