@@ -79,7 +79,7 @@ const CARD_IMPL = {
     onBuy: (state, player, paymentInfo?) => ActionFlow | void,
     onRoundStart: (state, player) => ActionFlow | void,
     // ... 其他 hook
-    computeBonusScore: (state, player) => { score: number, label: string } | null,
+    computeBonusScore: (state, player, ctx) => number,  // 返回 VP 数（不是对象）
     handHooks: ['onRoundStart'],  // meta：声明手牌时也触发的 hook
   },
   listeners: [           // 行动触发（可选）
@@ -120,8 +120,9 @@ const CARD_IMPL = {
 
 | hook | 返回值 | 用途 |
 |------|--------|------|
-| computeBonusScore | \`{ score: number, label: string }\` | 终局加分 |
-| computePostScore / computeSharedPostScore | 同上 | 高级计分 |
+| computeBonusScore | \`(state, player, ctx) => number\` | 终局加分（返回 VP 数，不是 \`{score,label}\`） |
+| computePostScore | \`(state, player, categories) => number\` | 终局后续加分 |
+| computeSharedPostScore | \`(state, owner, summaries) => Array<{playerId, score}>\` | 跨玩家加分 |
 | computeExtraRoomCapacity | \`number\` | 额外容纳空间 |
 | onComputeAnimalZones | 修改 zones 数组 | 动物分区扩展 |
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
