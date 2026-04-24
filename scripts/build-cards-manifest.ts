@@ -295,12 +295,18 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
   return manifest
 }
 
-if (process.argv[1] && process.argv[1].endsWith('build-cards-manifest.ts')) {
-  const repoRoot = path.resolve(__dirname, '..')
+export function writeCardsManifest(repoRoot: string): string {
   const cardsRoot = path.join(repoRoot, 'shared', 'cards')
   const outputPath = path.join(repoRoot, 'public', 'cards-manifest.json')
   const manifest = buildCardsManifest(cardsRoot)
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })
   fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+  return outputPath
+}
+
+if (process.argv[1] && process.argv[1].endsWith('build-cards-manifest.ts')) {
+  const repoRoot = path.resolve(__dirname, '..')
+  const outputPath = writeCardsManifest(repoRoot)
+  const manifest = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as CardsManifest
   console.log(`[build-cards-manifest] wrote ${Object.keys(manifest).length} cards to ${outputPath}`)
 }

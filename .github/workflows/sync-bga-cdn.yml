@@ -1,0 +1,46 @@
+name: Sync BGA CDN Base URL
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # daily 12:00 UTC = 20:00 CST (Beijing)
+  workflow_dispatch:
+
+concurrency:
+  group: sync-bga-cdn
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Probe BGA and sync BGA_CDN_BASE_URL
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: pnpm run sync-bga-cdn
+
+      - name: Trigger deploy-pages (only if variable actually changed)
+        if: steps.sync.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "BGA_CDN_BASE_URL changed to: ${{ steps.sync.outputs.new_base }}"
+          gh workflow run deploy-pages.yml --ref main

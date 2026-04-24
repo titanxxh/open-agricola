@@ -17,6 +17,7 @@
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
     "test:fast": "vitest run --project fast --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
     "test:slow": "vitest run --project slow --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
+    "test:llm": "vitest run --project llm --testTimeout=120000",
     "test:bench": "RUN_BENCHMARKS=1 vitest run tests/pay-dp.test.ts tests/pay-optimizations.test.ts --testTimeout=20000",
     "test:e2e": "npx playwright test",
     "verify": "bash scripts/verify.sh",

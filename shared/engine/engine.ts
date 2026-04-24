@@ -8,6 +8,8 @@ import type {
   PlayerState,
   GameState,
   ActionChoiceOption,
+  ImmediateLogEntry,
+  LogEntry,
   Resource,
 } from '../game/types'
 import type { FollowUpAction } from '../actions/hooks'
@@ -33,6 +35,56 @@ type EngineContext = {
   state: GameState
   player: PlayerState
   space: ActionSpace
+}
+
+type ImmediateLogCarrier = {
+  logKey?: string
+  logParams?: Record<string, unknown>
+  immediateLogs?: ImmediateLogEntry[]
+}
+
+const stableSerializeLogValue = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerializeLogValue(item)).join(',')}]`
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )
+    return `{${entries
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerializeLogValue(item)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+const serializeImmediateLog = (entry: ImmediateLogEntry): string =>
+  `${entry.key}:${stableSerializeLogValue(entry.params ?? {})}`
+
+const collectImmediateLogs = (
+  playerName: string,
+  result: ImmediateLogCarrier | null | undefined,
+  options: { includeLegacyLogKey?: boolean } = {},
+): LogEntry[] => {
+  if (!result) return []
+  const entries = [...(result.immediateLogs ?? [])]
+  const seenEntries = new Set(entries.map((entry) => serializeImmediateLog(entry)))
+  if ((options.includeLegacyLogKey ?? true) && result.logKey) {
+    const legacyEntry = {
+      key: result.logKey,
+      params: result.logParams,
+    }
+    if (!seenEntries.has(serializeImmediateLog(legacyEntry))) {
+      entries.unshift(legacyEntry)
+    }
+  }
+  return entries.map((entry) => ({
+    key: entry.key,
+    params: {
+      player: playerName,
+      ...(entry.params ?? {}),
+    },
+  }))
 }
 
 export class Engine {
@@ -1013,15 +1065,20 @@ export class Engine {
       const result = executeCardListener(listener, listenerContext as import('../cards/card-listeners').CardListenerContext, {
         ownerPlayerId,
       })
+      const effectPlayer =
+        (ownerPlayerId
+          ? context.state.players.find((player) => player.id === ownerPlayerId)
+          : null) ?? context.player
       const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
         this.normalizeFollowUpAction(followUp, result?.sourceCard),
       )
+      collectImmediateLogs(effectPlayer.name, result, {
+        includeLegacyLogKey: result ? !shouldSkipImmediateListenerLog(result) : true,
+      }).forEach((entry) => {
+        this.log.append(entry)
+      })
       if (result?.flow || normalizedFollowUps.length > 0) {
         const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
-        const effectPlayer =
-          (ownerPlayerId
-            ? context.state.players.find((player) => player.id === ownerPlayerId)
-            : null) ?? context.player
         const insertedNodes: EngineNode[] = []
         if (result?.flow) {
           const flowNode = this.buildFlowNode(
@@ -1044,18 +1101,6 @@ export class Engine {
         } else {
           this.tree.insertAfter(node.id, insertedNodes)
         }
-      }
-      if (result?.logKey && !shouldSkipImmediateListenerLog(result)) {
-        const effectPlayer =
-          (ownerPlayerId ? context.state.players.find((player) => player.id === ownerPlayerId) : null)
-          ?? context.player
-        this.log.append({
-          key: result.logKey,
-          params: {
-            player: effectPlayer.name,
-            ...result.logParams,
-          },
-        })
       }
       node.resolve(result ?? {})
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -1191,6 +1236,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
 }
       }
       this.findPairedChoiceNode(node)?.setState('resolved')
+      if (result.type === 'ok' || result.type === 'flow') {
+        collectImmediateLogs(context.player.name, result).forEach((entry) => {
+          this.log.append(entry)
+        })
+      }
       if (result.type === 'flow') {
         const flowNode = this.buildFlowNode(result.flow)
         this.tree.insertAfter(node.id, [flowNode])
@@ -1199,12 +1249,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         { ...executionContext, actionId: replacedActionId },
         result,
       )
-      if (result.type === 'ok' && result.logKey) {
-        this.log.append({
-          key: result.logKey,
-          params: { player: context.player.name, ...result.logParams },
-        })
-      } else {
+      if (
+        (result.type === 'ok' && !result.logKey && (result.immediateLogs?.length ?? 0) === 0)
+        || (result.type === 'flow' && (result.immediateLogs?.length ?? 0) === 0)
+        || (result.type !== 'ok' && result.type !== 'flow')
+      ) {
         this.log.append({
           key: 'log.action',
           params: { actionId: replacedActionId },
@@ -1219,6 +1268,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         ...immediatePhase.actionHookResults,
         ...afterPhase.actionHookResults,
       ]
+      allActionHookResults
+        .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
+        .forEach((entry) => {
+          this.log.append(entry)
+        })
       const hookFlows = allActionHookResults
         .map((entry) => entry.flow
           ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
@@ -1411,6 +1465,15 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           }
           return result
         }
+        if (result.type === 'ok' || result.type === 'flow') {
+          collectImmediateLogs(context.player.name, result).forEach((entry) => {
+            this.log.append(entry)
+          })
+        }
+        if (result.type === 'flow') {
+          const flowNode = this.buildFlowNode(result.flow)
+          this.tree.insertAfter(node instanceof XorNode ? node.id : child.id, [flowNode])
+        }
         const immediatePhase = this.hooks.immediatelyAfter(
           { ...executionContext, actionId, choice },
           result,
@@ -1426,14 +1489,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           ...immediatePhase.actionHookResults,
           ...afterPhase.actionHookResults,
         ]
-        allResults.forEach((entry) => {
-          if (entry.logKey) {
-            this.log.append({
-              key: entry.logKey,
-              params: { player: context.player.name, ...entry.logParams },
-            })
-          }
-        })
+        allResults
+          .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
+          .forEach((entry) => {
+            this.log.append(entry)
+          })
         
         const hookFlows = allResults
           .map((entry) => entry.flow
@@ -1524,19 +1584,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
     }
+    if (result.type === 'ok' || result.type === 'flow') {
+      collectImmediateLogs(context.player.name, result).forEach((entry) => {
+        this.log.append(entry)
+      })
+    }
     const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
     if (result.type === 'flow') {
       const flowNode = this.buildFlowNode(result.flow)
       if (insertionTargetId) {
         this.tree.insertAfter(insertionTargetId, [flowNode])
       }
-    }
-    // Use result's logKey if present, otherwise use generic action log
-    if (result.type === 'ok' && result.logKey) {
-      this.log.append({
-        key: result.logKey,
-        params: { player: context.player.name, ...result.logParams },
-      })
     }
     const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
@@ -1545,14 +1603,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       ...immediatePhase.actionHookResults,
       ...afterPhase.actionHookResults,
     ]
-    allResults.forEach((entry) => {
-      if (entry.logKey) {
-        this.log.append({
-          key: entry.logKey,
-          params: { player: context.player.name, ...entry.logParams },
-        })
-      }
-    })
+    allResults
+      .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
+      .forEach((entry) => {
+        this.log.append(entry)
+      })
     
     const hookFlows = allResults
       .map((entry) => entry.flow

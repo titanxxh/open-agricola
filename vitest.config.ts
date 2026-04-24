@@ -28,8 +28,16 @@ const FAST_INCLUDE = [
   'server/game/__tests__/*.test.ts',
   'server/workshop-pr/__tests__/*.test.ts',
 ]
-const SHARED_EXCLUDE = [...defaultExclude, '**/.worktree/**']
+const BASE_EXCLUDE = [...defaultExclude, '**/.worktree/**']
+// LLM tests are manual / workflow_dispatch only via `pnpm test:llm` (which
+// passes `--project llm`). Excluded from fast + slow project includes so
+// `pnpm test:fast`, `pnpm test:slow` never trigger LLM calls. `pnpm test`
+// (no --project flag) iterates all projects — the llm project's
+// describe.skipIf detects no API key and skips quietly.
+const LLM_GLOB = 'tests/llm-card-gen/**'
+const SHARED_EXCLUDE = [...BASE_EXCLUDE, LLM_GLOB]
 const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
+const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
 const SHARED_SETUP = [
   './shared/cards/__tests__/setup-register-all.ts',
   './client/__tests__/setup.ts',
@@ -39,7 +47,11 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      exclude: SHARED_EXCLUDE,
+      // Top-level exclude is inherited by every project's exclude (vitest
+      // concatenates parent + project). Keep it minimal so the `llm` project
+      // can opt back in by setting its own exclude that doesn't drop LLM
+      // tests. Per-project excludes below add LLM_GLOB where needed.
+      exclude: BASE_EXCLUDE,
       setupFiles: SHARED_SETUP,
       projects: [
         {
@@ -57,6 +69,15 @@ export default mergeConfig(
             name: 'slow',
             include: SLOW_INCLUDE,
             exclude: SHARED_EXCLUDE,
+            setupFiles: SHARED_SETUP,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'llm',
+            include: LLM_INCLUDE,
+            exclude: BASE_EXCLUDE,
             setupFiles: SHARED_SETUP,
           },
         },

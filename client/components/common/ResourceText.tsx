@@ -7,6 +7,7 @@ import { Fragment } from 'react'
  */
 
 const RESOURCE_TAGS: Record<string, string> = {
+  // ── Resources ──
   WOOD: 'wood',
   CLAY: 'clay',
   REED: 'reed',
@@ -21,9 +22,26 @@ const RESOURCE_TAGS: Record<string, string> = {
   STABLE: 'barn', // desc text uses STABLE; reuses .res-icon-barn (stables.png gray column)
   BEGGING: 'begging',
   SCORE: 'score', // CSS class .res-icon-score is an alias for .res-icon-bonusVp (game.css)
+
+  // ── Arrows (the "→" used in exchanges and scoring maps) ──
+  // Plain `<ARROW>` is the small inline arrow between two resource atoms
+  // (Fireplace's "GRAIN → 2 FOOD" etc). The `-1X` / `-2X` variants label
+  // the exchange rate BGA draws over the arrow; the sprites carry the
+  // "1×" / "2×" badge built-in.
+  ARROW: 'arrow',
+  'ARROW-1X': 'arrow-1x',
+  'ARROW-2X': 'arrow-2x',
+
+  // ── Action / farm iconography ──
+  BAKE: 'bake', // BGA meeple-bake: bread-baking action icon
+  FIELD: 'field', // existing .res-icon-field sprite
+  FENCE: 'fence-icon', // reuses existing .res-icon-fence-icon
+  GRAIN_VEG_STACK: 'grain-veg-stack', // BGA grain_veg_stack.png
 }
 
-const TAG_RE = /<([A-Z_]+)>/g
+// `<([A-Z0-9_-]+)>` — accepts hyphens + digits so `<ARROW-1X>` etc.
+// register as a single tag rather than being skipped.
+const TAG_RE = /<([A-Z0-9_-]+)>/g
 
 type Part = { type: 'text'; text: string } | { type: 'icon'; resource: string; tag: string }
 

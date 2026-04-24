@@ -122,4 +122,46 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(player.resources.grain).toBe(initial.grain)
     expect(player.resources.food).toBe(initial.food)
   })
+
+  it('offers the B85 FarmHand tile as a selection candidate', () => {
+    const player = createOwner()
+    player.stableTiles = []
+    player.cardStates = {
+      B85_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
+    }
+    const state = createState([player])
+    const flow = getCardEffect(CARD_ID)!.onStartReturnHome!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    expect(flow).toBeDefined()
+    const selection = flow.children[0]
+    expect(selection.actionContext.selectableTiles).toEqual([{ row: 2, col: 1 }])
+  })
+
+  it('returns the B85 FarmHand tile and pays the normal resource reward', () => {
+    const player = createOwner()
+    player.stableTiles = []
+    player.cardStates = {
+      B85_FarmHand: {
+        flagged: true,
+        extraData: { position: { row: 2, col: 1 } },
+      },
+    }
+    const initial = {
+      wood: player.resources.wood,
+      grain: player.resources.grain,
+      food: player.resources.food,
+    }
+    runSelectionEffect(FIELD_EFFECT, {
+      player,
+      positions: ['2-1'],
+      sourceCard: CARD_ID,
+    })
+    // FarmHand tile cleared from cardStates, but `flagged` stays true so
+    // the player cannot rebuild it.
+    expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
+    expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
+    expect(player.stableTiles).toEqual([])
+    expect(player.resources.wood).toBe(initial.wood + 1)
+    expect(player.resources.grain).toBe(initial.grain + 1)
+    expect(player.resources.food).toBe(initial.food + 1)
+  })
 })

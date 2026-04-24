@@ -261,4 +261,116 @@ describe('D95_SiteManager session', () => {
     expect(p.resources.food).toBe(10)
     expect(p.resources.clay).toBe(3) // 5 - 2
   })
+
+  it('emits log.playOccupation for the card itself AND log.playImprovement for the bought major', () => {
+    const session = new GameSession(/* seed */ 1)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    // 1 clay + food → Fireplace (cost 2 clay) forces D95 substitution.
+    player.resources = { ...player.resources, food: 10, clay: 1, wood: 0, stone: 0, reed: 0 }
+    if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
+      state.availableMajorImprovements.push('Major_Fireplace1')
+    }
+    session.loadState(state)
+
+    let resp = playOccupation(session)
+    // Drive through the optional improvement-any flow to the end.
+    let steps = 0
+    let bought = false
+    while (resp.pending.type === 'choice' && steps < 12) {
+      steps++
+      const options = resp.pending.options ?? []
+      const fireplace = options.find(
+        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+      )
+      if (fireplace && !bought) {
+        resp = session.resolveChoice(0, fireplace.value)
+        bought = true
+        continue
+      }
+      const next = options.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
+      if (!next) break
+      resp = session.resolveChoice(0, next.value)
+    }
+
+    const log = resp.state.log
+    type PlayOccupationParams = { occupations?: string; bonusSources?: string[] }
+    type PlayImprovementParams = { improvements?: string; bonusSources?: string[] }
+    const occEntry = log.find((e) => e.key === 'log.playOccupation')
+    const impEntry = log.find((e) => e.key === 'log.playImprovement')
+    expect(occEntry).toBeDefined()
+    expect((occEntry!.params as PlayOccupationParams | undefined)?.occupations).toContain(CARD_ID)
+    expect(impEntry).toBeDefined()
+    expect((impEntry!.params as PlayImprovementParams | undefined)?.improvements).toContain('Major_Fireplace1')
+    // D95's bonus fired during the improvement payment, so its attribution
+    // rides the scratchpad that is still populated when logImprovementDelta
+    // runs.
+    expect((impEntry!.params as PlayImprovementParams | undefined)?.bonusSources).toContain(CARD_ID)
+  })
+
+  it('keeps occupation log cost scoped to the occupation step when a later improvement also spends resources', () => {
+    const session = new GameSession(/* seed */ 1)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    for (const p of state.players) {
+      p.minorHand = [FILLER]
+      p.occupationHand = [FILLER]
+    }
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.occupationHand = [CARD_ID]
+    player.occupationPlayed = ['A85_Homekeeper']
+    // Second occupation on Lessons costs 1 food. The follow-up Fireplace buy
+    // spends 1 clay + 1 food via D95, and must not leak into log.playOccupation.
+    player.resources = { ...player.resources, food: 10, clay: 1, wood: 0, stone: 0, reed: 0 }
+    if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
+      state.availableMajorImprovements.push('Major_Fireplace1')
+    }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    if (resp.pending.type !== 'choice') return
+    resp = session.resolveChoice(0, CARD_ID)
+
+    let steps = 0
+    let bought = false
+    while (resp.pending.type === 'choice' && steps < 12) {
+      steps++
+      const options = resp.pending.options ?? []
+      const fireplace = options.find(
+        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+      )
+      if (fireplace && !bought) {
+        resp = session.resolveChoice(0, fireplace.value)
+        bought = true
+        continue
+      }
+      const next = options.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
+      if (!next) break
+      resp = session.resolveChoice(0, next.value)
+    }
+
+    type PlayOccupationParams = {
+      occupations?: string
+      costResources?: Record<string, number>
+      bonusSources?: string[]
+    }
+    const occEntry = resp.state.log.find((e) => e.key === 'log.playOccupation')
+    expect(occEntry).toBeDefined()
+    expect((occEntry!.params as PlayOccupationParams | undefined)?.occupations).toContain(CARD_ID)
+    expect((occEntry!.params as PlayOccupationParams | undefined)?.costResources).toEqual({ food: 1 })
+    expect((occEntry!.params as PlayOccupationParams | undefined)?.bonusSources).toBeUndefined()
+  })
 })

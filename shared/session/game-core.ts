@@ -249,10 +249,7 @@ export class GameCore {
     gains: {},
     costs: {},
   }
-  private usedBakeBreadThisAction = false
   private nextActionToken = 1
-  private loggedImprovementThisAction = false
-  private loggedBakeBreadThisAction = false
   private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
   private turnOwnerPlayerIndex: number | null = null
 
@@ -1124,7 +1121,11 @@ export class GameCore {
     const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
-    if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) return
+    if (
+      detailParts.effects?.improvements
+      || detailParts.effects?.minorImprovements
+      || detailParts.effects?.bakeBread
+    ) return
     if (!hasGains && !hasCosts && !hasEffects) return
     this.state.log.unshift({
       key: 'log.actionDetail',
@@ -1146,8 +1147,8 @@ export class GameCore {
    *   - no active snapshot (no in-flight action),
    *   - leaf actionId equals the top-level activeSpaceId (the wrapper itself),
    *   - the action wrote its own logKey (e.g. `log.sow`, `log.buildStable`),
-   *   - improvement was just played (logImprovementDelta will own the log),
-   *   - bake-bread was just used (logBakeBreadDelta owns the log).
+   *   - the resulting delta is already covered by a dedicated immediate log
+   *     (for example improvement / bake-bread).
    */
   private flushLeafActionDetail(
     actionId: string | undefined,
@@ -1158,8 +1159,6 @@ export class GameCore {
     if (this.activePlayerIndex === null) return
     if (actionId === this.activeSpaceId) return
     if (hasOwnLogKey) return
-    if (this.loggedImprovementThisAction) return
-    if (this.usedBakeBreadThisAction) return
     const def = getActionDefinition(actionId)
     if (!def?.emitLeafActionDetail) return
     const player = this.state.players[this.activePlayerIndex]
@@ -1180,8 +1179,11 @@ export class GameCore {
     const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
-    if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) {
-      player._activeActionBonusSources = []
+    if (
+      detailParts.effects?.improvements
+      || detailParts.effects?.minorImprovements
+      || detailParts.effects?.bakeBread
+    ) {
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
       return
     }
@@ -1203,69 +1205,10 @@ export class GameCore {
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
 
-  private logImprovementDelta(before: PlayerState, player: PlayerState) {
-    if (this.loggedImprovementThisAction) return
-    const newImprovements = player.improvements.filter(
-      (id) => !before.improvements.includes(id),
-    )
-    const newMinorImprovements = player.minorPlayed.filter(
-      (id) => !before.minorPlayed.includes(id),
-    )
-    const returnedCards = before.improvements.filter(
-      (id) => !player.improvements.includes(id),
-    )
-    const { costs } = this.buildActionDetailParts(before, player)
-    const costResources = Object.fromEntries(
-      resourceKeyList
-        .filter((key) => (costs[key] ?? 0) > 0)
-        .map((key) => [key, costs[key] ?? 0]),
-    )
-    if (newImprovements.length > 0) {
-      this.state.log.unshift({
-        key: 'log.playImprovement',
-        params: {
-          player: player.name,
-          improvements: newImprovements.join(','),
-          costResources,
-          returnedCards: returnedCards.length > 0 ? returnedCards : undefined,
-        },
-      })
-      this.loggedImprovementThisAction = true
-    }
-    if (newMinorImprovements.length > 0) {
-      this.state.log.unshift({
-        key: 'log.playMinorImprovement',
-        params: {
-          player: player.name,
-          improvements: newMinorImprovements.join(','),
-          costResources,
-          returnedCards: returnedCards.length > 0 ? returnedCards : undefined,
-        },
-      })
-      this.loggedImprovementThisAction = true
-    }
-  }
-
-  private logBakeBreadDelta(before: PlayerState, player: PlayerState) {
-    if (this.loggedBakeBreadThisAction) return
-    const grainUsed = Math.max(0, before.resources.grain - player.resources.grain)
-    const foodGained = Math.max(0, player.resources.food - before.resources.food)
-    if (grainUsed > 0 && foodGained > 0) {
-      this.state.log.unshift({
-        key: 'log.bakeBread',
-        params: { player: player.name, count: grainUsed, food: foodGained },
-      })
-      this.loggedBakeBreadThisAction = true
-    }
-  }
-
   private flushEngineLog() {
     const entries = this.engineLog.all()
     if (entries.length > 0) {
       const toAdd = entries.filter((e) => e.key !== 'log.action')
-      if (toAdd.some((e) => e.key === 'log.playImprovement' || e.key === 'log.playMinorImprovement')) {
-        this.loggedImprovementThisAction = true
-      }
       for (const entry of toAdd) {
         if (entry.key === 'log.cardEffectGain') {
           const gain = (entry.params as { gain?: Partial<Resource> } | undefined)?.gain
@@ -1297,21 +1240,10 @@ export class GameCore {
   private finalizeActionLog(player: PlayerState) {
     const before = this.actionStartPlayerSnapshot
     if (before) {
-      if (!this.loggedImprovementThisAction && !this.usedBakeBreadThisAction) {
-        this.logActionDetail(before, player)
-      }
-    }
-    if (before && !this.loggedImprovementThisAction) {
-      this.logImprovementDelta(before, player)
-    }
-    if (before && !this.loggedBakeBreadThisAction && this.usedBakeBreadThisAction) {
-      this.logBakeBreadDelta(before, player)
+      this.logActionDetail(before, player)
     }
     this.actionStartPlayerSnapshot = null
     delete player._activeActionBonusSources
-    this.usedBakeBreadThisAction = false
-    this.loggedImprovementThisAction = false
-    this.loggedBakeBreadThisAction = false
   }
 
   private startStageFlow(
@@ -1720,15 +1652,6 @@ export class GameCore {
             const resolvedActionId = this.engine?.snapshot().pendingChoiceActionId ?? undefined
             const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
-            const isBakeChoice =
-              autoPromptKey === 'ui.interactionBakeBreadChoice' ||
-              autoPromptKey === 'ui.interactionBakeBreadCount'
-            if (isBakeChoice && auto.value !== 'cancel' && auto.value !== '__skip__') {
-              this.usedBakeBreadThisAction = true
-            }
-            if (isBakeChoice) {
-              this.logBakeBreadDelta(before, player)
-            }
             if (result.type === 'ok' && resolvedActionId) {
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
@@ -1794,7 +1717,6 @@ export class GameCore {
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
         delete player._activeActionBonusSources
-        this.usedBakeBreadThisAction = false
         this.turnOwnerPlayerIndex = null
         return
       }
@@ -1980,7 +1902,6 @@ export class GameCore {
     player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
-    this.usedBakeBreadThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
     const worker = smallestAvailableWorker(this.state, player)
     if (worker) {
@@ -2085,13 +2006,6 @@ export class GameCore {
     if (pushHistoryEntry) {
       this.pushHistory()
     }
-    const before = this.clonePlayer(player)
-    const isBakeChoice =
-      promptKey === 'ui.interactionBakeBreadChoice' ||
-      promptKey === 'ui.interactionBakeBreadCount'
-    if (isBakeChoice && value !== 'cancel' && value !== '__skip__') {
-      this.usedBakeBreadThisAction = true
-    }
     // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
     // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
     // ActionFlow that runs after the engine's own choice resolution.
@@ -2112,9 +2026,6 @@ export class GameCore {
     const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space })
     this.flushEngineLog()
-    if (isBakeChoice) {
-      this.logBakeBreadDelta(before, player)
-    }
     if (result.type === 'ok' && resolvedActionId) {
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
@@ -2145,7 +2056,6 @@ export class GameCore {
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
-      this.usedBakeBreadThisAction = false
       this.turnOwnerPlayerIndex = null
       return this.respond()
     }

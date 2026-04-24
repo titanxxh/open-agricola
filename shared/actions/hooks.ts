@@ -28,6 +28,7 @@ export const actionHookPhases: ActionHookPhase[] = [
   'computeChoiceCandidates',
   'computeReplace',
   'isDoable',
+  'anytime',
 ]
 
 export type ActionHookContext = ActionExecutionContext & {
@@ -53,6 +54,7 @@ export type ActionHookResult = {
   sourceCard?: string
   logKey?: string
   logParams?: Record<string, unknown>
+  immediateLogs?: import('../game/types').ImmediateLogEntry[]
   labelKey?: string
   labelParams?: Record<string, unknown>
   decline?: boolean

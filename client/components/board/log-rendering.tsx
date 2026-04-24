@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
 import type { ActionDetailParts } from '../../../shared/protocol/game'
+import { getCardMeta } from '../../services/card-meta'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
@@ -12,21 +13,43 @@ export type CardRef = { id: string; type: CardType; name: string }
 const joinCardNames = (locale: Locale, names: string[]) =>
   locale === 'zh' ? names.join('、') : names.join(', ')
 
+const humanizeCardId = (id: string): string =>
+  id
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+
 export const resolveCardName = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
     const name = t(locale, `${prefix}.${id}.name`)
     if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
     return null
   }
-  return (
+  const translated =
     tryKey('improvements', 'major') ??
     tryKey('minorImprovements', 'minor') ??
     tryKey('occupations', 'occupation')
-  )
+  if (translated) return translated
+
+  const meta = getCardMeta(id)
+  if (!meta) return null
+
+  const type: CardRef['type'] =
+    meta.type === 'major'
+      ? 'major'
+      : meta.type === 'minor'
+        ? 'minor'
+        : meta.type === 'occupation'
+          ? 'occupation'
+          : t(locale, `minorImprovements.${id}.name`) !== `minorImprovements.${id}.name`
+            ? 'minor'
+            : 'occupation'
+
+  return { id, type, name: meta.name.replace(/\s*[（(].*$/, '') }
 }
 
 const resolveCardDisplayName = (locale: Locale, id: string) =>
-  resolveCardName(locale, id)?.name ?? id
+  resolveCardName(locale, id)?.name ?? humanizeCardId(id)
 
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const prefix =
@@ -239,10 +262,52 @@ const stringifyParams = (
   return out
 }
 
+const collectReferencedCardIds = (params: Record<string, unknown> | undefined): string[] => {
+  if (!params) return []
+
+  const cardIds: string[] = []
+  if (typeof params.cardId === 'string') cardIds.push(params.cardId)
+  if (params.improvements) {
+    const ids = Array.isArray(params.improvements)
+      ? params.improvements
+      : String(params.improvements).split(',')
+    ids.forEach((id) => {
+      if (typeof id === 'string') cardIds.push(id.trim())
+    })
+  }
+  if (params.occupations) {
+    const ids = Array.isArray(params.occupations)
+      ? params.occupations
+      : String(params.occupations).split(',')
+    ids.forEach((id) => {
+      if (typeof id === 'string') cardIds.push(id.trim())
+    })
+  }
+  if (params.returnedCards) {
+    const ids = Array.isArray(params.returnedCards)
+      ? params.returnedCards
+      : String(params.returnedCards).split(',')
+    ids.forEach((id) => {
+      if (typeof id === 'string') cardIds.push(id.trim())
+    })
+  }
+  if (Array.isArray(params.bonusSources)) {
+    params.bonusSources.forEach((id) => {
+      if (typeof id === 'string') cardIds.push(id.trim())
+    })
+  }
+  const detailParts = params.detailParts as ActionDetailParts | undefined
+  detailParts?.effects?.improvements?.forEach((id) => cardIds.push(id))
+  detailParts?.effects?.minorImprovements?.forEach((id) => cardIds.push(id))
+  detailParts?.bonusSources?.forEach((id) => cardIds.push(id))
+  return cardIds
+}
+
 export const prepareLogEntry = (
   entry: GameState['log'][number],
   locale: Locale,
 ): PreparedLogEntry => {
+  const cardIds = collectReferencedCardIds(entry.params)
   const params = entry.params ? { ...entry.params } : undefined
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {
@@ -250,16 +315,22 @@ export const prepareLogEntry = (
   }
   if (
     params &&
-    (entry.key === 'log.playImprovement' || entry.key === 'log.playMinorImprovement')
+    (entry.key === 'log.playImprovement' ||
+      entry.key === 'log.playMinorImprovement' ||
+      entry.key === 'log.playOccupation')
   ) {
-    const raw = params.improvements
+    const isOccupation = entry.key === 'log.playOccupation'
+    const isMinor = entry.key === 'log.playMinorImprovement'
+    const raw = isOccupation ? params.occupations : params.improvements
     const ids = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
-    const prefix = entry.key === 'log.playMinorImprovement' ? 'minorImprovements' : 'improvements'
     const names = ids
-      .map((id) => t(locale, `${prefix}.${id}.name`).replace(/\s*[（(].*$/, ''))
+      .map((id) => resolveCardDisplayName(locale, String(id).trim()))
       .filter((name) => name)
-    params.improvements = joinCardNames(locale, names)
+    const joined = joinCardNames(locale, names)
+    if (isOccupation) params.occupations = joined
+    else params.improvements = joined
     params.returned = ''
+    params.via = ''
     const costResources = params.costResources as Partial<Resource> | undefined
     if (costResources && typeof costResources === 'object') {
       richParams.cost = (
@@ -276,20 +347,44 @@ export const prepareLogEntry = (
     } else {
       params.cost = ''
     }
-    const returnedCardsRaw = params.returnedCards
-    const returnedCardIds = Array.isArray(returnedCardsRaw)
-      ? returnedCardsRaw.map((id) => String(id).trim()).filter(Boolean)
-      : typeof returnedCardsRaw === 'string'
-        ? returnedCardsRaw
-            .split(',')
-            .map((id) => id.trim())
-            .filter(Boolean)
-        : []
-    if (returnedCardIds.length > 0) {
-      const returnedNames = returnedCardIds.map((id) => resolveCardDisplayName(locale, id))
-      params.returned = ` ${t(locale, 'log.returns', {
-        cards: joinCardNames(locale, returnedNames),
-      })}`
+    if (!isOccupation) {
+      const returnedCardsRaw = params.returnedCards
+      const returnedCardIds = Array.isArray(returnedCardsRaw)
+        ? returnedCardsRaw.map((id) => String(id).trim()).filter(Boolean)
+        : typeof returnedCardsRaw === 'string'
+          ? returnedCardsRaw
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean)
+          : []
+      if (returnedCardIds.length > 0) {
+        const returnedNames = returnedCardIds.map((id) => resolveCardDisplayName(locale, id))
+        params.returned = ` ${t(locale, 'log.returns', {
+          cards: joinCardNames(locale, returnedNames),
+        })}`
+      }
+    }
+    const bonusSourcesRaw = params.bonusSources
+    const bonusSourceIds = Array.isArray(bonusSourcesRaw)
+      ? bonusSourcesRaw.map((id) => String(id).trim()).filter(Boolean)
+      : []
+    if (bonusSourceIds.length > 0) {
+      const refs = bonusSourceIds
+        .map((id) => resolveCardName(locale, id))
+        .filter((ref): ref is CardRef => ref !== null)
+      if (refs.length > 0) {
+        richParams.via = (
+          <>
+            {' · '}
+            {renderRichTemplate(
+              locale,
+              'log.bonusSources',
+              {},
+              { cards: joinCardRefs(locale, refs) },
+            )}
+          </>
+        )
+      }
     }
   }
   if (
@@ -509,31 +604,6 @@ export const prepareLogEntry = (
       )
   }
 
-  const cardIds: string[] = []
-  if (entry.params) {
-    const raw = entry.params
-    if (typeof raw.cardId === 'string') cardIds.push(raw.cardId)
-    if (raw.improvements) {
-      const ids = Array.isArray(raw.improvements)
-        ? raw.improvements
-        : String(raw.improvements).split(',')
-      ids.forEach((id) => {
-        if (typeof id === 'string') cardIds.push(id.trim())
-      })
-    }
-    if (raw.returnedCards) {
-      const ids = Array.isArray(raw.returnedCards)
-        ? raw.returnedCards
-        : String(raw.returnedCards).split(',')
-      ids.forEach((id) => {
-        if (typeof id === 'string') cardIds.push(id.trim())
-      })
-    }
-    const detailParts = raw.detailParts as ActionDetailParts | undefined
-    detailParts?.effects?.improvements?.forEach((id) => cardIds.push(id))
-    detailParts?.effects?.minorImprovements?.forEach((id) => cardIds.push(id))
-    detailParts?.bonusSources?.forEach((id) => cardIds.push(id))
-  }
   const cardRefs = cardIds
     .map((id) => resolveCardName(locale, id))
     .filter((ref): ref is CardRef => ref !== null)

@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import {
   canAffordCardPreviewCostByProvider,
@@ -7,6 +7,65 @@ import {
 } from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
+
+const getPositiveResourceLog = (
+  resources?: Partial<Resource> | null,
+): Partial<Resource> | undefined => {
+  if (!resources) return undefined
+  const positiveEntries = Object.entries(resources).filter(
+    ([, amount]) => (amount ?? 0) > 0,
+  )
+  if (positiveEntries.length === 0) return undefined
+  return Object.fromEntries(positiveEntries) as Partial<Resource>
+}
+
+const readActionBonusSources = (player: PlayerState): string[] | undefined => {
+  const sources = player._activeActionBonusSources
+  if (!sources || sources.length === 0) return undefined
+  return [...sources]
+}
+
+const buildOccupationLogParams = (
+  occupationId: string,
+  costResources: Partial<Resource> | undefined,
+  bonusSources?: string[],
+) => {
+  const params: Record<string, unknown> = {
+    occupations: occupationId,
+    costResources: getPositiveResourceLog(costResources) ?? {},
+  }
+  if (bonusSources && bonusSources.length > 0) {
+    params.bonusSources = [...bonusSources]
+  }
+  return params
+}
+
+const buildOccupationImmediateLogs = (
+  occupationId: string,
+  costResources: Partial<Resource> | undefined,
+  bonusSources?: string[],
+) => [
+  {
+    key: 'log.playOccupation',
+    params: buildOccupationLogParams(
+      occupationId,
+      costResources,
+      bonusSources,
+    ),
+  },
+]
+
+const attachOccupationImmediateLogs = (
+  result: Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>,
+  immediateLogs: NonNullable<ActionExecutionResult['immediateLogs']>,
+): Extract<ActionExecutionResult, { type: 'ok' | 'flow' }> => {
+  result.immediateLogs = [
+    ...immediateLogs,
+    ...(result.immediateLogs ?? []),
+  ]
+  return result
+}
+
 const buildOccupationCostProvider = (
   player: PlayerState,
   occupationId: string,
@@ -62,24 +121,30 @@ export const playOccupation = (
   if (!player.occupationHand.includes(occupation.id)) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
+  const cost = buildOccupationCostProvider(player, occupationId, costOverride)()
   const paySucceeded = state
     ? payCardPreviewCostByProvider(
         state,
         player,
         'play-occupation',
         occupationId,
-        buildOccupationCostProvider(player, occupationId, costOverride),
+        () => cost,
         actionCardId,
         'occupation',
       )
     : payTypedFlatCost(
         player,
-        buildOccupationCostProvider(player, occupationId, costOverride)(),
+        cost,
         'occupation',
       )
   if (!paySucceeded) {
     return { type: 'fail', logKey: 'log.occupationFail' }
   }
+  const immediateLogs = buildOccupationImmediateLogs(
+    occupation.id,
+    cost,
+    readActionBonusSources(player),
+  )
   player.occupationHand = player.occupationHand.filter(
     (id) => id !== occupation.id,
   )
@@ -93,10 +158,13 @@ export const playOccupation = (
   if (state) {
     const activation = activateCard(state, player, occupation.id, 'onBuy')
     if (activation.type === 'flow') {
-      return activation
+      return attachOccupationImmediateLogs(activation, immediateLogs)
     }
   }
-  return { type: 'ok' }
+  return {
+    type: 'ok',
+    immediateLogs,
+  }
 }
 
 export const getOccupationCost = (

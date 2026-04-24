@@ -119,4 +119,35 @@ describe('E76_LumberPile card effect', () => {
     expect(player.stableTiles).toHaveLength(1)
     expect(player.resources.wood).toBe(initialWood)
   })
+
+  it('lists the B85 FarmHand tile alongside normal stables and returns it for 3 wood', () => {
+    const player = createPlayer('p1')
+    player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    player.cardStates = {
+      B85_FarmHand: {
+        flagged: true,
+        extraData: { position: { row: 3, col: 2 } },
+      },
+    }
+    const state = createState([player])
+    const flow = getCardEffect(CARD_ID)!.onBuy!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    const leaf = flow.children[0]
+    expect(leaf.actionContext.selectableTiles).toEqual([
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 3, col: 2 },
+    ])
+
+    const initialWood = player.resources.wood
+    runSelectionEffect(FIELD_EFFECT, {
+      player,
+      positions: ['0-0', '3-2', '0-1'],
+      sourceCard: CARD_ID,
+    })
+    expect(player.resources.wood).toBe(initialWood + 9)
+    expect(player.stableTiles).toEqual([])
+    expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
+    // once-per-game flag persists so B85 cannot be re-used.
+    expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
+  })
 })

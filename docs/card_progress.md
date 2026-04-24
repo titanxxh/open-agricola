@@ -46,6 +46,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-24 — D95 SiteManager 日志归因修正**：`log.playOccupation` 不再在 action 结束时用整段 delta 倒推成本，而是在 `playOccupation` 子步骤支付成功后立刻固化自己的 `costResources` / `bonusSources`；若职业 `onBuy` 继续接 flow（如 D95 立即触发 `improvement-any`），则通过 `extraData.occupationLog` 把这份 payload 带到 `GameCore` 立刻落日志，避免把后续大改良支付误记进职业日志。新增 `server/__tests__/D95_SiteManager-session.test.ts` 回归：第二张职业走 `lessons`（应只记 1 food）后再买 `Major_Fireplace1`，断言 `log.playOccupation.costResources === { food: 1 }` 且 `bonusSources` 为空。
+- **2026-04-24 — C150 ParrotBreeder + B85 FarmHand 模型 + D102/E76 FarmHand 分支 BGA 对齐**：C150 从占位实现（花 1 谷然后立刻还 1 谷）重写为真实效果——`after:place-farmer` scope `player`/`opponent` 跟踪右邻 seat 的上一次 place-farmer 到 `cardStates.C150.extraData.right`；`anytime` 支付 1 谷并 flag；`computeArgs:place-farmer` scope `player` 注入 `OCCUPIED_SPACE_CHOICE_PREFIX` extra option 让 tracked 空间即使被占用也可落子（自动跳过 Meeting Place）。seat order = `state.players` 数组顺序，右邻 = `(owner − 1 + n) mod n`。B85 FarmHand stable tile 模型重写：存 `cardStates.B85_FarmHand.extraData.position`（2×2 top-left），复用通用 `computeExtraRoomCapacity` hook（同 A10/A85/A127/C10/D85/E85 风格）给 `getExtraRoomCapacity` + `wish-children.ts` 的 `effectiveRooms` 贡献 +1 容量；`cardStates.B85_FarmHand.flagged` 作为 once-per-game sentinel 在 D102/E76 返还后仍为真。`anytime` 守卫 `ctx.space?.id === 'stables'` 严格限定 Build Stables，对齐 BGA rulings（排除 Lazybones E148 / Stable Planner A089 等）。`shared/cards/helpers/stable-removal.ts` 扩成"可归还 stable" 抽象层：`listReturnableStableTiles(player)` + `removeStableOrFarmHandAtTile(player, tile)`；D102 / E76 走这组 helper，完全不触碰 FarmHand 储存字段——`cardStates.B85_FarmHand.extraData.position` 只在 B85 本卡 + stable-removal helper 里出现（spec §3.5.1 封装规则）。**刻意简化**：BGA "返还 FarmHand 时占用者搬回其他房间"不做显式搬人 UI，`familySize` 不变 + 容量 −1 → 下一次 family growth 天然阻塞。**刻意偏离**：BGA `orderComputeCardCosts` 不实现（见 memory "no listener ordering"）。新增 `server/__tests__/C150_ParrotBreeder-session.test.ts`（10 例）+ `server/__tests__/B85_FarmHand-session.test.ts` 重写（10 例覆盖守卫 / housing hook / once-per-game / 2×2 候选检测）+ D102 / E76 session tests 加 FarmHand 返还用例。§2.2 的 C150 + D102/E76 行清空。§2.1 新增 4 条。设计文档：`docs/superpowers/specs/2026-04-24-c150-and-farmhand-model-design.md`。
 - **2026-04-23 — D95 SiteManager 对齐 BGA（2⁴ 食物替换组合）**：把 `computeCosts` listener 从贪心 `{ costs: delta }` 改成返回 4 条 optional `Bonus`（wood/clay/stone/reed 各 1 条，`discount: { <res>: 1, food: -1 }`）。通用支付求解器自然把 4 条 optional 累乘为 2⁴ = 16 条费用变体，`keepOnlyOptimals` Pareto 剪枝掉"基础费用没该类资源却花 food 换"的支配解；剩余 Pareto 并集由 `buildPaymentChoiceResult` 作为 `prompt.selectPayment` 弹出，每个走 D95 的选项自动显示 "via Site Manager" 归因（复用 2026-04-23 早些时候落地的 payment `sourceCards` UI）。清理：去掉 listener 里死分支 `actions: ['minor-improvement']`（BGA 只给 MAJOR，onBuy 强制 `types: ['major']`），去掉 `getMajorCardEffect / getMinorImprovement / Resource` 导入，文件从 125 行缩到 ~75 行（比 BGA 92 行更短）。**刻意偏离**：BGA `orderComputeCardCosts`（D95 < A143 / C27 / B95）未实现——我们没有 listener 排序机制；bonus 展开产出的 Pareto 并集是所有顺序的超集，比单一顺序更完整。新增 `server/__tests__/D95_SiteManager-session.test.ts` 的"多选支付弹窗"用例（Joinery `{ wood:2, stone:2 }` + 充足资源 → 3 条 Pareto 不可比路径 skip / swap-wood / swap-stone，各自 `sourceCards` 如期）。§2.2 移除 D95，迁入 §2.1。设计文档：`docs/superpowers/specs/2026-04-23-d95-site-manager-design.md`。
 - **2026-04-23 — `renovate-house` 支付路径走 `resolveCostPaymentSelection` 两阶段 choice**：修复 `payTypedFlatCost` 在直接支付分支里把 `BonusModifier` 短路的 bug——当玩家可同时走直接支付与 bonus 折扣两条路径时（例如 A123 FrameBuilder 下持有 2 clay + 1 reed + 4 wood 的木屋翻修），现在会弹出 `prompt.selectPayment` 让玩家二选一，而不是静默地走直接支付。`renovateHouseAction.resolveChoice` 重构：选定翻修目标后调用 `resolveCostPaymentSelection(..., costType: 'renovation')`，多解时返回 `{ type: 'choice' }`，单解时直接 `executeResolvedTypedFlatPayment`；payment-choice 的 option value 走 `pay:renovate:<target>:<idx>` 前缀，把目标编码进去以跨 choice 回合保留（不依赖 `params.selectedOption` 被第二次 resolveChoice 覆盖）。新增 `server/__tests__/A123_FrameBuilder-renovate-choice-repro.test.ts`。既有 log 归因 / A87 Conservator / B107 Manservant / B55 MaintenancePremium / shared renovation 单测全部保持通过。
 - **2026-04-23 — `log.actionDetail` 增加 `bonusSources` 字段**：当某次 action 的支付路径走了 `BonusModifier.sources`（如 A123 FrameBuilder 的 `-2 clay / +1 wood` 替换）时，`ActionDetailParts.bonusSources` 现在记录触发卡 id；前端 log 面板渲染为“via {card}”尾缀（i18n: `log.bonusSources`），card link 可 hover 预览。实现：`PlayerState` 新增 session-transient `_activeActionBonusSources?: string[]` 标记（`shared/game/types.ts`），`GameCore` 在 action 开始 / leaf flush / finalize 三处各自 init / reset / delete；`executePaymentSolution`（`shared/actions/effects/pay.ts`）在完成扣资源后把 `PaymentSolution.bonusUsed` 的 source 写入该 scratchpad；`buildActionDetailParts` 把 scratchpad 拷进 `detailParts.bonusSources`。保留在 `shared/` 层——renovate / construct / 任何未来走 `payTypedFlatCost` / `payCardPreviewCost` 的 action 自动受益。新增 `server/__tests__/A123_FrameBuilder-renovate-log-session.test.ts`（2 例：走 bonus 路径时归因、直接支付时不归因）。
@@ -86,9 +88,9 @@
 - **2026-04-19 — E16 BriarHedge + B30 WoodPalisades border-fence 对齐 BGA**：`isBorderEdge(edgeId)` helper（`shared/game/farm.ts`）检测农场边缘格；新增 `CardEffect.computeFenceDiscount` hook + `collectFenceDiscount(state, player, ctx)` 聚合器（`shared/cards/card-effects.ts`）；E16 注册 `computeFenceDiscount`，按每条 border edge 抵扣 1 wood（最多抵 4）；B30 palisade 限制仅能放 border edge（新增 `PALISADE_NOT_ON_BORDER` 错误码，`server/fence-validation.ts`）；前端 palisade 模式自动过滤内部边缘（`useFarmSelection` hook early-return + gray-out）；5 个 session 测试场景覆盖折扣 + B30 共存；§2.2 移除 E16 简化条目，迁入 §2.1。已知偏离：`canStartFencing` 仍要求 wood ≥ 4，见 §2.5。
 - **2026-04-18 — E125 DelayedWayfarer BGA 对齐**：新增 `onAllWorkersPlaced` hook phase（所有工人放完后、round end 前触发）；`place-farmer` 增加 `fromSupply` 模式（激活 supply worker）；E125 从简化（下轮开始）改为精确时序（本轮所有人放完后）；修复引擎 OptionalNode 路径漏传 `actionContext`/`sourceCard` 的 bug。
 
-### 2.1 ✅ 完全对齐（已逐项核对的 28 张）
+### 2.1 ✅ 完全对齐（已逐项核对的 32 张）
 
-> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 28 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 + D154 迁入 2026-04-19 + D95 迁入 2026-04-23）。
+> ~800 张未列卡按 `shared/cards/catalog.ts` 注册即视为已实现；下表是 2026-04-17 复核中逐项核对过、明确标 ✅ 的 32 张（14 base + A25 + A87 + B30 + PR2 迁入 6 张 + PR3 迁入 D60 + A113 + D25 + E16 + D154 迁入 2026-04-19 + D95 迁入 2026-04-23 + C150 + B85 + D102 + E76 迁入 2026-04-24）。
 
 | Card | 复核要点 | 备注 |
 |---|---|---|
@@ -119,18 +121,22 @@
 | D38 MilkingStool | 补 2-Occupations prereq | 2026-04-17 PR2：`cost: { wood: 1 }`（本来就对）、新增 `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` |
 | D60 LargePottery | dual-type（minor + alsoCountsAs major）+ prerequisite `Return the Pottery` + onBuy 退回 Major_Pottery + scoresMap 按 clay 3-4/5/6/7+ 给 1/2/3/4 | 2026-04-17 PR3：`cost: { clay: 1, stone: 1 }`、`category: 'FOOD_PROVIDER'`、`vp: 3` + `extraVp: true` + `evenMoreSet: true`、`alsoCountsAs: ['major']`；2026-04-18 修正建模：删除 `returnCards`，改为保留印刷 `prerequisite: 'Return the Pottery'` + custom prerequisite handler（需已打出 `Major_Pottery`）+ D60 `onBuy` 主动把 `Major_Pottery` 退回 `availableMajorImprovements`。`computeBonusScore` 原本已对（clay≥3/5/6/7 → 1/2/3/4）。注：D59 EarthOven / A60 OrientalFireplace 同步补 `alsoCountsAs: ['major']`——行为等价（之前就有 returnCards）但现在 2-Major prereq 与 B133 VillagePeasant / C5 Remodeling / A31 DebtSecurity / D145 RoofExaminer / A101 CookeryOutfitter 都会把它们计入 major 侧 |
 | D154 ChimneySweep | `renovate-house` computeCosts hook 无条件返回 `{ costs: { stone: -2 } }`——clay→stone 与 wood→stone（A87 Conservator 直升）都减 2 石；结算时每名其他玩家住石屋 +1 bonus VP | 2026-04-19：去掉 `houseType === 'clay'` 守卫、`players: '3+' → '4+'`；wood→clay 由 `applyCostOverride` 的 `Math.max(0, …)` clamp 处理——stone 不在基础 cost 中，负数不产生副作用；BGA `extraVp = true` 仅卡面 UI 标记，规则无影响 |
-| D95 SiteManager | onBuy 免费起一张 MAJOR（optional `improvement-any, types: ['major']`）；付费时为 wood/clay/stone/reed 各注入 1 条 optional `Bonus`（`discount: { <res>: 1, food: -1 }`），通用支付求解器 2⁴ 展开 + Pareto 剪枝 → `prompt.selectPayment` 让玩家在 skip / 任意子集替换中选一条 | 2026-04-23：复用 Bonus.optional + `computeAllBuyableCombinations` + `keepOnlyOptimals` + payment-choice prompt + `sourceCards` 归因；刻意偏离 BGA `orderComputeCardCosts`（见 §2.5 下方说明）；文件 ~75 行 / BGA 92 行 |
+| D95 SiteManager | onBuy 免费起一张 MAJOR（optional `improvement-any, types: ['major']`）；付费时为 wood/clay/stone/reed 各注入 1 条 optional `Bonus`（`discount: { <res>: 1, food: -1 }`），通用支付求解器 2⁴ 展开 + Pareto 剪枝 → `prompt.selectPayment` 让玩家在 skip / 任意子集替换中选一条 | 2026-04-23：复用 Bonus.optional + `computeAllBuyableCombinations` + `keepOnlyOptimals` + payment-choice prompt + `sourceCards` 归因。2026-04-24：`log.playOccupation` 改为在 `playOccupation` 子步骤支付成功后立刻固化 payload；若 `onBuy` 接 flow，则经 `extraData.occupationLog` 立即落日志，不再把后续大改良支付误计入职业本身。刻意偏离 BGA `orderComputeCardCosts`（见 §2.5 下方说明）；文件 ~75 行 / BGA 92 行 |
+| C150 ParrotBreeder | 4+ 人局；双 listener 跟踪右邻 seat 的上一次 place-farmer 到 `cardStates.C150.extraData.right`；`anytime` 付 1 谷 + flag；`computeArgs:place-farmer` 注入 `OCCUPIED_SPACE_CHOICE_PREFIX` 让被占的 tracked 空间仍可落子（自动跳过 `meeting-place`） | 2026-04-24：seat order = `state.players` 数组顺序；右邻 = `(owner−1+n) mod n`；复用现有 `OCCUPIED_SPACE_CHOICE_PREFIX` 机制（~8 张卡共用）；不实现 BGA `orderComputeCardCosts` |
+| B85 FarmHand | 只在 `stables` action 内触发（BGA rulings 明确排除 Lazybones / Stable Planner 等）；付 1 wood + 2×2 top-left selection；`cardStates.B85.extraData.position` 存位置，`flagged` 作为 once-per-game sentinel；housing +1 通过通用 `computeExtraRoomCapacity` hook（不改 `player.rooms`，不进 `stableTiles`，动物容量不变） | 2026-04-24：复用 A10/A85/A127/C10/D85/E85 风格的 housing hook；D102/E76 返还 FarmHand 时仅清位置、`flagged` 保留，once-per-game 依旧生效；BGA "occupant moves to other rooms" 简化为"capacity −1 自然阻塞 family growth"（见 §2.5） |
+| D102 SampleStableMaker | return-home 阶段 optional：归还 1 个 stable（普通或 FarmHand）→ 1 wood + 1 grain + 1 food + optional minor improvement | 2026-04-24：复用 `shared/cards/helpers/stable-removal.ts` 的 `listReturnableStableTiles` + `removeStableOrFarmHandAtTile`；FarmHand 归还时只清 `cardStates.B85.extraData.position`，`flagged` 保留 |
+| E76 LumberPile | onBuy optional：归还至多 3 个 stable（普通或 FarmHand），每个 +3 wood | 2026-04-24：同上，走 `stable-removal` 共享 helper；"per returned stable" 语义对 FarmHand 同样适用 |
 
-### 2.2 🟡 简化实现（3 张）
+### 2.2 🟡 简化实现（0 张）
 
-> 简化原因写在各卡 `.ts` 文件顶部注释中。回归 BGA 完整规则需要的基础设施列在最后一列。
+> 所有此前列入本节的卡都已回到完整规则。保留历史条目以便审计。
 
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
-| C150 ParrotBreeder | 仅保留 anytime 激活信号（付 1 谷 → 得 1 谷）；对手行动追踪未实现 | 跨玩家状态 + 动态 computeArgs-place-farmer |
-| D102 / E76 | 跳过 FarmHand 分支 | B85 模型需独立 FarmHand 马厩 tile |
 | ~~E96 Elder~~ | ~~回合 1 StartOfWork 额外打出职业未实现~~ | 已实现（2026-04-19），通过 `handHooks` 机制 |
 | ~~D95 SiteManager~~ | ~~贪心：短缺时才用食物替换建材~~ | 已实现（2026-04-23）——用 4 条 optional `Bonus`（wood/clay/stone/reed → food）由通用 `computeAllBuyableCombinations` + `keepOnlyOptimals` 自动展开 |
+| ~~C150 ParrotBreeder~~ | ~~占位：付 1 谷 + 归还 1 谷，没有跟踪右邻~~ | 已实现（2026-04-24）——双 listener 跟踪右邻 place-farmer + `computeArgs:place-farmer` 注入 occupied-override option |
+| ~~D102 / E76~~ | ~~跳过 FarmHand 分支~~ | 已实现（2026-04-24）——`shared/cards/helpers/stable-removal.ts` 抽象"可归还 stable"层；消费者无感知 FarmHand 储存 |
 
 ### 2.3 ⚠ 行为偏差待修（0 张）
 
@@ -146,7 +152,7 @@
 >
 > 后续若再出现 cost/prereq/vp 偏差，重新在本节登记并走同样流程：`scripts/audit-card-vp.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（3 张）
+### 2.5 🔀 刻意偏离 BGA（4 张）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -157,6 +163,7 @@
 | C22 BasketChair | `onBuy` 时若本工作阶段已首置 farmer 于非 Meeting Place 格，则把该工人撤回到卡持有态，再给予额外 `place-farmer`（净消耗 2 个在家工人，释放 1 个格位）；BGA 允许 JobContract 伪人 meeple 互动、同轮工人用完后再激活 | (a) 不支持同轮再激活（heldWorker 用完即止）；(b) JobContract 的假人 meeple 清理未实现 | (a) 影响极少：需同轮两次 place-farmer + JobContract 共存；(b) JobContract 未实现，无实际影响 | (a) `onEndTurn` 监听放人计数，用完后重新激活一次；(b) 等 JobContract 实现后再处理假人清理 |
 | D161 CabbageBuyer | 按改良类型 3/2/1 售价 | 3/2/1 按打出改良的实际属性；仅在 house-redevelopment 生效 | 仅在 house-redevelopment 生效；farm-redev / 卡触发 renovate 不 offer | 给 farm-redev / standalone renovate 各加一条 offer 3 食物分支 |
 | E16 BriarHedge + `canStartFencing` | BGA `actFencing` 中 `maxBuyable = wood + borderFreePotential`，因此有 2–3 wood 时 E16 可让玩家进入围栏流程 | 我们 `canStartFencing` 仍要求 wood ≥ 4；E16 的折扣只在边 edge 选定后才被 `collectFenceDiscount` 应用，无法提前拉低入口门槛 | 入口守卫与折扣聚合解耦，改动范围最小；实际影响极小（仅在 2–3 wood 且 E16 已打出的特定边角场景） | `canStartFencing` 读 `collectFenceDiscount` 计算潜在折扣，动态降低最低 wood 要求 |
+| B85 FarmHand（返还占用者搬人） | D102 / E76 返还 FarmHand 时，BGA 显式把占用的 farmer "搬回其他房间"；若其他房间不够则拒绝返还 | 我们不跑显式搬人 UI——`familySize` 不变、capacity 通过 `computeExtraRoomCapacity` drops 1 → 下一次 family growth 天然阻塞；返还始终被允许 | 没有"哪个 farmer 住在哪个 tile" 的细粒度模型；加一条 UI 流程代价偏大 | 引入 farmer-to-tile 的 "housing assignments" 模型，D102 / E76 返还时带检查 + 可选迁移交互 |
 
 > **历史记录**：~~E132 VeggieLover~~ 之前被误标为"刻意不同"。实际上它是 BGA 3+ 人卡（不是 5+），desc 与行为（harvest 1G+1V→6F、scoring 1/2/3 stack→2/4/6 VP）都已与 BGA 对齐。2026-04-17 移除。
 
@@ -204,7 +211,7 @@
 | `PrerequisiteHandler(player, state?)` | ✅ | 2026-04-17 扩展了 state 参数（C32 全局检查需要） |
 | `returnCardToBoard(player, cardId, state?)` | ✅ | 2026-04-18：helper 现在可选接收 `state`，统一负责“从 `player.improvements` / `player.minorPlayed` 移除卡”以及“若归还的是 major，则回收到 `state.availableMajorImprovements` 且不重复追加”。消费者：major/minor improvement 支付路径、D60 LargePottery。 |
 | `selectionEffect` / `selection-effect-registry` | ✅ | 2026-04-18：原 `fieldEffect` / `field-effect-registry` 更名，并在同日完成与 `selection` action 对齐。语义是“selection 提交后执行一个注册回调”，不再把这类“选择提交后的副作用”误称为 field effect。消费者：A58/A70/A71/B115/B165/C18/D27/D70/D71/D72/D102/E4/E71/E76。 |
-| `stable-removal` helper | ✅ | D102 / E76 |
+| `stable-removal` helper | ✅ | D102 / E76；2026-04-24 扩为"可归还 stable 抽象层"，加 `listReturnableStableTiles(player)` + `removeStableOrFarmHandAtTile(player, tile)`，把 B85 FarmHand tile 和普通 stable 一视同仁；`cardStates.B85_FarmHand.extraData.position` 的读/写只在 B85 本卡 + 本 helper 里出现（spec §3.5.1 封装规则） |
 | `recall-placed-worker` action | ✅ | D93（通用农民回收）；2026-04-19 新增 `forceFirst`（强制回收最先放置的工人）与 `targetCardHold`（回收后将工人持有到指定卡的 cardStates.extraData.heldWorkerId）参数 |
 | **Card-held workers（2026-04-19）** | ✅ | `shared/cards/helpers/card-held-workers.ts`：`holdWorkerOnCard(player, cardId, workerId)` / `getWorkerHeldOnCard(player, cardId): string \| undefined` / `releaseWorkerFromCard(player, cardId): string \| undefined` / `getCardHeldWorkerIds(player): Set<string>` 原语。持有的工人存于 `player.cardStates[cardId].extraData.heldWorkerId`；`workersAvailable(state, p)` 已排除被卡持有的工人（不在任何 `takenBy` 也不在家）；回家阶段（`GameSession.returnHome`）在清空行动格 `takenBy` 之后，以 for 循环遍历每个玩家的所有 cardStates key，对每个 cardId 调用 `releaseWorkerFromCard(p, cardId)` 释放持有工人（无单独的 releaseAll 辅助函数）。首个消费者：C22 BasketChair。 |
 | `discard-from-hand` action | ✅ | B146（通用弃手牌） |
