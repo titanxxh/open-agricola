@@ -26,6 +26,14 @@ import { registerExecutorBackedCustomCard } from '../../server/custom-code/runti
 import { createInitialState } from '../../shared/logic/state'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 import { rewriteCardId } from './extract'
+import { collectBonusScores, type BonusScoreResult } from '../../shared/cards/card-effects'
+import {
+  setWorkersAtHome,
+  markAllWorkersUsed,
+  setActiveWorkerCount,
+  workersAvailable,
+} from '../../shared/game/player'
+import { GameSession } from '../../server/game/authoritative-session'
 
 export type CardType = 'minor' | 'occupation'
 
@@ -163,3 +171,143 @@ export function invokeListenerByIndex(
     context,
   } as any)
 }
+
+// ---------------------------------------------------------------------------
+// Session-level helpers (Task 1 additions)
+// ---------------------------------------------------------------------------
+
+export const FIXED_ROUND_ACTION_ORDER = [
+  'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
+  'wish-children', 'western-quarry', 'house-redevelopment',
+  'vegetable-seeds', 'pig-market',
+  'eastern-quarry', 'cattle-market',
+  'cultivation', 'urgent-wish-children',
+  'farm-redevelopment',
+] as const
+
+export const ALL_ZERO_RESOURCES: Resource = {
+  wood: 0, clay: 0, reed: 0, stone: 0,
+  food: 0, grain: 0, vegetable: 0,
+  sheep: 0, boar: 0, cattle: 0,
+  begging: 0,
+}
+
+export function clearAllHands(state: GameState): void {
+  state.players.forEach((p) => {
+    p.minorHand = []
+    p.occupationHand = []
+  })
+}
+
+export function setHand(
+  state: GameState,
+  playerIndex: number,
+  cards: { minor?: string[]; occupation?: string[] },
+): void {
+  const p = state.players[playerIndex]
+  if (!p) throw new Error(`no player ${playerIndex}`)
+  if (cards.minor) p.minorHand = [...cards.minor]
+  if (cards.occupation) p.occupationHand = [...cards.occupation]
+}
+
+export function fixRoundActionOrder(
+  state: GameState,
+  order: readonly string[] = FIXED_ROUND_ACTION_ORDER,
+): void {
+  state.roundActionOrder = [...order]
+}
+
+export function freezeOtherPlayers(state: GameState, testPlayerIndex: number): void {
+  state.players.forEach((p, i) => {
+    if (i !== testPlayerIndex) setWorkersAtHome(state, p, 0)
+  })
+}
+
+export interface BuildOpts {
+  cardId: string
+  cardType: CardType
+  cardName: string
+  cardCost?: Partial<Resource>
+  cardPrerequisite?: string
+  playerCount?: number
+}
+
+export interface BuildResult {
+  session: GameSession
+  cardData: CustomCardData
+  manifest: any
+}
+
+export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): BuildResult {
+  const compiled = compileLLMCard({
+    llmGeneratedCode: llmCode,
+    cardId: opts.cardId,
+    cardType: opts.cardType,
+    cardName: opts.cardName,
+    cardCost: opts.cardCost,
+    cardPrerequisite: opts.cardPrerequisite,
+  })
+  const session = new GameSession(undefined, [compiled.cardData], {
+    playerCount: opts.playerCount ?? 2,
+  })
+  // Force determinism on every fixture's session.
+  // getState().state returns the live this.state reference — mutating it
+  // mutates the session directly. Do NOT call loadState here: normalizeState
+  // re-deals hands when any minorHand/occupationHand is empty.
+  const state = session.getState().state
+  clearAllHands(state)
+  fixRoundActionOrder(state)
+  return { session, cardData: compiled.cardData, manifest: compiled.manifest }
+}
+
+export function getBonusBreakdown(
+  state: GameState,
+  player: PlayerState,
+): { cardId: string; score: number }[] {
+  const result: BonusScoreResult = collectBonusScores(state, player)
+  return result.entries
+}
+
+export interface AutoAdvanceOptions {
+  /** Defensive max iterations to avoid infinite loops on engine bugs. Default 50. */
+  maxIterations?: number
+}
+
+export function autoAdvanceRoundEnd(
+  session: GameSession,
+  opts: AutoAdvanceOptions = {},
+): void {
+  const max = opts.maxIterations ?? 50
+  let iter = 0
+  let resp = session.performRoundEnd()
+  while (iter++ < max) {
+    if (resp.pending.type === 'none' && session.getState().state.gameOver) return
+    if (resp.pending.type === 'harvestFeed') {
+      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      continue
+    }
+    if (resp.pending.type === 'animalReorg') {
+      resp = session.confirmAnimalReorg(resp.pending.playerIndex, [])
+      continue
+    }
+    if (resp.pending.type === 'confirmNextPlayer') {
+      resp = session.confirmNextPlayer()
+      continue
+    }
+    if (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+      continue
+    }
+    if (resp.pending.type === 'choice') {
+      throw new Error(
+        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.pending).slice(0, 200)}`,
+      )
+    }
+    // pending.type === 'none' but game not over → kick next round
+    resp = session.performRoundEnd()
+  }
+  throw new Error(`autoAdvanceRoundEnd exceeded ${max} iterations`)
+}
+
+// Re-export player helpers for fixtures to import from one place
+export { setWorkersAtHome, markAllWorkersUsed, setActiveWorkerCount, workersAvailable }
