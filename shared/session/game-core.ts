@@ -252,6 +252,7 @@ export class GameCore {
   private usedBakeBreadThisAction = false
   private nextActionToken = 1
   private loggedImprovementThisAction = false
+  private loggedOccupationThisAction = false
   private loggedBakeBreadThisAction = false
   private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
   private turnOwnerPlayerIndex: number | null = null
@@ -1254,6 +1255,7 @@ export class GameCore {
   }
 
   private logOccupationDelta(before: PlayerState, player: PlayerState) {
+    if (this.loggedOccupationThisAction) return
     const newOccupations = player.occupationPlayed.filter(
       (id) => !before.occupationPlayed.includes(id),
     )
@@ -1279,6 +1281,20 @@ export class GameCore {
     })
   }
 
+  private emitActionResultExtraLogs(player: PlayerState, extraData: Record<string, unknown> | undefined) {
+    const occupationLog = extraData?.occupationLog as Record<string, unknown> | undefined
+    if (occupationLog) {
+      this.state.log.unshift({
+        key: 'log.playOccupation',
+        params: {
+          player: player.name,
+          ...occupationLog,
+        },
+      })
+      this.loggedOccupationThisAction = true
+    }
+  }
+
   private logBakeBreadDelta(before: PlayerState, player: PlayerState) {
     if (this.loggedBakeBreadThisAction) return
     const grainUsed = Math.max(0, before.resources.grain - player.resources.grain)
@@ -1298,6 +1314,9 @@ export class GameCore {
       const toAdd = entries.filter((e) => e.key !== 'log.action')
       if (toAdd.some((e) => e.key === 'log.playImprovement' || e.key === 'log.playMinorImprovement')) {
         this.loggedImprovementThisAction = true
+      }
+      if (toAdd.some((e) => e.key === 'log.playOccupation')) {
+        this.loggedOccupationThisAction = true
       }
       for (const entry of toAdd) {
         if (entry.key === 'log.cardEffectGain') {
@@ -1337,7 +1356,7 @@ export class GameCore {
     if (before && !this.loggedImprovementThisAction) {
       this.logImprovementDelta(before, player)
     }
-    if (before) {
+    if (before && !this.loggedOccupationThisAction) {
       this.logOccupationDelta(before, player)
     }
     if (before && !this.loggedBakeBreadThisAction && this.usedBakeBreadThisAction) {
@@ -1347,6 +1366,7 @@ export class GameCore {
     delete player._activeActionBonusSources
     this.usedBakeBreadThisAction = false
     this.loggedImprovementThisAction = false
+    this.loggedOccupationThisAction = false
     this.loggedBakeBreadThisAction = false
   }
 
@@ -1765,6 +1785,10 @@ export class GameCore {
             if (isBakeChoice) {
               this.logBakeBreadDelta(before, player)
             }
+            this.emitActionResultExtraLogs(
+              player,
+              (result as { extraData?: Record<string, unknown> } | undefined)?.extraData,
+            )
             if (result.type === 'ok' && resolvedActionId) {
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
@@ -1831,8 +1855,16 @@ export class GameCore {
         this.actionStartPlayerSnapshot = null
         delete player._activeActionBonusSources
         this.usedBakeBreadThisAction = false
+        this.loggedOccupationThisAction = false
         this.turnOwnerPlayerIndex = null
         return
+      }
+
+      if (step.type === 'ok') {
+        this.emitActionResultExtraLogs(
+          player,
+          (step.result as { extraData?: Record<string, unknown> } | undefined)?.extraData,
+        )
       }
 
       if (step.type === 'ok' && step.result.type === 'ok') {
@@ -2017,6 +2049,7 @@ export class GameCore {
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
     this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
     this.usedBakeBreadThisAction = false
+    this.loggedOccupationThisAction = false
     recordActionSnapshot(player, this.nextActionToken++)
     const worker = smallestAvailableWorker(this.state, player)
     if (worker) {
@@ -2182,6 +2215,7 @@ export class GameCore {
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
       this.usedBakeBreadThisAction = false
+      this.loggedOccupationThisAction = false
       this.turnOwnerPlayerIndex = null
       return this.respond()
     }
