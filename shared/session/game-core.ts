@@ -1181,7 +1181,8 @@ export class GameCore {
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
     if (detailParts.effects?.improvements || detailParts.effects?.minorImprovements) {
-      player._activeActionBonusSources = []
+      // `logImprovementDelta` (run from `finalizeActionLog`) still needs the
+      // bonus-sources scratchpad to attribute the payment — leave it intact.
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
       return
     }
@@ -1220,6 +1221,10 @@ export class GameCore {
         .filter((key) => (costs[key] ?? 0) > 0)
         .map((key) => [key, costs[key] ?? 0]),
     )
+    const bonusSources =
+      player._activeActionBonusSources && player._activeActionBonusSources.length > 0
+        ? [...player._activeActionBonusSources]
+        : undefined
     if (newImprovements.length > 0) {
       this.state.log.unshift({
         key: 'log.playImprovement',
@@ -1228,6 +1233,7 @@ export class GameCore {
           improvements: newImprovements.join(','),
           costResources,
           returnedCards: returnedCards.length > 0 ? returnedCards : undefined,
+          bonusSources,
         },
       })
       this.loggedImprovementThisAction = true
@@ -1240,10 +1246,37 @@ export class GameCore {
           improvements: newMinorImprovements.join(','),
           costResources,
           returnedCards: returnedCards.length > 0 ? returnedCards : undefined,
+          bonusSources,
         },
       })
       this.loggedImprovementThisAction = true
     }
+  }
+
+  private logOccupationDelta(before: PlayerState, player: PlayerState) {
+    const newOccupations = player.occupationPlayed.filter(
+      (id) => !before.occupationPlayed.includes(id),
+    )
+    if (newOccupations.length === 0) return
+    const { costs } = this.buildActionDetailParts(before, player)
+    const costResources = Object.fromEntries(
+      resourceKeyList
+        .filter((key) => (costs[key] ?? 0) > 0)
+        .map((key) => [key, costs[key] ?? 0]),
+    )
+    const bonusSources =
+      player._activeActionBonusSources && player._activeActionBonusSources.length > 0
+        ? [...player._activeActionBonusSources]
+        : undefined
+    this.state.log.unshift({
+      key: 'log.playOccupation',
+      params: {
+        player: player.name,
+        occupations: newOccupations.join(','),
+        costResources,
+        bonusSources,
+      },
+    })
   }
 
   private logBakeBreadDelta(before: PlayerState, player: PlayerState) {
@@ -1303,6 +1336,9 @@ export class GameCore {
     }
     if (before && !this.loggedImprovementThisAction) {
       this.logImprovementDelta(before, player)
+    }
+    if (before) {
+      this.logOccupationDelta(before, player)
     }
     if (before && !this.loggedBakeBreadThisAction && this.usedBakeBreadThisAction) {
       this.logBakeBreadDelta(before, player)

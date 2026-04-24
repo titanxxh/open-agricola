@@ -250,16 +250,27 @@ export const prepareLogEntry = (
   }
   if (
     params &&
-    (entry.key === 'log.playImprovement' || entry.key === 'log.playMinorImprovement')
+    (entry.key === 'log.playImprovement' ||
+      entry.key === 'log.playMinorImprovement' ||
+      entry.key === 'log.playOccupation')
   ) {
-    const raw = params.improvements
+    const isOccupation = entry.key === 'log.playOccupation'
+    const isMinor = entry.key === 'log.playMinorImprovement'
+    const raw = isOccupation ? params.occupations : params.improvements
     const ids = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
-    const prefix = entry.key === 'log.playMinorImprovement' ? 'minorImprovements' : 'improvements'
+    const prefix = isOccupation
+      ? 'occupations'
+      : isMinor
+        ? 'minorImprovements'
+        : 'improvements'
     const names = ids
       .map((id) => t(locale, `${prefix}.${id}.name`).replace(/\s*[（(].*$/, ''))
       .filter((name) => name)
-    params.improvements = joinCardNames(locale, names)
+    const joined = joinCardNames(locale, names)
+    if (isOccupation) params.occupations = joined
+    else params.improvements = joined
     params.returned = ''
+    params.via = ''
     const costResources = params.costResources as Partial<Resource> | undefined
     if (costResources && typeof costResources === 'object') {
       richParams.cost = (
@@ -276,20 +287,44 @@ export const prepareLogEntry = (
     } else {
       params.cost = ''
     }
-    const returnedCardsRaw = params.returnedCards
-    const returnedCardIds = Array.isArray(returnedCardsRaw)
-      ? returnedCardsRaw.map((id) => String(id).trim()).filter(Boolean)
-      : typeof returnedCardsRaw === 'string'
-        ? returnedCardsRaw
-            .split(',')
-            .map((id) => id.trim())
-            .filter(Boolean)
-        : []
-    if (returnedCardIds.length > 0) {
-      const returnedNames = returnedCardIds.map((id) => resolveCardDisplayName(locale, id))
-      params.returned = ` ${t(locale, 'log.returns', {
-        cards: joinCardNames(locale, returnedNames),
-      })}`
+    if (!isOccupation) {
+      const returnedCardsRaw = params.returnedCards
+      const returnedCardIds = Array.isArray(returnedCardsRaw)
+        ? returnedCardsRaw.map((id) => String(id).trim()).filter(Boolean)
+        : typeof returnedCardsRaw === 'string'
+          ? returnedCardsRaw
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean)
+          : []
+      if (returnedCardIds.length > 0) {
+        const returnedNames = returnedCardIds.map((id) => resolveCardDisplayName(locale, id))
+        params.returned = ` ${t(locale, 'log.returns', {
+          cards: joinCardNames(locale, returnedNames),
+        })}`
+      }
+    }
+    const bonusSourcesRaw = params.bonusSources
+    const bonusSourceIds = Array.isArray(bonusSourcesRaw)
+      ? bonusSourcesRaw.map((id) => String(id).trim()).filter(Boolean)
+      : []
+    if (bonusSourceIds.length > 0) {
+      const refs = bonusSourceIds
+        .map((id) => resolveCardName(locale, id))
+        .filter((ref): ref is CardRef => ref !== null)
+      if (refs.length > 0) {
+        richParams.via = (
+          <>
+            {' · '}
+            {renderRichTemplate(
+              locale,
+              'log.bonusSources',
+              {},
+              { cards: joinCardRefs(locale, refs) },
+            )}
+          </>
+        )
+      }
     }
   }
   if (
@@ -521,11 +556,24 @@ export const prepareLogEntry = (
         if (typeof id === 'string') cardIds.push(id.trim())
       })
     }
+    if (raw.occupations) {
+      const ids = Array.isArray(raw.occupations)
+        ? raw.occupations
+        : String(raw.occupations).split(',')
+      ids.forEach((id) => {
+        if (typeof id === 'string') cardIds.push(id.trim())
+      })
+    }
     if (raw.returnedCards) {
       const ids = Array.isArray(raw.returnedCards)
         ? raw.returnedCards
         : String(raw.returnedCards).split(',')
       ids.forEach((id) => {
+        if (typeof id === 'string') cardIds.push(id.trim())
+      })
+    }
+    if (Array.isArray(raw.bonusSources)) {
+      raw.bonusSources.forEach((id) => {
         if (typeof id === 'string') cardIds.push(id.trim())
       })
     }
