@@ -1,7 +1,10 @@
 import { MinorImprovement } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
-import { removeStableAtTile } from '../helpers/stable-removal'
+import {
+  listReturnableStableTiles,
+  removeStableOrFarmHandAtTile,
+} from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -10,13 +13,15 @@ const FIELD_EFFECT = 'lumber-pile-return-stables'
 
 /**
  * E76 Lumber Pile (Minor, E, 76):
- * - onBuy: player may immediately return up to 3 stables from the farmyard to
- *   their supply. Each returned stable grants 3 WOOD.
+ * - onBuy: player may immediately return up to 3 stables from the farmyard
+ *   to their supply (normal stables OR the B85 FarmHand stable). Each
+ *   returned stable grants 3 WOOD.
  *
- * BGA (E76_LumberPile.php): optional returnStables → max 3 normal stables,
- * then gainNode(WOOD => 3 * count). BGA also has a FarmHand branch but in our
- * engine FarmHand (B85) is modeled as `rooms + 1` without a distinct stable
- * tile, so we only implement the normal-stable branch.
+ * BGA (E76_LumberPile.php): optional returnStables → max 3 stables
+ * (including the FarmHand stable), then gainNode(WOOD => 3 * count).
+ * Candidate listing + removal dispatch go through the shared
+ * `stable-removal` helper so this card stays agnostic of the FarmHand
+ * storage (see spec §3.5.1).
  */
 registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   let removed = 0
@@ -26,7 +31,7 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
     const col = Number(colStr)
     if (!Number.isFinite(row) || !Number.isFinite(col)) continue
     const tile: FarmTilePosition = { row, col }
-    if (removeStableAtTile(player, tile)) removed += 1
+    if (removeStableOrFarmHandAtTile(player, tile)) removed += 1
     if (removed >= 3) break
   }
   if (removed > 0) {
@@ -53,11 +58,8 @@ export const E76_LumberPile_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    if (player.stableTiles.length === 0) return
-    const selectableTiles = player.stableTiles.map((t) => ({
-      row: t.row,
-      col: t.col,
-    }))
+    const selectableTiles = listReturnableStableTiles(player)
+    if (selectableTiles.length === 0) return
     const flow: ActionFlow = {
       type: 'seq',
       optional: true,

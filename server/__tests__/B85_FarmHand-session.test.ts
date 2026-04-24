@@ -1,137 +1,156 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { isCardFlagged } from '../../shared/cards/helpers/card-state'
+import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import {
+  getRegisteredCardListeners,
+  executeCardListener,
+} from '../../shared/cards/card-listeners'
+import {
+  isCardFlagged,
+  readCardExtraData,
+  setCardFlag,
+  writeCardExtraData,
+} from '../../shared/cards/helpers/card-state'
+import { getCardEffect } from '../../shared/cards/card-effects'
+import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
+import { getFarmHandCandidates } from '../../shared/cards/B/B85_FarmHand'
 
-import { setActiveWorkerCount, familySize } from '../../shared/game/player'
 import '../../shared/cards/B/B85_FarmHand'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { ActionSpace, FarmTilePosition, GameState, PlayerState } from '../../shared/game/types'
 
-describe('B85_FarmHand session', () => {
-  const make2x2Fields = () => [
-    { row: 0, col: 2, crop: null as null, remaining: 0 },
-    { row: 0, col: 3, crop: null as null, remaining: 0 },
-    { row: 1, col: 2, crop: null as null, remaining: 0 },
-    { row: 1, col: 3, crop: null as null, remaining: 0 },
-  ]
+const CARD_ID = 'B85_FarmHand'
+const LISTENER_ID = 'B85-farm-hand-anytime'
 
-  const setup = (options?: { wood?: number; fields?: typeof make2x2Fields extends () => infer R ? R : never }) => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
+const getListener = (id: string) =>
+  getRegisteredCardListeners().find((l) => l.id === id)!
 
-    const player = state.players[0]!
-    player.occupationHand.push('B85_FarmHand')
-    player.resources.wood = options?.wood ?? 5
-    player.resources.food = 10
-    player.fields = options?.fields ?? make2x2Fields()
-    session.loadState(state)
-    session.devPlayCard(0, 'B85_FarmHand')
-    return session
+const make2x2Fields = (): FarmTilePosition[] => [
+  { row: 0, col: 2 },
+  { row: 0, col: 3 },
+  { row: 1, col: 2 },
+  { row: 1, col: 3 },
+]
+
+const setupPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => {
+  const session = new GameSession()
+  const state = session.getState().state
+  const p = state.players[0]!
+  p.occupationPlayed.push(CARD_ID)
+  p.resources.wood = 5
+  p.resources.food = 10
+  p.fields = make2x2Fields().map((t) => ({ ...t, stacks: [] }))
+  return { ...p, ...overrides }
+}
+
+const buildContext = (
+  player: PlayerState,
+  space: Partial<ActionSpace> & { id: string },
+): CardListenerContext => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = [player]
+  return {
+    state: state as GameState,
+    player,
+    space: { nameKey: '', descriptionKey: '', roundAvailable: 1, gainPerRound: {}, canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }), resources: {} as never, takenBy: [], ...space } as ActionSpace,
+    actionId: space.id,
+    phase: 'anytime',
   }
+}
 
-  const enterActiveInteraction = (session: GameSession) => {
-    const resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-    return resp
-  }
-
-  it('anytime available with 2x2 fields and 2+ wood', () => {
-    const session = setup()
-    const resp = enterActiveInteraction(session)
-
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).toContain('B85-farm-hand-anytime')
+describe('B85_FarmHand — anytime guard', () => {
+  it('offers to build FarmHand when inside `stables` with a valid 2×2 + wood', () => {
+    const player = setupPlayer()
+    const ctx = buildContext(player, { id: 'stables' })
+    const result = executeCardListener(getListener(LISTENER_ID), ctx)
+    expect(result?.flow).toBeDefined()
   })
 
-  it('anytime not available without 2x2 fields', () => {
-    const session = setup({
-      fields: [
-        { row: 0, col: 2, crop: null, remaining: 0 },
-        { row: 0, col: 3, crop: null, remaining: 0 },
-        { row: 1, col: 2, crop: null, remaining: 0 },
-        // missing fourth field in 2x2 block
-      ],
-    })
-    const resp = enterActiveInteraction(session)
-
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
+  it('refuses outside `stables` (e.g. in farm-expansion top level, forest, etc.)', () => {
+    const player = setupPlayer()
+    for (const spaceId of ['forest', 'farm-expansion', 'construct', 'play-occupation']) {
+      const ctx = buildContext(player, { id: spaceId })
+      const result = executeCardListener(getListener(LISTENER_ID), ctx)
+      expect(result).toBeUndefined()
+    }
   })
 
-  it('anytime not available without enough wood', () => {
-    const session = setup({ wood: 1 })
-    const resp = enterActiveInteraction(session)
-
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
+  it('refuses without a 2×2 field block', () => {
+    const player = setupPlayer()
+    // Remove one corner so no 2x2 exists.
+    player.fields = player.fields.slice(0, 3)
+    const ctx = buildContext(player, { id: 'stables' })
+    expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
   })
 
-  it('build Farm Hand: pay 2 wood, gain +1 room capacity', () => {
-    const session = setup({ wood: 5 })
-    const state = session.getState().state
-    const initialRooms = state.players[0]!.rooms
-
-    enterActiveInteraction(session)
-
-    const resp = session.takeAnytimeAction(0, 'B85-farm-hand-anytime')
-    expect(resp.ok).toBe(true)
-
-    const updatedPlayer = resp.state.players[0]!
-    expect(updatedPlayer.resources.wood).toBe(3) // 5 - 2
-    expect(updatedPlayer.rooms).toBe(initialRooms + 1)
-    expect(isCardFlagged(updatedPlayer, 'B85_FarmHand')).toBe(true)
+  it('refuses without 1 wood', () => {
+    const player = setupPlayer()
+    player.resources.wood = 0
+    const ctx = buildContext(player, { id: 'stables' })
+    expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
   })
 
-  it('once per game: not available after first use', () => {
-    const session = setup({ wood: 10 })
-
-    enterActiveInteraction(session)
-
-    const resp1 = session.takeAnytimeAction(0, 'B85-farm-hand-anytime')
-    expect(resp1.ok).toBe(true)
-
-    // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
-  })
-
-  it('Farm Hand room enables family growth', () => {
-    const session = setup({ wood: 5 })
-    const state = session.getState().state
-    const player = state.players[0]!
-    // Set family size equal to rooms so growth is blocked
-    player.rooms = 2
-    setActiveWorkerCount(player, 2)
-    session.loadState(state)
-
-    enterActiveInteraction(session)
-
-    // Use anytime action to gain +1 room
-    const resp = session.takeAnytimeAction(0, 'B85-farm-hand-anytime')
-    expect(resp.ok).toBe(true)
-
-    const updatedPlayer = resp.state.players[0]!
-    expect(updatedPlayer.rooms).toBe(3)
-    expect(familySize(updatedPlayer)).toBe(2)
-    // Now rooms (3) > familySize (2), so family growth should be possible
-    expect(updatedPlayer.rooms > familySize(updatedPlayer)).toBe(true)
-  })
-
-  it('2x2 detection works with non-adjacent fields', () => {
-    // Has 4 fields but NOT in a 2x2 block
-    const session = setup({
-      fields: [
-        { row: 0, col: 0, crop: null, remaining: 0 },
-        { row: 0, col: 2, crop: null, remaining: 0 },
-        { row: 2, col: 0, crop: null, remaining: 0 },
-        { row: 2, col: 2, crop: null, remaining: 0 },
-      ],
-    })
-    const resp = enterActiveInteraction(session)
-
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).not.toContain('B85-farm-hand-anytime')
+  it('refuses after once-per-game use (flagged)', () => {
+    const player = setupPlayer()
+    setCardFlag(player, CARD_ID, true)
+    const ctx = buildContext(player, { id: 'stables' })
+    expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
   })
 })
+
+describe('B85_FarmHand — housing contribution', () => {
+  it('adds +1 housing via computeExtraRoomCapacity once position is set', () => {
+    const player = setupPlayer()
+    expect(getExtraRoomCapacity(player)).toBe(0)
+    writeCardExtraData(player, CARD_ID, 'position', { row: 0, col: 2 })
+    expect(getExtraRoomCapacity(player)).toBe(1)
+  })
+
+  it('drops back to 0 after the position is cleared', () => {
+    const player = setupPlayer()
+    writeCardExtraData(player, CARD_ID, 'position', { row: 0, col: 2 })
+    expect(getExtraRoomCapacity(player)).toBe(1)
+    delete player.cardStates![CARD_ID]!.extraData!.position
+    expect(getExtraRoomCapacity(player)).toBe(0)
+  })
+
+  it('once-per-game flag stays true after position is cleared (blocks second build)', () => {
+    const player = setupPlayer()
+    setCardFlag(player, CARD_ID, true)
+    writeCardExtraData(player, CARD_ID, 'position', { row: 0, col: 2 })
+    // Sample-Stable-Maker-style return: clear position only.
+    delete player.cardStates![CARD_ID]!.extraData!.position
+    expect(isCardFlagged(player, CARD_ID)).toBe(true)
+    // Listener still refuses — card is "used" for the whole game.
+    const ctx = buildContext(player, { id: 'stables' })
+    expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
+  })
+})
+
+describe('B85_FarmHand — candidate detection', () => {
+  it('returns all valid 2x2 top-left positions', () => {
+    const p = setupPlayer()
+    p.fields = [
+      { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [] },
+      { row: 1, col: 2, stacks: [] },
+      { row: 1, col: 3, stacks: [] },
+    ] as PlayerState['fields']
+    expect(getFarmHandCandidates(p)).toEqual([{ row: 0, col: 2 }])
+  })
+
+  it('returns no candidates when the four tiles do not form a contiguous 2x2', () => {
+    const p = setupPlayer()
+    p.fields = [
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 2, stacks: [] },
+      { row: 2, col: 0, stacks: [] },
+      { row: 2, col: 2, stacks: [] },
+    ] as PlayerState['fields']
+    expect(getFarmHandCandidates(p)).toEqual([])
+  })
+})
+
+// Silence unused-import warnings when eslint runs on this file.
+void readCardExtraData
+void getCardEffect

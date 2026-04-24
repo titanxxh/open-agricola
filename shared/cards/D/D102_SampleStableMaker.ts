@@ -1,7 +1,10 @@
 import { Occupation } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
-import { removeStableAtTile } from '../helpers/stable-removal'
+import {
+  listReturnableStableTiles,
+  removeStableOrFarmHandAtTile,
+} from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -10,14 +13,18 @@ const FIELD_EFFECT = 'sample-stable-maker-return'
 
 /**
  * D102 Sample Stable Maker (Occupation, D, 102):
- * - onStartReturnHome: if the player has at least one built stable, they may
- *   return 1 stable to supply. In exchange: gain 1 WOOD + 1 GRAIN + 1 FOOD
- *   and then optionally play a minor improvement.
+ * - onStartReturnHome: if the player has at least one built stable (normal
+ *   or the B85 FarmHand stable), they may return 1 stable to supply. In
+ *   exchange: gain 1 WOOD + 1 GRAIN + 1 FOOD and then optionally play a
+ *   minor improvement.
  *
  * BGA (D102_SampleStableMaker.php lines 42-111): player can always choose
  * whether to use the effect (NODE_SEQ optional). A single-stable shortcut
- * skips the selection step. Our implementation skips the Farm Hand branch
- * since our B85 FarmHand does not create a dedicated stable tile.
+ * skips the selection step.
+ *
+ * Candidate listing + removal dispatch go through
+ * `shared/cards/helpers/stable-removal.ts` so this card stays agnostic
+ * of the FarmHand storage layout (see spec §3.5.1).
  */
 registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   if (positions.length === 0) return
@@ -26,8 +33,8 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   const col = Number(colStr)
   if (!Number.isFinite(row) || !Number.isFinite(col)) return
   const tile: FarmTilePosition = { row, col }
-  const removed = removeStableAtTile(player, tile)
-  if (!removed) return
+  const kind = removeStableOrFarmHandAtTile(player, tile)
+  if (!kind) return
 
   const gain = { wood: 1, grain: 1, food: 1 } as const
   player.resources.wood = (player.resources.wood ?? 0) + gain.wood
@@ -55,12 +62,8 @@ export const D102_SampleStableMaker_impl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
-    if (player.stableTiles.length === 0) return
-
-    const selectableTiles = player.stableTiles.map((t) => ({
-      row: t.row,
-      col: t.col,
-    }))
+    const selectableTiles = listReturnableStableTiles(player)
+    if (selectableTiles.length === 0) return
 
     const flow: ActionFlow = {
       type: 'seq',
