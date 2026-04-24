@@ -121,8 +121,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 | hook | 签名特殊点 | 用途 |
 |---|---|---|
-| `computeBonusScore` | 返回 `{ score, label }` 而非 ActionFlow | 终局加分 |
-| `computePostScore` / `computeSharedPostScore` | 同上 | 高级计分 |
+| `computeBonusScore` | `(state, player, ctx) => number`（返回 VP 数；`ctx.reserved` 可声明保留资源） | 终局加分（`collectBonusScores` 收集后并入 `cardStateBonusVp`） |
+| `computePostScore` | `(state, player, categories) => number` | 终局后续加分；可读其它分类小计再加 |
+| `computeSharedPostScore` | `(state, owner, summaries) => Array<{ playerId, score }>` | 跨玩家加分（如对手最低分给你额外 VP） |
 | `computeExtraRoomCapacity` | 返回 `number` | 额外容纳空间 |
 | `onComputeAnimalZones` | 接收 `(zones, state, player)` 或 `(state, player, zones)` | 动物分区扩展（双接口） |
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种 | 播种扩展 |
@@ -285,6 +286,81 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ---
 
+## 5.5 listener `actions:` 字段（高频踩坑）
+
+`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`、`wish-children`）。完整列表见 `client/services/llmPrompts.ts §"可监听的行动"`。
+
+要在"玩家走某个行动空间"后触发，监听 `actions: ['place-farmer']` 然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。
+
+```ts
+// ✗ 错误：'forest' 不是 leaf actionId，listener 永不触发
+{ actions: ['forest'], phases: ['after'], handler: (ctx) => ({ flow: ... }) }
+
+// ✓ 正确：监听 place-farmer，handler 内过滤空间 id
+{
+  actions: ['place-farmer'],
+  phases: ['after'],
+  handler: (ctx) => {
+    if (ctx.space?.id !== 'forest') return
+    return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
+  },
+}
+```
+
+特殊行动名 `harvest-feed` **不是** listener 可监听项 —— 收获阶段的 feeding 走直接资源 mutation，不进 listener pipeline。要在 feeding 前补食物，用 effect hook `onHarvest` 返回 `gainLeaf(CARD_ID, { food: N })`。
+
+## 5.6 Anytime ability（任意时刻能力）
+
+不是单独的 API。直接写一个 listener，`phases: ['anytime']`，**不要** `actions:` 字段：
+
+```ts
+{
+  cardIds: [CARD_ID],
+  phases: ['anytime'],
+  handler: (ctx) => {
+    if (ctx.player.cardStates?.[CARD_ID]?.flagged) return  // 一次性闸门
+    if ((ctx.player.resources?.wood ?? 0) < 2) return       // 资源不够就不出
+    return {
+      flow: {
+        type: 'seq',
+        // 不要写 optional: true —— 玩家会跳过 pay 还白拿 gain
+        children: [
+          payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
+          gainLeaf(CARD_ID, { food: 3 }),
+          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+```
+
+引擎会在每次 `respond()` 时自动收集所有 anytime listener，调 handler 拿 flow，把 flow 暴露在 `interaction.anytimeActions[]`。玩家通过 `takeAnytimeAction(playerIndex, action.id)` 触发。`action.id` 即 listener 的 `registrationId`（沙箱卡为 `{cardId}:listener:{index}`）。
+
+## 5.7 `futureMeeplesNode` 不在沙箱
+
+虽然官方卡用 `futureMeeplesNode(request)` builder，但**沙箱里没注入这个 helper**。要预放未来回合的资源，手写 leaf：
+
+```ts
+return {
+  type: 'leaf',
+  actionId: 'future-meeples',
+  sourceCard: CARD_ID,
+  params: {
+    __futureMeepleRequest: {
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: [{ round: state.round + 1, resources: { wood: 1 } }],
+    },
+  },
+}
+```
+
+`futureMeeplesAction.execute()` 识别 `params.__futureMeepleRequest`，把 entry 入队到 `state.pendingFutureMeeples`，下一回合开始时落到当回合行动卡格上。`FutureMeepleRequest` 还有 `{ startRound, count, resources }` 形式（多个回合连续放），见 `shared/game/types.ts:189`。
+
+---
+
 ## 6. `actionId` 行为校准
 
 下面这几个是高频踩坑点。完整 `actionId` 列表见 `shared/actions/effects/*` 目录。
@@ -302,6 +378,8 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 | `write-card-extra-data` | 写入 `player.cardStates[CARD_ID].extraData` |
 | `hold-worker-on-card` | 将工人标记为被卡牌持有（不回家） |
 | `release-worker-from-card` | 释放被卡牌持有的工人 |
+| `flag-card` | 设置 `player.cardStates[CARD_ID].flagged = true`，常用于 anytime 一次性 |
+| `future-meeples` | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7） |
 
 ---
 
@@ -394,5 +472,6 @@ CI 会拦下漏改的情况。
 
 | 日期 | 变更 |
 |---|---|
+| 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
 | 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId |
 | 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `docs/superpowers/specs/2026-04-19-architecture-three-layer-split-design.md` §16 内联描述迁出 |
