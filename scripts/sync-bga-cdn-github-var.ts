@@ -311,6 +311,15 @@ function ghVariableSet(name: string, value: string, repo: string | undefined): v
   })
 }
 
+function writeGithubOutput(entries: Record<string, string>): void {
+  const file = process.env.GITHUB_OUTPUT
+  if (!file) return
+  const lines = Object.entries(entries)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n')
+  fs.appendFileSync(file, `${lines}\n`)
+}
+
 function parseArgs(argv: string[]): {
   probeOnly: boolean
   dryRun: boolean
@@ -414,17 +423,20 @@ async function main(): Promise<number> {
 
   if (currentNorm === newBase) {
     console.log('已与 GitHub 变量一致，无需更新。')
+    writeGithubOutput({ updated: 'false', new_base: newBase })
     return 0
   }
 
   if (args.dryRun) {
     console.log(`[dry-run] 将执行: gh variable set ${VAR_NAME} --body <新值>`)
     console.log(`[dry-run] 新值: ${newBase}`)
+    writeGithubOutput({ updated: 'false', new_base: newBase })
     return 0
   }
 
   ghVariableSet(VAR_NAME, newBase, repo)
   console.log(`已更新 ${VAR_NAME}。`)
+  writeGithubOutput({ updated: 'true', new_base: newBase })
   return 0
 }
 
