@@ -3,9 +3,11 @@
 // providers/, import it here, and add one entry to PROVIDERS.
 import type { ProviderDef, ProviderId } from './types'
 import { openaiProvider } from './providers/openai'
+import { groqProvider } from './providers/groq'
 
 export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
   openai: openaiProvider,
+  groq: groqProvider,
 }
 
 export function getProvider(id: ProviderId): ProviderDef {
