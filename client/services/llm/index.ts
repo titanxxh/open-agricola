@@ -2,12 +2,12 @@
 // Public API for the LLM service. Re-exports types and provides the
 // dispatcher (streamChat, generateCardArt). Card-extraction helpers and the
 // localStorage-backed config helpers live in card-utils.ts.
-export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef } from './types'
-export { PROVIDERS, getProvider, listProviders } from './registry'
-
 import type { ChatMessage, LlmConfig, ReferenceImage } from './types'
 import { getProvider } from './registry'
 import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
+
+export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef } from './types'
+export { PROVIDERS, getProvider, listProviders } from './registry'
 
 export async function* streamChat(
   messages: ChatMessage[],
@@ -21,10 +21,7 @@ export async function* streamChat(
   }
   const baseUrl = config.baseUrl ?? def.baseUrl
   if (!baseUrl) throw new Error(`Provider ${config.provider} has no baseUrl`)
-  // Gemini's preset OpenAI-compat shim accepts up to 65536 output tokens —
-  // give it the headroom; everyone else gets the 8192 default.
-  const maxTokens = config.provider === 'gemini' ? 65536 : 8192
-  yield* openaiCompatStreamChat(messages, systemPrompt, config, baseUrl, { maxTokens })
+  yield* openaiCompatStreamChat(messages, systemPrompt, config, baseUrl, { maxTokens: def.maxOutputTokens })
 }
 
 export async function generateCardArt(
