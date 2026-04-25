@@ -25,6 +25,7 @@ import type { DraftPool } from '../draft/types'
 import type { ActionSpace, CropStack, Field, GameState, PlayerState } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
+import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   applyRoundGrowth,
   defaultPlayerColors,
@@ -59,21 +60,29 @@ export const dealHands = (
 ) => {
   const rng = createRng(seed)
   const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
+  const allow = (players: string | undefined) =>
+    cardAllowedForPlayerCount(players, playerCount)
   const minorPool = Array.from(new Set([
     ...implementedMinorImprovementCards
       .filter((card) => allowedDecks.has(card.deck))
+      .filter((card) => allow(card.players))
       .map((card) => card.id),
     ...(enableCommunityDeck
-      ? implementedCommunityMinors.map((card) => card.id)
+      ? implementedCommunityMinors
+          .filter((card) => allow(card.players))
+          .map((card) => card.id)
       : []),
     ...extraMinorIds,
   ]))
   const occupationPool = Array.from(new Set([
     ...implementedOccupationCards
       .filter((card) => allowedDecks.has(card.deck))
+      .filter((card) => allow(card.players))
       .map((card) => card.id),
     ...(enableCommunityDeck
-      ? implementedCommunityOccupations.map((card) => card.id)
+      ? implementedCommunityOccupations
+          .filter((card) => allow(card.players))
+          .map((card) => card.id)
       : []),
     ...extraOccupationIds,
   ]))
