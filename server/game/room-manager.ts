@@ -182,6 +182,8 @@ type PersistedRoomRow = {
   max_players: number
   custom_card_ids: string | null
   version: number
+  /** Optional: present when rows are loaded for restore-with-TTL bookkeeping. */
+  updated_at?: number
 }
 
 const serializeCustomCardDbIds = (room?: Pick<Room, 'customCardDbIds'>) =>
@@ -503,19 +505,58 @@ function ensurePersistentRooms(): void {
 }
 
 /**
- * In SQLite mode: restore all 'playing' rooms from the database into memory.
- * Called once at startup. Players will reconnect via joinRoom. Fixed dev rooms
- * are excluded — `ensurePersistentRooms` already loaded them with the right
- * playerCount-bound seed when they didn't have a persisted state yet.
+ * Batch-mark long-stale rooms as `'finished'` so the in-process cleanup TTL
+ * effectively crosses server restarts. Returns the number of rows touched.
+ *
+ * Exported for tests and the cleanup script.
  */
-function restoreRoomsFromSqlite(): void {
+export function pruneStaleRoomRows(
+  db: Pick<import('better-sqlite3').Database, 'prepare'>,
+  now: number,
+  ttlMs: number,
+  fixedIds: ReadonlyArray<string> = FIXED_DEV_ROOMS.map((r) => r.id),
+): number {
+  const placeholders = fixedIds.map(() => '?').join(', ') || "''"
+  const staleCutoff = now - ttlMs
+  try {
+    const res = db.prepare(
+      `UPDATE rooms SET status = 'finished', updated_at = ? WHERE status != 'finished' AND updated_at < ? AND id NOT IN (${placeholders})`,
+    ).run(now, staleCutoff, ...fixedIds) as { changes: number }
+    return res.changes
+  } catch (err) {
+    console.warn('[room-manager] stale-room prune failed:', err)
+    return 0
+  }
+}
+
+/**
+ * In SQLite mode: restore non-stale rooms into memory and prune the rest.
+ *
+ * Stale = `updated_at` is older than `EMPTY_ROOM_TTL_MS`. Without players to
+ * keep `roomLastActivity` warm in memory, the in-process cleanup loop never
+ * notices these and they pile up across restarts. We make the TTL cross
+ * restart-boundaries by:
+ *   1. batch-marking stale rows as 'finished' before restore;
+ *   2. only loading rooms whose `updated_at` is within the TTL window;
+ *   3. seeding `roomLastActivity` with the persisted `updated_at` so the
+ *      cleanup loop can prune them at the right moment after restart.
+ *
+ * Fixed dev rooms are excluded — `ensurePersistentRooms` already loaded them.
+ */
+function restoreRoomsFromSqlite(now = Date.now()): void {
   if (PERSIST_ROOMS !== 'sqlite') return
   try {
     const db = getDb()
     const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
     const placeholders = fixedIds.map(() => '?').join(', ')
+
+    const prunedCount = pruneStaleRoomRows(db, now, EMPTY_ROOM_TTL_MS, fixedIds)
+    if (prunedCount > 0) {
+      console.log(`[room-manager] pruned ${prunedCount} stale room(s) older than TTL`)
+    }
+
     const rows = db.prepare(
-      `SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
+      `SELECT id, created_by, state_json, max_players, custom_card_ids, version, updated_at FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
     ).all(...fixedIds) as PersistedRoomRow[]
     for (const row of rows) {
       if (rooms.has(row.id)) continue
@@ -523,6 +564,12 @@ function restoreRoomsFromSqlite(): void {
         const room = restoreRoomFromSqliteRow(row)
         if (!room) continue
         rooms.set(row.id, room)
+        // Seed the cleanup TTL with the persisted timestamp so the loop can
+        // expire the room at the right moment instead of waiting another full
+        // TTL window after the restart.
+        if (typeof row.updated_at === 'number') {
+          roomLastActivity.set(row.id, row.updated_at)
+        }
         console.log(`[room-manager] restored room ${row.id} from SQLite`)
       } catch (err) {
         console.warn(`[room-manager] failed to restore room ${row.id}:`, err)
@@ -1072,14 +1119,36 @@ export const createWsServer = (server: import('node:http').Server) => {
   return wss
 }
 
-export const getRooms = (): RoomSummary[] =>
-  Array.from(rooms.values()).map((r) => ({
-    id: r.id,
-    playerCount: r.players.length,
-    maxPlayers: r.maxPlayers,
-    createdBy: r.createdBy,
-    status: r.players.length < r.maxPlayers ? 'waiting' as const : 'playing' as const,
-  }))
+type RoomLikeForSummary = Pick<Room, 'id' | 'players' | 'maxPlayers' | 'createdBy'>
+
+/**
+ * Pure helper used by `getRooms` and tested directly. Hide rooms whose
+ * creator/all players have disconnected — they are zombie shells that aren't
+ * joinable until the cleanup loop expires them, and they pollute the lobby.
+ * Fixed dev rooms are kept so dev URLs still discover them.
+ */
+export function summarizeRoomsForLobby(
+  source: Iterable<RoomLikeForSummary>,
+  limit?: number,
+  isFixedDev: (id: string) => boolean = isFixedDevRoom,
+): RoomSummary[] {
+  const list: RoomSummary[] = []
+  for (const r of source) {
+    if (r.players.length === 0 && !isFixedDev(r.id)) continue
+    list.push({
+      id: r.id,
+      playerCount: r.players.length,
+      maxPlayers: r.maxPlayers,
+      createdBy: r.createdBy,
+      status: r.players.length < r.maxPlayers ? 'waiting' as const : 'playing' as const,
+    })
+    if (typeof limit === 'number' && list.length >= limit) break
+  }
+  return list
+}
+
+export const getRooms = (limit?: number): RoomSummary[] =>
+  summarizeRoomsForLobby(rooms.values(), limit)
 
 export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean; error?: string } => {
   const room = rooms.get(roomId)
