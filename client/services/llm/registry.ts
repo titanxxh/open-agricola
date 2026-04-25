@@ -2,10 +2,11 @@
 // Central registry of LLM providers. Adding a provider = create a file under
 // providers/, import it here, and add one entry to PROVIDERS.
 import type { ProviderDef, ProviderId } from './types'
+import { openaiProvider } from './providers/openai'
 
-// Providers registered below as each Task adds them.
-
-export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {}
+export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
+  openai: openaiProvider,
+}
 
 export function getProvider(id: ProviderId): ProviderDef {
   const def = PROVIDERS[id]
