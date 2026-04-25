@@ -290,6 +290,41 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
   )
 }
 
+function ConfigStatusSummary({
+  artConfig,
+  abilityConfig,
+  locale,
+  t,
+}: {
+  artConfig: LlmConfig | null
+  abilityConfig: LlmConfig | null
+  locale: 'zh' | 'en'
+  t: (key: string, params?: Record<string, string | number>) => string
+}) {
+  const statusText = (heading: string, config: LlmConfig | null) => {
+    if (!config) {
+      return locale === 'zh'
+        ? `${heading}：${t('platform.aiConfigStatusMissing')}`
+        : `${heading}: ${t('platform.aiConfigStatusMissing')}`
+    }
+    const provider = PROVIDER_LABELS[config.provider] ?? config.provider
+    return locale === 'zh'
+      ? `${heading}：${provider} · ${config.model}`
+      : `${heading}: ${provider} · ${config.model}`
+  }
+
+  return (
+    <div className="ai-config-status-summary" aria-label={t('platform.aiConfigStatusLabel')}>
+      <span className={`ai-config-status-chip${artConfig ? '' : ' is-missing'}`}>
+        {statusText(t('platform.aiConfigImageHeading'), artConfig)}
+      </span>
+      <span className={`ai-config-status-chip${abilityConfig ? '' : ' is-missing'}`}>
+        {statusText(t('platform.aiConfigAbilityHeading'), abilityConfig)}
+      </span>
+    </div>
+  )
+}
+
 // ── BGA Reference Image Picker ────────────────────────────────────────────────
 
 /** BGA card image URL given deck letter and card number */
@@ -1218,8 +1253,22 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
           defaultCollapsed={!!(abilityConfig && artConfig)}
           icon="🤖"
           title={t('platform.aiConfig')}
+          actions={
+            <ConfigStatusSummary
+              artConfig={artConfig}
+              abilityConfig={abilityConfig}
+              locale={locale}
+              t={t}
+            />
+          }
           variant="parchment"
         >
+          {!abilityConfig && !artConfig && (
+            <div className="ai-config-missing-alert">
+              <strong>{t('platform.aiConfigMissingTitle')}</strong>
+              <span>{t('platform.aiConfigMissingBody')}</span>
+            </div>
+          )}
           <div className="ai-config-grid">
             <div className="ai-config-grid-col">
               <h4 className="ai-config-grid-heading">{t('platform.aiConfigImageHeading')}</h4>
