@@ -1642,6 +1642,29 @@
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 640px) {
+  /* Tighten AI designer on phones — default 20/24px paddings ate ~30% of viewport. */
+  .ai-designer-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .ai-card-info-bar {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .ai-designer-config-section {
+    padding: 8px 6px 0;
+  }
+  .ai-designer-config-section .section {
+    padding-left: var(--spacing-sm);
+    padding-right: var(--spacing-sm);
+  }
+  .ai-config-bar,
+  .ai-config-bar.ai-config-bar-expanded {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
 .ai-config-grid-col {
   display: flex;
   flex-direction: column;
