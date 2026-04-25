@@ -5,6 +5,12 @@ export type PlayerActionSpaceConfig = {
   cardId: string
   /** Who can use this action space: 'all' = any player, 'owner' = only the player who played it */
   access: 'all' | 'owner'
+  /**
+   * Optional gate. If provided, the space is only created when this returns
+   * true for the current game state. Use for cards whose action-space behavior
+   * is conditional on player count or other game state.
+   */
+  shouldRegister?: (state: GameState) => boolean
   /** Build the ActionDefinition for this card's action space */
   createDefinition: (ownerId: string) => Omit<ActionDefinition, 'roundAvailable' | 'gainPerRound'>
 }
@@ -42,6 +48,7 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
     for (const cardId of allPlayed) {
       const config = registry.get(cardId)
       if (!config) continue
+      if (config.shouldRegister && !config.shouldRegister(state)) continue
       if (spaces.some((s) => s.id === cardId)) continue
       const def = config.createDefinition(player.id)
       spaces.push({
