@@ -16,7 +16,12 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  background: var(--bg-wood-dark);
+  background-color: #c5a576;
+  background-image: var(--bg-monthly);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 #root {
