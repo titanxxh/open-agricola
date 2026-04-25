@@ -115,7 +115,12 @@ export function LobbyPage() {
         />
         <div className="lobby-header__right">
           <LocaleSwitcher />
-          <button type="button" className="btn-link" onClick={() => setPage('settings')}>
+          <button
+            type="button"
+            className="lobby-user-pill"
+            onClick={() => setPage('settings')}
+            title={t('platform.settings')}
+          >
             {user?.displayName || user?.username}
           </button>
           <button type="button" className="btn-link" onClick={logout}>{t('platform.logout')}</button>
@@ -242,7 +247,7 @@ export function LobbyPage() {
               <li key={r.id} className="room-item">
                 <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
                 <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
-                <span className="room-status">
+                <span className="room-status" data-status={r.status}>
                   {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
                 </span>
                 <button
@@ -276,6 +281,9 @@ export function LobbyPage() {
               <li key={room.id} className="room-item">
                 <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
                 <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                <span className="room-status" data-status={room.status}>
+                  {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}
+                </span>
                 {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
                   <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
                     {t('platform.joinBtn')}
