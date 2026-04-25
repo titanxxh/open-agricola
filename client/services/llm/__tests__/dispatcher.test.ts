@@ -38,6 +38,21 @@ describe('streamChat dispatcher', () => {
     vi.unstubAllGlobals()
   })
 
+  it('routes openrouter to its OpenAI-compatible base URL', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeOpenAISseChunks('or-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'openrouter',
+      apiKey: 'or-test',
+      model: 'qwen/qwen3.6-plus:free',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('or-out')
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://openrouter.ai/api/v1/chat/completions')
+  })
+
   it('routes groq to its OpenAI-compatible base URL', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
