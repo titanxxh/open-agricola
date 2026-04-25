@@ -5,11 +5,13 @@ import type { ProviderDef, ProviderId } from './types'
 import { openaiProvider } from './providers/openai'
 import { groqProvider } from './providers/groq'
 import { openrouterProvider } from './providers/openrouter'
+import { customProvider } from './providers/custom'
 
 export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
   openai: openaiProvider,
   groq: groqProvider,
   openrouter: openrouterProvider,
+  custom: customProvider,
 }
 
 export function getProvider(id: ProviderId): ProviderDef {
