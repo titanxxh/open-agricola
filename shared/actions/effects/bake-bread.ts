@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
+  ImmediateLogEntry,
   PlayerState,
 } from '../../game/types'
 import { getPlayerBakeRates, hasAnyBakingImprovement } from '../../cards/helpers/exchange-registry'
@@ -55,7 +56,7 @@ const resolveBakeBreadChoice = (
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
-    const immediateLogs: NonNullable<ActionExecutionResult['immediateLogs']> = []
+    const immediateLogs: ImmediateLogEntry[] = []
     payload.split(',').forEach((entry) => {
       const [cardId, countText] = entry.split('=')
       const rate = rateMap.get(cardId!)

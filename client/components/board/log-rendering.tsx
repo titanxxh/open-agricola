@@ -320,7 +320,6 @@ export const prepareLogEntry = (
       entry.key === 'log.playOccupation')
   ) {
     const isOccupation = entry.key === 'log.playOccupation'
-    const isMinor = entry.key === 'log.playMinorImprovement'
     const raw = isOccupation ? params.occupations : params.improvements
     const ids = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
     const names = ids
