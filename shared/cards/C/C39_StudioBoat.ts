@@ -53,6 +53,9 @@ const travelingPlayersOwnerVp: CardListenerRegistration = {
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    // context.space is the action space the farmer was placed on (resolved
+    // from the engine's activeSpaceId). Only fire on the global Traveling
+    // Players accumulation space, which exists only in 4-player games.
     if (context.space?.id !== 'traveling-players') return
     return {
       flow: {
