@@ -1,0 +1,55 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'shared/**'
+      - 'Dockerfile'
+      - 'docker-compose.prod.yml'
+      - 'deploy-backend.sh'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+env:
+  DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'open-agricola.duckdns.org' }}
+  DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
+  DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/root/open-agricola' }}
+  DEPLOY_BRANCH: main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPLOY_SSH_PRIVATE_KEY" ]; then
+            echo "DEPLOY_SSH_PRIVATE_KEY secret is required" >&2
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy backend
+        run: |
+          chmod +x ./deploy-backend.sh
+          ./deploy-backend.sh "$DEPLOY_USER@$DEPLOY_HOST" "$DEPLOY_BRANCH" "$DEPLOY_REMOTE_DIR"
