@@ -5,7 +5,7 @@ import type { ProviderDef, ProviderId } from './types'
 
 // Providers registered below as each Task adds them.
 
-export const PROVIDERS: Record<ProviderId, ProviderDef> = {} as Record<ProviderId, ProviderDef>
+export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {}
 
 export function getProvider(id: ProviderId): ProviderDef {
   const def = PROVIDERS[id]
@@ -14,6 +14,6 @@ export function getProvider(id: ProviderId): ProviderDef {
 }
 
 export function listProviders(): ProviderDef[] {
-  // Object.values preserves insertion order — order matches the imports above.
+  // Object.values preserves insertion order — providers appear in registration order.
   return Object.values(PROVIDERS)
 }
