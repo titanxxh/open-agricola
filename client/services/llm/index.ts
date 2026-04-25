@@ -2,8 +2,8 @@
 // Public API for the LLM service. Re-exports types and provides the
 // dispatcher (streamChat, generateCardArt). Card-extraction helpers and the
 // localStorage-backed config helpers live in card-utils.ts.
-import type { ChatMessage, LlmConfig, ReferenceImage } from './types'
-import { getProvider } from './registry'
+import type { ChatMessage, LlmConfig, ReferenceImage, ProviderId } from './types'
+import { getProvider, PROVIDERS } from './registry'
 import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
 
 export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef } from './types'
@@ -48,3 +48,55 @@ export function supportsImageGeneration(config: LlmConfig): boolean {
     return false
   }
 }
+
+// ── localStorage-backed config helpers ──────────────────────────────────────
+const KEY_LLM_CONFIG = 'open-agricola-llm-config'
+export const KEY_LLM_CONFIG_ART = 'open-agricola-llm-config-art'
+
+export function getLlmConfig(storageKey?: string): LlmConfig | null {
+  try {
+    const raw = localStorage.getItem(storageKey ?? KEY_LLM_CONFIG)
+    if (!raw) return null
+    return JSON.parse(raw) as LlmConfig
+  } catch {
+    return null
+  }
+}
+
+export function saveLlmConfig(config: LlmConfig, storageKey?: string): void {
+  localStorage.setItem(storageKey ?? KEY_LLM_CONFIG, JSON.stringify(config))
+}
+
+export function clearLlmConfig(storageKey?: string): void {
+  localStorage.removeItem(storageKey ?? KEY_LLM_CONFIG)
+}
+
+export function defaultModel(provider: ProviderId): string {
+  return getProvider(provider).defaultModel
+}
+
+// ── Backwards-compat exports (computed from PROVIDERS) ──────────────────────
+// AiCardDesigner.tsx still reads these as Record<LlmProvider, …>. We compute
+// them once from PROVIDERS so the registry stays the source of truth.
+
+export type LlmProvider = ProviderId
+
+export const PROVIDER_LABELS = Object.fromEntries(
+  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.label]),
+) as Record<ProviderId, string>
+
+export const PROVIDER_KEY_HINTS = Object.fromEntries(
+  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.apiKeyHint]),
+) as Record<ProviderId, string>
+
+export const PROVIDER_MODELS = Object.fromEntries(
+  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.models]),
+) as Record<ProviderId, ReadonlyArray<{ id: string; label: string }>>
+
+// ── Re-export card-utils ────────────────────────────────────────────────────
+export {
+  extractCardFromResponse,
+  extractCardJson,
+  translateCardContent,
+  buildCardArtPrompt,
+} from './card-utils'
