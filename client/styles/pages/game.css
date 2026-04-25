@@ -1340,6 +1340,9 @@
   color: #fff;
 }
 /* ══════════ FARM GRID ══════════ */
+/* Outer board reads as a matte wooden tray instead of bright grass — frees the
+ * outer monthly background to own the green palette and lets the empty plots
+ * sit on a neutral surface. */
 .farm-grid {
   display: grid;
   /* Size tiles by the .center container width, not the viewport.
@@ -1352,11 +1355,30 @@
     var(--tile) var(--fence);
   grid-template-rows: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence);
-  background: #7fb161;
+  background-color: #8a623d;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(60, 36, 18, 0.18) 0,
+      rgba(60, 36, 18, 0.18) 1px,
+      transparent 1px,
+      transparent 14px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 240, 210, 0.05) 0,
+      rgba(255, 240, 210, 0.05) 1px,
+      transparent 1px,
+      transparent 6px
+    ),
+    linear-gradient(180deg, #936b44 0%, #7a5230 100%);
   padding: 12px;
   border-radius: 14px;
   margin-bottom: 16px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 240, 210, 0.18),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.18);
   width: 100%;
   justify-content: center;
 }
@@ -1365,16 +1387,18 @@
   height: 100%;
 }
 .farm-tile {
-  background: #84c56a;
+  background: #f0dcb0;
   border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgba(58, 90, 44, 0.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 84, 44, 0.35),
+    inset 0 1px 0 rgba(255, 248, 224, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: #2f4f1f;
+  color: #5a3a1f;
   padding: 4px;
   position: relative;
 }
@@ -1812,13 +1836,37 @@
 .hand-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
+  padding-top: 16px; /* room for hover lift */
+  perspective: 800px;
 }
 .hand-row > * {
   flex: 1 1 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
+  transform-origin: bottom center;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 0.18s ease;
+  will-change: transform;
+}
+/* Fan rotations — apply only when a row has multiple cards. The arc is mild
+ * (±10°), enough to feel like a hand without breaking flex-wrap. */
+.hand-row:not(:has(> :only-child)) > :nth-child(1) { transform: rotate(-9deg) translateY(2px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(2) { transform: rotate(-4.5deg) translateY(1px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(3) { transform: rotate(0deg); }
+.hand-row:not(:has(> :only-child)) > :nth-child(4) { transform: rotate(4.5deg) translateY(1px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(5) { transform: rotate(9deg) translateY(2px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(n+6) { transform: rotate(0deg); }
+.hand-row > *:hover,
+.hand-row > *:focus-within {
+  transform: translateY(-12px) scale(1.05) rotate(0deg) !important;
+  z-index: 5;
+  filter: drop-shadow(0 6px 14px rgba(60, 36, 18, 0.25));
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-row > * { transition: none; transform: none !important; }
 }
 .hand-sections {
   display: flex;
@@ -2194,12 +2242,31 @@
   color: #6b6b6b;
 }
 /* ══════════ DEV PANEL ══════════ */
+/* Marked as a developer-only surface so it never reads as product UI:
+ * gold dashed warning border + "DEV ONLY" corner ribbon. */
 .dev-panel {
-  background: #f3f7ea;
+  position: relative;
+  background: #fffbed;
   border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 16px;
-  border: 1px solid #d7e5c8;
+  padding: 18px 12px 12px;
+  margin: 18px 0 16px;
+  border: 2px dashed var(--color-accent-strong, #d4a017);
+  box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.15);
+}
+.dev-panel__badge {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--color-accent-strong, #d4a017);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(120, 80, 0, 0.3);
 }
 .dev-panel h3 {
   margin: 0 0 8px;

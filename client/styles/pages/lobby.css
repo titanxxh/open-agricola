@@ -44,6 +44,85 @@
   font-size: 14px;
   flex-wrap: wrap;
 }
+
+/* Hamburger toggle — only shown on small viewports. Three stacked bars become
+ * an "X" when open. */
+.lobby-menu-toggle {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(255, 247, 230, 0.85);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+}
+.lobby-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: transform 0.18s, opacity 0.18s;
+}
+.lobby-menu-toggle.is-open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.lobby-menu-toggle.is-open span:nth-child(2) { opacity: 0; }
+.lobby-menu-toggle.is-open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.lobby-drawer {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--bg-parchment, #fff7e6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 12px 28px rgba(60, 36, 18, 0.2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+  animation: drawerIn 0.16s ease-out;
+}
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lobby-drawer__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 36, 18, 0.18);
+  z-index: 20;
+}
+.lobby-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lobby-drawer__item:hover { background: rgba(212, 160, 23, 0.12); }
+.lobby-drawer__item--danger { color: var(--color-danger, #b3261e); }
+.lobby-drawer__item--danger:hover { background: rgba(179, 38, 30, 0.1); }
+.lobby-drawer__locale {
+  padding: 6px 12px;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+  margin: 4px 0;
+}
 /* Username pill — replaces a plain text link so the header reads as
  * "brand · user identity · controls" rather than a row of equal-weight links. */
 .lobby-user-pill {
@@ -183,13 +262,17 @@
 /* ── Small phone breakpoint ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .lobby-header {
-    flex-direction: column;
-    align-items: flex-start;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
   }
   .lobby-header__right {
-    width: 100%;
-    justify-content: space-between;
+    display: none;
+  }
+  .lobby-menu-toggle {
+    display: inline-flex;
   }
   /* Two-line room item so the join button doesn't get squashed on narrow
    * screens. Status badge moves up next to room id; players + button below. */
@@ -263,4 +346,26 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+/* Lobby horizon band — closes the page with a green field + fence motif so the
+ * empty parchment below the rooms list doesn't read as unfinished. */
+.lobby-horizon {
+  margin: 32px -24px 0;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.lobby-horizon svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+.lobby-horizon__hill--back { fill: #9bbf7c; opacity: 0.55; }
+.lobby-horizon__hill--front { fill: #6fa256; }
+.lobby-horizon__grass { fill: #4f7a3a; opacity: 0.7; }
+.lobby-horizon__fence { fill: #6b4a2a; }
+@media (max-width: 640px) {
+  .lobby-horizon { margin-left: -16px; margin-right: -16px; }
+  .lobby-horizon svg { height: 72px; }
 }

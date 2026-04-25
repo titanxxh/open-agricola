@@ -151,21 +151,64 @@
   gap: 12px;
   justify-content: flex-end;
 }
+/* Search input now reads as an embossed parchment groove with the magnifier
+ * inline on the left, matching the workshop's overall aged-paper language. The
+ * explicit submit becomes a quiet chip — Enter still submits. */
 .ws-search {
   display: flex;
-  gap: 8px;
+  align-items: center;
   flex: 1;
+  position: relative;
+  background: rgba(255, 247, 230, 0.85);
+  border: 1px solid var(--color-border, #d6c19a);
+  border-radius: 999px;
+  padding: 4px 4px 4px 36px;
+  box-shadow: inset 0 2px 4px rgba(120, 84, 44, 0.12);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ws-search:focus-within {
+  border-color: var(--color-accent-strong, #d4a017);
+  box-shadow:
+    inset 0 2px 4px rgba(120, 84, 44, 0.18),
+    0 0 0 3px rgba(212, 160, 23, 0.18);
+}
+.ws-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--color-text-secondary, #6b4a2a);
+  pointer-events: none;
 }
 .ws-search input {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 8px 8px;
+  border: none;
+  background: transparent;
   font-size: 14px;
   outline: none;
+  color: var(--color-text);
+  min-width: 0;
 }
-.ws-search input:focus {
-  border-color: var(--color-primary);
+.ws-search input::placeholder {
+  color: var(--color-text-muted, #9a805d);
+  opacity: 0.85;
+}
+.ws-search__submit {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ws-search__submit:hover {
+  background: var(--color-primary-hover, var(--color-primary));
 }
 .ws-sort {
   display: flex;

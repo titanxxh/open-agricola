@@ -57,7 +57,8 @@ export const DevPanel = ({
   onSeedChange,
   onResetGame,
 }: Props) => (
-  <div className="dev-panel">
+  <div className="dev-panel" data-dev-only>
+    <span className="dev-panel__badge" aria-hidden>DEV ONLY</span>
     <h3>{t(locale, 'ui.devPanelTitle')}</h3>
     <div className="dev-row dev-player-row">
       <div className="dev-field">

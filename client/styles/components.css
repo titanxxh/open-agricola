@@ -238,6 +238,11 @@
   margin-bottom: 12px;
   opacity: 0.7;
 }
+.empty-state--art .empty-state__icon { opacity: 1; line-height: 0; }
+.empty-state__art { display: inline-block; line-height: 0; }
+.empty-state__art svg {
+  filter: drop-shadow(0 1px 1px rgba(60, 36, 18, 0.18));
+}
 .empty-state__title {
   margin: 0 0 6px;
   font-size: var(--fs-h3);
@@ -309,6 +314,16 @@
   padding: 4px 8px;
 }
 .section__body { color: var(--color-text); }
+/* Mobile-only collapsibility: small screens hide the body when collapsed; on
+ * >640px the toggle is hidden and the body is always shown. The body stays in
+ * the DOM in this mode so resizing back to desktop reveals it instantly. */
+@media (max-width: 640px) {
+  .section--mobile-collapsible.is-collapsed .section__body { display: none; }
+  .section--mobile-collapsible.is-collapsed .section__header { margin-bottom: 0; }
+}
+@media (min-width: 641px) {
+  .section--mobile-collapsible .section__toggle { display: none; }
+}
 
 /* ══════════ DangerButton ══════════ */
 .danger-button { display: inline-block; position: relative; }
