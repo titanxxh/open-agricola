@@ -38,6 +38,22 @@ describe('streamChat dispatcher', () => {
     vi.unstubAllGlobals()
   })
 
+  it('uses LlmConfig.baseUrl when provider is custom', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeOpenAISseChunks('custom-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'custom',
+      apiKey: 'sk-test',
+      model: 'my-local-model',
+      baseUrl: 'https://my-llm.example.com/v1',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('custom-out')
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://my-llm.example.com/v1/chat/completions')
+  })
+
   it('routes openrouter to its OpenAI-compatible base URL', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
