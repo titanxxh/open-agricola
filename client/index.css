@@ -24,6 +24,15 @@ body {
   background-repeat: no-repeat;
 }
 
+/* iOS Safari has known repaint glitches with `background-attachment: fixed`
+ * that cause flicker when the address bar collapses. Use scroll attachment on
+ * narrow viewports — visual fidelity barely changes and stability improves. */
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+}
+
 #root {
   min-height: 100vh;
 }
