@@ -15,6 +15,8 @@ interface SectionProps {
    */
   variant?: 'default' | 'parchment' | 'sandbox' | 'secondary' | 'danger'
   collapsible?: boolean
+  /** When true, collapse only on small viewports — desktop always shows body. */
+  mobileCollapsible?: boolean
   defaultCollapsed?: boolean
   className?: string
   children: ReactNode
@@ -22,12 +24,24 @@ interface SectionProps {
 
 export function Section({
   title, subtitle, icon, actions,
-  variant = 'default', collapsible = false, defaultCollapsed = false,
+  variant = 'default', collapsible = false, mobileCollapsible = false,
+  defaultCollapsed = false,
   className, children,
 }: SectionProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const showToggle = collapsible || mobileCollapsible
+  // For desktop-collapsible we unmount the body (matches old behavior); for
+  // mobile-only we keep it mounted so CSS can show it on >640px.
+  const hideBodyInDom = collapsible && collapsed
+  const sectionClass = [
+    'section',
+    `section--${variant}`,
+    collapsed ? 'is-collapsed' : '',
+    mobileCollapsible ? 'section--mobile-collapsible' : '',
+    className ?? '',
+  ].filter(Boolean).join(' ')
   return (
-    <section className={`section section--${variant}${className ? ` ${className}` : ''}`}>
+    <section className={sectionClass}>
       {(title || actions) && (
         <header className="section__header">
           <div className="section__heading">
@@ -35,14 +49,15 @@ export function Section({
             {title && <h2 className="section__title">{title}</h2>}
             {subtitle && <p className="section__subtitle">{subtitle}</p>}
           </div>
-          {(actions || collapsible) && (
+          {(actions || showToggle) && (
             <div className="section__actions">
               {actions}
-              {collapsible && (
+              {showToggle && (
                 <button
                   type="button"
                   className="section__toggle"
                   aria-label={collapsed ? 'expand' : 'collapse'}
+                  aria-expanded={!collapsed}
                   onClick={() => setCollapsed((v) => !v)}
                 >
                   {collapsed ? '▸' : '▾'}
@@ -52,7 +67,7 @@ export function Section({
           )}
         </header>
       )}
-      {!collapsed && <div className="section__body">{children}</div>}
+      {!hideBodyInDom && <div className="section__body">{children}</div>}
     </section>
   )
 }
