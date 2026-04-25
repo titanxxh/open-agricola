@@ -1646,7 +1646,6 @@ export class GameCore {
         }
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
-          let autoPromptKey = step.choice.promptKey
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
             const resolvedActionId = this.engine?.snapshot().pendingChoiceActionId ?? undefined
@@ -1658,7 +1657,6 @@ export class GameCore {
             if (result.type === 'choice') {
               if ((result.options?.length ?? 0) === 1) {
                 autoOptions = result.options!
-                autoPromptKey = result.promptKey
                 continue
               }
               this.pending = {
@@ -2002,7 +2000,6 @@ export class GameCore {
       return farmPaymentResponse
     }
 
-    const promptKey = pending.promptKey
     if (pushHistoryEntry) {
       this.pushHistory()
     }

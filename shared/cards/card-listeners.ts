@@ -206,9 +206,11 @@ export const executeCardListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
   options?: { ownerPlayerId?: string },
-): ActionHookResult | void => {
-  return registration.handler(
-    buildCardListenerContext(registration, context, options?.ownerPlayerId),
+): ActionHookResult | undefined => {
+  return (
+    registration.handler(
+      buildCardListenerContext(registration, context, options?.ownerPlayerId),
+    ) ?? undefined
   )
 }
 
