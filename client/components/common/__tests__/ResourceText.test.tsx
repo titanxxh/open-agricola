@@ -65,4 +65,43 @@ describe('ResourceText', () => {
     expect(container.querySelector('.res-icon-fence-icon')).toBeTruthy()
     expect(container.querySelector('.res-icon-grain-veg-stack')).toBeTruthy()
   })
+
+  it('strips [text] brackets and wraps the inner content in card-desc-label', () => {
+    const { container } = render(<ResourceText text="[Anytime]" />)
+    const label = container.querySelector('.card-desc-label')
+    expect(label).toBeTruthy()
+    expect(label!.textContent).toBe('Anytime')
+    expect(container.textContent).not.toContain('[')
+    expect(container.textContent).not.toContain(']')
+  })
+
+  it('strips __text__ markers and wraps the inner content in card-desc-em', () => {
+    const { container } = render(<ResourceText text="get __1 wood__ now" />)
+    const em = container.querySelector('em.card-desc-em')
+    expect(em).toBeTruthy()
+    expect(em!.textContent).toBe('1 wood')
+    expect(container.textContent).not.toContain('__')
+  })
+
+  it('parses nested [__Bake Bread__ action:] into label-with-em', () => {
+    const { container } = render(<ResourceText text="[__Bake Bread__ action:]" />)
+    const label = container.querySelector('.card-desc-label')
+    expect(label).toBeTruthy()
+    const em = label!.querySelector('em.card-desc-em')
+    expect(em).toBeTruthy()
+    expect(em!.textContent).toBe('Bake Bread')
+    // The trailing " action:" stays inside the label as plain text.
+    expect(label!.textContent).toBe('Bake Bread action:')
+    expect(container.textContent).not.toContain('[')
+    expect(container.textContent).not.toContain('__')
+  })
+
+  it('icon placeholders inside [..] still render as sprites', () => {
+    const { container } = render(<ResourceText text="[<GRAIN> <ARROW> 2<FOOD>]" />)
+    const label = container.querySelector('.card-desc-label')
+    expect(label).toBeTruthy()
+    expect(label!.querySelector('.res-icon-grain')).toBeTruthy()
+    expect(label!.querySelector('.res-icon-arrow')).toBeTruthy()
+    expect(label!.querySelector('.res-icon-food')).toBeTruthy()
+  })
 })
