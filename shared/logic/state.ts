@@ -27,6 +27,14 @@ import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
+  getCustomMinorImprovement,
+  getCustomOccupation,
+} from '../cards/custom-registry'
+import {
+  getRegisteredMinorImprovement,
+  getRegisteredOccupation,
+} from '../cards/types'
+import {
   applyRoundGrowth,
   defaultPlayerColors,
   defaultSandboxDeckIds,
@@ -62,6 +70,13 @@ export const dealHands = (
   const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
   const allow = (players: string | undefined) =>
     cardAllowedForPlayerCount(players, playerCount)
+  const lookupPlayersField = (id: string): string | undefined =>
+    getCustomMinorImprovement(id)?.players
+    ?? getCustomOccupation(id)?.players
+    ?? getRegisteredMinorImprovement(id)?.players
+    ?? getRegisteredOccupation(id)?.players
+    ?? undefined
+  const allowExtra = (id: string) => allow(lookupPlayersField(id))
   const minorPool = Array.from(new Set([
     ...implementedMinorImprovementCards
       .filter((card) => allowedDecks.has(card.deck))
@@ -72,7 +87,7 @@ export const dealHands = (
           .filter((card) => allow(card.players))
           .map((card) => card.id)
       : []),
-    ...extraMinorIds,
+    ...extraMinorIds.filter(allowExtra),
   ]))
   const occupationPool = Array.from(new Set([
     ...implementedOccupationCards
@@ -84,7 +99,7 @@ export const dealHands = (
           .filter((card) => allow(card.players))
           .map((card) => card.id)
       : []),
-    ...extraOccupationIds,
+    ...extraOccupationIds.filter(allowExtra),
   ]))
   const shuffledMinor = shuffleWithRng(minorPool, rng)
   const shuffledOccupation = shuffleWithRng(occupationPool, rng)
