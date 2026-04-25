@@ -797,6 +797,9 @@
 }
 .ai-minor-input {
   flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 6px 10px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -1664,6 +1667,10 @@
     padding-left: 8px;
     padding-right: 8px;
   }
+  .ai-minor-fields {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }
 .ai-config-grid-col {
   display: flex;
@@ -1735,6 +1742,7 @@
 /* Visible-label form fields inside the minor toolbar row. */
 .ai-minor-fields .ai-minor-field {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
