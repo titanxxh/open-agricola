@@ -1448,7 +1448,7 @@ export function WorkshopPage() {
       )}
 
       <Section
-        variant="parchment"
+        variant="secondary"
         icon="⭐"
         title={t('platform.featured')}
         subtitle={t('platform.featuredSubtitle')}
@@ -1571,7 +1571,10 @@ function WorkshopNav({
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="btn-link ws-back-home" onClick={() => setPage('lobby')}>{t('platform.backToLobbyShort')}</button>
+        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
+          <span aria-hidden="true">‹</span>
+          {t('platform.backToLobbyShort')}
+        </button>
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">

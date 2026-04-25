@@ -24,23 +24,51 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px var(--app-edge-padding);
-  background: #fff;
-  border-bottom: 1px solid var(--color-border-light);
+  padding: 12px clamp(16px, 2vw, 28px);
+  margin: 12px clamp(12px, 2vw, 20px) 0;
+  background: var(--bg-parchment);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-paper);
   flex-shrink: 0;
 }
 .ws-nav-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .ws-nav-left h1 {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--color-primary);
   margin: 0;
+  font-family: var(--agricola-font);
+  letter-spacing: 0.5px;
 }
+/* Back button — chevron + label, sits as a small parchment chip rather than
+ * a flat link so it reads as an action affordance. */
 .ws-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px 6px 8px;
+  background: rgba(255, 247, 230, 0.6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ws-back-home > span {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: -2px;
+}
+.ws-back-home:hover {
+  background: #fff7e6;
+  border-color: var(--color-accent-strong);
+  color: var(--color-text);
 }
 .ws-nav-actions {
   display: flex;
