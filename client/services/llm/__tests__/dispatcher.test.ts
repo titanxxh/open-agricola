@@ -109,4 +109,21 @@ describe('streamChat dispatcher', () => {
     expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' })
     expect(body.messages[1]).toEqual({ role: 'user', content: 'hi' })
   })
+
+  it('routes gemini chat through its OpenAI-compatible shim with 65536 max_tokens', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeOpenAISseChunks('gem-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'gemini',
+      apiKey: 'gem-test',
+      model: 'gemini-2.5-flash',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('gem-out')
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions')
+    expect(JSON.parse(init.body).max_tokens).toBe(65536)
+  })
 })

@@ -3,12 +3,14 @@
 // providers/, import it here, and add one entry to PROVIDERS.
 import type { ProviderDef, ProviderId } from './types'
 import { openaiProvider } from './providers/openai'
+import { geminiProvider } from './providers/gemini'
 import { groqProvider } from './providers/groq'
 import { openrouterProvider } from './providers/openrouter'
 import { customProvider } from './providers/custom'
 
 export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
   openai: openaiProvider,
+  gemini: geminiProvider,
   groq: groqProvider,
   openrouter: openrouterProvider,
   custom: customProvider,
