@@ -460,6 +460,21 @@
   color: #333;
   text-align: center;
   overflow: hidden;
+  font-family: var(--agricola-font);
+}
+
+/* `[text]` markup → italic section label rendered on its own line.
+ * Mirrors BGA's `formatStringMeeples` ([…] → span.text). */
+.card-desc .card-desc-label {
+  display: block;
+  font-style: italic;
+  margin: 1px 0;
+}
+
+/* `__text__` markup → italic emphasis for inline references such as
+ * "Bake Bread" inside `[__Bake Bread__ action:]`. */
+.card-desc .card-desc-em {
+  font-style: italic;
 }
 
 .player-card-inner[data-cook="true"] .card-desc::before {

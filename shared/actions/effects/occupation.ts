@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import {
   canAffordCardPreviewCostByProvider,
@@ -57,7 +57,7 @@ const buildOccupationImmediateLogs = (
 
 const attachOccupationImmediateLogs = (
   result: Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>,
-  immediateLogs: NonNullable<ActionExecutionResult['immediateLogs']>,
+  immediateLogs: ImmediateLogEntry[],
 ): Extract<ActionExecutionResult, { type: 'ok' | 'flow' }> => {
   result.immediateLogs = [
     ...immediateLogs,
