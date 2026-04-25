@@ -283,10 +283,6 @@ export const PlayerCard = ({
           <div className="card-category" data-category={cardData.category} title={CATEGORY_LABELS[locale]?.[cardData.category] ?? cardData.category} />
         )}
 
-        {'passing' in cardData && cardData.passing && (
-          <div className="card-passing-badge" title={locale === 'zh' ? '传递卡' : 'Passing card'} />
-        )}
-        
         {hasCost && !cardData.altCosts && (
           <div className="card-cost">
             {'returnCards' in cardData && cardData.returnCards && cardData.returnCards.length > 0 ? (
