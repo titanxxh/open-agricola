@@ -38,6 +38,22 @@ describe('streamChat dispatcher', () => {
     vi.unstubAllGlobals()
   })
 
+  it('routes groq to its OpenAI-compatible base URL', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeOpenAISseChunks('groq-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'groq',
+      apiKey: 'gsk-test',
+      model: 'llama-3.3-70b-versatile',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('groq-out')
+    const [url] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://api.groq.com/openai/v1/chat/completions')
+  })
+
   it('routes openai chat to /v1/chat/completions with Bearer auth', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
