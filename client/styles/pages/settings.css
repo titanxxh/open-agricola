@@ -16,15 +16,17 @@
   gap: 16px;
   margin-bottom: 8px;
   background: var(--bg-parchment);
-  padding: 12px 20px;
+  padding: 14px 20px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-paper);
 }
 
 .settings-page header h1 {
-  font-size: 22px;
+  font-size: 24px;
   color: var(--color-primary);
   margin: 0;
+  font-family: var(--agricola-font);
+  letter-spacing: 0.5px;
 }
 
 .settings-form {
