@@ -1,12 +1,12 @@
 /* Login page — tableau styling per UI overhaul Batch 2 spec §6.1. */
 
-/* .login-page — wood backdrop + center card */
+/* .login-page — seasonal backdrop inherited from body + center card */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--bg-wood-dark);
+  background: transparent;
   padding: 20px;
 }
 

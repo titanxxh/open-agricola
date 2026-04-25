@@ -27,7 +27,7 @@ a:focus-visible,
 .app {
   min-height: 100vh;
   color: var(--color-text);
-  background: var(--bg-wood-dark);
+  background: transparent;
   padding: var(--app-edge-padding);
   box-sizing: border-box;
   overflow-x: hidden;
