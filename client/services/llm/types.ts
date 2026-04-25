@@ -38,6 +38,8 @@ export type ProviderDef = {
   apiKeyHint: string
   apiKeyHelpUrl?: string
   capabilities: { chat: boolean; image: boolean }
+  /** Override default 8192-token cap for openai-compat chat. */
+  maxOutputTokens?: number
 
   // Optional overrides — dispatcher falls back to openai-compat when omitted.
   streamChat?: (
