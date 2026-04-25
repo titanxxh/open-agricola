@@ -167,8 +167,13 @@ const server = createServer(async (req, res) => {
   }
 
   // ── Lobby routes ───────────────────────────────────────
-  if (req.method === 'GET' && req.url === '/api/rooms') {
-    sendJson(res, 200, { ok: true, rooms: getRooms() })
+  if (req.method === 'GET' && req.url && (req.url === '/api/rooms' || req.url.startsWith('/api/rooms?'))) {
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    const rawLimit = Number(url.searchParams.get('limit'))
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(Math.floor(rawLimit), 200)
+      : 50
+    sendJson(res, 200, { ok: true, rooms: getRooms(limit) })
     return
   }
 

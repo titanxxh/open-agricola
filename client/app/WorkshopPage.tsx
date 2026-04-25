@@ -1387,7 +1387,7 @@ export function WorkshopPage() {
           </div>
           {sandboxCards.length === 0 && (
             <EmptyState
-              icon="🃏"
+              art="cards"
               title={t('platform.sandboxEmptyTitle')}
               description={t('platform.sandboxEmptyDesc')}
               variant="compact"
@@ -1402,6 +1402,8 @@ export function WorkshopPage() {
           icon="📒"
           title={t('platform.myCards')}
           subtitle={t('platform.myCardsSubtitle')}
+          mobileCollapsible
+          defaultCollapsed
           actions={(
             <button
               type="button"
@@ -1420,7 +1422,7 @@ export function WorkshopPage() {
             <div className="ws-loading">{t('platform.loadingMore')}</div>
           ) : myCards.length === 0 ? (
             <EmptyState
-              icon="📦"
+              art="wheat"
               title={t('platform.noMyCards')}
               description={t('platform.myCardsSubtitle')}
               action={(
@@ -1448,16 +1450,18 @@ export function WorkshopPage() {
       )}
 
       <Section
-        variant="parchment"
+        variant="secondary"
         icon="⭐"
         title={t('platform.featured')}
         subtitle={t('platform.featuredSubtitle')}
+        mobileCollapsible
+        defaultCollapsed
       >
         {featuredLoading ? (
           <div className="ws-loading">{t('platform.loadingMore')}</div>
         ) : featuredCards.length === 0 ? (
           <EmptyState
-            icon="⭐"
+            art="fence"
             title={t('platform.noFeatured')}
             description={t('platform.featuredSubtitle')}
             variant="compact"
@@ -1493,16 +1497,27 @@ export function WorkshopPage() {
         icon="🔍"
         title={t('platform.browse')}
         subtitle={t('platform.browseSubtitle')}
+        mobileCollapsible
+        defaultCollapsed
         actions={(
           <div className="ws-toolbar">
             <form onSubmit={event => { event.preventDefault(); setSearch(searchInput.trim()) }} className="ws-search">
+              <span className="ws-search__icon" aria-hidden>
+                <svg viewBox="0 0 16 16" width="16" height="16" focusable="false">
+                  <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <line x1="11" y1="11" x2="14" y2="14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
               <input
                 type="search"
                 value={searchInput}
                 onChange={event => setSearchInput(event.target.value)}
                 placeholder={t('platform.searchPlaceholder')}
+                aria-label={t('platform.searchBtn')}
               />
-              <button type="submit" className="btn-primary ws-btn-sm">{t('platform.searchBtn')}</button>
+              <button type="submit" className="ws-search__submit" aria-label={t('platform.searchBtn')}>
+                {t('platform.searchBtn')}
+              </button>
             </form>
             <div className="ws-sort-tabs">
               <button
@@ -1525,7 +1540,7 @@ export function WorkshopPage() {
       >
         {browseCards.length === 0 && !browseLoading ? (
           <EmptyState
-            icon="🔍"
+            art="magnifier"
             title={t('platform.noPublished')}
             description={t('platform.browseSubtitle')}
             variant="compact"
@@ -1571,7 +1586,10 @@ function WorkshopNav({
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="btn-link ws-back-home" onClick={() => setPage('lobby')}>{t('platform.backToLobbyShort')}</button>
+        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
+          <span aria-hidden="true">‹</span>
+          {t('platform.backToLobbyShort')}
+        </button>
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">

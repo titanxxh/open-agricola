@@ -70,8 +70,8 @@ describe('C39_StudioBoat', () => {
     })
   })
 
-  describe('execute action space', () => {
-    it('collects accumulated food from the space', () => {
+  describe('execute action space (1-3p semantics)', () => {
+    it('collects accumulated food from the space for the actor', () => {
       const config = getPlayerActionSpaceConfig(CARD_ID)!
       const def = config.createDefinition('p1')
       const owner = createPlayer('p1')
@@ -85,27 +85,11 @@ describe('C39_StudioBoat', () => {
 
       const result = def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
       expect(result.type).toBe('ok')
-      expect(user.resources.food).toBe(3) // collected 3 food
-      expect(space.resources.food).toBe(0) // space emptied
+      expect(user.resources.food).toBe(3)
+      expect(space.resources.food).toBe(0)
     })
 
-    it('gives +1 bonus VP to the owner when anyone uses it', () => {
-      const config = getPlayerActionSpaceConfig(CARD_ID)!
-      const def = config.createDefinition('p1')
-      const owner = createPlayer('p1')
-      const user = createPlayer('p2', 'P2')
-      user.minorPlayed = []
-      const state = createState(owner, user)
-      const space = createSpace(CARD_ID, {
-        resources: { ...emptyResources, food: 2 },
-      })
-      state.actionSpaces = [space]
-
-      def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
-      expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
-    })
-
-    it('gives +1 bonus VP to owner even when owner uses it', () => {
+    it('grants +1 bonus VP to the owner only when the owner uses it', () => {
       const config = getPlayerActionSpaceConfig(CARD_ID)!
       const def = config.createDefinition('p1')
       const owner = createPlayer('p1')
@@ -120,7 +104,7 @@ describe('C39_StudioBoat', () => {
       expect(owner.resources.food).toBe(2)
     })
 
-    it('accumulates bonusVp across multiple uses', () => {
+    it('does NOT grant +1 bonus VP when a non-owner uses it', () => {
       const config = getPlayerActionSpaceConfig(CARD_ID)!
       const def = config.createDefinition('p1')
       const owner = createPlayer('p1')
@@ -128,12 +112,27 @@ describe('C39_StudioBoat', () => {
       user.minorPlayed = []
       const state = createState(owner, user)
       const space = createSpace(CARD_ID, {
-        resources: { ...emptyResources, food: 1 },
+        resources: { ...emptyResources, food: 2 },
       })
       state.actionSpaces = [space]
 
       def.execute({ state, player: user, space } as unknown as ActionExecutionContext)
-      space.resources.food = 2 // simulate next round accumulation
+      expect(user.resources.food).toBe(2)
+      expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
+    })
+
+    it('accumulates bonusVp across multiple owner uses', () => {
+      const config = getPlayerActionSpaceConfig(CARD_ID)!
+      const def = config.createDefinition('p1')
+      const owner = createPlayer('p1')
+      const state = createState(owner)
+      const space = createSpace(CARD_ID, {
+        resources: { ...emptyResources, food: 1 },
+      })
+      state.actionSpaces = [space]
+
+      def.execute({ state, player: owner, space } as unknown as ActionExecutionContext)
+      space.resources.food = 2
       def.execute({ state, player: owner, space } as unknown as ActionExecutionContext)
       expect(owner.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(2)
     })
@@ -189,6 +188,52 @@ describe('C39_StudioBoat', () => {
       const state = createState(owner)
       // No space created; should not throw
       expect(() => effect.onRoundStart!(state, owner)).not.toThrow()
+    })
+  })
+
+  describe('player-count gating', () => {
+    it('registers the action space in 1p / 2p / 3p games', () => {
+      for (const pc of [1, 2, 3] as const) {
+        const players = Array.from({ length: pc }, (_, i) =>
+          createPlayer(`p${i + 1}`, `P${i + 1}`),
+        )
+        players[0].minorPlayed = [CARD_ID]
+        const state = createState(...players)
+        const effect = getCardEffect(CARD_ID)!
+        effect.onBuy!(state, players[0])
+        expect(state.actionSpaces.find((s) => s.id === CARD_ID)).toBeDefined()
+      }
+    })
+
+    it('does NOT register the action space in 4p games', () => {
+      const players = Array.from({ length: 4 }, (_, i) =>
+        createPlayer(`p${i + 1}`, `P${i + 1}`),
+      )
+      players[0].minorPlayed = [CARD_ID]
+      const state = createState(...players)
+      const effect = getCardEffect(CARD_ID)!
+      effect.onBuy!(state, players[0])
+      expect(state.actionSpaces.find((s) => s.id === CARD_ID)).toBeUndefined()
+    })
+
+    it('onRoundStart accumulates food only in 1-3p', () => {
+      const effect = getCardEffect(CARD_ID)!
+      // 2p
+      const small = createState(createPlayer('p1'), createPlayer('p2', 'P2'))
+      small.players[0].minorPlayed = [CARD_ID]
+      effect.onBuy!(small, small.players[0])
+      effect.onRoundStart!(small, small.players[0])
+      expect(small.actionSpaces.find((s) => s.id === CARD_ID)?.resources.food).toBe(1)
+
+      // 4p — no space, so no food anywhere with this id
+      const big = createState(
+        createPlayer('p1'), createPlayer('p2', 'P2'),
+        createPlayer('p3', 'P3'), createPlayer('p4', 'P4'),
+      )
+      big.players[0].minorPlayed = [CARD_ID]
+      effect.onBuy!(big, big.players[0])
+      effect.onRoundStart!(big, big.players[0])
+      expect(big.actionSpaces.find((s) => s.id === CARD_ID)).toBeUndefined()
     })
   })
 })

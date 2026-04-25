@@ -24,23 +24,51 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px var(--app-edge-padding);
-  background: #fff;
-  border-bottom: 1px solid var(--color-border-light);
+  padding: 12px clamp(16px, 2vw, 28px);
+  margin: 12px clamp(12px, 2vw, 20px) 0;
+  background: var(--bg-parchment);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-paper);
   flex-shrink: 0;
 }
 .ws-nav-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .ws-nav-left h1 {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--color-primary);
   margin: 0;
+  font-family: var(--agricola-font);
+  letter-spacing: 0.5px;
 }
+/* Back button — chevron + label, sits as a small parchment chip rather than
+ * a flat link so it reads as an action affordance. */
 .ws-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px 6px 8px;
+  background: rgba(255, 247, 230, 0.6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ws-back-home > span {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: -2px;
+}
+.ws-back-home:hover {
+  background: #fff7e6;
+  border-color: var(--color-accent-strong);
+  color: var(--color-text);
 }
 .ws-nav-actions {
   display: flex;
@@ -123,21 +151,64 @@
   gap: 12px;
   justify-content: flex-end;
 }
+/* Search input now reads as an embossed parchment groove with the magnifier
+ * inline on the left, matching the workshop's overall aged-paper language. The
+ * explicit submit becomes a quiet chip — Enter still submits. */
 .ws-search {
   display: flex;
-  gap: 8px;
+  align-items: center;
   flex: 1;
+  position: relative;
+  background: rgba(255, 247, 230, 0.85);
+  border: 1px solid var(--color-border, #d6c19a);
+  border-radius: 999px;
+  padding: 4px 4px 4px 36px;
+  box-shadow: inset 0 2px 4px rgba(120, 84, 44, 0.12);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ws-search:focus-within {
+  border-color: var(--color-accent-strong, #d4a017);
+  box-shadow:
+    inset 0 2px 4px rgba(120, 84, 44, 0.18),
+    0 0 0 3px rgba(212, 160, 23, 0.18);
+}
+.ws-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--color-text-secondary, #6b4a2a);
+  pointer-events: none;
 }
 .ws-search input {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 8px 8px;
+  border: none;
+  background: transparent;
   font-size: 14px;
   outline: none;
+  color: var(--color-text);
+  min-width: 0;
 }
-.ws-search input:focus {
-  border-color: var(--color-primary);
+.ws-search input::placeholder {
+  color: var(--color-text-muted, #9a805d);
+  opacity: 0.85;
+}
+.ws-search__submit {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ws-search__submit:hover {
+  background: var(--color-primary-hover, var(--color-primary));
 }
 .ws-sort {
   display: flex;
@@ -1640,9 +1711,73 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.ai-config-status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: min(640px, 58vw);
+}
+.ai-config-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid rgba(58, 90, 44, 0.28);
+  background: rgba(58, 90, 44, 0.11);
+  color: #2f4f22;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.ai-config-status-chip.is-missing {
+  border-color: rgba(185, 74, 54, 0.45);
+  background: rgba(185, 74, 54, 0.13);
+  color: #8f2f22;
+}
+.ai-config-missing-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 2px solid rgba(185, 74, 54, 0.4);
+  border-radius: var(--radius-md, 10px);
+  background: linear-gradient(135deg, rgba(255, 242, 205, 0.96), rgba(255, 222, 196, 0.92));
+  box-shadow: 0 6px 18px rgba(90, 58, 32, 0.12);
+  color: #6f2d1d;
+  font-size: 13px;
+}
+.ai-config-missing-alert strong {
+  font-size: 14px;
+}
+.ai-designer-config-section .section__toggle {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid rgba(58, 90, 44, 0.42);
+  border-radius: 9px;
+  background: rgba(58, 90, 44, 0.13);
+  color: #24451d;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(36, 69, 29, 0.16);
+}
+.ai-designer-config-section .section__toggle:hover,
+.ai-designer-config-section .section__toggle:focus-visible {
+  background: #3a5a2c;
+  color: #fff;
+  outline: none;
+}
 @media (max-width: 768px) {
   .ai-config-grid {
     grid-template-columns: 1fr;
+  }
+  .ai-config-status-summary {
+    justify-content: flex-start;
+    max-width: 100%;
   }
 }
 @media (max-width: 640px) {

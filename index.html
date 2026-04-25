@@ -5,6 +5,34 @@
     <link rel="icon" type="image/png" href="%BASE_URL%logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Open Agricola</title>
+    <script>
+      // Resolve seasonal background URL synchronously so the browser can start
+      // fetching the image while the JS bundle is still being downloaded.
+      // Mirrors logic in client/utils/seasonalBackground.ts.
+      (function () {
+        var base = "%BASE_URL%";
+        var map = {
+          1: "winter-2", 2: "winter-3", 3: "spring-1", 4: "spring-2",
+          5: "spring-3", 6: "summer-2", 7: "summer-1", 8: "summer-3",
+          9: "autumn-1", 10: "autumn-2", 11: "autumn-3", 12: "winter-1",
+        };
+        var p = new URLSearchParams(location.search);
+        var override = p.get("bg");
+        var variant = null;
+        if (override === "none") variant = null;
+        else if (override && /^\d+$/.test(override)) variant = map[+override] || null;
+        else if (override && /^(spring|summer|autumn|winter)-[1-3]$/.test(override)) variant = override;
+        else variant = map[new Date().getMonth() + 1];
+        if (variant) {
+          var href = base + "seasons/" + variant + ".webp";
+          document.documentElement.style.setProperty("--bg-monthly", 'url("' + href + '")');
+          var l = document.createElement("link");
+          l.rel = "preload"; l.as = "image"; l.href = href;
+          l.setAttribute("fetchpriority", "high");
+          document.head.appendChild(l);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

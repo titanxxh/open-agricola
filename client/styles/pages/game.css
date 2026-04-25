@@ -1,18 +1,26 @@
 /* Migrated from client/App.css during UI overhaul Batch 1 (mechanical split, no rewrites). */
 
-/* ══════════ INTERACTION BAR ══════════ */
+/* ══════════ INTERACTION BAR ══════════
+ * The interaction bar lives at the table edge and represents *the player's
+ * own action board* — so render it as a deep-green wood plank with gold
+ * inlays, not as a frosted SaaS toolbar. Primary buttons sit as gold emboss
+ * tiles; utility buttons sit as parchment chips so the visual hierarchy
+ * matches the action priority. */
 .interaction-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background:
+    linear-gradient(180deg, rgba(58, 90, 44, 0.96), rgba(45, 74, 33, 0.96));
+  border-top: 1px solid rgba(212, 160, 23, 0.6);
   border-radius: 16px 16px 0 0;
-  padding: 10px 16px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 -6px 18px rgba(0, 0, 0, 0.2);
+  color: #fdf6e3;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -28,7 +36,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: rgba(255, 255, 255, 0.96);
+  background: linear-gradient(180deg, rgba(58, 90, 44, 0.98), rgba(58, 90, 44, 0.92));
 }
 .interaction-bar__controls {
   display: flex;
@@ -37,32 +45,52 @@
   gap: 8px;
 }
 .interaction-bar__controls button {
-  border: none;
+  border: 1px solid rgba(255, 247, 230, 0.25);
   border-radius: 999px;
   padding: 6px 14px;
-  background: var(--color-primary);
-  color: #fff;
+  background: rgba(255, 247, 230, 0.12);
+  color: #fdf6e3;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
 .interaction-bar__controls button:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: rgba(255, 247, 230, 0.22);
+  border-color: rgba(212, 160, 23, 0.7);
 }
 .interaction-bar__controls button:active:not(:disabled) {
   transform: translateY(1px);
 }
 .interaction-bar__controls button:disabled {
-  background: #93a68a;
-  color: #eef2ea;
+  background: rgba(255, 247, 230, 0.04);
+  color: rgba(253, 246, 227, 0.45);
+  border-color: rgba(255, 247, 230, 0.1);
   cursor: not-allowed;
-  opacity: 0.85;
+}
+/* Primary CTA inside the bar (confirm / commit) — gold emboss so it visibly
+ * outranks the parchment utility buttons. */
+.interaction-bar__controls button.is-primary,
+.interaction-actions button.is-primary {
+  background: linear-gradient(180deg, #e6b73a, var(--color-accent-strong));
+  color: #2d2010;
+  border-color: rgba(74, 47, 24, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 4px rgba(74, 47, 24, 0.25),
+    0 2px 0 #8c6310;
+  font-weight: 700;
+}
+.interaction-bar__controls button.is-primary:hover:not(:disabled),
+.interaction-actions button.is-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  border-color: rgba(74, 47, 24, 0.8);
 }
 .interaction-bar__body {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(205, 185, 150, 0.85);
+  border-top: 1px solid rgba(212, 160, 23, 0.4);
 }
 /* Forward-compat aliases for utility / pending split.
  * Existing structure already consolidates utility buttons (undo / scoring /
@@ -137,17 +165,33 @@
 .anytime-bar--inline .anytime-title {
   font-size: 13px;
   white-space: nowrap;
+  color: rgba(253, 246, 227, 0.85);
 }
 .anytime-bar--inline .anytime-actions {
   justify-content: flex-end;
 }
+.anytime-bar--inline .anytime-actions button {
+  background: rgba(255, 247, 230, 0.14);
+  color: #fdf6e3;
+  border: 1px solid rgba(255, 247, 230, 0.25);
+}
+.anytime-bar--inline .anytime-actions button:hover:not(:disabled) {
+  background: rgba(255, 247, 230, 0.24);
+  border-color: rgba(212, 160, 23, 0.7);
+}
+.anytime-bar--inline .anytime-actions button:disabled {
+  background: rgba(255, 247, 230, 0.05);
+  color: rgba(253, 246, 227, 0.4);
+  border-color: rgba(255, 247, 230, 0.1);
+}
 .interaction-title {
   font-weight: 700;
-  color: #2e4b1e;
+  color: #fdf6e3;
+  letter-spacing: 0.3px;
 }
 .interaction-subtitle {
   font-size: 13px;
-  color: #4f4f4f;
+  color: rgba(253, 246, 227, 0.8);
 }
 .interaction-actions {
   display: flex;
@@ -160,20 +204,25 @@
   margin-top: 6px;
 }
 .interaction-actions button {
-  border: none;
+  border: 1px solid rgba(255, 247, 230, 0.3);
   border-radius: 999px;
   padding: 6px 14px;
-  background: var(--color-primary);
-  color: #fff;
+  background: rgba(255, 247, 230, 0.14);
+  color: #fdf6e3;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.interaction-actions button:hover:not(:disabled) {
+  background: rgba(255, 247, 230, 0.24);
+  border-color: rgba(212, 160, 23, 0.7);
 }
 .interaction-actions button:disabled {
-  background: #93a68a;
-  color: #eef2ea;
+  background: rgba(255, 247, 230, 0.05);
+  color: rgba(253, 246, 227, 0.45);
+  border-color: rgba(255, 247, 230, 0.1);
   cursor: not-allowed;
-  opacity: 0.85;
 }
 .interaction-actions button.choice-option-disabled {
   opacity: 0.5;
@@ -500,9 +549,6 @@
   }
   .stage-bar__cells {
     grid-template-columns: repeat(7, 1fr);
-  }
-  .stage-bar__cells > :nth-child(n+8) {
-    display: none;
   }
 }
 .board {
@@ -1294,6 +1340,9 @@
   color: #fff;
 }
 /* ══════════ FARM GRID ══════════ */
+/* Outer board reads as a matte wooden tray instead of bright grass — frees the
+ * outer monthly background to own the green palette and lets the empty plots
+ * sit on a neutral surface. */
 .farm-grid {
   display: grid;
   /* Size tiles by the .center container width, not the viewport.
@@ -1306,11 +1355,30 @@
     var(--tile) var(--fence);
   grid-template-rows: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence);
-  background: #7fb161;
+  background-color: #8a623d;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(60, 36, 18, 0.18) 0,
+      rgba(60, 36, 18, 0.18) 1px,
+      transparent 1px,
+      transparent 14px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 240, 210, 0.05) 0,
+      rgba(255, 240, 210, 0.05) 1px,
+      transparent 1px,
+      transparent 6px
+    ),
+    linear-gradient(180deg, #936b44 0%, #7a5230 100%);
   padding: 12px;
   border-radius: 14px;
   margin-bottom: 16px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 240, 210, 0.18),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.18);
   width: 100%;
   justify-content: center;
 }
@@ -1319,16 +1387,18 @@
   height: 100%;
 }
 .farm-tile {
-  background: #84c56a;
+  background: #f0dcb0;
   border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgba(58, 90, 44, 0.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 84, 44, 0.35),
+    inset 0 1px 0 rgba(255, 248, 224, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: #2f4f1f;
+  color: #5a3a1f;
   padding: 4px;
   position: relative;
 }
@@ -1766,13 +1836,37 @@
 .hand-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
+  padding-top: 16px; /* room for hover lift */
+  perspective: 800px;
 }
 .hand-row > * {
   flex: 1 1 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
+  transform-origin: bottom center;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 0.18s ease;
+  will-change: transform;
+}
+/* Fan rotations — apply only when a row has multiple cards. The arc is mild
+ * (±10°), enough to feel like a hand without breaking flex-wrap. */
+.hand-row:not(:has(> :only-child)) > :nth-child(1) { transform: rotate(-9deg) translateY(2px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(2) { transform: rotate(-4.5deg) translateY(1px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(3) { transform: rotate(0deg); }
+.hand-row:not(:has(> :only-child)) > :nth-child(4) { transform: rotate(4.5deg) translateY(1px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(5) { transform: rotate(9deg) translateY(2px); }
+.hand-row:not(:has(> :only-child)) > :nth-child(n+6) { transform: rotate(0deg); }
+.hand-row > *:hover,
+.hand-row > *:focus-within {
+  transform: translateY(-12px) scale(1.05) rotate(0deg) !important;
+  z-index: 5;
+  filter: drop-shadow(0 6px 14px rgba(60, 36, 18, 0.25));
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-row > * { transition: none; transform: none !important; }
 }
 .hand-sections {
   display: flex;
@@ -2148,12 +2242,31 @@
   color: #6b6b6b;
 }
 /* ══════════ DEV PANEL ══════════ */
+/* Marked as a developer-only surface so it never reads as product UI:
+ * gold dashed warning border + "DEV ONLY" corner ribbon. */
 .dev-panel {
-  background: #f3f7ea;
+  position: relative;
+  background: #fffbed;
   border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 16px;
-  border: 1px solid #d7e5c8;
+  padding: 18px 12px 12px;
+  margin: 18px 0 16px;
+  border: 2px dashed var(--color-accent-strong, #d4a017);
+  box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.15);
+}
+.dev-panel__badge {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--color-accent-strong, #d4a017);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(120, 80, 0, 0.3);
 }
 .dev-panel h3 {
   margin: 0 0 8px;
@@ -3091,9 +3204,13 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 .score-panel__total {
   grid-area: total;
   font-weight: 700;
-  font-size: var(--fs-h2);
+  font-size: 26px;
+  line-height: 1;
   color: var(--color-accent-strong);
   font-family: var(--agricola-font);
+  /* Tabular numerals so totals align cleanly across rows. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 .score-panel__breakdown {
   grid-area: breakdown;
@@ -3154,16 +3271,36 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 }
 .action-log__entry {
   display: grid;
-  grid-template-columns: 20px 24px 1fr;
+  grid-template-columns: 4px 20px 24px 1fr;
   gap: 6px;
   align-items: center;
-  padding: 4px 6px;
+  padding: 5px 6px 5px 0;
+  margin-bottom: 1px;
   font-size: var(--fs-small);
+  line-height: 1.5;
   color: var(--color-text);
   border-radius: var(--radius-sm);
+  /* Faded older entries so the active turn is what the eye lands on. */
+  opacity: 0.78;
+}
+.action-log__entry::before {
+  content: '';
+  align-self: stretch;
+  background: var(--color-border);
+  border-radius: 2px;
+}
+.action-log__entry[data-current="true"],
+.action-log__entry.is-current {
+  font-weight: 600;
+  opacity: 1;
+}
+.action-log__entry[data-current="true"]::before,
+.action-log__entry.is-current::before {
+  background: var(--color-accent-strong);
 }
 .action-log__entry:hover {
   background: rgba(0, 0, 0, 0.03);
+  opacity: 1;
 }
 .action-log__icon {
   text-align: center;

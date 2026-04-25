@@ -651,21 +651,6 @@
 .player-card.major[data-id="Major_Basket"] .card-icon { background-position: 75% 100%; }
 .player-card.major[data-id="Major_Well"] .card-icon { background-position: 100% 100%; }
 
-/* Passing card badge */
-.card-passing-badge {
-  position: absolute;
-  top: 113px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 50px;
-  height: 30px;
-  background-image: url('/bga-img/meeples.png');
-  background-position: 76.5% 14.9%;
-  background-size: 1300%;
-  pointer-events: none;
-  opacity: 0.8;
-}
-
 /* Card with copy overlay integration */
 .player-card .card-copy-overlay {
   border-radius: 15.5px;

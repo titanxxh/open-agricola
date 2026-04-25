@@ -32,6 +32,7 @@ export function LobbyPage() {
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
   const [showPlayerSelect, setShowPlayerSelect] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
@@ -115,11 +116,69 @@ export function LobbyPage() {
         />
         <div className="lobby-header__right">
           <LocaleSwitcher />
-          <button type="button" className="btn-link" onClick={() => setPage('settings')}>
+          <button
+            type="button"
+            className="lobby-user-pill"
+            onClick={() => setPage('settings')}
+            title={t('platform.tabSettings')}
+          >
             {user?.displayName || user?.username}
           </button>
           <button type="button" className="btn-link" onClick={logout}>{t('platform.logout')}</button>
         </div>
+        <button
+          type="button"
+          className={`lobby-menu-toggle${menuOpen ? ' is-open' : ''}`}
+          aria-expanded={menuOpen}
+          aria-controls="lobby-mobile-drawer"
+          aria-label={t('platform.tabSettings')}
+          onClick={() => setMenuOpen(open => !open)}
+        >
+          <span aria-hidden />
+          <span aria-hidden />
+          <span aria-hidden />
+        </button>
+        {menuOpen && (
+          <>
+            <div
+              className="lobby-drawer__scrim"
+              role="presentation"
+              onClick={() => setMenuOpen(false)}
+            />
+            <div className="lobby-drawer" id="lobby-mobile-drawer" role="menu">
+              <button
+                type="button"
+                className="lobby-drawer__item"
+                role="menuitem"
+                onClick={() => { setMenuOpen(false); setPage('settings') }}
+              >
+                <span aria-hidden>👤</span>
+                {user?.displayName || user?.username}
+              </button>
+              <div className="lobby-drawer__locale" role="menuitem">
+                <LocaleSwitcher />
+              </div>
+              <button
+                type="button"
+                className="lobby-drawer__item"
+                role="menuitem"
+                onClick={() => { setMenuOpen(false); setPage('settings') }}
+              >
+                <span aria-hidden>⚙️</span>
+                {t('platform.tabSettings')}
+              </button>
+              <button
+                type="button"
+                className="lobby-drawer__item lobby-drawer__item--danger"
+                role="menuitem"
+                onClick={() => { setMenuOpen(false); logout() }}
+              >
+                <span aria-hidden>↪︎</span>
+                {t('platform.logout')}
+              </button>
+            </div>
+          </>
+        )}
       </header>
 
       <div className="lobby-grid">
@@ -242,7 +301,7 @@ export function LobbyPage() {
               <li key={r.id} className="room-item">
                 <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
                 <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
-                <span className="room-status">
+                <span className="room-status" data-status={r.status}>
                   {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
                 </span>
                 <button
@@ -261,7 +320,7 @@ export function LobbyPage() {
       <Section icon="🏠" title={t('platform.activeRooms')} variant="default" className="lobby-rooms">
         {rooms.length === 0 ? (
           <EmptyState
-            icon="🎲"
+            art="tractor"
             title={t('platform.noActiveRoomsTitle')}
             description={t('platform.noActiveRoomsDesc')}
             action={
@@ -276,6 +335,9 @@ export function LobbyPage() {
               <li key={room.id} className="room-item">
                 <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
                 <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                <span className="room-status" data-status={room.status}>
+                  {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}
+                </span>
                 {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
                   <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
                     {t('platform.joinBtn')}
@@ -291,6 +353,32 @@ export function LobbyPage() {
           </ul>
         )}
       </Section>
+
+      <div className="lobby-horizon" aria-hidden>
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" focusable="false">
+          <path
+            className="lobby-horizon__hill lobby-horizon__hill--back"
+            d="M0,90 C150,60 300,80 450,70 C600,60 750,90 900,80 C1050,72 1150,62 1200,68 L1200,120 L0,120 Z"
+          />
+          <path
+            className="lobby-horizon__hill lobby-horizon__hill--front"
+            d="M0,100 C120,82 260,98 400,92 C540,86 680,104 830,96 C980,90 1100,84 1200,90 L1200,120 L0,120 Z"
+          />
+          <g className="lobby-horizon__grass">
+            <path d="M40,108 l3,-10 l3,10 z M48,110 l2,-7 l2,7 z M56,108 l3,-10 l3,10 z" />
+            <path d="M310,108 l3,-10 l3,10 z M318,110 l2,-7 l2,7 z M326,108 l3,-10 l3,10 z" />
+            <path d="M870,108 l3,-10 l3,10 z M878,110 l2,-7 l2,7 z M886,108 l3,-10 l3,10 z" />
+          </g>
+          <g className="lobby-horizon__fence">
+            <rect x="1048" y="86" width="2" height="22" />
+            <rect x="1064" y="84" width="2" height="24" />
+            <rect x="1080" y="86" width="2" height="22" />
+            <rect x="1096" y="84" width="2" height="24" />
+            <rect x="1042" y="92" width="60" height="2" />
+            <rect x="1042" y="100" width="60" height="2" />
+          </g>
+        </svg>
+      </div>
     </div>
   )
 }

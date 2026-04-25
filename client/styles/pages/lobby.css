@@ -18,40 +18,151 @@
   gap: 12px;
   margin-bottom: 32px;
   background: var(--bg-parchment);
-  padding: 12px 20px;
+  padding: 14px 24px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-paper);
 }
 .lobby-brand {
-  gap: 14px;
+  gap: 16px;
 }
 .lobby-brand .brand-mark-image {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
 }
 .lobby-title {
-  font-size: 24px;
+  font-size: 28px;
   color: var(--color-primary);
   margin: 0;
   font-family: var(--agricola-font);
+  letter-spacing: 0.5px;
 }
 .lobby-header__right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: var(--color-text-secondary);
   font-size: 14px;
   flex-wrap: wrap;
 }
 
+/* Hamburger toggle — only shown on small viewports. Three stacked bars become
+ * an "X" when open. */
+.lobby-menu-toggle {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(255, 247, 230, 0.85);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+}
+.lobby-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: transform 0.18s, opacity 0.18s;
+}
+.lobby-menu-toggle.is-open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.lobby-menu-toggle.is-open span:nth-child(2) { opacity: 0; }
+.lobby-menu-toggle.is-open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.lobby-drawer {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--bg-parchment, #fff7e6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 12px 28px rgba(60, 36, 18, 0.2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+  animation: drawerIn 0.16s ease-out;
+}
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lobby-drawer__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 36, 18, 0.18);
+  z-index: 20;
+}
+.lobby-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lobby-drawer__item:hover { background: rgba(212, 160, 23, 0.12); }
+.lobby-drawer__item--danger { color: var(--color-danger, #b3261e); }
+.lobby-drawer__item--danger:hover { background: rgba(179, 38, 30, 0.1); }
+.lobby-drawer__locale {
+  padding: 6px 12px;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+  margin: 4px 0;
+}
+/* Username pill — replaces a plain text link so the header reads as
+ * "brand · user identity · controls" rather than a row of equal-weight links. */
+.lobby-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  background: rgba(255, 247, 230, 0.7);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.lobby-user-pill:hover {
+  background: #fff7e6;
+  border-color: var(--color-accent-strong);
+}
+.lobby-user-pill::before {
+  content: '';
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent-strong));
+  flex-shrink: 0;
+}
+
 .lobby-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 1.6fr 1fr 1fr;
   gap: 20px;
   margin-bottom: 24px;
 }
 .lobby-hero { display: flex; flex-direction: column; gap: 12px; }
-.lobby-hero .lobby-cta-primary { font-size: var(--fs-h3); padding: 14px; }
+.lobby-hero .lobby-cta-primary {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 14px;
+}
 
 .join-form {
   display: flex;
@@ -89,29 +200,52 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: var(--color-bg-warm);
-  border-radius: var(--radius-sm);
-  border-bottom: 1px solid var(--color-border-light);
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px rgba(90, 58, 32, 0.05);
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
 }
-.lobby-rooms .room-item:last-child {
-  border-bottom: none;
+.lobby-rooms .room-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(90, 58, 32, 0.1);
+  border-color: var(--color-accent-strong);
 }
 .room-id {
-  font-weight: 600;
-  color: var(--color-text-secondary);
+  font-weight: 700;
+  color: var(--color-text);
   flex: 1;
+  letter-spacing: 0.3px;
 }
 .room-players {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 13px;
+  font-weight: 600;
 }
 .room-status {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+}
+/* Status badges — colour-code joinability so the lobby is scannable. */
+.room-status[data-status="waiting"] {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+  border-color: rgba(45, 122, 31, 0.3);
+}
+.room-status[data-status="playing"] {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-bg);
+  border-color: rgba(212, 160, 23, 0.4);
+}
+.room-status[data-status="finished"] {
   color: var(--color-text-muted);
   background: #f0e6d0;
-  padding: 2px 7px;
-  border-radius: 10px;
 }
 
 /* ── Tablet breakpoint ───────────────────────────────────────────────────── */
@@ -128,14 +262,33 @@
 /* ── Small phone breakpoint ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .lobby-header {
-    flex-direction: column;
-    align-items: flex-start;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
   }
   .lobby-header__right {
-    width: 100%;
-    justify-content: space-between;
+    display: none;
   }
+  .lobby-menu-toggle {
+    display: inline-flex;
+  }
+  /* Two-line room item so the join button doesn't get squashed on narrow
+   * screens. Status badge moves up next to room id; players + button below. */
+  .lobby-rooms .room-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "id status"
+      "players button";
+    gap: 6px 10px;
+    padding: 12px 14px;
+  }
+  .lobby-rooms .room-item .room-id { grid-area: id; }
+  .lobby-rooms .room-item .room-status { grid-area: status; justify-self: end; }
+  .lobby-rooms .room-item .room-players { grid-area: players; }
+  .lobby-rooms .room-item > button { grid-area: button; justify-self: end; }
 }
 
 .player-select-panel {
@@ -193,4 +346,26 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+/* Lobby horizon band — closes the page with a green field + fence motif so the
+ * empty parchment below the rooms list doesn't read as unfinished. */
+.lobby-horizon {
+  margin: 32px -24px 0;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.lobby-horizon svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+.lobby-horizon__hill--back { fill: #9bbf7c; opacity: 0.55; }
+.lobby-horizon__hill--front { fill: #6fa256; }
+.lobby-horizon__grass { fill: #4f7a3a; opacity: 0.7; }
+.lobby-horizon__fence { fill: #6b4a2a; }
+@media (max-width: 640px) {
+  .lobby-horizon { margin-left: -16px; margin-right: -16px; }
+  .lobby-horizon svg { height: 72px; }
 }

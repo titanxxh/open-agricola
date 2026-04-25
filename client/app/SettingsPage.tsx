@@ -75,7 +75,10 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header>
-        <button type="button" className="btn-link" onClick={() => setPage('lobby')}>{t('platform.backToLobby')}</button>
+        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
+          <span aria-hidden="true">‹</span>
+          {t('platform.backToLobby')}
+        </button>
         <h1>{t('platform.settingsTitle')}</h1>
         <LocaleSwitcher />
       </header>
@@ -153,7 +156,7 @@ export function SettingsPage() {
       <Section
         icon="⚠️"
         title={t('platform.dangerZone')}
-        variant="parchment"
+        variant="danger"
         className="settings-danger"
       >
         <DangerButton
