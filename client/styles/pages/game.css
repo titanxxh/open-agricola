@@ -1664,22 +1664,18 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
-/* Horizontal-scroll carousel — was wrap-stack (vertical pile of 12+ cards). */
+/* Adaptive grid — show all played cards in-place, max 7 per row, cards
+ * shrink to fit the viewport so nothing gets clipped on phones. */
 .played-row {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-start;
-  gap: clamp(6px, 1.2vw, 8px);
-  overflow-x: auto;
-  overflow-y: visible;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 4px; /* room for scrollbar */
-  -webkit-overflow-scrolling: touch;
+  gap: 6px;
 }
 .played-row > * {
-  flex: 0 0 188px;
+  flex: 1 1 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
-  scroll-snap-align: start;
+  min-width: 0;
 }
 .played-card {
   background: #fff;
@@ -1765,22 +1761,18 @@
 .card-copy-btn:hover {
   background: #3a6830;
 }
-/* Horizontal-scroll carousel for hand cards (occupation / minor improvement). */
+/* Adaptive wrap layout for hand cards. Cards shrink to fit so all are
+ * visible without horizontal scrolling, with a hard cap of 7 per row. */
 .hand-row {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-start;
-  gap: clamp(6px, 1.2vw, 8px);
-  overflow-x: auto;
-  overflow-y: visible;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
+  gap: 6px;
 }
 .hand-row > * {
-  flex: 0 0 188px;
+  flex: 1 1 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
-  scroll-snap-align: start;
+  min-width: 0;
 }
 .hand-sections {
   display: flex;
