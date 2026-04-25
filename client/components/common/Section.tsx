@@ -5,7 +5,15 @@ interface SectionProps {
   subtitle?: string
   icon?: ReactNode
   actions?: ReactNode
-  variant?: 'default' | 'parchment' | 'sandbox'
+  /**
+   * Visual hierarchy — pick by importance, not by aesthetic preference:
+   * - `sandbox`  — the page's hero card (only one per page)
+   * - `parchment` — primary content cards
+   * - `secondary` — supporting cards that should not compete with primary
+   * - `danger`   — destructive operations
+   * - `default`  — neutral white card (game sidebar / inline panels)
+   */
+  variant?: 'default' | 'parchment' | 'sandbox' | 'secondary' | 'danger'
   collapsible?: boolean
   defaultCollapsed?: boolean
   className?: string

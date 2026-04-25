@@ -272,6 +272,28 @@
   box-shadow: var(--shadow-paper, 0 4px 16px rgba(90, 58, 32, 0.15));
   border: 2px solid var(--color-accent-border, var(--color-border));
 }
+/* Secondary: supporting cards. Lighter, no parchment shadow — should sit behind
+ * primary `parchment` cards in visual weight. */
+.section--secondary {
+  background: var(--color-bg-warm);
+  border: 1px solid var(--color-border-light);
+  box-shadow: 0 1px 4px rgba(90, 58, 32, 0.06);
+}
+.section--secondary .section__title {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-h3);
+}
+/* Danger: destructive-operations zone (Settings page, room dissolve, etc.). */
+.section--danger {
+  background: var(--bg-parchment, var(--color-bg-card));
+  border: 2px solid var(--color-danger);
+  box-shadow:
+    0 0 0 4px rgba(215, 74, 58, 0.06),
+    var(--shadow-paper, 0 2px 12px rgba(90, 58, 32, 0.08));
+}
+.section--danger .section__title {
+  color: var(--color-danger);
+}
 .section__header {
   display: flex; justify-content: space-between; align-items: flex-start;
   gap: 16px; margin-bottom: var(--spacing-md);
@@ -346,11 +368,23 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: transparent; border: none;
   color: var(--color-text-muted);
-  font-size: 11px; cursor: pointer;
-  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  gap: 3px;
+  /* Inset highlight pad — the active tab gets a parchment+gold pill so it's
+   * obvious by glance, not just by color. */
+  margin: 4px;
+  padding: 6px 4px;
+  border-radius: 12px;
+  transition: background 0.15s, color 0.15s;
 }
-.mobile-tab-bar__tab.is-active { color: var(--color-accent-strong); font-weight: 600; }
-.mobile-tab-bar__icon { font-size: 22px; }
+.mobile-tab-bar__tab.is-active {
+  color: var(--color-accent-strong);
+  background: rgba(212, 160, 23, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.35);
+}
+.mobile-tab-bar__icon { font-size: 24px; }
 
 @media (max-width: 640px) {
   .mobile-tab-bar { display: flex; }
