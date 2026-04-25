@@ -154,4 +154,23 @@ describe('streamChat dispatcher', () => {
     expect(body.system).toBe('sys')
     expect(body.messages).toEqual([{ role: 'user', content: 'hi' }])
   })
+
+  it('routes deepseek to api.deepseek.com/v1 with Bearer auth and v4 model', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeOpenAISseChunks('ds-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'deepseek',
+      apiKey: 'sk-deepseek',
+      model: 'deepseek-v4-flash',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('ds-out')
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
+    const headers = init.headers as Record<string, string>
+    expect(headers['Authorization']).toBe('Bearer sk-deepseek')
+    expect(JSON.parse(init.body).model).toBe('deepseek-v4-flash')
+  })
 })
