@@ -21,6 +21,12 @@ function fakeOpenAISseChunks(text: string): string[] {
   ]
 }
 
+function fakeAnthropicSseChunks(text: string): string[] {
+  return [
+    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text } })}\n\n`,
+  ]
+}
+
 async function collect(stream: AsyncGenerator<string>): Promise<string> {
   let out = ''
   for await (const chunk of stream) out += chunk
@@ -125,5 +131,27 @@ describe('streamChat dispatcher', () => {
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions')
     expect(JSON.parse(init.body).max_tokens).toBe(65536)
+  })
+
+  it('routes anthropic to /v1/messages with x-api-key header', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      body: makeFakeStream(fakeAnthropicSseChunks('claude-out')),
+    })
+    const config: LlmConfig = {
+      provider: 'anthropic',
+      apiKey: 'sk-ant-test',
+      model: 'claude-sonnet-4-5',
+    }
+    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
+    expect(out).toBe('claude-out')
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://api.anthropic.com/v1/messages')
+    const headers = init.headers as Record<string, string>
+    expect(headers['x-api-key']).toBe('sk-ant-test')
+    expect(headers['anthropic-version']).toBe('2023-06-01')
+    const body = JSON.parse(init.body)
+    expect(body.system).toBe('sys')
+    expect(body.messages).toEqual([{ role: 'user', content: 'hi' }])
   })
 })
