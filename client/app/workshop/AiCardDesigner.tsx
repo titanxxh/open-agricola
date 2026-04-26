@@ -15,10 +15,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
+  getLlmConfig, saveLlmConfig, clearLlmConfig,
+  getProvider, listModelsFor, defaultModelFor,
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
-  PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
+  PROVIDER_LABELS, PROVIDER_KEY_HINTS,
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
@@ -82,7 +83,7 @@ export type ExtractedCard = {
 
 type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean; promptSnapshot?: string }
 
-type ApiCard = {
+export type ApiCard = {
   id: string          // DB row id
   card_id: string     // CUSTOM_xxx
   card_type: string
@@ -169,28 +170,37 @@ function MessageContent({ text }: { text: string }) {
 
 // ── Inline Config Bar ─────────────────────────────────────────────────────────
 
-function ConfigBar({ config, onConfigured, onClear, storageKey }: {
+function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
   config: LlmConfig | null
   onConfigured: () => void
   onClear: () => void
   storageKey?: string
+  capability: 'chat' | 'image'
 }) {
   const [expanded, setExpanded] = useState(!config)
-  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
+  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'gemini')
   const [apiKey, setApiKey] = useState('')
-  const [model, setModel] = useState(config?.model ?? defaultModel('openai'))
-  const [baseUrl, setBaseUrl] = useState(config?.baseUrl ?? '')
+  const [model, setModel] = useState(() => {
+    if (!config) return defaultModelFor(getProvider('gemini'), capability) ?? ''
+    // Validate the saved model against this panel's capability. If it doesn't
+    // qualify (e.g. user saved a chat-only model in the image panel), fall back
+    // to the provider's preferred model for this capability.
+    const def = getProvider(config.provider)
+    const valid = listModelsFor(def, capability)
+    if (valid.some(m => m.id === config.model)) return config.model
+    return defaultModelFor(def, capability) ?? ''
+  })
   const [showKey, setShowKey] = useState(false)
 
   const handleProviderChange = (p: LlmProvider) => {
     setProvider(p)
-    setModel(defaultModel(p))
-    setBaseUrl('')
+    const next = defaultModelFor(getProvider(p), capability)
+    setModel(next ?? '')
   }
 
   const handleSave = () => {
     if (!apiKey.trim()) return
-    saveLlmConfig({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined }, storageKey)
+    saveLlmConfig({ provider, apiKey: apiKey.trim(), model }, storageKey)
     setExpanded(false)
     onConfigured()
   }
@@ -203,9 +213,24 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
   }
 
   if (!expanded && config) {
+    // Detect stale-but-saved model that no longer matches the panel's capability
+    // (e.g. a previously saved gemini-2.5-flash for the image panel after Task 3
+    // trimmed the model list). Surface a subtle warning so the user knows to fix it.
+    let stale = false
+    try {
+      const def = getProvider(config.provider)
+      if (def.models.length > 0) {
+        const validIds = listModelsFor(def, capability).map(m => m.id)
+        if (!validIds.includes(config.model)) stale = true
+      }
+    } catch { /* unknown provider — leave hint off */ }
+
     return (
       <div className="ai-config-bar">
         <span className="ai-provider-tag">{config.provider} / {config.model}</span>
+        {stale && (
+          <span className="ai-config-bar-stale" title={`'${config.model}' 不再可用，请点击「切换」更新`}>已失效</span>
+        )}
         <button type="button" className="btn-link" onClick={() => setExpanded(true)}>切换</button>
         <button type="button" className="btn-link ai-config-bar-clear" onClick={handleClear}>清除</button>
       </div>
@@ -224,7 +249,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
 
       <div className="ai-config-bar-fields">
         <div className="ai-provider-btns">
-          {(['gemini', 'openrouter'] as LlmProvider[]).map(p => (
+          {(['gemini', 'openrouter', 'deepseek', 'aihubmix'] as LlmProvider[]).map(p => (
             <button
               key={p}
               type="button"
@@ -236,38 +261,34 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
           ))}
         </div>
 
-        {provider === 'custom' && (
-          <input
-            type="url"
-            value={baseUrl}
-            onChange={e => setBaseUrl(e.target.value)}
-            placeholder="API 端点 (兼容 OpenAI 格式)"
-            className="ai-config-bar-input"
-          />
-        )}
-
-        {PROVIDER_MODELS[provider].length > 0 ? (
-          <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
-            {PROVIDER_MODELS[provider].map(m => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            placeholder={defaultModel(provider)}
-            className="ai-config-bar-input"
-          />
-        )}
+        {(() => {
+          const providerDef = getProvider(provider)
+          const availableModels = listModelsFor(providerDef, capability)
+          if (availableModels.length === 0) {
+            // Provider has models but none support this capability.
+            return (
+              <span className="ai-model-mismatch">
+                {capability === 'image'
+                  ? '该 provider 不支持图像生成，请切换 provider'
+                  : '该 provider 不支持代码/聊天生成，请切换 provider'}
+              </span>
+            )
+          }
+          return (
+            <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
+              {availableModels.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          )
+        })()}
 
         <div className="ai-key-input-row">
           <input
             type={showKey ? 'text' : 'password'}
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
-            placeholder={provider === 'openai' ? 'sk-...' : provider === 'anthropic' ? 'sk-ant-...' : 'API Key'}
+            placeholder="API Key"
             autoComplete="off"
             className="ai-config-bar-input"
           />
@@ -282,7 +303,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
           </div>
         )}
 
-        <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim()}>
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim() || !model.trim()}>
           保存配置
         </button>
       </div>
@@ -631,8 +652,8 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersi
           ) : (
             <div className="ai-art-no-gen">
               {locale === 'zh'
-                ? '图片生成需要 Gemini（gemini-3.1-flash-image-preview）或 OpenAI（DALL-E 3）'
-                : 'Image gen requires Gemini (gemini-3.1-flash-image-preview) or OpenAI (DALL-E 3)'
+                ? '图片生成需要 Gemini、OpenAI 或 OpenRouter 图片模型'
+                : 'Image gen requires Gemini, OpenAI, or OpenRouter image models'
               }
             </div>
           )}
@@ -986,7 +1007,8 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+  initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
@@ -1203,7 +1225,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     }
   }
 
-  const handleLoadCard = (apiCard: ApiCard) => {
+  const handleLoadCard = useCallback((apiCard: ApiCard) => {
     const cj = apiCard.card_json
     const ct = ((cj.card_type ?? apiCard.card_type) as string) as 'minor' | 'occupation'
     const cardData: ExtractedCard['card'] = {
@@ -1238,7 +1260,11 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     // Restore locales from card_json
     const savedLocales = (cj.locales ?? {}) as Record<string, { name: string; desc: string[]; prerequisite?: string }>
     setCardLocales(savedLocales)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (initialCard) handleLoadCard(initialCard)
+  }, [handleLoadCard, initialCard])
 
   return (
     <div className="ai-designer">
@@ -1274,6 +1300,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
               <h4 className="ai-config-grid-heading">{t('platform.aiConfigImageHeading')}</h4>
               <ConfigBar
                 storageKey={KEY_LLM_CONFIG_ART}
+                capability="image"
                 config={artConfig}
                 onConfigured={() => { setArtConfig(getLlmConfig(KEY_LLM_CONFIG_ART)); bumpConfig() }}
                 onClear={() => { setArtConfig(null); bumpConfig() }}
@@ -1282,6 +1309,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
             <div className="ai-config-grid-col">
               <h4 className="ai-config-grid-heading">{t('platform.aiConfigAbilityHeading')}</h4>
               <ConfigBar
+                capability="chat"
                 config={abilityConfig}
                 onConfigured={() => { setAbilityConfig(getLlmConfig()); bumpConfig() }}
                 onClear={() => { setAbilityConfig(null); bumpConfig() }}

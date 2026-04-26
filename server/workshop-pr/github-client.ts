@@ -44,6 +44,9 @@ export class GitHubClient {
   async ensureFork(): Promise<{ owner: string; repo: string }> {
     const login = await this.getUserLogin()
     const repo = this.opts.upstreamRepo
+    if (login.toLowerCase() === this.opts.upstreamOwner.toLowerCase()) {
+      return { owner: this.opts.upstreamOwner, repo }
+    }
     const check = await this.fetch(`/repos/${login}/${repo}`)
     if (check.ok) return { owner: login, repo }
     if (check.status !== 404) {

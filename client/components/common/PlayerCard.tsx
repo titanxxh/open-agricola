@@ -47,6 +47,7 @@ type PlayerCardProps = {
   selected?: boolean
   usable?: boolean
   className?: string
+  enablePreview?: boolean
 }
 
 const getCardNumbering = (cardId: string): string => {
@@ -114,6 +115,7 @@ export const PlayerCard = ({
   selected = false,
   usable = false,
   className = '',
+  enablePreview = true,
 }: PlayerCardProps) => {
   const cardData = useMemo(() => {
     const meta = getCardMeta(cardId)
@@ -227,6 +229,17 @@ export const PlayerCard = ({
 
   const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => typeof v === 'number' && (v as number) > 0)
 
+  const previewCard = enablePreview ? (
+    <PlayerCard
+      locale={locale}
+      cardId={cardId}
+      cardType={cardType}
+      infobox={infobox}
+      enablePreview={false}
+      className="player-card-preview-body"
+    />
+  ) : null
+
   return (
     <CardWithCopy
       locale={locale}
@@ -235,6 +248,8 @@ export const PlayerCard = ({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       className={classes}
+      enablePreview={enablePreview}
+      previewCard={previewCard}
     >
       <div 
         className="player-card-inner" 

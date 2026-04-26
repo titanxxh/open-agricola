@@ -64,6 +64,84 @@ const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
 
 type View = 'home' | 'sandbox' | 'editor' | 'detail'
 
+export function getWorkshopCardIdFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get('card')?.trim()
+  return value || null
+}
+
+export function buildWorkshopCardUrl(
+  pathname: string,
+  search: string,
+  cardDbId: string | null,
+): string {
+  const params = new URLSearchParams(search)
+  params.set('page', 'workshop')
+  if (cardDbId) {
+    params.set('card', cardDbId)
+  } else {
+    params.delete('card')
+  }
+  const nextSearch = params.toString()
+  return `${pathname}${nextSearch ? `?${nextSearch}` : ''}`
+}
+
+type WorkshopPrActionInput = {
+  enabled: boolean
+  isAuthor: boolean
+  status: WorkshopCard['status']
+  githubPrUrl?: string | null
+  githubPrStatus?: WorkshopCard['github_pr_status']
+}
+
+export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
+  visible: boolean
+  disabled: boolean
+  buttonLabel: string
+  secondary: string | null
+} {
+  if (!input.isAuthor) {
+    return { visible: false, disabled: true, buttonLabel: '', secondary: null }
+  }
+  if (!input.enabled) {
+    return { visible: true, disabled: true, buttonLabel: 'PR 功能未开启', secondary: null }
+  }
+  if (input.status !== 'published') {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '先发布后可发起 PR',
+      secondary: '发布后可以提交到主仓库，等待 maintainer review。',
+    }
+  }
+
+  const prNum = extractPrNumber(input.githubPrUrl)
+  if (!input.githubPrUrl) {
+    return { visible: true, disabled: false, buttonLabel: '发起 PR 到主仓库', secondary: null }
+  }
+  if (input.githubPrStatus === 'merged') {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '已合并 ✓',
+      secondary: `PR #${prNum} · 社区卡已上线`,
+    }
+  }
+  if (input.githubPrStatus === 'closed') {
+    return {
+      visible: true,
+      disabled: false,
+      buttonLabel: '重新发起 PR',
+      secondary: `上次 PR #${prNum} 已关闭 · 点击重开`,
+    }
+  }
+  return {
+    visible: true,
+    disabled: false,
+    buttonLabel: '更新已有 PR',
+    secondary: `#${prNum} 等待 review · 点击重发最新版`,
+  }
+}
+
 function authHeaders(token: string | null): Record<string, string> {
   if (!token) return {}
   return { Authorization: `Bearer ${token}` }
@@ -84,6 +162,16 @@ function normalizeSandboxSettings(raw: unknown): SandboxSettings {
     player_count: playerCount,
     deck_ids: deckIds.length > 0 ? Array.from(new Set(deckIds)) : [...DEFAULT_SANDBOX_SETTINGS.deck_ids],
   }
+}
+
+export function buildSandboxCardIds(
+  cards: ReadonlyArray<{ id: string }>,
+  extraCardId?: string | null,
+): string[] {
+  const ids = cards.map(card => card.id)
+  const trimmed = extraCardId?.trim()
+  if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
+  return ids
 }
 
 // ── Card Preview Tile ────────────────────────────────────────────────────────
@@ -173,31 +261,14 @@ function CardDetailPrSection({
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
 
-  const enabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
-  if (!enabled) return null
-  if (!currentUserId || card.author_id !== currentUserId) return null
-  if (card.status !== 'published') return null
-
-  const prNum = extractPrNumber(card.github_pr_url)
-  const status = card.github_pr_status
-
-  let buttonLabel: string
-  let secondary: string | null = null
-  let disabled = false
-
-  if (!card.github_pr_url) {
-    buttonLabel = '发起 PR 到主仓库'
-  } else if (status === 'merged') {
-    buttonLabel = '已合并 ✓'
-    secondary = `PR #${prNum} · 社区卡已上线`
-    disabled = true
-  } else if (status === 'closed') {
-    buttonLabel = '重新发起 PR'
-    secondary = `上次 PR #${prNum} 已关闭 · 点击重开`
-  } else {
-    buttonLabel = '更新已有 PR'
-    secondary = `#${prNum} 等待 review · 点击重发最新版`
-  }
+  const action = getWorkshopPrActionState({
+    enabled: true,
+    isAuthor: !!currentUserId && card.author_id === currentUserId,
+    status: card.status,
+    githubPrUrl: card.github_pr_url,
+    githubPrStatus: card.github_pr_status,
+  })
+  if (!action.visible) return null
 
   async function onRefresh() {
     setRefreshing(true)
@@ -228,14 +299,14 @@ function CardDetailPrSection({
     >
       <button
         type="button"
-        className={disabled ? 'btn-secondary ws-btn-sm' : 'btn-primary ws-btn-sm'}
-        disabled={disabled}
+        className={action.disabled ? 'btn-secondary ws-btn-sm' : 'btn-primary ws-btn-sm'}
+        disabled={action.disabled}
         onClick={() => setModalOpen(true)}
       >
-        {buttonLabel}
+        {action.buttonLabel}
       </button>
-      {secondary && (
-        <span style={{ fontSize: '0.9em', opacity: 0.75 }}>{secondary}</span>
+      {action.secondary && (
+        <span style={{ fontSize: '0.9em', opacity: 0.75 }}>{action.secondary}</span>
       )}
       {card.github_pr_url && (
         <>
@@ -296,6 +367,8 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   const [submitting, setSubmitting] = useState(false)
   const [versions, setVersions] = useState<CardVersion[]>([])
   const [showVersions, setShowVersions] = useState(false)
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [versionsError, setVersionsError] = useState<string | null>(null)
   const [isFeatured, setIsFeatured] = useState(!!card.featured)
 
   useEffect(() => {
@@ -334,9 +407,24 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
   const fetchVersions = async () => {
     if (showVersions) { setShowVersions(false); return }
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/versions`, { headers: authHeaders(token) })
-    const d = await r.json()
-    if (d.ok) { setVersions(d.versions); setShowVersions(true) }
+    setVersionsLoading(true)
+    setVersionsError(null)
+    setShowVersions(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/versions`, { headers: authHeaders(token) })
+      const d = await r.json()
+      if (d.ok && Array.isArray(d.versions)) {
+        setVersions(d.versions)
+      } else {
+        setVersions([])
+        setVersionsError(d.error ?? '加载版本历史失败')
+      }
+    } catch {
+      setVersions([])
+      setVersionsError('网络错误，无法加载版本历史')
+    } finally {
+      setVersionsLoading(false)
+    }
   }
 
   const handleRevert = async (versionId: string) => {
@@ -448,14 +536,14 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
         </div>
       </div>
 
-      {card.effect_code && (
-        <CardSourceViewer card={card} t={t} />
-      )}
-
       {showVersions && (
-        <div className="ws-detail-section">
+        <div className="ws-detail-section ws-version-history-panel">
           <h3>{t('platform.versionHistoryCount', { count: versions.length })}</h3>
-          {versions.length === 0 ? (
+          {versionsLoading ? (
+            <p className="ws-empty">正在加载版本历史...</p>
+          ) : versionsError ? (
+            <p className="ws-empty ws-version-error">{versionsError}</p>
+          ) : versions.length === 0 ? (
             <p className="ws-empty">{t('platform.noVersions')}</p>
           ) : (
             <ul className="ws-versions">
@@ -477,6 +565,10 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
             </ul>
           )}
         </div>
+      )}
+
+      {card.effect_code && (
+        <CardSourceViewer card={card} t={t} />
       )}
 
       <div className="ws-detail-section">
@@ -509,7 +601,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
   initial?: WorkshopCard
   token: string | null
   onCancel: () => void
@@ -525,6 +617,7 @@ function CardEditor({ onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandb
   return (
     <div className="ws-editor ws-editor-ai">
       <AiCardDesigner
+        initialCard={initial}
         onImport={handleAiImport}
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
@@ -1142,13 +1235,13 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = async () => {
+  const handleStartSandboxGame = async (extraCardId?: string) => {
     try {
       const response = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({
-          customCardIds: sandboxCards.map(card => card.id),
+          customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
           playerCount: sandboxSettings.player_count,
           deckIds: sandboxSettings.deck_ids,
         }),
@@ -1171,15 +1264,54 @@ export function WorkshopPage() {
     }
   }
 
+  const writeCardUrl = useCallback((cardDbId: string | null, mode: 'push' | 'replace') => {
+    const nextUrl = buildWorkshopCardUrl(window.location.pathname, window.location.search, cardDbId)
+    if (mode === 'push') {
+      window.history.pushState(null, '', nextUrl)
+    } else {
+      window.history.replaceState(null, '', nextUrl)
+    }
+  }, [])
+
+  const loadCardDetail = useCallback(async (cardDbId: string) => {
+    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
+      headers: authHeaders(token),
+    })
+    const data = await response.json()
+    if (data.ok) {
+      prevView.current = 'home'
+      setSelectedCard(data.card)
+      setView('detail')
+    }
+  }, [token])
+
+  useEffect(() => {
+    const syncDetailFromUrl = () => {
+      const cardDbId = getWorkshopCardIdFromSearch(window.location.search)
+      if (!cardDbId) {
+        setSelectedCard(null)
+        setView((current) => current === 'detail' ? prevView.current : current)
+        return
+      }
+      void loadCardDetail(cardDbId)
+    }
+
+    syncDetailFromUrl()
+    window.addEventListener('popstate', syncDetailFromUrl)
+    return () => window.removeEventListener('popstate', syncDetailFromUrl)
+  }, [loadCardDetail])
+
   const goBack = () => {
     setSelectedCard(null)
     setView(prevView.current)
+    writeCardUrl(null, 'replace')
   }
 
   const selectCard = (card: WorkshopCard) => {
     prevView.current = view
     setSelectedCard(card)
     setView('detail')
+    writeCardUrl(card.id, 'push')
   }
 
   if (view === 'detail' && selectedCard) {
@@ -1187,7 +1319,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setSelectedCard(null); setView('home') }}
+          onOpenHome={() => { setSelectedCard(null); setView('home'); writeCardUrl(null, 'replace') }}
           t={t}
         />
         <CardDetail
@@ -1235,7 +1367,7 @@ export function WorkshopPage() {
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
-            await handleStartSandboxGame()
+            await handleStartSandboxGame(cardDbId)
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
@@ -1245,7 +1377,7 @@ export function WorkshopPage() {
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1253,7 +1385,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}
@@ -1306,7 +1438,7 @@ export function WorkshopPage() {
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1314,7 +1446,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}

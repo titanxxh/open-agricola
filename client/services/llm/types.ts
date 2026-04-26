@@ -4,13 +4,10 @@
 // anywhere without cycles.
 
 export type ProviderId =
-  | 'openai'
-  | 'anthropic'
   | 'gemini'
-  | 'groq'
   | 'openrouter'
   | 'deepseek'
-  | 'custom'
+  | 'aihubmix'
 
 export type LlmConfig = {
   provider: ProviderId
@@ -29,15 +26,24 @@ export type ReferenceImage = {
   mimeType: string
 }
 
+export type Capabilities = { chat: boolean; image: boolean }
+
+export type ModelDef = {
+  id: string
+  label: string
+  /** Per-model capability override. Falls back to provider-level when omitted. */
+  capabilities?: Partial<Capabilities>
+}
+
 export type ProviderDef = {
   id: ProviderId
   label: string
   baseUrl?: string
   defaultModel: string
-  models: ReadonlyArray<{ id: string; label: string }>
+  models: ReadonlyArray<ModelDef>
   apiKeyHint: string
   apiKeyHelpUrl?: string
-  capabilities: { chat: boolean; image: boolean }
+  capabilities: Capabilities
   /** Override default 8192-token cap for openai-compat chat. */
   maxOutputTokens?: number
 

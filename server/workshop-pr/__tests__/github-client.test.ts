@@ -26,6 +26,22 @@ describe('GitHubClient', () => {
   })
 
   describe('ensureFork', () => {
+    it('uses the upstream repo directly when the authorized user is the upstream owner', async () => {
+      fetchHandler = (url) => {
+        if (url.endsWith('/user')) return okJson({ login: 'titanxxh' })
+        if (url.includes('/repos/titanxxh/open-agricola/forks'))
+          throw new Error('should not try to fork the upstream repo into itself')
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+      const result = await c.ensureFork()
+      expect(result).toEqual({ owner: 'titanxxh', repo: 'open-agricola' })
+    })
+
     it('returns existing fork when present', async () => {
       fetchHandler = (url) => {
         if (url.endsWith('/user')) return okJson({ login: 'alice' })

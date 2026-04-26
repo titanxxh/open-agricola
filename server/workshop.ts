@@ -126,6 +126,7 @@ export async function handleWorkshopRoute(
 ): Promise<boolean> {
   const url = req.url ?? ''
   if (!url.startsWith('/api/workshop/') && !url.startsWith('/api/admin/')) return false
+  const routeUrl = new URL(url, 'http://localhost')
 
   const token = extractToken(req.headers.authorization)
   const user = validateSession(token)
@@ -162,8 +163,8 @@ export async function handleWorkshopRoute(
   }
 
   // ── GET /api/workshop/cards ─────────────────────────────────────────────
-  if (req.method === 'GET' && url.startsWith('/api/workshop/cards') && !url.includes('/comments') && !url.includes('/like')) {
-    const q = new URL(url, 'http://localhost').searchParams
+  if (req.method === 'GET' && routeUrl.pathname === '/api/workshop/cards') {
+    const q = routeUrl.searchParams
     const sort = q.get('sort') === 'popular' ? 'popular' : 'recent'
     const search = q.get('search')?.trim() ?? ''
     const page = Math.max(1, Number(q.get('page') ?? '1'))

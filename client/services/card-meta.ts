@@ -9,6 +9,11 @@
  * The manifest is built by `scripts/build-cards-manifest.ts` — keep the
  * `CardMeta` type in sync with that script's output.
  */
+import {
+  getCustomMinorImprovement,
+  getCustomOccupation,
+} from '../../shared/cards/custom-registry'
+import type { CardBase } from '../../shared/cards/types'
 
 export type CardMeta = {
   id: string
@@ -80,13 +85,42 @@ export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
   return manifestPromise
 }
 
+const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMeta => ({
+  id: card.id,
+  name: card.name,
+  deck: card.deck,
+  number: card.number,
+  type,
+  category: card.category,
+  desc: card.desc,
+  cost: card.cost,
+  altCosts: card.altCosts,
+  players: card.players,
+  newSet: card.newSet,
+  prerequisite: card.prerequisite,
+  vp: card.vp,
+  isCookery: card.isCookery,
+  isBaking: card.isBaking,
+  passing: card.passing,
+  returnCards: card.returnCards,
+  alsoCountsAs: card.alsoCountsAs,
+})
+
+const getCustomCardMeta = (id: string): CardMeta | undefined => {
+  if (!id.startsWith('CUSTOM_')) return undefined
+  const minor = getCustomMinorImprovement(id)
+  if (minor) return customCardToMeta(minor, 'minor')
+  const occupation = getCustomOccupation(id)
+  if (occupation) return customCardToMeta(occupation, 'occupation')
+  return undefined
+}
+
 /**
- * Synchronous lookup; returns undefined if the manifest hasn't finished
- * loading yet. Call `loadCardsManifest()` at app startup before relying on
- * this.
+ * Synchronous lookup; returns undefined if neither the static manifest nor the
+ * runtime custom-card registry knows this id.
  */
 export const getCardMeta = (id: string): CardMeta | undefined =>
-  manifestCache?.[id]
+  manifestCache?.[id] ?? getCustomCardMeta(id)
 
 export const isCardsManifestReady = (): boolean => manifestCache !== null
 
