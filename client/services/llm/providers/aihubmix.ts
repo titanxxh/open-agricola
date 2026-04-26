@@ -1,19 +1,25 @@
 // client/services/llm/providers/aihubmix.ts
 import type { LlmConfig, ProviderDef, ReferenceImage } from '../types'
 
+const AIHUBMIX_BASE_URL = 'https://aihubmix.com/v1'
+
+type OaiContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 async function aihubmixGenerateImage(
   prompt: string,
   config: LlmConfig,
   referenceImages?: ReferenceImage[],
 ): Promise<string | null> {
-  const userParts: Array<unknown> = [{ type: 'text', text: prompt }]
+  const userParts: OaiContentPart[] = [{ type: 'text', text: prompt }]
   for (const img of referenceImages ?? []) {
     userParts.push({
       type: 'image_url',
       image_url: { url: `data:${img.mimeType};base64,${img.data}` },
     })
   }
-  const resp = await fetch('https://aihubmix.com/v1/chat/completions', {
+  const resp = await fetch(`${AIHUBMIX_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,7 +55,7 @@ async function aihubmixGenerateImage(
 export const aihubmixProvider: ProviderDef = {
   id: 'aihubmix',
   label: 'AiHubMix',
-  baseUrl: 'https://aihubmix.com/v1',
+  baseUrl: AIHUBMIX_BASE_URL,
   defaultModel: 'coding-glm-5.1-free',
   models: [
     {
