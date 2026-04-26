@@ -70,6 +70,25 @@ describe('handleOAuthCallback', () => {
     tokenCache.delete(hs)
   })
 
+  it('posts OAuth completion to cross-origin frontend opener', async () => {
+    const hs = tokenCache.allocateHandshakeId('user-42-cross-origin')
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      return new Response(JSON.stringify({ access_token: 'ghp_test' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }))
+
+    const req = fakeReq(`/api/workshop/github/oauth/callback?code=abc&state=${hs}`)
+    const res = fakeRes()
+    await handleOAuthCallback(req, res, new URL(`http://x${req.url!}`))
+
+    const body = (res as unknown as { body: string }).body
+    expect(body).toContain('postMessage({ type: \'workshop-pr-oauth\', result: result }, \'*\')')
+    expect(body).not.toContain('window.location.origin')
+    tokenCache.delete(hs)
+  })
+
   it('rejects unknown state', async () => {
     const req = fakeReq('/api/workshop/github/oauth/callback?code=abc&state=not-real')
     const res = fakeRes()
