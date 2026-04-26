@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
+import { clearCustomCards, registerCustomCard } from '../../../../shared/cards/custom-registry'
 // Cards-manifest is preloaded by `shared/cards/__tests__/setup-register-all.ts`
 // (listed in `vitest.config.ts` -> `setupFiles`), so `getCardMeta()` resolves
 // synchronously during render.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
+  beforeEach(() => {
+    clearCustomCards()
+  })
+
   it('marks D60_LargePottery with data-also-counts-as="major"', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="D60_LargePottery" cardType="minor" />,
@@ -58,5 +63,29 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('res-icon-barn')
     expect(html).not.toContain('&lt;WOOD&gt;')
     expect(html).not.toContain('<WOOD>')
+  })
+
+  it('renders globally registered custom cards even though they are absent from the static manifest', () => {
+    registerCustomCard({
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_DebugMallet',
+        name: 'Debug Mallet',
+        deck: 'CUSTOM',
+        number: 0,
+        desc: ['Gain 1 wood.'],
+        cost: { wood: 1 },
+        vp: 0,
+        implemented: true,
+      },
+    }, { allowGlobal: true })
+
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="CUSTOM_DebugMallet" cardType="minor" />,
+    )
+
+    expect(html).toContain('Debug Mallet')
+    expect(html).toContain('Gain 1 wood.')
+    expect(html).toContain('data-id="CUSTOM_DebugMallet"')
   })
 })
