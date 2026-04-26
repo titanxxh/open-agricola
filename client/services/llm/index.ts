@@ -77,10 +77,6 @@ export function clearLlmConfig(storageKey?: string): void {
   localStorage.removeItem(storageKey ?? KEY_LLM_CONFIG)
 }
 
-export function defaultModel(provider: ProviderId): string {
-  return getProvider(provider).defaultModel
-}
-
 // ── Backwards-compat exports (computed from PROVIDERS) ──────────────────────
 // AiCardDesigner.tsx still reads these as Record<LlmProvider, …>. We compute
 // them once from PROVIDERS so the registry stays the source of truth.
@@ -94,10 +90,6 @@ export const PROVIDER_LABELS = Object.fromEntries(
 export const PROVIDER_KEY_HINTS = Object.fromEntries(
   Object.entries(PROVIDERS).map(([id, def]) => [id, def!.apiKeyHint]),
 ) as Record<ProviderId, string>
-
-export const PROVIDER_MODELS = Object.fromEntries(
-  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.models]),
-) as Record<ProviderId, ReadonlyArray<{ id: string; label: string }>>
 
 // ── Re-export card-utils ────────────────────────────────────────────────────
 export {

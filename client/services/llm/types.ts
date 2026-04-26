@@ -4,14 +4,10 @@
 // anywhere without cycles.
 
 export type ProviderId =
-  | 'openai'
-  | 'anthropic'
   | 'gemini'
-  | 'groq'
   | 'openrouter'
   | 'deepseek'
   | 'aihubmix'
-  | 'custom'
 
 export type LlmConfig = {
   provider: ProviderId

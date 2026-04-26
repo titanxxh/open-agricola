@@ -4,7 +4,7 @@ import { PROVIDERS, listProviders, listModelsFor, defaultModelFor } from '../reg
 import type { ProviderDef, ProviderId } from '../types'
 
 const EXPECTED_IDS: ProviderId[] = [
-  'openai', 'anthropic', 'gemini', 'groq', 'openrouter', 'deepseek', 'aihubmix', 'custom',
+  'gemini', 'openrouter', 'deepseek', 'aihubmix',
 ]
 
 describe('PROVIDERS registry', () => {
@@ -27,12 +27,8 @@ describe('PROVIDERS registry', () => {
     }
   })
 
-  it('defaultModel is in the models list (or models is empty for custom)', () => {
+  it('defaultModel is in the models list', () => {
     for (const def of listProviders()) {
-      if (def.id === 'custom') {
-        expect(def.models).toEqual([])
-        continue
-      }
       const ids = def.models.map(m => m.id)
       expect(ids, `${def.id}: defaultModel ${def.defaultModel} not in models`).toContain(def.defaultModel)
     }
@@ -108,7 +104,7 @@ describe('PROVIDERS registry', () => {
 
     it('respects per-model capability overrides', () => {
       const fake: ProviderDef = {
-        id: 'custom',
+        id: 'aihubmix',
         label: 'fake',
         defaultModel: 'a',
         models: [
@@ -131,7 +127,7 @@ describe('PROVIDERS registry', () => {
 
     it('returns first capability-matching model when defaultModel does not match', () => {
       const fake: ProviderDef = {
-        id: 'custom',
+        id: 'aihubmix',
         label: 'fake',
         defaultModel: 'a',
         models: [
