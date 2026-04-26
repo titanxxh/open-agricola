@@ -124,7 +124,7 @@ describe('streamChat dispatcher', () => {
     const config: LlmConfig = {
       provider: 'gemini',
       apiKey: 'gem-test',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-pro-preview',
     }
     const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
     expect(out).toBe('gem-out')
