@@ -650,8 +650,3 @@
 .player-card.major[data-id="Major_Pottery"] .card-icon { background-position: 50% 100%; }
 .player-card.major[data-id="Major_Basket"] .card-icon { background-position: 75% 100%; }
 .player-card.major[data-id="Major_Well"] .card-icon { background-position: 100% 100%; }
-
-/* Card with copy overlay integration */
-.player-card .card-copy-overlay {
-  border-radius: 15.5px;
-}

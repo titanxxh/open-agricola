@@ -1734,8 +1734,9 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
-/* Played-cards row — wrap strictly after 7 cards. Same flex-basis trick as
- * .hand-row so an 8th card always wraps to a new row. */
+/* Played-cards row — wrap strictly after 7 cards. Cards keep their 1/7 basis
+ * (no flex-grow) so a single played card matches a hand-row card visually
+ * instead of stretching to fill the row. */
 .played-row {
   display: flex;
   flex-wrap: wrap;
@@ -1743,7 +1744,7 @@
   gap: 6px;
 }
 .played-row > * {
-  flex: 1 0 calc((100% - 6 * 6px) / 7);
+  flex: 0 0 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
 }
@@ -1778,47 +1779,48 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
-.card-with-copy {
-  position: relative;
-}
-.card-with-copy[aria-disabled="true"] {
-  opacity: 0.6;
-  pointer-events: none;
-}
-/* In dev mode, always allow pointer events for card ID copy functionality */
-.card-with-copy.dev-mode {
-  pointer-events: auto;
-}
-.card-copy-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 235px;
-  height: 374px;
-  transform: scale(calc(100cqi / 235px));
-  transform-origin: top left;
-  background: rgba(0, 0, 0, 0.75);
-  border-radius: 19.5px;
+/* ══════════ CARD HOVER PREVIEW ══════════ */
+/* Floating enlarged preview shown when the cursor lingers on a card. The
+ * preview body re-mounts a `<PlayerCard enablePreview={false}>` inside a
+ * fixed-width wrapper, so the existing container-query scaling does the work. */
+.card-hover-preview {
+  position: fixed;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  z-index: 10;
+  gap: 6px;
+  pointer-events: auto;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
 }
-.card-copy-id {
+.card-hover-preview-card {
+  position: relative;
+}
+.card-hover-preview-card .player-card.player-card-preview-body {
+  max-width: none;
+  width: 100%;
+}
+.card-hover-preview-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(20, 20, 20, 0.92);
+  border-radius: 8px;
   color: #fff;
-  font-size: 11px;
+}
+.card-hover-preview-id {
+  flex: 1;
   font-family: monospace;
-  background: rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
   padding: 4px 8px;
   border-radius: 4px;
-  max-width: 90%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card-copy-btn {
+.card-hover-preview-copy {
   background: #4a7c3f;
   color: #fff;
   border: none;
@@ -1827,8 +1829,9 @@
   font-size: 12px;
   cursor: pointer;
   transition: background 0.2s;
+  white-space: nowrap;
 }
-.card-copy-btn:hover {
+.card-hover-preview-copy:hover {
   background: #3a6830;
 }
 /* Hand row — wrap to a new line strictly after 7 cards. Items keep their
