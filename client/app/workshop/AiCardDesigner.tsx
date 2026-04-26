@@ -13,7 +13,7 @@
  * If you add UI copy here that lists hooks / phases / denied identifiers,
  * link to the SANDBOX doc rather than embedding a parallel list.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
   getProvider, listModelsFor, defaultModelFor,
@@ -219,21 +219,21 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
     // Detect stale-but-saved model that no longer matches the panel's capability
     // (e.g. a previously saved gemini-2.5-flash for the image panel after Task 3
     // trimmed the model list). Surface a subtle warning so the user knows to fix it.
-    let staleHint: ReactNode = null
+    let stale = false
     try {
       const def = getProvider(config.provider)
       if (def.models.length > 0) {
         const validIds = listModelsFor(def, capability).map(m => m.id)
-        if (!validIds.includes(config.model)) {
-          staleHint = <span className="ai-config-bar-stale" title={`'${config.model}' 不再可用，请点击「切换」更新`}>已失效</span>
-        }
+        if (!validIds.includes(config.model)) stale = true
       }
     } catch { /* unknown provider — leave hint off */ }
 
     return (
       <div className="ai-config-bar">
         <span className="ai-provider-tag">{config.provider} / {config.model}</span>
-        {staleHint}
+        {stale && (
+          <span className="ai-config-bar-stale" title={`'${config.model}' 不再可用，请点击「切换」更新`}>已失效</span>
+        )}
         <button type="button" className="btn-link" onClick={() => setExpanded(true)}>切换</button>
         <button type="button" className="btn-link ai-config-bar-clear" onClick={handleClear}>清除</button>
       </div>
