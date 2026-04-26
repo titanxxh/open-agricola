@@ -4,7 +4,7 @@ import { PROVIDERS, listProviders, listModelsFor, defaultModelFor } from '../reg
 import type { ProviderDef, ProviderId } from '../types'
 
 const EXPECTED_IDS: ProviderId[] = [
-  'openai', 'anthropic', 'gemini', 'groq', 'openrouter', 'deepseek', 'custom',
+  'openai', 'anthropic', 'gemini', 'groq', 'openrouter', 'deepseek', 'aihubmix', 'custom',
 ]
 
 describe('PROVIDERS registry', () => {
@@ -69,6 +69,18 @@ describe('PROVIDERS registry', () => {
       'deepseek/deepseek-v4-flash',
       'deepseek/deepseek-v4-pro',
     ]))
+  })
+
+  it('aihubmix exposes the 3 free models with proper capabilities', () => {
+    const a = PROVIDERS.aihubmix!
+    expect(a.models.map(m => m.id)).toEqual([
+      'gemini-3.1-flash-image-preview-free',
+      'coding-glm-5.1-free',
+      'k2.6-code-preview-free',
+    ])
+    expect(a.defaultModel).toBe('coding-glm-5.1-free')
+    expect(a.baseUrl).toBe('https://aihubmix.com/v1')
+    expect(a.capabilities).toEqual({ chat: true, image: true })
   })
 
   it('gemini exposes only the 3.1-preview models with proper capabilities', () => {

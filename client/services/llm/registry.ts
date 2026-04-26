@@ -8,6 +8,7 @@ import { anthropicProvider } from './providers/anthropic'
 import { groqProvider } from './providers/groq'
 import { openrouterProvider } from './providers/openrouter'
 import { deepseekProvider } from './providers/deepseek'
+import { aihubmixProvider } from './providers/aihubmix'
 import { customProvider } from './providers/custom'
 
 export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
@@ -17,6 +18,7 @@ export const PROVIDERS: Partial<Record<ProviderId, ProviderDef>> = {
   groq: groqProvider,
   openrouter: openrouterProvider,
   deepseek: deepseekProvider,
+  aihubmix: aihubmixProvider,
   custom: customProvider,
 }
 
