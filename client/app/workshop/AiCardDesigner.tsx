@@ -180,7 +180,17 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
   const [expanded, setExpanded] = useState(!config)
   const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
   const [apiKey, setApiKey] = useState('')
-  const [model, setModel] = useState(config?.model ?? defaultModel('openai'))
+  const [model, setModel] = useState(() => {
+    if (!config) return defaultModel('openai')
+    // Validate the saved model against this panel's capability. If it doesn't
+    // qualify (e.g. user saved a chat-only model in the image panel), fall back
+    // to the provider's preferred model for this capability.
+    const def = getProvider(config.provider)
+    if (def.models.length === 0) return config.model // custom provider: trust user input
+    const valid = listModelsFor(def, capability)
+    if (valid.some(m => m.id === config.model)) return config.model
+    return defaultModelFor(def, capability) ?? ''
+  })
   const [baseUrl, setBaseUrl] = useState(config?.baseUrl ?? '')
   const [showKey, setShowKey] = useState(false)
 

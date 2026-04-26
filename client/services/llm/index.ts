@@ -3,7 +3,7 @@
 // dispatcher (streamChat, generateCardArt). Card-extraction helpers and the
 // localStorage-backed config helpers live in card-utils.ts.
 import type { ChatMessage, LlmConfig, ReferenceImage, ProviderId } from './types'
-import { getProvider, PROVIDERS } from './registry'
+import { getProvider, PROVIDERS, listModelsFor } from './registry'
 import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
 
 export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef, Capabilities, ModelDef } from './types'
@@ -43,7 +43,13 @@ export async function generateCardArt(
 
 export function supportsImageGeneration(config: LlmConfig): boolean {
   try {
-    return getProvider(config.provider).capabilities.image
+    const def = getProvider(config.provider)
+    // Curated providers: the specific saved model must be image-capable.
+    if (def.models.length > 0) {
+      return listModelsFor(def, 'image').some(m => m.id === config.model)
+    }
+    // Custom (free-form) providers: fall back to provider-level capability.
+    return def.capabilities.image
   } catch {
     return false
   }
