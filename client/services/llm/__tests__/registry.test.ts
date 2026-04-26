@@ -52,4 +52,22 @@ describe('PROVIDERS registry', () => {
     expect(ds.baseUrl).toBe('https://api.deepseek.com/v1')
     expect(ds.capabilities).toEqual({ chat: true, image: false })
   })
+
+  it('openrouter exposes supported image generation models', () => {
+    const openrouter = PROVIDERS.openrouter!
+    expect(openrouter.capabilities.image).toBe(true)
+    expect(openrouter.models.map(m => m.id)).toEqual(expect.arrayContaining([
+      'openai/gpt-5-image-mini',
+      'google/gemini-2.5-flash-image',
+      'bytedance-seed/seedream-4.5',
+    ]))
+  })
+
+  it('openrouter exposes DeepSeek V4 chat models', () => {
+    const openrouter = PROVIDERS.openrouter!
+    expect(openrouter.models.map(m => m.id)).toEqual(expect.arrayContaining([
+      'deepseek/deepseek-v4-flash',
+      'deepseek/deepseek-v4-pro',
+    ]))
+  })
 })

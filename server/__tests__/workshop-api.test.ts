@@ -54,6 +54,19 @@ db.exec(`
     deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
     updated_at INTEGER NOT NULL
   );
+  CREATE TABLE workshop_card_versions (
+    id TEXT PRIMARY KEY,
+    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+    card_json TEXT NOT NULL,
+    effect_dsl TEXT,
+    effect_code TEXT,
+    compiled_code TEXT,
+    code_manifest TEXT,
+    art_url TEXT,
+    version_number INTEGER NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL
+  );
 `)
 
 vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
@@ -237,6 +250,41 @@ describe('workshop API', () => {
       expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Draft Card' && card.status === 'draft')).toBe(true)
       expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Published Card' && card.status === 'published')).toBe(true)
       expect(d.cards.some((card: { name: string }) => card.name === 'Other Published Card')).toBe(false)
+    })
+  })
+
+  describe('GET /api/workshop/cards/:id/versions', () => {
+    it('returns version history for an owned card instead of the card list payload', async () => {
+      const createReq = mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_VersionRouteCard',
+        card_type: 'minor',
+        name: 'Version Route Card',
+        card_json: { id: 'CUSTOM_VersionRouteCard', name: 'Version Route Card', deck: 'CUSTOM', number: 0, desc: ['v1'] },
+      }, 'tok-alice')
+      const createRes = mockRes()
+      await handleWorkshopRoute(createReq, createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+
+      const updateReq = mockReq('POST', '/api/workshop/cards', {
+        id: cardDbId,
+        card_id: 'CUSTOM_VersionRouteCard',
+        card_type: 'minor',
+        name: 'Version Route Card v2',
+        card_json: { id: 'CUSTOM_VersionRouteCard', name: 'Version Route Card v2', deck: 'CUSTOM', number: 0, desc: ['v2'] },
+      }, 'tok-alice')
+      const updateRes = mockRes()
+      await handleWorkshopRoute(updateReq, updateRes)
+      expect(JSON.parse(updateRes.body).ok).toBe(true)
+
+      const versionsReq = mockReq('GET', `/api/workshop/cards/${cardDbId}/versions`, null, 'tok-alice')
+      const versionsRes = mockRes()
+      await handleWorkshopRoute(versionsReq, versionsRes)
+      const data = JSON.parse(versionsRes.body)
+
+      expect(data.ok).toBe(true)
+      expect(data.cards).toBeUndefined()
+      expect(data.versions).toHaveLength(1)
+      expect(data.versions[0].version_number).toBe(1)
     })
   })
 

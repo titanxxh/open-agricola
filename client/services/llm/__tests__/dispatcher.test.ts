@@ -1,6 +1,6 @@
 // client/services/llm/__tests__/dispatcher.test.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { streamChat } from '../index'
+import { generateCardArt, streamChat } from '../index'
 import type { LlmConfig } from '../types'
 
 function makeFakeStream(chunks: string[]): ReadableStream<Uint8Array> {
@@ -172,5 +172,46 @@ describe('streamChat dispatcher', () => {
     const headers = init.headers as Record<string, string>
     expect(headers['Authorization']).toBe('Bearer sk-deepseek')
     expect(JSON.parse(init.body).model).toBe('deepseek-v4-flash')
+  })
+})
+
+describe('generateCardArt dispatcher', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('routes OpenRouter image models through chat completions with image modality', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            images: [{ image_url: { url: 'data:image/png;base64,abc123' } }],
+          },
+        }],
+      }),
+    })
+
+    const result = await generateCardArt('wooden mallet', {
+      provider: 'openrouter',
+      apiKey: 'or-test',
+      model: 'bytedance-seed/seedream-4.5',
+    })
+
+    expect(result).toBe('data:image/png;base64,abc123')
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    const headers = init.headers as Record<string, string>
+    expect(headers['Authorization']).toBe('Bearer or-test')
+    const body = JSON.parse(init.body)
+    expect(body.model).toBe('bytedance-seed/seedream-4.5')
+    expect(body.modalities).toEqual(['image'])
+    expect(body.messages[0].content).toBe('wooden mallet')
   })
 })
