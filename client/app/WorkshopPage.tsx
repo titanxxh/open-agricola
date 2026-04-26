@@ -86,6 +86,16 @@ function normalizeSandboxSettings(raw: unknown): SandboxSettings {
   }
 }
 
+export function buildSandboxCardIds(
+  cards: ReadonlyArray<{ id: string }>,
+  extraCardId?: string | null,
+): string[] {
+  const ids = cards.map(card => card.id)
+  const trimmed = extraCardId?.trim()
+  if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
+  return ids
+}
+
 // ── Card Preview Tile ────────────────────────────────────────────────────────
 
 function CardTile({ card, onSelect, onLike, mine, t }: {
@@ -1142,13 +1152,13 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = async () => {
+  const handleStartSandboxGame = async (extraCardId?: string) => {
     try {
       const response = await fetch(`${API_BASE}/api/game/new-sandbox`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({
-          customCardIds: sandboxCards.map(card => card.id),
+          customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
           playerCount: sandboxSettings.player_count,
           deckIds: sandboxSettings.deck_ids,
         }),
@@ -1235,7 +1245,7 @@ export function WorkshopPage() {
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
-            await handleStartSandboxGame()
+            await handleStartSandboxGame(cardDbId)
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
@@ -1245,7 +1255,7 @@ export function WorkshopPage() {
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1253,7 +1263,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}
@@ -1306,7 +1316,7 @@ export function WorkshopPage() {
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1314,7 +1324,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={handleStartSandboxGame}>
+              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}
