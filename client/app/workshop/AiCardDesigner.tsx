@@ -16,9 +16,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
+  getProvider, listModelsFor, defaultModelFor,
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
-  PROVIDER_LABELS, PROVIDER_KEY_HINTS, PROVIDER_MODELS,
+  PROVIDER_LABELS, PROVIDER_KEY_HINTS,
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
@@ -169,11 +170,12 @@ function MessageContent({ text }: { text: string }) {
 
 // ── Inline Config Bar ─────────────────────────────────────────────────────────
 
-function ConfigBar({ config, onConfigured, onClear, storageKey }: {
+function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
   config: LlmConfig | null
   onConfigured: () => void
   onClear: () => void
   storageKey?: string
+  capability: 'chat' | 'image'
 }) {
   const [expanded, setExpanded] = useState(!config)
   const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
@@ -184,7 +186,8 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
 
   const handleProviderChange = (p: LlmProvider) => {
     setProvider(p)
-    setModel(defaultModel(p))
+    const next = defaultModelFor(getProvider(p), capability)
+    setModel(next ?? '')
     setBaseUrl('')
   }
 
@@ -224,7 +227,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
 
       <div className="ai-config-bar-fields">
         <div className="ai-provider-btns">
-          {(['gemini', 'openrouter', 'deepseek'] as LlmProvider[]).map(p => (
+          {(['gemini', 'openrouter', 'deepseek', 'aihubmix'] as LlmProvider[]).map(p => (
             <button
               key={p}
               type="button"
@@ -246,21 +249,39 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
           />
         )}
 
-        {PROVIDER_MODELS[provider].length > 0 ? (
-          <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
-            {PROVIDER_MODELS[provider].map(m => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            placeholder={defaultModel(provider)}
-            className="ai-config-bar-input"
-          />
-        )}
+        {(() => {
+          const providerDef = getProvider(provider)
+          const availableModels = listModelsFor(providerDef, capability)
+          if (availableModels.length === 0 && providerDef.models.length === 0) {
+            // Custom provider: free-form input.
+            return (
+              <input
+                type="text"
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder={defaultModel(provider)}
+                className="ai-config-bar-input"
+              />
+            )
+          }
+          if (availableModels.length === 0) {
+            // Provider has models but none support this capability.
+            return (
+              <span className="ai-model-mismatch">
+                {capability === 'image'
+                  ? '该 provider 不支持图像生成，请切换 provider'
+                  : '该 provider 不支持代码/聊天生成，请切换 provider'}
+              </span>
+            )
+          }
+          return (
+            <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
+              {availableModels.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          )
+        })()}
 
         <div className="ai-key-input-row">
           <input
@@ -282,7 +303,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey }: {
           </div>
         )}
 
-        <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim()}>
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={!apiKey.trim() || !model.trim()}>
           保存配置
         </button>
       </div>
@@ -1279,6 +1300,7 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
               <h4 className="ai-config-grid-heading">{t('platform.aiConfigImageHeading')}</h4>
               <ConfigBar
                 storageKey={KEY_LLM_CONFIG_ART}
+                capability="image"
                 config={artConfig}
                 onConfigured={() => { setArtConfig(getLlmConfig(KEY_LLM_CONFIG_ART)); bumpConfig() }}
                 onClear={() => { setArtConfig(null); bumpConfig() }}
@@ -1287,6 +1309,7 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
             <div className="ai-config-grid-col">
               <h4 className="ai-config-grid-heading">{t('platform.aiConfigAbilityHeading')}</h4>
               <ConfigBar
+                capability="chat"
                 config={abilityConfig}
                 onConfigured={() => { setAbilityConfig(getLlmConfig()); bumpConfig() }}
                 onClear={() => { setAbilityConfig(null); bumpConfig() }}
