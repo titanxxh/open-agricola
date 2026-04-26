@@ -816,6 +816,12 @@
   outline: none;
   cursor: pointer;
 }
+.ai-model-mismatch {
+  font-size: 12px;
+  color: var(--color-text-muted, #8a6f4a);
+  font-style: italic;
+  padding: 6px 10px;
+}
 /* Card info bar */
 .ai-card-info-bar {
   display: flex;
