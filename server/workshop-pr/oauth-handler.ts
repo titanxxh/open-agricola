@@ -26,7 +26,7 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
   const params = new URLSearchParams({
     client_id: workshopPrConfig.clientId,
     redirect_uri: redirectUri,
-    scope: 'public_repo',
+    scope: 'repo',
     state: hs,
     allow_signup: 'false',
   })
