@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  getLlmConfig, saveLlmConfig, clearLlmConfig, defaultModel,
+  getLlmConfig, saveLlmConfig, clearLlmConfig,
   getProvider, listModelsFor, defaultModelFor,
   streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
@@ -178,32 +178,29 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
   capability: 'chat' | 'image'
 }) {
   const [expanded, setExpanded] = useState(!config)
-  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'openai')
+  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'gemini')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState(() => {
-    if (!config) return defaultModel('openai')
+    if (!config) return defaultModelFor(getProvider('gemini'), capability) ?? ''
     // Validate the saved model against this panel's capability. If it doesn't
     // qualify (e.g. user saved a chat-only model in the image panel), fall back
     // to the provider's preferred model for this capability.
     const def = getProvider(config.provider)
-    if (def.models.length === 0) return config.model // custom provider: trust user input
     const valid = listModelsFor(def, capability)
     if (valid.some(m => m.id === config.model)) return config.model
     return defaultModelFor(def, capability) ?? ''
   })
-  const [baseUrl, setBaseUrl] = useState(config?.baseUrl ?? '')
   const [showKey, setShowKey] = useState(false)
 
   const handleProviderChange = (p: LlmProvider) => {
     setProvider(p)
     const next = defaultModelFor(getProvider(p), capability)
     setModel(next ?? '')
-    setBaseUrl('')
   }
 
   const handleSave = () => {
     if (!apiKey.trim()) return
-    saveLlmConfig({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined }, storageKey)
+    saveLlmConfig({ provider, apiKey: apiKey.trim(), model }, storageKey)
     setExpanded(false)
     onConfigured()
   }
@@ -264,31 +261,9 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
           ))}
         </div>
 
-        {provider === 'custom' && (
-          <input
-            type="url"
-            value={baseUrl}
-            onChange={e => setBaseUrl(e.target.value)}
-            placeholder="API 端点 (兼容 OpenAI 格式)"
-            className="ai-config-bar-input"
-          />
-        )}
-
         {(() => {
           const providerDef = getProvider(provider)
           const availableModels = listModelsFor(providerDef, capability)
-          if (availableModels.length === 0 && providerDef.models.length === 0) {
-            // Custom provider: free-form input.
-            return (
-              <input
-                type="text"
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                placeholder={defaultModel(provider)}
-                className="ai-config-bar-input"
-              />
-            )
-          }
           if (availableModels.length === 0) {
             // Provider has models but none support this capability.
             return (
@@ -313,7 +288,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
             type={showKey ? 'text' : 'password'}
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
-            placeholder={provider === 'openai' ? 'sk-...' : provider === 'anthropic' ? 'sk-ant-...' : 'API Key'}
+            placeholder="API Key"
             autoComplete="off"
             className="ai-config-bar-input"
           />

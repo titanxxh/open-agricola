@@ -21,12 +21,6 @@ function fakeOpenAISseChunks(text: string): string[] {
   ]
 }
 
-function fakeAnthropicSseChunks(text: string): string[] {
-  return [
-    `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text } })}\n\n`,
-  ]
-}
-
 async function collect(stream: AsyncGenerator<string>): Promise<string> {
   let out = ''
   for await (const chunk of stream) out += chunk
@@ -44,22 +38,6 @@ describe('streamChat dispatcher', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses LlmConfig.baseUrl when provider is custom', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      body: makeFakeStream(fakeOpenAISseChunks('custom-out')),
-    })
-    const config: LlmConfig = {
-      provider: 'custom',
-      apiKey: 'sk-test',
-      model: 'my-local-model',
-      baseUrl: 'https://my-llm.example.com/v1',
-    }
-    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
-    expect(out).toBe('custom-out')
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://my-llm.example.com/v1/chat/completions')
-  })
-
   it('routes openrouter to its OpenAI-compatible base URL', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -73,47 +51,6 @@ describe('streamChat dispatcher', () => {
     const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
     expect(out).toBe('or-out')
     expect(fetchMock.mock.calls[0]![0]).toBe('https://openrouter.ai/api/v1/chat/completions')
-  })
-
-  it('routes groq to its OpenAI-compatible base URL', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      body: makeFakeStream(fakeOpenAISseChunks('groq-out')),
-    })
-    const config: LlmConfig = {
-      provider: 'groq',
-      apiKey: 'gsk-test',
-      model: 'llama-3.3-70b-versatile',
-    }
-    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
-    expect(out).toBe('groq-out')
-    const [url] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://api.groq.com/openai/v1/chat/completions')
-  })
-
-  it('routes openai chat to /v1/chat/completions with Bearer auth', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      body: makeFakeStream(fakeOpenAISseChunks('hello')),
-    })
-    const config: LlmConfig = {
-      provider: 'openai',
-      apiKey: 'sk-test',
-      model: 'gpt-4o',
-    }
-    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
-    expect(out).toBe('hello')
-    expect(fetchMock).toHaveBeenCalledOnce()
-    const [url, init] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://api.openai.com/v1/chat/completions')
-    const headers = init.headers as Record<string, string>
-    expect(headers['Authorization']).toBe('Bearer sk-test')
-    expect(headers['Content-Type']).toBe('application/json')
-    const body = JSON.parse(init.body)
-    expect(body.model).toBe('gpt-4o')
-    expect(body.stream).toBe(true)
-    expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' })
-    expect(body.messages[1]).toEqual({ role: 'user', content: 'hi' })
   })
 
   it('routes gemini chat through its OpenAI-compatible shim with 65536 max_tokens', async () => {
@@ -131,28 +68,6 @@ describe('streamChat dispatcher', () => {
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions')
     expect(JSON.parse(init.body).max_tokens).toBe(65536)
-  })
-
-  it('routes anthropic to /v1/messages with x-api-key header', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      body: makeFakeStream(fakeAnthropicSseChunks('claude-out')),
-    })
-    const config: LlmConfig = {
-      provider: 'anthropic',
-      apiKey: 'sk-ant-test',
-      model: 'claude-sonnet-4-5',
-    }
-    const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
-    expect(out).toBe('claude-out')
-    const [url, init] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://api.anthropic.com/v1/messages')
-    const headers = init.headers as Record<string, string>
-    expect(headers['x-api-key']).toBe('sk-ant-test')
-    expect(headers['anthropic-version']).toBe('2023-06-01')
-    const body = JSON.parse(init.body)
-    expect(body.system).toBe('sys')
-    expect(body.messages).toEqual([{ role: 'user', content: 'hi' }])
   })
 
   it('routes deepseek to api.deepseek.com/v1 with Bearer auth and v4 model', async () => {
