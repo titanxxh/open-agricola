@@ -1734,8 +1734,8 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
-/* Adaptive grid — show all played cards in-place, max 7 per row, cards
- * shrink to fit the viewport so nothing gets clipped on phones. */
+/* Played-cards row — wrap strictly after 7 cards. Same flex-basis trick as
+ * .hand-row so an 8th card always wraps to a new row. */
 .played-row {
   display: flex;
   flex-wrap: wrap;
@@ -1743,7 +1743,7 @@
   gap: 6px;
 }
 .played-row > * {
-  flex: 1 1 calc((100% - 6 * 6px) / 7);
+  flex: 1 0 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
 }
@@ -1831,42 +1831,19 @@
 .card-copy-btn:hover {
   background: #3a6830;
 }
-/* Adaptive wrap layout for hand cards. Cards shrink to fit so all are
- * visible without horizontal scrolling, with a hard cap of 7 per row. */
+/* Hand row — wrap to a new line strictly after 7 cards. Items keep their
+ * 1/7 basis and don't shrink below it, so an 8th card always pushes onto
+ * the next row instead of squeezing the existing seven. */
 .hand-row {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  padding-top: 16px; /* room for hover lift */
-  perspective: 800px;
 }
 .hand-row > * {
-  flex: 1 1 calc((100% - 6 * 6px) / 7);
+  flex: 1 0 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
-  transform-origin: bottom center;
-  transition:
-    transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
-    filter 0.18s ease;
-  will-change: transform;
-}
-/* Fan rotations — apply only when a row has multiple cards. The arc is mild
- * (±10°), enough to feel like a hand without breaking flex-wrap. */
-.hand-row:not(:has(> :only-child)) > :nth-child(1) { transform: rotate(-9deg) translateY(2px); }
-.hand-row:not(:has(> :only-child)) > :nth-child(2) { transform: rotate(-4.5deg) translateY(1px); }
-.hand-row:not(:has(> :only-child)) > :nth-child(3) { transform: rotate(0deg); }
-.hand-row:not(:has(> :only-child)) > :nth-child(4) { transform: rotate(4.5deg) translateY(1px); }
-.hand-row:not(:has(> :only-child)) > :nth-child(5) { transform: rotate(9deg) translateY(2px); }
-.hand-row:not(:has(> :only-child)) > :nth-child(n+6) { transform: rotate(0deg); }
-.hand-row > *:hover,
-.hand-row > *:focus-within {
-  transform: translateY(-12px) scale(1.05) rotate(0deg) !important;
-  z-index: 5;
-  filter: drop-shadow(0 6px 14px rgba(60, 36, 18, 0.25));
-}
-@media (prefers-reduced-motion: reduce) {
-  .hand-row > * { transition: none; transform: none !important; }
 }
 .hand-sections {
   display: flex;
