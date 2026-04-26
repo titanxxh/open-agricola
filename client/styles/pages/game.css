@@ -1834,9 +1834,10 @@
 .card-hover-preview-copy:hover {
   background: #3a6830;
 }
-/* Hand row — wrap to a new line strictly after 7 cards. Items keep their
- * 1/7 basis and don't shrink below it, so an 8th card always pushes onto
- * the next row instead of squeezing the existing seven. */
+/* Hand row — wrap strictly after 7 cards. Items keep their 1/7 basis with
+ * no flex-grow, so a lone 8th card on the next row stays the same width as
+ * the seven above instead of stretching to fill. Few-card rows are centered
+ * via justify-content. */
 .hand-row {
   display: flex;
   flex-wrap: wrap;
@@ -1844,7 +1845,7 @@
   gap: 6px;
 }
 .hand-row > * {
-  flex: 1 0 calc((100% - 6 * 6px) / 7);
+  flex: 0 0 calc((100% - 6 * 6px) / 7);
   max-width: 188px;
   min-width: 0;
 }
