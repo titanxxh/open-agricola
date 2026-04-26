@@ -26,6 +26,14 @@ describe('AiCardDesigner AI config header', () => {
     expect(html).toContain('能力生成：未配置')
   })
 
+  it('offers DeepSeek alongside the default visible providers', () => {
+    const html = renderDesigner()
+
+    expect(html).toContain('Gemini')
+    expect(html).toContain('OpenRouter')
+    expect(html).toContain('DeepSeek')
+  })
+
   it('shows configured provider and model in the collapsed header summary', () => {
     localStorage.setItem(
       'open-agricola-llm-config-art',
