@@ -117,7 +117,7 @@ function closePopupHtml(result: { ok: boolean; hs: string; error?: string }): st
   var result = ${safeResult};
   try {
     if (window.opener) {
-      window.opener.postMessage({ type: 'workshop-pr-oauth', result: result }, window.location.origin);
+      window.opener.postMessage({ type: 'workshop-pr-oauth', result: result }, '*');
     }
   } catch (e) {}
   try { window.close(); } catch (e) {}
