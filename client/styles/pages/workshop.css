@@ -822,6 +822,14 @@
   font-style: italic;
   padding: 6px 10px;
 }
+.ai-config-bar-stale {
+  font-size: 11px;
+  color: #b35a00;
+  background: rgba(255, 218, 158, 0.45);
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: help;
+}
 /* Card info bar */
 .ai-card-info-bar {
   display: flex;

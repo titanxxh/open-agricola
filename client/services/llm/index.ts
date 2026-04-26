@@ -30,8 +30,8 @@ export async function generateCardArt(
   referenceImages?: ReferenceImage[],
 ): Promise<string | null> {
   const def = getProvider(config.provider)
-  if (!def.capabilities.image) {
-    throw new Error(`Provider ${def.label} does not support image generation`)
+  if (!supportsImageGeneration(config)) {
+    throw new Error(`Provider ${def.label} model ${config.model} does not support image generation`)
   }
   if (def.generateImage) {
     return def.generateImage(prompt, config, referenceImages)
