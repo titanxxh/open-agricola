@@ -26,7 +26,7 @@ describe('aihubmixGenerateImage', () => {
         choices: [{
           message: {
             multi_mod_content: [
-              { inlineData: { data: 'XXXX', mimeType: 'image/png' } },
+              { inline_data: { data: 'XXXX', mime_type: 'image/png' } },
             ],
           },
         }],
@@ -72,7 +72,7 @@ describe('aihubmixGenerateImage', () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
-        choices: [{ message: { multi_mod_content: [{ inlineData: { data: 'Y', mimeType: 'image/png' } }] } }],
+        choices: [{ message: { multi_mod_content: [{ inline_data: { data: 'Y', mime_type: 'image/png' } }] } }],
       }),
     })
     await aihubmixProvider.generateImage!(

@@ -40,16 +40,17 @@ async function aihubmixGenerateImage(
     choices?: Array<{
       message?: {
         multi_mod_content?: Array<{
-          inlineData?: { data?: string; mimeType?: string }
+          // AiHubMix returns snake_case field names (verified via smoke test)
+          inline_data?: { data?: string; mime_type?: string }
         }>
       }
     }>
   }
   const parts = data.choices?.[0]?.message?.multi_mod_content ?? []
-  const imgPart = parts.find(p => p.inlineData?.data)
-  if (!imgPart?.inlineData?.data) return null
-  const mime = imgPart.inlineData.mimeType ?? 'image/png'
-  return `data:${mime};base64,${imgPart.inlineData.data}`
+  const imgPart = parts.find(p => p.inline_data?.data)
+  if (!imgPart?.inline_data?.data) return null
+  const mime = imgPart.inline_data.mime_type ?? 'image/png'
+  return `data:${mime};base64,${imgPart.inline_data.data}`
 }
 
 export const aihubmixProvider: ProviderDef = {
