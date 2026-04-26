@@ -82,7 +82,7 @@ export type ExtractedCard = {
 
 type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean; promptSnapshot?: string }
 
-type ApiCard = {
+export type ApiCard = {
   id: string          // DB row id
   card_id: string     // CUSTOM_xxx
   card_type: string
@@ -631,8 +631,8 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersi
           ) : (
             <div className="ai-art-no-gen">
               {locale === 'zh'
-                ? '图片生成需要 Gemini（gemini-3.1-flash-image-preview）或 OpenAI（DALL-E 3）'
-                : 'Image gen requires Gemini (gemini-3.1-flash-image-preview) or OpenAI (DALL-E 3)'
+                ? '图片生成需要 Gemini、OpenAI 或 OpenRouter 图片模型'
+                : 'Image gen requires Gemini, OpenAI, or OpenRouter image models'
               }
             </div>
           )}
@@ -986,7 +986,8 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+  initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
@@ -1203,7 +1204,7 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     }
   }
 
-  const handleLoadCard = (apiCard: ApiCard) => {
+  const handleLoadCard = useCallback((apiCard: ApiCard) => {
     const cj = apiCard.card_json
     const ct = ((cj.card_type ?? apiCard.card_type) as string) as 'minor' | 'occupation'
     const cardData: ExtractedCard['card'] = {
@@ -1238,7 +1239,11 @@ export function AiCardDesigner({ onImport, onClose, onAddToSandboxAndRestart, sa
     // Restore locales from card_json
     const savedLocales = (cj.locales ?? {}) as Record<string, { name: string; desc: string[]; prerequisite?: string }>
     setCardLocales(savedLocales)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (initialCard) handleLoadCard(initialCard)
+  }, [handleLoadCard, initialCard])
 
   return (
     <div className="ai-designer">

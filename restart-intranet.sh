@@ -9,6 +9,16 @@ FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
 
+# Local platform features (GitHub OAuth, community deck toggle, API bases, etc.)
+# live in .env during development. Export them so both tsx and Vite see the
+# same config when this script is used as the one-stop local launcher.
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/.env"
+  set +a
+fi
+
 # Anchor persistent dev state (sqlite DB, JSON room snapshots, custom cards,
 # card art, BGA local images) to the MAIN repo even when we're running from
 # a worktree. Without this, each worktree gets its own ./data and ./output,
@@ -290,6 +300,14 @@ done
 echo ""
 echo "HTTP single-player (debug, non-persistent):"
 echo "  http://${LAN_IP}:5173/?player=p1"
+echo ""
+echo "Platform / workshop testing:"
+echo "  Logged-in dev workshop (auth shortcut as p1):"
+echo "    http://${LAN_IP}:5173/?page=workshop&player=p1&devMode=1"
+echo "  Login page (real account/session flow):"
+echo "    http://${LAN_IP}:5173/?page=login"
+echo "  Logged-in dev lobby (auth shortcut as p1):"
+echo "    http://${LAN_IP}:5173/?player=p1&devMode=1"
 echo ""
 echo "Logs:"
 echo "  tail -f \"$BACKEND_LOG\""
