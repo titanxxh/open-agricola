@@ -888,6 +888,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: var(--color-bg-warm);
 }
 @media (max-width: 768px) {
   .ai-designer-panels {
