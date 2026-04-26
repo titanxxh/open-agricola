@@ -11,7 +11,7 @@ async function geminiGenerateImage(
     inlineData: { mimeType: img.mimeType, data: img.data },
   }))
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${config.apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,12 +39,18 @@ export const geminiProvider: ProviderDef = {
   id: 'gemini',
   label: 'Gemini',
   baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-  defaultModel: 'gemini-2.5-flash',
+  defaultModel: 'gemini-3.1-pro-preview',
   models: [
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (65k)' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (65k)' },
-    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview (65k)' },
-    { id: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash Image (图片生成)' },
+    {
+      id: 'gemini-3.1-pro-preview',
+      label: 'Gemini 3.1 Pro Preview (65k)',
+      capabilities: { chat: true, image: true },
+    },
+    {
+      id: 'gemini-3.1-flash-image-preview',
+      label: 'Gemini 3.1 Flash Image (图片生成)',
+      capabilities: { chat: false, image: true },
+    },
   ],
   apiKeyHint: 'aistudio.google.com/apikey',
   apiKeyHelpUrl: 'https://aistudio.google.com/apikey',

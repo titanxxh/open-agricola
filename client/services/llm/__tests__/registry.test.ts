@@ -71,6 +71,17 @@ describe('PROVIDERS registry', () => {
     ]))
   })
 
+  it('gemini exposes only the 3.1-preview models with proper capabilities', () => {
+    const g = PROVIDERS.gemini!
+    expect(g.models.map(m => m.id)).toEqual([
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-flash-image-preview',
+    ])
+    expect(g.defaultModel).toBe('gemini-3.1-pro-preview')
+    expect(g.models[0].capabilities).toEqual({ chat: true, image: true })
+    expect(g.models[1].capabilities).toEqual({ chat: false, image: true })
+  })
+
   describe('listModelsFor', () => {
     it('returns all models for a provider whose capability matches at provider level', () => {
       // openrouter is chat:true, image:true; no per-model overrides — chat filter passes all
