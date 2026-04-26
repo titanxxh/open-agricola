@@ -31,7 +31,7 @@
 
 ## Scope
 
-应用只请求 `public_repo` scope（公开仓库 fork + push + PR），不请求任何其它权限。
+应用请求 `repo` scope，以便在主仓库是 private repository 时读取内容、创建分支并提交 PR。若主仓库改为 public repository，可再收紧为 `public_repo`。
 
 ## Revocation
 

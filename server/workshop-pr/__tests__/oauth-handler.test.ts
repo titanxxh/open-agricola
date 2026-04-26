@@ -49,15 +49,16 @@ describe('handleOAuthCallback', () => {
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = origEnabled
   })
 
-  it('requests repo scope so private upstream contents are readable', () => {
+  it('requests repo scope so private upstream repositories can be updated', () => {
     const hs = tokenCache.allocateHandshakeId('user-private-repo')
     const req = fakeReq(`/api/workshop/github/oauth/start?hs=${hs}`)
     const res = fakeRes()
-
     handleOAuthStart(req, res, new URL(`http://x${req.url!}`))
 
+    expect(res.statusCode).toBe(302)
     const location = String(res.headers.Location)
     const authUrl = new URL(location)
+    expect(authUrl.hostname).toBe('github.com')
     expect(authUrl.searchParams.get('scope')).toBe('repo')
     tokenCache.delete(hs)
   })
