@@ -90,6 +90,10 @@ function allowedMessageOrigins(): Set<string> {
   return origins
 }
 
+function resolveOAuthPopupUrl(authUrl: string): string {
+  return new URL(authUrl, API_BASE || window.location.origin).toString()
+}
+
 /**
  * Open the OAuth popup and wait for the callback's postMessage.
  * Returns { ok: true } when the callback page succeeded, or { ok: false, error } on denial/timeout.
@@ -100,7 +104,7 @@ export function openOAuthPopupAndWait(
   timeoutMs = 120_000,
 ): Promise<{ ok: boolean; error?: string }> {
   return new Promise((resolve) => {
-    const popup = window.open(authUrl, 'workshop-pr-oauth', 'width=600,height=700')
+    const popup = window.open(resolveOAuthPopupUrl(authUrl), 'workshop-pr-oauth', 'width=600,height=700')
     let done = false
     const allowed = allowedMessageOrigins()
 
