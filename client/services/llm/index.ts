@@ -6,8 +6,8 @@ import type { ChatMessage, LlmConfig, ReferenceImage, ProviderId } from './types
 import { getProvider, PROVIDERS } from './registry'
 import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
 
-export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef } from './types'
-export { PROVIDERS, getProvider, listProviders } from './registry'
+export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef, Capabilities, ModelDef } from './types'
+export { PROVIDERS, getProvider, listProviders, listModelsFor, defaultModelFor } from './registry'
 
 export async function* streamChat(
   messages: ChatMessage[],

@@ -1,7 +1,7 @@
 // client/services/llm/__tests__/registry.test.ts
 import { describe, expect, it } from 'vitest'
-import { PROVIDERS, listProviders } from '../registry'
-import type { ProviderId } from '../types'
+import { PROVIDERS, listProviders, listModelsFor, defaultModelFor } from '../registry'
+import type { ProviderDef, ProviderId } from '../types'
 
 const EXPECTED_IDS: ProviderId[] = [
   'openai', 'anthropic', 'gemini', 'groq', 'openrouter', 'deepseek', 'custom',
@@ -69,5 +69,61 @@ describe('PROVIDERS registry', () => {
       'deepseek/deepseek-v4-flash',
       'deepseek/deepseek-v4-pro',
     ]))
+  })
+
+  describe('listModelsFor', () => {
+    it('returns all models for a provider whose capability matches at provider level', () => {
+      // openrouter is chat:true, image:true; no per-model overrides — chat filter passes all
+      const models = listModelsFor(PROVIDERS.openrouter!, 'chat')
+      expect(models.length).toBe(PROVIDERS.openrouter!.models.length)
+    })
+
+    it('returns empty when capability is false at provider level and no model overrides', () => {
+      const models = listModelsFor(PROVIDERS.deepseek!, 'image')
+      expect(models).toEqual([])
+    })
+
+    it('respects per-model capability overrides', () => {
+      const fake: ProviderDef = {
+        id: 'custom',
+        label: 'fake',
+        defaultModel: 'a',
+        models: [
+          { id: 'a', label: 'A', capabilities: { chat: true, image: false } },
+          { id: 'b', label: 'B', capabilities: { chat: false, image: true } },
+        ],
+        apiKeyHint: '',
+        capabilities: { chat: true, image: true },
+      }
+      expect(listModelsFor(fake, 'chat').map(m => m.id)).toEqual(['a'])
+      expect(listModelsFor(fake, 'image').map(m => m.id)).toEqual(['b'])
+    })
+  })
+
+  describe('defaultModelFor', () => {
+    it('returns provider.defaultModel when it supports the requested capability', () => {
+      // openrouter.defaultModel = 'qwen/qwen3.6-plus:free' (chat-capable)
+      expect(defaultModelFor(PROVIDERS.openrouter!, 'chat')).toBe('qwen/qwen3.6-plus:free')
+    })
+
+    it('returns first capability-matching model when defaultModel does not match', () => {
+      const fake: ProviderDef = {
+        id: 'custom',
+        label: 'fake',
+        defaultModel: 'a',
+        models: [
+          { id: 'a', label: 'A', capabilities: { chat: true, image: false } },
+          { id: 'b', label: 'B', capabilities: { chat: false, image: true } },
+          { id: 'c', label: 'C', capabilities: { chat: false, image: true } },
+        ],
+        apiKeyHint: '',
+        capabilities: { chat: true, image: true },
+      }
+      expect(defaultModelFor(fake, 'image')).toBe('b')
+    })
+
+    it('returns null when no model supports the capability', () => {
+      expect(defaultModelFor(PROVIDERS.deepseek!, 'image')).toBeNull()
+    })
   })
 })
