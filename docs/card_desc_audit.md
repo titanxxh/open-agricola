@@ -1,6 +1,6 @@
 # Card Description Audit vs BGA
 
-对比 `shared/cards/**/*.ts` 中 `desc` / `description` 字段与 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/` 中 `$this->desc` 的差异。
+对比 `shared/cards/**/*.ts` 中 `desc` / `description` 字段与 BGA 参考仓库 `bga-agricola/modules/php/Cards/` 中 `$this->desc` 的差异。
 
 > **范围**：本文件**只**做 desc / description 文本级别的对齐审计。
 > 行为/实现差异（刻意简化、刻意不同、BGA 行为复核 TODO）统一在 `docs/card_progress.md` 追踪。

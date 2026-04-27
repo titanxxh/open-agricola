@@ -11,6 +11,7 @@
 ### A1. 数据库：SQLite (better-sqlite3)
 
 **为什么选 SQLite 而非 Postgres/MongoDB：**
+
 - 单服务器 indie 项目，SQLite 零运维（无守护进程、无连接池、无 Docker 服务）
 - 当前代码已用同步 `readFileSync`/`writeFileSync` 持久化，`better-sqlite3` 同步 API 天然适配
 - 游戏状态是复杂嵌套 JSON — SQLite 的 `json_extract` 支持 JSON 列存储+查询
@@ -109,6 +110,7 @@ CREATE TABLE sandbox_cards (
 ### A2. 认证：服务端 Session Token
 
 **不用 JWT，不用 OAuth — 保持简单：**
+
 - 注册：username + password，`crypto.scrypt` 哈希（Node.js 内置，不加依赖）
 - 登录：返回不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
 - Token 通过 `Authorization: Bearer <token>` 发送
@@ -120,6 +122,7 @@ CREATE TABLE sandbox_cards (
 **不引入 react-router** — 保持现有 URL 参数风格：
 
 添加 `?page=` 参数：
+
 - `?page=login` → 登录/注册页
 - `?page=lobby` → 大厅（登录后默认）
 - `?page=workshop` → 工坊模式
@@ -136,6 +139,7 @@ App.tsx
 ### A4. 状态管理：保持 Hooks，加 AuthContext
 
 不引入 Redux/Zustand：
+
 - 新增 `AuthContext`：提供 `{ user, token, login, logout, register }`
 - 工坊页面用 `useState` + fetch，和游戏现有风格一致
 - `GameTransport` 构造器加可选 `token` 参数
@@ -178,6 +182,7 @@ App.tsx
 ### B3. 生产部署
 
 单机部署即可：
+
 - Node.js 进程 (backend + WebSocket) + Vite build 的静态文件
 - SQLite 文件持久化到磁盘
 - 可选 Nginx 反代前端静态文件 + WebSocket 代理
@@ -193,22 +198,49 @@ App.tsx
 ┌─────────────────────────────────────────┐
 │  Browser                                │
 │                                         │
-│  localStorage: llm-api-key              │
+│  localStorage: LLM config + API key     │
 │       │                                 │
 │       ▼                                 │
-│  LLM Service (src/services/llmService)  │
+│  LLM Service (client/services/llm)      │
 │       │                                 │
 │       │  fetch() 直连 (CORS)            │
 │       ▼                                 │
-│  api.openai.com / api.anthropic.com     │
+│  Gemini / OpenRouter / DeepSeek /       │
+│  AiHubMix                               │
 │                                         │
 │  ✗ 绝不经过游戏服务器                      │
 └─────────────────────────────────────────┘
 ```
 
-- API Key 存在 `localStorage('open-agricola-llm-key')` 和 `localStorage('open-agricola-llm-provider')`
-- 支持多个 Provider：OpenAI (gpt-4o)、Anthropic (claude-sonnet)、兼容 OpenAI 的自定义端点
+- API Key 与模型配置存在浏览器 `localStorage`：能力/聊天配置用 `open-agricola-llm-config`，图片配置用 `open-agricola-llm-config-art`。
+- Provider 注册源：`client/services/llm/registry.ts`，模型能力以 provider 文件中的 `capabilities` 为准。
+- 聊天默认走 OpenAI-compatible `POST {baseUrl}/chat/completions` SSE；Gemini 图片、OpenRouter 图片、AiHubMix 图片各有 provider-specific `generateImage` 实现。
 - UI 明确展示："代码开源可查，API Key 绝不离开浏览器"
+
+#### C1.1 当前支持的 LLM 模型
+
+
+| Provider   | 模型 ID                                 | UI 名称                                       | 默认  | 聊天  | 图片生成 | 说明                                                             |
+| ---------- | ------------------------------------- | ------------------------------------------- | --- | --- | ---- | -------------------------------------------------------------- |
+| Gemini     | `gemini-3.1-pro-preview`              | Gemini 3.1 Pro Preview (65k)                | 是   | 是   | 是    | 聊天走 Gemini OpenAI-compatible shim；图片走 Gemini `generateContent` |
+| Gemini     | `gemini-3.1-flash-image-preview`      | Gemini 3.1 Flash Image (图片生成)               | 否   | 否   | 是    | 仅图片生成                                                          |
+| Gemini     | `gemini-2.5-flash-image`              | Gemini 2.5 Flash Image (图片生成)               | 否   | 否   | 是    | 仅图片生成                                                          |
+| OpenRouter | `qwen/qwen3.6-plus:free`              | Qwen 3.6 Plus (免费)                          | 是   | 是   | 否    | OpenRouter 聊天模型                                                |
+| OpenRouter | `google/gemini-2.5-flash-preview`     | Gemini 2.5 Flash                            | 否   | 是   | 否    | OpenRouter 聊天模型                                                |
+| OpenRouter | `google/gemini-2.5-pro-preview`       | Gemini 2.5 Pro                              | 否   | 是   | 否    | OpenRouter 聊天模型                                                |
+| OpenRouter | `openai/gpt-5-image-mini`             | GPT-5 Image Mini (图片生成)                     | 否   | 否   | 是    | OpenRouter 图片模型                                                |
+| OpenRouter | `google/gemini-2.5-flash-image`       | Gemini 2.5 Flash Image / Nano Banana (图片生成) | 否   | 否   | 是    | OpenRouter 图片模型                                                |
+| OpenRouter | `bytedance-seed/seedream-4.5`         | Seedream 4.5 (图片生成)                         | 否   | 否   | 是    | OpenRouter 图片模型                                                |
+| OpenRouter | `deepseek/deepseek-v4-flash`          | DeepSeek V4 Flash                           | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| OpenRouter | `deepseek/deepseek-v4-pro`            | DeepSeek V4 Pro                             | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| DeepSeek   | `deepseek-v4-flash`                   | DeepSeek V4 Flash                           | 是   | 是   | 否    | 官方 DeepSeek API                                                |
+| DeepSeek   | `deepseek-v4-pro`                     | DeepSeek V4 Pro (推理)                        | 否   | 是   | 否    | 官方 DeepSeek API；推理内容不渲染，只展示最终内容                                |
+| AiHubMix   | `gemini-3.1-flash-image-preview-free` | Gemini 3.1 Flash Image (免费)                 | 否   | 否   | 是    | AiHubMix 免费图片模型                                                |
+| AiHubMix   | `coding-glm-5.1-free`                 | Coding GLM 5.1 (免费)                         | 是   | 是   | 否    | AiHubMix 免费聊天模型                                                |
+| AiHubMix   | `k2.6-code-preview-free`              | K2.6 Code Preview (免费)                      | 否   | 是   | 否    | AiHubMix 免费聊天模型                                                |
+
+
+OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个模型必须显式声明自己的能力，避免图片面板展示聊天模型或聊天面板展示图片模型。
 
 ### C2. 系统提示词设计
 
@@ -411,6 +443,7 @@ export function getCustomCard(id: string): CardBase | undefined {
 ```
 
 现有 `catalog.ts` 的查找函数 fallback 到 custom registry：
+
 ```typescript
 export function getMinorImprovementCard(id: string) {
   return officialCards.get(id) ?? getCustomCard(id)
@@ -468,24 +501,28 @@ WorkshopPage
 
 服务端核心模块：
 
-| 模块 | 职责 |
-|---|---|
-| `server/workshop-pr/propose-handler.ts` | 提交流程编排：权限检查、读取 upstream 文件、生成 PR 文件、创建 commit/branch/PR |
-| `server/workshop-pr/oauth-handler.ts` | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream |
-| `server/workshop-pr/github-client.ts` | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支 |
-| `server/workshop-pr/code-gen.ts` | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档 |
-| `client/services/workshop-pr.ts` | 前端 propose/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
+
+| 模块                                      | 职责                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------------- |
+| `server/workshop-pr/propose-handler.ts` | 提交流程编排：权限检查、读取 upstream 文件、生成 PR 文件、创建 commit/branch/PR                    |
+| `server/workshop-pr/oauth-handler.ts`   | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream           |
+| `server/workshop-pr/github-client.ts`   | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支          |
+| `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档                        |
+| `client/services/workshop-pr.ts`        | 前端 propose/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
+
 
 生成的 PR 文件固定包含：
 
-| 文件 | 说明 |
-|---|---|
-| `shared/cards/community/{CUSTOM_ID}.ts` | community card 定义和 `CardImpl` |
-| `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts` | smoke test：定义存在、`deck === 'community'`、有行为 |
-| `shared/cards/register-all.ts` | 注册 `{CUSTOM_ID}_impl` |
-| `shared/cards/community/auto-catalog.ts` | 注册 community deck card definition |
-| `docs/community_cards.md` | community card 索引；PR 创建后会用真实 PR number 二次提交 |
-| `public/card-art/community/{CUSTOM_ID}.{ext}` | 可选，美术二进制 |
+
+| 文件                                                     | 说明                                          |
+| ------------------------------------------------------ | ------------------------------------------- |
+| `shared/cards/community/{CUSTOM_ID}.ts`                | community card 定义和 `CardImpl`               |
+| `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts` | smoke test：定义存在、`deck === 'community'`、有行为  |
+| `shared/cards/register-all.ts`                         | 注册 `{CUSTOM_ID}_impl`                       |
+| `shared/cards/community/auto-catalog.ts`               | 注册 community deck card definition           |
+| `docs/community_cards.md`                              | community card 索引；PR 创建后会用真实 PR number 二次提交 |
+| `public/card-art/community/{CUSTOM_ID}.{ext}`          | 可选，美术二进制                                    |
+
 
 生成器会做必要规范化，避免用户在沙盒中能跑但 PR CI 不通过：
 
@@ -507,25 +544,29 @@ WorkshopPage
 
 ## E. 安全设计
 
-| 威胁 | 对策 |
-|------|------|
-| API Key 泄露 | 仅存 localStorage，绝不发送到游戏服务器，UI 明确标示 |
-| 密码泄露 | `crypto.scrypt` 哈希，不存明文 |
-| Session 劫持 | HTTPS（生产）+ HttpOnly 考虑（当前 Bearer token 简单可行）|
-| 暴力破解 | 登录 API 限流：5 次/分钟/IP |
-| 恶意卡牌代码 | V1 纯 DSL 无执行；V2 AST 白名单 + vm 沙盒 + 超时 |
-| XSS via 卡牌描述 | React 默认转义 HTML；不用 dangerouslySetInnerHTML |
-| WebSocket 未认证 | 连接后 5 秒内必须发 auth 消息，否则断开 |
+
+| 威胁            | 对策                                           |
+| ------------- | -------------------------------------------- |
+| API Key 泄露    | 仅存 localStorage，绝不发送到游戏服务器，UI 明确标示           |
+| 密码泄露          | `crypto.scrypt` 哈希，不存明文                      |
+| Session 劫持    | HTTPS（生产）+ HttpOnly 考虑（当前 Bearer token 简单可行） |
+| 暴力破解          | 登录 API 限流：5 次/分钟/IP                          |
+| 恶意卡牌代码        | V1 纯 DSL 无执行；V2 AST 白名单 + vm 沙盒 + 超时         |
+| XSS via 卡牌描述  | React 默认转义 HTML；不用 dangerouslySetInnerHTML   |
+| WebSocket 未认证 | 连接后 5 秒内必须发 auth 消息，否则断开                     |
+
 
 ---
 
 ## F. 新增依赖
 
-| 依赖 | 用途 | 备注 |
-|------|------|------|
-| `better-sqlite3` | SQLite 数据库 | 同步 API，适配现有代码风格 |
-| `@types/better-sqlite3` | 类型定义 | dev dep |
-| `nanoid` | 生成短 ID | 用于 user/card/room ID |
+
+| 依赖                      | 用途         | 备注                   |
+| ----------------------- | ---------- | -------------------- |
+| `better-sqlite3`        | SQLite 数据库 | 同步 API，适配现有代码风格      |
+| `@types/better-sqlite3` | 类型定义       | dev dep              |
+| `nanoid`                | 生成短 ID     | 用于 user/card/room ID |
+
 
 不需要其他依赖。`crypto.scrypt` 和 `crypto.randomUUID` 都是 Node.js 内置。
 
@@ -534,6 +575,7 @@ WorkshopPage
 ## G. 实施阶段
 
 ### Phase 1: 数据库 + 认证
+
 - 添加 `better-sqlite3`，创建 `server/db.ts` (schema 初始化)
 - 创建 `server/auth.ts` (register/login/session)
 - 添加认证中间件到 `server/index.ts`
@@ -542,24 +584,28 @@ WorkshopPage
 - WebSocket 认证握手
 
 ### Phase 2: 大厅
+
 - 创建 `src/app/LobbyPage.tsx`
 - 添加大厅 API 路由
 - 创建 `PageRouter` 替代 App.tsx 中的直接渲染
 - 房间列表/创建/加入 UI
 
 ### Phase 3: 工坊（数据驱动卡牌）
+
 - 工坊 API 路由
 - `CustomCardRegistry` + DSL 运行器
 - `src/app/WorkshopPage.tsx` (浏览/编辑/沙盒)
 - 社交功能（点赞/评论）
 
 ### Phase 4: LLM 卡牌设计师
+
 - `src/services/llmService.ts` (浏览器端 LLM 调用)
 - 系统提示词模板
 - AI 对话式设计 UI
 - 卡牌美术生成
 
 ### Phase 5: 高级卡牌效果（可选）
+
 - TypeScript AST 验证器
 - `vm.runInContext()` 沙盒执行
 - 完整 `registerCardEffect`/`registerCardListener` 支持
@@ -569,6 +615,7 @@ WorkshopPage
 ## H. 关键文件清单
 
 **需修改：**
+
 - `server/index.ts` — 添加新路由、认证中间件
 - `server/room-manager.ts` — JSON 持久化 → SQLite、认证集成
 - `shared/cards/card-effects.ts` — 自定义卡牌 try/catch 包裹
@@ -577,6 +624,7 @@ WorkshopPage
 - `src/app/GameContainerApi.tsx` — transport 添加 auth token
 
 **需新建：**
+
 - `server/db.ts` — 数据库初始化与迁移
 - `server/auth.ts` — 认证逻辑
 - `server/workshop.ts` — 工坊 API
@@ -610,48 +658,53 @@ WorkshopPage
 
 ### 已完成
 
-| 功能 | 文件 |
-|------|------|
-| 注册/登录/登出/会话验证 | `server/auth.ts`, `src/app/LoginPage.tsx`, `src/contexts/AuthContext.tsx` |
-| SQLite 数据库 + migration (v1-v3) | `server/db.ts` |
-| WebSocket 认证握手 | `server/room-manager.ts`, `shared/protocol/ws.ts` |
-| WS 房间 → SQLite 写入 | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer) |
-| 服务器重启恢复房间 | `server/room-manager.ts` (restoreRoomsFromSqlite) |
-| 游戏状态持久化（JSON/SQLite） | `server/room-manager.ts` (PERSIST_ROOMS 环境变量) |
-| 游戏结束更新房间状态 | `server/room-manager.ts` (broadcastState → rooms.status=finished) |
-| 房间 TTL 清理 | `server/room-manager.ts` (startRoomCleanup, 30min TTL) |
-| 大厅页面 | `src/app/LobbyPage.tsx`, `/api/lobby/my-rooms` |
-| 页面路由 (?page=) | `src/app/PageRouter.tsx` |
-| URL params 实时读取 | `src/app/GameContainerApi.tsx` (移出模块级) |
-| 返回大厅按钮 | `src/components/header/GameHeader.tsx` |
-| Dev 模式默认关闭 | `src/app/GameContainerApi.tsx` (?devMode=1) |
-| Auth 401 自动登出 | `src/contexts/AuthContext.tsx` (apiFetch) |
-| 游戏中玩家名与登录用户同步 | `server/game-session.ts` (updatePlayerName), `server/room-manager.ts`, `server/game-router.ts` |
-| 工坊卡牌 CRUD | `server/workshop.ts`, `src/app/WorkshopPage.tsx` |
-| 工坊社交（点赞/评论） | `server/workshop.ts` |
-| 工坊沙盒 | `server/workshop.ts`, WorkshopPage SandboxView |
-| 自定义 DSL 效果系统 | `shared/cards/custom-dsl-runner.ts` |
-| 自定义卡牌注册表 + catalog fallback | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts` |
-| 自定义卡牌 try-catch 容错 | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过) |
-| DSL 系统单元测试 | `shared/cards/__tests__/custom-dsl-runner.test.ts`, `custom-registry.test.ts` |
-| 单人沙盒游戏（含自定义卡牌） | `/api/game/new-sandbox`, `server/game-router.ts` |
-| WS 多人游戏含自定义卡牌 | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts` |
-| LLM 卡牌设计师 | `src/app/workshop/AiCardDesigner.tsx`, `src/services/llmService.ts` |
-| 多 LLM Provider 支持 | OpenAI / Anthropic / 自定义端点 |
-| API Key 浏览器隔离 | localStorage 存储，绝不发往服务器 |
-| 卡牌美术生成 + 上传 | DALL-E 3 + `POST /api/workshop/art` + `/card-art/` 静态服务 |
-| 资源图标解析 | `src/components/common/ResourceText.tsx` |
-| auth/workshop 单元测试 | `server/__tests__/auth.test.ts`, `workshop-api.test.ts` |
-| TypeScript AST 验证 + VM 沙盒 | `server/ast-validator.ts`, `server/card-compiler.ts`, WorkshopPage 代码模式 |
-| 卡牌版本历史 | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板 |
-| 工坊精选页面 | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页 |
-| 生产部署 (Docker + GitHub Pages) | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `src/config.ts` |
-| 管理员角色 | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量 |
-| 管理员 API | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
-| 卡牌发布/取消发布 | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌 |
+
+| 功能                             | 文件                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| 注册/登录/登出/会话验证                  | `server/auth.ts`, `src/app/LoginPage.tsx`, `src/contexts/AuthContext.tsx`                                                    |
+| SQLite 数据库 + migration (v1-v3) | `server/db.ts`                                                                                                               |
+| WebSocket 认证握手                 | `server/room-manager.ts`, `shared/protocol/ws.ts`                                                                            |
+| WS 房间 → SQLite 写入              | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer)                                                             |
+| 服务器重启恢复房间                      | `server/room-manager.ts` (restoreRoomsFromSqlite)                                                                            |
+| 游戏状态持久化（JSON/SQLite）           | `server/room-manager.ts` (PERSIST_ROOMS 环境变量)                                                                                |
+| 游戏结束更新房间状态                     | `server/room-manager.ts` (broadcastState → rooms.status=finished)                                                            |
+| 房间 TTL 清理                      | `server/room-manager.ts` (startRoomCleanup, 30min TTL)                                                                       |
+| 大厅页面                           | `src/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
+| 页面路由 (?page=)                  | `src/app/PageRouter.tsx`                                                                                                     |
+| URL params 实时读取                | `src/app/GameContainerApi.tsx` (移出模块级)                                                                                       |
+| 返回大厅按钮                         | `src/components/header/GameHeader.tsx`                                                                                       |
+| Dev 模式默认关闭                     | `src/app/GameContainerApi.tsx` (?devMode=1)                                                                                  |
+| Auth 401 自动登出                  | `src/contexts/AuthContext.tsx` (apiFetch)                                                                                    |
+| 游戏中玩家名与登录用户同步                  | `server/game-session.ts` (updatePlayerName), `server/room-manager.ts`, `server/game-router.ts`                               |
+| 工坊卡牌 CRUD                      | `server/workshop.ts`, `src/app/WorkshopPage.tsx`                                                                             |
+| 工坊社交（点赞/评论）                    | `server/workshop.ts`                                                                                                         |
+| 工坊沙盒                           | `server/workshop.ts`, WorkshopPage SandboxView                                                                               |
+| 自定义 DSL 效果系统                   | `shared/cards/custom-dsl-runner.ts`                                                                                          |
+| 自定义卡牌注册表 + catalog fallback    | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts`                                                                 |
+| 自定义卡牌 try-catch 容错             | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过)                                                                           |
+| DSL 系统单元测试                     | `shared/cards/__tests__/custom-dsl-runner.test.ts`, `custom-registry.test.ts`                                                |
+| 单人沙盒游戏（含自定义卡牌）                 | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
+| WS 多人游戏含自定义卡牌                  | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts`                                                 |
+| LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llmService.ts`, `client/services/llm/`*                           |
+| 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |
+| API Key 浏览器隔离                  | localStorage 存储，绝不发往服务器                                                                                                      |
+| 卡牌美术生成 + 上传                    | Gemini / OpenRouter / AiHubMix 图片模型 + `POST /api/workshop/art` + `/card-art/` 静态服务                                           |
+| 资源图标解析                         | `src/components/common/ResourceText.tsx`                                                                                     |
+| auth/workshop 单元测试             | `server/__tests__/auth.test.ts`, `workshop-api.test.ts`                                                                      |
+| TypeScript AST 验证 + VM 沙盒      | `server/ast-validator.ts`, `server/card-compiler.ts`, WorkshopPage 代码模式                                                      |
+| 卡牌版本历史                         | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板                                                           |
+| 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
+| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `src/config.ts`                                    |
+| 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
+| 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
+| 卡牌发布/取消发布                      | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌                                                             |
+
 
 ### 未完成（可选）
 
-| 功能 | 说明 |
-|------|------|
-| 邮箱验证 | 注册后验证邮件（需要外部邮件服务）|
+
+| 功能   | 说明                |
+| ---- | ----------------- |
+| 邮箱验证 | 注册后验证邮件（需要外部邮件服务） |
+
+

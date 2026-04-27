@@ -3,12 +3,20 @@ name: CI LLM Cards
 on:
   workflow_dispatch:
     inputs:
-      model:
-        description: 'LLM model id (e.g. gemini-3.1-pro-preview)'
+      code_model:
+        description: 'Code-generation model id (e.g. deepseek-v4-flash)'
         required: false
-        default: 'gemini-3.1-pro-preview'
-      provider:
-        description: 'Provider key (gemini | openai)'
+        default: 'deepseek-v4-flash'
+      code_provider:
+        description: 'Code-generation provider key (gemini | openai | openrouter | deepseek | aihubmix)'
+        required: false
+        default: 'deepseek'
+      image_model:
+        description: 'Image-generation model id (reserved for image smoke tests)'
+        required: false
+        default: 'gemini-2.5-flash-image'
+      image_provider:
+        description: 'Image-generation provider key (reserved for image smoke tests)'
         required: false
         default: 'gemini'
 
@@ -34,9 +42,15 @@ jobs:
 
       - name: Run LLM card-gen tests
         env:
-          LLM_TEST_PROVIDER: ${{ github.event.inputs.provider || 'gemini' }}
-          LLM_TEST_MODEL: ${{ github.event.inputs.model || 'gemini-3.1-pro-preview' }}
+          LLM_TEST_CODE_PROVIDER: ${{ github.event.inputs.code_provider || 'deepseek' }}
+          LLM_TEST_CODE_MODEL: ${{ github.event.inputs.code_model || 'deepseek-v4-flash' }}
+          LLM_TEST_IMAGE_PROVIDER: ${{ github.event.inputs.image_provider || 'gemini' }}
+          LLM_TEST_IMAGE_MODEL: ${{ github.event.inputs.image_model || 'gemini-2.5-flash-image' }}
           GEMINI_API_KEY: ${{ secrets.MY_TEST_GEMINI_APIKEY }}
+          OPENAI_API_KEY: ${{ secrets.MY_TEST_OPENAI_APIKEY }}
+          OPENROUTER_API_KEY: ${{ secrets.MY_TEST_OPENROUTER_APIKEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.MY_TEST_DEEPSEEK_APIKEY }}
+          AIHUBMIX_API_KEY: ${{ secrets.MY_TEST_AIHUBMIX_APIKEY }}
         run: pnpm run test:llm
 
       - name: Upload LLM response dumps

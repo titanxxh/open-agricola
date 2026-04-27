@@ -29,8 +29,8 @@ const FAST_INCLUDE = [
   'server/workshop-pr/__tests__/*.test.ts',
 ]
 const BASE_EXCLUDE = [...defaultExclude, '**/.worktree/**']
-// LLM tests are manual / workflow_dispatch only via `pnpm test:llm` (which
-// passes `--project llm`). Excluded from fast + slow project includes so
+// LLM tests are manual-only via `pnpm test:llm` or the workflow_dispatch-only
+// LLM workflow. Excluded from fast + slow project includes so
 // `pnpm test:fast`, `pnpm test:slow` never trigger LLM calls. `pnpm test`
 // (no --project flag) iterates all projects — the llm project's
 // describe.skipIf detects no API key and skips quietly.

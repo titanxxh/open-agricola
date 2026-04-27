@@ -102,3 +102,4 @@ GitHub 不允许用户 fork 自己的仓库。`GitHubClient.ensureFork()` 必须
 2. 点 "Generate a new client secret"
 3. 更新服务端 env 的 `GITHUB_OAUTH_CLIENT_SECRET`
 4. 重启服务
+

@@ -6,12 +6,32 @@
  *
  * Retries on 429 / 5xx (configurable). Other 4xx errors are thrown immediately.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-export type Provider = 'gemini' | 'openai'
+export type Provider = 'gemini' | 'openai' | 'openrouter' | 'deepseek' | 'aihubmix'
+export type LlmTestPurpose = 'code' | 'image'
+export type LlmTestConfig = { provider: Provider; model: string }
 
 export const PROVIDER_BASE_URL: Record<Provider, string> = {
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
   openai: 'https://api.openai.com/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+  deepseek: 'https://api.deepseek.com/v1/chat/completions',
+  aihubmix: 'https://aihubmix.com/v1/chat/completions',
+}
+
+const PROVIDER_KEY_ENVS: Record<Provider, readonly string[]> = {
+  gemini: ['GEMINI_API_KEY', 'MY_TEST_GEMINI_APIKEY'],
+  openai: ['OPENAI_API_KEY', 'MY_TEST_OPENAI_APIKEY'],
+  openrouter: ['OPENROUTER_API_KEY', 'MY_TEST_OPENROUTER_APIKEY'],
+  deepseek: ['DEEPSEEK_API_KEY', 'MY_TEST_DEEPSEEK_APIKEY'],
+  aihubmix: ['AIHUBMIX_API_KEY', 'MY_TEST_AIHUBMIX_APIKEY'],
+}
+
+const DEFAULT_TEST_CONFIG: Record<LlmTestPurpose, LlmTestConfig> = {
+  code: { provider: 'deepseek', model: 'deepseek-v4-flash' },
+  image: { provider: 'aihubmix', model: 'gemini-3.1-flash-image-preview-free' },
 }
 
 export interface CallLLMOptions {
@@ -117,10 +137,48 @@ export async function callLLM(opts: CallLLMOptions): Promise<string> {
 }
 
 export function readApiKey(provider: Provider): string {
-  const envName = provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY'
-  const key = process.env[envName]
-  if (!key) {
-    throw new Error(`missing env ${envName} for provider ${provider}`)
+  const envNames = PROVIDER_KEY_ENVS[provider]
+  for (const envName of envNames) {
+    const key = process.env[envName]
+    if (key) return key
   }
-  return key
+  const dotenv = readDotenv()
+  for (const envName of envNames) {
+    const key = dotenv[envName]
+    if (key) return key
+  }
+  throw new Error(`missing env ${envNames.join(' or ')} for provider ${provider}`)
+}
+
+function readDotenv(): Record<string, string> {
+  try {
+    const raw = readFileSync(join(process.cwd(), '.env'), 'utf8')
+    const result: Record<string, string> = {}
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eq = trimmed.indexOf('=')
+      if (eq <= 0) continue
+      const key = trimmed.slice(0, eq).trim()
+      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+      result[key] = value
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+export function resolveLlmTestConfig(purpose: LlmTestPurpose): LlmTestConfig {
+  const defaults = DEFAULT_TEST_CONFIG[purpose]
+  if (purpose === 'code') {
+    return {
+      provider: (process.env.LLM_TEST_CODE_PROVIDER ?? defaults.provider) as Provider,
+      model: process.env.LLM_TEST_CODE_MODEL ?? defaults.model,
+    }
+  }
+  return {
+    provider: (process.env.LLM_TEST_IMAGE_PROVIDER ?? defaults.provider) as Provider,
+    model: process.env.LLM_TEST_IMAGE_MODEL ?? defaults.model,
+  }
 }
