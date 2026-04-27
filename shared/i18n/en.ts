@@ -841,7 +841,8 @@ export const en = {
     logoutAllDevices: 'Sign out all devices',
 
     workshopTitle: 'Card Workshop',
-    backToLobbyShort: '← Lobby',
+    backToLobbyShort: 'Lobby',
+    backToLobbyPlain: 'Back to Lobby',
     browse: 'Browse',
     featured: '★ Featured',
     myCards: 'My Cards',
@@ -851,7 +852,7 @@ export const en = {
     sortRecent: 'Recent',
     sortPopular: 'Popular',
     createCard: '+ Create / Edit Card',
-    backToWorkshopHome: 'Back to home',
+    backToWorkshopHome: 'Workshop Home',
     myCardsSubtitle: 'See both your drafts and published cards here.',
     featuredSubtitle: 'Featured cards are marked with a star.',
     browseSubtitle: 'Browse published cards from other players.',

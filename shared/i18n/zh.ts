@@ -821,7 +821,8 @@ export const zh = {
     logoutAllDevices: '登出所有设备',
 
     workshopTitle: '卡牌工坊',
-    backToLobbyShort: '← 大厅',
+    backToLobbyShort: '大厅',
+    backToLobbyPlain: '返回大厅',
     browse: '浏览',
     featured: '★ 精选',
     myCards: '我的卡牌',
@@ -831,7 +832,7 @@ export const zh = {
     sortRecent: '最新',
     sortPopular: '最热',
     createCard: '+ 创建/修改卡牌',
-    backToWorkshopHome: '返回主界面',
+    backToWorkshopHome: '工坊主页',
     myCardsSubtitle: '这里同时展示你的草稿和已发布卡牌。',
     featuredSubtitle: '精选卡会带星标显示。',
     browseSubtitle: '浏览其他玩家已发布的卡牌。',

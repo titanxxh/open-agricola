@@ -69,17 +69,42 @@ export function getWorkshopCardIdFromSearch(search: string): string | null {
   return value || null
 }
 
+type WorkshopUrlView = 'sandbox' | 'editor'
+
+export function getWorkshopViewFromSearch(search: string): WorkshopUrlView | null {
+  const value = new URLSearchParams(search).get('view')?.trim()
+  if (value === 'sandbox' || value === 'editor') return value
+  return null
+}
+
 export function buildWorkshopCardUrl(
   pathname: string,
   search: string,
   cardDbId: string | null,
 ): string {
+  return buildWorkshopUrl(pathname, search, { card: cardDbId })
+}
+
+export function buildWorkshopUrl(
+  pathname: string,
+  search: string,
+  opts: { view?: WorkshopUrlView | null; card?: string | null } = {},
+): string {
   const params = new URLSearchParams(search)
   params.set('page', 'workshop')
-  if (cardDbId) {
-    params.set('card', cardDbId)
-  } else {
-    params.delete('card')
+  if ('view' in opts) {
+    if (opts.view === 'sandbox' || opts.view === 'editor') {
+      params.set('view', opts.view)
+    } else {
+      params.delete('view')
+    }
+  }
+  if ('card' in opts) {
+    if (opts.card) {
+      params.set('card', opts.card)
+    } else {
+      params.delete('card')
+    }
   }
   const nextSearch = params.toString()
   return `${pathname}${nextSearch ? `?${nextSearch}` : ''}`
@@ -1288,8 +1313,11 @@ export function WorkshopPage() {
     }
   }
 
-  const writeCardUrl = useCallback((cardDbId: string | null, mode: 'push' | 'replace') => {
-    const nextUrl = buildWorkshopCardUrl(window.location.pathname, window.location.search, cardDbId)
+  const writeWorkshopUrl = useCallback((
+    opts: { view?: 'sandbox' | 'editor' | null; card?: string | null },
+    mode: 'push' | 'replace' = 'push',
+  ) => {
+    const nextUrl = buildWorkshopUrl(window.location.pathname, window.location.search, opts)
     if (mode === 'push') {
       window.history.pushState(null, '', nextUrl)
     } else {
@@ -1297,45 +1325,62 @@ export function WorkshopPage() {
     }
   }, [])
 
+  const navigateView = useCallback((
+    next: 'home' | 'sandbox' | 'editor',
+    mode: 'push' | 'replace' = 'push',
+  ) => {
+    if (next === 'home') {
+      setSelectedCard(null)
+      setEditCard(undefined)
+    }
+    setView(next)
+    writeWorkshopUrl({ view: next === 'home' ? null : next, card: null }, mode)
+  }, [writeWorkshopUrl])
+
   const loadCardDetail = useCallback(async (cardDbId: string) => {
     const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
       headers: authHeaders(token),
     })
     const data = await response.json()
     if (data.ok) {
-      prevView.current = 'home'
       setSelectedCard(data.card)
       setView('detail')
     }
   }, [token])
 
   useEffect(() => {
-    const syncDetailFromUrl = () => {
+    const syncFromUrl = () => {
       const cardDbId = getWorkshopCardIdFromSearch(window.location.search)
-      if (!cardDbId) {
-        setSelectedCard(null)
-        setView((current) => current === 'detail' ? prevView.current : current)
+      if (cardDbId) {
+        void loadCardDetail(cardDbId)
         return
       }
-      void loadCardDetail(cardDbId)
+      const v = getWorkshopViewFromSearch(window.location.search)
+      setSelectedCard(null)
+      if (v === 'sandbox' || v === 'editor') {
+        setView(v)
+      } else {
+        setEditCard(undefined)
+        setView('home')
+      }
     }
 
-    syncDetailFromUrl()
-    window.addEventListener('popstate', syncDetailFromUrl)
-    return () => window.removeEventListener('popstate', syncDetailFromUrl)
+    syncFromUrl()
+    window.addEventListener('popstate', syncFromUrl)
+    return () => window.removeEventListener('popstate', syncFromUrl)
   }, [loadCardDetail])
 
   const goBack = () => {
-    setSelectedCard(null)
-    setView(prevView.current)
-    writeCardUrl(null, 'replace')
+    const target = prevView.current
+    const next = target === 'sandbox' || target === 'editor' ? target : 'home'
+    navigateView(next, 'replace')
   }
 
   const selectCard = (card: WorkshopCard) => {
-    prevView.current = view
+    prevView.current = view === 'detail' ? prevView.current : view
     setSelectedCard(card)
     setView('detail')
-    writeCardUrl(card.id, 'push')
+    writeWorkshopUrl({ card: card.id }, 'push')
   }
 
   if (view === 'detail' && selectedCard) {
@@ -1343,7 +1388,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setSelectedCard(null); setView('home'); writeCardUrl(null, 'replace') }}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <CardDetail
@@ -1351,7 +1396,7 @@ export function WorkshopPage() {
           token={token}
           onBack={goBack}
           onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
-            ? () => { setEditCard(selectedCard); setView('editor'); writeCardUrl(null, 'replace') }
+            ? () => { prevView.current = 'detail'; setEditCard(selectedCard); navigateView('editor') }
             : undefined}
           onAddSandbox={handleAddSandbox}
           isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
@@ -1379,16 +1424,22 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setEditCard(undefined); setView('home'); writeCardUrl(null, 'replace') }}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <CardEditor
           initial={editCard}
           token={token}
           onCancel={() => {
-            setEditCard(undefined)
-            setView(prevView.current)
-            writeCardUrl(null, 'replace')
+            const target = prevView.current
+            const next = target === 'sandbox' || target === 'detail' ? target : 'home'
+            if (next === 'detail' && selectedCard) {
+              setEditCard(undefined)
+              setView('detail')
+              writeWorkshopUrl({ view: null, card: selectedCard.id }, 'replace')
+            } else {
+              navigateView(next === 'detail' ? 'home' : next, 'replace')
+            }
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
@@ -1437,7 +1488,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => setView('home')}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <SandboxView
@@ -1497,7 +1548,7 @@ export function WorkshopPage() {
     <div className="ws-page">
       <WorkshopNav
         view={view}
-        onOpenHome={() => setView('home')}
+        onOpenHome={() => navigateView('home')}
         t={t}
       />
 
@@ -1519,7 +1570,7 @@ export function WorkshopPage() {
               <button
                 type="button"
                 className="btn-primary ws-btn-sm"
-                onClick={() => setView('sandbox')}
+                onClick={() => navigateView('sandbox')}
               >
                 {t('platform.enterSandbox')}
               </button>
@@ -1568,7 +1619,7 @@ export function WorkshopPage() {
               onClick={() => {
                 prevView.current = view
                 setEditCard(undefined)
-                setView('editor')
+                navigateView('editor')
               }}
             >
               {t('platform.createCard')}
@@ -1589,7 +1640,7 @@ export function WorkshopPage() {
                   onClick={() => {
                     prevView.current = view
                     setEditCard(undefined)
-                    setView('editor')
+                    navigateView('editor')
                   }}
                 >
                   {t('platform.createCard')}
@@ -1740,19 +1791,22 @@ function WorkshopNav({
   onOpenHome: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const isHome = view === 'home'
+  const handleBack = isHome ? () => setPage('lobby') : onOpenHome
+  const backLabel = isHome ? t('platform.backToLobbyShort') : t('platform.backToWorkshopHome')
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
+        <button type="button" className="ws-back-home" onClick={handleBack}>
           <span aria-hidden="true">‹</span>
-          {t('platform.backToLobbyShort')}
+          {backLabel}
         </button>
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">
-        {view !== 'home' && (
-          <button type="button" className="btn-link ws-nav-link" onClick={onOpenHome}>
-            {t('platform.backToWorkshopHome')}
+        {!isHome && (
+          <button type="button" className="btn-link ws-nav-link" onClick={() => setPage('lobby')}>
+            {t('platform.backToLobbyPlain')}
           </button>
         )}
         <LocaleSwitcher />
