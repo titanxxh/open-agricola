@@ -9,7 +9,9 @@
 
 
 
+<!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+<!-- community-card-entries:end -->
 
 
