@@ -13,6 +13,7 @@ type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
 const PAGE_SCOPED_QUERY_KEYS = [
   'card',
+  'view',
   'room',
   'player',
   'playerId',

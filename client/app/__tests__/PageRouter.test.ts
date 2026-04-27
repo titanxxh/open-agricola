@@ -51,4 +51,28 @@ describe('setPage URL hygiene', () => {
     setPage('settings')
     expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=settings')
   })
+
+  it('drops the workshop view param when returning to the lobby', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?page=workshop&view=sandbox',
+    )
+
+    setPage('lobby')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
+  })
+
+  it('drops the workshop view param when navigating to settings', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?page=workshop&view=editor',
+    )
+
+    setPage('settings')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=settings')
+  })
 })
