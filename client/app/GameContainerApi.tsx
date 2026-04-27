@@ -38,6 +38,7 @@ const httpTransportSingleton = new HttpGameTransport()
 const setRoomInUrl = (roomId: string) => {
   if (typeof window === 'undefined') return
   const params = new URLSearchParams(window.location.search)
+  params.delete('card')
   params.set('room', roomId)
   const newSearch = params.toString()
   const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash || ''}`

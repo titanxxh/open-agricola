@@ -456,6 +456,53 @@ WorkshopPage
     └── TestGameButton   "开始沙盒测试" → 创建含自定义卡牌的单人游戏
 ```
 
+### D5. Workshop → GitHub PR 流程
+
+卡牌工坊支持把用户发布的设计提交为主仓库的 community card PR。入口在卡牌详情页：
+
+1. 用户必须登录，且是该工坊卡牌作者或管理员。
+2. 卡牌必须先发布；草稿状态只显示提示，不允许发起 PR。
+3. 前端调用 `POST /api/workshop/cards/:id/github/propose`。
+4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
+5. 授权完成后前端重试 propose 请求，服务端创建/更新分支并打开或更新 PR。
+
+服务端核心模块：
+
+| 模块 | 职责 |
+|---|---|
+| `server/workshop-pr/propose-handler.ts` | 提交流程编排：权限检查、读取 upstream 文件、生成 PR 文件、创建 commit/branch/PR |
+| `server/workshop-pr/oauth-handler.ts` | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream |
+| `server/workshop-pr/github-client.ts` | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支 |
+| `server/workshop-pr/code-gen.ts` | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档 |
+| `client/services/workshop-pr.ts` | 前端 propose/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
+
+生成的 PR 文件固定包含：
+
+| 文件 | 说明 |
+|---|---|
+| `shared/cards/community/{CUSTOM_ID}.ts` | community card 定义和 `CardImpl` |
+| `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts` | smoke test：定义存在、`deck === 'community'`、有行为 |
+| `shared/cards/register-all.ts` | 注册 `{CUSTOM_ID}_impl` |
+| `shared/cards/community/auto-catalog.ts` | 注册 community deck card definition |
+| `docs/community_cards.md` | community card 索引；PR 创建后会用真实 PR number 二次提交 |
+| `public/card-art/community/{CUSTOM_ID}.{ext}` | 可选，美术二进制 |
+
+生成器会做必要规范化，避免用户在沙盒中能跑但 PR CI 不通过：
+
+- `deck: 'CUSTOM'` 会转换为 `deck: 'community'`。
+- `CARD_IMPL` 会补上 `CardImpl` 上下文类型，避免 listener phase/action 字面量退化成 `string[]`。
+- 缺失 `id` 的 listener 会补稳定 id：`{cardId}-listener-{n}`。
+- `prerequisite: { occupation: N }` 会转为仓库支持的 `prerequisite: 'N Occupations'` + `occupationPrerequisites: { min: N }`。
+- 同步更新 `auto-catalog.ts`，保证 `pnpm run check:community-deck` 不报 out-of-sync。
+
+### D6. 卡牌详情、版本历史和编辑回填
+
+卡牌详情页使用 URL 参数表达当前卡牌：`?page=workshop&card=<workshop-card-id>`。点击卡牌进入详情时使用 `pushState`，返回列表或切换首页时用 `replaceState`，并监听 `popstate` 支持浏览器前进/后退。
+
+版本历史面板读取 `GET /api/workshop/cards/:id/versions`。该路由必须精确匹配，不能被 `GET /api/workshop/cards` 的列表路由吞掉。前端面板需要有 loading/error/empty 状态，避免接口失败时整页空白。
+
+详情页点击"编辑"会切到 `CardEditor`，并把选中的 `WorkshopCard` 作为 `initialCard` 传给 `AiCardDesigner`。AI 设计器用该初始卡填充当前设计，用户可以从已有卡牌继续修改。
+
 ---
 
 ## E. 安全设计

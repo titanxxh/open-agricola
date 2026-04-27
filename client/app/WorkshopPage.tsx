@@ -1327,7 +1327,7 @@ export function WorkshopPage() {
           token={token}
           onBack={goBack}
           onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
-            ? () => { setEditCard(selectedCard); setView('editor') }
+            ? () => { setEditCard(selectedCard); setView('editor'); writeCardUrl(null, 'replace') }
             : undefined}
           onAddSandbox={handleAddSandbox}
           isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
@@ -1355,7 +1355,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setEditCard(undefined); setView('home') }}
+          onOpenHome={() => { setEditCard(undefined); setView('home'); writeCardUrl(null, 'replace') }}
           t={t}
         />
         <CardEditor
@@ -1364,6 +1364,7 @@ export function WorkshopPage() {
           onCancel={() => {
             setEditCard(undefined)
             setView(prevView.current)
+            writeCardUrl(null, 'replace')
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
