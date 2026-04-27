@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { patchCommunityCardsMarkdown } from '../code-gen'
 
@@ -39,5 +41,17 @@ describe('patchCommunityCardsMarkdown', () => {
         pr_number: 1,
       }),
     ).toThrow()
+  })
+
+  it('patches the checked-in community cards document', () => {
+    const source = readFileSync(join(process.cwd(), 'docs/community_cards.md'), 'utf8')
+    const patched = patchCommunityCardsMarkdown(source, {
+      card_id: 'CUSTOM_RegressionMarker',
+      card_name: 'Regression Marker',
+      card_type: 'minor',
+      github_login: 'tester',
+      pr_number: 999,
+    })
+    expect(patched).toContain('| CUSTOM_RegressionMarker | Regression Marker | minor | @tester | #999 |')
   })
 })

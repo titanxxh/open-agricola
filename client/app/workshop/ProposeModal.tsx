@@ -3,6 +3,7 @@ import {
   startPropose,
   completePropose,
   openOAuthPopupAndWait,
+  type ProposeFailure,
 } from '../../services/workshop-pr'
 
 // Minimal shape needed by this modal. Kept local so this file doesn't
@@ -17,6 +18,7 @@ export type ProposeCard = {
 type Stage = 'preview' | 'auth' | 'progress'
 
 type Step = { key: string; label: string; done: boolean; error?: string }
+type FailureInfo = { summary: string; detail?: string }
 
 const INITIAL_STEPS: Step[] = [
   { key: 'github', label: '正在连接 GitHub', done: false },
@@ -37,7 +39,7 @@ export function ProposeModal({
   const [stage, setStage] = useState<Stage>('preview')
   const [steps, setSteps] = useState<Step[]>(INITIAL_STEPS)
   const [prUrl, setPrUrl] = useState<string>()
-  const [failure, setFailure] = useState<string>()
+  const [failure, setFailure] = useState<FailureInfo>()
   const [agreed, setAgreed] = useState(false)
 
   function markStep(key: string, patch: Partial<Step>) {
@@ -65,9 +67,9 @@ export function ProposeModal({
     }
     if (!('needsAuth' in phase1) || !phase1.needsAuth) {
       setStage('progress')
-      const code = phase1.code ?? phase1.error ?? 'failed'
-      markStep('github', { error: code })
-      setFailure(code)
+      const failureInfo = describeProposeFailure(phase1)
+      markStep('github', { error: failureInfo.summary })
+      setFailure(failureInfo)
       return
     }
 
@@ -75,9 +77,9 @@ export function ProposeModal({
     const popupResult = await openOAuthPopupAndWait(authUrl, handshakeId)
     if (!popupResult.ok) {
       setStage('progress')
-      const code = popupResult.error ?? 'oauth_cancelled'
-      markStep('github', { error: code })
-      setFailure(code)
+      const failureInfo = describePopupFailure(popupResult.error)
+      markStep('github', { error: failureInfo.summary })
+      setFailure(failureInfo)
       return
     }
 
@@ -94,23 +96,23 @@ export function ProposeModal({
       onSuccess?.(phase2.prUrl)
     } else if ('needsAuth' in phase2 && phase2.needsAuth) {
       // Token expired between phases — re-loop via OAuth.
-      const code = 'needs_reauth'
+      const failureInfo = describePopupFailure('needs_reauth')
       setSteps((s) => {
         const next = [...s]
         const idx = next.findIndex((it) => !it.done)
-        if (idx >= 0) next[idx] = { ...next[idx]!, error: code }
+        if (idx >= 0) next[idx] = { ...next[idx]!, error: failureInfo.summary }
         return next
       })
-      setFailure(code)
+      setFailure(failureInfo)
     } else {
-      const code = phase2.code ?? phase2.error ?? 'failed'
+      const failureInfo = describeProposeFailure(phase2)
       setSteps((s) => {
         const next = [...s]
         const idx = next.findIndex((it) => !it.done)
-        if (idx >= 0) next[idx] = { ...next[idx]!, error: code }
+        if (idx >= 0) next[idx] = { ...next[idx]!, error: failureInfo.summary }
         return next
       })
-      setFailure(code)
+      setFailure(failureInfo)
     }
   }
 
@@ -148,6 +150,27 @@ export function ProposeModal({
       )}
     </ModalShell>
   )
+}
+
+function describeProposeFailure(resp: ProposeFailure): FailureInfo {
+  const code = resp.code ?? resp.error ?? 'failed'
+  const message = resp.message?.trim()
+  const retryAfter = resp.retryAfter ? `可在 ${resp.retryAfter} 秒后重试。` : undefined
+  const detail = [message, retryAfter].filter(Boolean).join(' ')
+  return {
+    summary: message ? `${code}: ${message}` : code,
+    detail: detail || undefined,
+  }
+}
+
+function describePopupFailure(error: string | undefined): FailureInfo {
+  const code = error ?? 'oauth_cancelled'
+  const details: Record<string, string> = {
+    timeout: 'GitHub 授权弹窗超时。请确认弹窗没有被浏览器拦截，然后重试。',
+    oauth_cancelled: 'GitHub 授权未完成或已取消。',
+    needs_reauth: '授权信息已过期，需要重新连接 GitHub。',
+  }
+  return { summary: code, detail: details[code] }
 }
 
 function ModalShell({
@@ -236,7 +259,7 @@ function ProposeProgress({
 }: {
   steps: Step[]
   prUrl?: string
-  failure?: string
+  failure?: FailureInfo
   onRetry: () => void
   onClose: () => void
 }) {
@@ -273,9 +296,28 @@ function ProposeProgress({
         </div>
       )}
       {failure && !prUrl && (
-        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <button type="button" onClick={onRetry}>重试</button>
-          <button type="button" onClick={onClose}>关闭</button>
+        <div style={{ marginTop: 16 }}>
+          <div
+            role="alert"
+            style={{
+              padding: 12,
+              border: '1px solid rgba(220, 20, 60, 0.35)',
+              background: 'rgba(220, 20, 60, 0.08)',
+              borderRadius: 4,
+              color: 'crimson',
+            }}
+          >
+            <div><strong>提交失败：</strong>{failure.summary}</div>
+            {failure.detail && (
+              <div style={{ marginTop: 6, fontSize: '0.9em', whiteSpace: 'pre-wrap' }}>
+                详细信息：{failure.detail}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onRetry}>重试</button>
+            <button type="button" onClick={onClose}>关闭</button>
+          </div>
         </div>
       )}
       {prUrl && (
