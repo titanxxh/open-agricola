@@ -90,7 +90,7 @@ describe('player-count action space filtering', () => {
 
 describe('3P hollow accumulation', () => {
   it('accumulates 1 clay per round', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = new GameSession(42, undefined, { playerCount: 3 })
     const state = session.getState().state
     const hollowSpace = state.actionSpaces.find((s) => s.id === 'hollow')
     expect(hollowSpace).toBeDefined()
@@ -101,7 +101,7 @@ describe('3P hollow accumulation', () => {
 
 describe('3P resource-market XOR choice', () => {
   it('presents two XOR options (reed+food / stone+food)', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = new GameSession(42, undefined, { playerCount: 3 })
     const state = session.getState().state
     state.currentPlayerIndex = 0
     session.loadState(state)
@@ -155,7 +155,7 @@ describe('3P resource-market XOR choice', () => {
 
 describe('3P lessons-3 cost', () => {
   it('charges 2 food for first occupation', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = new GameSession(42, undefined, { playerCount: 3 })
     const state = session.getState().state
     state.currentPlayerIndex = 0
     const p = state.players[0]!
