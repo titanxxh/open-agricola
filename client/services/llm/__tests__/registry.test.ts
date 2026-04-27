@@ -81,15 +81,17 @@ describe('PROVIDERS registry', () => {
     expect(a.capabilities).toEqual({ chat: true, image: true })
   })
 
-  it('gemini exposes only the 3.1-preview models with proper capabilities', () => {
+  it('gemini exposes supported chat and image models with proper capabilities', () => {
     const g = PROVIDERS.gemini!
     expect(g.models.map(m => m.id)).toEqual([
       'gemini-3.1-pro-preview',
       'gemini-3.1-flash-image-preview',
+      'gemini-2.5-flash-image',
     ])
     expect(g.defaultModel).toBe('gemini-3.1-pro-preview')
     expect(g.models[0].capabilities).toEqual({ chat: true, image: true })
     expect(g.models[1].capabilities).toEqual({ chat: false, image: true })
+    expect(g.models[2].capabilities).toEqual({ chat: false, image: true })
   })
 
   describe('listModelsFor', () => {

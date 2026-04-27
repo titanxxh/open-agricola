@@ -51,6 +51,11 @@ export const geminiProvider: ProviderDef = {
       label: 'Gemini 3.1 Flash Image (图片生成)',
       capabilities: { chat: false, image: true },
     },
+    {
+      id: 'gemini-2.5-flash-image',
+      label: 'Gemini 2.5 Flash Image (图片生成)',
+      capabilities: { chat: false, image: true },
+    },
   ],
   apiKeyHint: 'aistudio.google.com/apikey',
   apiKeyHelpUrl: 'https://aistudio.google.com/apikey',

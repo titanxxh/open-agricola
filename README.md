@@ -4,6 +4,8 @@
 
 ## 快速开始
 
+本地开发请使用 Node.js 22。仓库里的原生依赖（例如 `better-sqlite3`）会按当前 Node ABI 编译；如果依赖用 Node 22 安装，却用 Node 20 启动后端，会出现 `NODE_MODULE_VERSION` 不匹配。
+
 ```bash
 pnpm install
 ```
@@ -11,6 +13,13 @@ pnpm install
 ### 启动后端 + 前端
 
 ```bash
+./restart-intranet.sh
+```
+
+如果当前 shell 默认不是 Node 22，请先用本机的版本管理工具切到 Node 22（例如 `asdf local nodejs 22.x`、`nvm use 22` 或 Volta 配置），再启动：
+
+```bash
+node --version  # 应为 v22.x
 ./restart-intranet.sh
 ```
 
@@ -50,12 +59,14 @@ HTTP 模式使用单例 GameSession，适合单人调试。
 
 ### URL 参数
 
-| 参数 | 说明 |
-|---|---|
-| `player=p1` / `player=p2` | 锁定玩家视角 |
-| `transport=ws` | 启用 WebSocket 实时同步 |
-| `room=<id>` | 加入指定房间（P2 用） |
-| `devMode=1` | 启用开发者面板 |
+
+| 参数                        | 说明                |
+| ------------------------- | ----------------- |
+| `player=p1` / `player=p2` | 锁定玩家视角            |
+| `transport=ws`            | 启用 WebSocket 实时同步 |
+| `room=<id>`               | 加入指定房间（P2 用）      |
+| `devMode=1`               | 启用开发者面板           |
+
 
 ## 项目结构
 
@@ -96,6 +107,7 @@ pnpm run build       # TypeScript + Vite 构建
 详见 `docs/ENGINE_ARCHITECTURE.md`。
 
 核心设计：
+
 - **后端权威**：`GameSession` 是唯一可写入 `GameState` 的入口
 - **命令驱动**：前端发送 `ClientCommand`，后端执行后广播 `StateUpdateEnvelope`
 - **全量快照同步**：每次状态变更广播完整序列化状态给所有客户端
@@ -104,7 +116,9 @@ pnpm run build       # TypeScript + Vite 构建
 ## 开发者模式
 
 URL 加 `?devMode=1` 或在界面中开启，可使用：
+
 - 资源编辑、回合跳转、卡牌发放/打出
 - 围栏快速创建
 - 状态导出/导入
 - 种子指定重开（Reset）
+

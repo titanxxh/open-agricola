@@ -378,3 +378,4 @@ const CARD_IMPL = {
 ```
 
 > `handHooks` 是 meta 字段，声明哪些 hook 在卡牌还在手牌时也触发。一旦卡牌打出，只走正常 hook 路径。
+

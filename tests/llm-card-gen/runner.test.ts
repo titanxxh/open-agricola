@@ -2,15 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fixtures } from './fixtures'
-import { callLLM, readApiKey, type Provider } from './llm-client'
+import { callLLM, readApiKey, resolveLlmTestConfig } from './llm-client'
 import { extractCardCode, ExtractError } from './extract'
 import { resetCards } from './session-helpers'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../client/services/llmPrompts'
 import type { TriggerResult, FixtureContext } from './fixtures/types'
 import type { GameSession } from '../../server/game/authoritative-session'
 
-const PROVIDER = (process.env.LLM_TEST_PROVIDER ?? 'gemini') as Provider
-const MODEL = process.env.LLM_TEST_MODEL ?? 'gemini-3.1-pro-preview'
+const { provider: PROVIDER, model: MODEL } = resolveLlmTestConfig('code')
 const DUMP_DIR = 'output/tmp/llm-card-gen'
 
 const apiKeyAvailable = (() => {

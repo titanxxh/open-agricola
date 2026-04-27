@@ -9,7 +9,7 @@ tests/llm-card-gen/
 ├── runner.test.ts            # 逐个 fixture 调 LLM → 编译 → 跑 fixture.setup/trigger/assert
 ├── session-helpers.ts        # buildSessionWithLLMCard / autoAdvanceRoundEnd / getBonusBreakdown 等
 ├── session-helpers.test.ts   # helpers 自身的 smoke（不调 LLM）
-├── llm-client.ts             # Gemini / OpenAI 兼容包装
+├── llm-client.ts             # Gemini / OpenAI / OpenRouter / DeepSeek / AiHubMix 兼容包装
 ├── extract.ts / extract.test.ts   # 从 LLM 响应里抽 TS 代码块
 └── fixtures/
     ├── types.ts              # CardFixture = { setup, trigger, assert }
@@ -29,8 +29,9 @@ tests/llm-card-gen/
 默认 CI / 本地跑**不**触发 LLM 套件——需要显式选 project。
 
 ```bash
-# 1. 需要 Gemini API key（.env 里 MY_TEST_GEMINI_APIKEY）
-export GEMINI_API_KEY="$(grep '^MY_TEST_GEMINI_APIKEY=' .env | cut -d= -f2-)"
+# 1. 默认代码生成使用 DeepSeek；API key 可直接放在 .env 的 MY_TEST_DEEPSEEK_APIKEY
+export LLM_TEST_CODE_PROVIDER=deepseek
+export LLM_TEST_CODE_MODEL=deepseek-v4-flash
 
 # 2. 全量 9 fixture（~110s）
 pnpm test:llm
@@ -41,15 +42,48 @@ pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M2-per-
 # 只跑 helper smoke（不调 LLM，~5s）
 pnpm exec vitest run --project llm tests/llm-card-gen/session-helpers.test.ts
 
-# 切换 provider / model
-LLM_TEST_PROVIDER=openai LLM_TEST_MODEL=gpt-4.1 OPENAI_API_KEY=... pnpm test:llm
+# 单独跑 Gemini 图片生成 smoke（2 个真实卡牌 case：1 张职业 + 1 张小改良）
+pnpm run smoke:gemini:image
+
+# 切换 provider / model（示例：AiHubMix 免费代码模型）
+LLM_TEST_CODE_PROVIDER=aihubmix \
+LLM_TEST_CODE_MODEL=coding-glm-5.1-free \
+AIHUBMIX_API_KEY=... \
+pnpm test:llm
 ```
 
-默认 provider=`gemini`、model=`gemini-3.1-pro-preview`。每次跑会把原始 LLM 响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
+代码生成测试默认 provider=`deepseek`、model=`deepseek-v4-flash`。每次跑会把原始 LLM 响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
 
-## CI
+环境变量按用途拆分，避免代码模型和图片模型混用：
 
-工作流：`.github/workflows/ci-llm-cards.yml`，`workflow_dispatch` 手动触发（不在 push / PR 自动跑，避免 API key 消耗）。
+
+| 用途     | Provider env              | Model env              | 默认                                                 |
+| ------ | ------------------------- | ---------------------- | -------------------------------------------------- |
+| 卡牌代码生成 | `LLM_TEST_CODE_PROVIDER`  | `LLM_TEST_CODE_MODEL`  | `deepseek` / `deepseek-v4-flash`                   |
+| 卡牌图片生成 | `LLM_TEST_IMAGE_PROVIDER` | `LLM_TEST_IMAGE_MODEL` | `gemini` / `gemini-2.5-flash-image`                |
+
+
+当前 `tests/llm-card-gen/runner.test.ts` 只做代码生成，不调用图片模型。
+
+支持的代码生成 provider（用于 `LLM_TEST_CODE_PROVIDER`）：
+
+
+| Provider     | Chat completions endpoint                                                  | API key 环境变量                                       |
+| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------- |
+| `gemini`     | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | `GEMINI_API_KEY` 或 `MY_TEST_GEMINI_APIKEY`         |
+| `openai`     | `https://api.openai.com/v1/chat/completions`                               | `OPENAI_API_KEY` 或 `MY_TEST_OPENAI_APIKEY`         |
+| `openrouter` | `https://openrouter.ai/api/v1/chat/completions`                            | `OPENROUTER_API_KEY` 或 `MY_TEST_OPENROUTER_APIKEY` |
+| `deepseek`   | `https://api.deepseek.com/v1/chat/completions`                             | `DEEPSEEK_API_KEY` 或 `MY_TEST_DEEPSEEK_APIKEY`     |
+| `aihubmix`   | `https://aihubmix.com/v1/chat/completions`                                 | `AIHUBMIX_API_KEY` 或 `MY_TEST_AIHUBMIX_APIKEY`     |
+
+
+`LLM_TEST_CODE_MODEL` / `LLM_TEST_IMAGE_MODEL` 不做白名单校验，直接透传给 provider，便于临时验证新模型。
+
+## CI / Workflow
+
+本套件不会在 push / PR 自动触发，只能本地手动运行或通过 GitHub Actions 的 `workflow_dispatch` 手动触发。原因是每次运行都会真实调用外部 LLM，受 API key、余额、限流和模型输出波动影响。
+
+工作流：`.github/workflows/ci-llm-cards.yml`
 
 触发方式：
 
@@ -143,3 +177,4 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 - 2026-04-23 套件初版（9 fixture，hook-level 断言：`invokeCustomCodeEffect` / `invokeCustomCodeListener` 验证 LLM 代码形状）
 - 2026-04-24 重写到 session-driven：每个 fixture 真的装进 `GameSession` 里跑起来断 `state` / `pending` / `scores`，能验"游戏中跑起来是否符合预期"而不是"编出来的 ActionFlow 是不是预期形状"
+

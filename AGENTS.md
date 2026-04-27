@@ -105,7 +105,7 @@ src/       前端：React UI、transport 抽象、hooks
 
 ### 认证与持久化
 
-- 用户认证通过 `/api/auth/*` 端点（注册、登录、登出、会话校验）
+- 用户认证通过 `/api/auth/`* 端点（注册、登录、登出、会话校验）
 - `AuthContext.tsx` 提供认证状态和 `apiFetch()` 辅助
 - 房间持久化：`PERSIST_ROOMS=sqlite` 用 SQLite（`DB_PATH=./data/open-agricola.db`），默认用 JSON 文件
 - `ALLOW_ANONYMOUS_WS=true` 跳过 WS 认证（dev 默认开启）
@@ -119,10 +119,12 @@ src/       前端：React UI、transport 抽象、hooks
 ```bash
 # 安装依赖（canvas 需要系统库：libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev）
 # 本项目用 pnpm（版本在 package.json 的 packageManager 字段锁定）
+# 本地开发统一使用 Node.js 22；better-sqlite3 等原生依赖会按 Node ABI 编译，避免用 Node 20 启动已由 Node 22 安装的依赖
 pnpm install
 
 # 同时启动前后端
 ./restart-intranet.sh
+# 如果 shell 默认不是 Node 22，先用本机版本管理工具切换到 Node 22（如 asdf/nvm/volta），确认 node --version 为 v22.x 后再启动
 
 # 或分开启动
 pnpm run server  # 后端 5175
@@ -162,23 +164,25 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
 
 > 文档分工固定如下，**不要新建并行文档**（之前的 `IMPLEMENTATION_STATUS.md` / `cards_impl.md` 已废弃）。
 
-| 文档 | 作用 | 何时必须更新 |
-|---|---|---|
-| `docs/card_progress.md` | **卡牌实现进度的唯一权威源**：覆盖率总表、当前批次、剩余卡分类、刻意简化、刻意不同（与 BGA 偏离的原因）、BGA 行为复核 TODO、基础设施清单、时间线 | **每次**改卡牌相关代码（实现新卡 / 改 desc / 调 hook / 改简化策略 / 删改测试 / 改通用机制并影响某类卡）都必须同步本文件 |
-| `docs/card_desc_audit.md` | BGA `$this->desc` ↔ 我们 `desc` **文本级**对齐审计（脚本可重跑）；只追踪 desc 字符串，不写实现差异 | 改卡牌 desc 文案 / 改卡牌 ID 命名 / 跑完一轮 desc 重对齐 |
-| `docs/ENGINE_ARCHITECTURE.md` | 引擎、节点树、hook、pending、协议层等架构性约束 | 改通用扩展点（新 hook phase、新 ActionFlow 节点类型、协议层演进） |
-| `docs/CARD_TEST_TEMPLATE.md` | 卡牌测试说明模板 | 测试策略 / 卡牌测试写法变化 |
-| `docs/PLATFORM_DESIGN.md` / `docs/DEPLOY_PLAN.md` / `docs/HOW_TO_DEPLOY.md` | 平台设计 / 部署 | 仅在对应议题改动时更新 |
+
+| 文档                                                                          | 作用                                                                                | 何时必须更新                                                                     |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `docs/card_progress.md`                                                     | **卡牌实现进度的唯一权威源**：覆盖率总表、当前批次、剩余卡分类、刻意简化、刻意不同（与 BGA 偏离的原因）、BGA 行为复核 TODO、基础设施清单、时间线 | **每次**改卡牌相关代码（实现新卡 / 改 desc / 调 hook / 改简化策略 / 删改测试 / 改通用机制并影响某类卡）都必须同步本文件 |
+| `docs/card_desc_audit.md`                                                   | BGA `$this->desc` ↔ 我们 `desc` **文本级**对齐审计（脚本可重跑）；只追踪 desc 字符串，不写实现差异              | 改卡牌 desc 文案 / 改卡牌 ID 命名 / 跑完一轮 desc 重对齐                                    |
+| `docs/ENGINE_ARCHITECTURE.md`                                               | 引擎、节点树、hook、pending、协议层等架构性约束                                                     | 改通用扩展点（新 hook phase、新 ActionFlow 节点类型、协议层演进）                               |
+| `docs/CARD_TEST_TEMPLATE.md`                                                | 卡牌测试说明模板                                                                          | 测试策略 / 卡牌测试写法变化                                                            |
+| `docs/PLATFORM_DESIGN.md` / `docs/DEPLOY_PLAN.md` / `docs/HOW_TO_DEPLOY.md` | 平台设计 / 部署                                                                         | 仅在对应议题改动时更新                                                                |
+
 
 ### `card_progress.md` 同步检查清单
 
 每次卡牌相关 commit 至少检查：
 
-- [ ] §2 当前轮次 — 加一行说明本次变更（日期 + 涉及卡 + 一句话摘要）
-- [ ] §3 / §4 / §5 / §6 — 把对应卡片从待实现 / 简化 / 刻意不同 / 待复核中迁出或更新状态
-- [ ] §1 总览数字 — 实现数 / Tier 数有变化时同步
-- [ ] §7 基础设施 — 新加的通用机制要登记
-- [ ] §8 时间线 — 新批次要加新行
+- §2 当前轮次 — 加一行说明本次变更（日期 + 涉及卡 + 一句话摘要）
+- §3 / §4 / §5 / §6 — 把对应卡片从待实现 / 简化 / 刻意不同 / 待复核中迁出或更新状态
+- §1 总览数字 — 实现数 / Tier 数有变化时同步
+- §7 基础设施 — 新加的通用机制要登记
+- §8 时间线 — 新批次要加新行
 
 ## 卡牌开发流程
 
@@ -263,7 +267,7 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
 
 **硬性要求**：每次 `git push` 之后必须等到相关 GitHub Actions run 结束；**只要有 run 仍在进行或失败，当前任务都不算完成**。失败时立刻定位并修复，再继续其他工作。
 
-Actions 页面：<https://github.com/titanxxh/open-agricola/actions>。
+Actions 页面：[https://github.com/titanxxh/open-agricola/actions](https://github.com/titanxxh/open-agricola/actions)。
 
 仓库是私有的，匿名 `curl` / WebFetch 会返回 404。要在命令行验证，先拿到 `GH_TOKEN`：
 
@@ -304,7 +308,7 @@ gh run view <RUN_ID> --log-failed
     https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/dispatches \
     -d '{"ref":"main"}'
   ```
-- 部署地址：<https://titanxxh.github.io/open-agricola/>。
+- 部署地址：[https://titanxxh.github.io/open-agricola/](https://titanxxh.github.io/open-agricola/)。
 - 构建时 `VITE_API_BASE` / `VITE_WS_BASE` / `BGA_CDN_BASE_URL` 从 GitHub repo variable 注入（见 workflow yml）。
 
 ### 后端：自建 Docker 主机（手动）
@@ -335,6 +339,7 @@ gh run view <RUN_ID> --log-failed
 - 后端（5175）：`pnpm run server`
 - 前端（5173）：`pnpm run dev`
 - 同时启动：`./restart-intranet.sh`
+- 本地开发统一使用 Node.js 22。若默认 shell 是 Node 20，先用本机版本管理工具切到 Node 22（如 asdf/nvm/volta），否则 `better-sqlite3` 可能因 `NODE_MODULE_VERSION` 不匹配导致后端启动失败。
 
 ### 常用命令
 
@@ -364,3 +369,4 @@ gh run view <RUN_ID> --log-failed
 ?page=login             强制登录页（认证后默认跳 lobby）
 ?page=workshop          打开工坊
 ```
+
