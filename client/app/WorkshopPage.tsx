@@ -174,6 +174,28 @@ export function buildSandboxCardIds(
   return ids
 }
 
+export type SandboxStartResult = {
+  ok: boolean
+  error?: string
+  cardWarnings?: string[]
+}
+
+export async function readSandboxStartResponse(
+  response: Response,
+  fallbackError: string,
+): Promise<SandboxStartResult> {
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<SandboxStartResult>
+  }
+  return {
+    ok: false,
+    error: response.ok
+      ? fallbackError
+      : `Sandbox start failed (${response.status} ${response.statusText || 'HTTP error'})`,
+  }
+}
+
 // ── Card Preview Tile ────────────────────────────────────────────────────────
 
 function CardTile({ card, onSelect, onLike, mine, t }: {
@@ -1246,7 +1268,7 @@ export function WorkshopPage() {
           deckIds: sandboxSettings.deck_ids,
         }),
       })
-      const data = await response.json()
+      const data = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
         setSandboxActive(true)
@@ -1258,9 +1280,11 @@ export function WorkshopPage() {
       } else {
         const errors = [data.error ?? t('platform.sandboxUnknownError')]
         setPendingSandboxErrors(errors)
+        alert(errors.join('\n'))
       }
-    } catch {
-      alert(t('platform.sandboxNetworkError'))
+    } catch (err) {
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
+      alert(`${t('platform.sandboxNetworkError')}${detail}`)
     }
   }
 

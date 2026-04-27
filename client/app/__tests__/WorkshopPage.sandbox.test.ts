@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 
-import { buildSandboxCardIds } from '../WorkshopPage'
+import { buildSandboxCardIds, readSandboxStartResponse } from '../WorkshopPage'
 
 describe('WorkshopPage sandbox launch helpers', () => {
   it('includes the newly saved card id when launching before React state refreshes', () => {
@@ -25,5 +25,21 @@ describe('WorkshopPage sandbox launch helpers', () => {
     )
 
     expect(cardIds).toEqual(['existing-db-id', 'new-db-id'])
+  })
+
+  it('turns non-JSON sandbox start failures into a readable error', async () => {
+    const result = await readSandboxStartResponse(
+      new Response('<html>bad gateway</html>', {
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { 'Content-Type': 'text/html' },
+      }),
+      'Unknown sandbox error',
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Sandbox start failed (502 Bad Gateway)',
+    })
   })
 })
