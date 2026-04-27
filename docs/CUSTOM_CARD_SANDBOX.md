@@ -121,6 +121,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
+<!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
 - `onRoundStart`
 - `onHarvest`
@@ -155,6 +156,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onSowExtraField`
 - `computeLockedFarmTiles`
 - `computeFenceDiscount`
+<!-- prompt-sync:end id=card-effect-hooks -->
 
 
 
@@ -182,6 +184,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
+<!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
 - `during`
 - `immediatelyAfter`
@@ -192,6 +195,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `isDoable`
 - `anytime`
 - `computeChoiceCandidates`
+<!-- prompt-sync:end id=action-hook-phases -->
 
 
 
@@ -201,9 +205,11 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
+<!-- prompt-sync:begin id=listener-scopes -->
 - `player`
 - `opponent`
 - `any`
+<!-- prompt-sync:end id=listener-scopes -->
 
 
 
@@ -282,6 +288,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 
 
+<!-- prompt-sync:begin id=denied-identifiers -->
 - `eval`
 - `Function`
 - `process`
@@ -304,6 +311,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 - `Bun`
 - `Proxy`
 - `Reflect`
+<!-- prompt-sync:end id=denied-identifiers -->
 
 
 
@@ -311,12 +319,14 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 
 
+<!-- prompt-sync:begin id=denied-property-access -->
 - `constructor`
 - `__proto__`
 - `__defineGetter__`
 - `__defineSetter__`
 - `__lookupGetter__`
 - `__lookupSetter__`
+<!-- prompt-sync:end id=denied-property-access -->
 
 
 
