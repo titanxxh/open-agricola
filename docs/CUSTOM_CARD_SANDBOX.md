@@ -231,7 +231,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `player.fields`           | `Field[]`                                    | `.length` 得到田地数                                                   |
 | `player.pastures`         | `Pasture[]`                                  | `.length` 得到牧场数                                                   |
 | `player.rooms`            | `number`                                     | 房间数                                                               |
-| `player.houseType`        | `'wood' | 'clay' | 'stone'`                  | 房屋类型                                                              |
+| `player.houseType`        | `'wood' \| 'clay' \| 'stone'`               | 房屋类型                                                              |
 | `player.resources`        | `Partial<Record<Resource, number>>`          | `player.resources.wood ?? 0`                                      |
 | `player.minorPlayed`      | `string[]`                                   | 已打小发展卡 ID 列表                                                      |
 | `player.occupationPlayed` | `string[]`                                   | 已打职业卡 ID 列表                                                       |
