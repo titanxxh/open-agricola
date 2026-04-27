@@ -58,7 +58,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
       author_name: 'xxh',
       effect_code: `
 const CARD_ID = 'CUSTOM_MedievalMallet'
-const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Mallet', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Mallet', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0, prerequisite: { occupation: 2 } })
 const CARD_IMPL = {
   listeners: [
     { cardIds: [CARD_ID], actions: ['renovate-house'], phases: ['computeCosts'], handler: () => undefined },
@@ -74,6 +74,9 @@ const CARD_IMPL = {
     })
 
     expect(out).toContain(`deck: "community"`)
+    expect(out).toContain(`occupationPrerequisites: { min: 2 }`)
+    expect(out).toContain(`prerequisite: "2 Occupations"`)
+    expect(out).toContain(`const CARD_IMPL: CardImpl =`)
     expect(out).toContain(`id: "CUSTOM_MedievalMallet-listener-1"`)
     expect(out).toContain(`id: 'custom-existing'`)
     expect(out).not.toContain(`deck: 'CUSTOM'`)
