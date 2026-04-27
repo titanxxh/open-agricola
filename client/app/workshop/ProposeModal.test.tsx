@@ -46,7 +46,7 @@ describe('ProposeModal', () => {
     await userEvent.click(screen.getByRole('button', { name: '发起 PR' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('community_cards.md markers not found')
+      expect(screen.getByRole('alert').textContent).toContain('community_cards.md markers not found')
     })
   })
 })
