@@ -4,38 +4,100 @@
 
 ## 步骤
 
-1. 访问 https://github.com/settings/applications/new
+1. 访问 [https://github.com/settings/applications/new](https://github.com/settings/applications/new)
 2. 填：
-   - Application name: **Open Agricola Workshop**
-   - Homepage URL: `https://titanxxh.github.io/open-agricola/`
-   - Authorization callback URL:
-     - Dev: `http://localhost:5175/api/workshop/github/oauth/callback`
-     - Prod: `https://<backend-host>/api/workshop/github/oauth/callback`
-   - 可配多个 callback URL（每个环境一个）
+  - Application name: **Open Agricola Workshop**
+  - Homepage URL: `https://titanxxh.github.io/open-agricola/`
+  - Authorization callback URL:
+    - Dev: `http://localhost:5175/api/workshop/github/oauth/callback`
+    - Prod: `https://<backend-host>/api/workshop/github/oauth/callback`
+    - 当前生产示例：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
+  - 可配多个 callback URL（每个环境一个）
 3. 点 Register application
 4. 在 App 详情页点 "Generate a new client secret"，**立刻**复制保存 Client ID 和 Client Secret（secret 离开页面后无法再看）
 5. 把 secret 写入服务端 env：
-
-   ```
+  ```
    GITHUB_OAUTH_CLIENT_ID=<Client ID>
    GITHUB_OAUTH_CLIENT_SECRET=<Client Secret>
    GITHUB_UPSTREAM_OWNER=titanxxh
    GITHUB_UPSTREAM_REPO=open-agricola
    WORKSHOP_PR_ENABLED=true
-   ```
-
-   - Dev: 写 `.env`（已在 `.gitignore`）
-   - Prod: 通过 Docker secret 或环境变量注入
-
+   # 生产前端在 GitHub Pages 时，后端需要知道自己的公开 URL
+   # 用于拼 OAuth callback URL。
+   PUBLIC_API_BASE=https://open-agricola.duckdns.org:8443
+  ```
+  - Dev: 写 `.env`（已在 `.gitignore`）
+  - Prod: 通过 Docker secret 或环境变量注入
 6. 验证：服务启动后访问 `GET /api/workshop/github/oauth/start?hs=test`，应 302 到 `github.com/login/oauth/authorize`
 
 ## Scope
 
 应用请求 `repo` scope，以便在主仓库是 private repository 时读取内容、创建分支并提交 PR。若主仓库改为 public repository，可再收紧为 `public_repo`。
 
+## Runtime Flow
+
+1. 前端卡牌详情页点击"发起 PR 到主仓库"。
+2. 前端调用 `POST /api/workshop/cards/:id/github/propose`。
+3. 服务端若缺 GitHub token，返回 OAuth start URL。
+4. 前端 popup 打开 OAuth URL。生产环境下 popup URL 必须解析到后端域名，而不是 GitHub Pages 路径；前端通过 `VITE_API_BASE` 做 base URL。
+5. GitHub callback 页面由后端返回一段 HTML，执行：
+  ```js
+   window.opener.postMessage({ type: 'workshop-pr-oauth', result }, '*')
+  ```
+   这里必须用 `'*'`，因为 callback 页面在后端域名，opener 在 GitHub Pages 域名。
+6. 前端收到消息后关闭 popup 并重试 propose。
+7. 服务端：
+  - 若授权用户与 upstream owner 相同，跳过 fork，直接使用 upstream repo。
+  - 否则确保 fork 存在。
+  - 读取 `shared/cards/register-all.ts`、`shared/cards/community/auto-catalog.ts`、`docs/community_cards.md`。
+  - 生成 community card 文件、smoke test、注册表、community docs、可选 card art。
+  - 先提交占位 PR number 的 V1 commit，打开或更新 PR。
+  - 再提交带真实 PR number 的 V2 commit。
+
+## CI Requirements for Generated PRs
+
+生成出的社区卡 PR 必须满足完整 CI，尤其是：
+
+```bash
+pnpm run check:community-deck
+pnpm exec tsc -p tsconfig.server.json --noEmit
+pnpm run build
+```
+
+常见生成问题与对应修复点：
+
+
+| 症状                                  | 原因                     | 修复位置                                                                      |
+| ----------------------------------- | ---------------------- | ------------------------------------------------------------------------- |
+| `deck` 检查失败                         | 工坊卡仍是 `deck: 'CUSTOM'` | `server/workshop-pr/code-gen.ts` 把 deck 规范成 `community`                   |
+| `localeCompare` / listener 排序报错     | listener 缺稳定 `id`      | 生成器给缺 id 的 listener 补 `{cardId}-listener-{n}`                             |
+| `auto-catalog.ts is out of sync`    | 只更新了 `register-all.ts` | 生成器必须同时更新 `shared/cards/community/auto-catalog.ts`                        |
+| TypeScript 报 `phases: string[]` 不兼容 | `CARD_IMPL` 没有上下文类型    | 生成器把 `CARD_IMPL` 标注为 `CardImpl`                                           |
+| TypeScript 报 `prerequisite` 类型不兼容   | 工坊 JSON 用了结构化 prereq   | 生成器把 `{ occupation: N }` 转成 `prerequisite` 文本 + `occupationPrerequisites` |
+
+
+## Troubleshooting
+
+### OAuth 页面显示 `redirect_uri is not associated with this application`
+
+GitHub OAuth App 的 Authorization callback URL 与服务端实际拼出的 callback 不一致。检查：
+
+- GitHub App 里是否配置了生产 callback：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
+- 服务端 `PUBLIC_API_BASE` / 反代 HTTPS 地址是否正确
+- 浏览器实际打开的 GitHub 授权 URL 中 `redirect_uri=` 参数是否与 GitHub App 完全一致
+
+### 授权完成后 popup 关闭了，但页面没有创建 PR
+
+优先检查 callback HTML 的 `postMessage` target origin。生产环境是跨域：后端 callback 页面向 GitHub Pages opener 发消息，必须使用 `'*'`。如果限定为 `window.location.origin`，前端收不到消息，propose 不会重试。
+
+### 授权用户就是 upstream owner，fork 失败
+
+GitHub 不允许用户 fork 自己的仓库。`GitHubClient.ensureFork()` 必须在 `login === upstreamOwner` 时直接返回 upstream owner/repo，跳过 fork API。
+
 ## Revocation
 
 若 secret 泄露：
+
 1. 在 App 详情页 "Revoke all user tokens"
 2. 点 "Generate a new client secret"
 3. 更新服务端 env 的 `GITHUB_OAUTH_CLIENT_SECRET`
