@@ -79,6 +79,19 @@ function propertyNameMatches(name: ts.PropertyName, expected: string): boolean {
     && name.text === expected
 }
 
+function getNumericObjectProperty(object: ts.ObjectLiteralExpression, key: string): number | null {
+  for (const prop of object.properties) {
+    if (
+      ts.isPropertyAssignment(prop)
+      && propertyNameMatches(prop.name, key)
+      && ts.isNumericLiteral(prop.initializer)
+    ) {
+      return Number(prop.initializer.text)
+    }
+  }
+  return null
+}
+
 export function normalizeWorkshopEffectCode(source: string, cardId: string): string {
   const sf = ts.createSourceFile(
     `${cardId}.ts`,
@@ -91,6 +104,64 @@ export function normalizeWorkshopEffectCode(source: string, cardId: string): str
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
     const visit: ts.Visitor = (node) => {
+      if (
+        ts.isVariableDeclaration(node)
+        && ts.isIdentifier(node.name)
+        && node.name.text === 'CARD_IMPL'
+      ) {
+        const initializer = node.initializer
+          ? ts.visitNode(node.initializer, visit) as ts.Expression
+          : undefined
+        return factory.updateVariableDeclaration(
+          node,
+          node.name,
+          node.exclamationToken,
+          node.type ?? factory.createTypeReferenceNode('CardImpl'),
+          initializer,
+        )
+      }
+
+      if (ts.isObjectLiteralExpression(node)) {
+        let changed = false
+        const properties: ts.ObjectLiteralElementLike[] = []
+        for (const prop of node.properties) {
+          if (
+            ts.isPropertyAssignment(prop)
+            && propertyNameMatches(prop.name, 'prerequisite')
+            && ts.isObjectLiteralExpression(prop.initializer)
+          ) {
+            const occupationCount = getNumericObjectProperty(prop.initializer, 'occupation')
+            if (occupationCount !== null) {
+              changed = true
+              properties.push(
+                factory.createPropertyAssignment(
+                  'prerequisite',
+                  factory.createStringLiteral(`${occupationCount} Occupations`),
+                ),
+                factory.createPropertyAssignment(
+                  'occupationPrerequisites',
+                  factory.createObjectLiteralExpression([
+                    factory.createPropertyAssignment(
+                      'min',
+                      factory.createNumericLiteral(occupationCount),
+                    ),
+                  ], false),
+                ),
+              )
+              continue
+            }
+          }
+          properties.push(prop)
+        }
+        if (changed) {
+          return ts.visitEachChild(
+            factory.updateObjectLiteralExpression(node, properties),
+            visit,
+            context,
+          )
+        }
+      }
+
       if (ts.isPropertyAssignment(node)) {
         if (
           propertyNameMatches(node.name, 'deck')
