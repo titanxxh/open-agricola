@@ -126,6 +126,7 @@ export async function handleProposeRequest(
     const githubLogin = fork.owner
 
     const upstreamRegisterAll = await client.getUpstreamFile('shared/cards/register-all.ts')
+    const upstreamAutoCatalog = await client.getUpstreamFile('shared/cards/community/auto-catalog.ts')
     const upstreamCommunityMd = await client.getUpstreamFile('docs/community_cards.md')
 
     const artData = loadArtIfAny(wcard.art_url)
@@ -149,6 +150,7 @@ export async function handleProposeRequest(
       wcard: wcardForGen,
       github_login: githubLogin,
       upstream_register_all: upstreamRegisterAll,
+      upstream_auto_catalog: upstreamAutoCatalog,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 0,
       art_data: artData,
@@ -189,6 +191,7 @@ export async function handleProposeRequest(
       wcard: wcardForGen,
       github_login: githubLogin,
       upstream_register_all: upstreamRegisterAll,
+      upstream_auto_catalog: upstreamAutoCatalog,
       upstream_community_md: upstreamCommunityMd,
       pr_number: pr.number,
       art_data: artData,

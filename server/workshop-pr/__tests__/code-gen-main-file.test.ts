@@ -23,7 +23,9 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
     expect(out).not.toContain(`import { Occupation }`)
     expect(out).toContain(`import { gainLeaf } from '../helpers/pay-gain-node'`)
     expect(out).not.toContain(`import { payLeaf }`)
-    expect(out).toContain(wcard.effect_code)
+    expect(out).toContain(`const CARD_ID = 'CUSTOM_Foo'`)
+    expect(out).toContain(`deck: 'community'`)
+    expect(out).toContain(`gainLeaf(CARD_ID, { food: 2 })`)
     expect(out).toContain(`export const CUSTOM_Foo = CARD_DEF`)
     expect(out).toContain(
       `export const CUSTOM_Foo_impl = CARD_IMPL satisfies CardImpl`,
@@ -46,5 +48,34 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
     })
     expect(out).toContain(`import { Occupation } from '../types'`)
     expect(out).not.toContain(`import { MinorImprovement }`)
+  })
+
+  it('normalizes workshop code for community deck and listener ids', () => {
+    const wcard = {
+      id: 'wc3',
+      card_id: 'CUSTOM_MedievalMallet',
+      card_type: 'minor',
+      author_name: 'xxh',
+      effect_code: `
+const CARD_ID = 'CUSTOM_MedievalMallet'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Mallet', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_IMPL = {
+  listeners: [
+    { cardIds: [CARD_ID], actions: ['renovate-house'], phases: ['computeCosts'], handler: () => undefined },
+    { id: 'custom-existing', cardIds: [CARD_ID], actions: ['improvement-any'], phases: ['computeCosts'], handler: () => undefined },
+  ],
+}
+`.trim(),
+    }
+
+    const out = generateMainCardFile(wcard, {
+      githubLogin: 'titanxxh',
+      iso: '2026-04-22T00:00:00Z',
+    })
+
+    expect(out).toContain(`deck: "community"`)
+    expect(out).toContain(`id: "CUSTOM_MedievalMallet-listener-1"`)
+    expect(out).toContain(`id: 'custom-existing'`)
+    expect(out).not.toContain(`deck: 'CUSTOM'`)
   })
 })
