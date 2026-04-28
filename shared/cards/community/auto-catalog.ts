@@ -3,7 +3,9 @@
 import type { MinorImprovement, Occupation } from '../types'
 
 import { CUSTOM_FixtureHarvester } from './CUSTOM_FixtureHarvester'
+import { CUSTOM_MedievalMallet } from './CUSTOM_MedievalMallet'
 
 export const allCommunityCards: Array<MinorImprovement | Occupation> = [
   CUSTOM_FixtureHarvester,
+  CUSTOM_MedievalMallet,
 ]
