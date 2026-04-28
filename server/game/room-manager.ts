@@ -748,6 +748,9 @@ const roomLastActivity = new Map<string, number>()
 const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
   room.status === 'playing' ? PLAYING_EMPTY_ROOM_TTL_MS : WAITING_EMPTY_ROOM_TTL_MS
 
+const isDevCommandAllowed = (room: Pick<Room, 'id'>): boolean =>
+  isFixedDevRoom(room.id)
+
 function startRoomCleanup(): void {
   setInterval(() => {
     const now = Date.now()
@@ -1095,14 +1098,22 @@ export const createWsServer = (server: import('node:http').Server) => {
       // testers / dev tooling are expected to operate from their own seat.
       // If a future debug flow genuinely needs cross-seat mutation, add an
       // explicit admin-only channel rather than weakening this guard.
+      const assertDevCommandAllowed = () => {
+        if (isDevCommandAllowed(room)) return true
+        sendCommandError('dev commands disabled for this room')
+        return false
+      }
+
       if (msg.type === 'devSetResources') {
         if (!assertOwnSeat(msg.playerIndex)) return
+        if (!assertDevCommandAllowed()) return
         const resp = callRoom(s => s.devSetResources(msg.playerIndex, msg.resources))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
       }
 
       if (msg.type === 'devSetRound') {
+        if (!assertDevCommandAllowed()) return
         const resp = callRoom(s => s.devSetRound(msg.round))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
@@ -1110,6 +1121,7 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       if (msg.type === 'devDrawCard') {
         if (!assertOwnSeat(msg.playerIndex)) return
+        if (!assertDevCommandAllowed()) return
         const resp = callRoom(s => s.devDrawCard(msg.playerIndex, msg.cardId))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
@@ -1117,12 +1129,14 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       if (msg.type === 'devPlayCard') {
         if (!assertOwnSeat(msg.playerIndex)) return
+        if (!assertDevCommandAllowed()) return
         const resp = callRoom(s => s.devPlayCard(msg.playerIndex, msg.cardId))
         broadcastState(room, resp, 'dev', msg.requestId)
         return
       }
 
       if (msg.type === 'devCreatePasture') {
+        if (!assertDevCommandAllowed()) return
         const resp = callRoom(s => s.startDevFenceSelect(currentPlayerIndex))
         broadcastState(room, resp, 'action', msg.requestId)
         return

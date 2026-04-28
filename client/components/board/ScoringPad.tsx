@@ -19,6 +19,7 @@ type Props = {
   scores: PlayerScoreSummary[]
   players: PlayerState[]
   onClose: () => void
+  showDraftHistory?: boolean
 }
 
 type Tab = 'score' | 'stats' | 'draft'
@@ -87,7 +88,7 @@ type ScoringRow =
   | { id: string; type: 'cardBonus'; cardId: string }
   | { id: string; type: 'total' }
 
-export const ScoringPad = ({ locale, scores, players, onClose }: Props) => {
+export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
   const categoryRows: ScoringRow[] = categoryOrder.map((key) => ({
     id: `cat-${key}`,
@@ -155,13 +156,15 @@ export const ScoringPad = ({ locale, scores, players, onClose }: Props) => {
             >
               {t(locale, 'ui.scoringTabStats')}
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('draft')}
-              className={activeTab === 'draft' ? 'active' : ''}
-            >
-              {t(locale, 'ui.scoringTabDraft')}
-            </button>
+            {showDraftHistory ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab('draft')}
+                className={activeTab === 'draft' ? 'active' : ''}
+              >
+                {t(locale, 'ui.scoringTabDraft')}
+              </button>
+            ) : null}
           </div>
           <button onClick={onClose}>{t(locale, 'ui.close')}</button>
         </div>

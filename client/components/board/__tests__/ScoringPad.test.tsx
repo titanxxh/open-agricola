@@ -45,11 +45,11 @@ describe('ScoringPad', () => {
     expect(html).not.toContain('occupations.A92_AdoptiveParents.name')
   })
 
-  it('renders Score / Stats / Draft tab buttons and Score is active by default', () => {
+  it('hides Draft tab during the game and Score is active by default', () => {
     render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => {}} />)
     expect(screen.getByRole('button', { name: 'Score' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Stats' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Draft' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
     // total score row visible
     expect(screen.getAllByText('Total').length).toBeGreaterThan(0)
   })
@@ -61,7 +61,7 @@ describe('ScoringPad', () => {
   })
 
   it('switches to Draft tab on click', () => {
-    render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => {}} />)
+    render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => {}} showDraftHistory />)
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
     expect(screen.queryAllByText('Total').length).toBe(0)
   })
@@ -82,7 +82,7 @@ describe('ScoringPad', () => {
       { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },
     ] as unknown as PlayerState[]
 
-    render(<ScoringPad locale="en" scores={mockScores} players={players} onClose={() => {}} />)
+    render(<ScoringPad locale="en" scores={mockScores} players={players} onClose={() => {}} showDraftHistory />)
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
 
     // Alice's two picks should appear (rendered by getAnyCardDisplayName)
