@@ -18,6 +18,8 @@ import {
   compareDesc,
   extractI18nKeys,
   scanI18nGaps,
+  writeJsonl,
+  runAudit,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -300,4 +302,38 @@ describe('scanI18nGaps', () => {
     const gaps = scanI18nGaps(used, zh, en)
     expect(gaps[0]).toMatchObject({ key: 'actions.X.foo', missingZh: true, missingEn: false })
   })
+})
+
+describe('writeJsonl', () => {
+  it('writes one JSON object per line', () => {
+    const tmp = path.join('output', 'tmp', 'test-out.jsonl')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    writeJsonl(tmp, [
+      { cardId: 'A1', x: 1 },
+      { cardId: 'A2', x: 2 },
+    ] as any)
+    const lines = fs.readFileSync(tmp, 'utf8').split('\n').filter(Boolean)
+    expect(lines.length).toBe(2)
+    expect(JSON.parse(lines[0]).cardId).toBe('A1')
+    fs.unlinkSync(tmp)
+  })
+})
+
+describe('runAudit (smoke)', () => {
+  it('runs end-to-end on real repo and writes jsonl', () => {
+    const out = path.join('output', 'tmp', 'audit-smoke.jsonl')
+    runAudit({
+      ourCardsDir: 'shared/cards',
+      bgaCardsDir: '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+      outputPath: out,
+      strict: false,
+    })
+    expect(fs.existsSync(out)).toBe(true)
+    const lines = fs.readFileSync(out, 'utf8').split('\n').filter(Boolean)
+    expect(lines.length).toBeGreaterThan(800)
+    const first = JSON.parse(lines[0])
+    expect(first.cardId).toMatch(/^[A-E]\d+$/)
+    expect(first.signals).toBeDefined()
+    fs.unlinkSync(out)
+  }, 60_000)
 })

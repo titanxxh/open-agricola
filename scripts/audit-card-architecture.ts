@@ -428,7 +428,60 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
   }
 }
 
+export function writeJsonl(outputPath: string, results: CardAuditResult[]): void {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+  const content = results.map(r => JSON.stringify(r)).join('\n') + '\n'
+  fs.writeFileSync(outputPath, content)
+}
+
+export interface AuditSummary {
+  totalCards: number
+  oursOnly: number
+  bgaOnly: number
+  bothScanned: number
+  signalCounts: Record<string, number>
+}
+
+export function runAudit(args: ParsedArgs, repoRoot: string = '.'): AuditSummary {
+  const discovery = discoverCardPairs(args.ourCardsDir, args.bgaCardsDir)
+  const results: CardAuditResult[] = []
+  for (const pair of discovery.both) {
+    results.push(scanCard(pair, repoRoot))
+  }
+  writeJsonl(args.outputPath, results)
+
+  const sigCounts: Record<string, number> = {
+    S1: 0, S4: 0, S5: 0, S6_over_2: 0, S6_15_to_2: 0,
+    S7: 0, S10_high: 0, S11_diff: 0, S11_missing: 0, S12: 0,
+  }
+  for (const r of results) {
+    if (r.signals.S1_coreFileMentions.length > 0) sigCounts.S1++
+    if (r.signals.S4_crossLayerImports.length > 0) sigCounts.S4++
+    if (r.signals.S5_aggregateMutations.length > 0) sigCounts.S5++
+    if (r.signals.S6_lineRatio > 2) sigCounts.S6_over_2++
+    else if (r.signals.S6_lineRatio > 1.5) sigCounts.S6_15_to_2++
+    if (r.signals.S7_externalCardIdMentions.length > 0) sigCounts.S7++
+    if (r.signals.S10_shellLikelihood === 'high') sigCounts.S10_high++
+    if (r.signals.S11_descAlignment === 'diff-from-bga') sigCounts.S11_diff++
+    if (r.signals.S11_descAlignment === 'missing-i18n') sigCounts.S11_missing++
+    if (r.signals.S12_i18nGapKeys.length > 0) sigCounts.S12++
+  }
+
+  return {
+    totalCards: results.length,
+    oursOnly: discovery.oursOnly.length,
+    bgaOnly: discovery.bgaOnly.length,
+    bothScanned: discovery.both.length,
+    signalCounts: sigCounts,
+  }
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = parseArgs(process.argv.slice(2))
-  console.log(JSON.stringify(args, null, 2))
+  const summary = runAudit(args)
+  console.log(JSON.stringify(summary, null, 2))
+  if (args.strict) {
+    const total = Object.values(summary.signalCounts).reduce((a, b) => a + b, 0)
+    if (total > 0) process.exit(1)
+  }
 }
