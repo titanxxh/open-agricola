@@ -59,7 +59,7 @@ import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-re
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
-import { incCardUsed } from '../cards/helpers/card-state.ts'
+import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
@@ -779,6 +779,9 @@ export class GameCore {
         ownerPlayerId: entry.ownerPlayerId,
       })
       if (!result?.flow) continue
+      // anytime listeners are queried during build (idempotent peek), not
+      // fire — do not increment used here. The increment is done when the
+      // player actually picks the anytime entry and triggers the flow.
       anytimeEntries.push({
         descriptor: {
           id: entry.registration.id,
@@ -2782,6 +2785,7 @@ export class GameCore {
         break
       }
       case 'plow': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const tile = (payload as { tile?: FarmTilePosition }).tile
         const selection = validatePlowSelection(normalized, tile, lockedKeys)
         if (!selection.ok) return this.respond(false, selection.error?.code ?? 'validation failed')
@@ -2824,6 +2828,9 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats) {
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { field: 1 })
+        }
         break
       }
       case 'sow': {
