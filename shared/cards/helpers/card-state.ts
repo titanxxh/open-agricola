@@ -1,4 +1,10 @@
-import type { CardResourceStats, CardState, PlayerState, Resource } from '../../game/types'
+import type {
+  CardResourceStats,
+  CardStatGained,
+  CardState,
+  PlayerState,
+  Resource,
+} from '../../game/types'
 
 const CARD_RESOURCE_STATS_KEY = 'resourceStats'
 
@@ -67,29 +73,41 @@ export const writeCardExtraData = (
   cardState.extraData[key] = value
 }
 
-const normalizePositiveResources = (
-  resources: Partial<Resource>,
-): Partial<Resource> => {
-  const normalized: Partial<Resource> = {}
+// Accepts both real-resource Partial<Resource> and pseudo-resource maps used
+// by CardResourceStats.gained. Drops zero / negative / non-number values;
+// preserves keys passed through (real or pseudo) without filtering — callers
+// decide which keys are valid for which field.
+const normalizeNonNegativeResources = <T extends Record<string, number | undefined>>(
+  resources: T,
+): T => {
+  const normalized: Record<string, number> = {}
   Object.entries(resources).forEach(([key, value]) => {
     if (typeof value !== 'number' || value <= 0) return
-    normalized[key as keyof Resource] = value
+    normalized[key] = value
   })
-  return normalized
+  return normalized as T
 }
 
-const mergeResources = (
-  base: Partial<Resource>,
-  delta: Partial<Resource>,
-): Partial<Resource> => {
-  const next: Partial<Resource> = { ...base }
+const mergeResources = <T extends Record<string, number | undefined>>(
+  base: T | undefined,
+  delta: T,
+): T => {
+  const next: Record<string, number | undefined> = { ...(base ?? {}) }
   Object.entries(delta).forEach(([key, value]) => {
     if (typeof value !== 'number' || value <= 0) return
-    const resourceKey = key as keyof Resource
-    next[resourceKey] = (next[resourceKey] ?? 0) + value
+    next[key] = ((next[key] ?? 0) as number) + value
   })
-  return next
+  return next as T
 }
+
+export const emptyCardResourceStats = (): CardResourceStats => ({
+  used: 0,
+  gained: {},
+  paid: {},
+  saved: {},
+  receivedPayment: {},
+  paidToOthers: {},
+})
 
 export const readCardResourceStats = (
   player: PlayerState,
@@ -98,24 +116,34 @@ export const readCardResourceStats = (
   const value = readCardExtraData<Partial<CardResourceStats>>(player, cardId, CARD_RESOURCE_STATS_KEY)
   if (!value || typeof value !== 'object') return undefined
   return {
-    paid: normalizePositiveResources(value.paid ?? {}),
-    gained: normalizePositiveResources(value.gained ?? {}),
+    used: typeof value.used === 'number' && value.used > 0 ? value.used : 0,
+    gained: normalizeNonNegativeResources<CardStatGained>(value.gained ?? {}),
+    paid: normalizeNonNegativeResources<Partial<Resource>>(value.paid ?? {}),
+    saved: normalizeNonNegativeResources<Partial<Resource>>(value.saved ?? {}),
+    receivedPayment: normalizeNonNegativeResources<Partial<Resource>>(value.receivedPayment ?? {}),
+    paidToOthers: normalizeNonNegativeResources<Partial<Resource>>(value.paidToOthers ?? {}),
   }
 }
+
+type ResourceStatField = 'gained' | 'paid' | 'saved' | 'receivedPayment' | 'paidToOthers'
 
 const addCardResourceStats = (
   player: PlayerState,
   cardId: string,
-  field: keyof CardResourceStats,
-  resources: Partial<Resource>,
+  field: ResourceStatField,
+  resources: Partial<Resource> | CardStatGained,
 ) => {
-  const normalized = normalizePositiveResources(resources)
+  const normalized = normalizeNonNegativeResources(resources as Record<string, number | undefined>)
   if (Object.keys(normalized).length === 0) return
-  const current = readCardResourceStats(player, cardId) ?? { paid: {}, gained: {} }
-  writeCardExtraData(player, cardId, CARD_RESOURCE_STATS_KEY, {
+  const current = readCardResourceStats(player, cardId) ?? emptyCardResourceStats()
+  const merged: CardResourceStats = {
     ...current,
-    [field]: mergeResources(current[field], normalized),
-  } satisfies CardResourceStats)
+    [field]: mergeResources(
+      current[field] as Record<string, number | undefined>,
+      normalized,
+    ),
+  } as CardResourceStats
+  writeCardExtraData(player, cardId, CARD_RESOURCE_STATS_KEY, merged)
 }
 
 export const addCardResourcePaid = (
@@ -129,7 +157,7 @@ export const addCardResourcePaid = (
 export const addCardResourceGained = (
   player: PlayerState,
   cardId: string,
-  resources: Partial<Resource>,
+  resources: CardStatGained,
 ) => {
   addCardResourceStats(player, cardId, 'gained', resources)
 }

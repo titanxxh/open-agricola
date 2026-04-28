@@ -185,8 +185,12 @@ export type CardState = {
 }
 
 export type CardResourceStats = {
+  used: number
+  gained: CardStatGained             // includes pseudo-resource keys
   paid: Partial<Resource>
-  gained: Partial<Resource>
+  saved: Partial<Resource>
+  receivedPayment: Partial<Resource>
+  paidToOthers: Partial<Resource>
 }
 
 export type CardStates = Record<string, CardState>

@@ -136,7 +136,7 @@ describe('A37_Bucksaw', () => {
       sourceCard: 'A37_Bucksaw',
     })
     expect(gainResult.type).toBe('ok')
-    expect(readCardResourceStats(player, 'A37_Bucksaw')).toEqual({
+    expect(readCardResourceStats(player, 'A37_Bucksaw')).toMatchObject({
       paid: { wood: 1 },
       gained: { grain: 1 },
     })
