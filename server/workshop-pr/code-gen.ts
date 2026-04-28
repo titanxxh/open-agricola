@@ -74,6 +74,77 @@ export type WorkshopCardForGen = {
   effect_code: string
 }
 
+export type CardLocaleEntry = {
+  name: string
+  desc: string[]
+  prerequisite?: string
+}
+
+export type CardLocales = Record<string, CardLocaleEntry>
+
+export function readLocalesFromCardJson(cardJson: string | undefined): CardLocales | null {
+  if (!cardJson) return null
+  let parsed: { locales?: unknown } = {}
+  try {
+    parsed = JSON.parse(cardJson) as { locales?: unknown }
+  } catch {
+    return null
+  }
+  const raw = parsed.locales
+  if (!raw || typeof raw !== 'object') return null
+  const result: CardLocales = {}
+  for (const [lang, entryRaw] of Object.entries(raw as Record<string, unknown>)) {
+    if (!entryRaw || typeof entryRaw !== 'object') continue
+    const entry = entryRaw as Partial<CardLocaleEntry>
+    if (typeof entry.name !== 'string' || !Array.isArray(entry.desc)) continue
+    const desc = entry.desc.filter((line): line is string => typeof line === 'string')
+    if (entry.name.length === 0 && desc.length === 0) continue
+    result[lang] = {
+      name: entry.name,
+      desc,
+      ...(typeof entry.prerequisite === 'string' && entry.prerequisite.length > 0
+        ? { prerequisite: entry.prerequisite }
+        : {}),
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null
+}
+
+function buildLocalesLiteral(
+  factory: ts.NodeFactory,
+  locales: CardLocales,
+): ts.ObjectLiteralExpression {
+  const langProps: ts.PropertyAssignment[] = []
+  for (const [lang, entry] of Object.entries(locales)) {
+    if (!entry || typeof entry.name !== 'string' || !Array.isArray(entry.desc)) continue
+    const fields: ts.PropertyAssignment[] = [
+      factory.createPropertyAssignment('name', factory.createStringLiteral(entry.name)),
+      factory.createPropertyAssignment(
+        'desc',
+        factory.createArrayLiteralExpression(
+          entry.desc.map((line) => factory.createStringLiteral(line)),
+          false,
+        ),
+      ),
+    ]
+    if (typeof entry.prerequisite === 'string' && entry.prerequisite.length > 0) {
+      fields.push(
+        factory.createPropertyAssignment(
+          'prerequisite',
+          factory.createStringLiteral(entry.prerequisite),
+        ),
+      )
+    }
+    langProps.push(
+      factory.createPropertyAssignment(
+        lang,
+        factory.createObjectLiteralExpression(fields, true),
+      ),
+    )
+  }
+  return factory.createObjectLiteralExpression(langProps, true)
+}
+
 function propertyNameMatches(name: ts.PropertyName, expected: string): boolean {
   return (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
     && name.text === expected
@@ -92,7 +163,11 @@ function getNumericObjectProperty(object: ts.ObjectLiteralExpression, key: strin
   return null
 }
 
-export function normalizeWorkshopEffectCode(source: string, cardId: string): string {
+export function normalizeWorkshopEffectCode(
+  source: string,
+  cardId: string,
+  opts: { locales?: CardLocales | null } = {},
+): string {
   const sf = ts.createSourceFile(
     `${cardId}.ts`,
     source,
@@ -101,9 +176,52 @@ export function normalizeWorkshopEffectCode(source: string, cardId: string): str
     ts.ScriptKind.TS,
   )
 
+  const localesToInject = opts.locales && Object.keys(opts.locales).length > 0
+    ? opts.locales
+    : null
+
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
     const visit: ts.Visitor = (node) => {
+      // Sync the CARD_DEF locales field with card_json.locales (db is the
+      // source of truth; LLM-generated locales in source may be stale once
+      // the user edits via the LocalizationModal). Drop any existing
+      // `locales:` property and re-emit from `localesToInject`.
+      if (
+        ts.isNewExpression(node)
+        && ts.isIdentifier(node.expression)
+        && (node.expression.text === 'MinorImprovement' || node.expression.text === 'Occupation')
+        && node.arguments?.length === 1
+      ) {
+        const arg = node.arguments[0]!
+        if (ts.isObjectLiteralExpression(arg)) {
+          const filtered: ts.ObjectLiteralElementLike[] = []
+          for (const prop of arg.properties) {
+            if (
+              ts.isPropertyAssignment(prop)
+              && propertyNameMatches(prop.name, 'locales')
+            ) {
+              continue
+            }
+            filtered.push(prop)
+          }
+          if (localesToInject) {
+            filtered.push(
+              factory.createPropertyAssignment(
+                'locales',
+                buildLocalesLiteral(factory, localesToInject),
+              ),
+            )
+          }
+          const updatedArg = factory.updateObjectLiteralExpression(arg, filtered)
+          return ts.visitEachChild(
+            factory.updateNewExpression(node, node.expression, node.typeArguments, [updatedArg]),
+            visit,
+            context,
+          )
+        }
+      }
+
       if (
         ts.isVariableDeclaration(node)
         && ts.isIdentifier(node.name)
@@ -205,16 +323,22 @@ export function normalizeWorkshopEffectCode(source: string, cardId: string): str
 
   const result = ts.transform(sf, [transformer])
   try {
-    return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+    const printed = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
       .printFile(result.transformed[0]!)
       .trim()
+    // ts.createPrinter escapes every non-ASCII character to \uXXXX even though
+    // the project source files store CJK literals verbatim. Reverse that so the
+    // generated card file matches the rest of the codebase.
+    return printed.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
   } finally {
     result.dispose()
   }
 }
 
 export function generateMainCardFile(
-  wcard: WorkshopCardForGen,
+  wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
 ): string {
   const classImport =
@@ -228,7 +352,8 @@ export function generateMainCardFile(
     .sort()
     .join('\n')
 
-  const effectCode = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id)
+  const locales = readLocalesFromCardJson(wcard.card_json)
+  const effectCode = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}

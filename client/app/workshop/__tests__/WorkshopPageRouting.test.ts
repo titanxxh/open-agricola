@@ -7,6 +7,7 @@ import {
   getWorkshopCardIdFromSearch,
   getWorkshopPrActionState,
   getWorkshopViewFromSearch,
+  hasZhLocale,
 } from '../../WorkshopPage'
 
 describe('WorkshopPage card detail routing', () => {
@@ -97,10 +98,66 @@ describe('WorkshopPage PR action state', () => {
       status: 'published',
       githubPrUrl: null,
       githubPrStatus: null,
+      localesComplete: true,
     })
 
     expect(state.visible).toBe(true)
     expect(state.disabled).toBe(false)
     expect(state.buttonLabel).toBe('发起 PR 到主仓库')
+  })
+
+  it('blocks PR submission when zh locale is missing', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      status: 'published',
+      githubPrUrl: null,
+      githubPrStatus: null,
+      localesComplete: false,
+    })
+
+    expect(state.visible).toBe(true)
+    expect(state.disabled).toBe(true)
+    expect(state.buttonLabel).toBe('请先完成中文本地化')
+    expect(state.secondary).toMatch(/本地化/)
+  })
+
+  it('treats omitted localesComplete as legacy (allowed) for back-compat', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      status: 'published',
+      githubPrUrl: null,
+      githubPrStatus: null,
+    })
+
+    expect(state.disabled).toBe(false)
+  })
+})
+
+describe('hasZhLocale', () => {
+  it('accepts a complete zh entry', () => {
+    expect(hasZhLocale({
+      locales: { zh: { name: '名字', desc: ['描述'] } },
+    })).toBe(true)
+  })
+
+  it('rejects when locales is absent', () => {
+    expect(hasZhLocale({})).toBe(false)
+    expect(hasZhLocale(null)).toBe(false)
+    expect(hasZhLocale(undefined)).toBe(false)
+  })
+
+  it('rejects when zh is missing', () => {
+    expect(hasZhLocale({ locales: { en: { name: 'name', desc: ['d'] } } })).toBe(false)
+  })
+
+  it('rejects when zh.name is empty', () => {
+    expect(hasZhLocale({ locales: { zh: { name: '   ', desc: ['描述'] } } })).toBe(false)
+  })
+
+  it('rejects when zh.desc is empty or whitespace-only', () => {
+    expect(hasZhLocale({ locales: { zh: { name: '名字', desc: [] } } })).toBe(false)
+    expect(hasZhLocale({ locales: { zh: { name: '名字', desc: ['  '] } } })).toBe(false)
   })
 })

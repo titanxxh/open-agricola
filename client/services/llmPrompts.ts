@@ -27,13 +27,19 @@ const CARD_ID = 'CUSTOM_英文驼峰名'
 // 卡牌定义（必须）
 const CARD_DEF = new MinorImprovement({
   id: CARD_ID,
-  name: '卡牌中文名',
+  name: 'Card Name',                    // 必须英文，与项目内置卡风格一致（如 "Roughcaster"）
   deck: 'CUSTOM',
   number: 0,
-  desc: ['效果描述，资源用 <WOOD> <FOOD> 等标记'],
+  desc: ['Effect description in English; resource tags like <WOOD> <FOOD> stay unchanged.'],
   cost: { wood: 1 },
   vp: 0,
   implemented: true,
+  locales: {
+    zh: {
+      name: '卡牌中文名',
+      desc: ['中文版效果描述，资源标记 <WOOD> <FOOD> 保持不变。'],
+    },
+  },
 })
 
 // 卡牌实现（无效果卡可省略或写空对象）
@@ -69,6 +75,12 @@ const CARD_IMPL = {
 - ✅ 引擎自动处理所有权检查——**不需要**手动检查 \`player.minorPlayed.includes(CARD_ID)\`
 - 即使只做小修改，也要重新输出完整代码
 - ❌ 禁止在 desc 中包含前置条件信息——前置条件已在卡牌左上角单独显示
+
+**i18n 规则（硬性，PR 阻断）：**
+- \`name\` / \`desc\` / \`prerequisite\` 顶层字段**必须英文**，与内置卡风格一致——主仓库代码 = 英文。
+- \`locales.zh\` 必须填全：\`{ name, desc[], prerequisite? }\`，把用户原始中文描述放进去。如果用户输入是英文，把它意译为中文。
+- 不要省略 \`locales.zh\`——前端会硬阻断没有 zh 翻译的提交。
+- 资源标记 \`<WOOD>\` / \`<FOOD>\` / \`<GRAIN>\` / \`<SCORE>\` 等在 zh 和 en 里**保持不变**，不要翻译标记本身。
 
 ## CARD_IMPL 结构详解
 

@@ -120,6 +120,7 @@ function parseCardFromTs(code: string): {
   const vp = extractNumberField(objStr, 'vp') ?? 0
   const cost = extractObjectField(objStr, 'cost') ?? {}
   const modifiers = extractModifiers(objStr)
+  const locales = extractLocales(objStr)
 
   const card: Record<string, unknown> = {
     id: cardId,
@@ -130,11 +131,70 @@ function parseCardFromTs(code: string): {
     desc,
   }
   if (modifiers.length > 0) card.modifiers = modifiers
+  if (locales) card.locales = locales
 
   return {
     card,
     sourceCode: code,
   }
+}
+
+/**
+ * Extract `locales: { <lang>: { name, desc[], prerequisite? }, ... }` from
+ * the constructor object literal. Returns `null` when the field is absent or
+ * has no recognised language entries.
+ *
+ * Uses brace-balance scanning rather than regex so a `desc` array containing
+ * `}` characters or trailing keys (like `modifiers`) doesn't confuse the
+ * boundary.
+ */
+function extractLocales(
+  objStr: string,
+): Record<string, { name: string; desc: string[]; prerequisite?: string }> | null {
+  const headerRe = /locales\s*:\s*\{/g
+  const header = headerRe.exec(objStr)
+  if (!header) return null
+  const bodyStart = header.index + header[0].length
+  const bodyEnd = findMatchingBrace(objStr, bodyStart)
+  if (bodyEnd < 0) return null
+  const body = objStr.slice(bodyStart, bodyEnd)
+
+  const result: Record<string, { name: string; desc: string[]; prerequisite?: string }> = {}
+  const langRe = /(\w+)\s*:\s*\{/g
+  let m: RegExpExecArray | null
+  while ((m = langRe.exec(body)) !== null) {
+    const lang = m[1]!
+    const entryStart = m.index + m[0].length
+    const entryEnd = findMatchingBrace(body, entryStart)
+    if (entryEnd < 0) continue
+    const entry = body.slice(entryStart, entryEnd)
+    const name = extractStringField(entry, 'name')
+    const desc = extractArrayField(entry, 'desc') ?? []
+    const prerequisite = extractStringField(entry, 'prerequisite') ?? undefined
+    if (!name && desc.length === 0) continue
+    result[lang] = {
+      name: name ?? '',
+      desc,
+      ...(prerequisite ? { prerequisite } : {}),
+    }
+    langRe.lastIndex = entryEnd + 1
+  }
+
+  return Object.keys(result).length > 0 ? result : null
+}
+
+/** Given an open-brace body start index, return the index of its matching `}`. */
+function findMatchingBrace(source: string, openBodyStart: number): number {
+  let depth = 1
+  for (let i = openBodyStart; i < source.length; i++) {
+    const ch = source[i]
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
 }
 
 function extractStringField(objStr: string, field: string): string | null {

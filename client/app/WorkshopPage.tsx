@@ -116,6 +116,12 @@ type WorkshopPrActionInput = {
   status: WorkshopCard['status']
   githubPrUrl?: string | null
   githubPrStatus?: WorkshopCard['github_pr_status']
+  /**
+   * Workshop card has at least zh + en filled in. PR submission is blocked
+   * until both locales are present so the upstream code file is bilingual.
+   * Optional for back-compat; when omitted, treated as `true`.
+   */
+  localesComplete?: boolean
 }
 
 export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
@@ -136,6 +142,14 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
       disabled: true,
       buttonLabel: '先发布后可发起 PR',
       secondary: '发布后可以提交到主仓库，等待 maintainer review。',
+    }
+  }
+  if (input.localesComplete === false) {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '请先完成中文本地化',
+      secondary: '主仓库代码使用英文，需要 zh 翻译同步提交。点击 AI 设计器顶部的"本地化"按钮补齐。',
     }
   }
 
@@ -170,6 +184,26 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
 function authHeaders(token: string | null): Record<string, string> {
   if (!token) return {}
   return { Authorization: `Bearer ${token}` }
+}
+
+/**
+ * Returns true iff `card.card_json.locales.zh` carries a non-empty translation
+ * (name + at least one desc line). Required gate for submitting to the main
+ * repo: code-side fields are English by design, so a Chinese localisation is
+ * the missing half.
+ */
+export function hasZhLocale(cardJson: Record<string, unknown> | null | undefined): boolean {
+  if (!cardJson || typeof cardJson !== 'object') return false
+  const locales = (cardJson as { locales?: unknown }).locales
+  if (!locales || typeof locales !== 'object') return false
+  const zh = (locales as Record<string, unknown>).zh
+  if (!zh || typeof zh !== 'object') return false
+  const entry = zh as { name?: unknown; desc?: unknown }
+  const hasName = typeof entry.name === 'string' && entry.name.trim().length > 0
+  const hasDesc = Array.isArray(entry.desc) && entry.desc.some(
+    (line) => typeof line === 'string' && line.trim().length > 0,
+  )
+  return hasName && hasDesc
 }
 
 function normalizeSandboxSettings(raw: unknown): SandboxSettings {
@@ -314,6 +348,7 @@ function CardDetailPrSection({
     status: card.status,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
+    localesComplete: hasZhLocale(card.card_json),
   })
   if (!action.visible) return null
 
