@@ -473,10 +473,10 @@ const PlayedCardStats = ({
           ))}
           {bonusVp > 0 ? (
             <div className="played-card-stats-section">
-              <div className="played-card-stats-label">{t(locale, 'ui.cardStatsGained')}</div>
+              <div className="played-card-stats-label">{t(locale, 'ui.cardStats.bonusVp')}</div>
               <ResourceLine
                 locale={locale}
-                resources={{ ...emptyResources }}
+                resources={{}}
                 bonusVp={bonusVp}
                 className="played-card-stats-line"
               />

@@ -343,21 +343,25 @@ const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
             {' '}— {t(locale, 'ui.draftHistoryHeader')}
           </span>
         </div>
-        <ul>
-          {player.stats.draftHistory.map((entry) => {
-            const name = getAnyCardDisplayName(locale, entry.cardId)
-            return (
-              <li key={`${player.id}-pick-${entry.cardId}`}>
-                T{entry.draftTurn} ▸ {name}
-                {entry.playedTurn !== undefined ? (
-                  <span className="scoring-draft-played">
-                    {' '}({t(locale, 'ui.draftPlayedAt', { turn: entry.playedTurn })})
-                  </span>
-                ) : null}
-              </li>
-            )
-          })}
-        </ul>
+        {player.stats.draftHistory.length === 0 ? (
+          <div className="scoring-draft-empty">{t(locale, 'ui.draftEmpty')}</div>
+        ) : (
+          <ul>
+            {player.stats.draftHistory.map((entry) => {
+              const name = getAnyCardDisplayName(locale, entry.cardId)
+              return (
+                <li key={`${player.id}-pick-${entry.cardId}`}>
+                  T{entry.draftTurn} ▸ {name}
+                  {entry.playedTurn !== undefined ? (
+                    <span className="scoring-draft-played">
+                      {' '}({t(locale, 'ui.draftPlayedAt', { turn: entry.playedTurn })})
+                    </span>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        )}
         {player.stats.draftDiscarded.length > 0 ? (
           <div className="scoring-draft-discarded">
             <div className="scoring-draft-subheader">{t(locale, 'ui.draftDiscarded')}</div>
