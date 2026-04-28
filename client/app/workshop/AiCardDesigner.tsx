@@ -1040,13 +1040,16 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
   initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
+  /** Called whenever the user opens an existing card in the editor. Lets
+   *  the parent reflect the active card id in the URL. */
+  onCardLoaded?: (cardDbId: string) => void
 }) {
   const { locale, t } = useLocale()
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
@@ -1308,6 +1311,13 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
     setCardLocales(savedLocales)
   }, [])
 
+  // Mirror the active card id into the URL whenever it changes — covers
+  // both opening an existing card via `handleLoadCard` and the new-card-id
+  // assigned after the first save.
+  useEffect(() => {
+    if (currentCardDbId) onCardLoaded?.(currentCardDbId)
+  }, [currentCardDbId, onCardLoaded])
+
   useEffect(() => {
     if (initialCard) handleLoadCard(initialCard)
   }, [handleLoadCard, initialCard])
@@ -1419,22 +1429,53 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
 
             {/* Group 2: name + ID */}
             <div className="ai-designer-toolbar__group ai-designer-toolbar__group--grow">
-              <input
-                type="text"
-                className="ai-card-name-input"
-                value={cardName}
-                onChange={e => {
-                  setCardName(e.target.value)
-                  // Auto-generate card ID from name if user hasn't manually edited it
-                  const prevAuto = autoCardId(cardName)
-                  if (!cardIdInput || cardIdInput === prevAuto) {
-                    const newAuto = autoCardId(e.target.value)
-                    // Only auto-set if the name has ASCII chars; otherwise leave empty for AI to fill
-                    if (newAuto.length > 7) setCardIdInput(newAuto)
+              {/* Show the localised name under a non-English UI so a Chinese
+                  user reads "中世纪木槌" instead of "Medieval Mallet". The
+                  English `cardName` stays as the source-of-truth for the
+                  generated CARD_DEF, so the upstream PR file stays English. */}
+              {(() => {
+                const editorName = locale === 'zh'
+                  ? (cardLocales.zh?.name?.trim() ? cardLocales.zh.name : cardName)
+                  : cardName
+                const updateEditorName = (v: string) => {
+                  if (locale === 'zh') {
+                    setCardLocales((prev) => ({
+                      ...prev,
+                      zh: {
+                        name: v,
+                        desc: prev.zh?.desc ?? [],
+                        ...(prev.zh?.prerequisite
+                          ? { prerequisite: prev.zh.prerequisite }
+                          : {}),
+                      },
+                    }))
+                  } else {
+                    setCardName(v)
                   }
-                }}
-                placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
-              />
+                }
+                return (
+                  <input
+                    type="text"
+                    className="ai-card-name-input"
+                    value={editorName}
+                    onChange={e => {
+                      const v = e.target.value
+                      updateEditorName(v)
+                      // Auto-generate card ID only when editing the English
+                      // (code-side) name — Chinese input would fall through
+                      // `autoCardId` to an empty string anyway.
+                      if (locale !== 'zh') {
+                        const prevAuto = autoCardId(cardName)
+                        if (!cardIdInput || cardIdInput === prevAuto) {
+                          const newAuto = autoCardId(v)
+                          if (newAuto.length > 7) setCardIdInput(newAuto)
+                        }
+                      }
+                    }}
+                    placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
+                  />
+                )
+              })()}
               <input
                 type="text"
                 className="ai-card-id-input"

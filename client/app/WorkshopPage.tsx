@@ -683,7 +683,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
   initial?: WorkshopCard
   token: string | null
   onCancel: () => void
@@ -691,6 +691,7 @@ function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
+  onCardLoaded?: (cardDbId: string) => void
 }) {
   const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
     // AI designer handles everything now; this callback is kept for interface compatibility
@@ -705,6 +706,7 @@ function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
         onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+        onCardLoaded={onCardLoaded}
       />
     </div>
   )
@@ -1383,17 +1385,41 @@ export function WorkshopPage() {
     }
   }, [token])
 
+  const loadCardForEdit = useCallback(async (cardDbId: string) => {
+    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
+      headers: authHeaders(token),
+    })
+    const data = await response.json()
+    if (data.ok) {
+      setEditCard(data.card)
+      setView('editor')
+    }
+  }, [token])
+
   useEffect(() => {
     const syncFromUrl = () => {
+      const v = getWorkshopViewFromSearch(window.location.search)
       const cardDbId = getWorkshopCardIdFromSearch(window.location.search)
+      // view=editor takes precedence over a bare ?card= so the editor URL
+      // pattern (?view=editor&card=<id>) loads the card into the editor
+      // instead of bouncing into the detail view.
+      if (v === 'editor') {
+        setSelectedCard(null)
+        if (cardDbId) {
+          void loadCardForEdit(cardDbId)
+        } else {
+          setEditCard(undefined)
+          setView('editor')
+        }
+        return
+      }
       if (cardDbId) {
         void loadCardDetail(cardDbId)
         return
       }
-      const v = getWorkshopViewFromSearch(window.location.search)
       setSelectedCard(null)
-      if (v === 'sandbox' || v === 'editor') {
-        setView(v)
+      if (v === 'sandbox') {
+        setView('sandbox')
       } else {
         setEditCard(undefined)
         setView('home')
@@ -1403,7 +1429,7 @@ export function WorkshopPage() {
     syncFromUrl()
     window.addEventListener('popstate', syncFromUrl)
     return () => window.removeEventListener('popstate', syncFromUrl)
-  }, [loadCardDetail])
+  }, [loadCardDetail, loadCardForEdit])
 
   const goBack = () => {
     const target = prevView.current
@@ -1475,6 +1501,11 @@ export function WorkshopPage() {
             } else {
               navigateView(next === 'detail' ? 'home' : next, 'replace')
             }
+          }}
+          onCardLoaded={(cardDbId) => {
+            // Reflect the active card in the URL so the user can copy/share
+            // the link or refresh without losing their selection.
+            writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
