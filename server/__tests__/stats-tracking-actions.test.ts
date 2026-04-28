@@ -106,6 +106,40 @@ describe('PlayerStats action tracking', () => {
     expect(session.getState().state.players[0]!.stats.totalRoomsBuilt).toBe(1)
   })
 
+  it('totalOccupationBuilt increments when an occupation is played', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    setWorkersAtHome(state, state.players[1]!, 0)
+    player.resources = { ...player.resources, food: 5 }
+    // pick first occupation in hand to play
+    const occId = player.occupationHand[0]
+    if (!occId) throw new Error('player needs at least one occupation in hand')
+    session.loadState(state)
+    expect(session.getState().state.players[0]!.stats.totalOccupationBuilt).toBe(0)
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    if (resp.pending.type !== 'choice') throw new Error('expected occupation choice')
+    const opt = resp.pending.options.find((o) => o.value === occId)
+    if (!opt) {
+      // fallback: pick first non-skip option
+      const first = resp.pending.options.find((o) => o.value !== '__skip__')
+      if (!first) throw new Error('no occupation option found')
+      resp = session.resolveChoice(0, first.value)
+    } else {
+      resp = session.resolveChoice(0, opt.value)
+    }
+    // Some occupation flows continue with sub-choices; finishing them all is
+    // out-of-scope. We assert the played list updated and stats fired.
+    const after = session.getState().state.players[0]!
+    expect(after.occupationPlayed.length).toBeGreaterThanOrEqual(1)
+    expect(after.stats.totalOccupationBuilt).toBe(after.occupationPlayed.length)
+  })
+
   it('totalMajorBuilt increments when a major improvement is played', () => {
     const session = new GameSession()
     const state = session.getState().state

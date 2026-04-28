@@ -7,6 +7,7 @@ import {
 } from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
+import { incOccupationBuilt } from '../../logic/stats'
 
 const getPositiveResourceLog = (
   resources?: Partial<Resource> | null,
@@ -149,6 +150,7 @@ export const playOccupation = (
     (id) => id !== occupation.id,
   )
   player.occupationPlayed.push(occupation.id)
+  incOccupationBuilt(player)
   getCardModifiers(occupation.id).forEach((modifier) => {
     if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
       player.activeModifiers.push(modifier)
