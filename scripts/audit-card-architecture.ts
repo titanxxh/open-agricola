@@ -161,9 +161,61 @@ export function computeLineRatio(ourLines: number, bgaLines: number): number {
   return ourLines / bgaLines
 }
 
+export interface ShellResult {
+  likelihood: 'none' | 'low' | 'high'
+  evidence: { hookCount: number; bgaHookCount: number; bodyLines: number }
+}
+
+const HOOK_PATTERNS_OURS = [
+  /\bregisterCardListener\s*\(/g,
+  /\bonBuy\s*[:=]/g,
+  /\bcomputeBonusScore\s*[:=]/g,
+  /\bcomputeReplace\s*[:=]/g,
+  /\bcomputeArgs\s*[:=]/g,
+  /\bcomputeCosts\s*[:=]/g,
+  /\bonRoundStart\s*[:=]/g,
+  /\bonAllWorkersPlaced\s*[:=]/g,
+  /\bcomputeFenceDiscount\s*[:=]/g,
+  /\bcomputeLockedFarmTiles\s*[:=]/g,
+  /\bhandHooks\s*[:=]/g,
+  /\bresolveChoice\s*[:=]/g,
+]
+
+const HOOK_PATTERNS_BGA = [
+  /function\s+execute\s*\(/g,
+  /function\s+\w+Hook\s*\(/g,
+  /function\s+computeCost/gi,
+  /function\s+onBuy/gi,
+  /function\s+onRoundStart/gi,
+  /function\s+onHarvest/gi,
+  /function\s+isDoable/gi,
+  /function\s+canUse/gi,
+]
+
+function countMatches(content: string, patterns: RegExp[]): number {
+  return patterns.reduce((sum, re) => sum + (content.match(re)?.length ?? 0), 0)
+}
+
+export function detectShell(oursContent: string, bgaContent: string): ShellResult {
+  const hookCount = countMatches(oursContent, HOOK_PATTERNS_OURS)
+  const bgaHookCount = countMatches(bgaContent, HOOK_PATTERNS_BGA)
+  const bodyLines = bgaContent.split('\n').filter(l => l.trim().length > 0).length
+
+  let likelihood: ShellResult['likelihood'] = 'none'
+  if (hookCount === 0 && bgaHookCount > 0) likelihood = 'high'
+  else if (hookCount === 0 && bgaHookCount === 0) likelihood = 'low'
+  else likelihood = 'none'
+
+  return { likelihood, evidence: { hookCount, bgaHookCount, bodyLines } }
+}
+
 export function scanCard(pair: CardPair): CardAuditResult {
-  const ourLines = countLines(pair.ourPath)
-  const bgaLines = countLines(pair.bgaPath)
+  const oursContent = fs.readFileSync(pair.ourPath, 'utf8')
+  const bgaContent = fs.readFileSync(pair.bgaPath, 'utf8')
+  const ourLines = oursContent.split('\n').filter(l => l.trim().length > 0).length
+  const bgaLines = bgaContent.split('\n').filter(l => l.trim().length > 0).length
+  const shell = detectShell(oursContent, bgaContent)
+
   return {
     cardId: pair.cardId,
     ourPath: pair.ourPath,
@@ -176,8 +228,8 @@ export function scanCard(pair: CardPair): CardAuditResult {
       S5_aggregateMutations: [],
       S6_lineRatio: computeLineRatio(ourLines, bgaLines),
       S7_externalCardIdMentions: [],
-      S10_shellLikelihood: 'none',
-      S10_evidence: { hookCount: 0, bgaHookCount: 0, bodyLines: 0 },
+      S10_shellLikelihood: shell.likelihood,
+      S10_evidence: shell.evidence,
       S11_descAlignment: 'aligned',
       S12_i18nGapKeys: [],
     },

@@ -7,6 +7,7 @@ import {
   scanCard,
   computeLineRatio,
   countLines,
+  detectShell,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -97,5 +98,35 @@ describe('countLines', () => {
   it('counts non-empty lines in a real file', () => {
     const n = countLines('shared/cards/A/A123_FrameBuilder.ts')
     expect(n).toBeGreaterThan(0)
+  })
+})
+
+describe('detectShell (S10)', () => {
+  it('returns none when our file has hooks AND BGA has hooks', () => {
+    const ours = `
+      registerCardListener({ id: 'A123', actions: ['construct'], handler: () => {} })
+    `
+    const bga = `
+      class A123_FrameBuilder { function execute() { return 1; } }
+    `
+    const r = detectShell(ours, bga)
+    expect(r.likelihood).toBe('none')
+    expect(r.evidence.hookCount).toBe(1)
+    expect(r.evidence.bgaHookCount).toBeGreaterThan(0)
+  })
+
+  it('returns high when our file has no hooks but BGA has execute()', () => {
+    const ours = `export const A1 = new MinorImprovement({ id: 'A1' })`
+    const bga = `class A1 { function execute() { do_something(); something_else(); } }`
+    const r = detectShell(ours, bga)
+    expect(r.likelihood).toBe('high')
+    expect(r.evidence.hookCount).toBe(0)
+  })
+
+  it('returns low when both empty (data-only on both sides)', () => {
+    const ours = `export const A1 = new MinorImprovement({ id: 'A1' })`
+    const bga = `class A1 { /* no hooks */ }`
+    const r = detectShell(ours, bga)
+    expect(r.likelihood).toBe('low')
   })
 })
