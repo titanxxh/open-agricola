@@ -47,7 +47,7 @@ import {
   applyFutureMeeples,
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
-import { incPlacedFarmers } from '../logic/stats.ts'
+import { incFirstPlayer, incPlacedFarmers } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
   registerCustomCard,
@@ -1496,6 +1496,9 @@ export class GameCore {
     }
     const startIdx = this.state.players.findIndex((player) => player.startPlayer)
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
+    if (this.state.round >= 2 && startIdx >= 0) {
+      incFirstPlayer(this.state.players[startIdx]!)
+    }
     this.state.roundPhase = 'work'
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
