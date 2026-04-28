@@ -167,7 +167,7 @@ export const applyFarmChoice = <T extends PlayerState>(
         return { ok: false, error: getInsufficientResourceError(normalized, { wood: validated.payableWoodCost }) }
       }
       const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment, 'fencing')
       const consumed = consumePendingFenceBonus(
         nextPlayer,
         validated.newFenceEdges.length,
@@ -262,7 +262,7 @@ export const applyFarmChoice = <T extends PlayerState>(
         return { ok: false, error: getInsufficientResourceError(normalized, totalCost) }
       }
       const nextPlayer = JSON.parse(JSON.stringify(normalized)) as PlayerState
-      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment, 'stables')
       return {
         ok: true,
         player: {
@@ -294,7 +294,7 @@ export const applyFarmChoice = <T extends PlayerState>(
         return { ok: false, error: getInsufficientResourceError(result.player, plowCost) }
       }
       const nextPlayer = JSON.parse(JSON.stringify(result.player)) as PlayerState
-      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment)
+      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment, 'plow')
       return { ok: true, player: nextPlayer as unknown as T }
     }
     case 'sow': {

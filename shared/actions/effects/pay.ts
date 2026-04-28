@@ -647,10 +647,60 @@ export const canPayCost = (
   return solutions.length > 0
 }
 
+/**
+ * Best-effort attribution of a PaymentSolution's bonus discounts back to the
+ * source `BonusModifier` cards. For each cardId listed in `solution.bonusUsed`,
+ * we look up the player's `activeModifiers` of type 'bonus' whose `cardId`
+ * matches, and accumulate their `discount` resources. This covers the common
+ * discount-mode bonuses (e.g. A14_CarpentersHammer, A143_Stonecutter,
+ * D82_HuntingTrophy). Choices-mode bonuses (e.g. A123_FrameBuilder) don't carry
+ * which candidate was selected on the PaymentSolution, so the attribution is
+ * skipped for them — better to record nothing than to mis-attribute.
+ *
+ * If `costType` is supplied we also restrict the lookup to modifiers whose
+ * `appliesTo` includes that cost type. This prevents over-crediting when the
+ * same card defines multiple BonusModifiers for different cost types (e.g.
+ * C122_Bricklayer has separate `construct` (-2 clay) and `renovation` (-1 clay)
+ * entries — only the matching one fires for any given payment).
+ */
+const buildBonusReductions = (
+  player: PlayerState,
+  solution: PaymentSolution,
+  costType?: CostModifierType,
+): Record<string, Partial<Resource>> => {
+  const result: Record<string, Partial<Resource>> = {}
+  const csv = solution.bonusUsed
+  if (!csv) return result
+  const sourceIds = new Set<string>()
+  for (const raw of csv.split(',')) {
+    const id = raw.trim()
+    if (id) sourceIds.add(id)
+  }
+  if (sourceIds.size === 0) return result
+  for (const mod of player.activeModifiers ?? []) {
+    if (mod.type !== 'bonus') continue
+    const bonusMod = mod as BonusModifier
+    if (!sourceIds.has(bonusMod.cardId)) continue
+    if (costType && !bonusMod.appliesTo.includes(costType)) continue
+    const discount = bonusMod.discount
+    if (!discount) continue
+    const accum = result[bonusMod.cardId] ?? {}
+    for (const [key, value] of Object.entries(discount)) {
+      if (typeof value !== 'number' || value <= 0) continue
+      const k = key as keyof Resource
+      accum[k] = (accum[k] ?? 0) + value
+    }
+    if (Object.keys(accum).length > 0) {
+      result[bonusMod.cardId] = accum
+    }
+  }
+  return result
+}
+
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
-  options: { trackStats?: boolean } = {},
+  options: { trackStats?: boolean; costType?: CostModifierType } = {},
 ): string | undefined => {
   const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
   for (const key of paidKeys) {
@@ -670,7 +720,8 @@ export const executePaymentSolution = (
   if (options.trackStats !== false) {
     // Lazy require to avoid pulling card-state into pay.ts top-of-module cycle.
     // recordPaymentStats writes per-card paid/saved derived from tradesUsed.
-    recordPaymentStats(player, solution)
+    const bonusReductions = buildBonusReductions(player, solution, options.costType)
+    recordPaymentStats(player, solution, bonusReductions)
   }
   return solution.cardUsed
 }
