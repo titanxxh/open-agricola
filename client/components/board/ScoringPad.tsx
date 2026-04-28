@@ -11,7 +11,7 @@ import type {
   PlayerStats,
   Resource,
 } from '../../../shared/game/types'
-import { getCardDisplayName } from '../common/cardText'
+import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
 
 type Props = {
@@ -326,6 +326,51 @@ const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
   )
 }
 
-const DraftTab = ({ locale: _locale, players: _players }: { locale: Locale; players: PlayerState[] }) => (
-  <div className="scoring-content scoring-draft-tab" />
+const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] }) => (
+  <div
+    className="scoring-content scoring-draft-tab"
+    style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${players.length}, 1fr)`,
+      gap: '16px',
+    }}
+  >
+    {players.map((player) => (
+      <div key={`draft-col-${player.id}`} className="scoring-draft-column">
+        <div className="scoring-draft-header">
+          {player.name}
+          <span className="scoring-draft-subheader">
+            {' '}— {t(locale, 'ui.draftHistoryHeader')}
+          </span>
+        </div>
+        <ul>
+          {player.stats.draftHistory.map((entry) => {
+            const name = getAnyCardDisplayName(locale, entry.cardId)
+            return (
+              <li key={`${player.id}-pick-${entry.cardId}`}>
+                T{entry.draftTurn} ▸ {name}
+                {entry.playedTurn !== undefined ? (
+                  <span className="scoring-draft-played">
+                    {' '}({t(locale, 'ui.draftPlayedAt', { turn: entry.playedTurn })})
+                  </span>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+        {player.stats.draftDiscarded.length > 0 ? (
+          <div className="scoring-draft-discarded">
+            <div className="scoring-draft-subheader">{t(locale, 'ui.draftDiscarded')}</div>
+            <ul>
+              {player.stats.draftDiscarded.map((cardId) => (
+                <li key={`${player.id}-discard-${cardId}`}>
+                  {getAnyCardDisplayName(locale, cardId)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    ))}
+  </div>
 )
