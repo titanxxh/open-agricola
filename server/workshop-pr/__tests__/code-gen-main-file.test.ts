@@ -160,4 +160,121 @@ const CARD_IMPL = {
     expect(out).toContain(`id: 'custom-existing'`)
     expect(out).not.toContain(`deck: 'CUSTOM'`)
   })
+
+  it('underscores unused listener handler params (TS6133 prevention)', () => {
+    const wcard = {
+      id: 'wc-unused',
+      card_id: 'CUSTOM_FlatDiscount',
+      card_type: 'minor',
+      effect_code: `
+const CARD_ID = 'CUSTOM_FlatDiscount'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Discount', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_IMPL = {
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['improvement-any'],
+      phases: ['computeCosts'],
+      handler: (context) => {
+        return { costs: { stone: -1 }, sourceCard: CARD_ID }
+      },
+    },
+  ],
+}
+`.trim(),
+    }
+    const out = generateMainCardFile(wcard, { githubLogin: 'gh', iso: '2026-04-28T00:00:00Z' })
+    expect(out).toMatch(/handler:\s*\(_context\)\s*=>/)
+    expect(out).not.toMatch(/handler:\s*\(context\)\s*=>/)
+  })
+
+  it('keeps used params untouched even when other params are unused', () => {
+    const wcard = {
+      id: 'wc-mixed',
+      card_id: 'CUSTOM_Mixed',
+      card_type: 'minor',
+      effect_code: `
+const CARD_ID = 'CUSTOM_Mixed'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Mixed', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onRoundStart: (state, player) => {
+      if (player.houseType === 'stone') return
+      return undefined
+    },
+  },
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['plow'],
+      phases: ['after'],
+      handler: (context) => {
+        return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+      },
+    },
+  ],
+}
+`.trim(),
+    }
+    const out = generateMainCardFile(wcard, { githubLogin: 'gh', iso: '2026-04-28T00:00:00Z' })
+    // onRoundStart: state unused, player used
+    expect(out).toMatch(/onRoundStart:\s*\(_state,\s*player\)/)
+    // listener handler: context unused
+    expect(out).toMatch(/handler:\s*\(_context\)\s*=>/)
+  })
+
+  it('does not double-underscore params that are already prefixed', () => {
+    const wcard = {
+      id: 'wc-already',
+      card_id: 'CUSTOM_AlreadyPrefixed',
+      card_type: 'minor',
+      effect_code: `
+const CARD_ID = 'CUSTOM_AlreadyPrefixed'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Pre', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_IMPL = {
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['improvement-any'],
+      phases: ['computeCosts'],
+      handler: (_ctx) => ({ costs: { stone: -1 }, sourceCard: CARD_ID }),
+    },
+  ],
+}
+`.trim(),
+    }
+    const out = generateMainCardFile(wcard, { githubLogin: 'gh', iso: '2026-04-28T00:00:00Z' })
+    expect(out).toContain('(_ctx)')
+    expect(out).not.toContain('(__ctx)')
+  })
+
+  it('treats nested closure references as a use of the outer param', () => {
+    const wcard = {
+      id: 'wc-closure',
+      card_id: 'CUSTOM_Closure',
+      card_type: 'minor',
+      effect_code: `
+const CARD_ID = 'CUSTOM_Closure'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Closure', deck: 'CUSTOM', number: 0, desc: [], cost: {}, vp: 0 })
+const CARD_IMPL = {
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['plow'],
+      phases: ['after'],
+      handler: (context) => {
+        const ids = (context.state?.players ?? []).map((p) => p.id)
+        return { flow: undefined, sourceCard: CARD_ID, _ids: ids }
+      },
+    },
+  ],
+}
+`.trim(),
+    }
+    const out = generateMainCardFile(wcard, { githubLogin: 'gh', iso: '2026-04-28T00:00:00Z' })
+    // context is referenced inside the nested arrow body => keep as-is
+    expect(out).toMatch(/handler:\s*\(context\)\s*=>/)
+    expect(out).not.toMatch(/handler:\s*\(_context\)/)
+  })
 })

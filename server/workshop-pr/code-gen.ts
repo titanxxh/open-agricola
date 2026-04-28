@@ -145,6 +145,31 @@ function buildLocalesLiteral(
   return factory.createObjectLiteralExpression(langProps, true)
 }
 
+/**
+ * Walk a function body and report whether any Identifier inside it spells
+ * `name`. Used to decide whether a function parameter is actually consumed,
+ * so we can rename unused params with a `_` prefix and avoid TS6133 errors
+ * on the upstream build.
+ *
+ * Conservative: nested functions that re-declare the same name still count
+ * as "used" (the body identifier matches by spelling), which keeps us from
+ * accidentally renaming a param that is in fact referenced. False-positive
+ * safe.
+ */
+function isIdentifierReferencedInBody(body: ts.Node, name: string): boolean {
+  let found = false
+  function visit(node: ts.Node): void {
+    if (found) return
+    if (ts.isIdentifier(node) && node.text === name) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(body)
+  return found
+}
+
 function propertyNameMatches(name: ts.PropertyName, expected: string): boolean {
   return (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
     && name.text === expected
@@ -321,7 +346,62 @@ export function normalizeWorkshopEffectCode(
     return (node) => ts.visitNode(node, visit) as ts.SourceFile
   }
 
-  const result = ts.transform(sf, [transformer])
+  // Second pass: rename unused arrow/function-expression parameters with a
+  // `_` prefix so the upstream `tsc -b` build doesn't trip TS6133. Run as a
+  // separate transform because the first pass returns updated PropertyAssignment
+  // nodes (e.g. for `listeners:`) without recursing into their children — the
+  // arrow functions inside listener objects would otherwise never be visited.
+  const unusedParamsTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
+    const { factory } = context
+    const visit: ts.Visitor = (node) => {
+      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+        const visitedBody = ts.visitNode(node.body, visit) as ts.ConciseBody
+        let changed = visitedBody !== node.body
+        const newParams = node.parameters.map((p) => {
+          if (!ts.isIdentifier(p.name)) return p
+          const paramName = p.name.text
+          if (paramName.startsWith('_')) return p
+          if (isIdentifierReferencedInBody(visitedBody, paramName)) return p
+          changed = true
+          return factory.updateParameterDeclaration(
+            p,
+            p.modifiers,
+            p.dotDotDotToken,
+            factory.createIdentifier(`_${paramName}`),
+            p.questionToken,
+            p.type,
+            p.initializer,
+          )
+        })
+        if (!changed) return node
+        if (ts.isArrowFunction(node)) {
+          return factory.updateArrowFunction(
+            node,
+            node.modifiers,
+            node.typeParameters,
+            newParams,
+            node.type,
+            node.equalsGreaterThanToken,
+            visitedBody,
+          )
+        }
+        return factory.updateFunctionExpression(
+          node,
+          node.modifiers,
+          node.asteriskToken,
+          node.name,
+          node.typeParameters,
+          newParams,
+          node.type,
+          visitedBody as ts.Block,
+        )
+      }
+      return ts.visitEachChild(node, visit, context)
+    }
+    return (node) => ts.visitNode(node, visit) as ts.SourceFile
+  }
+
+  const result = ts.transform(sf, [transformer, unusedParamsTransformer])
   try {
     const printed = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
       .printFile(result.transformed[0]!)
