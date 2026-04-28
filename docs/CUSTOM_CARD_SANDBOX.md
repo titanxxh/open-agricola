@@ -109,6 +109,24 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 **判定卡主必须用 `context.ownerPlayer`**，不能用 `context.player`。
 
+### 2.1 `context.space` (ActionSpace) 可读字段
+
+`context.space` 的运行时形状是 `ActionDefinition + resources + takenBy`（见 `shared/game/types.ts:407`）。Listener handler 只应读以下字段：
+
+| 字段 | 类型 | 用途 |
+|------|------|------|
+| `space.id` | `string` | 行动位 ID（`'renovate-house'`、`'plow-1'` 等），用 `===` 精确过滤 |
+| `space.takenBy` | `WorkerRef[]` | 占用情况；用 `spaceHasPlayer(space, playerId)` helper 判定 |
+| `space.resources` | `Resource` | 行动位上堆积的资源（如累积 wood） |
+
+⚠️ **不存在但常被幻觉**：`space.params`、`space.target`、`space.amount`、`space.houseType`。`params` 是 ActionFlow leaf 节点的字段（`{ type: 'leaf', actionId, params }`），**不属于** ActionSpace。写 `space.params.X` 在 sandbox 跑能过（`ts.transpileModule` 不做类型检查），但提交到主仓库 PR 后 `pnpm run build` 必报 `TS2339: Property 'params' does not exist on type 'ActionSpace'`。
+
+### 2.2 常见判断与陷阱
+
+- **翻修目标房屋类型**：BGA 升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
+- **建造房屋类型**：`construct` 行动看 `context.choice` 或 `context.actionId`（`'build-clay-room'` / `'build-stone-room'` 等），不是 `space.params`。
+- **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context（例如返回固定折扣），把参数前缀 `_` 或省掉：`handler: (_context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID })` 或 `handler: () => ({ ... })`。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
+
 ---
 
 ## 3. 沙盒识别的 hook / phase 白名单
