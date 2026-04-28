@@ -266,6 +266,24 @@ export function scanAggregateMutations(filePath: string): AggregateMutation[] {
   return hits
 }
 
+const FORBIDDEN_IMPORT_RE = /import\s+(?:.+\s+from\s+)?['"]([^'"]+)['"]/
+
+export function scanCrossLayerImports(filePath: string): CrossLayerImport[] {
+  if (!fs.existsSync(filePath)) return []
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n')
+  const hits: CrossLayerImport[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(FORBIDDEN_IMPORT_RE)
+    if (!m) continue
+    const importPath = m[1]
+    if (/(?:^|\/)(server|client)\//.test(importPath)) {
+      hits.push({ from: filePath, to: importPath, line: i + 1 })
+    }
+  }
+  return hits
+}
+
 function* walkTsFiles(dir: string): Generator<string> {
   if (!fs.existsSync(dir)) return
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -314,7 +332,7 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
     bgaLines,
     signals: {
       S1_coreFileMentions: scanCoreFilesForCardId(pair.cardId, repoRoot),
-      S4_crossLayerImports: [],
+      S4_crossLayerImports: scanCrossLayerImports(pair.ourPath),
       S5_aggregateMutations: scanAggregateMutations(pair.ourPath),
       S6_lineRatio: computeLineRatio(ourLines, bgaLines),
       S7_externalCardIdMentions: scanExternalCardIdMentions(pair.cardId, repoRoot),

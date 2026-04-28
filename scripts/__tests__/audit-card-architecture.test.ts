@@ -11,6 +11,7 @@ import {
   scanCoreFilesForCardId,
   scanAggregateMutations,
   scanExternalCardIdMentions,
+  scanCrossLayerImports,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -203,5 +204,36 @@ describe('scanExternalCardIdMentions (S7)', () => {
     const hits = scanExternalCardIdMentions('A999', path.join('output', 'tmp', 'test-shared2'))
     expect(hits.length).toBe(0)
     fs.rmSync(path.join('output', 'tmp', 'test-shared2'), { recursive: true })
+  })
+})
+
+describe('scanCrossLayerImports (S4)', () => {
+  it('flags imports from server/', () => {
+    const tmp = path.join('output', 'tmp', 'test-imp.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `import { foo } from '../../../server/game-session'\n`)
+    const hits = scanCrossLayerImports(tmp)
+    expect(hits.length).toBe(1)
+    expect(hits[0].to).toContain('server/')
+    fs.unlinkSync(tmp)
+  })
+
+  it('flags imports from client/', () => {
+    const tmp = path.join('output', 'tmp', 'test-imp2.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `import { Bar } from '../../../client/services/game'\n`)
+    const hits = scanCrossLayerImports(tmp)
+    expect(hits.length).toBe(1)
+    expect(hits[0].to).toContain('client/')
+    fs.unlinkSync(tmp)
+  })
+
+  it('does NOT flag imports within shared/', () => {
+    const tmp = path.join('output', 'tmp', 'test-imp3.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `import { Resource } from '../../game/types'\n`)
+    const hits = scanCrossLayerImports(tmp)
+    expect(hits.length).toBe(0)
+    fs.unlinkSync(tmp)
   })
 })
