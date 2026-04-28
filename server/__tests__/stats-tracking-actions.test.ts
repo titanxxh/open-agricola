@@ -105,4 +105,30 @@ describe('PlayerStats action tracking', () => {
     expect(session.getState().state.players[0]!.rooms).toBe(3)
     expect(session.getState().state.players[0]!.stats.totalRoomsBuilt).toBe(1)
   })
+
+  it('totalMajorBuilt increments when a major improvement is played', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    setWorkersAtHome(state, state.players[1]!, 0)
+    player.resources = { ...player.resources, food: 5, clay: 3 }
+    if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
+      state.availableMajorImprovements.push('Major_Fireplace1')
+    }
+    session.loadState(state)
+    expect(session.getState().state.players[0]!.stats.totalMajorBuilt).toBe(0)
+
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    if (resp.pending.type !== 'choice') throw new Error('expected major choice')
+    const opt = resp.pending.options.find((o) => o.value === 'major:Major_Fireplace1')
+    if (!opt) throw new Error('Fireplace1 option missing')
+    resp = session.resolveChoice(0, opt.value)
+    expect(resp.ok).toBe(true)
+    expect(session.getState().state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(session.getState().state.players[0]!.stats.totalMajorBuilt).toBe(1)
+  })
 })
