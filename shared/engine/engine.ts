@@ -1070,10 +1070,11 @@ export class Engine {
         (ownerPlayerId
           ? context.state.players.find((player) => player.id === ownerPlayerId)
           : null) ?? context.player
-      // Track BGA-style per-card `used` stat: every listener fire for this
-      // card on this player counts as one use. Skip when cardId is empty
-      // (universal listeners that don't bind to a card).
-      if (node.cardId) {
+      // Track BGA-style per-card `used` stat: count a use only when the
+      // listener actually returned an effect (flow / followUp / decision /
+      // log etc.). Pure no-op fires (handler returned undefined / void) and
+      // universal listeners without a cardId are skipped.
+      if (node.cardId && result) {
         incCardUsed(effectPlayer, node.cardId)
       }
       const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>

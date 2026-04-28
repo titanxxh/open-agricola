@@ -40,7 +40,11 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.pending.type !== 'confirmPlayerSwitch') return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.A128_RiparianBuilder).toBeUndefined()
+    // The listener fires on `after place-farmer` for the opponent's owner —
+    // the owner's per-card stats now record `used` immediately. The acting
+    // player (players[1]) is not the listener owner, so their copy stays empty.
+    expect(resp.state.players[0]!.cardStates?.A128_RiparianBuilder?.extraData)
+      .toMatchObject({ resourceStats: { used: 1 } })
     expect(resp.state.players[1]!.cardStates?.A128_RiparianBuilder).toBeUndefined()
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
