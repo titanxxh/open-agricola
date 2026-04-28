@@ -16,6 +16,8 @@ import {
   extractBgaDesc,
   normalizeDesc,
   compareDesc,
+  extractI18nKeys,
+  scanI18nGaps,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -267,5 +269,35 @@ describe('compareDesc', () => {
 
   it('returns missing-i18n when ours is empty', () => {
     expect(compareDesc('', 'bar')).toBe('missing-i18n')
+  })
+})
+
+describe('extractI18nKeys', () => {
+  it('finds actions.<id>.* keys', () => {
+    const content = `
+      i18nKey: 'actions.A123.usePower'
+      foo: 'actions.B45.bar'
+    `
+    expect(extractI18nKeys(content)).toEqual(['actions.A123.usePower', 'actions.B45.bar'])
+  })
+
+  it('finds ui.interaction* and prompt.* keys', () => {
+    const content = `
+      'ui.interactionSelectPayment'
+      'prompt.A123Choice'
+    `
+    const keys = extractI18nKeys(content)
+    expect(keys).toContain('ui.interactionSelectPayment')
+    expect(keys).toContain('prompt.A123Choice')
+  })
+})
+
+describe('scanI18nGaps', () => {
+  it('reports keys missing from zh', () => {
+    const used = ['actions.X.foo']
+    const zh = `export const zh = { 'actions.X.bar': 'x' }`
+    const en = `export const en = { 'actions.X.foo': 'x' }`
+    const gaps = scanI18nGaps(used, zh, en)
+    expect(gaps[0]).toMatchObject({ key: 'actions.X.foo', missingZh: true, missingEn: false })
   })
 })
