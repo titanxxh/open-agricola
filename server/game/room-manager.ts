@@ -269,6 +269,23 @@ export const resolveJoinPlayerIndex = (
   return { ok: false, error: 'room full' }
 }
 
+export const resolveJoinRequestPlayerIndex = (
+  room: Pick<Room, 'players'>,
+  requestedPlayerIndex: number | undefined,
+  userId: string | undefined,
+): { ok: true; requestedPlayerIndex: number | undefined } | { ok: false; error: string } => {
+  if (!userId) return { ok: true, requestedPlayerIndex }
+  const existingSeat = room.players.find(p => p.userId === userId)
+  if (!existingSeat) return { ok: true, requestedPlayerIndex }
+  if (requestedPlayerIndex === undefined) {
+    return { ok: true, requestedPlayerIndex: existingSeat.playerIndex }
+  }
+  if (requestedPlayerIndex === existingSeat.playerIndex) {
+    return { ok: true, requestedPlayerIndex }
+  }
+  return { ok: false, error: 'you are already in this room' }
+}
+
 // ── Persistence helpers ──────────────────────────────────────────────────────
 
 function savePersistedState(roomId: string, serialized: SerializedGameState, room?: Room): void {
@@ -848,27 +865,16 @@ export const createWsServer = (server: import('node:http').Server) => {
         const roomId = msg.roomId
         const room = rooms.get(roomId)
         if (!room) { sendCommandError('room not found'); return }
-        // If this userId already has a seat, reconnect to that seat
-        let requestedPlayerIndex =
+        const rawRequestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
             ? msg.requestedPlayerIndex
             : undefined
-        if (requestedPlayerIndex === undefined && currentUserId) {
-          const existingSeat = room.players.find(p => p.userId === currentUserId)
-          if (existingSeat) {
-            requestedPlayerIndex = existingSeat.playerIndex
-          }
+        const requested = resolveJoinRequestPlayerIndex(room, rawRequestedPlayerIndex, currentUserId)
+        if (!requested.ok) {
+          sendCommandError(requested.error)
+          return
         }
-        // Prevent same user from taking a NEW seat (self-join) or
-        // replacing an active connection to the same seat
-        if (currentUserId) {
-          const existingSeat = room.players.find(p => p.userId === currentUserId)
-          if (existingSeat && existingSeat.ws.readyState === existingSeat.ws.OPEN) {
-            sendCommandError('you are already in this room')
-            return
-          }
-        }
-        const seat = resolveJoinPlayerIndex(room, requestedPlayerIndex, currentUserId)
+        const seat = resolveJoinPlayerIndex(room, requested.requestedPlayerIndex, currentUserId)
         if (!seat.ok) { sendCommandError(seat.error); return }
         currentRoom = room
         currentPlayerIndex = seat.playerIndex

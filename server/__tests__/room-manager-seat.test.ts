@@ -4,6 +4,7 @@ import {
   FIXED_DEV_ROOM_IDS,
   isFixedDevRoom,
   removePlayerFromRoom,
+  resolveJoinRequestPlayerIndex,
   resolveJoinPlayerIndex,
   restoreRoomFromSqliteRow,
 } from '../game/room-manager.ts'
@@ -14,6 +15,7 @@ const createRoom = (
   id: string,
   playerIndices: number[],
   maxPlayers = 2,
+  userIds: Record<number, string> = {},
 ) => ({
   id,
   maxPlayers,
@@ -21,6 +23,7 @@ const createRoom = (
     playerIndex,
     ws: {} as never,
     name: `Player ${playerIndex + 1}`,
+    userId: userIds[playerIndex],
   })),
 })
 
@@ -65,6 +68,24 @@ describe('room-manager seat assignment', () => {
       ok: true,
       playerIndex: 0,
       replacedExistingPlayer: false,
+    })
+  })
+
+  it('routes same-user re-entry without a requested seat back to the existing seat', () => {
+    const room = createRoom('abc123', [0], 2, { 0: 'user-1' })
+
+    expect(resolveJoinRequestPlayerIndex(room, undefined, 'user-1')).toEqual({
+      ok: true,
+      requestedPlayerIndex: 0,
+    })
+  })
+
+  it('rejects same-user re-entry when explicitly requesting another seat', () => {
+    const room = createRoom('abc123', [0], 2, { 0: 'user-1' })
+
+    expect(resolveJoinRequestPlayerIndex(room, 1, 'user-1')).toEqual({
+      ok: false,
+      error: 'you are already in this room',
     })
   })
 
