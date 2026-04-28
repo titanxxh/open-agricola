@@ -48,10 +48,12 @@ import {
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
 import {
+  addFoodFromConversion,
   incFirstPlayer,
   incHarvestedGrain,
   incHarvestedVegetable,
   incPlacedFarmers,
+  incResourceConverted,
   incRoomsBuilt,
 } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
@@ -2226,6 +2228,8 @@ export class GameCore {
       player.resources[sel.resourceKey] -= used
       totalFood += used * sel.food
       usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
+      incResourceConverted(player, sel.resourceKey, used)
+      addFoodFromConversion(player, sel.resourceKey, used * sel.food)
       this.state.log.unshift({
         key: 'log.harvestFeedConvert',
         params: {

@@ -12,6 +12,7 @@ import { payResources } from './pay'
 import { gainResources } from './gain'
 import { canAffordFlatCost } from './pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -276,6 +277,24 @@ const buildTradeEffectPreview = (trade: Trade, times: number) => ({
   resourcesGained: scaleResources(trade.to, times),
 })
 
+const recordCookeryConversion = (
+  player: PlayerState,
+  trade: Trade,
+  times: number,
+) => {
+  if (times <= 0) return
+  const fromKey = (Object.keys(trade.from)[0] ?? null) as ResourceKey | null
+  if (!fromKey) return
+  const perFrom = trade.from[fromKey] ?? 0
+  if (perFrom <= 0) return
+  const totalFrom = perFrom * times
+  incResourceConverted(player, fromKey, totalFrom)
+  const foodOut = (trade.to.food ?? 0) * times
+  if (foodOut > 0) {
+    addFoodFromConversion(player, fromKey, foodOut)
+  }
+}
+
 const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
   const trades = getPlayerCookeryTrades(player)
   const options: ActionChoiceOption[] = []
@@ -318,6 +337,7 @@ const resolveExchangeChoice = (
       const times = Math.min(count, max)
       if (times > 0) {
         applyTrade(player, trade, times)
+        recordCookeryConversion(player, trade, times)
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
@@ -335,6 +355,7 @@ const resolveExchangeChoice = (
     const times = Math.min(count, max)
     if (times > 0) {
       applyTrade(player, trade, times)
+      recordCookeryConversion(player, trade, times)
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     trackWorkPhaseBuildingResources(state, player.id, gained)
