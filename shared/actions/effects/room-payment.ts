@@ -423,5 +423,5 @@ export const executeResolvedRoomPayment = (
   player: PlayerState,
   resolution: SelectedRoomPayment,
 ) => {
-  executeResolvedTypedFlatPayment(player, resolution)
+  executeResolvedTypedFlatPayment(player, resolution, 'construct')
 }

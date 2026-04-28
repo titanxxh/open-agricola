@@ -312,8 +312,9 @@ export const resolveTypedFlatPaymentSelection = (
 export const executeResolvedTypedFlatPayment = (
   player: PlayerState,
   payment: Extract<TypedFlatPaymentSelection, { type: 'selected' }>,
+  costType?: CostModifierType,
 ) => {
-  executePaymentSolution(player, payment.solution)
+  executePaymentSolution(player, payment.solution, { costType })
 }
 
 export const canAffordTypedFlatCost = (
@@ -336,7 +337,7 @@ export const payTypedFlatCost = (
     payResources(player, resolved.directCost)
     return true
   }
-  executePaymentSolution(player, resolved.solution)
+  executePaymentSolution(player, resolved.solution, { costType })
   return true
 }
 
@@ -465,7 +466,7 @@ export const payCardPreviewCost = (
     costType,
   )[0]
   if (!solution) return false
-  executePaymentSolution(player, solution)
+  executePaymentSolution(player, solution, { costType })
   return true
 }
 

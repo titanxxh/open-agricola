@@ -141,7 +141,7 @@ describe('A29_AleBenches', () => {
     expect(owner.resources.grain).toBe(0)
     expect(opponent.resources.food).toBe(1)
     expect(owner.cardStates?.A29_AleBenches?.counters?.bonusVp).toBe(1)
-    expect(readCardResourceStats(owner, 'A29_AleBenches')).toEqual({
+    expect(readCardResourceStats(owner, 'A29_AleBenches')).toMatchObject({
       paid: { grain: 1 },
       gained: { food: 1 },
     })

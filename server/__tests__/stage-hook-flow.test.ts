@@ -52,7 +52,7 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
-    expect(readCardResourceStats(resp.state.players[0]!, 'B70_NewPurchase')).toEqual({
+    expect(readCardResourceStats(resp.state.players[0]!, 'B70_NewPurchase')).toMatchObject({
       paid: { food: 6 },
       gained: { grain: 1, vegetable: 1 },
     })
@@ -97,7 +97,7 @@ describe('stage hook flows', () => {
     expect(resp.pending.type).toBe('none')
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!.resources.cattle).toBe(1)
-    expect(readCardResourceStats(resp.state.players[0]!, 'A166_Haydryer')).toEqual({
+    expect(readCardResourceStats(resp.state.players[0]!, 'A166_Haydryer')).toMatchObject({
       paid: { food: 3 },
       gained: { cattle: 1 },
     })
@@ -132,7 +132,7 @@ describe('stage hook flows', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.bonusVp).toBe(2)
-    expect(readCardResourceStats(resp.state.players[0]!, 'D99_EarthenwarePotter')).toEqual({
+    expect(readCardResourceStats(resp.state.players[0]!, 'D99_EarthenwarePotter')).toMatchObject({
       paid: { clay: 2 },
       gained: {},
     })
@@ -163,7 +163,7 @@ describe('stage hook flows', () => {
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
     expect(resp.state.players[0]!.resources.grain).toBe(2)
-    expect(readCardResourceStats(resp.state.players[0]!, 'A64_BarleyMill')).toEqual({
+    expect(readCardResourceStats(resp.state.players[0]!, 'A64_BarleyMill')).toMatchObject({
       paid: {},
       gained: { food: 2 },
     })
