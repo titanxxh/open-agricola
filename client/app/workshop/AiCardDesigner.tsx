@@ -23,7 +23,7 @@ import {
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
 } from '../../services/llmService'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
-import { LocalizationModal } from './LocalizationModal'
+import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
 import { Section } from '../../components/common/Section'
@@ -1493,6 +1493,18 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
             <span className={`card-asset-chip${extracted?.sourceCode ? ' is-active' : ''}`}>
               {extracted?.sourceCode ? '✏' : '✗'} {t('platform.code')}
             </span>
+            {(() => {
+              // Mirror the same predicate the PR submission gate uses
+              // (`hasZhLocale` in WorkshopPage). Code-side `name`/`desc` are
+              // English by design; the missing half that blocks community PRs
+              // is always the zh translation.
+              const zhDone = isLocaleEntryComplete(cardLocales.zh)
+              return (
+                <span className={`card-asset-chip${zhDone ? ' is-active' : ''}`}>
+                  {zhDone ? '🌐' : '✗'} {locale === 'zh' ? '本地化' : 'i18n'}
+                </span>
+              )
+            })()}
             {autoSaving && (
               <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
             )}
