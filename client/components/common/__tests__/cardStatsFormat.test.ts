@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatCardStatsLines } from '../cardStatsFormat'
+import { t } from '../../../../shared/i18n'
 import type { CardResourceStats } from '../../../../shared/game/types'
 
 const empty: CardResourceStats = {
@@ -85,6 +86,15 @@ describe('formatCardStatsLines', () => {
   it('drops keys whose values are 0', () => {
     const stats: CardResourceStats = { ...empty, used: 0, gained: { wood: 0 } }
     expect(formatCardStatsLines(stats, 'C99', 'en')).toEqual([])
+  })
+
+  it('translates ui.cardStats.* keys for both locales', () => {
+    expect(t('zh', 'ui.cardStats.used')).toBe('使用次数')
+    expect(t('en', 'ui.cardStats.used')).toBe('Used')
+    expect(t('zh', 'ui.cardStats.gainedField')).toBe('开垦次数')
+    expect(t('en', 'ui.cardStats.gainedField')).toBe('Plows')
+    expect(t('zh', 'ui.cardStats.saved')).toBe('节省')
+    expect(t('en', 'ui.cardStats.saved')).toBe('Saved')
   })
 
   it('sums roomWood + roomClay + roomStone into a single Built-rooms line', () => {
