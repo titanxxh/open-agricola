@@ -67,4 +67,42 @@ describe('PlayerStats action tracking', () => {
     expect(after.players[0]!.stats.firstPlayerCount).toBe(1)
     expect(after.players[1]!.stats.firstPlayerCount).toBe(0)
   })
+
+  it('totalRoomsBuilt increments when a room is constructed via farm-expansion', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources = { ...player.resources, wood: 5, reed: 2 }
+    setWorkersAtHome(state, player, 2)
+    setWorkersAtHome(state, state.players[1]!, 0)
+
+    session.loadState(state)
+    expect(session.getState().state.players[0]!.stats.totalRoomsBuilt).toBe(0)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    // First a choice: construct (rooms) vs stables. Pick construct.
+    if (resp.pending.type !== 'choice') {
+      throw new Error('expected initial farm-expansion choice')
+    }
+    const constructOption = resp.pending.options.find((o) =>
+      typeof o.value === 'string' && o.value.startsWith('seq-construct'),
+    )
+    if (!constructOption) throw new Error('construct option missing')
+    resp = session.resolveChoice(0, constructOption.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'farmSelect') {
+      throw new Error('expected farmSelect interaction')
+    }
+    if (resp.interaction.farm.farmType !== 'room') {
+      throw new Error('expected farm type room')
+    }
+    const tile = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitFarmChoice(0, 'room', { rooms: [tile] })
+    expect(resp.ok).toBe(true)
+    expect(session.getState().state.players[0]!.rooms).toBe(3)
+    expect(session.getState().state.players[0]!.stats.totalRoomsBuilt).toBe(1)
+  })
 })
