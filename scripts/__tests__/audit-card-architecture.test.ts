@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { parseArgs, discoverCardPairs } from '../audit-card-architecture'
+import { parseArgs, discoverCardPairs, scanCard } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
   it('uses defaults when no args provided', () => {
@@ -48,5 +48,27 @@ describe('discoverCardPairs', () => {
     // E80 is BGA-only at this snapshot (we have not implemented it yet)
     const bgaOnly = pairs.bgaOnly.find(c => c.cardId === 'E80')
     expect(bgaOnly).toBeDefined()
+  })
+})
+
+describe('scanCard (skeleton)', () => {
+  it('returns CardAuditResult with all signal fields initialized', () => {
+    const result = scanCard({
+      cardId: 'A123',
+      deck: 'A',
+      ourPath: 'shared/cards/A/A123_FrameBuilder.ts',
+      bgaPath: '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/A/A123_FrameBuilder.php',
+    })
+
+    expect(result.cardId).toBe('A123')
+    expect(result.signals.S1_coreFileMentions).toEqual([])
+    expect(result.signals.S4_crossLayerImports).toEqual([])
+    expect(result.signals.S5_aggregateMutations).toEqual([])
+    expect(typeof result.signals.S6_lineRatio).toBe('number')
+    expect(result.signals.S7_externalCardIdMentions).toEqual([])
+    expect(['none', 'low', 'high']).toContain(result.signals.S10_shellLikelihood)
+    expect(result.signals.S11_descAlignment).toMatch(/aligned|missing-i18n|diff-from-bga/)
+    expect(result.signals.S12_i18nGapKeys).toEqual([])
+    expect(result.verdict).toBe('pending')
   })
 })
