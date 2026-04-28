@@ -104,6 +104,75 @@ export function discoverCardPairs(ourCardsDir: string, bgaCardsDir: string): Dis
   return { both, oursOnly, bgaOnly }
 }
 
+export interface CodeMention {
+  file: string
+  line: number
+  snippet: string
+}
+
+export interface CrossLayerImport {
+  from: string
+  to: string
+  line: number
+}
+
+export interface AggregateMutation {
+  file: string
+  line: number
+  field: string
+}
+
+export interface I18nGap {
+  key: string
+  missingZh: boolean
+  missingEn: boolean
+  bgaHasButOurMissing: boolean
+}
+
+export interface CardSignals {
+  S1_coreFileMentions: CodeMention[]
+  S4_crossLayerImports: CrossLayerImport[]
+  S5_aggregateMutations: AggregateMutation[]
+  S6_lineRatio: number
+  S7_externalCardIdMentions: CodeMention[]
+  S10_shellLikelihood: 'none' | 'low' | 'high'
+  S10_evidence: { hookCount: number; bgaHookCount: number; bodyLines: number }
+  S11_descAlignment: 'aligned' | 'missing-i18n' | 'diff-from-bga'
+  S12_i18nGapKeys: I18nGap[]
+}
+
+export interface CardAuditResult {
+  cardId: string
+  ourPath: string
+  bgaPath: string
+  ourLines: number
+  bgaLines: number
+  signals: CardSignals
+  verdict: 'pending'
+}
+
+export function scanCard(pair: CardPair): CardAuditResult {
+  return {
+    cardId: pair.cardId,
+    ourPath: pair.ourPath,
+    bgaPath: pair.bgaPath,
+    ourLines: 0,
+    bgaLines: 0,
+    signals: {
+      S1_coreFileMentions: [],
+      S4_crossLayerImports: [],
+      S5_aggregateMutations: [],
+      S6_lineRatio: 0,
+      S7_externalCardIdMentions: [],
+      S10_shellLikelihood: 'none',
+      S10_evidence: { hookCount: 0, bgaHookCount: 0, bodyLines: 0 },
+      S11_descAlignment: 'aligned',
+      S12_i18nGapKeys: [],
+    },
+    verdict: 'pending',
+  }
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = parseArgs(process.argv.slice(2))
   console.log(JSON.stringify(args, null, 2))
