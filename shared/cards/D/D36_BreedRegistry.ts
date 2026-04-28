@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D36_BreedRegistry'
@@ -18,7 +18,9 @@ const afterCollectListener: CardListenerRegistration = {
       : 0
     if (gained <= 0) return
     const current = readCardExtraData<number>(context.player, CARD_ID, 'sheepGained') ?? 0
-    writeCardExtraData(context.player, CARD_ID, 'sheepGained', current + gained)
+    const next = current + gained
+    writeCardExtraData(context.player, CARD_ID, 'sheepGained', next)
+    writeCardInfobox(context.player, CARD_ID, `${next} / 2`)
   },
 }
 
