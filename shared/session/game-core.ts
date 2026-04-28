@@ -47,6 +47,7 @@ import {
   applyFutureMeeples,
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
+import { incPlacedFarmers } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
   registerCustomCard,
@@ -1906,6 +1907,7 @@ export class GameCore {
       addWorkerRef(space, player.id, worker.id)
     }
     recordRoundPlacement(player, spaceId, worker?.id ?? '?')
+    incPlacedFarmers(player)
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
     this.engine = this.createEngine(spaceId)
