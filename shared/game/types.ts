@@ -12,6 +12,25 @@ export type Resource = {
   begging: number
 }
 
+// Pseudo-resource map — used ONLY by CardResourceStats.gained to record
+// BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
+// the same Partial<Resource>-shaped storage slot. These keys are NEVER
+// stored in player.resources or space.resources. See
+// shared/game/resource-keys.ts for the runtime list / discriminator.
+export type PseudoResourceMap = {
+  occupation?: number
+  field?: number
+  roomWood?: number
+  roomClay?: number
+  roomStone?: number
+  stable?: number
+}
+
+// Storage shape for `CardResourceStats.gained`: real-resource counts plus
+// optional pseudo-resource counters. All Partial because individual cards
+// only touch the keys they care about.
+export type CardStatGained = Partial<Resource> & PseudoResourceMap
+
 export type ResourceKey = keyof Resource
 
 export type Trade = {
