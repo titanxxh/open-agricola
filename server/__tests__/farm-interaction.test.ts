@@ -95,6 +95,23 @@ describe('farm interaction builders', () => {
     expect(interaction.maxSelections).toBe(1)
   })
 
+  it('only offers room tiles reachable within the buildable room count', () => {
+    const player = createPlayer()
+    player.resources.wood = 5
+    player.resources.reed = 2
+
+    const interaction = buildRoomFarmInteraction(player)
+
+    expect(interaction.farmType).toBe('room')
+    if (interaction.farmType !== 'room') return
+    const selectableKeys = new Set(
+      interaction.selectableTiles.map((tile) => `${tile.row}-${tile.col}`),
+    )
+    expect(interaction.maxSelections).toBe(1)
+    expect(selectableKeys).toEqual(new Set(['0-0', '1-1', '2-1']))
+    expect(selectableKeys.has('0-4')).toBe(false)
+  })
+
   it('counts frame builder replacement costs when computing room selections', () => {
     const player = createPlayer()
     player.houseType = 'clay'

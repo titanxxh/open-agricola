@@ -39,6 +39,44 @@ const scaleCost = (
   return sanitizePayableCost(total)
 }
 
+const roomNeighbors = (tile: FarmTilePosition) => [
+  { row: tile.row - 1, col: tile.col },
+  { row: tile.row + 1, col: tile.col },
+  { row: tile.row, col: tile.col - 1 },
+  { row: tile.row, col: tile.col + 1 },
+]
+
+const getReachableRoomTiles = (
+  player: PlayerState,
+  candidateTiles: FarmTilePosition[],
+  maxSelections: number,
+) => {
+  if (maxSelections <= 0) return []
+  const candidateByKey = new Map(
+    candidateTiles.map((tile) => [positionKey(tile), tile] as const),
+  )
+  const visited = new Set(player.roomTiles.map(positionKey))
+  const reachable = new Set<string>()
+  let frontier = [...player.roomTiles]
+
+  for (let depth = 0; depth < maxSelections; depth += 1) {
+    const nextFrontier: FarmTilePosition[] = []
+    frontier.forEach((tile) => {
+      roomNeighbors(tile).forEach((neighbor) => {
+        const key = positionKey(neighbor)
+        if (visited.has(key) || !candidateByKey.has(key)) return
+        visited.add(key)
+        reachable.add(key)
+        nextFrontier.push(candidateByKey.get(key)!)
+      })
+    })
+    frontier = nextFrontier
+    if (frontier.length === 0) break
+  }
+
+  return candidateTiles.filter((tile) => reachable.has(positionKey(tile)))
+}
+
 export const buildRoomFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
@@ -58,10 +96,15 @@ export const buildRoomFarmInteraction = (
     selectableTiles.length,
     getMaxBuildableRooms(player, costOverride, actionContext),
   )
+  const reachableTiles = getReachableRoomTiles(
+    normalized,
+    selectableTiles,
+    maxSelections,
+  )
   return {
     farmType: 'room',
-    selectableTiles,
-    maxSelections: Math.max(0, maxSelections),
+    selectableTiles: reachableTiles,
+    maxSelections: Math.min(reachableTiles.length, Math.max(0, maxSelections)),
   }
 }
 

@@ -70,6 +70,79 @@ type WsStatus =
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
 
+type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+
+const farmErrorKeys = {
+  room: {
+    NO_SELECTION: 'ui.roomErrorNoSelection',
+    INVALID_POSITION: 'ui.roomErrorInvalid',
+    OCCUPIED: 'ui.roomErrorOccupied',
+    NOT_CONNECTED: 'ui.roomErrorNotConnected',
+    LOCKED: 'ui.roomErrorInvalid',
+    'unable to pay room cost': 'ui.roomErrorNoResources',
+    'too many rooms selected': 'ui.roomErrorInvalid',
+  },
+  stable: {
+    NO_SELECTION: 'ui.stableErrorNoSelection',
+    INVALID_POSITION: 'ui.stableErrorInvalid',
+    OCCUPIED: 'ui.stableErrorOccupied',
+    LOCKED: 'ui.stableErrorInvalid',
+    LIMIT_REACHED: 'ui.stableErrorLimit',
+    'unable to pay stable cost': 'ui.stableErrorNoResources',
+  },
+  plow: {
+    NO_SELECTION: 'ui.plowErrorNoSelection',
+    INVALID_POSITION: 'ui.plowErrorInvalid',
+    OCCUPIED: 'ui.plowErrorOccupied',
+    NOT_ADJACENT: 'ui.plowErrorNotAdjacent',
+    FENCED: 'ui.plowErrorFenced',
+    LOCKED: 'ui.plowErrorInvalid',
+    'unable to pay plow cost': 'ui.plowErrorUnknown',
+  },
+  sow: {
+    NO_SELECTION: 'ui.sowErrorNoSelection',
+    INVALID_POSITION: 'ui.sowErrorInvalid',
+    NOT_EMPTY: 'ui.sowErrorNotEmpty',
+    NO_SEEDS: 'ui.sowErrorNoSeeds',
+    INVALID_CROP: 'ui.sowErrorInvalidCrop',
+  },
+} as const
+
+export const farmCommitErrorMessageKey = (
+  farmType: FarmCommitType,
+  error?: string,
+): string => {
+  if (farmType === 'fence') return error ? `fence.error.${error}` : 'fence.error.UNKNOWN'
+  const typeMap = farmErrorKeys[farmType]
+  return (error && error in typeMap)
+    ? typeMap[error as keyof typeof typeMap]
+    : `ui.${farmType}ErrorUnknown`
+}
+
+const roomNeighborKeys = (key: string) => {
+  const tile = parsePositionKey(key)
+  if (!tile) return []
+  return [
+    `${tile.row - 1}-${tile.col}`,
+    `${tile.row + 1}-${tile.col}`,
+    `${tile.row}-${tile.col - 1}`,
+    `${tile.row}-${tile.col + 1}`,
+  ]
+}
+
+export const getCurrentlySelectableRoomKeys = (
+  baseTiles: FarmTilePosition[],
+  existingRoomKeys: Set<string>,
+  pendingRoomKeys: Set<string>,
+): Set<string> => {
+  const anchors = new Set([...existingRoomKeys, ...pendingRoomKeys])
+  return new Set(
+    baseTiles
+      .map((tile) => positionKey(tile))
+      .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
+  )
+}
+
 const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
 
 export const isDevModeAllowedFromQuery = (search: string): boolean => {
@@ -416,6 +489,41 @@ export const GameContainerApi = () => {
     })
   }, [state, transport, isInteractive])
 
+  const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
+    if (farmType === 'fence') {
+      setFenceError({ code: error ?? 'UNKNOWN', edges: [], newEdges: [] })
+      return
+    }
+    if (farmType === 'room') {
+      setRoomError(error ?? 'UNKNOWN')
+      return
+    }
+    if (farmType === 'stable') {
+      setStableError(error ?? 'UNKNOWN')
+      return
+    }
+    if (farmType === 'plow') {
+      setPlowError(error ?? 'UNKNOWN')
+      return
+    }
+    setSowError(error ?? 'UNKNOWN')
+  }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
+
+  const commitFarmWithError = useCallback((
+    playerIndex: number,
+    farmType: FarmCommitType,
+    payload: Record<string, unknown>,
+  ) => {
+    void transport.commitFarm(playerIndex, farmType, payload)
+      .then((resp) => {
+        if (!resp.ok) setFarmCommitError(farmType, resp.error)
+      })
+      .catch((e) => {
+        console.error(e)
+        setFarmCommitError(farmType)
+      })
+  }, [transport, setFarmCommitError])
+
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
@@ -438,23 +546,23 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'fence') {
-        void transport.commitFarm(pendingPlayerIndex, 'fence', {
+        commitFarmWithError(pendingPlayerIndex, 'fence', {
           edges: pendingFenceEdges,
           palisadeEdges: pendingPalisadeEdges,
           extraWood: interaction.farm.extraWood ?? 0,
-        }).catch((e) => console.error(e))
+        })
         return
       }
       if (interaction.farm.farmType === 'room') {
-        void transport.commitFarm(pendingPlayerIndex, 'room', {
+        commitFarmWithError(pendingPlayerIndex, 'room', {
           rooms: pendingRoomTiles,
-        }).catch((e) => console.error(e))
+        })
         return
       }
       if (interaction.farm.farmType === 'stable') {
-        void transport.commitFarm(pendingPlayerIndex, 'stable', {
+        commitFarmWithError(pendingPlayerIndex, 'stable', {
           stables: pendingStableTiles,
-        }).catch((e) => console.error(e))
+        })
         return
       }
       if (interaction.farm.farmType === 'plow') {
@@ -462,9 +570,9 @@ export const GameContainerApi = () => {
           setPlowError('NO_SELECTION')
           return
         }
-        void transport.commitFarm(pendingPlayerIndex, 'plow', {
+        commitFarmWithError(pendingPlayerIndex, 'plow', {
           tile: pendingPlowTile,
-        }).catch((e) => console.error(e))
+        })
         return
       }
       if (interaction.farm.farmType === 'sow') {
@@ -483,14 +591,14 @@ export const GameContainerApi = () => {
           setSowError('NO_SELECTION')
           return
         }
-        void transport.commitFarm(pendingPlayerIndex, 'sow', { crops }).catch((e) => console.error(e))
+        commitFarmWithError(pendingPlayerIndex, 'sow', { crops })
         return
       }
       return
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive, commitFarmWithError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -889,10 +997,18 @@ export const GameContainerApi = () => {
   )
   const sowSelectedCount = Object.keys(pendingSowSelections).length
   const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
-  const roomErrorText: string | null = roomError ? (typeof roomError === 'string' ? roomError : '') : null
-  const stableErrorText: string | null = stableError ? (typeof stableError === 'string' ? stableError : '') : null
-  const plowErrorText: string | null = plowError ? (typeof plowError === 'string' ? plowError : '') : null
-  const sowErrorText: string | null = sowError ? (typeof sowError === 'string' ? sowError : '') : null
+  const roomErrorText: string | null = roomError
+    ? t(locale, farmCommitErrorMessageKey('room', roomError))
+    : null
+  const stableErrorText: string | null = stableError
+    ? t(locale, farmCommitErrorMessageKey('stable', stableError))
+    : null
+  const plowErrorText: string | null = plowError
+    ? t(locale, farmCommitErrorMessageKey('plow', plowError))
+    : null
+  const sowErrorText: string | null = sowError
+    ? t(locale, farmCommitErrorMessageKey('sow', sowError))
+    : null
   const farmCells = useMemo(() => {
     const rows = 7; const cols = 11
     const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
@@ -982,13 +1098,15 @@ export const GameContainerApi = () => {
     cattle: Math.max(0, reorgAvailable.cattle - reorgTotals.cattle),
   } : null
   const roomSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'room'
-          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
+    () => {
+      if (farmInteraction?.farmType !== 'room') return new Set<string>()
+      return getCurrentlySelectableRoomKeys(
+        farmInteraction.selectableTiles,
+        roomPositions,
+        new Set(pendingRoomTiles.map((tile) => positionKey(tile))),
+      )
+    },
+    [farmInteraction, pendingRoomTiles, roomPositions],
   )
   const stableSelectableSet = useMemo(
     () =>
