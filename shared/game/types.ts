@@ -129,6 +129,7 @@ export type PlayerState = {
   startPlayer: boolean
   activeModifiers: CostModifier[]
   cardStates: CardStates
+  stats: PlayerStats
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
    * `sources` fired during the currently-executing action. Initialised by
@@ -171,6 +172,29 @@ export type CardResourceStats = {
 }
 
 export type CardStates = Record<string, CardState>
+
+export type DraftHistoryEntry = {
+  cardId: string
+  draftTurn: number
+  playedTurn?: number
+}
+
+export type PlayerStats = {
+  placedFarmers: number
+  firstPlayerCount: number
+  totalRoomsBuilt: number
+  totalMajorBuilt: number
+  totalMinorBuilt: number
+  totalOccupationBuilt: number
+  harvestedGrain: number
+  harvestedVegetable: number
+  resourcesFromBoard: Partial<Resource>
+  resourcesFromCards: Partial<Resource>
+  resourcesConverted: Partial<Resource>
+  foodFromConversion: Partial<Resource>
+  draftHistory: DraftHistoryEntry[]
+  draftDiscarded: string[]
+}
 
 export type LogEntry = {
   key: string
