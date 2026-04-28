@@ -200,26 +200,26 @@ describe('WS seat binding', () => {
     expect(check.payload.state.players[1]!.resources.wood).not.toBe(999)
   })
 
-  it('accepts devSetResources when the seat matches the sender', async () => {
-    const { p1, initialP1 } = await setupTwoPlayerRoom(baseUrl, sockets)
-    const initialWood = initialP1.payload.state.players[0]!.resources.wood
-
+  it('rejects devSetResources in a normal room even when the seat matches the sender', async () => {
+    const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
     p1.send(
       JSON.stringify({
         type: 'devSetResources',
         playerIndex: 0,
-        resources: { wood: initialWood + 7 },
+        resources: { wood: 999 },
         requestId: 'own-dev-set-1',
       }),
     )
-    const afterResources = await waitForEvent(
+    const result = await waitForEvent(
       p1,
-      (event): event is StateUpdateEnvelope =>
-        event.type === 'stateUpdate' && event.requestId === 'own-dev-set-1',
+      (event): event is Extract<ServerEvent, { type: 'error' }> | StateUpdateEnvelope =>
+        (event.type === 'error' || event.type === 'stateUpdate') &&
+        event.requestId === 'own-dev-set-1',
     )
-    expect(afterResources.payload.state.players[0]!.resources.wood).toBe(
-      initialWood + 7,
-    )
+    expect(result.type).toBe('error')
+    if (result.type === 'error') {
+      expect(result.error).toMatch(/dev commands disabled/i)
+    }
   })
 
   it('rejects commitFarm with a playerIndex that is not the sender seat', async () => {

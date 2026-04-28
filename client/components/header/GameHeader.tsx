@@ -104,10 +104,12 @@ export const GameHeader = ({
           </button>
           {menuOpen && (
             <div className="header-menu">
-              <label className="header-menu-item">
-                <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
-                {t(locale, 'ui.devMode')}
-              </label>
+              {devMode ? (
+                <label className="header-menu-item">
+                  <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
+                  {t(locale, 'ui.devMode')}
+                </label>
+              ) : null}
               {myPlayerName && (
                 <div className="header-menu-item header-menu-identity">{locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}</div>
               )}

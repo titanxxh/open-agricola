@@ -194,10 +194,15 @@ describe('room-manager ws sync', () => {
     sockets.push(p1)
     await new Promise<void>((resolve) => p1.once('open', () => resolve()))
 
-    p1.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
-    const roomCreated = await waitForEvent(
+    p1.send(JSON.stringify({
+      type: 'joinRoom',
+      roomId: 'dev2',
+      requestedPlayerIndex: 0,
+      name: 'P1',
+    }))
+    await waitForEvent(
       p1,
-      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
+      (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined',
     )
 
     const p2 = new WebSocket(baseUrl) as TestSocket
@@ -208,7 +213,7 @@ describe('room-manager ws sync', () => {
 
     p2.send(JSON.stringify({
       type: 'joinRoom',
-      roomId: roomCreated.roomId,
+      roomId: 'dev2',
       requestedPlayerIndex: 1,
       name: 'P2',
     }))

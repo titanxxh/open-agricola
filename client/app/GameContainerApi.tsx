@@ -70,6 +70,16 @@ type WsStatus =
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
 
+const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
+
+export const isDevModeAllowedFromQuery = (search: string): boolean => {
+  const params = new URLSearchParams(search)
+  if (params.get('devMode') !== '1') return false
+  const roomId = params.get('room')
+  if (roomId && FIXED_DEV_ROOM_IDS.has(roomId)) return true
+  return params.get('embedded') === '1' && params.get('transport') !== 'ws'
+}
+
 const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const wsRef = useRef<WsGameTransport | null>(null)
@@ -244,7 +254,7 @@ export const GameContainerApi = () => {
   const { locale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
-  const [devMode, setDevMode] = useState(() => currentUrlParams.get('devMode') === '1')
+  const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
@@ -1596,7 +1606,7 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
-      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={() => setShowScoringPad(false)} /> : null}
+      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={() => setShowScoringPad(false)} showDraftHistory={state.gameOver} /> : null}
       {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}

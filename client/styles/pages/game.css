@@ -476,11 +476,14 @@
   height: 34px;
   padding: 0 10px;
   align-self: center;
-  border: 2px solid #355d2e;
+  border: 0;
   background: #fff;
   color: #2d5228;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.header-locale-select .select-button__trigger {
+  border: 0;
 }
 .header-locale-select:hover {
   background: #f4faf0;
