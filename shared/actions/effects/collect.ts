@@ -1,5 +1,6 @@
 import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../game/types'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { addResourcesFromBoard } from '../../logic/stats'
 
 export const collectAccumulatedResources = (
   player: PlayerState,
@@ -32,6 +33,7 @@ export const collectAction: ActionDefinition = {
     })
     collectAccumulatedResources(player, space)
     trackWorkPhaseBuildingResources(state, player.id, gained)
+    addResourcesFromBoard(player, gained)
     return { type: 'ok' as const, resourcesGained: gained }
   },
 }

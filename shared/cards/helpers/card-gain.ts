@@ -2,6 +2,10 @@ import type { PlayerState, Resource } from '../../game/types'
 import { gainResources } from '../../actions/effects/gain'
 import { incCounter } from '../__stubs__/helpers'
 import { addCardResourceGained } from './card-state'
+import {
+  addResourcesFromBoard,
+  addResourcesFromCards,
+} from '../../logic/stats'
 
 export type CardGain = Partial<Resource> & { score?: number }
 
@@ -31,6 +35,9 @@ export const applyCardGain = (
     gainResources(player, resources)
     if (cardId) {
       addCardResourceGained(player, cardId, resources)
+      addResourcesFromCards(player, resources)
+    } else {
+      addResourcesFromBoard(player, resources)
     }
   }
   if (score > 0 && cardId) {
