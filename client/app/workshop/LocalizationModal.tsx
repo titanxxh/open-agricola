@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llmService'
 import { useLocale } from '../../contexts/LocaleContext'
 
@@ -9,6 +9,29 @@ type CardLocaleContent = {
 }
 
 type CardLocales = Record<string, CardLocaleContent>
+
+const SUPPORTED_LANGS = ['zh', 'en'] as const
+
+export function isLocaleEntryComplete(entry: CardLocaleContent | undefined): boolean {
+  if (!entry) return false
+  if (typeof entry.name !== 'string' || entry.name.trim().length === 0) return false
+  if (!Array.isArray(entry.desc)) return false
+  return entry.desc.some((line) => typeof line === 'string' && line.trim().length > 0)
+}
+
+/**
+ * Languages that need a translation when the modal opens. Returns every
+ * SUPPORTED_LANGS entry that isn't `currentLang` and isn't already complete in
+ * `locales`. Caller skips auto-translation when this is empty.
+ */
+export function getMissingLanguages(
+  currentLang: string,
+  locales: CardLocales,
+): string[] {
+  return SUPPORTED_LANGS.filter(
+    (lang) => lang !== currentLang && !isLocaleEntryComplete(locales[lang]),
+  )
+}
 
 export function LocalizationModal({
   currentContent,
@@ -34,9 +57,73 @@ export function LocalizationModal({
   const [targetPrerequisite, setTargetPrerequisite] = useState(existing?.prerequisite ?? '')
 
   const [translating, setTranslating] = useState(false)
+  const [autoTranslating, setAutoTranslating] = useState(false)
   const [error, setError] = useState('')
 
   const langLabel = (lang: string) => lang === 'zh' ? '中文' : lang === 'en' ? 'English' : lang
+
+  // On mount: if any supported language is missing a translation, fire one
+  // request per missing language, merge results into `locales`, and persist
+  // via `onSave` (which also closes the modal). On error or missing config,
+  // leave the modal open so the user can correct it manually.
+  useEffect(() => {
+    if (!isLocaleEntryComplete(currentContent)) return
+    const missing = getMissingLanguages(currentLang, locales)
+    if (missing.length === 0) return
+
+    const config = getLlmConfig()
+    if (!config) {
+      setError(locale === 'zh' ? '请先配置 LLM API Key' : 'Please configure LLM API Key first')
+      return
+    }
+
+    let cancelled = false
+    setAutoTranslating(true)
+    setError('')
+    ;(async () => {
+      try {
+        const updated: CardLocales = {
+          ...locales,
+          [currentLang]: {
+            name: currentContent.name,
+            desc: currentContent.desc,
+            ...(currentContent.prerequisite ? { prerequisite: currentContent.prerequisite } : {}),
+          },
+        }
+        for (const lang of missing) {
+          if (cancelled) return
+          const result = await translateCardContent(
+            {
+              name: currentContent.name,
+              desc: currentContent.desc,
+              prerequisite: currentContent.prerequisite,
+            },
+            lang,
+            config as LlmConfig,
+          )
+          if (cancelled) return
+          updated[lang] = {
+            name: result.name,
+            desc: result.desc,
+            ...(result.prerequisite ? { prerequisite: result.prerequisite } : {}),
+          }
+        }
+        if (!cancelled) onSave(updated)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : (locale === 'zh' ? '自动翻译失败' : 'Auto-translation failed'))
+          setAutoTranslating(false)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // run once on mount; the modal is re-mounted each time it opens, so we
+    // intentionally don't list deps that would re-trigger translations.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleLangChange = (lang: string) => {
     setTargetLang(lang)
@@ -104,6 +191,11 @@ export function LocalizationModal({
             {locale === 'zh' ? '关闭' : 'Close'}
           </button>
         </div>
+        {autoTranslating && (
+          <div className="localization-auto-status" role="status" aria-live="polite">
+            {locale === 'zh' ? '正在自动翻译并保存…' : 'Auto-translating and saving…'}
+          </div>
+        )}
         <div className="localization-modal-body">
           {/* Top: current language content (read-only) */}
           <div className="localization-section">
