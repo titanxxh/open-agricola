@@ -2669,6 +2669,7 @@ export class GameCore {
         break
       }
       case 'room': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const rooms = Array.isArray((payload as { rooms?: FarmTilePosition[] }).rooms)
           ? (payload as { rooms: FarmTilePosition[] }).rooms
           : []
@@ -2729,9 +2730,20 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats && rooms.length > 0) {
+          // BGA-style gained.room{Wood/Clay/Stone}: when a card causes rooms
+          // to be built, count by player's current house material.
+          const houseType = this.state.players[playerIndex]!.houseType
+          const roomKey =
+            houseType === 'wood' ? 'roomWood'
+            : houseType === 'clay' ? 'roomClay'
+            : 'roomStone'
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { [roomKey]: rooms.length })
+        }
         break
       }
       case 'stable': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const stables = Array.isArray((payload as { stables?: FarmTilePosition[] }).stables)
           ? (payload as { stables: FarmTilePosition[] }).stables
           : []
@@ -2782,6 +2794,9 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats && stables.length > 0) {
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { stable: stables.length })
+        }
         break
       }
       case 'plow': {

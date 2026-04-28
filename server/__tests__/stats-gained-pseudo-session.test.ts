@@ -40,6 +40,33 @@ describe('gained.field pseudo-stat', () => {
   })
 })
 
+describe('gained.stable pseudo-stat', () => {
+  it('writes gained.stable to sourceCard when commitFarmChoice builds stables', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    state.players[0]!.resources.wood = 10
+
+    session.loadState(state)
+    const resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+
+    const pending = session.getState().pending
+    if (pending.type === 'choice') {
+      pending.sourceCard = 'TEST_StableCard'
+    }
+
+    const farmResp = session.commitFarmChoice(0, 'stable', { stables: [{ row: 0, col: 0 }] })
+    expect(farmResp.ok).toBe(true)
+
+    const stats = readCardResourceStats(session.getState().state.players[0]!, 'TEST_StableCard')
+    expect(stats?.gained?.stable).toBe(1)
+  })
+})
+
 describe('gained.occupation pseudo-stat', () => {
   it('does NOT write gained.occupation to the directly-played occupation card', () => {
     // Standard player-driven `lessons` action -> playOccupation has no sourceCard,
