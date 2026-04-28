@@ -47,7 +47,7 @@ import {
   applyFutureMeeples,
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
-import { incFirstPlayer, incPlacedFarmers } from '../logic/stats.ts'
+import { incFirstPlayer, incPlacedFarmers, incRoomsBuilt } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
   registerCustomCard,
@@ -2567,6 +2567,12 @@ export class GameCore {
 
     this.pushHistory()
     this.state.players[playerIndex] = result.player as unknown as PlayerState
+    if (farmPayment.farmType === 'room') {
+      const farmRooms = (farmPayment.payload as { rooms?: unknown[] }).rooms
+      if (Array.isArray(farmRooms)) {
+        incRoomsBuilt(this.state.players[playerIndex]!, farmRooms.length)
+      }
+    }
     return this.continueAfterResolvedFarmChoice(playerIndex)
   }
 
@@ -2722,6 +2728,7 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        incRoomsBuilt(this.state.players[playerIndex]!, rooms.length)
         break
       }
       case 'stable': {

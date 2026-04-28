@@ -1,4 +1,5 @@
 import type { ActionDefinition } from '../../game/types'
+import { incRoomsBuilt } from '../../logic/stats'
 
 /**
  * Card-specific action for B85_FarmHand.
@@ -14,6 +15,7 @@ export const buildFarmhandRoomAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player }) => {
     player.rooms += 1
+    incRoomsBuilt(player, 1)
     return { type: 'ok', logKey: 'log.buildFarmHandRoom' }
   },
 }
