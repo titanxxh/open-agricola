@@ -57,6 +57,8 @@ export const exchangeResources = (
     return { type: 'ok' }
   }
   payResources(player, scaledCost)
+  // TODO: legacy path — does not record resourcesFromCards.
+  // Active path is the BGA-aligned trade system below; new code should use that.
   gainResources(player, scaleResources(gain, times))
   return { type: 'ok' }
 }
