@@ -67,6 +67,9 @@ type WsStatus =
   | { phase: 'ready'; roomId: string; playerIndex: number }
   | { phase: 'error'; message: string }
 
+export const playerIdFromWsStatus = (status: WsStatus): string | null =>
+  status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
+
 const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const wsRef = useRef<WsGameTransport | null>(null)
@@ -330,10 +333,13 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
+  const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
+  const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   // In WS mode, selfPlayer is locked to the URL ?player= param.
+  // If the URL omits ?player=, use the seat assigned by the join/create handshake.
   // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
-  const selfPlayer = isWs && lockedViewPlayerId
-    ? state?.players.find((p) => p.id === lockedViewPlayerId) ?? currentPlayer
+  const selfPlayer = isWs && localPlayerId
+    ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // In WS mode, viewPlayerId lets you peek at another player's board.
@@ -1362,7 +1368,7 @@ export const GameContainerApi = () => {
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
   if (state.phase === 'draft' && state.draft) {
-    const meId = (isWs && lockedViewPlayerId) ? lockedViewPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         <DraftOverlay
