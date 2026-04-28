@@ -162,6 +162,38 @@ export const addCardResourceGained = (
   addCardResourceStats(player, cardId, 'gained', resources)
 }
 
+export const incCardUsed = (player: PlayerState, cardId: string) => {
+  const current = readCardResourceStats(player, cardId) ?? emptyCardResourceStats()
+  writeCardExtraData(player, cardId, CARD_RESOURCE_STATS_KEY, {
+    ...current,
+    used: current.used + 1,
+  } satisfies CardResourceStats)
+}
+
+export const addCardResourceSaved = (
+  player: PlayerState,
+  cardId: string,
+  resources: Partial<Resource>,
+) => {
+  addCardResourceStats(player, cardId, 'saved', resources)
+}
+
+export const addCardResourceReceivedPayment = (
+  player: PlayerState,
+  cardId: string,
+  resources: Partial<Resource>,
+) => {
+  addCardResourceStats(player, cardId, 'receivedPayment', resources)
+}
+
+export const addCardResourcePaidToOthers = (
+  player: PlayerState,
+  cardId: string,
+  resources: Partial<Resource>,
+) => {
+  addCardResourceStats(player, cardId, 'paidToOthers', resources)
+}
+
 export const getCardStack = (player: PlayerState, cardId: string): string[] =>
   player.cardStates?.[cardId]?.stack ?? []
 
