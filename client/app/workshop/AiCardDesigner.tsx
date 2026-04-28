@@ -67,6 +67,38 @@ async function uploadArt(dataUrl: string): Promise<string | null> {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Build the "current language" content fed to LocalizationModal. The modal
+ * shows this read-only as the source for the translate button. Picking the
+ * right source matters: if the user has already filled in a translation for
+ * the active UI language we want to honour it, otherwise fall back to the
+ * editor inputs the user is actually looking at.
+ */
+export function pickLocalizationCurrentContent(args: {
+  locale: string
+  cardLocales: Record<string, { name: string; desc: string[]; prerequisite?: string }>
+  cardName: string
+  prerequisite: string
+  extractedName: string | undefined
+  extractedDesc: string[] | undefined
+  extractedPrerequisite: string | undefined
+}): { name: string; desc: string[]; prerequisite?: string } {
+  const localeEntry = args.cardLocales[args.locale]
+  const editorPrereq = args.prerequisite || args.extractedPrerequisite
+  if (localeEntry?.name && (localeEntry.desc?.length ?? 0) > 0) {
+    return {
+      name: localeEntry.name,
+      desc: localeEntry.desc,
+      prerequisite: localeEntry.prerequisite ?? editorPrereq,
+    }
+  }
+  return {
+    name: args.cardName || args.extractedName || '',
+    desc: args.extractedDesc ?? [],
+    prerequisite: editorPrereq,
+  }
+}
+
 export type ExtractedCard = {
   card: {
     id: string
@@ -77,6 +109,7 @@ export type ExtractedCard = {
     desc: string[]
     prerequisite?: string
     modifiers?: unknown[]
+    locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
   }
   sourceCode?: string
 }
@@ -1112,6 +1145,19 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
       if (extracted.card.id?.startsWith('CUSTOM_') && isValidCardId(extracted.card.id).valid) {
         setCardIdInput(extracted.card.id)
       }
+      // Pull any locales the LLM emitted in the code block into the editor's
+      // cardLocales state so the LocalizationModal can show them. Existing
+      // user-edited entries win — we only fill keys the user hasn't touched.
+      const extractedLocales = extracted.card.locales
+      if (extractedLocales && Object.keys(extractedLocales).length > 0) {
+        setCardLocales((prev) => {
+          const merged = { ...prev }
+          for (const [lang, entry] of Object.entries(extractedLocales)) {
+            if (!merged[lang]) merged[lang] = entry
+          }
+          return merged
+        })
+      }
     }
   }, [extracted])
 
@@ -1510,11 +1556,15 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
 
       {showLocalizationModal && (
         <LocalizationModal
-          currentContent={{
-            name: extracted?.card?.name ?? cardName,
-            desc: extracted?.card?.desc ?? [],
-            prerequisite: extracted?.card?.prerequisite ?? (prerequisite || undefined),
-          }}
+          currentContent={pickLocalizationCurrentContent({
+            locale,
+            cardLocales,
+            cardName,
+            prerequisite,
+            extractedName: extracted?.card?.name,
+            extractedDesc: extracted?.card?.desc,
+            extractedPrerequisite: extracted?.card?.prerequisite,
+          })}
           currentLang={locale}
           locales={cardLocales}
           onSave={(updatedLocales) => {
