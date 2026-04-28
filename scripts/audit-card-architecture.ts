@@ -151,18 +151,30 @@ export interface CardAuditResult {
   verdict: 'pending'
 }
 
+export function countLines(filePath: string): number {
+  const content = fs.readFileSync(filePath, 'utf8')
+  return content.split('\n').filter(l => l.trim().length > 0).length
+}
+
+export function computeLineRatio(ourLines: number, bgaLines: number): number {
+  if (bgaLines === 0) return Infinity
+  return ourLines / bgaLines
+}
+
 export function scanCard(pair: CardPair): CardAuditResult {
+  const ourLines = countLines(pair.ourPath)
+  const bgaLines = countLines(pair.bgaPath)
   return {
     cardId: pair.cardId,
     ourPath: pair.ourPath,
     bgaPath: pair.bgaPath,
-    ourLines: 0,
-    bgaLines: 0,
+    ourLines,
+    bgaLines,
     signals: {
       S1_coreFileMentions: [],
       S4_crossLayerImports: [],
       S5_aggregateMutations: [],
-      S6_lineRatio: 0,
+      S6_lineRatio: computeLineRatio(ourLines, bgaLines),
       S7_externalCardIdMentions: [],
       S10_shellLikelihood: 'none',
       S10_evidence: { hookCount: 0, bgaHookCount: 0, bodyLines: 0 },

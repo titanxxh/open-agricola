@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { parseArgs, discoverCardPairs, scanCard } from '../audit-card-architecture'
+import {
+  parseArgs,
+  discoverCardPairs,
+  scanCard,
+  computeLineRatio,
+  countLines,
+} from '../audit-card-architecture'
 
 describe('parseArgs', () => {
   it('uses defaults when no args provided', () => {
@@ -70,5 +76,26 @@ describe('scanCard (skeleton)', () => {
     expect(result.signals.S11_descAlignment).toMatch(/aligned|missing-i18n|diff-from-bga/)
     expect(result.signals.S12_i18nGapKeys).toEqual([])
     expect(result.verdict).toBe('pending')
+  })
+})
+
+describe('computeLineRatio', () => {
+  it('returns ourLines / bgaLines', () => {
+    expect(computeLineRatio(150, 100)).toBeCloseTo(1.5)
+  })
+
+  it('returns Infinity when BGA has 0 lines', () => {
+    expect(computeLineRatio(50, 0)).toBe(Infinity)
+  })
+
+  it('returns 0 when our file has 0 lines', () => {
+    expect(computeLineRatio(0, 100)).toBe(0)
+  })
+})
+
+describe('countLines', () => {
+  it('counts non-empty lines in a real file', () => {
+    const n = countLines('shared/cards/A/A123_FrameBuilder.ts')
+    expect(n).toBeGreaterThan(0)
   })
 })
