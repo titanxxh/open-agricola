@@ -3,7 +3,7 @@ import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
-import { incMajorBuilt, incMinorBuilt } from '../../logic/stats'
+import { incMajorBuilt, incMinorBuilt, recordDraftPlayed } from '../../logic/stats'
 import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
@@ -440,6 +440,7 @@ const finalizeMinorImprovementPurchase = (
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
   player.minorPlayed.push(improvement.id)
   incMinorBuilt(player)
+  recordDraftPlayed(player, improvement.id, state.round)
 
   // D25 multi-identity: providesOccupation → also count as an occupation.
   if (improvement.providesOccupation) {

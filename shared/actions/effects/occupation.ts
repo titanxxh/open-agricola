@@ -7,7 +7,7 @@ import {
 } from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
-import { incOccupationBuilt } from '../../logic/stats'
+import { incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 
 const getPositiveResourceLog = (
   resources?: Partial<Resource> | null,
@@ -151,6 +151,9 @@ export const playOccupation = (
   )
   player.occupationPlayed.push(occupation.id)
   incOccupationBuilt(player)
+  if (state) {
+    recordDraftPlayed(player, occupation.id, state.round)
+  }
   getCardModifiers(occupation.id).forEach((modifier) => {
     if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
       player.activeModifiers.push(modifier)

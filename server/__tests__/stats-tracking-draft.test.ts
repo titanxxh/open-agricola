@@ -36,4 +36,15 @@ describe('PlayerStats draft tracking', () => {
       ]),
     )
   })
+
+  it('recordDraftPlayed sets playedTurn on the original draft entry when occupation is played', async () => {
+    const { recordDraftPick, recordDraftPlayed, createInitialPlayerStats } = await import('../../shared/logic/stats')
+    const player = {
+      id: 'p1',
+      stats: createInitialPlayerStats({ isFirstPlayer: false }),
+    } as unknown as Parameters<typeof recordDraftPick>[0]
+    recordDraftPick(player, 'A29', 1)
+    recordDraftPlayed(player, 'A29', 5)
+    expect(player.stats.draftHistory[0]!.playedTurn).toBe(5)
+  })
 })
