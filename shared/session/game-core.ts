@@ -55,6 +55,7 @@ import {
   incPlacedFarmers,
   incResourceConverted,
   incRoomsBuilt,
+  recordDraftPick,
 } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
@@ -2450,6 +2451,12 @@ export class GameCore {
       return this.respond(false, sub.error)
     }
     this.state.draft = sub.draft
+    const player = this.state.players.find((p) => p.id === playerId)
+    if (player) {
+      const draftTurn = this.state.draft.round
+      recordDraftPick(player, pick.occCardId, draftTurn)
+      recordDraftPick(player, pick.minorCardId, draftTurn)
+    }
     const advance = tryAdvanceRound(this.state.draft)
     this.state.draft = advance.draft
     if (advance.finished) {
