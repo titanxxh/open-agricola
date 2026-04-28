@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { executePaymentSolution } from '../../shared/actions/effects/pay'
-import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
-import type { PaymentSolution, PlayerState } from '../../shared/game/types'
+import { executePaymentSolution } from '../pay'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
+import type { PaymentSolution, PlayerState } from '../../../game/types'
 
 const mockPlayer = (): PlayerState =>
   ({
