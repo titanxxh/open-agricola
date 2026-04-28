@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -5,13 +6,17 @@ import type {
   ScoreCategoryResult,
   ScoreEntry,
 } from '../../../shared/logic/scoring'
+import type { PlayerState } from '../../../shared/game/types'
 import { getCardDisplayName } from '../common/cardText'
 
 type Props = {
   locale: Locale
   scores: PlayerScoreSummary[]
+  players: PlayerState[]
   onClose: () => void
 }
+
+type Tab = 'score' | 'stats' | 'draft'
 
 const categoryOrder: ScoreCategoryResult['key'][] = [
   'fields',
@@ -77,7 +82,8 @@ type ScoringRow =
   | { id: string; type: 'cardBonus'; cardId: string }
   | { id: string; type: 'total' }
 
-export const ScoringPad = ({ locale, scores, onClose }: Props) => {
+export const ScoringPad = ({ locale, scores, players, onClose }: Props) => {
+  const [activeTab, setActiveTab] = useState<Tab>('score')
   const categoryRows: ScoringRow[] = categoryOrder.map((key) => ({
     id: `cat-${key}`,
     type: 'category',
@@ -129,8 +135,36 @@ export const ScoringPad = ({ locale, scores, onClose }: Props) => {
       <div className="scoring-pad">
         <div className="scoring-header">
           <div className="scoring-title">{t(locale, 'ui.scoringPadTitle')}</div>
+          <div className="scoring-tabs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('score')}
+              className={activeTab === 'score' ? 'active' : ''}
+            >
+              {t(locale, 'ui.scoringTabScore')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('stats')}
+              className={activeTab === 'stats' ? 'active' : ''}
+            >
+              {t(locale, 'ui.scoringTabStats')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('draft')}
+              className={activeTab === 'draft' ? 'active' : ''}
+            >
+              {t(locale, 'ui.scoringTabDraft')}
+            </button>
+          </div>
           <button onClick={onClose}>{t(locale, 'ui.close')}</button>
         </div>
+        {activeTab === 'stats' ? (
+          <StatsTab locale={locale} players={players} />
+        ) : activeTab === 'draft' ? (
+          <DraftTab locale={locale} players={players} />
+        ) : (
         <div className="scoring-content">
           <div className="scoring-grid">
             <div className="scoring-row scoring-header-row" style={{ gridTemplateColumns }}>
@@ -222,7 +256,18 @@ export const ScoringPad = ({ locale, scores, onClose }: Props) => {
             })}
           </div>
         </div>
+        )}
       </div>
     </div>
   )
 }
+
+const StatsTab = ({ locale, players: _players }: { locale: Locale; players: PlayerState[] }) => (
+  <div className="scoring-content scoring-stats-tab">
+    <div>{t(locale, 'ui.statsPlacedFarmers')}</div>
+  </div>
+)
+
+const DraftTab = ({ locale: _locale, players: _players }: { locale: Locale; players: PlayerState[] }) => (
+  <div className="scoring-content scoring-draft-tab" />
+)

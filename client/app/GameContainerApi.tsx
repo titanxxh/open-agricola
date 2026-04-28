@@ -1590,7 +1590,7 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
-      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} onClose={() => setShowScoringPad(false)} /> : null}
+      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={() => setShowScoringPad(false)} /> : null}
       {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}
