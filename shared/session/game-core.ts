@@ -59,6 +59,7 @@ import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-re
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
@@ -441,6 +442,14 @@ export class GameCore {
       const result = executeCardListener(entry.registration, context, {
         ownerPlayerId: entry.ownerPlayerId,
       })
+      // Track BGA-style per-card `used` stat for the owner of the card whose
+      // listener actually produced an effect. This place-farmer 'after' path
+      // bypasses ActivateCardNode, so we book-keep here directly.
+      if (result && entry.cardId) {
+        const owner =
+          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
+        incCardUsed(owner, entry.cardId)
+      }
       if (!result?.flow) continue
       if (result.logKey && !shouldSkipImmediateListenerLog(result)) {
         const logPlayer =
@@ -770,6 +779,9 @@ export class GameCore {
         ownerPlayerId: entry.ownerPlayerId,
       })
       if (!result?.flow) continue
+      // anytime listeners are queried during build (idempotent peek), not
+      // fire — do not increment used here. The increment is done when the
+      // player actually picks the anytime entry and triggers the flow.
       anytimeEntries.push({
         descriptor: {
           id: entry.registration.id,
@@ -2657,6 +2669,7 @@ export class GameCore {
         break
       }
       case 'room': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const rooms = Array.isArray((payload as { rooms?: FarmTilePosition[] }).rooms)
           ? (payload as { rooms: FarmTilePosition[] }).rooms
           : []
@@ -2717,9 +2730,20 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats && rooms.length > 0) {
+          // BGA-style gained.room{Wood/Clay/Stone}: when a card causes rooms
+          // to be built, count by player's current house material.
+          const houseType = this.state.players[playerIndex]!.houseType
+          const roomKey =
+            houseType === 'wood' ? 'roomWood'
+            : houseType === 'clay' ? 'roomClay'
+            : 'roomStone'
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { [roomKey]: rooms.length })
+        }
         break
       }
       case 'stable': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const stables = Array.isArray((payload as { stables?: FarmTilePosition[] }).stables)
           ? (payload as { stables: FarmTilePosition[] }).stables
           : []
@@ -2770,9 +2794,13 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats && stables.length > 0) {
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { stable: stables.length })
+        }
         break
       }
       case 'plow': {
+        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
         const tile = (payload as { tile?: FarmTilePosition }).tile
         const selection = validatePlowSelection(normalized, tile, lockedKeys)
         if (!selection.ok) return this.respond(false, selection.error?.code ?? 'validation failed')
@@ -2815,6 +2843,9 @@ export class GameCore {
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
         this.state.players[playerIndex] = result.player as unknown as PlayerState
+        if (sourceCardForStats) {
+          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { field: 1 })
+        }
         break
       }
       case 'sow': {
