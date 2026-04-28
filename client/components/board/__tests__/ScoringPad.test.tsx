@@ -66,6 +66,34 @@ describe('ScoringPad', () => {
     expect(screen.queryAllByText('Total').length).toBe(0)
   })
 
+  it('renders draft history per player with played turns', () => {
+    const players = [
+      {
+        id: 'p1', name: 'Alice',
+        stats: {
+          ...createInitialPlayerStats({ isFirstPlayer: true }),
+          draftHistory: [
+            { cardId: 'A92_AdoptiveParents', draftTurn: 1, playedTurn: 3 },
+            { cardId: 'B79_Corf', draftTurn: 2 },
+          ],
+          draftDiscarded: ['D1_Foo'],
+        },
+      },
+      { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },
+    ] as unknown as PlayerState[]
+
+    render(<ScoringPad locale="en" scores={mockScores} players={players} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
+
+    // Alice's two picks should appear (rendered by getAnyCardDisplayName)
+    expect(screen.getByText(/Adoptive Parents/)).toBeTruthy()
+    expect(screen.getByText(/Corf/)).toBeTruthy()
+    // Discarded section appears for Alice
+    expect(screen.getByText(/Discarded/)).toBeTruthy()
+    // Played turn label appears for the entry that was played
+    expect(screen.getByText(/T3/)).toBeTruthy()
+  })
+
   it('renders all PlayerStats fields in Stats tab', () => {
     const players = [
       {
