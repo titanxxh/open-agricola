@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseArgs } from '../audit-card-architecture'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { parseArgs, discoverCardPairs } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
   it('uses defaults when no args provided', () => {
@@ -20,5 +22,31 @@ describe('parseArgs', () => {
 
   it('--strict sets strict flag', () => {
     expect(parseArgs(['--strict'], {}).strict).toBe(true)
+  })
+})
+
+describe('discoverCardPairs', () => {
+  it('matches our TS files to BGA PHP files by cardId', () => {
+    const pairs = discoverCardPairs(
+      'shared/cards',
+      '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+    )
+
+    expect(pairs.both.length).toBeGreaterThan(800)
+
+    const pair = pairs.both.find(p => p.cardId === 'A123')
+    expect(pair).toBeDefined()
+    expect(pair!.ourPath).toMatch(/A123_FrameBuilder\.ts$/)
+    expect(pair!.bgaPath).toMatch(/A123_FrameBuilder\.php$/)
+  })
+
+  it('reports BGA-only cards (we missed)', () => {
+    const pairs = discoverCardPairs(
+      'shared/cards',
+      '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+    )
+    // E80 is BGA-only at this snapshot (we have not implemented it yet)
+    const bgaOnly = pairs.bgaOnly.find(c => c.cardId === 'E80')
+    expect(bgaOnly).toBeDefined()
   })
 })
