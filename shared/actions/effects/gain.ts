@@ -2,6 +2,10 @@ import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import {
+  addResourcesFromBoard,
+  addResourcesFromCards,
+} from '../../logic/stats'
 
 export const gainResources = (
   player: PlayerState,
@@ -37,6 +41,9 @@ export const gainAction: ActionDefinition = {
       trackWorkPhaseBuildingResources(state, player.id, gained)
       if (sourceCard) {
         addCardResourceGained(player, sourceCard, gained)
+        addResourcesFromCards(player, gained)
+      } else {
+        addResourcesFromBoard(player, gained)
       }
     }
     if (sourceCard) {
@@ -64,6 +71,7 @@ const createBonusAction = (
   execute: ({ state, player }) => {
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
+    addResourcesFromBoard(player, gain)
     return { type: 'ok' }
   },
 })

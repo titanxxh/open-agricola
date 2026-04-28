@@ -6,6 +6,7 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { getPlayerBakeRates, hasAnyBakingImprovement } from '../../cards/helpers/exchange-registry'
+import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 
 export const canBakeBread = (player: PlayerState, cardId: string): boolean => {
   const rates = getPlayerBakeRates(player)
@@ -25,6 +26,8 @@ export const bakeBread = (
   const foodGained = rate.rate * bakeTimes
   player.resources.grain -= bakeTimes
   player.resources.food += foodGained
+  incResourceConverted(player, 'grain', bakeTimes)
+  addFoodFromConversion(player, 'grain', foodGained)
   return {
     type: 'ok',
     immediateLogs: [

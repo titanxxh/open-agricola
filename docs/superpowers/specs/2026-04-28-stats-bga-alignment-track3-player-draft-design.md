@@ -178,6 +178,7 @@ i18n 新增 keys（中英对照）：
 2. `resourcesFromBoard` / `resourcesFromCards` 写入点的 `sourceCard` 判定面：grep 所有调 `addCardResourceGained` 的地方对照"是否所有"行动格→玩家资源"路径都走过这一支，确保 board 来源不被漏记。
 3. Card type 推断（Draft tab 用）：占用前缀字典 A/B/C/D/E → occupation/minor/major 的对应关系实施时确认（参考 `getCardDisplayName` 的现有调用模式）。
 4. ScoringPad 现有 `onClose` / `state.gameOver` 触发逻辑要不要在新 tab 也兜底"游戏未结束时打开仅看 Stats/Draft"——本 spec 默认沿用现有触发（gameOver-only），不放宽。
+5. Pre-game discard：当前仓库 `shared/draft/draft-manager.ts` 没有"draft 结束后 / 开局前主动弃牌"的流程，所以 `draftDiscarded` 字段保留但 Track 3 实施期不写入；仅靠 helper 单元测试覆盖。后续如果引入 pre-game discard，需要在 discard 入口调 `recordDraftDiscarded`。
 
 ## 工作分解（建议 PR 切分）
 

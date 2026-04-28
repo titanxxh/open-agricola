@@ -47,6 +47,16 @@ import {
   applyFutureMeeples,
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
+import {
+  addFoodFromConversion,
+  incFirstPlayer,
+  incHarvestedGrain,
+  incHarvestedVegetable,
+  incPlacedFarmers,
+  incResourceConverted,
+  incRoomsBuilt,
+  recordDraftPick,
+} from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
   registerCustomCard,
@@ -1382,6 +1392,8 @@ export class GameCore {
       if (!player) return
       const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
+      incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
+      incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
       this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
     })
     return this.continueAfterReapEffects()
@@ -1507,6 +1519,9 @@ export class GameCore {
     }
     const startIdx = this.state.players.findIndex((player) => player.startPlayer)
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
+    if (this.state.round >= 2 && startIdx >= 0) {
+      incFirstPlayer(this.state.players[startIdx]!)
+    }
     this.state.roundPhase = 'work'
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
@@ -1918,6 +1933,7 @@ export class GameCore {
       addWorkerRef(space, player.id, worker.id)
     }
     recordRoundPlacement(player, spaceId, worker?.id ?? '?')
+    incPlacedFarmers(player)
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
     this.engine = this.createEngine(spaceId)
@@ -2225,6 +2241,8 @@ export class GameCore {
       player.resources[sel.resourceKey] -= used
       totalFood += used * sel.food
       usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
+      incResourceConverted(player, sel.resourceKey, used)
+      addFoodFromConversion(player, sel.resourceKey, used * sel.food)
       this.state.log.unshift({
         key: 'log.harvestFeedConvert',
         params: {
@@ -2445,6 +2463,12 @@ export class GameCore {
       return this.respond(false, sub.error)
     }
     this.state.draft = sub.draft
+    const player = this.state.players.find((p) => p.id === playerId)
+    if (player) {
+      const draftTurn = this.state.draft.round
+      recordDraftPick(player, pick.occCardId, draftTurn)
+      recordDraftPick(player, pick.minorCardId, draftTurn)
+    }
     const advance = tryAdvanceRound(this.state.draft)
     this.state.draft = advance.draft
     if (advance.finished) {
@@ -2574,6 +2598,12 @@ export class GameCore {
 
     this.pushHistory()
     this.state.players[playerIndex] = result.player as unknown as PlayerState
+    if (farmPayment.farmType === 'room') {
+      const farmRooms = (farmPayment.payload as { rooms?: unknown[] }).rooms
+      if (Array.isArray(farmRooms)) {
+        incRoomsBuilt(this.state.players[playerIndex]!, farmRooms.length)
+      }
+    }
     return this.continueAfterResolvedFarmChoice(playerIndex)
   }
 
@@ -2740,6 +2770,7 @@ export class GameCore {
             : 'roomStone'
           addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { [roomKey]: rooms.length })
         }
+        incRoomsBuilt(this.state.players[playerIndex]!, rooms.length)
         break
       }
       case 'stable': {
