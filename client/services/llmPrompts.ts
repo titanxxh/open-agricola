@@ -161,9 +161,26 @@ collect、gain、receive、plow、sow、construct、renovate-house、fence、sta
 - \`context.ownerPlayer\` — 卡牌所有者
 - \`context.actionId\` — 触发的行动 ID
 - \`context.phase\` — 当前阶段
-- \`context.space\` — 当前行动位对象
+- \`context.space\` — 当前行动位对象（仅以下字段可读，**没有 \`params\`**）
 - \`context.choice\` — 玩家选择
 - \`context.result\` — 行动结果（仅 after/immediatelyAfter 可用，含 \`resourcesGained\`）
+
+### \`context.space\` (ActionSpace) 可读字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| \`space.id\` | \`string\` | 行动位 ID（如 \`'renovate-house'\`、\`'plow-1'\`），用于精确过滤 |
+| \`space.takenBy\` | \`WorkerRef[]\` | 占用情况，用 \`spaceHasPlayer(space, playerId)\` helper 判定 |
+| \`space.resources\` | \`Resource\` | 行动位上堆积的资源（如累积 wood） |
+
+⚠️ **常见幻觉**：\`space.params.houseType\`、\`space.target\`、\`space.amount\` 等都不存在。
+\`params\` 是 ActionFlow leaf 节点的字段（\`{ type: 'leaf', actionId, params }\`），**不要**写成 \`space.params\`，TS 会报 \`Property 'params' does not exist on type 'ActionSpace'\`。
+
+### 常见判断与陷阱
+
+- **翻修目标房屋类型**：BGA 升级链固定 \`wood → clay → stone\`，无分支。\`renovate-house\` 触发时用 \`context.player.houseType\` 反推目标——\`'wood'\` 表示翻修到泥屋，\`'clay'\` 表示翻修到石屋。例：石屋翻修折扣 → \`if (context.player.houseType !== 'clay') return\`。
+- **建造房屋类型**：\`construct\` 行动看 \`context.choice\` 或 \`context.actionId\`（\`'build-clay-room'\` / \`'build-stone-room'\` 等），不是 \`space.params\`。
+- **未使用 handler 参数**：项目 TS strict 开了 \`noUnusedParameters\`。如果 handler 不需要 context（例如纯返回固定折扣），把参数前缀 \`_\` 或省掉：\`handler: (_context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID })\` 或 \`handler: () => ({ ... })\`。
 
 ### handler 返回值
 
