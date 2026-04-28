@@ -28,6 +28,7 @@ import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
 import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners'
+import { incCardUsed } from '../cards/helpers/card-state'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 
@@ -1069,6 +1070,12 @@ export class Engine {
         (ownerPlayerId
           ? context.state.players.find((player) => player.id === ownerPlayerId)
           : null) ?? context.player
+      // Track BGA-style per-card `used` stat: every listener fire for this
+      // card on this player counts as one use. Skip when cardId is empty
+      // (universal listeners that don't bind to a card).
+      if (node.cardId) {
+        incCardUsed(effectPlayer, node.cardId)
+      }
       const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
         this.normalizeFollowUpAction(followUp, result?.sourceCard),
       )

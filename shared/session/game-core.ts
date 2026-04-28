@@ -59,6 +59,7 @@ import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-re
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
@@ -441,6 +442,14 @@ export class GameCore {
       const result = executeCardListener(entry.registration, context, {
         ownerPlayerId: entry.ownerPlayerId,
       })
+      // Track BGA-style per-card `used` stat for the owner of the card whose
+      // listener actually produced an effect. This place-farmer 'after' path
+      // bypasses ActivateCardNode, so we book-keep here directly.
+      if (result && entry.cardId) {
+        const owner =
+          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
+        incCardUsed(owner, entry.cardId)
+      }
       if (!result?.flow) continue
       if (result.logKey && !shouldSkipImmediateListenerLog(result)) {
         const logPlayer =
