@@ -18,6 +18,7 @@ import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import { isBorderEdge } from '../../../shared/game/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
@@ -267,9 +268,6 @@ type TooltipPosition = {
   left: number
 }
 
-const hasAnyResource = (resources: Partial<Resource>) =>
-  Object.values(resources).some((value) => typeof value === 'number' && value > 0)
-
 const PlayedCardStats = ({
   locale,
   rawId,
@@ -312,9 +310,8 @@ const PlayedCardStats = ({
   )
   const hasCardStacks = !!cardStacks && cardStacks.some((s) => s.remaining > 0)
   const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0 || hasCardStacks
-  const hasPaid = hasAnyResource(resourceStats?.paid ?? {})
-  const hasGained = hasAnyResource(resourceStats?.gained ?? {})
-  const hasResourceStats = hasPaid || hasGained || bonusVp > 0
+  const statsLines = formatCardStatsLines(resourceStats, rawId, locale)
+  const hasResourceStats = statsLines.length > 0 || bonusVp > 0
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -460,22 +457,26 @@ const PlayedCardStats = ({
                       : `improvements.${rawId}.name`,
                 )}
           </div>
-          {hasPaid ? (
-            <div className="played-card-stats-section">
-              <div className="played-card-stats-label">{t(locale, 'ui.cardStatsPaid')}</div>
-              <ResourceLine
-                locale={locale}
-                resources={{ ...emptyResources, ...(resourceStats?.paid ?? {}) }}
-                className="played-card-stats-line"
-              />
+          {statsLines.map((line) => (
+            <div key={line.key} className="played-card-stats-section">
+              <div className="played-card-stats-label">{t(locale, line.labelKey)}</div>
+              {line.resources ? (
+                <ResourceLine
+                  locale={locale}
+                  resources={{ ...emptyResources, ...line.resources }}
+                  className="played-card-stats-line"
+                />
+              ) : line.value !== undefined ? (
+                <div className="played-card-stats-value">{line.value}</div>
+              ) : null}
             </div>
-          ) : null}
-          {hasGained || bonusVp > 0 ? (
+          ))}
+          {bonusVp > 0 ? (
             <div className="played-card-stats-section">
               <div className="played-card-stats-label">{t(locale, 'ui.cardStatsGained')}</div>
               <ResourceLine
                 locale={locale}
-                resources={{ ...emptyResources, ...(resourceStats?.gained ?? {}) }}
+                resources={{ ...emptyResources }}
                 bonusVp={bonusVp}
                 className="played-card-stats-line"
               />
