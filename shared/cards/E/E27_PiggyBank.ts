@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged } from '../helpers/card-state'
+import { isCardFlagged, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E27_PiggyBank'
@@ -58,6 +58,21 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 /**
+ * After store-on-card / take-from-card: refresh infobox to "n / 6" so the
+ * player can see how close they are to triggering the free-major payoff.
+ */
+const updateInfoboxListener: CardListenerRegistration = {
+  id: 'E27-piggy-bank-after-store',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['store-on-card', 'take-from-card'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const food = context.player.cardStates?.[CARD_ID]?.counters?.[FOOD_KEY] ?? 0
+    writeCardInfobox(context.player, CARD_ID, `${food} / ${FOOD_THRESHOLD}`)
+  },
+}
+
+/**
  * computeCosts listener: when card is flagged, zero out costs for major improvements.
  */
 const computeCostsListener: CardListenerRegistration = {
@@ -82,7 +97,7 @@ export const E27_PiggyBank = new MinorImprovement({
 })
 
 export const E27_PiggyBank_impl = {
-  listeners: [anytimeListener, computeCostsListener],
+  listeners: [anytimeListener, computeCostsListener, updateInfoboxListener],
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (_state, player) => {

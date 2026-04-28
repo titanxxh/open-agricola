@@ -7,6 +7,7 @@ import {
 } from './pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
+import { addCardResourceGained } from '../../cards/helpers/card-state'
 
 const getPositiveResourceLog = (
   resources?: Partial<Resource> | null,
@@ -281,12 +282,22 @@ export const playOccupationAction: ActionDefinition = {
       options: playableOptions,
     }
   },
-  resolveChoice: ({ player, space, params, state }, choice) => {
+  resolveChoice: ({ player, space, params, state, sourceCard }, choice) => {
     const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
     if (typed?.allowedCards && !typed.allowedCards.includes(choice)) {
       return { type: 'fail', logKey: 'log.occupationFail' }
     }
     const cost = typed?.costOverride ?? getLessonsCost(player, space.id)
-    return playOccupation(player, choice, cost, state, space.id)
+    const result = playOccupation(player, choice, cost, state, space.id)
+    if (
+      sourceCard
+      && sourceCard !== choice
+      && result.type !== 'fail'
+    ) {
+      // BGA-style gained.occupation: when a card causes an occupation to be
+      // played as a side-effect, the sourceCard accumulates +1.
+      addCardResourceGained(player, sourceCard, { occupation: 1 })
+    }
+    return result
   },
 }

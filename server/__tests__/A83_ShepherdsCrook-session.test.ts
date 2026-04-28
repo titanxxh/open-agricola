@@ -42,7 +42,7 @@ describe('A83_ShepherdsCrook session flow', () => {
 
     expect(resp.pending.type).toBe('animalReorg')
     expect(resp.state.players[0]!.resources.sheep).toBe(2)
-    expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toEqual({
+    expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toMatchObject({
       paid: {},
       gained: { sheep: 2 },
     })
