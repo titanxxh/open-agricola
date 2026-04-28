@@ -47,7 +47,13 @@ import {
   applyFutureMeeples,
 } from '../logic/state.ts'
 import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
-import { incFirstPlayer, incPlacedFarmers, incRoomsBuilt } from '../logic/stats.ts'
+import {
+  incFirstPlayer,
+  incHarvestedGrain,
+  incHarvestedVegetable,
+  incPlacedFarmers,
+  incRoomsBuilt,
+} from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
   registerCustomCard,
@@ -1371,6 +1377,8 @@ export class GameCore {
       if (!player) return
       const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
+      incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
+      incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
       this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
     })
     return this.continueAfterReapEffects()
