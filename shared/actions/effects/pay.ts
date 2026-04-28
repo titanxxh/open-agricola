@@ -17,6 +17,7 @@ import {
   hasValidResources,
 } from './exchange'
 import { getRegisteredMinorImprovement } from '../../cards/types'
+import { recordPaymentStats } from '../../cards/helpers/payment-stats'
 
 const FIREPLACE_COST_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
 
@@ -649,6 +650,7 @@ export const canPayCost = (
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
+  options: { trackStats?: boolean } = {},
 ): string | undefined => {
   const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
   for (const key of paidKeys) {
@@ -664,6 +666,11 @@ export const executePaymentSolution = (
         seen.add(trimmed)
       }
     }
+  }
+  if (options.trackStats !== false) {
+    // Lazy require to avoid pulling card-state into pay.ts top-of-module cycle.
+    // recordPaymentStats writes per-card paid/saved derived from tradesUsed.
+    recordPaymentStats(player, solution)
   }
   return solution.cardUsed
 }
