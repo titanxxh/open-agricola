@@ -10,6 +10,7 @@ import {
   detectShell,
   scanCoreFilesForCardId,
   scanAggregateMutations,
+  scanExternalCardIdMentions,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -179,5 +180,28 @@ describe('scanAggregateMutations (S5)', () => {
     const hits = scanAggregateMutations(tmp)
     expect(hits.length).toBe(0)
     fs.unlinkSync(tmp)
+  })
+})
+
+describe('scanExternalCardIdMentions (S7)', () => {
+  it('returns hits in shared/ files outside shared/cards/{deck}/', () => {
+    const tmpDir = path.join('output', 'tmp', 'test-shared', 'shared', 'actions')
+    fs.mkdirSync(tmpDir, { recursive: true })
+    const tmp = path.join(tmpDir, 'evil.ts')
+    fs.writeFileSync(tmp, `if (player.minorPlayed.includes('A999')) {}\n`)
+    const hits = scanExternalCardIdMentions('A999', path.join('output', 'tmp', 'test-shared'))
+    expect(hits.length).toBeGreaterThan(0)
+    expect(hits[0].file).toContain('evil.ts')
+    fs.rmSync(path.join('output', 'tmp', 'test-shared'), { recursive: true })
+  })
+
+  it('skips shared/cards/{deck}/ files (legit references)', () => {
+    const tmpDir = path.join('output', 'tmp', 'test-shared2', 'shared', 'cards', 'A')
+    fs.mkdirSync(tmpDir, { recursive: true })
+    const tmp = path.join(tmpDir, 'A999_Test.ts')
+    fs.writeFileSync(tmp, `export const A999 = { id: 'A999' }\n`)
+    const hits = scanExternalCardIdMentions('A999', path.join('output', 'tmp', 'test-shared2'))
+    expect(hits.length).toBe(0)
+    fs.rmSync(path.join('output', 'tmp', 'test-shared2'), { recursive: true })
   })
 })
