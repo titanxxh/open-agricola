@@ -209,7 +209,39 @@ export function detectShell(oursContent: string, bgaContent: string): ShellResul
   return { likelihood, evidence: { hookCount, bgaHookCount, bodyLines } }
 }
 
-export function scanCard(pair: CardPair): CardAuditResult {
+export const CORE_FILES = [
+  'server/game-session.ts',
+  'shared/actions/effects/pay.ts',
+  'shared/actions/effects/improvement.ts',
+  'shared/actions/effects/fencing.ts',
+  'shared/logic/scoring.ts',
+  'shared/engine/engine.ts',
+  'shared/engine/action-flow.ts',
+  'shared/session/game-core.ts',
+]
+
+export function scanCoreFilesForCardId(
+  cardId: string,
+  repoRoot: string,
+  files: string[] = CORE_FILES,
+): CodeMention[] {
+  const hits: CodeMention[] = []
+  const re = new RegExp(`\\b${cardId}(?:_\\w+)?\\b`)
+
+  for (const rel of files) {
+    const abs = path.join(repoRoot, rel)
+    if (!fs.existsSync(abs)) continue
+    const lines = fs.readFileSync(abs, 'utf8').split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        hits.push({ file: rel, line: i + 1, snippet: lines[i].trim().slice(0, 200) })
+      }
+    }
+  }
+  return hits
+}
+
+export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResult {
   const oursContent = fs.readFileSync(pair.ourPath, 'utf8')
   const bgaContent = fs.readFileSync(pair.bgaPath, 'utf8')
   const ourLines = oursContent.split('\n').filter(l => l.trim().length > 0).length
@@ -223,7 +255,7 @@ export function scanCard(pair: CardPair): CardAuditResult {
     ourLines,
     bgaLines,
     signals: {
-      S1_coreFileMentions: [],
+      S1_coreFileMentions: scanCoreFilesForCardId(pair.cardId, repoRoot),
       S4_crossLayerImports: [],
       S5_aggregateMutations: [],
       S6_lineRatio: computeLineRatio(ourLines, bgaLines),
