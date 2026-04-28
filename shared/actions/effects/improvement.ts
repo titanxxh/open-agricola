@@ -3,7 +3,7 @@ import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
-import { incMajorBuilt, incMinorBuilt, recordDraftPlayed } from '../../logic/stats'
+import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
@@ -443,10 +443,16 @@ const finalizeMinorImprovementPurchase = (
   recordDraftPlayed(player, improvement.id, state.round)
 
   // D25 multi-identity: providesOccupation → also count as an occupation.
+  // Stats note: countOccupations(player) (used by prerequisites and E101 scoring)
+  // already aggregates extraOccupationsFromCards alongside occupationPlayed.
+  // For consistency, totalOccupationBuilt also gets +1 here, so a single play
+  // increments both totalMinorBuilt and totalOccupationBuilt — matching the
+  // card's stated multi-identity ("a field, an occupation, and the Fireplace").
   if (improvement.providesOccupation) {
     player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     if (!player.extraOccupationsFromCards.includes(improvement.id)) {
       player.extraOccupationsFromCards.push(improvement.id)
+      incOccupationBuilt(player)
     }
   }
   // fireplaceIdentity: no existing "major gained" emitter/listener exists in the codebase; skipping (YAGNI).
