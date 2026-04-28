@@ -25,6 +25,7 @@ import type { DraftPool } from '../draft/types'
 import type { ActionSpace, CropStack, Field, GameState, PlayerState } from '../game/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
+import { createInitialPlayerStats } from './stats'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -422,6 +423,7 @@ export const createInitialPlayers = (
       startPlayer: info.startPlayer,
       activeModifiers: [],
       cardStates: {},
+      stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
     }
     return player
   })
