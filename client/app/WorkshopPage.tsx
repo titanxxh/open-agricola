@@ -191,10 +191,10 @@ function normalizeSandboxSettings(raw: unknown): SandboxSettings {
 
 export function buildSandboxCardIds(
   cards: ReadonlyArray<{ id: string }>,
-  extraCardId?: string | null,
+  extraCardId?: unknown,
 ): string[] {
   const ids = cards.map(card => card.id)
-  const trimmed = extraCardId?.trim()
+  const trimmed = typeof extraCardId === 'string' ? extraCardId.trim() : ''
   if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
   return ids
 }
@@ -1044,7 +1044,7 @@ function SandboxView({
         <button
           type="button"
           className="btn-primary"
-          onClick={onStartGame}
+          onClick={() => { onStartGame() }}
         >
           {t('platform.startSandbox')}
         </button>
