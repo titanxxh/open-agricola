@@ -6,8 +6,13 @@ import type {
   ScoreCategoryResult,
   ScoreEntry,
 } from '../../../shared/logic/scoring'
-import type { PlayerState } from '../../../shared/game/types'
+import type {
+  PlayerState,
+  PlayerStats,
+  Resource,
+} from '../../../shared/game/types'
 import { getCardDisplayName } from '../common/cardText'
+import { ResourceLine } from '../common/ResourceLine'
 
 type Props = {
   locale: Locale
@@ -262,11 +267,64 @@ export const ScoringPad = ({ locale, scores, players, onClose }: Props) => {
   )
 }
 
-const StatsTab = ({ locale, players: _players }: { locale: Locale; players: PlayerState[] }) => (
-  <div className="scoring-content scoring-stats-tab">
-    <div>{t(locale, 'ui.statsPlacedFarmers')}</div>
-  </div>
-)
+type StatRow =
+  | { kind: 'number'; labelKey: string; getValue: (s: PlayerStats) => number }
+  | { kind: 'resources'; labelKey: string; getValue: (s: PlayerStats) => Partial<Resource> }
+
+const STATS_ROWS: StatRow[] = [
+  { kind: 'number', labelKey: 'ui.statsPlacedFarmers', getValue: (s) => s.placedFarmers },
+  { kind: 'number', labelKey: 'ui.statsFirstPlayerCount', getValue: (s) => s.firstPlayerCount },
+  { kind: 'number', labelKey: 'ui.statsTotalRoomsBuilt', getValue: (s) => s.totalRoomsBuilt },
+  { kind: 'number', labelKey: 'ui.statsTotalMajorBuilt', getValue: (s) => s.totalMajorBuilt },
+  { kind: 'number', labelKey: 'ui.statsTotalMinorBuilt', getValue: (s) => s.totalMinorBuilt },
+  { kind: 'number', labelKey: 'ui.statsTotalOccupationBuilt', getValue: (s) => s.totalOccupationBuilt },
+  { kind: 'number', labelKey: 'ui.statsHarvestedGrain', getValue: (s) => s.harvestedGrain },
+  { kind: 'number', labelKey: 'ui.statsHarvestedVegetable', getValue: (s) => s.harvestedVegetable },
+  { kind: 'resources', labelKey: 'ui.statsResourcesFromBoard', getValue: (s) => s.resourcesFromBoard },
+  { kind: 'resources', labelKey: 'ui.statsResourcesFromCards', getValue: (s) => s.resourcesFromCards },
+  { kind: 'resources', labelKey: 'ui.statsResourcesConverted', getValue: (s) => s.resourcesConverted },
+  { kind: 'resources', labelKey: 'ui.statsFoodFromConversion', getValue: (s) => s.foodFromConversion },
+]
+
+const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] }) => {
+  const gridTemplateColumns = `minmax(180px, 1.3fr) repeat(${players.length}, minmax(120px, 1fr))`
+  return (
+    <div className="scoring-content scoring-stats-tab">
+      <div className="scoring-grid">
+        <div className="scoring-row scoring-header-row" style={{ gridTemplateColumns }}>
+          <div className="scoring-cell scoring-label">{t(locale, 'ui.scoringItem')}</div>
+          {players.map((p) => (
+            <div key={`stats-head-${p.id}`} className="scoring-cell scoring-player-name">{p.name}</div>
+          ))}
+        </div>
+        {STATS_ROWS.map((row) => (
+          <div key={row.labelKey} className="scoring-row" style={{ gridTemplateColumns }}>
+            <div className="scoring-cell scoring-label">{t(locale, row.labelKey)}</div>
+            {players.map((p) => {
+              const v = row.getValue(p.stats)
+              if (row.kind === 'number') {
+                return (
+                  <div key={`${row.labelKey}-${p.id}`} className="scoring-cell">
+                    <div className="scoring-cell-value">{v as number}</div>
+                  </div>
+                )
+              }
+              return (
+                <div key={`${row.labelKey}-${p.id}`} className="scoring-cell">
+                  <ResourceLine
+                    locale={locale}
+                    resources={v as Partial<Resource>}
+                    className="scoring-cell-resources"
+                  />
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const DraftTab = ({ locale: _locale, players: _players }: { locale: Locale; players: PlayerState[] }) => (
   <div className="scoring-content scoring-draft-tab" />
