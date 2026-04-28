@@ -27,6 +27,17 @@ describe('WorkshopPage sandbox launch helpers', () => {
     expect(cardIds).toEqual(['existing-db-id', 'new-db-id'])
   })
 
+  it('ignores non-string extras such as click events', () => {
+    const cardIds = buildSandboxCardIds(
+      [
+        { id: 'existing-db-id' },
+      ],
+      { type: 'click' },
+    )
+
+    expect(cardIds).toEqual(['existing-db-id'])
+  })
+
   it('turns non-JSON sandbox start failures into a readable error', async () => {
     const result = await readSandboxStartResponse(
       new Response('<html>bad gateway</html>', {
