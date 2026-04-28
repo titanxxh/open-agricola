@@ -317,6 +317,51 @@ export function compareDesc(ours: string, bga: string): DescAlignment {
   return 'diff-from-bga'
 }
 
+const I18N_KEY_RE = /['"`](actions\.[A-Z]\d+\.[\w.]+|ui\.interaction\w+|prompt\.\w+)['"`]/g
+
+export function extractI18nKeys(content: string): string[] {
+  const keys = new Set<string>()
+  let m: RegExpExecArray | null
+  I18N_KEY_RE.lastIndex = 0
+  while ((m = I18N_KEY_RE.exec(content)) !== null) {
+    keys.add(m[1])
+  }
+  return [...keys]
+}
+
+export function scanI18nGaps(
+  usedKeys: string[],
+  zhContent: string,
+  enContent: string,
+): I18nGap[] {
+  return usedKeys.map(key => {
+    const re = new RegExp(`['"\`]${key.replace(/\./g, '\\.')}['"\`]\\s*:`)
+    return {
+      key,
+      missingZh: !re.test(zhContent),
+      missingEn: !re.test(enContent),
+      bgaHasButOurMissing: false,
+    }
+  })
+}
+
+export interface I18nCache {
+  zh: string
+  en: string
+}
+
+let _i18nCache: I18nCache | null = null
+function getI18nCache(repoRoot: string): I18nCache {
+  if (_i18nCache) return _i18nCache
+  const zhPath = path.join(repoRoot, 'client', 'i18n', 'zh.ts')
+  const enPath = path.join(repoRoot, 'client', 'i18n', 'en.ts')
+  _i18nCache = {
+    zh: fs.existsSync(zhPath) ? fs.readFileSync(zhPath, 'utf8') : '',
+    en: fs.existsSync(enPath) ? fs.readFileSync(enPath, 'utf8') : '',
+  }
+  return _i18nCache
+}
+
 function* walkTsFiles(dir: string): Generator<string> {
   if (!fs.existsSync(dir)) return
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -358,6 +403,9 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
   const shell = detectShell(oursContent, bgaContent)
   const ourDesc = extractOurDesc(oursContent)
   const bgaDesc = extractBgaDesc(bgaContent)
+  const i18n = getI18nCache(repoRoot)
+  const usedKeys = extractI18nKeys(oursContent)
+  const gaps = scanI18nGaps(usedKeys, i18n.zh, i18n.en).filter(g => g.missingZh || g.missingEn)
 
   return {
     cardId: pair.cardId,
@@ -374,7 +422,7 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
       S10_shellLikelihood: shell.likelihood,
       S10_evidence: shell.evidence,
       S11_descAlignment: compareDesc(ourDesc, bgaDesc),
-      S12_i18nGapKeys: [],
+      S12_i18nGapKeys: gaps,
     },
     verdict: 'pending',
   }
