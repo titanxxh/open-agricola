@@ -11,6 +11,9 @@
  *   OUR_CARDS_DIR  默认 shared/cards
  */
 
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
 export interface ParsedArgs {
   ourCardsDir: string
   bgaCardsDir: string
@@ -25,6 +28,80 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
     outputPath: 'output/tmp/audit-card-arch-2026-04-28.jsonl',
     strict: argv.includes('--strict'),
   }
+}
+
+export interface CardEntry {
+  cardId: string
+  filePath: string
+  fileName: string
+  deck: 'A' | 'B' | 'C' | 'D' | 'E'
+}
+
+export interface CardPair {
+  cardId: string
+  deck: 'A' | 'B' | 'C' | 'D' | 'E'
+  ourPath: string
+  bgaPath: string
+}
+
+export interface DiscoveryResult {
+  both: CardPair[]
+  oursOnly: CardEntry[]
+  bgaOnly: CardEntry[]
+}
+
+const CARD_FILE_RE = /^([A-E])(\d+)_(\w+)\.(ts|php)$/
+
+function listDeckCards(deckDir: string, ext: 'ts' | 'php'): CardEntry[] {
+  if (!fs.existsSync(deckDir)) return []
+  return fs.readdirSync(deckDir)
+    .map(fileName => {
+      const m = fileName.match(CARD_FILE_RE)
+      if (!m || m[4] !== ext) return null
+      const deck = m[1] as 'A' | 'B' | 'C' | 'D' | 'E'
+      const num = m[2]
+      return {
+        cardId: `${deck}${num}`,
+        filePath: path.join(deckDir, fileName),
+        fileName,
+        deck,
+      }
+    })
+    .filter((e): e is CardEntry => e !== null)
+}
+
+export function discoverCardPairs(ourCardsDir: string, bgaCardsDir: string): DiscoveryResult {
+  const decks = ['A', 'B', 'C', 'D', 'E'] as const
+  const oursMap = new Map<string, CardEntry>()
+  const bgaMap = new Map<string, CardEntry>()
+
+  for (const deck of decks) {
+    for (const e of listDeckCards(path.join(ourCardsDir, deck), 'ts')) {
+      oursMap.set(e.cardId, e)
+    }
+    for (const e of listDeckCards(path.join(bgaCardsDir, deck), 'php')) {
+      bgaMap.set(e.cardId, e)
+    }
+  }
+
+  const both: CardPair[] = []
+  const oursOnly: CardEntry[] = []
+  const bgaOnly: CardEntry[] = []
+
+  for (const [id, ours] of oursMap) {
+    const bga = bgaMap.get(id)
+    if (bga) {
+      both.push({ cardId: id, deck: ours.deck, ourPath: ours.filePath, bgaPath: bga.filePath })
+    } else {
+      oursOnly.push(ours)
+    }
+  }
+  for (const [id, bga] of bgaMap) {
+    if (!oursMap.has(id)) bgaOnly.push(bga)
+  }
+
+  both.sort((a, b) => a.cardId.localeCompare(b.cardId))
+  return { both, oursOnly, bgaOnly }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
