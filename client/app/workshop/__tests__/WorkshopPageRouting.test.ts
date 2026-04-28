@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildWorkshopCardUrl,
+  buildWorkshopUrl,
   getWorkshopCardIdFromSearch,
   getWorkshopPrActionState,
+  getWorkshopViewFromSearch,
+  hasZhLocale,
 } from '../../WorkshopPage'
 
 describe('WorkshopPage card detail routing', () => {
@@ -23,6 +26,53 @@ describe('WorkshopPage card detail routing', () => {
   it('reads the selected workshop card id from the URL', () => {
     expect(getWorkshopCardIdFromSearch('?page=workshop&card=card-db-1')).toBe('card-db-1')
     expect(getWorkshopCardIdFromSearch('?page=workshop')).toBeNull()
+  })
+})
+
+describe('WorkshopPage view routing', () => {
+  it('writes the sandbox view into the URL', () => {
+    const url = buildWorkshopUrl('/open-agricola/', '?page=workshop', { view: 'sandbox' })
+    expect(url).toBe('/open-agricola/?page=workshop&view=sandbox')
+  })
+
+  it('writes the editor view into the URL', () => {
+    const url = buildWorkshopUrl('/open-agricola/', '?page=workshop', { view: 'editor' })
+    expect(url).toBe('/open-agricola/?page=workshop&view=editor')
+  })
+
+  it('clears the view query parameter when switching back to home', () => {
+    const url = buildWorkshopUrl('/open-agricola/', '?page=workshop&view=sandbox', { view: null })
+    expect(url).toBe('/open-agricola/?page=workshop')
+  })
+
+  it('replaces an existing view value rather than appending', () => {
+    const url = buildWorkshopUrl('/open-agricola/', '?page=workshop&view=sandbox', { view: 'editor' })
+    expect(url).toBe('/open-agricola/?page=workshop&view=editor')
+  })
+
+  it('preserves unrelated query parameters', () => {
+    const url = buildWorkshopUrl('/open-agricola/', '?page=workshop&sort=recent', { view: 'sandbox' })
+    expect(url).toBe('/open-agricola/?page=workshop&sort=recent&view=sandbox')
+  })
+
+  it('clears the card parameter when entering a non-detail view', () => {
+    const url = buildWorkshopUrl(
+      '/open-agricola/',
+      '?page=workshop&card=card-db-1',
+      { view: 'sandbox', card: null },
+    )
+    expect(url).toBe('/open-agricola/?page=workshop&view=sandbox')
+  })
+
+  it('reads the view from the URL when present', () => {
+    expect(getWorkshopViewFromSearch('?page=workshop&view=sandbox')).toBe('sandbox')
+    expect(getWorkshopViewFromSearch('?page=workshop&view=editor')).toBe('editor')
+  })
+
+  it('returns null when no recognised view is in the URL', () => {
+    expect(getWorkshopViewFromSearch('?page=workshop')).toBeNull()
+    expect(getWorkshopViewFromSearch('?page=workshop&view=detail')).toBeNull()
+    expect(getWorkshopViewFromSearch('?page=workshop&view=home')).toBeNull()
   })
 })
 
@@ -48,10 +98,66 @@ describe('WorkshopPage PR action state', () => {
       status: 'published',
       githubPrUrl: null,
       githubPrStatus: null,
+      localesComplete: true,
     })
 
     expect(state.visible).toBe(true)
     expect(state.disabled).toBe(false)
     expect(state.buttonLabel).toBe('发起 PR 到主仓库')
+  })
+
+  it('blocks PR submission when zh locale is missing', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      status: 'published',
+      githubPrUrl: null,
+      githubPrStatus: null,
+      localesComplete: false,
+    })
+
+    expect(state.visible).toBe(true)
+    expect(state.disabled).toBe(true)
+    expect(state.buttonLabel).toBe('请先完成中文本地化')
+    expect(state.secondary).toMatch(/本地化/)
+  })
+
+  it('treats omitted localesComplete as legacy (allowed) for back-compat', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      status: 'published',
+      githubPrUrl: null,
+      githubPrStatus: null,
+    })
+
+    expect(state.disabled).toBe(false)
+  })
+})
+
+describe('hasZhLocale', () => {
+  it('accepts a complete zh entry', () => {
+    expect(hasZhLocale({
+      locales: { zh: { name: '名字', desc: ['描述'] } },
+    })).toBe(true)
+  })
+
+  it('rejects when locales is absent', () => {
+    expect(hasZhLocale({})).toBe(false)
+    expect(hasZhLocale(null)).toBe(false)
+    expect(hasZhLocale(undefined)).toBe(false)
+  })
+
+  it('rejects when zh is missing', () => {
+    expect(hasZhLocale({ locales: { en: { name: 'name', desc: ['d'] } } })).toBe(false)
+  })
+
+  it('rejects when zh.name is empty', () => {
+    expect(hasZhLocale({ locales: { zh: { name: '   ', desc: ['描述'] } } })).toBe(false)
+  })
+
+  it('rejects when zh.desc is empty or whitespace-only', () => {
+    expect(hasZhLocale({ locales: { zh: { name: '名字', desc: [] } } })).toBe(false)
+    expect(hasZhLocale({ locales: { zh: { name: '名字', desc: ['  '] } } })).toBe(false)
   })
 })

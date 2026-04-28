@@ -198,7 +198,7 @@ export const renovateHouseAction: ActionDefinition = {
     )
     if (resolved.type === 'choice') return resolved
     if (resolved.type !== 'selected') return failure
-    executeResolvedTypedFlatPayment(player, resolved)
+    executeResolvedTypedFlatPayment(player, resolved, 'renovation')
     player.houseType = plan.nextType
     return { type: 'ok' }
   },

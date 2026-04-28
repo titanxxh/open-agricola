@@ -3,12 +3,14 @@
 **唯一真源**。本文件描述 Workshop / AI Designer 提交的自定义卡 TS 代码在 isolated-vm 沙盒里**实际能用什么、不能用什么**。
 
 > **谁该读这个文件**：
+>
 > - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 必须与本文件一致
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/CARD_DESIGN_PROMPT.md` / `docs/ENGINE_ARCHITECTURE.md` 提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
+>
 > 1. 同步修改 `client/services/llmPrompts.ts` 的 hook / phase / actionId 列表（CI `pnpm run check:prompt-sync` 会兜底）
 > 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ENGINE_ARCHITECTURE.md` 引用本文件而不是各自维护一份
 
@@ -20,26 +22,62 @@
 
 `server/custom-code/engine.ts` 往 isolate 注入以下全局：
 
-| 全局 | 形态 | 备注 |
-|---|---|---|
-| `MinorImprovement(def)` | 函数 stub | 直接 `return def`，`new MinorImprovement(def)` 也能跑 |
-| `Occupation(def)` | 函数 stub | 同上 |
-| `console.log(...)` / `console.warn(...)` | 函数 | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时） |
-| `gainLeaf(cardId, resources)` | 函数 | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }` |
-| `payLeaf({ cardId, cost })` | 函数 | 返回 `{ type: 'leaf', actionId: 'pay-resources', params: cost, sourceCard: cardId }` |
-| `spaceHasPlayer(space, playerId)` | 函数 | 判断某个行动位是否已被指定玩家占据 |
-| `positionKey(pos)` | 函数 | 将 `{ x, y }` 转为确定性字符串 `"x,y"` |
-| `getMajorCardEffect(cardId)` | 函数 stub | 沙盒里始终返回 `null`（无法访问主改良注册表） |
-| `getCardStack(player, cardId)` | 函数 | 读取 `player.cardStates[cardId].stack` 的浅拷贝 |
-| `readCardExtraData(player, cardId)` | 函数 | 读取 `player.cardStates[cardId].extraData` 的浅拷贝 |
+
+| 全局                                       | 形态      | 备注                                                                                 |
+| ---------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `MinorImprovement(def)`                  | 函数 stub | 直接 `return def`，`new MinorImprovement(def)` 也能跑                                    |
+| `Occupation(def)`                        | 函数 stub | 同上                                                                                 |
+| `console.log(...)` / `console.warn(...)` | 函数      | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时）                                       |
+| `gainLeaf(cardId, resources)`            | 函数      | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }`     |
+| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay-resources', params: cost, sourceCard: cardId }` |
+| `spaceHasPlayer(space, playerId)`        | 函数      | 判断某个行动位是否已被指定玩家占据                                                                  |
+| `positionKey(pos)`                       | 函数      | 将 `{ x, y }` 转为确定性字符串 `"x,y"`                                                      |
+| `getMajorCardEffect(cardId)`             | 函数 stub | 沙盒里始终返回 `null`（无法访问主改良注册表）                                                         |
+| `getCardStack(player, cardId)`           | 函数      | 读取 `player.cardStates[cardId].stack` 的浅拷贝                                          |
+| `readCardExtraData(player, cardId)`      | 函数      | 读取 `player.cardStates[cardId].extraData` 的浅拷贝                                      |
+
 
 **不再注入** `registerCardEffect` / `registerCardListener`。新契约通过 `CARD_DEF` + `CARD_IMPL` 双常量导出（见 §7）。
 
 **不注入**任何项目内 helper。下面这一组在沙盒里调用会抛 `ReferenceError`：
 
-`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, ...（即 `shared/game/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/*` 里所有导出）。
+`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, ...（即 `shared/game/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/`* 里所有导出）。
 
 **替代方案**：使用上述注入的 helper 函数，或直接读 `state` / `player` 字段（见 §4）。
+
+---
+
+## 1.1 从 Workshop 提交到主仓库 PR 的额外规范化
+
+沙盒里的代码目标是"能在工坊保存、预览、沙盒游戏中运行"；提交到主仓库后会变成 `shared/cards/community/*.ts` 的正式 TypeScript 模块，并参加完整 CI。因此 Workshop → PR 生成器会在 `server/workshop-pr/code-gen.ts` 做一层保守规范化：
+
+
+| Workshop 代码形态                     | PR 生成结果                                                                 | 原因                                                              |
+| --------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `deck: 'CUSTOM'`                  | `deck: 'community'`                                                     | community deck 检查要求所有社区牌属于 `community` deck                     |
+| `const CARD_IMPL = { ... }`       | `const CARD_IMPL: CardImpl = { ... }`                                   | 给 listener/action/phase 提供上下文类型，避免字面量数组变成 `string[]`            |
+| `listeners: [{ ... }]` 缺 `id`     | 自动补 `{cardId}-listener-{n}`                                             | listener 排序和注册要求稳定 id                                           |
+| `prerequisite: { occupation: 2 }` | `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` | 仓库正式卡牌类型中 `prerequisite` 是印刷文本，结构化校验走 `occupationPrerequisites` |
+
+
+生成器还会同步输出：
+
+- `shared/cards/community/{CUSTOM_ID}.ts`
+- `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts`
+- `shared/cards/register-all.ts`
+- `shared/cards/community/auto-catalog.ts`
+- `docs/community_cards.md`
+- 可选 `public/card-art/community/{CUSTOM_ID}.{ext}`
+
+提交到 GitHub PR 后，必须至少能通过：
+
+```bash
+pnpm run check:community-deck
+pnpm exec tsc -p tsconfig.server.json --noEmit
+pnpm run build
+```
+
+如果某张工坊卡在沙盒中通过、但 PR CI 因 TypeScript 类型失败，优先修生成器规范化，而不是只手改生成出来的单张社区牌；否则下一次用户提 PR 还会复现。
 
 ---
 
@@ -55,19 +93,39 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 - **没有方法**：只能读字段。任何 `player.xxx()` 调用必抛 `TypeError`。
 - **修改无效**：handler 里改 `state` / `player` 不影响宿主端真状态。要影响游戏必须 `return { flow }` 让引擎执行 ActionFlow。
-- **`undefined` 字段会消失**：`JSON.stringify` 会丢掉 `undefined` 值的 key，因此读字段时务必加 `?.` 和 `??` 兜底。
+- `**undefined` 字段会消失**：`JSON.stringify` 会丢掉 `undefined` 值的 key，因此读字段时务必加 `?.` 和 `??` 兜底。
 - **循环引用会爆**：宿主端 `JSON.stringify` 失败会抛错。GameState 已确保无循环，但自定义代码不要尝试在 effect 对象里塞回 `state`。
 
 特别注意 `CardListenerContext` 里的玩家字段：
 
-| 字段 | 含义 | `scope: 'player'` | `scope: 'opponent'` | `scope: 'any'` |
-|---|---|---|---|---|
-| `context.player` | **触发玩家**（执行 action 的人） | = 卡主 | ≠ 卡主 | 不一定 |
-| `context.ownerPlayer` | **卡主**（持有这张卡的玩家） | = `player` | = "我" | = 卡主 |
-| `context.triggerPlayer` | 同 `context.player`，便于阅读 | — | — | — |
-| `context.effectPlayer` | 效果应作用到的玩家（一般 = owner） | — | — | — |
+
+| 字段                      | 含义                      | `scope: 'player'` | `scope: 'opponent'` | `scope: 'any'` |
+| ----------------------- | ----------------------- | ----------------- | ------------------- | -------------- |
+| `context.player`        | **触发玩家**（执行 action 的人）  | = 卡主              | ≠ 卡主                | 不一定            |
+| `context.ownerPlayer`   | **卡主**（持有这张卡的玩家）        | = `player`        | = "我"               | = 卡主           |
+| `context.triggerPlayer` | 同 `context.player`，便于阅读 | —                 | —                   | —              |
+| `context.effectPlayer`  | 效果应作用到的玩家（一般 = owner）   | —                 | —                   | —              |
+
 
 **判定卡主必须用 `context.ownerPlayer`**，不能用 `context.player`。
+
+### 2.1 `context.space` (ActionSpace) 可读字段
+
+`context.space` 的运行时形状是 `ActionDefinition + resources + takenBy`（见 `shared/game/types.ts:407`）。Listener handler 只应读以下字段：
+
+| 字段 | 类型 | 用途 |
+|------|------|------|
+| `space.id` | `string` | 行动位 ID（`'renovate-house'`、`'plow-1'` 等），用 `===` 精确过滤 |
+| `space.takenBy` | `WorkerRef[]` | 占用情况；用 `spaceHasPlayer(space, playerId)` helper 判定 |
+| `space.resources` | `Resource` | 行动位上堆积的资源（如累积 wood） |
+
+⚠️ **不存在但常被幻觉**：`space.params`、`space.target`、`space.amount`、`space.houseType`。`params` 是 ActionFlow leaf 节点的字段（`{ type: 'leaf', actionId, params }`），**不属于** ActionSpace。写 `space.params.X` 在 sandbox 跑能过（`ts.transpileModule` 不做类型检查），但提交到主仓库 PR 后 `pnpm run build` 必报 `TS2339: Property 'params' does not exist on type 'ActionSpace'`。
+
+### 2.2 常见判断与陷阱
+
+- **翻修目标房屋类型**：BGA 升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
+- **建造房屋类型**：`construct` 行动看 `context.choice` 或 `context.actionId`（`'build-clay-room'` / `'build-stone-room'` 等），不是 `space.params`。
+- **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context（例如返回固定折扣），把参数前缀 `_` 或省掉：`handler: (_context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID })` 或 `handler: () => ({ ... })`。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
 
 ---
 
@@ -79,7 +137,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 `extractManifestFromCompiledCode` 用 `cardEffectHooks` 数组过滤 `CARD_IMPL.effect` 上的函数键。**只有列表中的 key 才会被沙盒注册**。AST validator 会**硬拒**不在列表中的键——保存直接失败并给出错误信息。
 
-<!-- prompt-sync:begin id=card-effect-hooks source=shared/cards/card-effects.ts:cardEffectHooks -->
+
+
+<!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
 - `onRoundStart`
 - `onHarvest`
@@ -116,27 +176,33 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeFenceDiscount`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
+
+
 额外允许的 meta 字段（不在 `cardEffectHooks` 数组中，但 AST validator 放行）：`id`、`handHooks`、`scoringPriority`。
 
 **进阶 hook 说明**：
 
-| hook | 签名特殊点 | 用途 |
-|---|---|---|
-| `computeBonusScore` | `(state, player, ctx) => number`（返回 VP 数；`ctx.reserved` 可声明保留资源） | 终局加分（`collectBonusScores` 收集后并入 `cardStateBonusVp`） |
-| `computePostScore` | `(state, player, categories) => number` | 终局后续加分；可读其它分类小计再加 |
-| `computeSharedPostScore` | `(state, owner, summaries) => Array<{ playerId, score }>` | 跨玩家加分（如对手最低分给你额外 VP） |
-| `computeExtraRoomCapacity` | 返回 `number` | 额外容纳空间 |
-| `onComputeAnimalZones` | 接收 `(zones, state, player)` 或 `(state, player, zones)` | 动物分区扩展（双接口） |
-| `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种 | 播种扩展 |
-| `computeLockedFarmTiles` | 返回锁定田地位置 | 田地锁定 |
-| `computeFenceDiscount` | 返回折扣数 | 围栏折扣 |
-| `handHooks`（meta） | `CardEffectHook[]` | 声明哪些 hook 在卡牌还在手牌时也触发 |
+
+| hook                                         | 签名特殊点                                                            | 用途                                                  |
+| -------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
+| `computeBonusScore`                          | `(state, player, ctx) => number`（返回 VP 数；`ctx.reserved` 可声明保留资源） | 终局加分（`collectBonusScores` 收集后并入 `cardStateBonusVp`） |
+| `computePostScore`                           | `(state, player, categories) => number`                          | 终局后续加分；可读其它分类小计再加                                   |
+| `computeSharedPostScore`                     | `(state, owner, summaries) => Array<{ playerId, score }>`        | 跨玩家加分（如对手最低分给你额外 VP）                                |
+| `computeExtraRoomCapacity`                   | 返回 `number`                                                      | 额外容纳空间                                              |
+| `onComputeAnimalZones`                       | 接收 `(zones, state, player)` 或 `(state, player, zones)`           | 动物分区扩展（双接口）                                         |
+| `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
+| `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
+| `computeFenceDiscount`                       | 返回折扣数                                                            | 围栏折扣                                                |
+| `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
+
 
 ### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase
 
 `isActionHookPhase` 在挂载 listener 前把 `phases` 数组里不在白名单的项过滤掉。AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。
 
-<!-- prompt-sync:begin id=action-hook-phases source=server/custom-code/engine.ts:isActionHookPhase -->
+
+
+<!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
 - `during`
 - `immediatelyAfter`
@@ -149,15 +215,21 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeChoiceCandidates`
 <!-- prompt-sync:end id=action-hook-phases -->
 
+
+
 ### 3.3 `scope` 取值
 
 `isCardListenerScope` 限制：
 
-<!-- prompt-sync:begin id=listener-scopes source=server/custom-code/engine.ts:isCardListenerScope -->
+
+
+<!-- prompt-sync:begin id=listener-scopes -->
 - `player`
 - `opponent`
 - `any`
 <!-- prompt-sync:end id=listener-scopes -->
+
+
 
 不在列表里的 `scope` 会被设为 `undefined`（行为等价于默认 `player`）。
 
@@ -169,19 +241,21 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ### 4.1 玩家字段
 
-| 字段 | 类型 | 用法 |
-|---|---|---|
-| `player.workers` | `Worker[]` 即 `{ id, isActive, isNewborn }[]` | **数家庭成员要 `.filter(w => w.isActive).length`**（少数卡如 A127 会把工人置为非活跃） |
-| `player.fenceSegments` | `string[]` | **字段名是 `fenceSegments`，不是 `fences`** |
-| `player.fields` | `Field[]` | `.length` 得到田地数 |
-| `player.pastures` | `Pasture[]` | `.length` 得到牧场数 |
-| `player.rooms` | `number` | 房间数 |
-| `player.houseType` | `'wood' \| 'clay' \| 'stone'` | 房屋类型 |
-| `player.resources` | `Partial<Record<Resource, number>>` | `player.resources.wood ?? 0` |
-| `player.minorPlayed` | `string[]` | 已打小发展卡 ID 列表 |
-| `player.occupationPlayed` | `string[]` | 已打职业卡 ID 列表 |
-| `player.improvements` | `string[]` | 已建主要改良 ID 列表 |
-| `player.cardStates` | `Record<string, CardState>` | 见 §4.2 |
+
+| 字段                        | 类型                                           | 用法                                                                |
+| ------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
+| `player.workers`          | `Worker[]` 即 `{ id, isActive, isNewborn }[]` | **数家庭成员要 `.filter(w => w.isActive).length`**（少数卡如 A127 会把工人置为非活跃） |
+| `player.fenceSegments`    | `string[]`                                   | **字段名是 `fenceSegments`，不是 `fences`**                              |
+| `player.fields`           | `Field[]`                                    | `.length` 得到田地数                                                   |
+| `player.pastures`         | `Pasture[]`                                  | `.length` 得到牧场数                                                   |
+| `player.rooms`            | `number`                                     | 房间数                                                               |
+| `player.houseType`        | `'wood' \| 'clay' \| 'stone'`               | 房屋类型                                                              |
+| `player.resources`        | `Partial<Record<Resource, number>>`          | `player.resources.wood ?? 0`                                      |
+| `player.minorPlayed`      | `string[]`                                   | 已打小发展卡 ID 列表                                                      |
+| `player.occupationPlayed` | `string[]`                                   | 已打职业卡 ID 列表                                                       |
+| `player.improvements`     | `string[]`                                   | 已建主要改良 ID 列表                                                      |
+| `player.cardStates`       | `Record<string, CardState>`                  | 见 §4.2                                                            |
+
 
 ### 4.2 `cardStates[id]` 形状
 
@@ -211,12 +285,14 @@ const stored = player.cardStates?.[CARD_ID]?.grain ?? 0  // ❌ 读不到
 
 ### 4.3 全局状态
 
-| 字段 | 注意 |
-|---|---|
-| `state.round` | 1–14 |
-| `state.players.length` | 玩家数。**没有 `state.playerCount` 字段** |
-| `state.actionSpaces` | `ActionSpace[]` |
-| `state.actionSpaces[i].takenBy` | `WorkerRef[]`，元素 **`{ playerId, workerId }`**（不是 `playerIndex`） |
+
+| 字段                              | 注意                                                              |
+| ------------------------------- | --------------------------------------------------------------- |
+| `state.round`                   | 1–14                                                            |
+| `state.players.length`          | 玩家数。**没有 `state.playerCount` 字段**                               |
+| `state.actionSpaces`            | `ActionSpace[]`                                                 |
+| `state.actionSpaces[i].takenBy` | `WorkerRef[]`，元素 `**{ playerId, workerId }`**（不是 `playerIndex`） |
+
 
 ---
 
@@ -228,7 +304,9 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ### 5.1 禁用标识符（裸引用即报错）
 
-<!-- prompt-sync:begin id=denied-identifiers source=server/ast-validator.ts:DENIED_IDENTIFIERS -->
+
+
+<!-- prompt-sync:begin id=denied-identifiers -->
 - `eval`
 - `Function`
 - `process`
@@ -253,9 +331,13 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 - `Reflect`
 <!-- prompt-sync:end id=denied-identifiers -->
 
+
+
 ### 5.2 禁用属性访问（包括 `obj.x` 和 `obj['x']`）
 
-<!-- prompt-sync:begin id=denied-property-access source=server/ast-validator.ts:DENIED_PROPERTY_ACCESS -->
+
+
+<!-- prompt-sync:begin id=denied-property-access -->
 - `constructor`
 - `__proto__`
 - `__defineGetter__`
@@ -264,17 +346,21 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 - `__lookupSetter__`
 <!-- prompt-sync:end id=denied-property-access -->
 
+
+
 ### 5.3 禁用语言结构
 
-| 结构 | 说明 |
-|---|---|
-| `import` 声明 | 静态 import 全禁 |
-| 动态 `import(...)` | 同上 |
-| `export` 声明 / `export =` | 全禁 |
-| `require()` 调用 | 即使没在禁用标识符里也会单独拦 |
-| `class` 声明 / `class` 表达式 | 全禁 |
-| `with` 语句 | 全禁 |
-| Generator 函数（`function*` / 表达式） | 全禁 |
+
+| 结构                              | 说明              |
+| ------------------------------- | --------------- |
+| `import` 声明                     | 静态 import 全禁    |
+| 动态 `import(...)`                | 同上              |
+| `export` 声明 / `export =`        | 全禁              |
+| `require()` 调用                  | 即使没在禁用标识符里也会单独拦 |
+| `class` 声明 / `class` 表达式        | 全禁              |
+| `with` 语句                       | 全禁              |
+| Generator 函数（`function`* / 表达式） | 全禁              |
+
 
 ### 5.4 允许的（非穷举提示）
 
@@ -366,21 +452,23 @@ return {
 
 下面这几个是高频踩坑点。完整 `actionId` 列表见 `shared/actions/effects/*` 目录。
 
-| actionId | 关键约束 |
-|---|---|
-| `bonus-vp` | **固定 +1 VP，不接受 `amount` / `vp` 参数**。要 N 分就把 N 个 leaf 串入 seq |
-| `store-on-card` | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters` |
-| `take-from-card` | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
-| `gain` | params 形如 `{ food: 2, wood: 1 }` |
-| `pay-resources` | 同上，扣资源 |
-| `gain-other-players` | 给其它每位玩家各发资源（不含自己） |
-| `bake-bread` | 启动一段烤面包子流程 |
-| `push-card-stack` | 向 `player.cardStates[CARD_ID].stack` 推入一项 |
-| `write-card-extra-data` | 写入 `player.cardStates[CARD_ID].extraData` |
-| `hold-worker-on-card` | 将工人标记为被卡牌持有（不回家） |
-| `release-worker-from-card` | 释放被卡牌持有的工人 |
-| `flag-card` | 设置 `player.cardStates[CARD_ID].flagged = true`，常用于 anytime 一次性 |
-| `future-meeples` | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7） |
+
+| actionId                   | 关键约束                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `bonus-vp`                 | **固定 +1 VP，不接受 `amount` / `vp` 参数**。要 N 分就把 N 个 leaf 串入 seq                       |
+| `store-on-card`            | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters`         |
+| `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
+| `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
+| `pay-resources`            | 同上，扣资源                                                                            |
+| `gain-other-players`       | 给其它每位玩家各发资源（不含自己）                                                                 |
+| `bake-bread`               | 启动一段烤面包子流程                                                                        |
+| `push-card-stack`          | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
+| `write-card-extra-data`    | 写入 `player.cardStates[CARD_ID].extraData`                                         |
+| `hold-worker-on-card`      | 将工人标记为被卡牌持有（不回家）                                                                  |
+| `release-worker-from-card` | 释放被卡牌持有的工人                                                                        |
+| `flag-card`                | 设置 `player.cardStates[CARD_ID].flagged = true`，常用于 anytime 一次性                    |
+| `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
+
 
 ---
 
@@ -429,6 +517,7 @@ const CARD_IMPL = {
 ```
 
 **关键点**：
+
 - 引擎自动处理所有权检查——effect hook 和 listener handler 内**不需要**手动检查 `player.minorPlayed.includes(CARD_ID)` 或 `player.occupationPlayed.includes(CARD_ID)`
 - `CARD_IMPL.effect` 的键必须在 §3.1 白名单中
 - `CARD_IMPL.listeners[].phases` 的值必须在 §3.2 白名单中
@@ -453,10 +542,10 @@ const CARD_IMPL = {
 
 ### 9.1 修改本文件 → 谁会自动同步
 
-- **`client/services/llmPrompts.ts`**：必须人工同步对应段落，CI `pnpm run check:prompt-sync` 会校验 §3.1 / §3.2 / §3.3 / §5.1 / §5.2 这五个 `prompt-sync` 标记块与 `llmPrompts.ts` 字符串、`shared/cards/card-effects.ts` 的 `cardEffectHooks`、`server/custom-code/engine.ts` 的 `isActionHookPhase` / `isCardListenerScope`、`shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 一致。
-- **`docs/CARD_DESIGN_PROMPT.md`**：手工同步引用本文件即可（避免重复列表）。
-- **`docs/ENGINE_ARCHITECTURE.md`**：手工同步引用本文件即可。
-- **`client/app/workshop/AiCardDesigner.tsx`**：手工同步引用本文件即可。
+- `**client/services/llmPrompts.ts`**：必须人工同步对应段落，CI `pnpm run check:prompt-sync` 会校验 §3.1 / §3.2 / §3.3 / §5.1 / §5.2 这五个 `prompt-sync` 标记块与 `llmPrompts.ts` 字符串、`shared/cards/card-effects.ts` 的 `cardEffectHooks`、`server/custom-code/engine.ts` 的 `isActionHookPhase` / `isCardListenerScope`、`shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 一致。
+- `**docs/CARD_DESIGN_PROMPT.md**`：手工同步引用本文件即可（避免重复列表）。
+- `**docs/ENGINE_ARCHITECTURE.md**`：手工同步引用本文件即可。
+- `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
 ### 9.2 修改 hook / phase / denylist 代码 → 必须更新本文件
 
@@ -471,8 +560,9 @@ CI 会拦下漏改的情况。
 
 ## 10. 历史
 
-| 日期 | 变更 |
-|---|---|
+
+| 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
-| 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId |
-| 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `docs/superpowers/specs/2026-04-19-architecture-three-layer-split-design.md` §16 内联描述迁出 |
+| 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId                                                                                                               |
+| 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `docs/superpowers/specs/2026-04-19-architecture-three-layer-split-design.md` §16 内联描述迁出                                                                                                                                                                                             |

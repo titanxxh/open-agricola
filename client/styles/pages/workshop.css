@@ -1735,6 +1735,15 @@
   margin-top: 8px;
 }
 
+.localization-auto-status {
+  margin: 0 16px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(120, 160, 220, 0.15);
+  color: #345;
+  font-size: 13px;
+}
+
 /* ── Batch 2 Task 5: AI Card Designer redesign ───────────────────────────── */
 
 /* Top-level lifted AI provider config — sits above the editor toolbar.       */

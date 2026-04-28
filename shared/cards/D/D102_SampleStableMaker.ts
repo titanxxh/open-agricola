@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
+import { addResourcesFromCards } from '../../logic/stats'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import {
   listReturnableStableTiles,
@@ -43,6 +44,7 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
   if (sourceCard) {
     addCardResourceGained(player, sourceCard, gain)
   }
+  addResourcesFromCards(player, gain)
 })
 
 export const D102_SampleStableMaker = new Occupation({

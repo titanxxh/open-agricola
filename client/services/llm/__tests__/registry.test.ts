@@ -51,20 +51,22 @@ describe('PROVIDERS registry', () => {
 
   it('openrouter exposes supported image generation models', () => {
     const openrouter = PROVIDERS.openrouter!
-    expect(openrouter.capabilities.image).toBe(true)
-    expect(openrouter.models.map(m => m.id)).toEqual(expect.arrayContaining([
+    expect(openrouter.capabilities).toEqual({ chat: false, image: false })
+    expect(listModelsFor(openrouter, 'image').map(m => m.id)).toEqual([
       'openai/gpt-5-image-mini',
       'google/gemini-2.5-flash-image',
       'bytedance-seed/seedream-4.5',
-    ]))
+    ])
+    expect(listModelsFor(openrouter, 'image').map(m => m.id)).not.toContain('qwen/qwen3.6-plus:free')
   })
 
   it('openrouter exposes DeepSeek V4 chat models', () => {
     const openrouter = PROVIDERS.openrouter!
-    expect(openrouter.models.map(m => m.id)).toEqual(expect.arrayContaining([
+    expect(listModelsFor(openrouter, 'chat').map(m => m.id)).toEqual(expect.arrayContaining([
       'deepseek/deepseek-v4-flash',
       'deepseek/deepseek-v4-pro',
     ]))
+    expect(listModelsFor(openrouter, 'chat').map(m => m.id)).not.toContain('openai/gpt-5-image-mini')
   })
 
   it('aihubmix exposes the 3 free models with proper capabilities', () => {
@@ -79,22 +81,34 @@ describe('PROVIDERS registry', () => {
     expect(a.capabilities).toEqual({ chat: true, image: true })
   })
 
-  it('gemini exposes only the 3.1-preview models with proper capabilities', () => {
+  it('gemini exposes supported chat and image models with proper capabilities', () => {
     const g = PROVIDERS.gemini!
     expect(g.models.map(m => m.id)).toEqual([
       'gemini-3.1-pro-preview',
       'gemini-3.1-flash-image-preview',
+      'gemini-2.5-flash-image',
     ])
     expect(g.defaultModel).toBe('gemini-3.1-pro-preview')
     expect(g.models[0].capabilities).toEqual({ chat: true, image: true })
     expect(g.models[1].capabilities).toEqual({ chat: false, image: true })
+    expect(g.models[2].capabilities).toEqual({ chat: false, image: true })
   })
 
   describe('listModelsFor', () => {
     it('returns all models for a provider whose capability matches at provider level', () => {
-      // openrouter is chat:true, image:true; no per-model overrides — chat filter passes all
-      const models = listModelsFor(PROVIDERS.openrouter!, 'chat')
-      expect(models.length).toBe(PROVIDERS.openrouter!.models.length)
+      const fake: ProviderDef = {
+        id: 'aihubmix',
+        label: 'fake',
+        defaultModel: 'a',
+        models: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+        ],
+        apiKeyHint: '',
+        capabilities: { chat: true, image: false },
+      }
+      const models = listModelsFor(fake, 'chat')
+      expect(models.map(m => m.id)).toEqual(['a', 'b'])
     })
 
     it('returns empty when capability is false at provider level and no model overrides', () => {

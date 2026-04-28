@@ -12,6 +12,25 @@ export type Resource = {
   begging: number
 }
 
+// Pseudo-resource map — used ONLY by CardResourceStats.gained to record
+// BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
+// the same Partial<Resource>-shaped storage slot. These keys are NEVER
+// stored in player.resources or space.resources. See
+// shared/game/resource-keys.ts for the runtime list / discriminator.
+export type PseudoResourceMap = {
+  occupation?: number
+  field?: number
+  roomWood?: number
+  roomClay?: number
+  roomStone?: number
+  stable?: number
+}
+
+// Storage shape for `CardResourceStats.gained`: real-resource counts plus
+// optional pseudo-resource counters. All Partial because individual cards
+// only touch the keys they care about.
+export type CardStatGained = Partial<Resource> & PseudoResourceMap
+
 export type ResourceKey = keyof Resource
 
 export type Trade = {
@@ -129,6 +148,7 @@ export type PlayerState = {
   startPlayer: boolean
   activeModifiers: CostModifier[]
   cardStates: CardStates
+  stats: PlayerStats
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
    * `sources` fired during the currently-executing action. Initialised by
@@ -166,11 +186,38 @@ export type CardState = {
 }
 
 export type CardResourceStats = {
+  used: number
+  gained: CardStatGained             // includes pseudo-resource keys
   paid: Partial<Resource>
-  gained: Partial<Resource>
+  saved: Partial<Resource>
+  receivedPayment: Partial<Resource>
+  paidToOthers: Partial<Resource>
 }
 
 export type CardStates = Record<string, CardState>
+
+export type DraftHistoryEntry = {
+  cardId: string
+  draftTurn: number
+  playedTurn?: number
+}
+
+export type PlayerStats = {
+  placedFarmers: number
+  firstPlayerCount: number
+  totalRoomsBuilt: number
+  totalMajorBuilt: number
+  totalMinorBuilt: number
+  totalOccupationBuilt: number
+  harvestedGrain: number
+  harvestedVegetable: number
+  resourcesFromBoard: Partial<Resource>
+  resourcesFromCards: Partial<Resource>
+  resourcesConverted: Partial<Resource>
+  foodFromConversion: Partial<Resource>
+  draftHistory: DraftHistoryEntry[]
+  draftDiscarded: string[]
+}
 
 export type LogEntry = {
   key: string

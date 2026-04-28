@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
+import { addResourcesFromCards } from '../../logic/stats'
 import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
 import {
   listReturnableStableTiles,
@@ -40,6 +41,7 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
     if (sourceCard) {
       addCardResourceGained(player, sourceCard, { wood })
     }
+    addResourcesFromCards(player, { wood })
   }
 })
 

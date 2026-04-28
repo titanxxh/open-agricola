@@ -2,6 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
+import { writeCardInfobox } from '../helpers/card-state'
 import {
   clearPendingFenceBonus,
 } from '../helpers/pending-fence-bonus'
@@ -76,6 +77,9 @@ const afterFenceListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     clearPendingFenceBonus(context.player)
+    const counters = initCardState(context.player, CARD_ID)
+    const remaining = counters['fences'] ?? 0
+    writeCardInfobox(context.player, CARD_ID, `${remaining} / ${MAX_FREE_FENCES}`)
   },
 }
 
@@ -95,7 +99,9 @@ export const E74_AshTrees_impl = {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const counters = initCardState(player, CARD_ID)
-    counters['fences'] = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
+    const initial = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
+    counters['fences'] = initial
+    writeCardInfobox(player, CARD_ID, `${initial} / ${MAX_FREE_FENCES}`)
   },
 },
   reaches: [] as readonly string[],

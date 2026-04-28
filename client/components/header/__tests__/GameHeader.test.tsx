@@ -1,4 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { GameState, PlayerState } from '../../../../shared/game/types'
@@ -40,5 +42,25 @@ describe('GameHeader', () => {
     expect(html).not.toContain('Undo Step')
     expect(html).not.toContain('Undo Action')
     expect(html).not.toContain('Scoring Pad')
+  })
+
+  it('does not show the developer mode toggle in normal games', () => {
+    render(
+      <LocaleProvider>
+        <GameHeader
+          locale="zh"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+        />
+      </LocaleProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /菜单/ }))
+
+    expect(screen.queryByText('开发者模式')).toBeNull()
   })
 })

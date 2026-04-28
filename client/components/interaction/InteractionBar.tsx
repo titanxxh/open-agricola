@@ -407,7 +407,7 @@ export const InteractionBar = ({
           <button onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot}>
             {t(locale, 'ui.undoAction')}
           </button>
-          <button onClick={onShowScoring} disabled={!isInteractive}>
+          <button onClick={onShowScoring}>
             {t(locale, 'ui.scoringPadButton')}
           </button>
         </div>

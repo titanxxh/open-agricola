@@ -11,6 +11,22 @@ const WorkshopPage = lazy(() => import('./WorkshopPage').then(m => ({ default: m
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
+const PAGE_SCOPED_QUERY_KEYS = [
+  'card',
+  'view',
+  'room',
+  'player',
+  'playerId',
+  'transport',
+  'maxPlayers',
+  'draftMode',
+  'draftPoolSize',
+  'enableCommunityDeck',
+  'customCards',
+  'embedded',
+  'devMode',
+]
+
 function getPage(): Page {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
@@ -21,11 +37,11 @@ function getPage(): Page {
 
 export function setPage(page: Page, extraParams?: Record<string, string>) {
   const params = new URLSearchParams(window.location.search)
+  for (const key of PAGE_SCOPED_QUERY_KEYS) {
+    params.delete(key)
+  }
   if (page === 'lobby') {
     params.delete('page')
-    params.delete('room')
-    params.delete('player')
-    params.delete('transport')
   } else {
     params.set('page', page)
   }

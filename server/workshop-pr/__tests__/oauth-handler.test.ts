@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
-import { handleOAuthCallback } from '../oauth-handler.ts'
+import { handleOAuthCallback, handleOAuthStart } from '../oauth-handler.ts'
 import { tokenCache } from '../token-cache.ts'
 import { workshopPrConfig } from '../config.ts'
 
@@ -47,6 +47,20 @@ describe('handleOAuthCallback', () => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = origClientId
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = origSecret
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = origEnabled
+  })
+
+  it('requests repo scope so private upstream repositories can be updated', () => {
+    const hs = tokenCache.allocateHandshakeId('user-private-repo')
+    const req = fakeReq(`/api/workshop/github/oauth/start?hs=${hs}`)
+    const res = fakeRes()
+    handleOAuthStart(req, res, new URL(`http://x${req.url!}`))
+
+    expect(res.statusCode).toBe(302)
+    const location = String(res.headers.Location)
+    const authUrl = new URL(location)
+    expect(authUrl.hostname).toBe('github.com')
+    expect(authUrl.searchParams.get('scope')).toBe('repo')
+    tokenCache.delete(hs)
   })
 
   it('exchanges code for token and binds to cache, returns popup-close HTML', async () => {

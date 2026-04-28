@@ -13,7 +13,8 @@ import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { pruneStaleRoomRows, summarizeRoomsForLobby } from '../game/room-manager.ts'
 
-const TTL_MS = 30 * 60 * 1000
+const WAITING_TTL_MS = 30 * 60 * 1000
+const PLAYING_TTL_MS = 24 * 60 * 60 * 1000
 
 const setupDb = () => {
   const db = new Database(':memory:')
@@ -46,37 +47,41 @@ const insertRoom = (
 }
 
 describe('pruneStaleRoomRows', () => {
-  it('marks rooms updated outside the TTL window as finished, leaves fresh ones alone', () => {
+  it('uses a shorter TTL for waiting rooms and a one-day TTL for started games', () => {
     const db = setupDb()
     const now = 1_700_000_000_000
-    const stale = now - TTL_MS - 1
-    const fresh = now - TTL_MS + 1000
-    insertRoom(db, 'stale1', 'playing', stale)
-    insertRoom(db, 'stale2', 'waiting', stale)
-    insertRoom(db, 'fresh1', 'playing', fresh)
-    insertRoom(db, 'already-done', 'finished', stale)
+    const staleWaiting = now - WAITING_TTL_MS - 1
+    const staleButPlayable = now - WAITING_TTL_MS - 1
+    const stalePlaying = now - PLAYING_TTL_MS - 1
+    const freshWaiting = now - WAITING_TTL_MS + 1000
+    insertRoom(db, 'stale-waiting', 'waiting', staleWaiting)
+    insertRoom(db, 'fresh-waiting', 'waiting', freshWaiting)
+    insertRoom(db, 'playing-under-day', 'playing', staleButPlayable)
+    insertRoom(db, 'playing-over-day', 'playing', stalePlaying)
+    insertRoom(db, 'already-done', 'finished', stalePlaying)
 
-    const changes = pruneStaleRoomRows(db, now, TTL_MS, [])
+    const changes = pruneStaleRoomRows(db, now, WAITING_TTL_MS, [], PLAYING_TTL_MS)
 
     expect(changes).toBe(2)
     const rows = db.prepare('SELECT id, status FROM rooms ORDER BY id').all()
     expect(rows).toEqual([
       { id: 'already-done', status: 'finished' },
-      { id: 'fresh1', status: 'playing' },
-      { id: 'stale1', status: 'finished' },
-      { id: 'stale2', status: 'finished' },
+      { id: 'fresh-waiting', status: 'waiting' },
+      { id: 'playing-over-day', status: 'finished' },
+      { id: 'playing-under-day', status: 'playing' },
+      { id: 'stale-waiting', status: 'finished' },
     ])
   })
 
   it('skips fixed dev rooms even when their updated_at is stale', () => {
     const db = setupDb()
     const now = 1_700_000_000_000
-    const stale = now - TTL_MS - 1
+    const stale = now - PLAYING_TTL_MS - 1
     insertRoom(db, 'dev2', 'playing', stale)
     insertRoom(db, 'dev3', 'playing', stale)
     insertRoom(db, 'abc123', 'playing', stale)
 
-    const changes = pruneStaleRoomRows(db, now, TTL_MS, ['dev2', 'dev3', 'dev4'])
+    const changes = pruneStaleRoomRows(db, now, WAITING_TTL_MS, ['dev2', 'dev3', 'dev4'], PLAYING_TTL_MS)
 
     expect(changes).toBe(1)
     const stillPlaying = db

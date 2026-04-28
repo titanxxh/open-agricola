@@ -69,17 +69,42 @@ export function getWorkshopCardIdFromSearch(search: string): string | null {
   return value || null
 }
 
+type WorkshopUrlView = 'sandbox' | 'editor'
+
+export function getWorkshopViewFromSearch(search: string): WorkshopUrlView | null {
+  const value = new URLSearchParams(search).get('view')?.trim()
+  if (value === 'sandbox' || value === 'editor') return value
+  return null
+}
+
 export function buildWorkshopCardUrl(
   pathname: string,
   search: string,
   cardDbId: string | null,
 ): string {
+  return buildWorkshopUrl(pathname, search, { card: cardDbId })
+}
+
+export function buildWorkshopUrl(
+  pathname: string,
+  search: string,
+  opts: { view?: WorkshopUrlView | null; card?: string | null } = {},
+): string {
   const params = new URLSearchParams(search)
   params.set('page', 'workshop')
-  if (cardDbId) {
-    params.set('card', cardDbId)
-  } else {
-    params.delete('card')
+  if ('view' in opts) {
+    if (opts.view === 'sandbox' || opts.view === 'editor') {
+      params.set('view', opts.view)
+    } else {
+      params.delete('view')
+    }
+  }
+  if ('card' in opts) {
+    if (opts.card) {
+      params.set('card', opts.card)
+    } else {
+      params.delete('card')
+    }
   }
   const nextSearch = params.toString()
   return `${pathname}${nextSearch ? `?${nextSearch}` : ''}`
@@ -91,6 +116,12 @@ type WorkshopPrActionInput = {
   status: WorkshopCard['status']
   githubPrUrl?: string | null
   githubPrStatus?: WorkshopCard['github_pr_status']
+  /**
+   * Workshop card has at least zh + en filled in. PR submission is blocked
+   * until both locales are present so the upstream code file is bilingual.
+   * Optional for back-compat; when omitted, treated as `true`.
+   */
+  localesComplete?: boolean
 }
 
 export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
@@ -111,6 +142,14 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
       disabled: true,
       buttonLabel: '先发布后可发起 PR',
       secondary: '发布后可以提交到主仓库，等待 maintainer review。',
+    }
+  }
+  if (input.localesComplete === false) {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '请先完成中文本地化',
+      secondary: '主仓库代码使用英文，需要 zh 翻译同步提交。点击 AI 设计器顶部的"本地化"按钮补齐。',
     }
   }
 
@@ -147,6 +186,26 @@ function authHeaders(token: string | null): Record<string, string> {
   return { Authorization: `Bearer ${token}` }
 }
 
+/**
+ * Returns true iff `card.card_json.locales.zh` carries a non-empty translation
+ * (name + at least one desc line). Required gate for submitting to the main
+ * repo: code-side fields are English by design, so a Chinese localisation is
+ * the missing half.
+ */
+export function hasZhLocale(cardJson: Record<string, unknown> | null | undefined): boolean {
+  if (!cardJson || typeof cardJson !== 'object') return false
+  const locales = (cardJson as { locales?: unknown }).locales
+  if (!locales || typeof locales !== 'object') return false
+  const zh = (locales as Record<string, unknown>).zh
+  if (!zh || typeof zh !== 'object') return false
+  const entry = zh as { name?: unknown; desc?: unknown }
+  const hasName = typeof entry.name === 'string' && entry.name.trim().length > 0
+  const hasDesc = Array.isArray(entry.desc) && entry.desc.some(
+    (line) => typeof line === 'string' && line.trim().length > 0,
+  )
+  return hasName && hasDesc
+}
+
 function normalizeSandboxSettings(raw: unknown): SandboxSettings {
   const source = (raw ?? {}) as Partial<SandboxSettings>
   const playerCount = typeof source.player_count === 'number'
@@ -166,12 +225,34 @@ function normalizeSandboxSettings(raw: unknown): SandboxSettings {
 
 export function buildSandboxCardIds(
   cards: ReadonlyArray<{ id: string }>,
-  extraCardId?: string | null,
+  extraCardId?: unknown,
 ): string[] {
   const ids = cards.map(card => card.id)
-  const trimmed = extraCardId?.trim()
+  const trimmed = typeof extraCardId === 'string' ? extraCardId.trim() : ''
   if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
   return ids
+}
+
+export type SandboxStartResult = {
+  ok: boolean
+  error?: string
+  cardWarnings?: string[]
+}
+
+export async function readSandboxStartResponse(
+  response: Response,
+  fallbackError: string,
+): Promise<SandboxStartResult> {
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<SandboxStartResult>
+  }
+  return {
+    ok: false,
+    error: response.ok
+      ? fallbackError
+      : `Sandbox start failed (${response.status} ${response.statusText || 'HTTP error'})`,
+  }
 }
 
 // ── Card Preview Tile ────────────────────────────────────────────────────────
@@ -267,6 +348,7 @@ function CardDetailPrSection({
     status: card.status,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
+    localesComplete: hasZhLocale(card.card_json),
   })
   if (!action.visible) return null
 
@@ -601,7 +683,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed }: {
+function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
   initial?: WorkshopCard
   token: string | null
   onCancel: () => void
@@ -609,6 +691,7 @@ function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
+  onCardLoaded?: (cardDbId: string) => void
 }) {
   const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
     // AI designer handles everything now; this callback is kept for interface compatibility
@@ -623,6 +706,7 @@ function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
         onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+        onCardLoaded={onCardLoaded}
       />
     </div>
   )
@@ -997,7 +1081,7 @@ function SandboxView({
         <button
           type="button"
           className="btn-primary"
-          onClick={onStartGame}
+          onClick={() => { onStartGame() }}
         >
           {t('platform.startSandbox')}
         </button>
@@ -1246,7 +1330,7 @@ export function WorkshopPage() {
           deckIds: sandboxSettings.deck_ids,
         }),
       })
-      const data = await response.json()
+      const data = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
         setSandboxActive(true)
@@ -1258,14 +1342,19 @@ export function WorkshopPage() {
       } else {
         const errors = [data.error ?? t('platform.sandboxUnknownError')]
         setPendingSandboxErrors(errors)
+        alert(errors.join('\n'))
       }
-    } catch {
-      alert(t('platform.sandboxNetworkError'))
+    } catch (err) {
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
+      alert(`${t('platform.sandboxNetworkError')}${detail}`)
     }
   }
 
-  const writeCardUrl = useCallback((cardDbId: string | null, mode: 'push' | 'replace') => {
-    const nextUrl = buildWorkshopCardUrl(window.location.pathname, window.location.search, cardDbId)
+  const writeWorkshopUrl = useCallback((
+    opts: { view?: 'sandbox' | 'editor' | null; card?: string | null },
+    mode: 'push' | 'replace' = 'push',
+  ) => {
+    const nextUrl = buildWorkshopUrl(window.location.pathname, window.location.search, opts)
     if (mode === 'push') {
       window.history.pushState(null, '', nextUrl)
     } else {
@@ -1273,45 +1362,86 @@ export function WorkshopPage() {
     }
   }, [])
 
+  const navigateView = useCallback((
+    next: 'home' | 'sandbox' | 'editor',
+    mode: 'push' | 'replace' = 'push',
+  ) => {
+    if (next === 'home') {
+      setSelectedCard(null)
+      setEditCard(undefined)
+    }
+    setView(next)
+    writeWorkshopUrl({ view: next === 'home' ? null : next, card: null }, mode)
+  }, [writeWorkshopUrl])
+
   const loadCardDetail = useCallback(async (cardDbId: string) => {
     const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
       headers: authHeaders(token),
     })
     const data = await response.json()
     if (data.ok) {
-      prevView.current = 'home'
       setSelectedCard(data.card)
       setView('detail')
     }
   }, [token])
 
+  const loadCardForEdit = useCallback(async (cardDbId: string) => {
+    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
+      headers: authHeaders(token),
+    })
+    const data = await response.json()
+    if (data.ok) {
+      setEditCard(data.card)
+      setView('editor')
+    }
+  }, [token])
+
   useEffect(() => {
-    const syncDetailFromUrl = () => {
+    const syncFromUrl = () => {
+      const v = getWorkshopViewFromSearch(window.location.search)
       const cardDbId = getWorkshopCardIdFromSearch(window.location.search)
-      if (!cardDbId) {
+      // view=editor takes precedence over a bare ?card= so the editor URL
+      // pattern (?view=editor&card=<id>) loads the card into the editor
+      // instead of bouncing into the detail view.
+      if (v === 'editor') {
         setSelectedCard(null)
-        setView((current) => current === 'detail' ? prevView.current : current)
+        if (cardDbId) {
+          void loadCardForEdit(cardDbId)
+        } else {
+          setEditCard(undefined)
+          setView('editor')
+        }
         return
       }
-      void loadCardDetail(cardDbId)
+      if (cardDbId) {
+        void loadCardDetail(cardDbId)
+        return
+      }
+      setSelectedCard(null)
+      if (v === 'sandbox') {
+        setView('sandbox')
+      } else {
+        setEditCard(undefined)
+        setView('home')
+      }
     }
 
-    syncDetailFromUrl()
-    window.addEventListener('popstate', syncDetailFromUrl)
-    return () => window.removeEventListener('popstate', syncDetailFromUrl)
-  }, [loadCardDetail])
+    syncFromUrl()
+    window.addEventListener('popstate', syncFromUrl)
+    return () => window.removeEventListener('popstate', syncFromUrl)
+  }, [loadCardDetail, loadCardForEdit])
 
   const goBack = () => {
-    setSelectedCard(null)
-    setView(prevView.current)
-    writeCardUrl(null, 'replace')
+    const target = prevView.current
+    const next = target === 'sandbox' || target === 'editor' ? target : 'home'
+    navigateView(next, 'replace')
   }
 
   const selectCard = (card: WorkshopCard) => {
-    prevView.current = view
+    prevView.current = view === 'detail' ? prevView.current : view
     setSelectedCard(card)
     setView('detail')
-    writeCardUrl(card.id, 'push')
+    writeWorkshopUrl({ card: card.id }, 'push')
   }
 
   if (view === 'detail' && selectedCard) {
@@ -1319,7 +1449,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setSelectedCard(null); setView('home'); writeCardUrl(null, 'replace') }}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <CardDetail
@@ -1327,7 +1457,7 @@ export function WorkshopPage() {
           token={token}
           onBack={goBack}
           onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
-            ? () => { setEditCard(selectedCard); setView('editor') }
+            ? () => { prevView.current = 'detail'; setEditCard(selectedCard); navigateView('editor') }
             : undefined}
           onAddSandbox={handleAddSandbox}
           isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
@@ -1355,15 +1485,27 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => { setEditCard(undefined); setView('home') }}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <CardEditor
           initial={editCard}
           token={token}
           onCancel={() => {
-            setEditCard(undefined)
-            setView(prevView.current)
+            const target = prevView.current
+            const next = target === 'sandbox' || target === 'detail' ? target : 'home'
+            if (next === 'detail' && selectedCard) {
+              setEditCard(undefined)
+              setView('detail')
+              writeWorkshopUrl({ view: null, card: selectedCard.id }, 'replace')
+            } else {
+              navigateView(next === 'detail' ? 'home' : next, 'replace')
+            }
+          }}
+          onCardLoaded={(cardDbId) => {
+            // Reflect the active card in the URL so the user can copy/share
+            // the link or refresh without losing their selection.
+            writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
           }}
           onAddToSandboxAndRestart={async (cardDbId: string) => {
             await handleAddSandbox(cardDbId)
@@ -1412,7 +1554,7 @@ export function WorkshopPage() {
       <div className="ws-page">
         <WorkshopNav
           view={view}
-          onOpenHome={() => setView('home')}
+          onOpenHome={() => navigateView('home')}
           t={t}
         />
         <SandboxView
@@ -1472,7 +1614,7 @@ export function WorkshopPage() {
     <div className="ws-page">
       <WorkshopNav
         view={view}
-        onOpenHome={() => setView('home')}
+        onOpenHome={() => navigateView('home')}
         t={t}
       />
 
@@ -1494,7 +1636,7 @@ export function WorkshopPage() {
               <button
                 type="button"
                 className="btn-primary ws-btn-sm"
-                onClick={() => setView('sandbox')}
+                onClick={() => navigateView('sandbox')}
               >
                 {t('platform.enterSandbox')}
               </button>
@@ -1543,7 +1685,7 @@ export function WorkshopPage() {
               onClick={() => {
                 prevView.current = view
                 setEditCard(undefined)
-                setView('editor')
+                navigateView('editor')
               }}
             >
               {t('platform.createCard')}
@@ -1564,7 +1706,7 @@ export function WorkshopPage() {
                   onClick={() => {
                     prevView.current = view
                     setEditCard(undefined)
-                    setView('editor')
+                    navigateView('editor')
                   }}
                 >
                   {t('platform.createCard')}
@@ -1715,19 +1857,22 @@ function WorkshopNav({
   onOpenHome: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const isHome = view === 'home'
+  const handleBack = isHome ? () => setPage('lobby') : onOpenHome
+  const backLabel = isHome ? t('platform.backToLobbyShort') : t('platform.backToWorkshopHome')
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
+        <button type="button" className="ws-back-home" onClick={handleBack}>
           <span aria-hidden="true">‹</span>
-          {t('platform.backToLobbyShort')}
+          {backLabel}
         </button>
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">
-        {view !== 'home' && (
-          <button type="button" className="btn-link ws-nav-link" onClick={onOpenHome}>
-            {t('platform.backToWorkshopHome')}
+        {!isHome && (
+          <button type="button" className="btn-link ws-nav-link" onClick={() => setPage('lobby')}>
+            {t('platform.backToLobbyPlain')}
           </button>
         )}
         <LocaleSwitcher />

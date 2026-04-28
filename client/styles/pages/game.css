@@ -476,11 +476,14 @@
   height: 34px;
   padding: 0 10px;
   align-self: center;
-  border: 2px solid #355d2e;
+  border: 0;
   background: #fff;
   color: #2d5228;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.header-locale-select .select-button__trigger {
+  border: 0;
 }
 .header-locale-select:hover {
   background: #f4faf0;
@@ -850,19 +853,32 @@
   display: inline-flex;
   align-items: flex-end;
   justify-content: center;
-  width: 24px;
-  height: 32px;
+  width: 30px;
+  height: 40px;
   flex: 0 0 auto;
+  filter: drop-shadow(0 7px 4px rgba(44, 31, 17, 0.34));
+}
+.action-farmer-stack::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 30px;
+  height: 9px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(40, 27, 12, 0.45), rgba(40, 27, 12, 0) 72%);
+  transform: translateX(-50%);
+  z-index: 0;
 }
 .action-farmer-stack.has-offspring {
-  width: 34px;
+  width: 42px;
 }
 .action-farmer {
   position: absolute;
   right: 0;
-  bottom: 0;
-  width: 24px;
-  height: 30px;
+  bottom: 4px;
+  width: 30px;
+  height: 38px;
   background: var(--color-danger);
   -webkit-mask-image: url('/bga-img/farmers.png');
   -webkit-mask-size: 500% 100%;
@@ -870,37 +886,42 @@
   mask-image: url('/bga-img/farmers.png');
   mask-size: 500% 100%;
   mask-repeat: no-repeat;
+  transform: translateY(-2px);
+  z-index: 2;
   filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.18))
-    drop-shadow(0 2px 2px rgba(0, 0, 0, 0.28))
-    drop-shadow(-1px 4px 4px rgba(0, 0, 0, 0.18));
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.75))
+    drop-shadow(1px 0 0 rgba(255, 255, 255, 0.62))
+    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.62))
+    drop-shadow(0 1px 0 rgba(59, 36, 17, 0.7))
+    drop-shadow(0 4px 3px rgba(0, 0, 0, 0.42))
+    drop-shadow(-2px 8px 6px rgba(0, 0, 0, 0.28));
 }
 .action-farmer.child {
-  width: 17px;
-  height: 21px;
+  width: 21px;
+  height: 26px;
   left: 0;
   right: auto;
-  bottom: 1px;
+  bottom: 5px;
   opacity: 0.98;
-  z-index: 2;
+  z-index: 3;
 }
 .action-farmer-red {
-  background: var(--color-danger);
+  background: linear-gradient(135deg, #ff7a68 0%, var(--color-danger) 48%, #7f1d1d 100%);
   -webkit-mask-position: 0% 0%;
   mask-position: 0% 0%;
 }
 .action-farmer-yellow {
-  background: #d6b332;
+  background: linear-gradient(135deg, #fff08a 0%, #d6b332 48%, #7c5d08 100%);
   -webkit-mask-position: 25% 0%;
   mask-position: 25% 0%;
 }
 .action-farmer-blue {
-  background: #3f6ee8;
+  background: linear-gradient(135deg, #8ab7ff 0%, #3f6ee8 48%, #1e2f8f 100%);
   -webkit-mask-position: 50% 0%;
   mask-position: 50% 0%;
 }
 .action-farmer-black {
-  background: #1f2937;
+  background: linear-gradient(135deg, #6b7280 0%, #1f2937 52%, #05070a 100%);
   -webkit-mask-position: 75% 0%;
   mask-position: 75% 0%;
 }

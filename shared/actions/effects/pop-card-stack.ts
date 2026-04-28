@@ -3,6 +3,7 @@ import { popFromCardStack } from '../../cards/helpers/card-state'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainResources } from './gain'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { addResourcesFromCards } from '../../logic/stats'
 
 export const popCardStackAction: ActionDefinition = {
   id: 'pop-card-stack',
@@ -23,6 +24,7 @@ export const popCardStackAction: ActionDefinition = {
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addCardResourceGained(player, sourceCard, gain)
+    addResourcesFromCards(player, gain)
     return {
       type: 'ok',
       resourcesGained: gain,

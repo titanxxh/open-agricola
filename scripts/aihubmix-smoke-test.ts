@@ -2,18 +2,22 @@
  * Manual smoke test for AiHubMix free-tier models.
  *
  *   pnpm run smoke:aihubmix
+ *   pnpm run smoke:aihubmix:image
+ *   pnpm run smoke:gemini:image
  *
- * Reads MY_TEST_AIHUBMIX_APIKEY from .env (do NOT commit the key — .env is gitignored).
- * Performs 3 real network calls:
+ * Reads test API keys from .env (do NOT commit the key — .env is gitignored).
+ * Performs real network calls:
  *   1. coding-glm-5.1-free  — chat completion
  *   2. k2.6-code-preview-free — chat completion
- *   3. gemini-3.1-flash-image-preview-free — image via chat-completions + modalities
+ *   3. gemini-3.1-flash-image-preview-free — two card-art image cases
+ * Writes generated code and image artifacts to output/tmp/aihubmix-smoke/.
  *
  * Exits 0 on full success, 1 on any failure (with response body dumped).
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildCardArtPrompt } from '../client/services/llm/card-utils.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WORKTREE_ROOT = path.resolve(__dirname, '..')
@@ -43,24 +47,76 @@ function resolveRepoRoot(): string {
 }
 
 const REPO_ROOT = resolveRepoRoot()
+const ENV_TEXT = loadEnvText()
 
-function loadKey(): string {
+function loadEnvText(): string {
   const envPath = path.join(REPO_ROOT, '.env')
   if (!fs.existsSync(envPath)) {
     console.error('❌ .env not found at', envPath)
     process.exit(1)
   }
-  const text = fs.readFileSync(envPath, 'utf8')
-  const line = text.split('\n').find(l => l.startsWith('MY_TEST_AIHUBMIX_APIKEY='))
-  if (!line) {
-    console.error('❌ MY_TEST_AIHUBMIX_APIKEY missing from .env')
-    process.exit(1)
-  }
-  return line.slice('MY_TEST_AIHUBMIX_APIKEY='.length).trim().replace(/^["']|["']$/g, '')
+  return fs.readFileSync(envPath, 'utf8')
 }
 
-const KEY = loadKey()
+function loadKey(envNames: string[]): string {
+  for (const envName of envNames) {
+    const processValue = process.env[envName]
+    if (processValue) return processValue
+    const line = ENV_TEXT.split('\n').find(l => l.startsWith(`${envName}=`))
+    if (line) return line.slice(envName.length + 1).trim().replace(/^["']|["']$/g, '')
+  }
+  console.error(`❌ Missing API key env: ${envNames.join(' or ')}`)
+  process.exit(1)
+}
+
 const BASE = 'https://aihubmix.com/v1'
+const OUTPUT_DIR = path.join(REPO_ROOT, 'output', 'tmp', 'aihubmix-smoke')
+
+type SmokeMode = 'all' | 'code' | 'image'
+type ImageProvider = 'aihubmix' | 'gemini'
+type SmokeCard = {
+  id: string
+  name: string
+  type: 'minor' | 'occupation'
+  artSubject: string
+}
+
+const SMOKE_IMAGE_CARDS: SmokeCard[] = [
+  {
+    id: 'CUSTOM_M1_QuickHaul',
+    name: '速运',
+    type: 'minor',
+    artSubject: '一辆装满木材和食物的小型手推车，由农夫在泥土小路上快速推行',
+  },
+  {
+    id: 'CUSTOM_M2_LumberJackBoots',
+    name: '伐木靴',
+    type: 'occupation',
+    artSubject: '一位穿着结实木屑靴子的伐木工，肩扛斧头，站在农场边缘的木柴堆旁',
+  },
+]
+
+const AIHUBMIX_KEY = loadKey(['AIHUBMIX_API_KEY', 'MY_TEST_AIHUBMIX_APIKEY'])
+
+function ensureOutputDir(): void {
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true })
+}
+
+function safeModelName(model: string): string {
+  return model.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function extensionForMime(mime: string | undefined): string {
+  if (mime === 'image/jpeg') return 'jpg'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'image/gif') return 'gif'
+  return 'png'
+}
+
+async function failFromResponse(label: string, resp: Response): Promise<never> {
+  const body = await resp.text()
+  throw new Error(`${label} HTTP ${resp.status}: ${body}`)
+}
 
 async function smokeChat(model: string): Promise<void> {
   console.log(`\n▶ Chat: ${model}`)
@@ -68,7 +124,7 @@ async function smokeChat(model: string): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${KEY}`,
+      Authorization: `Bearer ${AIHUBMIX_KEY}`,
     },
     body: JSON.stringify({
       model,
@@ -80,9 +136,7 @@ async function smokeChat(model: string): Promise<void> {
     }),
   })
   if (!resp.ok) {
-    console.error(`  ❌ HTTP ${resp.status}`)
-    console.error('  body:', await resp.text())
-    process.exit(1)
+    await failFromResponse(`Chat ${model}`, resp)
   }
   // Collect SSE deltas
   const reader = resp.body!.getReader()
@@ -108,38 +162,56 @@ async function smokeChat(model: string): Promise<void> {
     }
   }
   if (!collected.trim()) {
-    console.error('  ❌ Empty response')
-    process.exit(1)
+    throw new Error(`Chat ${model} returned empty response`)
   }
   if (!/function/i.test(collected)) {
     console.error('  ⚠️  Response does not contain "function" — model may have refused or veered off-topic. Body:')
     console.error('  ', collected.slice(0, 500))
   }
+  const outPath = path.join(OUTPUT_DIR, `${safeModelName(model)}-code.txt`)
+  fs.writeFileSync(outPath, collected, 'utf8')
   console.log(`  ✅ ${collected.length} chars streamed (snippet: ${collected.slice(0, 80).replace(/\s+/g, ' ')}...)`)
+  console.log(`  ↳ saved code output: ${path.relative(REPO_ROOT, outPath)}`)
 }
 
-async function smokeImage(model: string): Promise<void> {
-  console.log(`\n▶ Image: ${model}`)
+async function smokeImage(provider: ImageProvider, model: string, card: SmokeCard): Promise<void> {
+  const prompt = buildCardArtPrompt(card.artSubject, card.type, 'zh')
+  const promptPath = path.join(OUTPUT_DIR, `${card.id}-${provider}-${safeModelName(model)}-prompt.txt`)
+  fs.writeFileSync(promptPath, prompt, 'utf8')
+
+  console.log(`\n▶ Image: ${provider}/${model} (${card.id} ${card.name}, ${card.type})`)
+  console.log(`  ↳ saved art prompt: ${path.relative(REPO_ROOT, promptPath)}`)
+  const { data, mime } = provider === 'gemini'
+    ? await generateGeminiImage(model, prompt)
+    : await generateAiHubMixImage(model, prompt)
+  if (data.length < 1024) {
+    throw new Error(`Image ${provider}/${model} base64 too short: ${data.length} chars`)
+  }
+  const outPath = path.join(OUTPUT_DIR, `${card.id}-${provider}-${safeModelName(model)}-image.${extensionForMime(mime)}`)
+  fs.writeFileSync(outPath, Buffer.from(data, 'base64'))
+  console.log(`  ✅ ${data.length}-char base64 image (mime: ${mime})`)
+  console.log(`  ↳ saved image output: ${path.relative(REPO_ROOT, outPath)}`)
+}
+
+async function generateAiHubMixImage(model: string, prompt: string): Promise<{ data: string; mime: string }> {
   const resp = await fetch(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${KEY}`,
+      Authorization: `Bearer ${AIHUBMIX_KEY}`,
     },
     body: JSON.stringify({
       model,
       messages: [{
         role: 'user',
-        content: [{ type: 'text', text: 'a red apple on white background' }],
+        content: [{ type: 'text', text: prompt }],
       }],
       modalities: ['text', 'image'],
       temperature: 0.7,
     }),
   })
   if (!resp.ok) {
-    console.error(`  ❌ HTTP ${resp.status}`)
-    console.error('  body:', await resp.text())
-    process.exit(1)
+    await failFromResponse(`Image ${model}`, resp)
   }
   const data = await resp.json() as {
     // AiHubMix uses snake_case: inline_data / data / mime_type (verified 2026-04-26)
@@ -148,24 +220,96 @@ async function smokeImage(model: string): Promise<void> {
   const parts = data.choices?.[0]?.message?.multi_mod_content ?? []
   const imgPart = parts.find(p => p.inline_data?.data)
   if (!imgPart?.inline_data?.data) {
-    console.error('  ❌ No inline image part found. Full response:')
-    console.error(JSON.stringify(data, null, 2).slice(0, 2000))
-    process.exit(1)
+    throw new Error(`Image ${model} returned no inline image part: ${JSON.stringify(data, null, 2).slice(0, 2000)}`)
   }
-  const len = imgPart.inline_data.data.length
-  if (len < 1024) {
-    console.error(`  ❌ base64 too short: ${len} chars`)
-    process.exit(1)
+  return { data: imgPart.inline_data.data, mime: imgPart.inline_data.mime_type ?? 'image/png' }
+}
+
+async function generateGeminiImage(model: string, prompt: string): Promise<{ data: string; mime: string }> {
+  const key = loadKey(['GEMINI_API_KEY', 'MY_TEST_GEMINI_APIKEY'])
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      }),
+    },
+  )
+  if (!resp.ok) {
+    await failFromResponse(`Image gemini/${model}`, resp)
   }
-  console.log(`  ✅ ${len}-char base64 image (mime: ${imgPart.inline_data.mime_type ?? 'image/png'})`)
+  const data = await resp.json() as {
+    candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[]
+  }
+  const parts = data.candidates?.[0]?.content?.parts ?? []
+  const imgPart = parts.find(p => p.inlineData?.data)
+  if (!imgPart?.inlineData?.data) {
+    throw new Error(`Image gemini/${model} returned no inline image part: ${JSON.stringify(data, null, 2).slice(0, 2000)}`)
+  }
+  return { data: imgPart.inlineData.data, mime: imgPart.inlineData.mimeType ?? 'image/png' }
+}
+
+function parseMode(): SmokeMode {
+  if (process.argv.includes('--image-only')) return 'image'
+  if (process.argv.includes('--code-only')) return 'code'
+  return 'all'
+}
+
+function parseArg(name: string): string | null {
+  const prefix = `--${name}=`
+  return process.argv.find(arg => arg.startsWith(prefix))?.slice(prefix.length) ?? null
+}
+
+function parseImageProvider(): ImageProvider {
+  const raw = parseArg('image-provider') ?? process.env.LLM_TEST_IMAGE_PROVIDER ?? 'aihubmix'
+  if (raw === 'aihubmix' || raw === 'gemini') return raw
+  throw new Error(`Unsupported image provider: ${raw}`)
+}
+
+function parseImageModel(provider: ImageProvider): string {
+  return parseArg('image-model')
+    ?? process.env.LLM_TEST_IMAGE_MODEL
+    ?? (provider === 'gemini' ? 'gemini-2.5-flash-image' : 'gemini-3.1-flash-image-preview-free')
 }
 
 async function main(): Promise<void> {
-  console.log('AiHubMix smoke test — calling 3 free models against', BASE)
-  await smokeChat('coding-glm-5.1-free')
-  await smokeChat('k2.6-code-preview-free')
-  await smokeImage('gemini-3.1-flash-image-preview-free')
-  console.log('\n✅ All 3 free models reachable via AiHubMix')
+  const mode = parseMode()
+  const imageProvider = parseImageProvider()
+  const imageModel = parseImageModel(imageProvider)
+  ensureOutputDir()
+  console.log('LLM smoke test — calling configured provider models')
+  console.log(`Mode: ${mode}`)
+  console.log(`Image provider/model: ${imageProvider}/${imageModel}`)
+  console.log('Artifacts:', path.relative(REPO_ROOT, OUTPUT_DIR))
+  const failures: string[] = []
+  const runStep = async (label: string, fn: () => Promise<void>): Promise<void> => {
+    try {
+      await fn()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      failures.push(`${label}: ${message}`)
+      console.error(`  ❌ ${message}`)
+    }
+  }
+
+  if (mode === 'all' || mode === 'code') {
+    await runStep('coding-glm-5.1-free', () => smokeChat('coding-glm-5.1-free'))
+    await runStep('k2.6-code-preview-free', () => smokeChat('k2.6-code-preview-free'))
+  }
+  if (mode === 'all' || mode === 'image') {
+    for (const card of SMOKE_IMAGE_CARDS) {
+      await runStep(`${card.id}-image`, () => smokeImage(imageProvider, imageModel, card))
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error(`\n❌ ${failures.length} AiHubMix smoke step(s) failed.`)
+    process.exit(1)
+  }
+  console.log('\n✅ Requested AiHubMix smoke steps completed')
 }
 
 void main().catch(err => {
