@@ -241,6 +241,31 @@ export function scanCoreFilesForCardId(
   return hits
 }
 
+const AGG_FIELDS = ['fields', 'fences', 'familySize', 'workers']
+
+function buildMutationRegex(field: string): RegExp {
+  return new RegExp(
+    `\\bplayer\\.${field}\\s*(=[^=]|\\.push\\b|\\.pop\\b|\\.splice\\b|\\.shift\\b|\\.unshift\\b)`,
+  )
+}
+
+export function scanAggregateMutations(filePath: string): AggregateMutation[] {
+  if (!fs.existsSync(filePath)) return []
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n')
+  const hits: AggregateMutation[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    for (const field of AGG_FIELDS) {
+      const re = buildMutationRegex(field)
+      if (re.test(line)) {
+        hits.push({ file: filePath, line: i + 1, field: `player.${field}` })
+      }
+    }
+  }
+  return hits
+}
+
 export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResult {
   const oursContent = fs.readFileSync(pair.ourPath, 'utf8')
   const bgaContent = fs.readFileSync(pair.bgaPath, 'utf8')
@@ -257,7 +282,7 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
     signals: {
       S1_coreFileMentions: scanCoreFilesForCardId(pair.cardId, repoRoot),
       S4_crossLayerImports: [],
-      S5_aggregateMutations: [],
+      S5_aggregateMutations: scanAggregateMutations(pair.ourPath),
       S6_lineRatio: computeLineRatio(ourLines, bgaLines),
       S7_externalCardIdMentions: [],
       S10_shellLikelihood: shell.likelihood,
