@@ -284,6 +284,39 @@ export function scanCrossLayerImports(filePath: string): CrossLayerImport[] {
   return hits
 }
 
+export function normalizeDesc(s: string): string {
+  if (!s) return ''
+  return s
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\\\/g, '\\')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function extractOurDesc(content: string): string {
+  const m = content.match(/\bdesc(?:ription)?\s*:\s*['"`]([^'"`]*)['"`]/)
+  return m ? m[1] : ''
+}
+
+export function extractBgaDesc(content: string): string {
+  const m = content.match(/\$this->desc\s*=\s*['"]([^'"]*)['"]/)
+  return m ? m[1] : ''
+}
+
+export type DescAlignment = 'aligned' | 'missing-i18n' | 'diff-from-bga'
+
+export function compareDesc(ours: string, bga: string): DescAlignment {
+  const oN = normalizeDesc(ours)
+  const bN = normalizeDesc(bga)
+  if (oN === '' && bN !== '') return 'missing-i18n'
+  if (oN === bN) return 'aligned'
+  return 'diff-from-bga'
+}
+
 function* walkTsFiles(dir: string): Generator<string> {
   if (!fs.existsSync(dir)) return
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -323,6 +356,8 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
   const ourLines = oursContent.split('\n').filter(l => l.trim().length > 0).length
   const bgaLines = bgaContent.split('\n').filter(l => l.trim().length > 0).length
   const shell = detectShell(oursContent, bgaContent)
+  const ourDesc = extractOurDesc(oursContent)
+  const bgaDesc = extractBgaDesc(bgaContent)
 
   return {
     cardId: pair.cardId,
@@ -338,7 +373,7 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
       S7_externalCardIdMentions: scanExternalCardIdMentions(pair.cardId, repoRoot),
       S10_shellLikelihood: shell.likelihood,
       S10_evidence: shell.evidence,
-      S11_descAlignment: 'aligned',
+      S11_descAlignment: compareDesc(ourDesc, bgaDesc),
       S12_i18nGapKeys: [],
     },
     verdict: 'pending',

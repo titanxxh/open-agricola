@@ -12,6 +12,10 @@ import {
   scanAggregateMutations,
   scanExternalCardIdMentions,
   scanCrossLayerImports,
+  extractOurDesc,
+  extractBgaDesc,
+  normalizeDesc,
+  compareDesc,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -235,5 +239,33 @@ describe('scanCrossLayerImports (S4)', () => {
     const hits = scanCrossLayerImports(tmp)
     expect(hits.length).toBe(0)
     fs.unlinkSync(tmp)
+  })
+})
+
+describe('normalizeDesc', () => {
+  it('decodes JS escapes', () => {
+    expect(normalizeDesc('foo\\u00a0bar')).toBe('foo bar')
+  })
+
+  it('replaces curly quotes with straight', () => {
+    expect(normalizeDesc('"foo" ‘bar’')).toBe(`"foo" 'bar'`)
+  })
+
+  it('collapses whitespace', () => {
+    expect(normalizeDesc('  foo   bar  ')).toBe('foo bar')
+  })
+})
+
+describe('compareDesc', () => {
+  it('returns aligned when both texts equal post-normalize', () => {
+    expect(compareDesc('foo', 'foo')).toBe('aligned')
+  })
+
+  it('returns diff-from-bga when texts differ', () => {
+    expect(compareDesc('foo', 'bar')).toBe('diff-from-bga')
+  })
+
+  it('returns missing-i18n when ours is empty', () => {
+    expect(compareDesc('', 'bar')).toBe('missing-i18n')
   })
 })
