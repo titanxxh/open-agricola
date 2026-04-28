@@ -3,6 +3,7 @@ import { initCardState } from '../../cards/__stubs__/helpers'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainResources } from './gain'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { addResourcesFromCards } from '../../logic/stats'
 
 const canTakeFromCard = (
   counters: Record<string, number> | undefined,
@@ -38,6 +39,7 @@ export const takeFromCardAction: ActionDefinition = {
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addCardResourceGained(player, sourceCard, gain)
+    addResourcesFromCards(player, gain as Partial<Resource>)
 
     return {
       type: 'ok',
