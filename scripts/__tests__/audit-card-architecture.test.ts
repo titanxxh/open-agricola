@@ -9,6 +9,7 @@ import {
   countLines,
   detectShell,
   scanCoreFilesForCardId,
+  scanAggregateMutations,
 } from '../audit-card-architecture'
 
 describe('parseArgs', () => {
@@ -147,6 +148,36 @@ describe('scanCoreFilesForCardId (S1)', () => {
     expect(hits[0].file).toBe(tmp)
     expect(hits[0].line).toBe(1)
     expect(hits[0].snippet).toContain('A999')
+    fs.unlinkSync(tmp)
+  })
+})
+
+describe('scanAggregateMutations (S5)', () => {
+  it('flags direct player.fences assignment', () => {
+    const tmp = path.join('output', 'tmp', 'test-mut.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `player.fences = []\nplayer.fences.push(seg)\n`)
+    const hits = scanAggregateMutations(tmp)
+    expect(hits.length).toBeGreaterThanOrEqual(1)
+    expect(hits[0].field).toBe('player.fences')
+    fs.unlinkSync(tmp)
+  })
+
+  it('does not flag cardStates writes', () => {
+    const tmp = path.join('output', 'tmp', 'test-mut2.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `player.cardStates['A123'] = { flagged: true }\n`)
+    const hits = scanAggregateMutations(tmp)
+    expect(hits.length).toBe(0)
+    fs.unlinkSync(tmp)
+  })
+
+  it('does not flag reads (player.fences.length)', () => {
+    const tmp = path.join('output', 'tmp', 'test-mut3.ts')
+    fs.mkdirSync(path.dirname(tmp), { recursive: true })
+    fs.writeFileSync(tmp, `if (player.fences.length > 0) {}\n`)
+    const hits = scanAggregateMutations(tmp)
+    expect(hits.length).toBe(0)
     fs.unlinkSync(tmp)
   })
 })
