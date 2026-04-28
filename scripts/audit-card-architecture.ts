@@ -266,6 +266,39 @@ export function scanAggregateMutations(filePath: string): AggregateMutation[] {
   return hits
 }
 
+function* walkTsFiles(dir: string): Generator<string> {
+  if (!fs.existsSync(dir)) return
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (/[\\/]shared[\\/]cards[\\/][A-E]$/.test(full)) continue
+      if (entry.name === '__tests__') continue
+      yield* walkTsFiles(full)
+    } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+      yield full
+    }
+  }
+}
+
+export function scanExternalCardIdMentions(cardId: string, repoRoot: string): CodeMention[] {
+  const hits: CodeMention[] = []
+  const re = new RegExp(`['"\`]${cardId}['"\`]|\\b${cardId}_\\w+\\b`)
+
+  for (const file of walkTsFiles(path.join(repoRoot, 'shared'))) {
+    const lines = fs.readFileSync(file, 'utf8').split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        hits.push({
+          file: path.relative(repoRoot, file),
+          line: i + 1,
+          snippet: lines[i].trim().slice(0, 200),
+        })
+      }
+    }
+  }
+  return hits
+}
+
 export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResult {
   const oursContent = fs.readFileSync(pair.ourPath, 'utf8')
   const bgaContent = fs.readFileSync(pair.bgaPath, 'utf8')
@@ -284,7 +317,7 @@ export function scanCard(pair: CardPair, repoRoot: string = '.'): CardAuditResul
       S4_crossLayerImports: [],
       S5_aggregateMutations: scanAggregateMutations(pair.ourPath),
       S6_lineRatio: computeLineRatio(ourLines, bgaLines),
-      S7_externalCardIdMentions: [],
+      S7_externalCardIdMentions: scanExternalCardIdMentions(pair.cardId, repoRoot),
       S10_shellLikelihood: shell.likelihood,
       S10_evidence: shell.evidence,
       S11_descAlignment: 'aligned',
