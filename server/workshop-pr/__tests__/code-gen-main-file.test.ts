@@ -50,6 +50,85 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
     expect(out).not.toContain(`import { MinorImprovement }`)
   })
 
+  it('injects locales from card_json into the generated CARD_DEF', () => {
+    const wcard = {
+      id: 'wc-loc',
+      card_id: 'CUSTOM_LocalisedCard',
+      card_type: 'minor',
+      author_name: 'alice',
+      card_json: JSON.stringify({
+        locales: {
+          zh: { name: '本地化卡', desc: ['中文描述。'] },
+        },
+      }),
+      effect_code: `
+const CARD_ID = 'CUSTOM_LocalisedCard'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Localised Card', deck: 'CUSTOM', number: 0, desc: ['English desc.'], cost: {}, vp: 0 })
+const CARD_IMPL = {}
+`.trim(),
+    }
+
+    const out = generateMainCardFile(wcard, {
+      githubLogin: 'alicegh',
+      iso: '2026-04-22T00:00:00Z',
+    })
+
+    expect(out).toContain('本地化卡')
+    expect(out).toContain('中文描述。')
+    expect(out).toContain('locales:')
+    expect(out).toMatch(/zh:\s*\{/)
+  })
+
+  it('replaces a stale locales block in the source with card_json.locales', () => {
+    const wcard = {
+      id: 'wc-loc2',
+      card_id: 'CUSTOM_StaleLocale',
+      card_type: 'minor',
+      author_name: 'alice',
+      card_json: JSON.stringify({
+        locales: {
+          zh: { name: '新中文名', desc: ['新中文描述。'] },
+        },
+      }),
+      effect_code: `
+const CARD_ID = 'CUSTOM_StaleLocale'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Card', deck: 'CUSTOM', number: 0, desc: ['English desc.'], cost: {}, vp: 0, locales: { zh: { name: '旧中文名', desc: ['旧描述。'] } } })
+const CARD_IMPL = {}
+`.trim(),
+    }
+
+    const out = generateMainCardFile(wcard, {
+      githubLogin: 'alicegh',
+      iso: '2026-04-22T00:00:00Z',
+    })
+
+    expect(out).toContain('新中文名')
+    expect(out).not.toContain('旧中文名')
+    expect(out).not.toContain('旧描述。')
+  })
+
+  it('omits locales field when card_json has none', () => {
+    const wcard = {
+      id: 'wc-loc3',
+      card_id: 'CUSTOM_NoLocale',
+      card_type: 'minor',
+      author_name: 'alice',
+      card_json: JSON.stringify({}),
+      effect_code: `
+const CARD_ID = 'CUSTOM_NoLocale'
+const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Card', deck: 'CUSTOM', number: 0, desc: ['English desc.'], cost: {}, vp: 0 })
+const CARD_IMPL = {}
+`.trim(),
+    }
+
+    const out = generateMainCardFile(wcard, {
+      githubLogin: 'alicegh',
+      iso: '2026-04-22T00:00:00Z',
+    })
+
+    expect(out).not.toContain('locales:')
+  })
+
   it('normalizes workshop code for community deck and listener ids', () => {
     const wcard = {
       id: 'wc3',
