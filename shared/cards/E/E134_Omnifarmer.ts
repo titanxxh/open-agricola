@@ -93,5 +93,5 @@ export const E134_Omnifarmer_impl = {
       return vpMap[Math.min(n, 5)]!
     },
   },
-  reaches: [] as readonly string[],
+  reaches: ['E84_DollysMother'] as readonly string[],
 } satisfies CardImpl
