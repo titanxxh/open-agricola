@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getAssignedAnimalCount, getTotalAnimalCapacity } from '../../actions/effects/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A165_PigBreeder'
@@ -20,6 +21,13 @@ export const A165_PigBreeder_impl = {
   id: CARD_ID,
   onBuy: (_state, _player) => {
     return gainLeaf(CARD_ID, { boar: 1 })
+  },
+  onRoundEnd: (state, player) => {
+    if (state.round !== 12) return
+    if (player.resources.boar < 2) return
+    const free = getTotalAnimalCapacity(player) - getAssignedAnimalCount(player)
+    if (free <= 0) return
+    player.resources.boar += 1
   },
 },
   reaches: [] as readonly string[],

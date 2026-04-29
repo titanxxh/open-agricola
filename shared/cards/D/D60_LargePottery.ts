@@ -49,8 +49,9 @@ export const D60_LargePottery_impl = {
     if (!player.improvements.includes('Major_Pottery')) return
     returnCardToBoard(player, 'Major_Pottery', state)
   },
-  computeBonusScore: (_state, player) => {
-    const clay = player.resources.clay
+  computeBonusScore: (_state, player, ctx) => {
+    const reservedClay = ctx?.reserved?.clay ?? 0
+    const clay = Math.max(0, player.resources.clay - reservedClay)
     if (clay >= 7) return 4
     if (clay >= 6) return 3
     if (clay >= 5) return 2
