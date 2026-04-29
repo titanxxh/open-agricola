@@ -426,6 +426,6 @@ docs/card_desc_audit.md §1 总览数字降到：
 | 2.5 | BeforeEndOfGame interactive choice（A136/C133/C99/D132/E132） | 5 | 4 day | 0 | **skipped — registered as deliberate divergence** | — | — | — |
 | 3 | P0 E149 MidnightFencer | 1 | 3 day | ~1.5 day | done（implemented as deliberate divergence — onStartHarvest offers 0..2×(N−1), each owedFence = +1 raw VP；BGA fence-segment placement 待 fence 系统重写） | docs/superpowers/specs/2026-04-29-sprint-3-e149-design.md | — | #34 |
 | 4 | P1 机制 helper（sharedScoring + category + getExchangeResources） | 178 cards (category) + 2 cards (sharedScoring) | 5 day | ~1 day | done（PR-4A A135/C136 sharedScoring ✅、PR-4B 178 cards category alignment ✅、PR-4C **skipped** — audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed） | — | — | #35 / #36 |
-| 5 | P1 单卡行为偏差 | 28 | 9 day | — | pending | — | — | — |
+| 5 | P1 单卡行为偏差 | 28 | 9 day | ~0.5 day (PR-5 partial) | partially done (7/28; remainder deferred to follow-up — see card_progress.md §2.3 "Sprint 5 PR-5 deferred" subsection) | — | — | sprint-5-batch |
 | 6 | P2 长尾（extraVp + banned + E30 + D12↔D148 + i18n + stub） | ~50 + i18n | 7 day | — | pending | — | — | — |
 | 7 | P3 简化 130 张 | 130 | 视情况 | — | not started | — | — | — |
