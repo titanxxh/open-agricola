@@ -92,7 +92,8 @@ describe('A150_Stagehand session', () => {
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
-    expect(resp.interaction.farm.maxSelections).toBe(1)
+    // BGA: Stagehand's construct does not cap room count (unlike A128/D128).
+    expect(resp.interaction.farm.maxSelections).toBeGreaterThan(1)
 
     // Build a room
     resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
