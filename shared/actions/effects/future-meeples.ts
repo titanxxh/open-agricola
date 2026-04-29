@@ -5,7 +5,6 @@ import type {
   GameState,
   Resource,
 } from '../../game/types'
-import { tryAddRoomTile } from '../../logic/farm/build-room-helper'
 
 export const futureMeeplesNode = (request?: FutureMeepleRequest): ActionFlow => ({
   type: 'leaf',
@@ -116,22 +115,6 @@ export const futureMeeplesAction: ActionDefinition = {
       queueFutureMeeples(state, inlineRequest)
     }
     resolveFutureMeepleRequests(state)
-    // Consume any roomType entries due this round.
-    // For each due entry: if player.houseType matches, place one room tile;
-    // otherwise silently skip. The entry is dropped either way.
-    const remaining: typeof state.futureMeeples = []
-    for (const entry of state.futureMeeples) {
-      if (!entry.roomType || entry.round !== state.round) {
-        remaining.push(entry)
-        continue
-      }
-      const player = state.players.find((p) => p.id === entry.playerId)
-      if (player && player.houseType === entry.roomType) {
-        tryAddRoomTile(player, entry.roomType)
-      }
-      // drop entry
-    }
-    state.futureMeeples = remaining
     return { type: 'ok' }
   },
 }
