@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 2 PR-2C done — D138 PetLover — switched from `before` listener (which left original collect running, double-take bug) to `computeReplace` on `'collect'` action; engine's `buildReplaceChoiceFlow` auto-wraps the bonus branch into XOR(bonus, retry-default-with-sentinel), mirroring B26 AgrarianFences — see commit on branch sprint-2-pr-2c**
 - **2026-04-29 Sprint 2 PR-2B done — B14 Hawktower + future-meeples roomType extension — onBuy queues `{round:12, roomType:'stone'}`; `applyFutureMeeples` consumes roomType entries and calls `tryAddRoomTile` if `houseType` matches, silent skip otherwise — see commit on branch sprint-2-pr-2b**
 - **2026-04-29 Sprint 2 PR-2A done — 4 cards (B116/A165/B133/D60) + onBeforeEndGame hook — B116 reed-bank guard, A165 round-12 boar breed, B133 onBeforeEndGame +N vegetable, D60 reserved.clay subtraction — see commit on branch sprint-2-pr-2a**
 - **2026-04-29 Sprint 1 done — total 30 cards (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) — see master-plan.md §8**
@@ -181,7 +182,7 @@
 > - **B116 Shoreforester** — BGA reed bank 准备阶段填充时给 1 wood；TS 每个 round 开始无条件给 1 wood — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a
 > - **B14 Hawktower** — BGA round 12 预约一个石屋间（条件性建造）；TS 写成 +1 stone 资源 — ✅ Sprint 2 PR-2B on branch sprint-2-pr-2b
 > - **B133 VillagePeasant** — BGA 给 N 个 vegetable 资源；TS 用 computePostScore 给 N VP — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a
-> - **D138 PetLover** — `noop` xor 选项不取消原始 collect → 玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain bonus（`shared/cards/D/D138_PetLover.ts:42-62`）
+> - **D138 PetLover** — `noop` xor 选项不取消原始 collect → 玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain bonus（`shared/cards/D/D138_PetLover.ts:42-62`）— ✅ Sprint 2 PR-2C on branch sprint-2-pr-2c
 > - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener/effect 写入此字段——分数永远不触发
 >
 > **A 牌组（5 张）**：A38 WoolBlankets（cost 多收+prereq 错）、A165 PigBreeder（round 12 breeding 完全未实现） — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a、A135 AnimalReeve（sharedScoring 没写）、A1 Shelter（缺 pasture-size-1）、A22 Telegram（extraPlacement 模拟需 owner 确认）
