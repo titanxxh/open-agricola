@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D160_Midwife'
+import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionChoiceOption } from '../../shared/game/types'
 
 describe('D160_Midwife session', () => {
@@ -100,6 +101,37 @@ describe('D160_Midwife session', () => {
 
     const after = session.getState().state
     // Owner should NOT get grain — scope is 'opponent'
+    expect(after.players[0]!.resources.grain).toBe(grainBefore)
+  })
+
+  it('does not trigger when opponent already placed a farmer this round (not first)', () => {
+    const session = setup(1)
+    const s = session.getState().state
+    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
+    if (!wishSpace) return
+
+    // Pretend opponent already placed one farmer earlier this round.
+    recordRoundPlacement(s.players[1]!, 'forest', s.players[1]!.workers[0]!.id)
+    session.loadState(s)
+
+    const grainBefore = session.getState().state.players[0]!.resources.grain
+
+    let resp = session.takeAction(1, 'wish-children')
+    if (!resp.ok) return
+
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+    if (resp.pending.type === 'choice') {
+      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      if (skipOption) resp = session.resolveChoice(1, '__skip__')
+    }
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    const after = session.getState().state
+    // Opponent's wish-children was NOT their first placement → no grain
     expect(after.players[0]!.resources.grain).toBe(grainBefore)
   })
 
