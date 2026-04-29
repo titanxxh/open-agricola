@@ -78,6 +78,8 @@ export const C39_StudioBoat = new PlayerActionCard({
     'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
   ],
   cost: { wood: 1 },
+  prerequisite: '1 Occupation',
+  occupationPrerequisites: { min: 1 },
 })
 
 export const C39_StudioBoat_impl = {
