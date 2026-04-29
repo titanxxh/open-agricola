@@ -14,6 +14,7 @@ export const A134_FullFarmer = new Occupation({
   desc: ["When you play this card, you immediately get 1 <WOOD> and 1 <CLAY>. During scoring, you get 1 bonus <SCORE> for each pasture you have holding the maximum number of animals."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })
 
 export const A134_FullFarmer_impl = {

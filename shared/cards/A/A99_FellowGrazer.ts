@@ -12,6 +12,7 @@ export const A99_FellowGrazer = new Occupation({
   desc: ["During scoring, you get 2 bonus <SCORE> for each pasture you have covering at least 3 farmyard spaces."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })
 
 export const A99_FellowGrazer_impl = {

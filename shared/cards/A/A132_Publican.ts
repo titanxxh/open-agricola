@@ -56,6 +56,7 @@ export const A132_Publican = new Occupation({
   ],
   cost: {},
   players: '3+',
+  extraVp: true,
 })
 
 export const A132_Publican_impl = {
