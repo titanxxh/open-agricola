@@ -15,10 +15,23 @@ export const B4_WoodPile = new MinorImprovement({
   passing: true,
 })
 
+// BGA: $n = number of accumulation spaces with at least one farmer of mine.
+// Counts SPACES (not farmers) — `Farmers::getOnCard($spaceId, $pId)->empty()`.
 export const B4_WoodPile_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 3 }),
-},
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      let count = 0
+      for (const space of state.actionSpaces) {
+        // accumulation space marker: gainPerRound non-empty
+        if (Object.keys(space.gainPerRound ?? {}).length === 0) continue
+        if (space.takenBy.some((w) => w.playerId === player.id)) {
+          count++
+        }
+      }
+      if (count <= 0) return undefined
+      return gainLeaf(CARD_ID, { wood: count })
+    },
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
