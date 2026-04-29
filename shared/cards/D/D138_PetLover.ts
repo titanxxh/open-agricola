@@ -17,47 +17,32 @@ const ANIMAL_MARKET_SPACES: Record<string, 'sheep' | 'boar' | 'cattle'> = {
  * you can leave it on the space and get one from the general supply instead,
  * as well as 3 <FOOD> and 1 <GRAIN>.
  *
- * BGA: onPlayerComputePlaceFarmerFlow — wraps animal market flow in XOR:
- * normal collect OR get {animal:1, food:3, grain:1} without collecting.
- *
- * Implementation: Use a 'before' listener on place-farmer for animal markets.
- * When exactly 1 animal is on the space, offer an XOR: normal action vs Pet Lover bonus.
- * Players: 3+.
+ * BGA: onPlayerComputePlaceFarmerFlow wraps the entire collect flow in an XOR
+ * (normal collect vs PetLover bonus). We achieve the same shape with a
+ * computeReplace listener on the 'collect' action: returning `decline: true`
+ * with an alternativeFlow makes the engine build XOR(alternative, original-with-sentinel).
  */
-const beforeListener: CardListenerRegistration = {
-  id: 'D138-pet-lover-before-place-farmer',
+const computeReplaceListener: CardListenerRegistration = {
+  id: 'D138-pet-lover-replace-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['computeReplace' as ActionHookPhase],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.actionContext?.checkedReplaceAction) return
     const spaceId = context.space?.id
     const animalType = spaceId ? ANIMAL_MARKET_SPACES[spaceId] : undefined
     if (!animalType) return
-    // Count accumulated animals on the space
-    const spaceResources = context.space?.resources ?? {}
-    const totalAnimals = (spaceResources.sheep ?? 0) + (spaceResources.boar ?? 0) + (spaceResources.cattle ?? 0)
+    const r = context.space?.resources ?? {}
+    const totalAnimals = (r.sheep ?? 0) + (r.boar ?? 0) + (r.cattle ?? 0)
     if (totalAnimals !== 1) return
-    // Offer XOR: continue normal (empty flow) OR take Pet Lover bonus (gain animal+food+grain)
+
     return {
-      flow: {
-        type: 'xor',
-        optional: false,
+      decline: true,
+      alternativeFlow: {
+        type: 'seq',
+        choiceLabelKey: 'ui.interactionPetLoverBonus',
         children: [
-          {
-            // Normal option: don't intercept (decline and let normal flow run)
-            type: 'leaf',
-            actionId: 'noop',
-            sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionPetLoverNormal',
-          },
-          {
-            // Pet Lover option: get animal from supply + food + grain (leave space resources)
-            type: 'seq',
-            children: [
-              gainLeaf(CARD_ID, { [animalType]: 1, food: 3, grain: 1 }),
-            ],
-            choiceLabelKey: 'ui.interactionPetLoverBonus',
-          },
+          gainLeaf(CARD_ID, { [animalType]: 1, food: 3, grain: 1 }),
         ],
       },
       sourceCard: CARD_ID,
@@ -77,6 +62,6 @@ export const D138_PetLover = new Occupation({
 })
 
 export const D138_PetLover_impl = {
-  listeners: [beforeListener],
+  listeners: [computeReplaceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
