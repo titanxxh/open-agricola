@@ -128,7 +128,13 @@ const meetsTextPrerequisite = (
   state?: GameState,
 ) => {
   if (!prerequisite) return true
-  return prerequisite
+  const trimmed = prerequisite.trim()
+  if (!trimmed) return true
+  // Try whole-string custom handler first (supports prereqs containing " and ").
+  const customWhole = checkCustomPrerequisite(trimmed, player, state)
+  if (customWhole !== null) return customWhole
+  // Fall back: split on "and" and check each clause individually.
+  return trimmed
     .split(/\s+and\s+/i)
     .every((clause) => meetsTextClause(player, clause, state))
 }
