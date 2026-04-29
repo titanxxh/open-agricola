@@ -23,7 +23,7 @@
 |---|---|---|---|---|
 | ✅ 完全对齐 | 64 | 475 + 48 ⚪ | **587** | **67%** |
 | 🟡 简化实现 | 40 | 90 | **130** | 15% |
-| ⚠ 行为偏差 | 18 | 26 | **44** | 5% |
+| ⚠ 行为偏差 | 18 | 26 | **39**（PR-1C −5：D7/D8/D39/D53/D58 prereq 注册） | 4% |
 | ❌ 数值/元数据 | 6 | 66 | **57**（PR-1A −10、PR-1B −16） | 6% |
 | 🔀 刻意偏离 | 4 | 1 | **5** | 1% |
 | 🔍 待 owner | 1 | 13 | **14** | 2% |
@@ -51,7 +51,7 @@
 
 4. **§2.5 4 张刻意偏离全部通过复核**：B85 / C22 / D161 / E16 当初 owner 签字的取舍今天仍然成立。
 
-5. **prerequisite 注册系统性缺失**（D 牌组发现）：D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅写在 `prerequisite` 字符串、未注册到 `prerequisite-registry`。玩家"白买"——支付费用但 onBuy 不触发预期效果。**P0**
+5. **prerequisite 注册系统性缺失**（D 牌组发现）：D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅写在 `prerequisite` 字符串、未注册到 `prerequisite-registry`。玩家"白买"——支付费用但 onBuy 不触发预期效果。**P0** — ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c（5 张 D 卡 prereq handler 已注册；`meetsTextPrerequisite` 增加 whole-string 自定义查找，支持 D8 含 "and" 的 prereq）
 
 6. **sharedScoring 机制不完备**：A135 AnimalReeve / C136 RanchProvost 都声明 `sharedScoring=true` 但 `computeBonusScore` 没写。
 
@@ -317,6 +317,8 @@ D7/D8/D39/D53/D58 等卡的 buyable 守卫只写在 `prerequisite: '...'` 字符
 
 **修复路线**：跑全量 `prerequisite` 字符串扫描，列出未注册 handler 的卡 → 逐张补 `registerPrerequisite`。**P0**
 
+> ✅ **Sprint 1 PR-1C 已修复 5 张 D 卡（branch `sprint-1-pr-1c`）**：D7 Trident（round in {3,6,9,12}）、D8 FernSeeds（≥1 empty + ≥2 planted fields）、D39 TruffleSlicer（round ≥ 8）、D53 TeaHouse（round ≥ 6）、D58 Gritter（round ≥ 5）。同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找，支持 D8 含 `" and "` 的复合 prereq。剩余 prereq 字符串未注册 handler 的卡（如 A38 / D30 等）转后续 PR。
+
 #### 5.4.2 sharedScoring 机制不完备
 
 A135 AnimalReeve / C136 RanchProvost 都依赖 `sharedScoring=true` 但 `computeBonusScore` 没写。
@@ -396,7 +398,7 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 | **P0** | 11 张 players 字段错（深度 7 + wide 4：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158）(actual 10 unique cards) — ✅ PR-1A on branch sprint-1-pr-1a | 改字段；跑卡池过滤回归测试 / < 0.5 day |
 | **P0** | A4 Baseboards cost 模型错（择一→同时付）— 待 Sprint 5（alternative-cost 机制） | 1 张 / 0.5 day |
 | **P0** | A38 / A165 / A135 cost+prereq+breeding+sharedScoring — A38 cost ✅ PR-1B on branch sprint-1-pr-1b；A38 prereq + A165/A135 残留 | 3 张 / 1-2 day |
-| **P0** | D7/D8/D39/D53/D58+ prerequisite 注册"白买"bug | 5+ 张 / 1-2 day |
+| **P0** | D7/D8/D39/D53/D58+ prerequisite 注册"白买"bug — ✅ PR-1C on branch sprint-1-pr-1c | 5+ 张 / 1-2 day |
 | **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 — ✅ PR-1B on branch sprint-1-pr-1b（C13 isBuyable discount + D83 altCosts 等转 Sprint 5） | 12 张 / 2 day |
 | **P0** | B4 WoodPile gain 硬编码 + cost 错 — cost ✅ PR-1B；gain 行为转 Sprint 5 | 1 张 / 0.5 day |
 | **P0** | E95 Miller cost 多 food:1 — ✅ PR-1B on branch sprint-1-pr-1b | 1 张 / 0.1 day |

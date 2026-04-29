@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 1 done — total 30 cards (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) — see master-plan.md §8**
+- **2026-04-29 Sprint 1 PR-1C done — 5 D-deck cards (D7/D8/D39/D53/D58) — prerequisite handlers registered to fix "buy without enforcement" bug; whole-string registry lookup added to prerequisites helper — see commit on branch sprint-1-pr-1c**
 - **2026-04-29 Sprint 1 PR-1B done — 16 cards (A38/B4/B42/C3/C30/C33/C35/C39/C48/C59/D24/D29/D39/E32/E34/E95) — cost/vp metadata aligned to BGA — see commit on branch sprint-1-pr-1b**
 - **2026-04-29 Sprint 1 PR-1A done — 10 cards (A154/A158/A160/C134/C151/C152/C153/C158/C163/E154) — players field corrected to BGA values — see commit on branch sprint-1-pr-1a**
 - **2026-04-29 — 卡牌实现 vs BGA Wide-Scan（非深度池 741 张续审）**：5 个 sub-agent 并行扫剩余 ~746 张未进入 2026-04-28 深度池的卡。详见 `docs/card_desc_audit.md`。Verdict 分布：475 ✅ / 48 ⚪（数据 only）/ 90 🟡 / 26 ⚠ / 70 ❌ / 1 🔀 / 13 🔍。**严重新发现（P0）**：(a) **5 张行为完全错** — B116 Shoreforester（每轮给 wood 而非 reed bank 填充时）、B14 Hawktower（给资源而非建房）、B133 VillagePeasant（给 VP 而非 vegetable）、D138 PetLover（noop xor 不取消 collect 玩家拿双倍）、E134 Omnifarmer（computeBonusScore 读未写入字段，永远不计分）；(b) **A4 Baseboards cost 模型错**（BGA 是择一，TS 强迫同时付）；(c) **A38 / A165 / A135 严重缺实现**（cost+prereq 错 / round 12 breeding 缺 / sharedScoring 没写）；(d) **prerequisite 注册系统性缺失**（D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅在字符串未注册 handler，玩家"白买"扣费无效果）；(e) **12+ 张 cost/players 错**（A4/A38、C3/C13/C33/C35/C48、D24/D29/D39、E32/E34；A154/E154/C134/C158 重复确认与上轮 §2.4 7 张同模式）。**系统性问题**：(1) ~50 张 category 字段命名不齐（B/C/D），是 schema 级问题非单卡 bug；(2) sharedScoring 机制不完备（A135/C136）；(3) `getExchangeResources` 系统性简化（D35/D38/D45/D84 等只看 supply 不看场上动物）；(4) 15+ 张 stub/TODO（含 A135/A165/C62/C105/C109/C136/D62/D94/D108/D131/D157/E58/E134/E139/E153/E155）。**两轮合计**（深度+wide）verdict 分布：587 ✅ / 130 🟡 / 44 ⚠ / 83 ❌ / 5 🔀 / 14 🔍 = 881 张；按宽口径（✅+🟡）通过率约 81%，严格 ✅ 通过率约 67%。**Wide-scan 精度局限**：紧凑流程每张卡 ≤60s，未做完整 5 维度比对，建议 owner 对 ⚠/❌ 各抽 5-10 张做完整重审。同样未实施任何修复——按 spec 修复另起 brainstorming。冻结 SHA 同上轮（我方 `2b5ddee6`、BGA `3082e4d3`）。
@@ -218,6 +220,9 @@
 - **B42 ForestInn** — round ≤ 6 的 `isBuyable` 守卫未实现；vp 元数据已补 ✅ PR-1B — P1
 - **C39 StudioBoat** — `prerequisite` enforce（"Build a fishing pond/wooden hut etc."） 未注册 handler；cost 已对齐 ✅ PR-1B — P1
 
+**Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
+- **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
+
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
 ### 2.4 ❌ 数值/元数据待修（原 83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp → 实际剩 57 张）
@@ -365,6 +370,7 @@
 | **`Bonus.choices` + `BonusModifier.choices` + bonus accumulation 修正**（2026-04-20） | ✅ | `shared/game/types.ts` 在 `Bonus` / `BonusModifier` 新增 `choices?: BonusChoice[]` 字段，表达"一组互斥折扣，按 optional 展开为选用/跳过 + 每条 choice 各一个候选"。`computeAllBuyableCombinations` 的 bonus iteration 重写为 BGA 风格（非 optional 累积、optional 展开、`choices` 展开为多个候选）。`shared/actions/effects/room-payment.ts` 的 `buildRoomCostPerUnit` 与 `applyRoomCountBonuses` 同步处理 `modifier.choices`（per-room 与 total 两条路径都覆盖）。修正了原本把多 bonus 误当互斥的 bug。首个消费者：A123 FrameBuilder（迁移自 4 条独立 TradeModifier，见 §2.0 2026-04-20 条目）。 |
 | **`cardAllowedForPlayerCount` + `dealHands` 卡池按人数过滤**（2026-04-25） | ✅ | `shared/cards/player-count-filter.ts` 提供 `cardAllowedForPlayerCount(playersField, playerCount)` 解析器（识别 `'N+'` / `'N-M'` / `'N'` / undefined，fail-open on unknown）。`dealHands`（`shared/logic/state.ts`）的三类来源——内置 (`implementedMinorImprovementCards` / `implementedOccupationCards`)、community deck (`implementedCommunityMinors` / `implementedCommunityOccupations`)、extra IDs (`extraMinorIds` / `extraOccupationIds` 即 workshop + `customCards=`)——全部按 `playerCount` 过滤；extra IDs 通过 `lookupPlayersField` 内联多源回退（custom-registry → ad-hoc registry → 内置 lookup）。dev 通道（`devDrawCard` / `devPlayCard`）绕过卡池构造、不受影响。BGA 的"哪些卡只在某些人数下出现"语义现在生效（`E166_Roastmaster` / `E149_MidnightFencer` 等 `4+` 卡不再进 2/3p 手牌；C39 不再被错误打上 `players: '1-3'`）。 |
 | **`PlayerActionSpaceConfig.shouldRegister?(state)`**（2026-04-25） | ✅ | `shared/cards/player-action-space.ts`：可选 gate 决定是否在 `createPlayerActionSpaces` 中创建该卡的行动格。`createPlayerActionSpaces` 循环中位置：`if (!config) continue` 之后、duplicate-id 检查之前。首个消费者：C39 StudioBoat（`shouldRegister: (state) => state.players.length < 4` —— 4p 已有全局 Traveling Players 行动格，不再重复注册 C39 自己的复制品）。 |
+| **`meetsTextPrerequisite` whole-string 自定义查找**（2026-04-29, Sprint 1 PR-1C） | ✅ | `shared/cards/helpers/prerequisites.ts`：`meetsTextPrerequisite` 现在先用整串调用 `checkCustomPrerequisite`，命中即返回；未命中再回退到原有按 `" and "` 分句逐 clause 校验。新增能力让 D8 FernSeeds（`'1 Empty and 2 Planted Fields'`）这类含 "and" 的复合 prereq 也能整串注册一个 handler；原有单 clause 注册路径完全向后兼容。消费者：D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter。 |
 
 ### 目录重组（PR-3）
 
