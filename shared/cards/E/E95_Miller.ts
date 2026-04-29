@@ -91,7 +91,7 @@ export const E95_Miller = new Occupation({
   desc: [
     'You can immediately build a <BAKE>-improvement by paying its cost. Each time another player uses the __Grain Seeds__ action space, you can take a __Bake Bread__ action.',
   ],
-  cost: { food: 1 },
+  cost: {},
   players: '1+',
 })
 

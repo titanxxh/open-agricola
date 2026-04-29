@@ -10,7 +10,7 @@ export const C35_LanternHouse = new MinorImprovement({
   number: 35,
   category: "POINTS_PROVIDER",
   desc: ["During scoring, you get 1 negative <SCORE> for each card left in your hand. You cannot discard cards from your hand unplayed. If you already have, you cannot play this card."],
-  cost: { clay: 1 },
+  cost: { wood: 1 },
   vp: 7,
   // BGA parity: requires no occupations played before buying this minor.
   // Ref: bga-agricola/modules/php/Cards/C/C35_LanternHouse.php

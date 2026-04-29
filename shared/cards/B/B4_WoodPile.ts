@@ -11,7 +11,7 @@ export const B4_WoodPile = new MinorImprovement({
   number: 4,
   category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["You immediately get a number of <WOOD> equal to the number of people you have on accumulation spaces."],
-  cost: { food: 2 },
+  cost: {},
   passing: true,
 })
 

@@ -11,7 +11,7 @@ export const C3_CarriageTrip = new MinorImprovement({
   number: 3,
   category: "ACTIONS_BOOSTER",
   desc: ["If you play this card in the work phase, you can immediately place another person."],
-  cost: { food: 3 },
+  cost: {},
   passing: true,
   prerequisite: "1 Person yet to Place",
 })
