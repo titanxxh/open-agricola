@@ -162,6 +162,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onAfterFeed`
 - `onEndHarvest`
 - `onAfterHarvest`
+- `onBeforeEndGame`
 - `onBeforeStartOfTurn`
 - `onAllWorkersPlaced`
 - `resolveChoice`
