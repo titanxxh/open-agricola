@@ -38,7 +38,7 @@
 | ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 44 张（2026-04-28 深度 18 + 2026-04-29 wide 26） | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 83 张（2026-04-28 深度 13 + 2026-04-29 wide 70；含 ~50 张 category 字段批量不齐 + 11 张 players 字段错） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
+| ❌ 数值/元数据待修（§2.4） | 73 张（原 83；PR-1A 已修 10 张 players——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
 | 🔀 刻意偏离 BGA（§2.5） | 4 张（2026-04-28 全部复核取舍今天仍成立） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 多张（深度池 D159 + E149；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
@@ -214,7 +214,7 @@
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70）
+### 2.4 ❌ 数值/元数据待修（73 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players → 实际剩 73 张）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
