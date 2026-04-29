@@ -422,7 +422,7 @@ docs/card_desc_audit.md §1 总览数字降到：
 | Sprint | 主题 | 张数 | 估算 | 实际 | 状态 | Spec | Plan | PR/Commit |
 |---|---|---|---|---|---|---|---|---|
 | 1 | P0 高 ROI 批量（players + cost + prereq） | 30 (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) | 2 day | ~2 day | done（PR-1A 10 张 players ✅、PR-1B 16 张 cost/vp ✅、PR-1C 5 张 D-deck prereq ✅） | docs/superpowers/specs/2026-04-29-sprint-1-p0-batch-design.md | docs/superpowers/plans/2026-04-29-sprint-1-p0-batch.md | — |
-| 2 | P0 玩法完全错 + A165 + A135 | 7 | 4 day | — | pending | — | — | — |
+| 2 | P0 玩法完全错 + audit 顺带（B116/A165/B133/D60/B14/D138/E134；A135 移 Sprint 4） | 7 + D60 顺带 | 4 day | ~5 day | done（PR-2A 4 cards + onBeforeEndGame hook ✅、PR-2B B14 + future-meeples roomType ✅、PR-2C D138 computeReplace ✅、PR-2D E134 三 hook ✅） | docs/superpowers/specs/2026-04-29-sprint-2-p0-gameplay-design.md | docs/superpowers/plans/2026-04-29-sprint-2-p0-gameplay.md | #28 / #29 / #30 / #31 |
 | 3 | P0 E149 MidnightFencer | 1 | 3 day | — | pending | — | — | — |
 | 4 | P1 机制 helper（sharedScoring + category + getExchangeResources） | helper×3 | 5 day | — | pending | — | — | — |
 | 5 | P1 单卡行为偏差 | 28 | 9 day | — | pending | — | — | — |

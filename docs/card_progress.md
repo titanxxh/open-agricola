@@ -37,8 +37,8 @@
 |---|---|---|---|
 | ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 44 张（2026-04-28 深度 18 + 2026-04-29 wide 26） | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 57 张（原 83；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
+| ⚠ 行为偏差待修（§2.3） | 38 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134） | 行为与 BGA 偏差，是 bug | 排期修 |
+| ❌ 数值/元数据待修（§2.4） | 56 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
 | 🔀 刻意偏离 BGA（§2.5） | 4 张（2026-04-28 全部复核取舍今天仍成立） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 多张（深度池 D159 + E149；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 2 done — total 7 cards (B116/A165/B133/D60/B14/D138/E134) + 2 mechanism extensions (onBeforeEndGame hook + future-meeples roomType) — see master-plan.md §8**
+- **2026-04-29 Sprint 2 PR-2D done — E134 Omnifarmer — implemented full deposit-on-harvest state machine via existing `onAfterReap` / `onHarvestFeedingPhase` / `onAfterHarvest` effect hooks + `resolveChoice` returning follow-up `payLeaf`; storedGoods stored in `cardStates[CARD_ID].extraData`, `usedThisHarvest` enforces once-per-harvest; computeBonusScore vpMap[2..5]=3/5/7/9 — see commit on branch sprint-2-pr-2d**
 - **2026-04-29 Sprint 2 PR-2C done — D138 PetLover — switched from `before` listener (which left original collect running, double-take bug) to `computeReplace` on `'collect'` action; engine's `buildReplaceChoiceFlow` auto-wraps the bonus branch into XOR(bonus, retry-default-with-sentinel), mirroring B26 AgrarianFences — see commit on branch sprint-2-pr-2c**
 - **2026-04-29 Sprint 2 PR-2B done — B14 Hawktower + future-meeples roomType extension — onBuy queues `{round:12, roomType:'stone'}`; `applyFutureMeeples` consumes roomType entries and calls `tryAddRoomTile` if `houseType` matches, silent skip otherwise — see commit on branch sprint-2-pr-2b**
 - **2026-04-29 Sprint 2 PR-2A done — 4 cards (B116/A165/B133/D60) + onBeforeEndGame hook — B116 reed-bank guard, A165 round-12 boar breed, B133 onBeforeEndGame +N vegetable, D60 reserved.clay subtraction — see commit on branch sprint-2-pr-2a**
@@ -183,7 +185,7 @@
 > - **B14 Hawktower** — BGA round 12 预约一个石屋间（条件性建造）；TS 写成 +1 stone 资源 — ✅ Sprint 2 PR-2B on branch sprint-2-pr-2b
 > - **B133 VillagePeasant** — BGA 给 N 个 vegetable 资源；TS 用 computePostScore 给 N VP — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a
 > - **D138 PetLover** — `noop` xor 选项不取消原始 collect → 玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain bonus（`shared/cards/D/D138_PetLover.ts:42-62`）— ✅ Sprint 2 PR-2C on branch sprint-2-pr-2c
-> - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener/effect 写入此字段——分数永远不触发
+> - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener/effect 写入此字段——分数永远不触发 — ✅ Sprint 2 PR-2D on branch sprint-2-pr-2d
 >
 > **A 牌组（5 张）**：A38 WoolBlankets（cost 多收+prereq 错）、A165 PigBreeder（round 12 breeding 完全未实现） — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a、A135 AnimalReeve（sharedScoring 没写）、A1 Shelter（缺 pasture-size-1）、A22 Telegram（extraPlacement 模拟需 owner 确认）
 >
