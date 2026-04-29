@@ -33,6 +33,7 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onStartHarvestFeedingPhase' | 'onHarvestFeedingPhase' | 'onEndHarvestFeedingPhase'
   | 'onBeforeFeed' | 'onAfterFeed'
   | 'onEndHarvest' | 'onAfterHarvest'
+  | 'onBeforeEndGame'
   | 'onBeforeStartOfTurn'
   | 'onAllWorkersPlaced'
 
@@ -74,6 +75,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onAfterFeed',
   'onEndHarvest',
   'onAfterHarvest',
+  'onBeforeEndGame',
   'onBeforeStartOfTurn',
   'onAllWorkersPlaced',
   'resolveChoice',
@@ -149,6 +151,9 @@ export type CardEffect = {
   onAfterFeed?: EffectHandler
   onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
+  /** Runs once at the start of scoring, before any category computation.
+   *  Use to mutate state (e.g. give resources) so categories see them. */
+  onBeforeEndGame?: EffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
   onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
@@ -336,6 +341,9 @@ export const runEndHarvestFeedingPhaseHooks = (state: GameState, player: PlayerS
 
 export const runEndHarvestHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onEndHarvest')
+
+export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
+  runHookForAllCards(state, player, 'onBeforeEndGame')
 
 export type BonusScoreResult = {
   entries: { cardId: string; score: number }[]

@@ -19,12 +19,14 @@ export const B133_VillagePeasant = new Occupation({
 export const B133_VillagePeasant_impl = {
   effect: {
   id: CARD_ID,
-  computePostScore: (_state, player, _categories) => {
+  onBeforeEndGame: (_state, player) => {
     const majors = collectCardsAs(player, 'major').length
     const minors = player.minorPlayed.length
     const occupations = player.occupationPlayed.length
     const n = Math.min(majors, minors, occupations)
-    return Math.max(0, n)
+    if (n > 0) {
+      player.resources.vegetable += n
+    }
   },
 },
   reaches: [] as readonly string[],
