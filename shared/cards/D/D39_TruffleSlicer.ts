@@ -2,9 +2,15 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D39_TruffleSlicer'
+
+registerPrerequisite('Play in Round 8 or Later', (_player, state) => {
+  if (!state) return true
+  return state.round >= 8
+})
 
 /**
  * D39 Truffle Slicer (Minor Improvement):
@@ -47,6 +53,7 @@ export const D39_TruffleSlicer = new MinorImprovement({
   category: 'BONUS_POINTS',
   desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
   cost: { wood: 1 },
+  prerequisite: 'Play in Round 8 or Later',
 })
 
 export const D39_TruffleSlicer_impl = {

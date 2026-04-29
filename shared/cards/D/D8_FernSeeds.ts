@@ -1,8 +1,18 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { fieldIsEmpty, fieldHasCrop } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D8_FernSeeds'
+
+registerPrerequisite('1 Empty and 2 Planted Fields', (player) => {
+  const empty = player.fields.filter(fieldIsEmpty).length
+  const planted = player.fields.filter(
+    (f) => fieldHasCrop(f, 'grain') || fieldHasCrop(f, 'vegetable'),
+  ).length
+  return empty >= 1 && planted >= 2
+})
 
 export const D8_FernSeeds = new MinorImprovement({
   id: CARD_ID,
