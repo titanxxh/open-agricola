@@ -35,17 +35,20 @@
 
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
-| ✅ 完全对齐 | ~803 + §2.1 列举 27 张 | 行为 + 元数据均与 BGA 一致 | 不用动 |
-| 🟡 简化实现（§2.2） | 4 张 | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 0 张 | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 0 张 | cost / prereq / vp 与 BGA 不同 | 全部清零（PR1/PR2/PR3） |
-| 🔀 刻意偏离 BGA（§2.5） | 3 张 | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 2 张（D159 + E149；其余"BGA 也无逻辑"4 张未逐项列） | 未实现或需核心扩展 | 见 §2.6 优先级 |
+| ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
+| 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
+| ⚠ 行为偏差待修（§2.3） | 44 张（2026-04-28 深度 18 + 2026-04-29 wide 26） | 行为与 BGA 偏差，是 bug | 排期修 |
+| ❌ 数值/元数据待修（§2.4） | 83 张（2026-04-28 深度 13 + 2026-04-29 wide 70；含 ~50 张 category 字段批量不齐 + 11 张 players 字段错） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
+| 🔀 刻意偏离 BGA（§2.5） | 4 张（2026-04-28 全部复核取舍今天仍成立） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| ⏳ 待实现 / 待评估（§2.6） | 多张（深度池 D159 + E149；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
+| 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 — 卡牌实现 vs BGA Wide-Scan（非深度池 741 张续审）**：5 个 sub-agent 并行扫剩余 ~746 张未进入 2026-04-28 深度池的卡。详见 `docs/card_desc_audit.md`。Verdict 分布：475 ✅ / 48 ⚪（数据 only）/ 90 🟡 / 26 ⚠ / 70 ❌ / 1 🔀 / 13 🔍。**严重新发现（P0）**：(a) **5 张行为完全错** — B116 Shoreforester（每轮给 wood 而非 reed bank 填充时）、B14 Hawktower（给资源而非建房）、B133 VillagePeasant（给 VP 而非 vegetable）、D138 PetLover（noop xor 不取消 collect 玩家拿双倍）、E134 Omnifarmer（computeBonusScore 读未写入字段，永远不计分）；(b) **A4 Baseboards cost 模型错**（BGA 是择一，TS 强迫同时付）；(c) **A38 / A165 / A135 严重缺实现**（cost+prereq 错 / round 12 breeding 缺 / sharedScoring 没写）；(d) **prerequisite 注册系统性缺失**（D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅在字符串未注册 handler，玩家"白买"扣费无效果）；(e) **12+ 张 cost/players 错**（A4/A38、C3/C13/C33/C35/C48、D24/D29/D39、E32/E34；A154/E154/C134/C158 重复确认与上轮 §2.4 7 张同模式）。**系统性问题**：(1) ~50 张 category 字段命名不齐（B/C/D），是 schema 级问题非单卡 bug；(2) sharedScoring 机制不完备（A135/C136）；(3) `getExchangeResources` 系统性简化（D35/D38/D45/D84 等只看 supply 不看场上动物）；(4) 15+ 张 stub/TODO（含 A135/A165/C62/C105/C109/C136/D62/D94/D108/D131/D157/E58/E134/E139/E153/E155）。**两轮合计**（深度+wide）verdict 分布：587 ✅ / 130 🟡 / 44 ⚠ / 83 ❌ / 5 🔀 / 14 🔍 = 881 张；按宽口径（✅+🟡）通过率约 81%，严格 ✅ 通过率约 67%。**Wide-scan 精度局限**：紧凑流程每张卡 ≤60s，未做完整 5 维度比对，建议 owner 对 ⚠/❌ 各抽 5-10 张做完整重审。同样未实施任何修复——按 spec 修复另起 brainstorming。冻结 SHA 同上轮（我方 `2b5ddee6`、BGA `3082e4d3`）。
+- **2026-04-28 — 卡牌实现 vs BGA 全量审查（外部复核）**：跑了 887 张卡 vs BGA PHP 的全量对比，详见 `docs/card_desc_audit.md`。深度池 140 张 verdict 分布：64 ✅ / 40 🟡 / 18 ⚠ / 13 ❌ / 4 🔀 / 1 🔍。**关键发现**：(a) §2.3 自报 0 张行为偏差实际 18 张（A129/A139/A150/A151、B27/B29/B115/B130/B138/B150/B152/B155、C23/C51、D18/D117/D160、E53）；(b) §2.4 自报 0 张数值偏差实际 13 张——**最严重**：A154/A158/A160 + C151/C152/C153/C163 共 7 张 `players: '3+'` 应为 `'4+'`，破坏 2026-04-25 落地的卡池按人数过滤逻辑；其余 cost/prereq 错：A14（banned 字段）、B4 WoodPile（gain 硬编码 + cost 错）、B42 ForestInn（缺 vp + 守卫）、C30/C39/C59、E95 Miller（多 food:1）；(c) §2.5 4 张刻意偏离全部通过复核——B85/C22/D161/E16 取舍今天仍成立；(d) E149 MidnightFencer 确认是 stub-only（与 §2.6 自报一致）；(e) 架构纪律保持良好——0 跨层 import、0 §3 未登记扩展、0 测试 DOM 规则裁定、12 处 client cardId 分支均合法；(f) i18n 缺口 71 + 437 项（不阻塞）。脚本：`scripts/audit-card-architecture.ts`（可重跑）+ 4 A agent + 5 B agent。本 changelog 不展开个卡，详细按卡迁移见 §2.3 / §2.4 / §2.2 各节。冻结 SHA：我方 `2b5ddee6`、BGA `3082e4d3`。**未实施任何修复**——按 spec 修复另起 brainstorming，按 P0/P1/P2 优先级见 audit 报告 §7。
 - **2026-04-28 — Per-card 6-field stats + infobox（Stats × BGA Track 1）**：`CardResourceStats` 从 2 字段（paid / gained）扩成 6 字段（used / gained / paid / saved / receivedPayment / paidToOthers），`gained` 接受新 `CardStatGained = Partial<Resource> & PseudoResourceMap` 类型容纳 BGA 风格伪资源 `occupation` / `field` / `roomWood` / `roomClay` / `roomStone` / `stable`（运行时 helpers 见 `shared/game/resource-keys.ts`）。新写入点：`shared/engine/engine.ts ActivateCardNode` + `shared/session/game-core.ts runPlaceFarmerAfterHooks` 在 listener 真正返回 result 时 `incCardUsed`；`playOccupationAction.resolveChoice` 在 sourceCard 触发链式 play-occupation 时记 `gained.occupation`；`commitFarmChoice` 的 plow / room / stable 分支在 sourceCard 存在时记 `gained.field` / `gained.roomWood|Clay|Stone` / `gained.stable`；`executePaymentSolution` 接 `recordPaymentStats(player, solution)`（`shared/cards/helpers/payment-stats.ts`）按 `tradesUsed[].trade.sourceId` 摊算 `paid` / `saved`，新增 `trackStats: false` opt-out。前端：新 `client/components/common/cardStatsFormat.ts.formatCardStatsLines` 输出 6 类 BGA 顺序 line，FarmBoard tooltip 替换原 paid/gained 双段渲染；新 i18n keys `ui.cardStats.{used,gained,gainedOccupation,gainedField,builtRoom,builtStable,receivedFrom,paid,paidToOthers,saved}`（zh/en）。Infobox：D36_BreedRegistry（`n / 2`）、E74_AshTrees（`n / 5`）、E27_PiggyBank（`n / 6`）三张 progress 卡补 `writeCardInfobox`；C148_MudWallower / A53_Claypipe 之前已有 infobox 不动。新增/更新测试：`shared/game/__tests__/resource-pseudo-keys.test.ts`、`shared/cards/helpers/__tests__/card-state.test.ts`、`shared/cards/helpers/__tests__/payment-stats.test.ts`、`client/components/common/__tests__/cardStatsFormat.test.ts`、`server/__tests__/stats-card-used-session.test.ts`、`server/__tests__/stats-gained-pseudo-session.test.ts`、`server/__tests__/stats-payment-saved-session.test.ts`、`shared/cards/__tests__/D36_BreedRegistry.test.ts`、`shared/cards/__tests__/E74_AshTrees-infobox.test.ts`、`shared/cards/__tests__/E27_PiggyBank-infobox.test.ts`；A37/A29/A83/B70/A166/D99/A64 七张已有测试的 toEqual 改 toMatchObject 容纳新字段；A128_RiparianBuilder 测试断言 owner 端 `cardStates.A128.extraData.resourceStats.used:1` 已写入。**刻意偏离**：跨玩家 transfer（`receivedPayment` / `paidToOthers`）helper 已实现但写入点未发现真正的"player A 付 player B"路径，此场景 fields 留空，待后续有此类卡时补入。设计 / 计划：`docs/superpowers/specs/2026-04-28-stats-bga-alignment-track1-per-card-design.md` + `docs/superpowers/plans/2026-04-28-stats-bga-alignment-track1-per-card.md`。
 - **2026-04-25 — 卡池按人数过滤 + C39 StudioBoat 行为对齐 BGA**：新增 `shared/cards/player-count-filter.ts` 的 `cardAllowedForPlayerCount(playersField, playerCount)` 解析器，识别 `'N+'` / `'N-M'` / `'N'` / `undefined`，未知格式 fail-open。`dealHands`（`shared/logic/state.ts`）三类卡池来源（内置 / community deck / `extraMinorIds`+`extraOccupationIds` 即 workshop & `customCards=`）全部按 `playerCount` 过滤；workshop / 内置 / ad-hoc 通过新增的内联 `lookupPlayersField` 多源查找（custom-registry → ad-hoc registry → 内置）拿到 `players` 字段，查不到 fail-open。Dev 通道（`devDrawCard` / `devPlayCard`）绕过卡池构造、不受影响。`PlayerActionSpaceConfig` 新增可选 `shouldRegister?(state)` 门，由 `createPlayerActionSpaces` 在循环中检查（位置：`if (!config) continue` 之后、duplicate-id 检查之前）。C39 StudioBoat：BGA 的 PHP 卡定义不带 `players` 限制——我们之前的 `players: '1-3'` 是错的，本次移除；通过 `shouldRegister: (state) => state.players.length < 4` 让 C39 行动格只在 1-3p 注册（4p 已有全局 Traveling Players 行动格 `players: [4]`，不再重复）；`execute()` 中 +1 VP 只在 `player.id === ownerId` 时给（BGA "Each time you use"）——修正了之前"任何人用都给 owner +1 VP"的偏差；`onRoundStart` 在 4p 早退；新增 `travelingPlayersOwnerVp` listener（默认 `scope: 'player'`，监听 `place-farmer` / `traveling-players`）路由到现有 `bonus-vp` action，VP 归属同一 `cardStates[CARD_ID].counters.bonusVp` counter。1-3p 该 listener 因 traveling-players 行动格不存在自然 dormant，4p 才生效，两路径互斥不会重复计分。新增/更新测试：`shared/cards/__tests__/player-count-filter.test.ts`（6 例）、`shared/cards/__tests__/player-action-space-should-register.test.ts`（2 例）、`shared/logic/__tests__/deal-hands-player-count.test.ts`（4 内置 + 3 extra-id）、`shared/cards/__tests__/C39_StudioBoat.test.ts`（execute 块重写为 4 BGA-合规用例 + 新 player-count gating 块 3 例）、`server/__tests__/C39_StudioBoat-traveling-players-listener-session.test.ts`（4 例）。设计文档：`docs/superpowers/specs/2026-04-25-card-pool-by-player-count-design.md`（worktree 本地）。
 - **2026-04-24 — D95 SiteManager 日志归因修正**：`log.playOccupation` 不再在 action 结束时用整段 delta 倒推成本，而是在 `playOccupation` 子步骤支付成功后立刻固化自己的 `costResources` / `bonusSources`；若职业 `onBuy` 继续接 flow（如 D95 立即触发 `improvement-any`），则通过 `extraData.occupationLog` 把这份 payload 带到 `GameCore` 立刻落日志，避免把后续大改良支付误记进职业日志。新增 `server/__tests__/D95_SiteManager-session.test.ts` 回归：第二张职业走 `lessons`（应只记 1 food）后再买 `Major_Fireplace1`，断言 `log.playOccupation.costResources === { food: 1 }` 且 `bonusSources` 为空。
@@ -129,9 +132,31 @@
 | D102 SampleStableMaker | return-home 阶段 optional：归还 1 个 stable（普通或 FarmHand）→ 1 wood + 1 grain + 1 food + optional minor improvement | 2026-04-24：复用 `shared/cards/helpers/stable-removal.ts` 的 `listReturnableStableTiles` + `removeStableOrFarmHandAtTile`；FarmHand 归还时只清 `cardStates.B85.extraData.position`，`flagged` 保留 |
 | E76 LumberPile | onBuy optional：归还至多 3 个 stable（普通或 FarmHand），每个 +3 wood | 2026-04-24：同上，走 `stable-removal` 共享 helper；"per returned stable" 语义对 FarmHand 同样适用 |
 
-### 2.2 🟡 简化实现（0 张）
+### 2.2 🟡 简化实现（130 张：2026-04-28 深度 40 + 2026-04-29 wide-scan 90）
 
-> 所有此前列入本节的卡都已回到完整规则。保留历史条目以便审计。
+> 完整 verdict 段见 `docs/card_desc_audit.md` §4.6 + `docs/card_desc_audit.md` §3 + `output/tmp/audit-agent-b{1..10}.md`。
+
+> **2026-04-29 wide-scan 新增 90 张**（按 deck）：A=3 / B=17 / C=22 / D=35 / E=13。详见各 deck audit-agent-b{6..10}.md 的 🟡 节。
+>
+> **系统性简化（多张共享同一根因）**：
+> - **D 牌组 getExchangeResources 简化（≥4 张：D35/D38/D45/D84）** — 只看 `player.resources.{animal}` 忽略场上动物（pasture/stable）。BGA 含场上+supply。**修复路线：建一个共享 helper `getEffectiveExchangeAnimals(player, kind)`**
+> - **C 牌组跨卡协作机制缺失（多张：C18/C25/C27/C49/C75/C84/C130）** — sharedScoring / forceSkip / computeReplace / farm-hand stable / Wolf 联动 / reorganize / hollow 二人版等机制
+>
+> **stub 卡（≥15 张，含进 §2.6）**：A135 / A165 / C62 / C105 / C109 / C136 / D62 / D94 / D108 / D131 / D157 / E58 / E134 / E139 / E153 / E155
+>
+> **2026-04-28 深度池 40 张**（保留以下）：
+
+**按 deck 分组**（2026-04-28 审查）：
+
+| Deck | 张数 | 卡列表 |
+|---|---|---|
+| A | 2 | A132 Publican（缺 deferred feasibility check）、A19 Handplow（缺 round-track field token 可视化） |
+| B | 7 | B103 / B128 / B151 / B152 / B26 / B163 / B75 |
+| C | 9 | C71 / C117 / C120 / C135 / C145 / C146 / C70 / C88 / C89 / C164 |
+| D | 10 | D12 / D21 / D36 / D63 / D77 / D82 / D87 / D128 / D134 / D148 |
+| E | 12 | E30 / E36 / E49 / E66 / E72 / E73 / E91 / E112 / E118 / E132 / E148 / E161 |
+
+> **历史记录**（已迁入 §2.1）：
 
 | 卡牌 | 简化内容 | 完整规则需要 |
 |---|---|---|
@@ -140,25 +165,101 @@
 | ~~C150 ParrotBreeder~~ | ~~占位：付 1 谷 + 归还 1 谷，没有跟踪右邻~~ | 已实现（2026-04-24）——双 listener 跟踪右邻 place-farmer + `computeArgs:place-farmer` 注入 occupied-override option |
 | ~~D102 / E76~~ | ~~跳过 FarmHand 分支~~ | 已实现（2026-04-24）——`shared/cards/helpers/stable-removal.ts` 抽象"可归还 stable"层；消费者无感知 FarmHand 储存 |
 
-### 2.3 ⚠ 行为偏差待修（0 张）
+### 2.3 ⚠ 行为偏差待修（44 张：2026-04-28 深度 18 + 2026-04-29 wide-scan 26）
 
-> 本节已清零。
+> 完整证据链见 `docs/card_desc_audit.md` §4.3 + `docs/card_desc_audit.md` §3 + `output/tmp/audit-agent-b{1..10}.md`。
+
+> **2026-04-29 wide-scan 新增 26 张**（紧凑审查未做完整 5 维度对比，需抽样复核）：
+>
+> **Top 5 P0 严重玩法 bug**：
+> - **B116 Shoreforester** — BGA reed bank 准备阶段填充时给 1 wood；TS 每个 round 开始无条件给 1 wood
+> - **B14 Hawktower** — BGA round 12 预约一个石屋间（条件性建造）；TS 写成 +1 stone 资源
+> - **B133 VillagePeasant** — BGA 给 N 个 vegetable 资源；TS 用 computePostScore 给 N VP
+> - **D138 PetLover** — `noop` xor 选项不取消原始 collect → 玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain bonus（`shared/cards/D/D138_PetLover.ts:42-62`）
+> - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener/effect 写入此字段——分数永远不触发
+>
+> **A 牌组（5 张）**：A38 WoolBlankets（cost 多收+prereq 错）、A165 PigBreeder（round 12 breeding 完全未实现）、A135 AnimalReeve（sharedScoring 没写）、A1 Shelter（缺 pasture-size-1）、A22 Telegram（extraPlacement 模拟需 owner 确认）
+>
+> **B 牌组其余（11 张）**：B7-B 中除 B14/B116/B133 外的 11 张行为偏差，包括元数据驱动行为偏离的 holder/field 缺失等，详见 `output/tmp/audit-agent-b7.md`
+>
+> **D 牌组（1 张）**：D138 PetLover（已列上）
+>
+> **E 牌组（5 张）**：E134 Omnifarmer + 4 张待详细列（详见 `output/tmp/audit-agent-b10.md`）
+>
+> **2026-04-28 深度池 18 张**：
+
+| 卡牌 | 关键发现 | 优先级 |
+|---|---|---|
+| **A129 Swagman** | farm-expansion 用 OR 而 BGA 是 SEQ；未设 once-per-turn flag | P1 |
+| **A139 Hollow Warden** | 仅匹配 `hollow-4`，3+人模式下其它 hollow 累积格漏触发 | P1 |
+| **A150 Stagehand** | construct 硬编码 `maxRooms:1`，BGA 不限制 | P1 |
+| **A151 Minstrel** | sheep-market gain 未清累积；grain-utilization 用 OR 而 BGA 是 SEQ 允许同时 sow+bake | P1 |
+| **B27 Toolbox** | 每次构建都触发，未实现"turn 末一次性"语义 | P1 |
+| **B29 CookeryLesson** | "same turn" 被错误扩展成 "same round" | P1 |
+| **B115 Tinsmith** | 多 field 时只允许选 1 个，BGA 给每 field 各加 1 | P1 |
+| **B130 / B150 / B152** | `useActionSpace(other)` 语义被 inline 简化，丢"用 farmer 到另一格"的事件（同类问题）| P1 |
+| **B138 ForestGuardian** | 用 `gain-trigger-player` 可能没真扣对手食物（须确认） | P1 |
+| **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 |
+| **C23** | 触发条件偏差 | P1 |
+| **C51 FishingNet** | 没真正从 trigger player 扣 food | P1 |
+| **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）| P1 |
+| **D117 WoodExpert** | 强制扣 1 食物替换 wood，BGA 是给 alternative trade 让玩家选（应改用 `Bonus.optional`）| P1 |
+| **D160 Midwife** | 缺"对手本轮首个 farmer"守卫，违反 desc 文本 | P1 |
+| **E53** | 缺 E85 联动 + meeple-id 跟踪 | P1 |
+| **E149 MidnightFencer** | stub-only（文件存在但 effect/listener 全无；与 §2.6 自报一致）| P0 |
+
+**连带 finding**（不在深度池但 agent 顺带报）：
+- **D12 ↔ D148 互斥未实现**：BGA 明确 `NEGATED_BY_MILKING_PLACE`，我方 D12 仅过滤 'house' 不过滤 D148 zone — P2
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（0 张）
+### 2.4 ❌ 数值/元数据待修（83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70）
 
-> 卡牌**入场成本**、**前置条件**或**基础 vp** 与 BGA 不同——直接影响经济与可玩性，优先级最高。
->
-> 2026-04-17：本节已全部清零。PR1 统一接入印刷 `vp` 计分 + 16 张 minor vp 对齐；PR2 把 B39/D31/D33/D34/D35/D38 共 6 张的 cost/prereq 对齐；PR3 完成 D60 LargePottery 的 cost/category/alsoCountsAs + dual-type 基建（`CardType`、`alsoCountsAs`、`cardCountsAs`、`collectCardsAs`）。2026-04-18 再把 D60 的“返还 Pottery”从 `returnCards` 建模修正为 custom prerequisite + `onBuy` return。全部迁入 §2.1。
->
-> 后续若再出现 cost/prereq/vp 偏差，重新在本节登记并走同样流程：`scripts/audit-card-vp.ts` 本地审计 + 对应 caller 迁移。
+> 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
-### 2.5 🔀 刻意偏离 BGA（4 张）
+> **2026-04-29 wide-scan 新增 70 张**（紧凑审查；优先抽样复核）：
+>
+> **系统性问题（最大头）**：
+> - **~50 张 category 字段批量不齐**（B/C/D 三副）—— 我方自定义 category 命名 `RESOURCE_WOOD/CLAY/REED/STONE`、`ANIMAL_HANDLER`、`FAMILY_GROWTH`、`FOOD_MISC`、`ACTION_ENHANCER` 等与 BGA 的 `BUILDING_RESOURCE_PROVIDER`、`LIVESTOCK_PROVIDER`、`FOOD_PROVIDER`、`ACTIONS_BOOSTER` 等不一一对应。是 schema 级问题，不影响游戏行为只影响 UI 分组/统计。**修复路线：建 BGA→ours 映射表跑迁移脚本，或扩展我方 schema 接受 BGA 命名作为别名**。
+>
+> **P0 cost 偏差（12 张）**：
+> - **A4 Baseboards** — BGA `costs=[[food:2],[grain:1]]` 是择一，我方 `cost:{food:2, grain:1}` 强迫同时付（玩家加成本）
+> - **A38 WoolBlankets** — cost 多收 wood+sheep（BGA 是 0）；prerequisite 写"Wooden House"（BGA 是"5 Sheep on farm"）
+> - **C3** 多 food:3 / **C13** discount 应 stone:2 写成 stone:1 / **C33** 缺 food:3 / **C35** wood:1 写成 clay:1 / **C48** 多 wood/clay
+> - **D24** 缺 food:1 / **D29** 缺 wood:1 / **D39** 缺 wood:1 / **D83** 缺 altCosts grain:1 / **D30** 缺 prerequisite "3 Occupations"
+> - **E32** cost 类型错（BGA `STONE=>2,REED=>1`，TS 写成 `clay:2, reed:1`，stone 误为 clay） / **E34** 缺 cost（BGA `WOOD=>1`，TS `cost: {}`）
+>
+> **P0 players 字段错（4 张，与上轮 7 张同模式）**：A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+
+>
+> **A 牌组次要（22 张）**：缺 `extraVp` 元数据（A29/A30/A31/A32/A34/A35/A37/A38/A58/A62/A98/A99/A100/A101/A133/A134/A136/A153 等）—— 仅展示用，可批量补
+>
+> **2026-04-28 深度池 13 张**（保留以下）：
+
+> **最严重子类（P0）**：A154/A158/A160 + C151/C152/C153/C163 共 7 张 `players: '3+'` 应为 `'4+'`——这些卡会进 3 人局卡池但 BGA 限定 4+，破坏 2026-04-25 落地的"卡池按人数过滤"逻辑。
+
+| 卡牌 | 偏差 | 优先级 |
+|---|---|---|
+| **A14 Carpenter's Hammer** | BGA 标 `banned=true`（卡被禁用），我方未带等价字段（也归 §2.7 待 owner 决策） | P2 |
+| **A154 / A158 / A160** | `players` 元数据应为 '4+'，代码写 '3+' | **P0** |
+| **B4 WoodPile** | 硬编码 gain wood=3，应为"在累计格上 farmer 数"；并写错 cost: food:2（BGA 是 passing 免费） | **P0** |
+| **B42 ForestInn** | 缺 `vp:1` 元数据 + 缺 round ≤ 6 的 isBuyable 守卫 | P1 |
+| **C30** | cost 错 | **P0** |
+| **C39** | cost + prerequisite 错 | **P0** |
+| **C59** | cost 错 | **P0** |
+| **C151 / C152 / C153 / C163** | `players='3+'` 应 `'4+'`（影响 3p 卡池） | **P0** |
+| **E95 Miller** | Occupation 卡多了 `cost: { food: 1 }`，BGA 端没有该字段 | **P0** |
+
+> **历史记录**：2026-04-17 PR1/PR2/PR3 把上一轮 §2.4 全部清零（minor `vp` 计分接入、6 张 cost/prereq 对齐、D60 LargePottery dual-type）。本次审查重新发现 13 张——主要是上次审查后新写的卡或当时漏检的。
+>
+> 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
+
+### 2.5 🔀 刻意偏离 BGA（4 张；2026-04-28 复核取舍今天仍成立）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
 > **不要**把这些当作 bug 修。改这些之前先开 issue / 跟 owner 确认。
+>
+> **2026-04-28 审查复核**：4 张全部通过——B85 / C22 / D161 / E16 当初 owner 签字的取舍今天仍然合理，无需重新讨论。详见 `docs/card_desc_audit.md` §4.5。
 
 | 卡牌 | BGA 行为 | 我们的行为 | 偏离原因 | 回归 BGA 的代价 |
 |---|---|---|---|---|
