@@ -25,7 +25,7 @@ export const E50_WildGreens = new MinorImprovement({
   name: 'Wild Greens',
   deck: 'E',
   number: 50,
-  category: 'FOOD_PROVIDER',
+  category: 'FOOD',
   desc: ['Each time you sow, you get 1 <FOOD> for every different type of good that you sow.'],
   cost: {},
 })

@@ -18,7 +18,7 @@ export const E29_Heirloom = new MinorImprovement({
   name: 'Heirloom',
   deck: 'E',
   number: 29,
-  category: 'BONUS_POINT_GENERATOR',
+  category: 'BONUS_POINTS_-_GET',
   desc: ['(This card has no additional effect.)'],
   cost: {},
   vp: 2,

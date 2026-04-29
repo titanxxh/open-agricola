@@ -9,7 +9,7 @@ export const C77_ClaySupply = new MinorImprovement({
   name: "Clay Supply",
   deck: "C",
   number: 77,
-  category: "RESOURCE_CLAY",
+  category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["Place 1 <CLAY> on each of the next 3 round spaces. At the start of these rounds, you get the <CLAY>."],
   cost: { food: 1 },
 })

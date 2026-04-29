@@ -9,7 +9,7 @@ export const B22_WalkingBoots = new MinorImprovement({
   name: 'Walking Boots',
   deck: 'B',
   number: 22,
-  category: 'ACTION_ENHANCER',
+  category: 'ACTIONS_BOOSTER',
   desc: ['You immediately get 2 <FOOD>. You must immediately place a person from your supply. If you do, in the next returning home phase, you must remove that person from play.'],
   cost: {},
   prerequisite: 'At Most 4 People',

@@ -9,7 +9,7 @@ export const E132_VeggieLover = new Occupation({
   name: "Veggie Lover",
   deck: "E",
   number: 132,
-  category: "POINTS_PROVIDER",
+  category: "BONUS_POINTS",
   desc: [
     '[Harvest]',
     '<GRAIN_VEG_STACK> <ARROW-1X> 6<FOOD>',

@@ -73,7 +73,7 @@ export const E118_KindlingGatherer = new Occupation({
   name: 'Kindling Gatherer',
   deck: 'E',
   number: 118,
-  category: 'BUILDING_RESOURCE_PROVIDER',
+  category: 'BUILDING_RESOURCES_-_WOOD',
   desc: ['Each time you get <FOOD> from an action space, you get 1 additional <WOOD>.'],
   cost: {},
   players: '1+',

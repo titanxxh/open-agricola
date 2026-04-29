@@ -8,7 +8,7 @@ export const E30_ChildsToy = new MinorImprovement({
   name: "Child's Toy",
   deck: 'E',
   number: 30,
-  category: 'POINTS_PROVIDER',
+  category: 'BONUS_POINTS_-_GET',
   desc: ['During the feeding phase of each harvest, your newborns require 2 <FOOD> (instead of 1).'],
   cost: { wood: 1 },
   altCosts: [{ clay: 1 }],

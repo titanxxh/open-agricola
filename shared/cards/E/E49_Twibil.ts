@@ -38,7 +38,7 @@ export const E49_Twibil = new MinorImprovement({
   name: 'Twibil',
   deck: 'E',
   number: 49,
-  category: 'FOOD_PROVIDER',
+  category: 'FOOD',
   desc: [
     'Each time after any player (including you) builds at least 1 wood room, you get 1 <FOOD>.',
   ],

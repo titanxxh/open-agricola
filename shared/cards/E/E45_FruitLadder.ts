@@ -9,7 +9,7 @@ export const E45_FruitLadder = new MinorImprovement({
   name: 'Fruit Ladder',
   deck: 'E',
   number: 45,
-  category: 'FOOD_MISC',
+  category: 'FOOD',
   desc: ['Place 1 <FOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <FOOD>.'],
   vp: 1,
   cost: { wood: 2 },

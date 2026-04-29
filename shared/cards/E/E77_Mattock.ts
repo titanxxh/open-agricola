@@ -48,7 +48,7 @@ export const E77_Mattock = new MinorImprovement({
   name: 'Mattock',
   deck: 'E',
   number: 77,
-  category: 'BUILDING_RESOURCE_PROVIDER',
+  category: 'BUILDING_RESOURCES_-_CLAY',
   desc: ['Each time you get <REED> and/or <STONE> from an action space, you get 1 additional <CLAY>.'],
   cost: { wood: 1 },
 })

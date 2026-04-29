@@ -9,7 +9,7 @@ export const E25_BumperCrop = new MinorImprovement({
   name: 'Bumper Crop',
   deck: 'E',
   number: 25,
-  category: 'FARM_PLANNER',
+  category: 'ACTION',
   desc: ['When you play this card, immediately carry out the field phase on your farmyard only. (This is not a harvest.)'],
   vp: 1,
   prerequisite: '2 Grain Fields',

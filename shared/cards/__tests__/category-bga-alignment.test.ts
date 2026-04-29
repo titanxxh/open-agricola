@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { allMinorImprovementCards, allOccupationCards } from '../catalog'
+import { C39_StudioBoat } from '../C/C39_StudioBoat'
 
 const expectedCategories: Record<string, string> = {
   'A11_MudPatch': 'FARM_PLANNER',
@@ -183,7 +184,10 @@ const expectedCategories: Record<string, string> = {
 }
 
 describe('Sprint 4 PR-4B — category BGA alignment', () => {
-  const allCards = [...allMinorImprovementCards, ...allOccupationCards]
+  // C39_StudioBoat is a PlayerActionCard registered via side-effect import in
+  // catalog.ts; it does not appear in the minor/occupation arrays, so include
+  // it explicitly to keep this test's coverage exhaustive.
+  const allCards = [...allMinorImprovementCards, ...allOccupationCards, C39_StudioBoat]
   const cardsById = new Map(allCards.map((c) => [c.id, c]))
 
   for (const [cardId, expected] of Object.entries(expectedCategories)) {

@@ -8,7 +8,7 @@ export const C7_BladeShears = new MinorImprovement({
   name: "Blade Shears",
   deck: "C",
   number: 7,
-  category: "ANIMAL_HANDLER",
+  category: "FOOD_PROVIDER",
   desc: ["You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each sheep you have. (Keep the sheep.)"],
   cost: { wood: 1 },
   passing: true,

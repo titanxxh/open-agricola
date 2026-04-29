@@ -9,7 +9,7 @@ export const B167_StableSergeant = new Occupation({
   name: 'Stable Sergeant',
   deck: 'B',
   number: 167,
-  category: 'ANIMAL_HANDLER',
+  category: 'LIVESTOCK_PROVIDER',
   desc: ['When you play this card, you can pay 2 <FOOD> to get 1 <SHEEP>, 1 <PIG>, and 1 <CATTLE>, but only if you can accommodate all three animals on your farm.'],
   cost: {},
   players: '4+',

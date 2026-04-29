@@ -32,7 +32,7 @@ export const E122_Cottar = new Occupation({
   name: 'Cottar',
   deck: 'E',
   number: 122,
-  category: 'BUILDING_RESOURCES_CLAY',
+  category: 'BUILDING_RESOURCES_-_CLAY',
   desc: [
     'Each time you play or build an improvement, you get your choice of 1 <WOOD> or 1 <CLAY> immediately after paying its cost.',
   ],

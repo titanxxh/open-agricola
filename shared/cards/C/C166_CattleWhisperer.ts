@@ -9,7 +9,7 @@ export const C166_CattleWhisperer = new Occupation({
   name: "Cattle Whisperer",
   deck: "C",
   number: 166,
-  category: "ANIMAL_HANDLER",
+  category: "LIVESTOCK_PROVIDER",
   desc: ["Add 5 and 8 to the current round and place 1 <CATTLE> on each corresponding round space. At the start of these rounds, you get the <CATTLE>."],
   players: "4+",
 })

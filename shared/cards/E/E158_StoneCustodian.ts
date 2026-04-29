@@ -11,7 +11,7 @@ export const E158_StoneCustodian = new Occupation({
   name: 'Stone Custodian',
   deck: 'E',
   number: 158,
-  category: 'FOOD_PROVIDER',
+  category: 'FOOD',
   desc: ['At the end of each work phase, you get 1 <FOOD> for each stone accumulation space with stone on it.'],
   cost: {},
   players: '4+',

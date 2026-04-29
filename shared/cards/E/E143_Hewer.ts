@@ -10,7 +10,7 @@ export const E143_Hewer = new Occupation({
   name: 'Hewer',
   deck: 'E',
   number: 143,
-  category: 'BUILDING_RESOURCE_PROVIDER',
+  category: 'BUILDING_RESOURCES_-_CLAY_OR_STONE',
   desc: [
     'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
   ],

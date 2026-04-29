@@ -8,7 +8,7 @@ export const C12_CattleFarm = new MinorImprovement({
   name: 'Cattle Farm',
   deck: 'C',
   number: 12,
-  category: 'FARMYARD_PLACE_FOR_ANIMALS',
+  category: 'FARM_PLANNER',
   desc: ['For each pasture you have, you can keep 1 <CATTLE> on this card.'],
   cost: { wood: 1 },
 })
