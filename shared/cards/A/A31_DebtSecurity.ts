@@ -12,6 +12,7 @@ export const A31_DebtSecurity = new MinorImprovement({
   category: "POINTS_PROVIDER",
   desc: ["During scoring, you get 1 bonus <SCORE> for each major improvement you have, up to the number of your unused farmyard spaces."],
   cost: {},
+  extraVp: true,
 })
 
 export const A31_DebtSecurity_impl = {

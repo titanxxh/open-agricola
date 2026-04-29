@@ -15,6 +15,7 @@ export const A100_Curator = new Occupation({
   cost: {},
   players: '1+',
   evenMoreSet: true,
+  extraVp: true,
 })
 
 export const A100_Curator_impl = {
