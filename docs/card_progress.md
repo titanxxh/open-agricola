@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 6 partial done — 21 metadata fixes (A-deck extraVp) + 2 behavior fixes (E30 ChildsToy non-destructive isNewborn mutation, D12 ↔ D148 mutual exclusion). Metadata: A29/A30/A31/A32/A34/A35/A37/A38/A39/A58/A62/A98/A99/A100/A101/A132/A133/A134/A136/A153/A154 all gained `extraVp: true` (display-only field; matches BGA's 24 extraVp cards now that A33/A36/A135 already had it). E30: replaced destructive `w.isNewborn = false` with snapshot/restore via `cardStates[CARD_ID].extraData.suppressedNewbornIds` — onBeforeFeed clears + records, onAfterFeed restores so post-feed listeners (A35 SwimmingClass, A92 AdoptiveParents) still see correct state. D12 ↔ D148: D148 onComputeAnimalZones early-returns when `D12_MilkingPlace` is in minorPlayed (mirrors BGA `NEGATED_BY_MILKING_PLACE` ruling); D12 also splices `card:D148_DomesticianExpert` zone defensively. Deferred to follow-up: A14 banned field (no `banned` schema field yet — needs owner decision + types.ts + dealHands filter), i18n 71+437 keys, 14 stub cards. Each behavior fix: red test → green fix; reaches updated. lint/build/check:reaches/check:prompt-sync all green. — see branch sprint-6-batch**
 - **2026-04-29 Sprint 5 PR-5 partial done — 7 P1 behavior bugs fixed (high-ROI subset); remaining 21 deferred to follow-up (need wider mechanism work or >1h fix each, tracked in §2.3). Cards fixed: A150 Stagehand (drop maxRooms cap + players 4+), A139 HollowWarden (match both hollow / hollow-4 spaces), D18 SteamPlow (drop sow leaf), D160 Midwife (first-farmer guard), B42 ForestInn (maxRound: 6), B4 WoodPile (gain wood per accumulation space with my farmer), C39 StudioBoat (occupationPrerequisites: { min: 1 } enforce). Each fix: red test → green fix commit pair; lint + build + reaches + prompt-sync all green; fast/slow tests 264+262 files passing. — see branch sprint-5-batch**
 - **2026-04-29 Sprint 4 done — PR-4A A135/C136 sharedScoring + PR-4B 178 cards category alignment + PR-4C skipped (audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed). Total ~1 day actual vs 5 day estimate. — see master-plan.md §8**
 - **2026-04-29 Sprint 4 PR-4B done — 178 cards' `category` field aligned to BGA naming (UI grouping only, no behavior). Major rename groups: `RESOURCE_*` → `BUILDING_RESOURCE_PROVIDER` / `BUILDING_RESOURCES_-_*`; `ANIMAL_HANDLER` / `ANIMAL_FARMER` → `LIVESTOCK_PROVIDER` (or per-card `ANIMALS_-_*`); `FOOD_MISC` → `FOOD_PROVIDER` / `FOOD` / `GOODS_-_GET`; `ACTION_ENHANCER` / `ACTION_SPACE_EXTENDER` → `ACTIONS_BOOSTER` / `ACTION_-_*`; `BONUS_POINT_GENERATOR` / `BONUS_POINTS_GET` → `BONUS_POINTS_-_GET`; `FARM_BUILDER` → `FARM_PLANNER` / `PASSING_-_FARMYARD`; CROPS / FOOD_GRAIN sub-bucket renames per BGA. Each card matched against its BGA `$this->category` literal; the alignment test exhaustively covers all 178 IDs. — see branch sprint-pr-4b**
@@ -224,7 +225,7 @@
 | **E149 MidnightFencer** | stub-only（文件存在但 effect/listener 全无；与 §2.6 自报一致）— ✅ Sprint 3 done (rechecked: full onStartHarvest offer-flow + cardStates owedFences + computeBonusScore already in place; was misclassified as stub) | P0 |
 
 **连带 finding**（不在深度池但 agent 顺带报）：
-- **D12 ↔ D148 互斥未实现**：BGA 明确 `NEGATED_BY_MILKING_PLACE`，我方 D12 仅过滤 'house' 不过滤 D148 zone — P2
+- **D12 ↔ D148 互斥** ✅ **Sprint 6 已修**：BGA `NEGATED_BY_MILKING_PLACE` 落地——D148 onComputeAnimalZones 检测 `minorPlayed.includes('D12_MilkingPlace')` 早退；D12 防御性 splice `card:D148_DomesticianExpert` zone（reaches 双向声明）
 
 **Sprint 1 PR-1B 残留 behavior（cost/vp 已修，但行为分支待 Sprint 5）**：
 - **B4 WoodPile** — gain 仍硬编码 `wood: 3`，应改为"累积格上 farmer 数"；cost 字段已对齐 ✅ PR-1B — ✅ Sprint 5 PR-5 (onBuy now scans state.actionSpaces, filters gainPerRound non-empty, counts spaces with my farmer)
@@ -278,7 +279,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 >
 > **P0 players 字段错（4 张，与上轮 7 张同模式）**：A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+ — ✅ 全部已修，Sprint 1 PR-1A on branch sprint-1-pr-1a
 >
-> **A 牌组次要（22 张）**：缺 `extraVp` 元数据（A29/A30/A31/A32/A34/A35/A37/A38/A58/A62/A98/A99/A100/A101/A133/A134/A136/A153 等）—— 仅展示用，可批量补
+> **A 牌组次要（22 张）extraVp 元数据**：✅ Sprint 6 已批量补 21 张（A29/A30/A31/A32/A34/A35/A37/A38/A39/A58/A62/A98/A99/A100/A101/A132/A133/A134/A136/A153/A154）。本仓库 A 牌组现共 24 张 `extraVp: true`（含此前 A33/A36/A135），与 BGA 24 张完全对齐。仅展示字段，不影响规则。
 >
 > **2026-04-28 深度池 13 张**（保留以下）：
 
@@ -286,7 +287,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 
 | 卡牌 | 偏差 | 优先级 |
 |---|---|---|
-| **A14 Carpenter's Hammer** | BGA 标 `banned=true`（卡被禁用），我方未带等价字段（也归 §2.7 待 owner 决策） | P2 |
+| **A14 Carpenter's Hammer** | BGA 标 `banned=true`（卡被禁用），我方未带等价字段（也归 §2.7 待 owner 决策） — Sprint 6 evaluated: `banned` 字段尚未在 `shared/cards/types.ts` 定义，加字段 + dealHands 过滤 + UI 标识 是单独工作量；deferred to follow-up（待 owner 决策） | P2 |
 | **A154 / A158 / A160** | `players` 元数据应为 '4+'，代码写 '3+' — ✅ Sprint 1 PR-1A on branch sprint-1-pr-1a | **P0** |
 | **B4 WoodPile** | cost: food:2 已清空 ✅ PR-1B；硬编码 gain wood=3 行为偏差（BGA 是"累计格 farmer 数"）— 残留 behavior，转 Sprint 5（见 §2.3） | **P0** |
 | **B42 ForestInn** | `vp:1` 已补 ✅ PR-1B；round ≤ 6 的 isBuyable 守卫残留 behavior，转 Sprint 5（见 §2.3） | P1 |
@@ -509,6 +510,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 | A3+B3 BGA 对齐 via hand-picker infra | 04-19 | 0 | 821 | 92.0% |
 | A123 FrameBuilder → bonus.choices + pay 系统 Bonus.choices 能力 | 04-20 | 0 | 821 | 92.0% |
 | 卡池按人数过滤 + C39 StudioBoat BGA 对齐 | 04-25 | 0 | 821 | 92.0% |
+| Sprint 6 partial (A-deck extraVp ×21 + E30 mutation fix + D12↔D148) | 04-29 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
