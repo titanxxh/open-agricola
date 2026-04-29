@@ -43,13 +43,15 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
+const HOLLOW_SPACES = new Set(['hollow', 'hollow-4'])
+
 const hollowListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-after-hollow',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'hollow-4') return
+    if (!HOLLOW_SPACES.has(context.space?.id ?? '')) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }

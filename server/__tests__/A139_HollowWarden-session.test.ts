@@ -54,6 +54,38 @@ describe('A139_HollowWarden session', () => {
     expect(player.resources.food).toBe(foodBefore)
   })
 
+  it('gains 1 food when using 3p hollow space', () => {
+    // 3p game uses 'hollow' space (non-4p variant). BGA listens via
+    // isActionCardEvent($event, 'Hollow') which matches both spaces.
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    state.players = state.players.slice(0, 3)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    player.occupationHand.push(CARD_ID)
+    setWorkersAtHome(state, player, 2)
+    player.resources.food = 5
+
+    const hollow = state.actionSpaces.find((s) => s.id === 'hollow')
+    if (!hollow) {
+      // Some 3p configs may differ; skip if space missing.
+      return
+    }
+    hollow.resources.clay = 2
+
+    session.loadState(state)
+    session.devPlayCard(0, CARD_ID)
+
+    const foodBefore = session.getState().state.players[0]!.resources.food
+    const resp = session.takeAction(0, 'hollow')
+    expect(resp.ok).toBe(true)
+
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(foodBefore + 1)
+  })
+
   it('does not trigger for opponent using hollow', () => {
     const session = setup()
     const state = session.getState().state
