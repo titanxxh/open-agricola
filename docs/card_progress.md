@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 2 PR-2A done — 4 cards (B116/A165/B133/D60) + onBeforeEndGame hook — B116 reed-bank guard, A165 round-12 boar breed, B133 onBeforeEndGame +N vegetable, D60 reserved.clay subtraction — see commit on branch sprint-2-pr-2a**
 - **2026-04-29 Sprint 1 done — total 30 cards (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) — see master-plan.md §8**
 - **2026-04-29 Sprint 1 PR-1C done — 5 D-deck cards (D7/D8/D39/D53/D58) — prerequisite handlers registered to fix "buy without enforcement" bug; whole-string registry lookup added to prerequisites helper — see commit on branch sprint-1-pr-1c**
 - **2026-04-29 Sprint 1 PR-1B done — 16 cards (A38/B4/B42/C3/C30/C33/C35/C39/C48/C59/D24/D29/D39/E32/E34/E95) — cost/vp metadata aligned to BGA — see commit on branch sprint-1-pr-1b**
@@ -176,13 +177,13 @@
 > **2026-04-29 wide-scan 新增 26 张**（紧凑审查未做完整 5 维度对比，需抽样复核）：
 >
 > **Top 5 P0 严重玩法 bug**：
-> - **B116 Shoreforester** — BGA reed bank 准备阶段填充时给 1 wood；TS 每个 round 开始无条件给 1 wood
+> - **B116 Shoreforester** — BGA reed bank 准备阶段填充时给 1 wood；TS 每个 round 开始无条件给 1 wood — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a
 > - **B14 Hawktower** — BGA round 12 预约一个石屋间（条件性建造）；TS 写成 +1 stone 资源
-> - **B133 VillagePeasant** — BGA 给 N 个 vegetable 资源；TS 用 computePostScore 给 N VP
+> - **B133 VillagePeasant** — BGA 给 N 个 vegetable 资源；TS 用 computePostScore 给 N VP — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a
 > - **D138 PetLover** — `noop` xor 选项不取消原始 collect → 玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain bonus（`shared/cards/D/D138_PetLover.ts:42-62`）
 > - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener/effect 写入此字段——分数永远不触发
 >
-> **A 牌组（5 张）**：A38 WoolBlankets（cost 多收+prereq 错）、A165 PigBreeder（round 12 breeding 完全未实现）、A135 AnimalReeve（sharedScoring 没写）、A1 Shelter（缺 pasture-size-1）、A22 Telegram（extraPlacement 模拟需 owner 确认）
+> **A 牌组（5 张）**：A38 WoolBlankets（cost 多收+prereq 错）、A165 PigBreeder（round 12 breeding 完全未实现） — ✅ Sprint 2 PR-2A on branch sprint-2-pr-2a、A135 AnimalReeve（sharedScoring 没写）、A1 Shelter（缺 pasture-size-1）、A22 Telegram（extraPlacement 模拟需 owner 确认）
 >
 > **B 牌组其余（11 张）**：B7-B 中除 B14/B116/B133 外的 11 张行为偏差，包括元数据驱动行为偏离的 holder/field 缺失等，详见 `output/tmp/audit-agent-b7.md`
 >
@@ -371,6 +372,7 @@
 | **`cardAllowedForPlayerCount` + `dealHands` 卡池按人数过滤**（2026-04-25） | ✅ | `shared/cards/player-count-filter.ts` 提供 `cardAllowedForPlayerCount(playersField, playerCount)` 解析器（识别 `'N+'` / `'N-M'` / `'N'` / undefined，fail-open on unknown）。`dealHands`（`shared/logic/state.ts`）的三类来源——内置 (`implementedMinorImprovementCards` / `implementedOccupationCards`)、community deck (`implementedCommunityMinors` / `implementedCommunityOccupations`)、extra IDs (`extraMinorIds` / `extraOccupationIds` 即 workshop + `customCards=`)——全部按 `playerCount` 过滤；extra IDs 通过 `lookupPlayersField` 内联多源回退（custom-registry → ad-hoc registry → 内置 lookup）。dev 通道（`devDrawCard` / `devPlayCard`）绕过卡池构造、不受影响。BGA 的"哪些卡只在某些人数下出现"语义现在生效（`E166_Roastmaster` / `E149_MidnightFencer` 等 `4+` 卡不再进 2/3p 手牌；C39 不再被错误打上 `players: '1-3'`）。 |
 | **`PlayerActionSpaceConfig.shouldRegister?(state)`**（2026-04-25） | ✅ | `shared/cards/player-action-space.ts`：可选 gate 决定是否在 `createPlayerActionSpaces` 中创建该卡的行动格。`createPlayerActionSpaces` 循环中位置：`if (!config) continue` 之后、duplicate-id 检查之前。首个消费者：C39 StudioBoat（`shouldRegister: (state) => state.players.length < 4` —— 4p 已有全局 Traveling Players 行动格，不再重复注册 C39 自己的复制品）。 |
 | **`meetsTextPrerequisite` whole-string 自定义查找**（2026-04-29, Sprint 1 PR-1C） | ✅ | `shared/cards/helpers/prerequisites.ts`：`meetsTextPrerequisite` 现在先用整串调用 `checkCustomPrerequisite`，命中即返回；未命中再回退到原有按 `" and "` 分句逐 clause 校验。新增能力让 D8 FernSeeds（`'1 Empty and 2 Planted Fields'`）这类含 "and" 的复合 prereq 也能整串注册一个 handler；原有单 clause 注册路径完全向后兼容。消费者：D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter。 |
+| **`onBeforeEndGame` 阶段 hook**（2026-04-29, Sprint 2 PR-2A） | ✅ | `CardEffect.onBeforeEndGame?: EffectHandler`（`shared/cards/card-effects.ts:151`）：在 scoring 启动前、所有 categories 计算之前触发；用于 mutate state（如 B133 给 vegetable 资源），让标准计分自然把这些资源算进 VP，避免再走 legacy `computePostScore` 直接返 raw VP。dispatch 入口在 `shared/session/game-core.ts:2440`（`continueAfterRoundEnd` round>14 分支，gameOver 转换前），整局只触发一次。首个消费者：B133 VillagePeasant（之前 `computePostScore` 直接返 N VP，现改为 `onBeforeEndGame` 给 N vegetable）。BGA 对应事件：`onPlayerBeforeEndOfGame`。 |
 
 ### 目录重组（PR-3）
 
