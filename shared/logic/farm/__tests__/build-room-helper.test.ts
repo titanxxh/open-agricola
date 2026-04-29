@@ -79,8 +79,7 @@ describe('tryAddRoomTile', () => {
     const fields = allTiles.slice(2).map((t) => ({
       row: t.row,
       col: t.col,
-      crop: null,
-      remaining: 0,
+      stacks: [],
     }))
     const player = createPlayer({ roomTiles, fields })
     const before = player.rooms

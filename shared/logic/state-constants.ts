@@ -12,6 +12,7 @@
 import type { ActionSpace, FenceSegment, GameState, PlayerState, Resource } from '../game/types'
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from './rng'
+import { tryAddRoomTile } from './farm/build-room-helper'
 
 export { createSeed, createRng, shuffleWithRng } from './rng'
 
@@ -183,6 +184,9 @@ export const applyFutureMeeples = (state: GameState) => {
       const amount = value ?? 0
       player.resources[key as keyof Resource] += amount
     })
+    if (entry.roomType && player.houseType === entry.roomType) {
+      tryAddRoomTile(player, entry.roomType)
+    }
   })
   state.futureMeeples = remaining
 }

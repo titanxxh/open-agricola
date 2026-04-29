@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { getCardEffect } from '../../shared/cards/card-effects'
-import {
-  futureMeeplesAction,
-  resolveFutureMeepleRequests,
-} from '../../shared/actions/effects/future-meeples'
+import { resolveFutureMeepleRequests } from '../../shared/actions/effects/future-meeples'
+import { applyFutureMeeples } from '../../shared/logic/state'
 import '../../shared/cards/B/B14_Hawktower'
 
 const CARD_ID = 'B14_Hawktower'
@@ -26,7 +24,7 @@ const setup = (houseType: 'wood' | 'clay' | 'stone') => {
 }
 
 describe('B14 Hawktower — session', () => {
-  it('houseType=stone: gains 1 room after round-12 future-meeple trigger', () => {
+  it('houseType=stone: gains 1 room at round-12 round-start (applyFutureMeeples)', () => {
     const session = setup('stone')
     const state = session.getState().state
     const player = state.players[0]!
@@ -40,7 +38,7 @@ describe('B14 Hawktower — session', () => {
     const beforeTiles = player.roomTiles.length
 
     state.round = 12
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms + 1)
     expect(player.roomTiles.length).toBe(beforeTiles + 1)
@@ -64,7 +62,7 @@ describe('B14 Hawktower — session', () => {
     const beforeTiles = player.roomTiles.length
 
     state.round = 12
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms)
     expect(player.roomTiles.length).toBe(beforeTiles)
@@ -83,9 +81,47 @@ describe('B14 Hawktower — session', () => {
     const beforeTiles = player.roomTiles.length
 
     state.round = 12
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms)
     expect(player.roomTiles.length).toBe(beforeTiles)
+  })
+
+  it('round 12 round-start via real round-advance path: stone-room is built (no execute call)', () => {
+    // Real round-start consumption: applyFutureMeeples is called from
+    // shared/session/game-core.ts at every round transition. This test
+    // simulates that path directly (without invoking futureMeeplesAction.execute),
+    // proving the consumption is anchored on the correct entry point.
+    const session = setup('stone')
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const effect = getCardEffect(CARD_ID)
+    effect!.onBuy!(state, player)
+    resolveFutureMeepleRequests(state)
+
+    // Pre-12 rounds: applyFutureMeeples must NOT consume the entry.
+    const beforeRooms = player.rooms
+    for (let r = 2; r <= 11; r += 1) {
+      state.round = r
+      applyFutureMeeples(state)
+    }
+    expect(player.rooms).toBe(beforeRooms)
+    expect(
+      state.futureMeeples.some(
+        (e) => e.cardId === CARD_ID && e.roomType === 'stone',
+      ),
+    ).toBe(true)
+
+    // Round 12 round-start: entry is consumed and room is placed.
+    state.round = 12
+    applyFutureMeeples(state)
+
+    expect(player.rooms).toBe(beforeRooms + 1)
+    expect(
+      state.futureMeeples.some(
+        (e) => e.cardId === CARD_ID && e.playerId === player.id,
+      ),
+    ).toBe(false)
   })
 })
