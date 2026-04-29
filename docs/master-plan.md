@@ -421,7 +421,7 @@ docs/card_desc_audit.md §1 总览数字降到：
 
 | Sprint | 主题 | 张数 | 估算 | 实际 | 状态 | Spec | Plan | PR/Commit |
 |---|---|---|---|---|---|---|---|---|
-| 1 | P0 高 ROI 批量（players + cost + prereq） | 28+ | 2 day | — | pending | — | — | — |
+| 1 | P0 高 ROI 批量（players + cost + prereq） | 28+ | 2 day | — | in_progress | — | — | — |
 | 2 | P0 玩法完全错 + A165 + A135 | 7 | 4 day | — | pending | — | — | — |
 | 3 | P0 E149 MidnightFencer | 1 | 3 day | — | pending | — | — | — |
 | 4 | P1 机制 helper（sharedScoring + category + getExchangeResources） | helper×3 | 5 day | — | pending | — | — | — |
