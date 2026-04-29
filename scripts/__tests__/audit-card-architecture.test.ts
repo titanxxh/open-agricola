@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
+const BGA_AVAILABLE = fs.existsSync('/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/A')
+const describeBga = BGA_AVAILABLE ? describe : describe.skip
 import {
   parseArgs,
   discoverCardPairs,
@@ -12,8 +15,6 @@ import {
   scanAggregateMutations,
   scanExternalCardIdMentions,
   scanCrossLayerImports,
-  extractOurDesc,
-  extractBgaDesc,
   normalizeDesc,
   compareDesc,
   extractI18nKeys,
@@ -44,7 +45,7 @@ describe('parseArgs', () => {
   })
 })
 
-describe('discoverCardPairs', () => {
+describeBga('discoverCardPairs', () => {
   it('matches our TS files to BGA PHP files by cardId', () => {
     const pairs = discoverCardPairs(
       'shared/cards',
@@ -70,7 +71,7 @@ describe('discoverCardPairs', () => {
   })
 })
 
-describe('scanCard (skeleton)', () => {
+describeBga('scanCard (skeleton)', () => {
   it('returns CardAuditResult with all signal fields initialized', () => {
     const result = scanCard({
       cardId: 'A123',
@@ -319,7 +320,7 @@ describe('writeJsonl', () => {
   })
 })
 
-describe('runAudit (smoke)', () => {
+describeBga('runAudit (smoke)', () => {
   it('runs end-to-end on real repo and writes jsonl', () => {
     const out = path.join('output', 'tmp', 'audit-smoke.jsonl')
     runAudit({
