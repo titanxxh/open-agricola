@@ -20,7 +20,7 @@ const listener: CardListenerRegistration = {
         children: [
           { type: 'leaf', actionId: 'fence', sourceCard: CARD_ID, actionContext: { trueAction: false } },
           { type: 'leaf', actionId: 'stables', sourceCard: CARD_ID, actionContext: { trueAction: false } },
-          { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { maxRooms: 1, trueAction: false } },
+          { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: false } },
         ],
       },
       logKey: 'log.cardGrantedAction',
@@ -38,7 +38,7 @@ export const A150_Stagehand = new Occupation({
   category: 'ACTIONS_BOOSTER',
   desc: ['Each time another player uses the __Traveling Players__ accumulation space, you can take your choice of a __Build Fences__, __Build Stables__, or __Build Rooms__ action.'],
   cost: {},
-  players: '1+',
+  players: '4+',
 })
 
 export const A150_Stagehand_impl = {
