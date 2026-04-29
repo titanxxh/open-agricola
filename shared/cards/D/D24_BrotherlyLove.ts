@@ -75,7 +75,7 @@ export const D24_BrotherlyLove = new MinorImprovement({
   desc: [
     'As long as you have exactly 4 people, in the work phase of each round, you can place your third and fourth person immediately after one another, even on the same action space.',
   ],
-  cost: {},
+  cost: { food: 1 },
 })
 
 export const D24_BrotherlyLove_impl = {

@@ -11,7 +11,7 @@ export const C33_GreeningPlan = new MinorImprovement({
   number: 33,
   category: "POINTS_PROVIDER",
   desc: ["During scoring, if you then have at least 2/4/5/6 unplanted fields, you get 1/2/3/5 bonus <SCORE>."],
-  cost: {},
+  cost: { food: 3 },
 })
 
 export const C33_GreeningPlan_impl = {
