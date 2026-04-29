@@ -5,6 +5,7 @@ import type {
   GameState,
   Resource,
 } from '../../game/types'
+import { tryAddRoomTile } from '../../logic/farm/build-room-helper'
 
 export const futureMeeplesNode = (request?: FutureMeepleRequest): ActionFlow => ({
   type: 'leaf',
@@ -69,7 +70,7 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
         const round = clampRound(entry.round)
         if (round <= state.round) continue
         const resources: Partial<Resource> = {}
-        addResourceCounts(resources, entry.resources)
+        if (entry.resources) addResourceCounts(resources, entry.resources)
         nextEntries.push({
           id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
           cardId: request.cardId,
@@ -77,6 +78,7 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
           round,
           actionId: state.roundActionOrder[round - 1] ?? null,
           resources,
+          ...(entry.roomType ? { roomType: entry.roomType } : {}),
         })
       }
     } else {
@@ -114,6 +116,22 @@ export const futureMeeplesAction: ActionDefinition = {
       queueFutureMeeples(state, inlineRequest)
     }
     resolveFutureMeepleRequests(state)
+    // Consume any roomType entries due this round.
+    // For each due entry: if player.houseType matches, place one room tile;
+    // otherwise silently skip. The entry is dropped either way.
+    const remaining: typeof state.futureMeeples = []
+    for (const entry of state.futureMeeples) {
+      if (!entry.roomType || entry.round !== state.round) {
+        remaining.push(entry)
+        continue
+      }
+      const player = state.players.find((p) => p.id === entry.playerId)
+      if (player && player.houseType === entry.roomType) {
+        tryAddRoomTile(player, entry.roomType)
+      }
+      // drop entry
+    }
+    state.futureMeeples = remaining
     return { type: 'ok' }
   },
 }
