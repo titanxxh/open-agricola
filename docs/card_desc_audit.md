@@ -402,7 +402,7 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 | **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 — ✅ PR-1B on branch sprint-1-pr-1b（C13 isBuyable discount + D83 altCosts 等转 Sprint 5） | 12 张 / 2 day |
 | **P0** | B4 WoodPile gain 硬编码 + cost 错 — cost ✅ PR-1B；gain 行为转 Sprint 5 | 1 张 / 0.5 day |
 | **P0** | E95 Miller cost 多 food:1 — ✅ PR-1B on branch sprint-1-pr-1b | 1 张 / 0.1 day |
-| **P0** | E149 MidnightFencer 实现 | 按 BGA `StartHarvest` listener 写完 / 2-3 day |
+| **P0** | E149 MidnightFencer 实现 | 按 BGA `StartHarvest` listener 写完 / 2-3 day — ✅ Sprint 3 deliberate divergence on branch sprint-3-e149 |
 | **P1** | B130/B150/B152 useActionSpace(other) 语义 | 3 张 / 1-2 day |
 | **P1** | A129/A139/A150/A151 行为偏差 | 4 张 / 1-2 day |
 | **P1** | D18/D117/D160 行为偏差 | 3 张 / 1 day |
