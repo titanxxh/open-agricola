@@ -229,6 +229,8 @@ export type ImmediateLogEntry = {
   params?: Record<string, unknown>
 }
 
+export type FutureMeepleRoomType = 'wood' | 'clay' | 'stone'
+
 export type FutureMeeple = {
   id: string
   cardId: string
@@ -236,6 +238,7 @@ export type FutureMeeple = {
   round: number
   actionId: string | null
   resources: Partial<Resource>
+  roomType?: FutureMeepleRoomType
 }
 
 export type FutureMeepleRequest =
@@ -249,7 +252,11 @@ export type FutureMeepleRequest =
   | {
       cardId: string
       playerId: string
-      entries: { round: number; resources: Partial<Resource> }[]
+      entries: {
+        round: number
+        resources?: Partial<Resource>
+        roomType?: FutureMeepleRoomType
+      }[]
     }
 
 export type HarvestReapSummary = {
