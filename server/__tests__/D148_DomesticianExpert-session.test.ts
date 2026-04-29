@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/actions/effects/animals'
 
 import '../../shared/cards/D/D148_DomesticianExpert'
+import '../../shared/cards/D/D12_MilkingPlace'
 
 describe('D148_DomesticianExpert session', () => {
   const setup = (roomTiles?: Array<{row: number, col: number}>) => {
@@ -85,5 +86,20 @@ describe('D148_DomesticianExpert session', () => {
     const zones = computeAnimalZones(player)
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeUndefined()
+  })
+
+  it('negated by D12 MilkingPlace — adds no zone when D12 is also played', () => {
+    // 2 adjacent rooms — D148 alone would add capacity 2
+    const session = setup([{ row: 0, col: 0 }, { row: 1, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+    // Mark D12 as played (no need to run buy flow — zone hooks read minorPlayed)
+    player.minorPlayed.push('D12_MilkingPlace')
+    session.loadState(state)
+
+    const zones = computeAnimalZones(state.players[0]!)
+    expect(zones.find(z => z.id === 'card:D148_DomesticianExpert')).toBeUndefined()
+    // D12 also strips the house zone
+    expect(zones.find(z => z.zoneType === 'house')).toBeUndefined()
   })
 })

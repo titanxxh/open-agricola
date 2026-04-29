@@ -28,6 +28,9 @@ export const D148_DomesticianExpert_impl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones) => {
+    // BGA: NEGATED_BY_MILKING_PLACE — if D12_MilkingPlace is played, this card
+    // adds no zone. (D12's filter also strips D148_special on its end.)
+    if ((player.minorPlayed ?? []).includes('D12_MilkingPlace')) return
     const roomTiles = player.roomTiles ?? []
     const pairs = countAdjacentRoomPairs(roomTiles)
     if (pairs === 0) return
@@ -40,5 +43,5 @@ export const D148_DomesticianExpert_impl = {
     })
   },
 },
-  reaches: [] as readonly string[],
+  reaches: ['D12_MilkingPlace'] as readonly string[],
 } satisfies CardImpl
