@@ -424,7 +424,7 @@ docs/card_desc_audit.md §1 总览数字降到：
 | 1 | P0 高 ROI 批量（players + cost + prereq） | 30 (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) | 2 day | ~2 day | done（PR-1A 10 张 players ✅、PR-1B 16 张 cost/vp ✅、PR-1C 5 张 D-deck prereq ✅） | docs/superpowers/specs/2026-04-29-sprint-1-p0-batch-design.md | docs/superpowers/plans/2026-04-29-sprint-1-p0-batch.md | — |
 | 2 | P0 玩法完全错 + audit 顺带（B116/A165/B133/D60/B14/D138/E134；A135 移 Sprint 4） | 7 + D60 顺带 | 4 day | ~5 day | done（PR-2A 4 cards + onBeforeEndGame hook ✅、PR-2B B14 + future-meeples roomType ✅、PR-2C D138 computeReplace ✅、PR-2D E134 三 hook ✅） | docs/superpowers/specs/2026-04-29-sprint-2-p0-gameplay-design.md | docs/superpowers/plans/2026-04-29-sprint-2-p0-gameplay.md | #28 / #29 / #30 / #31 |
 | 2.5 | BeforeEndOfGame interactive choice（A136/C133/C99/D132/E132） | 5 | 4 day | 0 | **skipped — registered as deliberate divergence** | — | — | — |
-| 3 | P0 E149 MidnightFencer | 1 | 3 day | ~1.5 day | done（implemented as deliberate divergence — onStartHarvest offers 0..2×(N−1), each owedFence = +1 raw VP；BGA fence-segment placement 待 fence 系统重写） | docs/superpowers/specs/2026-04-29-sprint-3-e149-design.md | — | TBD |
+| 3 | P0 E149 MidnightFencer | 1 | 3 day | ~1.5 day | done（implemented as deliberate divergence — onStartHarvest offers 0..2×(N−1), each owedFence = +1 raw VP；BGA fence-segment placement 待 fence 系统重写） | docs/superpowers/specs/2026-04-29-sprint-3-e149-design.md | — | #34 |
 | 4 | P1 机制 helper（sharedScoring + category + getExchangeResources） | helper×3 | 5 day | — | pending | — | — | — |
 | 5 | P1 单卡行为偏差 | 28 | 9 day | — | pending | — | — | — |
 | 6 | P2 长尾（extraVp + banned + E30 + D12↔D148 + i18n + stub） | ~50 + i18n | 7 day | — | pending | — | — | — |
