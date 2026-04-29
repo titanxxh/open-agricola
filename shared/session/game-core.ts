@@ -71,7 +71,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
+import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
@@ -2437,6 +2437,7 @@ export class GameCore {
     })
     this.state.round += 1
     if (this.state.round > 14) {
+      this.state.players.forEach((p) => runBeforeEndGameHooks(this.state, p))
       this.state.gameOver = true
       this.state.log.unshift({ key: 'log.gameOver' })
       this.pending = { type: 'none' }
