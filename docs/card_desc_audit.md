@@ -24,7 +24,7 @@
 | ✅ 完全对齐 | 64 | 475 + 48 ⚪ | **587** | **67%** |
 | 🟡 简化实现 | 40 | 90 | **130** | 15% |
 | ⚠ 行为偏差 | 18 | 26 | **44** | 5% |
-| ❌ 数值/元数据 | 6 | 66 | **73** | 8% |
+| ❌ 数值/元数据 | 6 | 66 | **57**（PR-1A −10、PR-1B −16） | 6% |
 | 🔀 刻意偏离 | 4 | 1 | **5** | 1% |
 | 🔍 待 owner | 1 | 13 | **14** | 2% |
 
@@ -41,9 +41,9 @@
    - **D138 PetLover** — `noop` xor 选项不取消原始 collect，玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain
    - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener 写入此字段，分数永远不触发
 
-2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **73 张**（原报 83 张；PR-1A 已修 10 张 players，见 §1 verdict 表已修订为 73）。
+2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **57 张**（原报 83 张；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp，见 §1 verdict 表已修订为 57）。
    - **11 张 players 字段错**（深度 7 + wide 4，去重后实为 10 张唯一卡）：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158——全是 `'3+'` 应 `'4+'` 同模式，破坏 2026-04-25 落地的卡池过滤 — ✅ PR-1A on branch sprint-1-pr-1a（10 张全部已修，剩 0 张 players 残留）
-   - **12+ 张 cost 错**：A4 Baseboards（择一→同时付）、A38 WoolBlankets、C3/C13/C33/C35/C48、D24/D29/D39/D83/D30、E32（stone 误为 clay）、E34（缺 cost）、E95、B4、B42
+   - **12+ 张 cost 错** — A4 / D83（alternative-cost 机制）、C13（isBuyable discount）残留转 Sprint 5；其余 11 张 cost/vp 字段已 ✅ PR-1B on branch sprint-1-pr-1b：A38 WoolBlankets、C3/C33/C35/C48、D24/D29/D39、E32（stone 误为 clay）、E34（缺 cost）、E95、B4、B42
    - **~50 张 category 字段批量不齐**（B/C/D 三副系统性问题——schema 级而非单卡 bug）
    - **22 张缺 `extraVp` 元数据**（A 牌组，仅展示用）
 
@@ -382,29 +382,31 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 - **§2.2 简化实现**：从 0 张 → 130 张
 - **§2.6 待实现**：E149 验证为"我方有 stub 文件但无逻辑"，wide-scan 新增 ≥15 张 stub
 - **§3 基础设施**：sharedScoring 机制不完备，应加 limitation 备注（待落地）
-- **§1 总览数字**：合并两阶段 verdict 887/881 张 → 587 ✅ / 130 🟡 / 44 ⚠ / 83 ❌ / 5 🔀 / 14 🔍
+- **§1 总览数字**：合并两阶段 verdict 887/881 张 → 587 ✅ / 130 🟡 / 44 ⚠ / 57 ❌（PR-1A −10、PR-1B −16）/ 5 🔀 / 14 🔍
 
 ## 8. 后续建议（不自动开 issue）
 
 > 本审查不修复任何发现。下列建议供 owner 手动 issue 化、按优先级排期。
+>
+> **Sprint 1 PR-1B 已落地（cost/vp 字段对齐，2026-04-29，branch sprint-1-pr-1b）**：A38 / B4 / B42 / C3 / C30 / C33 / C35 / C39 / C48 / C59 / D24 / D29 / D39 / E32 / E34 / E95 共 16 张。A4 / D83（costs[][]）/ C13（isBuyable discount）deferred to Sprint 5。
 
 | 优先级 | 主题 | 张数 / 工作量 |
 |---|---|---|
 | **P0** | wide-scan 5 张行为完全错（B116 / B14 / B133 / D138 / E134）| 5 张 / 1-2 day |
 | **P0** | 11 张 players 字段错（深度 7 + wide 4：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158）(actual 10 unique cards) — ✅ PR-1A on branch sprint-1-pr-1a | 改字段；跑卡池过滤回归测试 / < 0.5 day |
-| **P0** | A4 Baseboards cost 模型错（择一→同时付）| 1 张 / 0.5 day |
-| **P0** | A38 / A165 / A135 cost+prereq+breeding+sharedScoring | 3 张 / 1-2 day |
+| **P0** | A4 Baseboards cost 模型错（择一→同时付）— 待 Sprint 5（alternative-cost 机制） | 1 张 / 0.5 day |
+| **P0** | A38 / A165 / A135 cost+prereq+breeding+sharedScoring — A38 cost ✅ PR-1B on branch sprint-1-pr-1b；A38 prereq + A165/A135 残留 | 3 张 / 1-2 day |
 | **P0** | D7/D8/D39/D53/D58+ prerequisite 注册"白买"bug | 5+ 张 / 1-2 day |
-| **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 | 12 张 / 2 day |
-| **P0** | B4 WoodPile gain 硬编码 + cost 错 | 1 张 / 0.5 day |
-| **P0** | E95 Miller cost 多 food:1 | 1 张 / 0.1 day |
+| **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 — ✅ PR-1B on branch sprint-1-pr-1b（C13 isBuyable discount + D83 altCosts 等转 Sprint 5） | 12 张 / 2 day |
+| **P0** | B4 WoodPile gain 硬编码 + cost 错 — cost ✅ PR-1B；gain 行为转 Sprint 5 | 1 张 / 0.5 day |
+| **P0** | E95 Miller cost 多 food:1 — ✅ PR-1B on branch sprint-1-pr-1b | 1 张 / 0.1 day |
 | **P0** | E149 MidnightFencer 实现 | 按 BGA `StartHarvest` listener 写完 / 2-3 day |
 | **P1** | B130/B150/B152 useActionSpace(other) 语义 | 3 张 / 1-2 day |
 | **P1** | A129/A139/A150/A151 行为偏差 | 4 张 / 1-2 day |
 | **P1** | D18/D117/D160 行为偏差 | 3 张 / 1 day |
 | **P1** | B27 Toolbox + B29 CookeryLesson | 2 张 / 0.5-1 day |
 | **P1** | E53 + B115 + B138 + B155 + C23 + C51 + B 牌组其余 11 张 | 17 张 / 2-3 day |
-| **P1** | B42 ForestInn vp + 守卫 | 1 张 / 0.3 day |
+| **P1** | B42 ForestInn vp + 守卫 — vp ✅ PR-1B；isBuyable round ≤ 6 守卫转 Sprint 5 | 1 张 / 0.3 day |
 | **P1** | A135 / C136 sharedScoring 机制 | 1-2 day（含通用扫描）|
 | **P1** | category 字段批量映射 | ~50 张 / 1-2 day |
 | **P1** | getExchangeResources helper 统一 | 8+ 张 / 1-2 day |
