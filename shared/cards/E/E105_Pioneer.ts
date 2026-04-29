@@ -56,7 +56,7 @@ export const E105_Pioneer = new Occupation({
   name: 'Pioneer',
   deck: 'E',
   number: 105,
-  category: 'GOODS_PROVIDER',
+  category: 'GOODS_-_GET',
   desc: [
     'When you play this card and each time before you use the most recent action space card, you get 1 building resource of your choice and 1 <FOOD>.',
   ],

@@ -8,7 +8,7 @@ export const C11_WildlifeReserve = new MinorImprovement({
   name: 'Wildlife Reserve',
   deck: 'C',
   number: 11,
-  category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+  category: 'FARM_PLANNER',
   desc: ['This card can hold up to 1 <SHEEP>, 1 <PIG>, and 1 <CATTLE>.'],
   cost: { wood: 2 },
   vp: 1,

@@ -18,7 +18,7 @@ export const B102_Consultant = new Occupation({
   name: 'Consultant',
   deck: 'B',
   number: 102,
-  category: 'RESOURCE_CLAY',
+  category: 'GOODS_PROVIDER',
   desc: ['When you play this card in a 1-/2-/3-/4- player game, you immediately get 2 <GRAIN>/3 <CLAY>/2 <REED>/2 <SHEEP>.'],
   cost: {},
   players: '1+',

@@ -19,7 +19,7 @@ export const E135_Pickler = new Occupation({
   name: "Pickler",
   deck: "E",
   number: 135,
-  category: "POINTS_PROVIDER",
+  category: "BONUS_POINTS_-_4_WOOD_CARD_COMPETITION",
   desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with the most total <VEGETABLE> gets 3 bonus <SCORE>.'],
   cost: {},
   players: "3+",

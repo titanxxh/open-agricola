@@ -42,7 +42,7 @@ export const C151_SowingDirector = new Occupation({
   name: 'Sowing Director',
   deck: 'C',
   number: 151,
-  category: 'ACTION_SPACE_EXTENDER',
+  category: 'ACTIONS_BOOSTER',
   desc: [
     'Each time after another player uses the __Grain Utilization__ action space, you get a __Sow__ action.',
   ],

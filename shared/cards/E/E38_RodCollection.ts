@@ -24,7 +24,7 @@ export const E38_RodCollection = new MinorImprovement({
   name: "Rod Collection",
   deck: "E",
   number: 38,
-  category: "POINTS_PROVIDER",
+  category: "BONUS_POINTS_-_GET",
   desc: ['Each time you use __Fishing__, you can place up to 2 <WOOD> on this card, irretrievably. During scoring, each such <WOOD> is worth 1 bonus <SCORE>, except the 1st, 4th, 7th, and 10th.'],
   cost: { wood: 1 },
   vp: 1,

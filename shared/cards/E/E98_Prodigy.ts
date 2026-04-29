@@ -8,7 +8,7 @@ export const E98_Prodigy = new Occupation({
   name: 'Prodigy',
   deck: 'E',
   number: 98,
-  category: 'POINTS_PROVIDER',
+  category: 'BONUS_POINTS_-_GET',
   desc: ['If this is your 1st occupation, you immediately get 1 <SCORE> for each improvement you have. (This will not apply to improvements played after this card.)'],
   players: '1+',
 })

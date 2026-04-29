@@ -9,7 +9,7 @@ export const B164_SheepWhisperer = new Occupation({
   name: 'Sheep Whisperer',
   deck: 'B',
   number: 164,
-  category: 'ANIMAL_HANDLER',
+  category: 'LIVESTOCK_PROVIDER',
   desc: ['Add 2, 5, 8, and 10 to the current round and place 1 <SHEEP> on each corresponding round space. At the start of these rounds, you get the <SHEEP>.'],
   cost: {},
   players: '4+',

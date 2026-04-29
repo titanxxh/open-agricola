@@ -9,7 +9,7 @@ export const C79_StoneCart = new MinorImprovement({
   name: "Stone Cart",
   deck: "C",
   number: 79,
-  category: "RESOURCE_STONE",
+  category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["Place 1 <STONE> on each remaining even-numbered round space. At the start of these rounds, you get the <STONE>."],
   cost: { wood: 2 },
   prerequisite: "2 Occupations",

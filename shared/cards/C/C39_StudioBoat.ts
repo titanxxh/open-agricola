@@ -73,7 +73,7 @@ export const C39_StudioBoat = new PlayerActionCard({
   name: 'Studio Boat',
   deck: 'C',
   number: 39,
-  category: 'FOOD_PROVIDER',
+  category: 'POINTS_PROVIDER',
   desc: [
     'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
   ],

@@ -36,7 +36,7 @@ export const E114_ShedBuilder = new Occupation({
   name: 'Shed Builder',
   deck: 'E',
   number: 114,
-  category: 'CROPS_GRAIN_AND_VEGETABLE',
+  category: 'CROPS_-_GRAIN_AND_VEGETABLE',
   desc: [
     'When you build your 1st and 2nd stable, you get 1 <GRAIN>. When you build your 3rd and 4th stable, you get 1 <VEGETABLE>. (This does not apply to stables you have already built.)',
   ],

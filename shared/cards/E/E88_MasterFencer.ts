@@ -9,7 +9,7 @@ export const E88_MasterFencer = new Occupation({
   name: 'Master Fencer',
   deck: 'E',
   number: 88,
-  category: 'FARMYARD_FENCING',
+  category: 'FARMYARD_-_FENCING',
   desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
   cost: {},
   players: '1+',

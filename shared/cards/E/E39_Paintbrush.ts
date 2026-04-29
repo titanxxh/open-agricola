@@ -9,7 +9,7 @@ export const E39_Paintbrush = new MinorImprovement({
   name: "Paintbrush",
   deck: "E",
   number: 39,
-  category: "POINTS_PROVIDER",
+  category: "BONUS_POINTS_-_GET",
   desc: ["Each harvest, you can exchange exactly 1 <CLAY> for your choice of 2 <FOOD> or 1 bonus <SCORE>."],
   cost: { wood: 1 },
   prerequisite: "1 Pig",

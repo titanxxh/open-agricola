@@ -9,7 +9,7 @@ export const E119_LandHeir = new Occupation({
   name: 'Land Heir',
   deck: 'E',
   number: 119,
-  category: 'RESOURCE_WOOD',
+  category: 'BUILDING_RESOURCES_-_WOOD_(AND_CLAY)',
   desc: ['If you play this card in round 4 or before, place 4 <WOOD> and 4 <CLAY> on the space for round 9. At the start of this round, you get the resources.'],
   players: '1+',
 })

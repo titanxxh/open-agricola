@@ -51,7 +51,7 @@ export const C153_PatternMaker = new Occupation({
   name: 'Pattern Maker',
   deck: 'C',
   number: 153,
-  category: 'BONUS_POINT_GENERATOR',
+  category: 'POINTS_PROVIDER',
   desc: [
     'Each time another player renovates, you can exchange exactly 2 <WOOD> for 1 <GRAIN>, 1 <FOOD>, and 1 bonus <SCORE>.',
   ],

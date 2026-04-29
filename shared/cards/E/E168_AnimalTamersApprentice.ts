@@ -10,7 +10,7 @@ export const E168_AnimalTamersApprentice = new Occupation({
   name: "Animal Tamer's Apprentice",
   deck: 'E',
   number: 168,
-  category: 'ANIMALS_ALL',
+  category: 'ANIMALS_-_ALL',
   desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house.'],
   cost: {},
   players: '4+',

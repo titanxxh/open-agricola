@@ -10,7 +10,7 @@ export const E3_TeaTime = new MinorImprovement({
   name: 'Tea Time',
   deck: 'E',
   number: 3,
-  category: 'ACTION_ENHANCER',
+  category: 'PASSING_-_ACTION_-_FARMYARD',
   desc: ['Immediately return your person on the __Grain Utilization__ action space home; you can place it again later this round.'],
   cost: { food: 1 },
   passing: true,
