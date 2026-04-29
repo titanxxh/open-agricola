@@ -64,7 +64,7 @@ const computeReplaceListener: CardListenerRegistration = {
 
 // BGA parity: agrarian fences also lets the player swap the BAKE half of
 // grain-utilization for a Build Fences action (or combine fence + bake).
-// See /data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/B/B26_AgrarianFences.php
+// See bga-agricola/modules/php/Cards/B/B26_AgrarianFences.php
 // onPlayerComputePlaceFarmerFlow — builds XOR(original, or(fence, sow), or(fence, bake)).
 const computeReplaceBakeListener: CardListenerRegistration = {
   id: 'B26-agrarian-fences-replace-bake-on-grain-utilization',
