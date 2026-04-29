@@ -22,7 +22,7 @@ export const B14_Hawktower_impl = {
     return queueFutureMeeplesFlow(state, {
       cardId: CARD_ID,
       playerId: player.id,
-      entries: [{ round: 12, resources: { stone: 1 } }],
+      entries: [{ round: 12, roomType: 'stone' }],
     })
   },
 },
