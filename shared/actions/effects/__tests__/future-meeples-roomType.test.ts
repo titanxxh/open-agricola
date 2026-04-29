@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  futureMeeplesAction,
   queueFutureMeeples,
   resolveFutureMeepleRequests,
 } from '../future-meeples'
+import { applyFutureMeeples } from '../../../logic/state-constants'
 import type { FarmTilePosition, GameState, PlayerState, Resource } from '../../../game/types'
 
 const emptyResources = (): Resource => ({
@@ -108,7 +108,7 @@ describe('future-meeples roomType resolution', () => {
     const beforeRooms = player.rooms
     const beforeTiles = player.roomTiles.length
 
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms + 1)
     expect(player.roomTiles.length).toBe(beforeTiles + 1)
@@ -130,7 +130,7 @@ describe('future-meeples roomType resolution', () => {
     const beforeRooms = player.rooms
     const beforeTiles = player.roomTiles.length
 
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms)
     expect(player.roomTiles.length).toBe(beforeTiles)
@@ -149,8 +149,7 @@ describe('future-meeples roomType resolution', () => {
     const fields = allTiles.slice(2).map((t) => ({
       row: t.row,
       col: t.col,
-      crop: null,
-      remaining: 0,
+      stacks: [],
     }))
     const player = createPlayer({ houseType: 'stone', roomTiles, fields })
     const state = createState(player, 1)
@@ -161,7 +160,7 @@ describe('future-meeples roomType resolution', () => {
     const beforeRooms = player.rooms
     const beforeTiles = player.roomTiles.length
 
-    futureMeeplesAction.execute({ state, params: {} } as never)
+    applyFutureMeeples(state)
 
     expect(player.rooms).toBe(beforeRooms)
     expect(player.roomTiles.length).toBe(beforeTiles)
