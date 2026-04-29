@@ -715,6 +715,7 @@ import { E145_Parvenu_impl } from './E/E145_Parvenu'
 import { E146_Reseller_impl } from './E/E146_Reseller'
 import { E147_AnimalDriver_impl } from './E/E147_AnimalDriver'
 import { E148_Lazybones_impl } from './E/E148_Lazybones'
+import { E149_MidnightFencer_impl } from './E/E149_MidnightFencer'
 import { E14_WoodSaw_impl } from './E/E14_WoodSaw'
 import { E150_RockBeater_impl } from './E/E150_RockBeater'
 import { E151_DeliveryNurse_impl } from './E/E151_DeliveryNurse'
@@ -1534,6 +1535,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E146_Reseller': E146_Reseller_impl,
   'E147_AnimalDriver': E147_AnimalDriver_impl,
   'E148_Lazybones': E148_Lazybones_impl,
+  'E149_MidnightFencer': E149_MidnightFencer_impl,
   'E14_WoodSaw': E14_WoodSaw_impl,
   'E150_RockBeater': E150_RockBeater_impl,
   'E151_DeliveryNurse': E151_DeliveryNurse_impl,
