@@ -47,7 +47,7 @@ export const C151_SowingDirector = new Occupation({
     'Each time after another player uses the __Grain Utilization__ action space, you get a __Sow__ action.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
 })
 
 export const C151_SowingDirector_impl = {

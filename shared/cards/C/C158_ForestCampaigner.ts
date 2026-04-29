@@ -63,7 +63,7 @@ export const C158_ForestCampaigner = new Occupation({
     'Each time before you place a person, if there are at least 8 <WOOD> total on accumulation spaces, you get 1 <FOOD>.',
   ],
   cost: {},
-  players: '1+',
+  players: '4+',
 })
 
 export const C158_ForestCampaigner_impl = {

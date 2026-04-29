@@ -64,7 +64,7 @@ export const A154_Paymaster = new Occupation({
     'Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
 })
 
 export const A154_Paymaster_impl = {
