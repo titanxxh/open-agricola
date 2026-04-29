@@ -36,6 +36,7 @@ export const A34_Loppers = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
+  extraVp: true,
 })
 
 export const A34_Loppers_impl = {

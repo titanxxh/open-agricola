@@ -65,6 +65,7 @@ export const A154_Paymaster = new Occupation({
   ],
   cost: {},
   players: '4+',
+  extraVp: true,
 })
 
 export const A154_Paymaster_impl = {

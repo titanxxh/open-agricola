@@ -21,6 +21,7 @@ export const A101_CookeryOutfitter = new Occupation({
   desc: ["During scoring, you get 1 bonus <SCORE> for each cooking improvement you have. (Ovens are not considered cooking improvements.)"],
   cost: {},
   players: "1+",
+  extraVp: true,
 })
 
 export const A101_CookeryOutfitter_impl = {

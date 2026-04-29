@@ -50,6 +50,7 @@ export const A153_PigOwner = new Occupation({
   desc: ['The first time after you play this card that you have 5 <PIG> on your farm, you immediately get 3 bonus <SCORE>.'],
   cost: {},
   players: '4+',
+  extraVp: true,
 })
 
 export const A153_PigOwner_impl = {

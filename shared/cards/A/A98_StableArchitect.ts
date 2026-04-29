@@ -12,6 +12,7 @@ export const A98_StableArchitect = new Occupation({
   desc: ["During scoring, you get 1 bonus <SCORE> for each unfenced stable in your farmyard."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })
 
 export const A98_StableArchitect_impl = {

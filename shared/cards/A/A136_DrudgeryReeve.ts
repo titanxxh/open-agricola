@@ -20,6 +20,7 @@ export const A136_DrudgeryReeve = new Occupation({
   desc: ["If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with 1+/2+/3+ building resources of each type gets 1/3/5 bonus <SCORE>."],
   cost: {},
   players: "3+",
+  extraVp: true,
 })
 
 export const A136_DrudgeryReeve_impl = {

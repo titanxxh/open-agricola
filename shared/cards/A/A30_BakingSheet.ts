@@ -34,6 +34,7 @@ export const A30_BakingSheet = new MinorImprovement({
   cost: {},
   prerequisite: 'No Grain Field',
   newSet: true,
+  extraVp: true,
 })
 
 export const A30_BakingSheet_impl = {
