@@ -39,14 +39,15 @@
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 38 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134） | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 56 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
-| 🔀 刻意偏离 BGA（§2.5） | 4 张（2026-04-28 全部复核取舍今天仍成立） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
-| ⏳ 待实现 / 待评估（§2.6） | 多张（深度池 D159 + E149；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
+| 🔀 刻意偏离 BGA（§2.5） | 10 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
 
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 3 done — E149 MidnightFencer implemented as deliberate divergence — onStartHarvest at round 14 offers 0..2×(N−1) midnight fences, each = +1 raw VP via cardStates.owedFences. BGA's fence-segment placement deferred to fence-system rewrite. — see commit on branch sprint-3-e149**
 - **2026-04-29 Sprint 2.5 skipped — 5 BeforeEndOfGame interactive cards (A136/C133/C99/D132/E132) registered as deliberate divergence in §2.5 — auto-max in TS is mathematically equivalent to BGA player optimum (resources reserved at scoring time have no other use). Saves ~4 day for Sprint 3-6 work. — see master-plan.md §8 Sprint 2.5 row**
 - **2026-04-29 Sprint 2 done — total 7 cards (B116/A165/B133/D60/B14/D138/E134) + 2 mechanism extensions (onBeforeEndGame hook + future-meeples roomType) — see master-plan.md §8**
 - **2026-04-29 Sprint 2 PR-2D done — E134 Omnifarmer — implemented full deposit-on-harvest state machine via existing `onAfterReap` / `onHarvestFeedingPhase` / `onAfterHarvest` effect hooks + `resolveChoice` returning follow-up `payLeaf`; storedGoods stored in `cardStates[CARD_ID].extraData`, `usedThisHarvest` enforces once-per-harvest; computeBonusScore vpMap[2..5]=3/5/7/9 — see commit on branch sprint-2-pr-2d**
@@ -273,7 +274,7 @@
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（4 张；2026-04-28 复核取舍今天仍成立）
+### 2.5 🔀 刻意偏离 BGA（10 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -292,12 +293,13 @@
 | C99 GardenDesigner（2026-04-29 Sprint 2.5 skip） | 每空 field 玩家选 1F/4F/7F → 1/2/3 VP | auto-max 贪心 7→4→1 跨空 fields | scoring 单调最优；可能在某些 food 数量精确分配场景与 BGA 玩家略不同（玩家可选偏好次优解），影响 ≤ 1-2 VP | 加 per-field XOR pending prompt |
 | D132 HideFarmer（2026-04-29 Sprint 2.5 skip） | 玩家选 hide 几个未用 farmyard（付等量 food，抵扣等量 -1 VP penalty）| `computePostScore` auto-max — `min(food, penalty)` 全 hide | scoring 阶段 food 已无其他用途；hide N 个 = 净 +N VP - 0 effective food cost；auto-max 严格最优 | 加 hide-N-spaces pending prompt |
 | E132 VeggieLover（2026-04-29 Sprint 2.5 skip） | 玩家选 0/1/2/3 套 (1G+1V→2 / 2G+2V→4 / 3G+3V→6 VP) | auto-max — `min(grain, veg, 3)` 套 + `ctx.reserved` | grain/vegetable 在 scoring 单独 category 计分（每个 1 VP up to 4），换 2VP 套相比保留 grain/veg 的 raw VP 几乎总不亏（每套 +2VP - 2 raw VP 资源 = 0 净；3 套 +6 - 6 = 0）；多数情况无差异 | 加 1/2/3 套 XOR pending prompt |
+| E149 MidnightFencer（2026-04-29 Sprint 3） | 第 14 轮 StartHarvest 触发 fencing flow，让玩家从对手 unbuilt fences 中拿最多 2 段免费放在自己农场（可超过 15 段上限），围出新 pasture 拿 VP | onStartHarvest 弹 choice 0..2×(numPlayers−1)，每选 K 在 `cardStates.E149.extraData.owedFences` 累加 K，`computeBonusScore` 直接 +K 原始 VP；`offered` 标记防止重触发 | 端的 fencing action 是 UI stub（`shared/actions/effects/fencing.ts:65-72`），fence 系统不模型化"每玩家围栏储备"；要复刻 BGA 玩家选边放置流程需要 fence 系统重写（≥1 周），远超 master-plan §8 Sprint 3 的 3 day 估算；数量级合理（4p max +6 VP ≈ BGA 1-2 pastures × 1-3 VP = 1-6 VP；略高估但在范围内） | 重写 fence 系统：引入"reserve fences per player"模型 + fencing flow 支持"midnight 模式跳付费 + 跨玩家 source"，再把 E149 切回 BGA 行为 |
 
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 
 > **历史记录**：~~E132 VeggieLover~~ 之前被误标为"刻意不同"。实际上它是 BGA 3+ 人卡（不是 5+），desc 与行为（harvest 1G+1V→6F、scoring 1/2/3 stack→2/4/6 VP）都已与 BGA 对齐。2026-04-17 移除。
 
-### 2.6 ⏳ 待实现 / 待评估（2 张）
+### 2.6 ⏳ 待实现 / 待评估（1 张）
 
 #### Tier 1 — BGA 自身无逻辑，我们也无逻辑（数据 only）
 
@@ -310,13 +312,12 @@
 
 #### Tier 2 — BGA 有完整实现，我们仍缺
 
-| Card | 类型 | BGA 关键点 | 我们的状态 | 优先级 |
-|---|---|---|---|---|
-| E149 Midnight Fencer | Occupation | `StartHarvest` listener，第 14 轮跨玩家拿围栏，可超过 15 上限 | 未做；最复杂剩余 | MED-HIGH |
+（暂无）
 
 > `D155_Ebonist`、`D103_CanalBoatman`、`E93_Motivator` 已于 2026-04-17 收口。
 > `E96 Elder` 已于 2026-04-19 通过新增的 `handHooks` 机制实现回合 1 免费打出自身。
 > `E125 DelayedWayfarer` 已于 2026-04-18 通过新增的 `onAllWorkersPlaced` 阶段 hook + `place-farmer fromSupply` 模式对齐 BGA 时序。
+> `E149 MidnightFencer`（2026-04-29 Sprint 3）已迁出至 §2.5：实现为刻意偏离（onStartHarvest 给 K 个 owedFences = +K raw VP），BGA 围栏放置流程待 fence 系统重写后回归。
 
 ---
 
