@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 5 PR-5 partial done — 7 P1 behavior bugs fixed (high-ROI subset); remaining 21 deferred to follow-up (need wider mechanism work or >1h fix each, tracked in §2.3). Cards fixed: A150 Stagehand (drop maxRooms cap + players 4+), A139 HollowWarden (match both hollow / hollow-4 spaces), D18 SteamPlow (drop sow leaf), D160 Midwife (first-farmer guard), B42 ForestInn (maxRound: 6), B4 WoodPile (gain wood per accumulation space with my farmer), C39 StudioBoat (occupationPrerequisites: { min: 1 } enforce). Each fix: red test → green fix commit pair; lint + build + reaches + prompt-sync all green; fast/slow tests 264+262 files passing. — see branch sprint-5-batch**
 - **2026-04-29 Sprint 4 done — PR-4A A135/C136 sharedScoring + PR-4B 178 cards category alignment + PR-4C skipped (audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed). Total ~1 day actual vs 5 day estimate. — see master-plan.md §8**
 - **2026-04-29 Sprint 4 PR-4B done — 178 cards' `category` field aligned to BGA naming (UI grouping only, no behavior). Major rename groups: `RESOURCE_*` → `BUILDING_RESOURCE_PROVIDER` / `BUILDING_RESOURCES_-_*`; `ANIMAL_HANDLER` / `ANIMAL_FARMER` → `LIVESTOCK_PROVIDER` (or per-card `ANIMALS_-_*`); `FOOD_MISC` → `FOOD_PROVIDER` / `FOOD` / `GOODS_-_GET`; `ACTION_ENHANCER` / `ACTION_SPACE_EXTENDER` → `ACTIONS_BOOSTER` / `ACTION_-_*`; `BONUS_POINT_GENERATOR` / `BONUS_POINTS_GET` → `BONUS_POINTS_-_GET`; `FARM_BUILDER` → `FARM_PLANNER` / `PASSING_-_FARMYARD`; CROPS / FOOD_GRAIN sub-bucket renames per BGA. Each card matched against its BGA `$this->category` literal; the alignment test exhaustively covers all 178 IDs. — see branch sprint-pr-4b**
 - **2026-04-29 Sprint 4 PR-4A — A135 AnimalReeve + C136 RanchProvost sharedScoring via existing `computeSharedPostScore` hook (no framework changes)**: A135 awards 0/1/3/5 VP per player based on `min(sheep, boar, cattle, 4)` set count (BGA `[0,0,1,3,5]` map); C136 awards 3 VP to every player tied for max pasture capacity (computed via `computeAnimalZones` filter on `pasture` zoneType). Both apply to every player including the owner. Tests in `server/__tests__/Sprint4-sharedScoring.test.ts` (12 cases). §2.3 wide-scan A135 sharedScoring entry resolved. — see commit on branch sprint-pr-4a
@@ -205,8 +206,8 @@
 | 卡牌 | 关键发现 | 优先级 |
 |---|---|---|
 | **A129 Swagman** | farm-expansion 用 OR 而 BGA 是 SEQ；未设 once-per-turn flag | P1 |
-| **A139 Hollow Warden** | 仅匹配 `hollow-4`，3+人模式下其它 hollow 累积格漏触发 | P1 |
-| **A150 Stagehand** | construct 硬编码 `maxRooms:1`，BGA 不限制 | P1 |
+| **A139 Hollow Warden** | 仅匹配 `hollow-4`，3+人模式下其它 hollow 累积格漏触发 — ✅ Sprint 5 PR-5 (listener now matches { hollow, hollow-4 }; +3p session test) | P1 |
+| **A150 Stagehand** | construct 硬编码 `maxRooms:1`，BGA 不限制 — ✅ Sprint 5 PR-5 (drop maxRooms cap + players: '4+'; test asserts maxSelections > 1) | P1 |
 | **A151 Minstrel** | sheep-market gain 未清累积；grain-utilization 用 OR 而 BGA 是 SEQ 允许同时 sow+bake | P1 |
 | **B27 Toolbox** | 每次构建都触发，未实现"turn 末一次性"语义 | P1 |
 | **B29 CookeryLesson** | "same turn" 被错误扩展成 "same round" | P1 |
@@ -216,19 +217,41 @@
 | **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 |
 | **C23** | 触发条件偏差 | P1 |
 | **C51 FishingNet** | 没真正从 trigger player 扣 food | P1 |
-| **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）| P1 |
+| **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）— ✅ Sprint 5 PR-5 (drop sow leaf; seq now pay + plow only) | P1 |
 | **D117 WoodExpert** | 强制扣 1 食物替换 wood，BGA 是给 alternative trade 让玩家选（应改用 `Bonus.optional`）| P1 |
-| **D160 Midwife** | 缺"对手本轮首个 farmer"守卫，违反 desc 文本 | P1 |
+| **D160 Midwife** | 缺"对手本轮首个 farmer"守卫，违反 desc 文本 — ✅ Sprint 5 PR-5 (listener checks `getRoundPlacementOrder(opponent).length === 1` in 'after' phase) | P1 |
 | **E53** | 缺 E85 联动 + meeple-id 跟踪 | P1 |
-| **E149 MidnightFencer** | stub-only（文件存在但 effect/listener 全无；与 §2.6 自报一致）| P0 |
+| **E149 MidnightFencer** | stub-only（文件存在但 effect/listener 全无；与 §2.6 自报一致）— ✅ Sprint 3 done (rechecked: full onStartHarvest offer-flow + cardStates owedFences + computeBonusScore already in place; was misclassified as stub) | P0 |
 
 **连带 finding**（不在深度池但 agent 顺带报）：
 - **D12 ↔ D148 互斥未实现**：BGA 明确 `NEGATED_BY_MILKING_PLACE`，我方 D12 仅过滤 'house' 不过滤 D148 zone — P2
 
 **Sprint 1 PR-1B 残留 behavior（cost/vp 已修，但行为分支待 Sprint 5）**：
-- **B4 WoodPile** — gain 仍硬编码 `wood: 3`，应改为"累积格上 farmer 数"；cost 字段已对齐 ✅ PR-1B — P1
-- **B42 ForestInn** — round ≤ 6 的 `isBuyable` 守卫未实现；vp 元数据已补 ✅ PR-1B — P1
-- **C39 StudioBoat** — `prerequisite` enforce（"Build a fishing pond/wooden hut etc."） 未注册 handler；cost 已对齐 ✅ PR-1B — P1
+- **B4 WoodPile** — gain 仍硬编码 `wood: 3`，应改为"累积格上 farmer 数"；cost 字段已对齐 ✅ PR-1B — ✅ Sprint 5 PR-5 (onBuy now scans state.actionSpaces, filters gainPerRound non-empty, counts spaces with my farmer)
+- **B42 ForestInn** — round ≤ 6 的 `isBuyable` 守卫未实现；vp 元数据已补 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `maxRound: 6`, picked up by existing meetsCardPrerequisites pipeline)
+- **C39 StudioBoat** — `prerequisite` enforce（"Build a fishing pond/wooden hut etc."） 未注册 handler；cost 已对齐 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `prerequisite: '1 Occupation'` + `occupationPrerequisites: { min: 1 }`; BGA's printed text is "1 Occupation", not the fishing-pond text mentioned in audit)
+
+**Sprint 5 PR-5 deferred to follow-up (21 cards)**:
+
+The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 hour of work or wider mechanism changes; tracked here so a future PR can pick them up:
+
+- **A129 Swagman** — needs SEQ semantics + once-per-turn flag covering both spaces; current OR + flag implementation doesn't model "use the other space directly with the same person"
+- **A151 Minstrel** — sheep-market accumulation clearance + grain-utilization SEQ-vs-OR re-check (audit's claim of OR-vs-SEQ contradicts BGA `ActionGrainUtilization` which is also `NODE_OR + forcePassAfterOne`); needs second pass to either close as already-correct or implement accumulation clearing
+- **B27 Toolbox** — needs once-per-turn semantics with onEndTurn cleanup; current implementation fires on every construct
+- **B29 CookeryLesson** — needs `turnId` (per-placement) tracking instead of `cookedThisRound` (per-round) — requires per-action-token state machine extension
+- **B115 Tinsmith** — multi-field: "+1 to each field" requires per-field iteration in the listener
+- **B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism for "execute another space's flow with the same person"; needs new helper or hook design
+- **B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food (audit flagged as "must confirm")
+- **B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths
+- **C23** — triggering condition deviation (need re-read of BGA file to identify)
+- **C51 FishingNet** — actually deduct trigger-player food
+- **D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade
+- **E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work
+- **B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read
+- **A1 Shelter, A22 Telegram, A38 WoolBlankets, A165 PigBreeder** wide-scan items — already partially fixed in Sprint 2 PR-2A; remaining tail not in this PR's scope
+- **E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"
+
+These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-day batch of medium-complexity items (B27 / B29 / B115 / D117) for a follow-up Sprint 5b.
 
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
