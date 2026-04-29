@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-const BGA_AVAILABLE = fs.existsSync('/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/A')
+const BGA_AVAILABLE = fs.existsSync('../bga-agricola/modules/php/Cards/A')
 const describeBga = BGA_AVAILABLE ? describe : describe.skip
 import {
   parseArgs,
@@ -27,7 +27,7 @@ describe('parseArgs', () => {
   it('uses defaults when no args provided', () => {
     expect(parseArgs([], {})).toEqual({
       ourCardsDir: 'shared/cards',
-      bgaCardsDir: '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+      bgaCardsDir: '../bga-agricola/modules/php/Cards',
       outputPath: 'output/tmp/audit-card-arch-2026-04-28.jsonl',
       strict: false,
     })
@@ -49,7 +49,7 @@ describeBga('discoverCardPairs', () => {
   it('matches our TS files to BGA PHP files by cardId', () => {
     const pairs = discoverCardPairs(
       'shared/cards',
-      '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+      '../bga-agricola/modules/php/Cards',
     )
 
     expect(pairs.both.length).toBeGreaterThan(800)
@@ -63,7 +63,7 @@ describeBga('discoverCardPairs', () => {
   it('reports BGA-only cards (we missed)', () => {
     const pairs = discoverCardPairs(
       'shared/cards',
-      '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+      '../bga-agricola/modules/php/Cards',
     )
     // E80 is BGA-only at this snapshot (we have not implemented it yet)
     const bgaOnly = pairs.bgaOnly.find(c => c.cardId === 'E80')
@@ -77,7 +77,7 @@ describeBga('scanCard (skeleton)', () => {
       cardId: 'A123',
       deck: 'A',
       ourPath: 'shared/cards/A/A123_FrameBuilder.ts',
-      bgaPath: '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/A/A123_FrameBuilder.php',
+      bgaPath: '../bga-agricola/modules/php/Cards/A/A123_FrameBuilder.php',
     })
 
     expect(result.cardId).toBe('A123')
@@ -325,7 +325,7 @@ describeBga('runAudit (smoke)', () => {
     const out = path.join('output', 'tmp', 'audit-smoke.jsonl')
     runAudit({
       ourCardsDir: 'shared/cards',
-      bgaCardsDir: '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+      bgaCardsDir: '../bga-agricola/modules/php/Cards',
       outputPath: out,
       strict: false,
     })

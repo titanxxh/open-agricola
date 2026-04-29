@@ -7,7 +7,7 @@
  *   pnpm tsx scripts/audit-card-architecture.ts --strict   # 任一信号命中即 exit 1
  *
  * env：
- *   BGA_CARDS_DIR  默认 /data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards
+ *   BGA_CARDS_DIR  默认 ../bga-agricola/modules/php/Cards（与 vite.config.ts BGA_IMAGE_DIR 同约定，相对仓库根）
  *   OUR_CARDS_DIR  默认 shared/cards
  */
 
@@ -24,7 +24,7 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env): ParsedArgs {
   return {
     ourCardsDir: env.OUR_CARDS_DIR ?? 'shared/cards',
-    bgaCardsDir: env.BGA_CARDS_DIR ?? '/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards',
+    bgaCardsDir: env.BGA_CARDS_DIR ?? '../bga-agricola/modules/php/Cards',
     outputPath: 'output/tmp/audit-card-arch-2026-04-28.jsonl',
     strict: argv.includes('--strict'),
   }
