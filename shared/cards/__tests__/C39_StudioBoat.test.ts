@@ -237,3 +237,29 @@ describe('C39_StudioBoat', () => {
     })
   })
 })
+
+describe('C39_StudioBoat prerequisite (BGA: 1 Occupation min)', () => {
+  it('declares occupationPrerequisites: { min: 1 }', async () => {
+    const { C39_StudioBoat } = await import('../C/C39_StudioBoat')
+    expect(C39_StudioBoat.occupationPrerequisites).toEqual({ min: 1 })
+  })
+
+  it('declares prerequisite text "1 Occupation"', async () => {
+    const { C39_StudioBoat } = await import('../C/C39_StudioBoat')
+    expect(C39_StudioBoat.prerequisite).toBe('1 Occupation')
+  })
+
+  it('meetsCardPrerequisites: 0 occupations → false', async () => {
+    const { C39_StudioBoat } = await import('../C/C39_StudioBoat')
+    const { meetsCardPrerequisites } = await import('../helpers/prerequisites')
+    const player = { occupationPlayed: [], minorPlayed: [], improvements: [], cardStates: {} } as unknown as PlayerState
+    expect(meetsCardPrerequisites(player, C39_StudioBoat, 1)).toBe(false)
+  })
+
+  it('meetsCardPrerequisites: 1 occupation → true', async () => {
+    const { C39_StudioBoat } = await import('../C/C39_StudioBoat')
+    const { meetsCardPrerequisites } = await import('../helpers/prerequisites')
+    const player = { occupationPlayed: ['Some_Occ'], minorPlayed: [], improvements: [], cardStates: {} } as unknown as PlayerState
+    expect(meetsCardPrerequisites(player, C39_StudioBoat, 1)).toBe(true)
+  })
+})
