@@ -11,7 +11,7 @@ export const C134_CowPrince = new Occupation({
   category: "POINTS_PROVIDER",
   desc: ["During scoring, you get 1 bonus <SCORE> for each space in your farmyard (including rooms) holding at least 1 <CATTLE>."],
   cost: {},
-  players: "1+",
+  players: "3+",
 })
 
 export const C134_CowPrince_impl = {

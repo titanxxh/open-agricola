@@ -51,7 +51,7 @@ export const A160_Lutenist = new Occupation({
     'Each time another player uses the __Traveling Players__ accumulation space, you get 1 <FOOD> and 1 <WOOD>. Immediately after, you can buy exactly 1 <VEGETABLE> for 2 <FOOD>.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
   newSet: true,
 })
 

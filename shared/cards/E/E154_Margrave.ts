@@ -26,7 +26,7 @@ export const E154_Margrave = new Occupation({
   category: "POINTS_PROVIDER",
   desc: ['Once you live in a stone house, you get 2 <FOOD> each time any player renovates and, during scoring, 1 bonus <SCORE> for each wood house and clay house.'],
   cost: {},
-  players: "3+",
+  players: "4+",
 })
 
 export const E154_Margrave_impl = {
