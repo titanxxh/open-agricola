@@ -12,7 +12,7 @@ export const D84_FeedPellets = new MinorImprovement({
   name: "Feed Pellets",
   deck: "D",
   number: 84,
-  category: "FOOD_PROVIDER",
+  category: "LIVESTOCK_PROVIDER",
   desc: ['When you play this card, you immediately get 1 <SHEEP>. In the feeding phase of each harvest, you can exchange exactly 1 <VEGETABLE> for 1 animal of a type you already have.'],
   cost: {},
 })

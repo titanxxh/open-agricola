@@ -41,7 +41,7 @@ export const E108_BlackberryFarmer = new Occupation({
   name: 'Blackberry Farmer',
   deck: 'E',
   number: 108,
-  category: 'FOOD_PROVIDER',
+  category: 'FOOD',
   desc: [
     'Each time you build fences, place 1 <FOOD> on each remaining round space, up to the number of fences just built. At the start of these rounds, you get the <FOOD>.',
   ],

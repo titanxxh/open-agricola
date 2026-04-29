@@ -69,7 +69,7 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
         const round = clampRound(entry.round)
         if (round <= state.round) continue
         const resources: Partial<Resource> = {}
-        addResourceCounts(resources, entry.resources)
+        if (entry.resources) addResourceCounts(resources, entry.resources)
         nextEntries.push({
           id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
           cardId: request.cardId,
@@ -77,6 +77,7 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
           round,
           actionId: state.roundActionOrder[round - 1] ?? null,
           resources,
+          ...(entry.roomType ? { roomType: entry.roomType } : {}),
         })
       }
     } else {

@@ -15,6 +15,7 @@ export const A29_AleBenches = new MinorImprovement({
   prerequisite: "2 Occupations",
   occupationPrerequisites: {"min":2},
   newSet: true,
+  extraVp: true,
 })
 
 export const A29_AleBenches_impl = {

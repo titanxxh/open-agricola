@@ -41,6 +41,7 @@ export const A39_Chapel = new PlayerActionCard({
   cost: {"wood":3,"clay":2},
   prerequisite: "2 Occupations",
   occupationPrerequisites: {"min":2},
+  extraVp: true,
 })
 
 export const A39_Chapel_impl = {

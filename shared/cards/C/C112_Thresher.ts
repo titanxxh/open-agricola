@@ -45,7 +45,7 @@ export const C112_Thresher = new Occupation({
   name: 'Thresher',
   deck: 'C',
   number: 112,
-  category: 'FOOD_PROVIDER',
+  category: 'CROP_PROVIDER',
   desc: [
     'Immediately before each time you use the __Grain Utilization__, __Farmland__, or __Cultivation__ action space, you can buy 1 <GRAIN> for 1 <FOOD>.',
   ],

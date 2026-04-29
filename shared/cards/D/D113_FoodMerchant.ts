@@ -10,7 +10,7 @@ export const D113_FoodMerchant = new Occupation({
   name: 'Food Merchant',
   deck: 'D',
   number: 113,
-  category: 'FOOD_PROVIDER',
+  category: 'CROP_PROVIDER',
   desc: [
     'For each <GRAIN> you harvest from a field, you can buy 1 <VEGETABLE> for 3 <FOOD>. If you harvest the last <GRAIN> from a field, the <VEGETABLE> costs you only 2 <FOOD>.',
   ],

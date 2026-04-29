@@ -2,10 +2,16 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D58_Gritter'
+
+registerPrerequisite('Play in Round 5 or Later', (_player, state) => {
+  if (!state) return true
+  return state.round >= 5
+})
 
 // D58 Gritter: At the end of each action in which you sow vegetables in a field,
 // you get 1 FOOD for each vegetable field you have (including the new ones).

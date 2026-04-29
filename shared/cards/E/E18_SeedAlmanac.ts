@@ -38,7 +38,7 @@ export const E18_SeedAlmanac = new MinorImprovement({
   name: 'Seed Almanac',
   deck: 'E',
   number: 18,
-  category: 'FARMYARD_PLOWING',
+  category: 'FARMYARD_-_PLOWING',
   desc: [
     'Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 field.',
   ],

@@ -53,7 +53,7 @@ export const C149_ResourceRecycler = new Occupation({
   name: 'Resource Recycler',
   deck: 'C',
   number: 149,
-  category: 'ACTIONS_BOOSTER',
+  category: 'FARM_PLANNER',
   desc: [
     'Each time another player renovates to stone, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost.',
   ],

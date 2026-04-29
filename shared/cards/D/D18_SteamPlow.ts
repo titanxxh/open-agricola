@@ -28,13 +28,6 @@ export const D18_SteamPlow_impl = {
       children: [
         payLeaf({ cardId: CARD_ID, cost: { wood: 2, food: 1 } }),
         { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
-        {
-          type: 'leaf',
-          actionId: 'sow',
-          sourceCard: CARD_ID,
-          optional: true,
-          actionContext: { trueAction: false },
-        },
       ],
     }
   },

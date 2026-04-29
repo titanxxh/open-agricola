@@ -59,12 +59,13 @@ export const A154_Paymaster = new Occupation({
   name: 'Paymaster',
   deck: 'A',
   number: 154,
-  category: 'BONUS_POINT_GENERATOR',
+  category: 'POINTS_PROVIDER',
   desc: [
     'Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
+  extraVp: true,
 })
 
 export const A154_Paymaster_impl = {

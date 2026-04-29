@@ -8,7 +8,7 @@ export const E2_RenovationMaterials = new MinorImprovement({
   name: 'Renovation Materials',
   deck: 'E',
   number: 2,
-  category: 'FARM_BUILDER',
+  category: 'PASSING_-_ACTION_-_FARMYARD',
   desc: ['Immediately renovate to clay at no cost. (You must pay the cost of this card though.)'],
   cost: { clay: 3, reed: 1 },
   passing: true,

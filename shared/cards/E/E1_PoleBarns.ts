@@ -8,7 +8,7 @@ export const E1_PoleBarns = new MinorImprovement({
   name: 'Pole Barns',
   deck: 'E',
   number: 1,
-  category: 'FARM_BUILDER',
+  category: 'PASSING_-_FARMYARD',
   desc: ['You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)'],
   cost: { wood: 2 },
   passing: true,

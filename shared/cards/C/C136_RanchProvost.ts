@@ -1,5 +1,6 @@
 import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { computeAnimalZones } from '../../actions/effects/animals'
 
 const CARD_ID = 'C136_RanchProvost'
 
@@ -32,8 +33,18 @@ export const C136_RanchProvost_impl = {
       params: { wood: toGain },
     }
   },
-  // TODO: computeBonusScore: each player with a pasture of highest capacity gets 3 bonus score.
-  // This requires checking all players' pastures, which is a shared scoring effect.
+  computeSharedPostScore: (state) => {
+    const bestPerPlayer = state.players.map((player) => {
+      const zones = computeAnimalZones(player)
+      const pastureCaps = zones.filter((z) => z.zoneType === 'pasture').map((z) => z.capacity)
+      return pastureCaps.length > 0 ? Math.max(...pastureCaps) : 0
+    })
+    const max = Math.max(...bestPerPlayer)
+    if (max <= 0) return []
+    return state.players.flatMap((player, idx) =>
+      bestPerPlayer[idx] === max ? [{ playerId: player.id, score: 3 }] : [],
+    )
+  },
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

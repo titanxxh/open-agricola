@@ -23,8 +23,8 @@
 |---|---|---|---|---|
 | ✅ 完全对齐 | 64 | 475 + 48 ⚪ | **587** | **67%** |
 | 🟡 简化实现 | 40 | 90 | **130** | 15% |
-| ⚠ 行为偏差 | 18 | 26 | **44** | 5% |
-| ❌ 数值/元数据 | 13 | 70 | **83** | 9% |
+| ⚠ 行为偏差 | 18 | 26 | **39**（PR-1C −5：D7/D8/D39/D53/D58 prereq 注册） | 4% |
+| ❌ 数值/元数据 | 6 | 66 | **57**（PR-1A −10、PR-1B −16） | 6% |
 | 🔀 刻意偏离 | 4 | 1 | **5** | 1% |
 | 🔍 待 owner | 1 | 13 | **14** | 2% |
 
@@ -41,9 +41,9 @@
    - **D138 PetLover** — `noop` xor 选项不取消原始 collect，玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain
    - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener 写入此字段，分数永远不触发
 
-2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **83 张**。
-   - **11 张 players 字段错**（深度 7 + wide 4）：A154/A158/A160 + C151/C152/C153/C163 + 新增 A154 重复确认 + E154 + C134 + C158——全是 `'3+'` 应 `'4+'` 同模式，破坏 2026-04-25 落地的卡池过滤
-   - **12+ 张 cost 错**：A4 Baseboards（择一→同时付）、A38 WoolBlankets、C3/C13/C33/C35/C48、D24/D29/D39/D83/D30、E32（stone 误为 clay）、E34（缺 cost）、E95、B4、B42
+2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **57 张**（原报 83 张；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp，见 §1 verdict 表已修订为 57）。
+   - **11 张 players 字段错**（深度 7 + wide 4，去重后实为 10 张唯一卡）：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158——全是 `'3+'` 应 `'4+'` 同模式，破坏 2026-04-25 落地的卡池过滤 — ✅ PR-1A on branch sprint-1-pr-1a（10 张全部已修，剩 0 张 players 残留）
+   - **12+ 张 cost 错** — A4 / D83（alternative-cost 机制）、C13（isBuyable discount）残留转 Sprint 5；其余 11 张 cost/vp 字段已 ✅ PR-1B on branch sprint-1-pr-1b：A38 WoolBlankets、C3/C33/C35/C48、D24/D29/D39、E32（stone 误为 clay）、E34（缺 cost）、E95、B4、B42
    - **~50 张 category 字段批量不齐**（B/C/D 三副系统性问题——schema 级而非单卡 bug）
    - **22 张缺 `extraVp` 元数据**（A 牌组，仅展示用）
 
@@ -51,7 +51,7 @@
 
 4. **§2.5 4 张刻意偏离全部通过复核**：B85 / C22 / D161 / E16 当初 owner 签字的取舍今天仍然成立。
 
-5. **prerequisite 注册系统性缺失**（D 牌组发现）：D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅写在 `prerequisite` 字符串、未注册到 `prerequisite-registry`。玩家"白买"——支付费用但 onBuy 不触发预期效果。**P0**
+5. **prerequisite 注册系统性缺失**（D 牌组发现）：D7/D8/D39/D53/D58 等 5+ 张 buyable 条件仅写在 `prerequisite` 字符串、未注册到 `prerequisite-registry`。玩家"白买"——支付费用但 onBuy 不触发预期效果。**P0** — ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c（5 张 D 卡 prereq handler 已注册；`meetsTextPrerequisite` 增加 whole-string 自定义查找，支持 D8 含 "and" 的 prereq）
 
 6. **sharedScoring 机制不完备**：A135 AnimalReeve / C136 RanchProvost 都声明 `sharedScoring=true` 但 `computeBonusScore` 没写。
 
@@ -215,6 +215,8 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 | **E95 Miller** | Occupation 卡多了 `cost: { food: 1 }`，BGA 端没有该字段 |
 
 > **重大警示**：A154/A158/A160 + C151/C152/C153/C163 共 7 张 `players` 字段错误，会让 2026-04-25 落地的"卡池按人数过滤"逻辑出现 false-positive——这些卡会进 3 人局卡池但 BGA 限定 4+。**优先级 P0**。
+>
+> ✅ **已由 Sprint 1 PR-1A 修复**（branch `sprint-1-pr-1a`）：A154/A158/A160 + C151/C152/C153/C163 共 7 张深度池 players 字段错全部已修。本节标题"13 张"为 PR-1A 之前的初始统计未减——实际剩 6 张待修（A14、B4、B42、C30、C39、C59、E95 中的 cost/vp 类，详见 §1 verdict 表已更新为深度池 6 张），由后续 PR 处理。
 
 ### 4.5 🔀 刻意偏离（4 张，与 §2.5 比对）
 
@@ -270,7 +272,7 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 
 **E 牌组（5 张）**：E134 Omnifarmer + 4 张 E 详细列表见 `output/tmp/audit-agent-b10.md`
 
-### 5.3 ❌ 数值/元数据偏差 wide-scan 新增（70 张）
+### 5.3 ❌ 数值/元数据偏差 wide-scan 新增（70 张；PR-1A 已修 3 张 players → 实际剩 67 张）
 
 **P0 cost 偏差（12 张）**：
 
@@ -289,8 +291,8 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 | **E32** | cost 类型错（BGA `STONE=>2,REED=>1`，TS 写成 `clay:2, reed:1`，stone 误为 clay） |
 | **E34** | 缺 cost（BGA `WOOD=>1`，TS `cost: {}`） |
 
-**P0 players 字段错（4 张，与深度池 7 张同模式）**：
-- A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+
+**P0 players 字段错（4 张，与深度池 7 张同模式）** — ✅ 全部已修，Sprint 1 PR-1A on branch sprint-1-pr-1a：
+- A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+（注：A154 在深度池 §4.4 已计入并已修，wide-scan 这条为重复确认；PR-1A 实际唯一修复 = E154/C134/C158 共 3 张 wide-scan 新增 + 7 张深度池 = 合计 10 张）
 
 **P1 prerequisite/altCosts 缺失（多张）**：
 - D83 缺 altCosts grain:1 / D30 缺 prerequisite "3 Occupations"
@@ -314,6 +316,8 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 D7/D8/D39/D53/D58 等卡的 buyable 守卫只写在 `prerequisite: '...'` 字符串里，未通过 `registerPrerequisite(...)` 注册 handler。玩家点击购买时支付了费用但 onBuy 未触发预期效果（"白买"）。
 
 **修复路线**：跑全量 `prerequisite` 字符串扫描，列出未注册 handler 的卡 → 逐张补 `registerPrerequisite`。**P0**
+
+> ✅ **Sprint 1 PR-1C 已修复 5 张 D 卡（branch `sprint-1-pr-1c`）**：D7 Trident（round in {3,6,9,12}）、D8 FernSeeds（≥1 empty + ≥2 planted fields）、D39 TruffleSlicer（round ≥ 8）、D53 TeaHouse（round ≥ 6）、D58 Gritter（round ≥ 5）。同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找，支持 D8 含 `" and "` 的复合 prereq。剩余 prereq 字符串未注册 handler 的卡（如 A38 / D30 等）转后续 PR。
 
 #### 5.4.2 sharedScoring 机制不完备
 
@@ -375,34 +379,36 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 预定 commit 改动（已落地于 commits `2f68602c` + `0d92e711`）：
 - **§2.0 changelog**：加两行说明本次审查的两阶段
 - **§2.3 行为偏差**：从 0 张 → 44 张
-- **§2.4 数值/元数据偏差**：从 0 张 → 83 张
+- **§2.4 数值/元数据偏差**：从 0 张 → 83 张（PR-1A 已修 10 张 players → 实际剩 73 张；§1 verdict 表已更新为 73）
 - **§2.5 刻意偏离**：4 张状态保持；表加"复核日期 2026-04-28"
 - **§2.2 简化实现**：从 0 张 → 130 张
 - **§2.6 待实现**：E149 验证为"我方有 stub 文件但无逻辑"，wide-scan 新增 ≥15 张 stub
 - **§3 基础设施**：sharedScoring 机制不完备，应加 limitation 备注（待落地）
-- **§1 总览数字**：合并两阶段 verdict 887/881 张 → 587 ✅ / 130 🟡 / 44 ⚠ / 83 ❌ / 5 🔀 / 14 🔍
+- **§1 总览数字**：合并两阶段 verdict 887/881 张 → 587 ✅ / 130 🟡 / 44 ⚠ / 57 ❌（PR-1A −10、PR-1B −16）/ 5 🔀 / 14 🔍
 
 ## 8. 后续建议（不自动开 issue）
 
 > 本审查不修复任何发现。下列建议供 owner 手动 issue 化、按优先级排期。
+>
+> **Sprint 1 PR-1B 已落地（cost/vp 字段对齐，2026-04-29，branch sprint-1-pr-1b）**：A38 / B4 / B42 / C3 / C30 / C33 / C35 / C39 / C48 / C59 / D24 / D29 / D39 / E32 / E34 / E95 共 16 张。A4 / D83（costs[][]）/ C13（isBuyable discount）deferred to Sprint 5。
 
 | 优先级 | 主题 | 张数 / 工作量 |
 |---|---|---|
 | **P0** | wide-scan 5 张行为完全错（B116 / B14 / B133 / D138 / E134）| 5 张 / 1-2 day |
-| **P0** | 11 张 players 字段错（深度 7 + wide 4：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158）| 改字段；跑卡池过滤回归测试 / < 0.5 day |
-| **P0** | A4 Baseboards cost 模型错（择一→同时付）| 1 张 / 0.5 day |
-| **P0** | A38 / A165 / A135 cost+prereq+breeding+sharedScoring | 3 张 / 1-2 day |
-| **P0** | D7/D8/D39/D53/D58+ prerequisite 注册"白买"bug | 5+ 张 / 1-2 day |
-| **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 | 12 张 / 2 day |
-| **P0** | B4 WoodPile gain 硬编码 + cost 错 | 1 张 / 0.5 day |
-| **P0** | E95 Miller cost 多 food:1 | 1 张 / 0.1 day |
-| **P0** | E149 MidnightFencer 实现 | 按 BGA `StartHarvest` listener 写完 / 2-3 day |
+| **P0** | 11 张 players 字段错（深度 7 + wide 4：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158）(actual 10 unique cards) — ✅ PR-1A on branch sprint-1-pr-1a | 改字段；跑卡池过滤回归测试 / < 0.5 day |
+| **P0** | A4 Baseboards cost 模型错（择一→同时付）— 待 Sprint 5（alternative-cost 机制） | 1 张 / 0.5 day |
+| **P0** | A38 / A165 / A135 cost+prereq+breeding+sharedScoring — A38 cost ✅ PR-1B on branch sprint-1-pr-1b；A38 prereq + A165/A135 残留 | 3 张 / 1-2 day |
+| **P0** | D7/D8/D39/D53/D58+ prerequisite 注册"白买"bug — ✅ PR-1C on branch sprint-1-pr-1c | 5+ 张 / 1-2 day |
+| **P0** | C3/C13/C33/C35/C48 + D24/D29/D39 + E32/E34 cost 错 — ✅ PR-1B on branch sprint-1-pr-1b（C13 isBuyable discount + D83 altCosts 等转 Sprint 5） | 12 张 / 2 day |
+| **P0** | B4 WoodPile gain 硬编码 + cost 错 — cost ✅ PR-1B；gain 行为转 Sprint 5 | 1 张 / 0.5 day |
+| **P0** | E95 Miller cost 多 food:1 — ✅ PR-1B on branch sprint-1-pr-1b | 1 张 / 0.1 day |
+| **P0** | E149 MidnightFencer 实现 | 按 BGA `StartHarvest` listener 写完 / 2-3 day — ✅ Sprint 3 deliberate divergence on branch sprint-3-e149 |
 | **P1** | B130/B150/B152 useActionSpace(other) 语义 | 3 张 / 1-2 day |
 | **P1** | A129/A139/A150/A151 行为偏差 | 4 张 / 1-2 day |
 | **P1** | D18/D117/D160 行为偏差 | 3 张 / 1 day |
 | **P1** | B27 Toolbox + B29 CookeryLesson | 2 张 / 0.5-1 day |
 | **P1** | E53 + B115 + B138 + B155 + C23 + C51 + B 牌组其余 11 张 | 17 张 / 2-3 day |
-| **P1** | B42 ForestInn vp + 守卫 | 1 张 / 0.3 day |
+| **P1** | B42 ForestInn vp + 守卫 — vp ✅ PR-1B；isBuyable round ≤ 6 守卫转 Sprint 5 | 1 张 / 0.3 day |
 | **P1** | A135 / C136 sharedScoring 机制 | 1-2 day（含通用扫描）|
 | **P1** | category 字段批量映射 | ~50 张 / 1-2 day |
 | **P1** | getExchangeResources helper 统一 | 8+ 张 / 1-2 day |

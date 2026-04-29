@@ -9,7 +9,7 @@ export const E138_LivestockExpert = new Occupation({
   name: 'Livestock Expert',
   deck: 'E',
   number: 138,
-  category: 'ANIMAL_HANDLER',
+  category: 'GOODS_-_GET',
   desc: ['If you play this card in round 11 or before, choose an animal type: you immediately get a number of animals of that type equal to the number you already have on your farm.'],
   players: '3+',
 })

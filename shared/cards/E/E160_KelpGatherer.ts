@@ -50,7 +50,7 @@ export const E160_KelpGatherer = new Occupation({
   name: 'Kelp Gatherer',
   deck: 'E',
   number: 160,
-  category: 'FOOD_PROVIDER',
+  category: 'CROPS',
   desc: [
     'Each time another player uses the __Fishing__ accumulation space, they get 1 additional <FOOD> and you get 1 <VEGETABLE>.',
   ],

@@ -62,7 +62,7 @@ export const D128_BuildingTycoon = new Occupation({
   name: 'Building Tycoon',
   deck: 'D',
   number: 128,
-  category: 'ACTIONS_BOOSTER',
+  category: 'FARM_PLANNER',
   desc: [
     'Each time after another player builds 1 or more rooms, you can give them 1 <FOOD> to build exactly 1 room yourself. (You must pay the building cost of the room.)',
   ],

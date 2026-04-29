@@ -8,7 +8,7 @@ export const C83_EarlyCattle = new MinorImprovement({
   name: "Early Cattle",
   deck: "C",
   number: 83,
-  category: "ANIMAL_HANDLER",
+  category: "LIVESTOCK_PROVIDER",
   desc: ["When you play this card, you immediately get 2 <CATTLE>."],
   vp: -3,
   prerequisite: "1 Pasture",

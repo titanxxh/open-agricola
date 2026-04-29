@@ -47,7 +47,7 @@ export const E33_BeaverColony = new MinorImprovement({
   name: "Beaver Colony",
   deck: "E",
   number: 33,
-  category: "BONUS_POINTS",
+  category: "BONUS_POINTS_-_GET",
   desc: ['From now on, one of your pastures with stable cannot hold animals. Each time you get <REED> from an action space, you get 1\u00a0bonus <SCORE>.'],
   vp: 1,
   cost: {},
