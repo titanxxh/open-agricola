@@ -22,7 +22,7 @@ export const E79_FieldSpade = new MinorImprovement({
   name: 'Field Spade',
   deck: 'E',
   number: 79,
-  category: 'BUILDING_RESOURCES_STONE',
+  category: 'BUILDING_RESOURCES_-_STONE',
   desc: ['Each time after you sow in at least 1 field, you get 1 <STONE>.'],
   cost: { wood: 1 },
 })

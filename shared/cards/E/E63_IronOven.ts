@@ -8,7 +8,7 @@ export const E63_IronOven = new MinorImprovement({
   name: "Iron Oven",
   deck: "E",
   number: 63,
-  category: "FOOD_GRAIN",
+  category: "FOOD_-_GRAIN",
   desc: [
     '[__Bake Bread__ action:]',
     '<GRAIN> <ARROW-1X> 6<FOOD>',

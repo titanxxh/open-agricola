@@ -45,7 +45,7 @@ export const E70_CropRotationField = new MinorImprovement({
   name: 'Crop Rotation Field',
   deck: 'E',
   number: 70,
-  category: 'CROP_PROVIDER',
+  category: 'CROPS_-_VEGETABLE',
   desc: [
     'This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
   ],

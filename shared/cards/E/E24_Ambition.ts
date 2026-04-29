@@ -40,7 +40,7 @@ export const E24_Ambition = new MinorImprovement({
   name: 'Ambition',
   deck: 'E',
   number: 24,
-  category: 'ACTIONS_BOOSTER',
+  category: 'ACTION',
   desc: ['Each time you get a __Minor Improvement__ action on an action space, you can build a major improvement instead of playing a minor one.'],
   cost: {},
   prerequisite: '2 Occupations',

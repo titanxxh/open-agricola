@@ -9,7 +9,7 @@ export const E139_BunnyBreeder = new Occupation({
   name: 'Bunny Breeder',
   deck: 'E',
   number: 139,
-  category: 'FOOD_MISC',
+  category: 'FOOD',
   desc: ['Select a future round space, subtract the number of the current round from it, and place this many <FOOD> on that space. At the start of that round, you get the <FOOD>.'],
   players: '3+',
 })

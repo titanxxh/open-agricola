@@ -9,7 +9,7 @@ export const B41_Hauberg = new MinorImprovement({
   name: 'Hauberg',
   deck: 'B',
   number: 41,
-  category: 'RESOURCE_WOOD',
+  category: 'GOODS_PROVIDER',
   desc: ['Alternate placing 2 <WOOD> and 1 <PIG> on the next 4 round spaces. You decide what to start with. At the start of these rounds, you get the goods.'],
   cost: { food: 3 },
   prerequisite: '3 Occupations',

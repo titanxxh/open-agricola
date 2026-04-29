@@ -9,7 +9,7 @@ export const B96_TreeFarmJoiner = new Occupation({
   name: 'Tree Farm Joiner',
   deck: 'B',
   number: 96,
-  category: 'ACTION_ENHANCER',
+  category: 'ACTIONS_BOOSTER',
   desc: ['Place 1 <WOOD> on each of the next 2 odd-numbered round spaces. At the start of these rounds, you get the <WOOD> and, immediately afterward, a __Minor Improvement__ action.'],
   cost: {},
   players: '1+',

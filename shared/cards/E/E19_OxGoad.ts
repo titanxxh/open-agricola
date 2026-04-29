@@ -33,7 +33,7 @@ export const E19_OxGoad = new MinorImprovement({
   name: 'Ox Goad',
   deck: 'E',
   number: 19,
-  category: 'FARM_PLANNER',
+  category: 'FARMYARD_-_PLOWING',
   desc: ['Each time after you use the __Cattle Market__ accumulation space, you can pay 2 <FOOD> to plow 1 field.'],
   cost: { wood: 1 },
   vp: 1,

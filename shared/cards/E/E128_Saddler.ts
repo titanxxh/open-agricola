@@ -33,7 +33,7 @@ export const E128_Saddler = new Occupation({
   name: "Saddler",
   deck: "E",
   number: 128,
-  category: "ACTIONS_BOOSTER",
+  category: "FARMYARD",
   desc: ["Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 field."],
   cost: {},
   players: "3+",

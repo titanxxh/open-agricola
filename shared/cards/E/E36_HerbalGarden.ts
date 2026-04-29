@@ -8,7 +8,7 @@ export const E36_HerbalGarden = new MinorImprovement({
   name: 'Herbal Garden',
   deck: 'E',
   number: 36,
-  category: 'POINTS_PROVIDER',
+  category: 'BONUS_POINTS_-_GET',
   desc: ['From now on, at least one of your pastures must contain no animals.'],
   cost: { wood: 1 },
   vp: 2,

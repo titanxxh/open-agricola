@@ -47,7 +47,7 @@ export const C163_MaterialDeliveryman = new Occupation({
   name: 'Material Deliveryman',
   deck: 'C',
   number: 163,
-  category: 'BUILDING_RESOURCE_PROVIDER',
+  category: 'ACTIONS_BOOSTER',
   desc: [
     'Each time any player (including you) takes 5/6/7/8+ goods from an accumulation space, you get 1 <WOOD>/<CLAY>/<REED>/<STONE> from the general supply.',
   ],

@@ -12,7 +12,7 @@ export const B7_Wage = new MinorImprovement({
   name: "Wage",
   deck: "B",
   number: 7,
-  category: "FOOD_MISC",
+  category: "FOOD_PROVIDER",
   desc: ["You immediately get 2 <FOOD> and 1 additional <FOOD> for each major improvement you have from the bottom row of the supply board."],
   cost: { food: 1 },
   passing: true,

@@ -9,7 +9,7 @@ export const B45_StrawberryPatch = new MinorImprovement({
   name: 'Strawberry Patch',
   deck: 'B',
   number: 45,
-  category: 'FOOD_MISC',
+  category: 'FOOD_PROVIDER',
   desc: ['Place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.'],
   cost: { wood: 1 },
   vp: 2,

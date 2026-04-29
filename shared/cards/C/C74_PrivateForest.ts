@@ -9,7 +9,7 @@ export const C74_PrivateForest = new MinorImprovement({
   name: "Private Forest",
   deck: "C",
   number: 74,
-  category: "RESOURCE_WOOD",
+  category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["Place 1 <WOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <WOOD>."],
   cost: { food: 2 },
   prerequisite: "1 Occupation",

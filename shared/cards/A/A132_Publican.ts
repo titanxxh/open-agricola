@@ -50,7 +50,7 @@ export const A132_Publican = new Occupation({
   name: 'Publican',
   deck: 'A',
   number: 132,
-  category: 'BONUS_POINT_GENERATOR',
+  category: 'POINTS_PROVIDER',
   desc: [
     'Each time before another player takes an unconditional __Sow__ action, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
   ],

@@ -49,7 +49,7 @@ export const E72_ArtichokeField = new MinorImprovement({
   name: 'Artichoke Field',
   deck: 'E',
   number: 72,
-  category: 'CROP_PROVIDER',
+  category: 'CROPS_-_GRAIN_AND_VEGETABLE',
   desc: [
     'This card is a field. During the field phase of each harvest, if you harvest at least 1\u00a0good from this card, you also get 1 <FOOD>.',
   ],

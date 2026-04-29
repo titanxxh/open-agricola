@@ -67,7 +67,7 @@ export const A87_Conservator = new Occupation({
   name: 'Conservator',
   deck: 'A',
   number: 87,
-  category: 'FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION',
+  category: 'FARM_PLANNER',
   desc: [
     'When you renovate your home, you can renovate from wood directly into stone.',
   ],

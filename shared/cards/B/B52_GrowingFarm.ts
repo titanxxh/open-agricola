@@ -9,7 +9,7 @@ export const B52_GrowingFarm = new MinorImprovement({
   name: 'Growing Farm',
   deck: 'B',
   number: 52,
-  category: 'FOOD_MISC',
+  category: 'FOOD_PROVIDER',
   desc: ['You can only play this card if you have at least as many pasture spaces as the number of completed rounds. If you do, you get a number of <FOOD> equal to the current round.'],
   cost: { clay: 2, reed: 1 },
   vp: 2,

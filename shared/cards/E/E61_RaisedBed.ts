@@ -9,7 +9,7 @@ export const E61_RaisedBed = new MinorImprovement({
   name: "Raised Bed",
   deck: "E",
   number: 61,
-  category: "FOOD_PROVIDER",
+  category: "FOOD_-_GRAIN",
   desc: ["At the start of each harvest, you get 4 <FOOD>."],
   vp: 1,
   cost: { clay: 2, stone: 2 },
