@@ -46,7 +46,7 @@ export const D39_TruffleSlicer = new MinorImprovement({
   number: 39,
   category: 'BONUS_POINTS',
   desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
-  cost: {},
+  cost: { wood: 1 },
 })
 
 export const D39_TruffleSlicer_impl = {

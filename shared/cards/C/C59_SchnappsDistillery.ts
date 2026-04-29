@@ -11,7 +11,7 @@ export const C59_SchnappsDistillery = new MinorImprovement({
   number: 59,
   category: "POINTS_PROVIDER",
   desc: ["In each feeding phase, you can use this card to turn exactly 1 <VEGETABLE> into 5 <FOOD>. During scoring, you get 1 bonus <SCORE> each for your 5th and 6th <VEGETABLE>."],
-  cost: { wood: 2, clay: 1 },
+  cost: { stone: 2, vegetable: 1 },
   vp: 2,
   exchanges: [
     { from: { vegetable: 1 }, to: { food: 5 }, max: 1, trigger: 'harvest' },

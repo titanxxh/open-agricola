@@ -10,7 +10,7 @@ export const A38_WoolBlankets = new MinorImprovement({
   number: 38,
   category: "POINTS_PROVIDER",
   desc: ["During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."],
-  cost: { wood: 1, sheep: 1 },
+  cost: {},
   prerequisite: "Wooden House",
 })
 

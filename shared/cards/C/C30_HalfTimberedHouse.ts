@@ -11,7 +11,7 @@ export const C30_HalfTimberedHouse = new MinorImprovement({
   number: 30,
   category: "POINTS_PROVIDER",
   desc: ["During scoring, you get 1 bonus <SCORE> for each stone room you have. You can only use one card to get bonus points for your stone house."],
-  cost: { wood: 2, clay: 2, reed: 1 },
+  cost: { wood: 1, clay: 1, stone: 2, reed: 1 },
   prerequisite: "Stone House",
 })
 
