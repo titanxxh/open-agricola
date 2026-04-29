@@ -64,7 +64,7 @@ export const A158_CulinaryArtist = new Occupation({
     'Each time another player uses the __Traveling Players__ accumulation space, you can exchange your choice of 1 <GRAIN>/<SHEEP>/<VEGETABLE> for 4/5/7 <FOOD>.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
   newSet: true,
 })
 
