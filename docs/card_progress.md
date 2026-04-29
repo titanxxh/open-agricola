@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-29 Sprint 4 PR-4B done — 178 cards' `category` field aligned to BGA naming (UI grouping only, no behavior). Major rename groups: `RESOURCE_*` → `BUILDING_RESOURCE_PROVIDER` / `BUILDING_RESOURCES_-_*`; `ANIMAL_HANDLER` / `ANIMAL_FARMER` → `LIVESTOCK_PROVIDER` (or per-card `ANIMALS_-_*`); `FOOD_MISC` → `FOOD_PROVIDER` / `FOOD` / `GOODS_-_GET`; `ACTION_ENHANCER` / `ACTION_SPACE_EXTENDER` → `ACTIONS_BOOSTER` / `ACTION_-_*`; `BONUS_POINT_GENERATOR` / `BONUS_POINTS_GET` → `BONUS_POINTS_-_GET`; `FARM_BUILDER` → `FARM_PLANNER` / `PASSING_-_FARMYARD`; CROPS / FOOD_GRAIN sub-bucket renames per BGA. Each card matched against its BGA `$this->category` literal; the alignment test exhaustively covers all 178 IDs. — see branch sprint-pr-4b**
 - **2026-04-29 Sprint 4 PR-4A — A135 AnimalReeve + C136 RanchProvost sharedScoring via existing `computeSharedPostScore` hook (no framework changes)**: A135 awards 0/1/3/5 VP per player based on `min(sheep, boar, cattle, 4)` set count (BGA `[0,0,1,3,5]` map); C136 awards 3 VP to every player tied for max pasture capacity (computed via `computeAnimalZones` filter on `pasture` zoneType). Both apply to every player including the owner. Tests in `server/__tests__/Sprint4-sharedScoring.test.ts` (12 cases). §2.3 wide-scan A135 sharedScoring entry resolved. — see commit on branch sprint-pr-4a
 - **2026-04-29 Sprint 3 done — E149 MidnightFencer implemented as deliberate divergence — onStartHarvest at round 14 offers 0..2×(N−1) midnight fences, each = +1 raw VP via cardStates.owedFences. BGA's fence-segment placement deferred to fence-system rewrite. — see commit on branch sprint-3-e149**
 - **2026-04-29 Sprint 2.5 skipped — 5 BeforeEndOfGame interactive cards (A136/C133/C99/D132/E132) registered as deliberate divergence in §2.5 — auto-max in TS is mathematically equivalent to BGA player optimum (resources reserved at scoring time have no other use). Saves ~4 day for Sprint 3-6 work. — see master-plan.md §8 Sprint 2.5 row**
@@ -240,7 +241,7 @@
 > **2026-04-29 wide-scan 新增 70 张**（紧凑审查；优先抽样复核）：
 >
 > **系统性问题（最大头）**：
-> - **~50 张 category 字段批量不齐**（B/C/D 三副）—— 我方自定义 category 命名 `RESOURCE_WOOD/CLAY/REED/STONE`、`ANIMAL_HANDLER`、`FAMILY_GROWTH`、`FOOD_MISC`、`ACTION_ENHANCER` 等与 BGA 的 `BUILDING_RESOURCE_PROVIDER`、`LIVESTOCK_PROVIDER`、`FOOD_PROVIDER`、`ACTIONS_BOOSTER` 等不一一对应。是 schema 级问题，不影响游戏行为只影响 UI 分组/统计。**修复路线：建 BGA→ours 映射表跑迁移脚本，或扩展我方 schema 接受 BGA 命名作为别名**。
+> - ~~**~50 张 category 字段批量不齐**~~ — ✅ **Sprint 4 PR-4B done**（实际 178 张，覆盖 A/B/C/D/E 全副）。BGA→ours 映射机械迁移完成，每张卡的 `category` 字段现在等于 BGA `$this->category` 字面量。覆盖测试 `shared/cards/__tests__/category-bga-alignment.test.ts` 178/178 绿。仅 UI 分组对齐，无任何行为/规则改动。详见 branch `sprint-pr-4b`。
 >
 > **P0 cost 偏差（12 张）** — A4 / D83 / C13 / D30 残留，其余 11 张 cost/prereq 字段已由 PR-1B 修复：
 > - **A4 Baseboards** — BGA `costs=[[food:2],[grain:1]]` 是择一，我方 `cost:{food:2, grain:1}` 强迫同时付（玩家加成本）— 待 Sprint 5（alternative-cost 机制）
