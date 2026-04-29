@@ -214,7 +214,7 @@
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（73 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players → 实际剩 73 张）
+### 2.4 ❌ 数值/元数据待修（原 83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players → 实际剩 73 张）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
