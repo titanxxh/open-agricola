@@ -68,6 +68,7 @@ export const B42_ForestInn = new PlayerActionCard({
   cost: {"clay":1,"reed":1},
   vp: 1,
   prerequisite: "Play in Round 6 or Before",
+  maxRound: 6,
   newSet: true,
 })
 
