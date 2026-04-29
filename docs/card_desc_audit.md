@@ -41,8 +41,8 @@
    - **D138 PetLover** — `noop` xor 选项不取消原始 collect，玩家同时拿空间动物 + 1 动物 + 3 food + 1 grain
    - **E134 Omnifarmer** — `computeBonusScore` 读 `storedTypes`，但代码无 listener 写入此字段，分数永远不触发
 
-2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **83 张**。
-   - **11 张 players 字段错**（深度 7 + wide 4）：A154/A158/A160 + C151/C152/C153/C163 + 新增 A154 重复确认 + E154 + C134 + C158——全是 `'3+'` 应 `'4+'` 同模式，破坏 2026-04-25 落地的卡池过滤
+2. **§2.4 自报"数值/元数据偏差 0 张"也被推翻**：合计 **73 张**（原报 83 张；PR-1A 已修 10 张 players，见 §1 verdict 表已修订为 73）。
+   - **11 张 players 字段错**（深度 7 + wide 4，去重后实为 10 张唯一卡）：A154/A158/A160 + C151/C152/C153/C163 + E154 + C134 + C158——全是 `'3+'` 应 `'4+'` 同模式，破坏 2026-04-25 落地的卡池过滤 — ✅ PR-1A on branch sprint-1-pr-1a（10 张全部已修，剩 0 张 players 残留）
    - **12+ 张 cost 错**：A4 Baseboards（择一→同时付）、A38 WoolBlankets、C3/C13/C33/C35/C48、D24/D29/D39/D83/D30、E32（stone 误为 clay）、E34（缺 cost）、E95、B4、B42
    - **~50 张 category 字段批量不齐**（B/C/D 三副系统性问题——schema 级而非单卡 bug）
    - **22 张缺 `extraVp` 元数据**（A 牌组，仅展示用）
@@ -215,6 +215,8 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 | **E95 Miller** | Occupation 卡多了 `cost: { food: 1 }`，BGA 端没有该字段 |
 
 > **重大警示**：A154/A158/A160 + C151/C152/C153/C163 共 7 张 `players` 字段错误，会让 2026-04-25 落地的"卡池按人数过滤"逻辑出现 false-positive——这些卡会进 3 人局卡池但 BGA 限定 4+。**优先级 P0**。
+>
+> ✅ **已由 Sprint 1 PR-1A 修复**（branch `sprint-1-pr-1a`）：A154/A158/A160 + C151/C152/C153/C163 共 7 张深度池 players 字段错全部已修。本节标题"13 张"为 PR-1A 之前的初始统计未减——实际剩 6 张待修（A14、B4、B42、C30、C39、C59、E95 中的 cost/vp 类，详见 §1 verdict 表已更新为深度池 6 张），由后续 PR 处理。
 
 ### 4.5 🔀 刻意偏离（4 张，与 §2.5 比对）
 
@@ -270,7 +272,7 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 
 **E 牌组（5 张）**：E134 Omnifarmer + 4 张 E 详细列表见 `output/tmp/audit-agent-b10.md`
 
-### 5.3 ❌ 数值/元数据偏差 wide-scan 新增（70 张）
+### 5.3 ❌ 数值/元数据偏差 wide-scan 新增（70 张；PR-1A 已修 3 张 players → 实际剩 67 张）
 
 **P0 cost 偏差（12 张）**：
 
@@ -289,8 +291,8 @@ pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
 | **E32** | cost 类型错（BGA `STONE=>2,REED=>1`，TS 写成 `clay:2, reed:1`，stone 误为 clay） |
 | **E34** | 缺 cost（BGA `WOOD=>1`，TS `cost: {}`） |
 
-**P0 players 字段错（4 张，与深度池 7 张同模式）**：
-- A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+
+**P0 players 字段错（4 张，与深度池 7 张同模式）** — ✅ 全部已修，Sprint 1 PR-1A on branch sprint-1-pr-1a：
+- A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+（注：A154 在深度池 §4.4 已计入并已修，wide-scan 这条为重复确认；PR-1A 实际唯一修复 = E154/C134/C158 共 3 张 wide-scan 新增 + 7 张深度池 = 合计 10 张）
 
 **P1 prerequisite/altCosts 缺失（多张）**：
 - D83 缺 altCosts grain:1 / D30 缺 prerequisite "3 Occupations"
@@ -375,7 +377,7 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 预定 commit 改动（已落地于 commits `2f68602c` + `0d92e711`）：
 - **§2.0 changelog**：加两行说明本次审查的两阶段
 - **§2.3 行为偏差**：从 0 张 → 44 张
-- **§2.4 数值/元数据偏差**：从 0 张 → 83 张
+- **§2.4 数值/元数据偏差**：从 0 张 → 83 张（PR-1A 已修 10 张 players → 实际剩 73 张；§1 verdict 表已更新为 73）
 - **§2.5 刻意偏离**：4 张状态保持；表加"复核日期 2026-04-28"
 - **§2.2 简化实现**：从 0 张 → 130 张
 - **§2.6 待实现**：E149 验证为"我方有 stub 文件但无逻辑"，wide-scan 新增 ≥15 张 stub
