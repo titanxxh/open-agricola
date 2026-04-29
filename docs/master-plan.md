@@ -16,6 +16,34 @@
 - **单 owner 推荐排期**：5 周完成 P0+P1+P2。
 - **冻结基线**：`docs/card_desc_audit.md` §2.4 输入快照（我方 SHA `2b5ddee651...`，BGA SHA `3082e4d358...`）。如基线漂移过大需重启审查。
 
+### Master Plan 收口状态（2026-04-29）
+
+7 个 sprint 全部走完一轮（详见 §8 Sprint 进度表）：
+
+```
+Sprint 1   done            30 张 P0 高 ROI 批量（players + cost + prereq）
+Sprint 2   done             7 张 P0 玩法完全错 + 2 个机制扩展（onBeforeEndGame hook + future-meeples roomType）
+Sprint 2.5 skipped           5 张 BeforeEndOfGame interactive — deliberate divergence (auto-max ≡ player optimum)
+Sprint 3   done             1 张 P0 E149 MidnightFencer — deliberate divergence (+K raw VP per owedFence)
+Sprint 4   done           178 张 category + 2 张 sharedScoring + PR-4C skipped (audit premise wrong)
+Sprint 5   partially done    7/28 张 P1 行为修复（21 张 deferred — 复杂度 >1h each，需架构改动）
+Sprint 6   partially done   21 张 extraVp + E30 + D12/D148（i18n 71+437 / 14 张 stub / 双轨重构 deferred）
+Sprint 7   not started     130 张 P3 简化（master plan §0 默认不做）
+```
+
+**已修复**：~250 项次（含 Sprint 4 178 张 category 字段批量；不计 deferred）。
+
+**未达 §0 "对齐 BGA 完成"严格判定**（⚠=0 / ❌=0 + Sprint 7 决策已落）：
+- ⚠ 残留：~21 张 P1 行为偏差（Sprint 5 deferred）
+- ❌ 残留：14 张 stub 未实现（Sprint 6 deferred）
+- 双轨重构（computePostScore vs computeBonusScore）未做
+- i18n 缺口 71+437 未补
+- Sprint 7 P3 130 张简化未启动
+
+**Follow-up 路线**：上述 deferred 项作为后续 sprint 单独立项；本 master plan 主体 P0+P1（核心机制 + 关键 bug）已闭环，残留为 P2/P3 范围细节。
+
+详见 `docs/card_progress.md` §2.3 / §2.4 各"deferred to follow-up"小节。
+
 ## 1. Sprint 切分
 
 ```
