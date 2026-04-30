@@ -354,7 +354,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       cardStateBonusVp += entry.score
     }
 
-    if (cardStateBonusVp > 0) {
+    if (cardStateBonusVp !== 0) {
       categories.push({
         key: 'cardStateBonusVp',
         total: cardStateBonusVp,

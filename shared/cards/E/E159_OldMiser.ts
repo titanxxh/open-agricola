@@ -24,7 +24,7 @@ export const E159_OldMiser_impl = {
     //   = familySize - newborn, which is adults * 1 + newborns * 0.
     player.resources.food += familySize(player)
   },
-  computePostScore: (_state, player) => {
+  computeBonusScore: (_state, player) => {
     // Normal scoring: familySize * 3. With Old Miser: familySize * 2.
     // Difference: -familySize (i.e., -1 per person).
     return -familySize(player)
