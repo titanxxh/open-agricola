@@ -12,6 +12,7 @@ export const recordActionSnapshot = (
     token,
     stableTiles: player.stableTiles.length,
     roomTiles: player.roomTiles.length,
+    fenceSegments: player.fenceSegments.length,
   }
 }
 
@@ -30,4 +31,11 @@ export const getRoomsBuiltThisAction = (player: PlayerState) => {
     player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.roomTiles as number | undefined
   if (typeof before !== 'number') return 0
   return Math.max(0, player.roomTiles.length - before)
+}
+
+export const getFencesBuiltThisAction = (player: PlayerState) => {
+  const before =
+    player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.fenceSegments as number | undefined
+  if (typeof before !== 'number') return 0
+  return Math.max(0, player.fenceSegments.length - before)
 }
