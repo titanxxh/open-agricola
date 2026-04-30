@@ -175,6 +175,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onSowExtraField`
 - `computeLockedFarmTiles`
 - `computeFenceDiscount`
+- `computeFenceFreeAvailable`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
@@ -194,6 +195,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
 | `computeFenceDiscount`                       | 返回折扣数                                                            | 围栏折扣                                                |
+| `computeFenceFreeAvailable`                  | `(state, player) => number`                                      | 围栏 entry-guard 加成（返回上限免费 fence 数）                     |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
 
 
