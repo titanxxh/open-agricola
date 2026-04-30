@@ -230,7 +230,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // normal grain sow, no bonus
     })
 
-    it('presents selection when sowing in 2 fields', () => {
+    it('auto-adds 1 bonus crop to EACH field when sowing in 2 fields', () => {
       const session = setupForSow({
         grain: 3,
         fields: [
@@ -253,14 +253,7 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      // Should get a selection choice for which field gets the bonus
-      if (resp.pending.type === 'choice') {
-        // Choose the first field
-        resp = session.resolveChoice(0, '0-0')
-        expect(resp.ok).toBe(true)
-      }
-
-      // Continue through any remaining choices
+      // No selection prompt — both fields get +1 automatically (BGA actAddAdditionalGood)
       while (resp.pending.type === 'choice') {
         resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
       }
@@ -268,9 +261,9 @@ describe('B115_TinsmithMaster session', () => {
       const player = resp.state.players[0]!
       const f0 = player.fields.find((f) => f.row === 0 && f.col === 0)
       const f1 = player.fields.find((f) => f.row === 0 && f.col === 1)
-      // One field should have 4 (3+1 bonus), the other 3
-      const totalRemaining = (f0?.stacks[0]?.remaining ?? 0 ?? 0) + (f1?.stacks[0]?.remaining ?? 0 ?? 0)
-      expect(totalRemaining).toBe(7) // 3 + 3 + 1 bonus = 7
+      // Each field should have 4 (3 normal + 1 bonus from card)
+      expect(f0?.stacks[0]?.remaining ?? 0).toBe(4)
+      expect(f1?.stacks[0]?.remaining ?? 0).toBe(4)
     })
   })
 })
