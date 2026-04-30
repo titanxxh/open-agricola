@@ -72,21 +72,35 @@ export const placeFarmerAction: ActionDefinition = {
       const sourceCard = actionContext.sourceCard as string | undefined
       const workerId = actionContext.workerId as string | undefined
       const targetSpaceId = actionContext.targetSpaceId as string | undefined
-      if (!sourceCard || !workerId || !targetSpaceId) {
+      if (!sourceCard || !targetSpaceId) {
         return { type: 'fail', logKey: 'log.placeFarmerFail' }
       }
 
-      const fromSpace = state.actionSpaces.find(s =>
-        s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
-      )
+      // worker-less mode: A151-style "use this action space" trigger during
+      // return-home phase, where there is no farmer in hand to relocate.
+      const isWorkerless = !workerId
+
+      let fromSpace: ActionSpace | undefined
+      if (!isWorkerless) {
+        fromSpace = state.actionSpaces.find(s =>
+          s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
+        )
+        if (!fromSpace) {
+          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        }
+      }
       const targetSpace = state.actionSpaces.find(s => s.id === targetSpaceId)
-      if (!fromSpace || !targetSpace) {
+      if (!targetSpace) {
         return { type: 'fail', logKey: 'log.placeFarmerFail' }
       }
 
-      const allowed = computeAllowedPlacementSpaces(state, player)
-      if (!allowed.some(a => a.spaceId === targetSpaceId)) {
-        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      // Reachability check only applies to worker mode (worker-less is invoked
+      // by cards that have already verified the space is unoccupied / valid).
+      if (!isWorkerless) {
+        const allowed = computeAllowedPlacementSpaces(state, player)
+        if (!allowed.some(a => a.spaceId === targetSpaceId)) {
+          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        }
       }
 
       actionContext.jumpChain = [
@@ -94,10 +108,12 @@ export const placeFarmerAction: ActionDefinition = {
         sourceCard,
       ]
 
-      removeWorkerRef(fromSpace, player.id, workerId)
-      addWorkerRef(targetSpace, player.id, workerId)
-      recordRoundPlacement(player, targetSpace.id, workerId)
-      incPlacedFarmers(player)
+      if (!isWorkerless && fromSpace) {
+        removeWorkerRef(fromSpace, player.id, workerId!)
+        addWorkerRef(targetSpace, player.id, workerId!)
+        recordRoundPlacement(player, targetSpace.id, workerId!)
+        incPlacedFarmers(player)
+      }
 
       // Cascade place-farmer after hooks for the second placement.
       // game-core's runPlaceFarmerAfterHooks (game-core.ts:1629) is one-shot
