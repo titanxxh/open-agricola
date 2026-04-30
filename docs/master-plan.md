@@ -4,6 +4,7 @@
 > 仅本文件是"对齐 BGA"工作的总入口，每个 sprint 自己单独走 brainstorming → spec → plan → 实施。
 >
 > 关联文档：
+>
 > - 审查报告：`docs/card_desc_audit.md`（含每张卡 verdict + §8 P0–P3 清单）
 > - 进度权威源：`docs/card_progress.md`（每 sprint 收口必须回流）
 > - 架构约束：`docs/ENGINE_ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
@@ -34,6 +35,7 @@ Sprint 7   not started     130 张 P3 简化（master plan §0 默认不做）
 **已修复**：~250 项次（含 Sprint 4 178 张 category 字段批量；不计 deferred）。
 
 **未达 §0 "对齐 BGA 完成"严格判定**（⚠=0 / ❌=0 + Sprint 7 决策已落）：
+
 - ⚠ 残留：~21 张 P1 行为偏差（Sprint 5 deferred）
 - ❌ 残留：14 张 stub 未实现（Sprint 6 deferred）
 - 双轨重构（computePostScore vs computeBonusScore）未做
@@ -93,7 +95,7 @@ P1 ─────────────────────────�
 P2/P3 ─────────────────────────────────────────
   Sprint 6  P2 长尾                    (7 day)
             ├─ 22 张 A 牌组 extraVp 元数据补齐
-            ├─ A14 banned 字段（owner 决策后实施）
+            ├─ A14 banned 字段 — ✅ 2026-04-30 owner 决议不做（迁入 card_progress.md §2.5）
             ├─ E30 ChildsToy isNewborn 破坏性 mutation 修复
             ├─ D12 ↔ D148 互斥逻辑
             ├─ i18n 缺口（71 + 437 项）
@@ -447,13 +449,16 @@ docs/card_desc_audit.md §1 总览数字降到：
 
 > 每个 sprint 收口后填本表，含实际工时用于校准估算。
 
-| Sprint | 主题 | 张数 | 估算 | 实际 | 状态 | Spec | Plan | PR/Commit |
-|---|---|---|---|---|---|---|---|---|
-| 1 | P0 高 ROI 批量（players + cost + prereq） | 30 (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) | 2 day | ~2 day | done（PR-1A 10 张 players ✅、PR-1B 16 张 cost/vp ✅、PR-1C 5 张 D-deck prereq ✅） | docs/superpowers/specs/2026-04-29-sprint-1-p0-batch-design.md | docs/superpowers/plans/2026-04-29-sprint-1-p0-batch.md | — |
-| 2 | P0 玩法完全错 + audit 顺带（B116/A165/B133/D60/B14/D138/E134；A135 移 Sprint 4） | 7 + D60 顺带 | 4 day | ~5 day | done（PR-2A 4 cards + onBeforeEndGame hook ✅、PR-2B B14 + future-meeples roomType ✅、PR-2C D138 computeReplace ✅、PR-2D E134 三 hook ✅） | docs/superpowers/specs/2026-04-29-sprint-2-p0-gameplay-design.md | docs/superpowers/plans/2026-04-29-sprint-2-p0-gameplay.md | #28 / #29 / #30 / #31 |
-| 2.5 | BeforeEndOfGame interactive choice（A136/C133/C99/D132/E132） | 5 | 4 day | 0 | **skipped — registered as deliberate divergence** | — | — | — |
-| 3 | P0 E149 MidnightFencer | 1 | 3 day | ~1.5 day | done（implemented as deliberate divergence — onStartHarvest offers 0..2×(N−1), each owedFence = +1 raw VP；BGA fence-segment placement 待 fence 系统重写） | docs/superpowers/specs/2026-04-29-sprint-3-e149-design.md | — | #34 |
-| 4 | P1 机制 helper（sharedScoring + category + getExchangeResources） | 178 cards (category) + 2 cards (sharedScoring) | 5 day | ~1 day | done（PR-4A A135/C136 sharedScoring ✅、PR-4B 178 cards category alignment ✅、PR-4C **skipped** — audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed） | — | — | #35 / #36 |
-| 5 | P1 单卡行为偏差 | 28 | 9 day | ~0.5 day (PR-5 partial) | partially done (7/28; remainder deferred to follow-up — see card_progress.md §2.3 "Sprint 5 PR-5 deferred" subsection) | — | — | sprint-5-batch |
-| 6 | P2 长尾（extraVp + banned + E30 + D12↔D148 + i18n + stub） | ~50 + i18n | 7 day | ~1.5 hour (PR-6 partial) | partially done（21 A-deck extraVp metadata + E30 ChildsToy non-destructive mutation + D12↔D148 mutual exclusion；A14 banned / i18n 71+437 / 14 stub 全部 deferred — 见 card_progress.md §2.0 "Sprint 6 partial done" 条目） | — | — | sprint-6-batch |
-| 7 | P3 简化 130 张 | 130 | 视情况 | — | not started | — | — | — |
+
+| Sprint | 主题                                                                    | 张数                                                        | 估算    | 实际                       | 状态                                                                                                                                                                                                                  | Spec                                                             | Plan                                                      | PR/Commit             |
+| ------ | --------------------------------------------------------------------- | --------------------------------------------------------- | ----- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- | --------------------- |
+| 1      | P0 高 ROI 批量（players + cost + prereq）                                  | 30 (10 players + 16 cost/vp + 5 D-prereq, D39 overlap −1) | 2 day | ~2 day                   | done（PR-1A 10 张 players ✅、PR-1B 16 张 cost/vp ✅、PR-1C 5 张 D-deck prereq ✅）                                                                                                                                           | docs/superpowers/specs/2026-04-29-sprint-1-p0-batch-design.md    | docs/superpowers/plans/2026-04-29-sprint-1-p0-batch.md    | —                     |
+| 2      | P0 玩法完全错 + audit 顺带（B116/A165/B133/D60/B14/D138/E134；A135 移 Sprint 4） | 7 + D60 顺带                                                | 4 day | ~5 day                   | done（PR-2A 4 cards + onBeforeEndGame hook ✅、PR-2B B14 + future-meeples roomType ✅、PR-2C D138 computeReplace ✅、PR-2D E134 三 hook ✅）                                                                                  | docs/superpowers/specs/2026-04-29-sprint-2-p0-gameplay-design.md | docs/superpowers/plans/2026-04-29-sprint-2-p0-gameplay.md | #28 / #29 / #30 / #31 |
+| 2.5    | BeforeEndOfGame interactive choice（A136/C133/C99/D132/E132）           | 5                                                         | 4 day | 0                        | **skipped — registered as deliberate divergence**                                                                                                                                                                   | —                                                                | —                                                         | —                     |
+| 3      | P0 E149 MidnightFencer                                                | 1                                                         | 3 day | ~1.5 day                 | done（implemented as deliberate divergence — onStartHarvest offers 0..2×(N−1), each owedFence = +1 raw VP；BGA fence-segment placement 待 fence 系统重写）                                                                  | docs/superpowers/specs/2026-04-29-sprint-3-e149-design.md        | —                                                         | #34                   |
+| 4      | P1 机制 helper（sharedScoring + category + getExchangeResources）         | 178 cards (category) + 2 cards (sharedScoring)            | 5 day | ~1 day                   | done（PR-4A A135/C136 sharedScoring ✅、PR-4B 178 cards category alignment ✅、PR-4C **skipped** — audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed）                   | —                                                                | —                                                         | #35 / #36             |
+| 5      | P1 单卡行为偏差                                                             | 28                                                        | 9 day | ~0.5 day (PR-5 partial)  | partially done (7/28; remainder deferred to follow-up — see card_progress.md §2.3 "Sprint 5 PR-5 deferred" subsection)                                                                                              | —                                                                | —                                                         | sprint-5-batch        |
+| 6      | P2 长尾（extraVp + banned + E30 + D12↔D148 + i18n + stub）                | ~50 + i18n                                                | 7 day | ~1.5 hour (PR-6 partial) | partially done（21 A-deck extraVp metadata + E30 ChildsToy non-destructive mutation + D12↔D148 mutual exclusion；A14 banned ✅ 2026-04-30 owner 决议不做（迁入 §2.5）；i18n 71+437 / 14 stub deferred — 见 card_progress.md §2.0 "Sprint 6 partial done" + "2026-04-30 A14 banned" 条目） | —                                                                | —                                                         | sprint-6-batch        |
+| 7      | P3 简化 130 张                                                           | 130                                                       | 视情况   | —                        | not started                                                                                                                                                                                                         | —                                                                | —                                                         | —                     |
+
+
