@@ -38,8 +38,8 @@
 | ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 38 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134） | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 56 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
-| 🔀 刻意偏离 BGA（§2.5） | 10 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| ❌ 数值/元数据待修（§2.4） | 55 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay + 2026-04-30 A14 banned 迁入 §2.5——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
+| 🔀 刻意偏离 BGA（§2.5） | 11 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
 
@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 — A14 Carpenter's Hammer banned 字段决议不做**：BGA `banned=true` 的语义是"卡池过滤"（不发到玩家手里）。当前 A14 通过 4-modifier 实现折扣效果（reed/wood/clay/stone in min 2 rooms），保留在卡池中可被抽到。**owner 决议（2026-04-30）：不实施 banned schema + dealHands 过滤**——加 schema 字段、dealHands 过滤、UI 标识属于独立工作，与 A14 本身的折扣实现无冲突。A14 从 §2.4 deferred 迁入 §2.5 deliberate divergence；§1 总览 §2.4 / §2.5 数量同步；master-plan.md §1 / §8 deferred 列表同步清理。无代码改动，doc-only commit。
 - **2026-04-29 Sprint 6 partial done — 21 metadata fixes (A-deck extraVp) + 2 behavior fixes (E30 ChildsToy non-destructive isNewborn mutation, D12 ↔ D148 mutual exclusion). Metadata: A29/A30/A31/A32/A34/A35/A37/A38/A39/A58/A62/A98/A99/A100/A101/A132/A133/A134/A136/A153/A154 all gained `extraVp: true` (display-only field; matches BGA's 24 extraVp cards now that A33/A36/A135 already had it). E30: replaced destructive `w.isNewborn = false` with snapshot/restore via `cardStates[CARD_ID].extraData.suppressedNewbornIds` — onBeforeFeed clears + records, onAfterFeed restores so post-feed listeners (A35 SwimmingClass, A92 AdoptiveParents) still see correct state. D12 ↔ D148: D148 onComputeAnimalZones early-returns when `D12_MilkingPlace` is in minorPlayed (mirrors BGA `NEGATED_BY_MILKING_PLACE` ruling); D12 also splices `card:D148_DomesticianExpert` zone defensively. Deferred to follow-up: A14 banned field (no `banned` schema field yet — needs owner decision + types.ts + dealHands filter), i18n 71+437 keys, 14 stub cards. Each behavior fix: red test → green fix; reaches updated. lint/build/check:reaches/check:prompt-sync all green. — see branch sprint-6-batch**
 - **2026-04-29 Sprint 5 PR-5 partial done — 7 P1 behavior bugs fixed (high-ROI subset); remaining 21 deferred to follow-up (need wider mechanism work or >1h fix each, tracked in §2.3). Cards fixed: A150 Stagehand (drop maxRooms cap + players 4+), A139 HollowWarden (match both hollow / hollow-4 spaces), D18 SteamPlow (drop sow leaf), D160 Midwife (first-farmer guard), B42 ForestInn (maxRound: 6), B4 WoodPile (gain wood per accumulation space with my farmer), C39 StudioBoat (occupationPrerequisites: { min: 1 } enforce). Each fix: red test → green fix commit pair; lint + build + reaches + prompt-sync all green; fast/slow tests 264+262 files passing. — see branch sprint-5-batch**
 - **2026-04-29 Sprint 4 done — PR-4A A135/C136 sharedScoring + PR-4B 178 cards category alignment + PR-4C skipped (audit premise wrong: `player.resources.{animal}` already aggregates board+supply, no helper needed). Total ~1 day actual vs 5 day estimate. — see master-plan.md §8**
@@ -287,7 +288,6 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 
 | 卡牌 | 偏差 | 优先级 |
 |---|---|---|
-| **A14 Carpenter's Hammer** | BGA 标 `banned=true`（卡被禁用），我方未带等价字段（也归 §2.7 待 owner 决策） — Sprint 6 evaluated: `banned` 字段尚未在 `shared/cards/types.ts` 定义，加字段 + dealHands 过滤 + UI 标识 是单独工作量；deferred to follow-up（待 owner 决策） | P2 |
 | **A154 / A158 / A160** | `players` 元数据应为 '4+'，代码写 '3+' — ✅ Sprint 1 PR-1A on branch sprint-1-pr-1a | **P0** |
 | **B4 WoodPile** | cost: food:2 已清空 ✅ PR-1B；硬编码 gain wood=3 行为偏差（BGA 是"累计格 farmer 数"）— 残留 behavior，转 Sprint 5（见 §2.3） | **P0** |
 | **B42 ForestInn** | `vp:1` 已补 ✅ PR-1B；round ≤ 6 的 isBuyable 守卫残留 behavior，转 Sprint 5（见 §2.3） | P1 |
@@ -301,7 +301,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（10 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149）
+### 2.5 🔀 刻意偏离 BGA（11 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -321,6 +321,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 | D132 HideFarmer（2026-04-29 Sprint 2.5 skip） | 玩家选 hide 几个未用 farmyard（付等量 food，抵扣等量 -1 VP penalty）| `computePostScore` auto-max — `min(food, penalty)` 全 hide | scoring 阶段 food 已无其他用途；hide N 个 = 净 +N VP - 0 effective food cost；auto-max 严格最优 | 加 hide-N-spaces pending prompt |
 | E132 VeggieLover（2026-04-29 Sprint 2.5 skip） | 玩家选 0/1/2/3 套 (1G+1V→2 / 2G+2V→4 / 3G+3V→6 VP) | auto-max — `min(grain, veg, 3)` 套 + `ctx.reserved` | grain/vegetable 在 scoring 单独 category 计分（每个 1 VP up to 4），换 2VP 套相比保留 grain/veg 的 raw VP 几乎总不亏（每套 +2VP - 2 raw VP 资源 = 0 净；3 套 +6 - 6 = 0）；多数情况无差异 | 加 1/2/3 套 XOR pending prompt |
 | E149 MidnightFencer（2026-04-29 Sprint 3） | 第 14 轮 StartHarvest 触发 fencing flow，让玩家从对手 unbuilt fences 中拿最多 2 段免费放在自己农场（可超过 15 段上限），围出新 pasture 拿 VP | onStartHarvest 弹 choice 0..2×(numPlayers−1)，每选 K 在 `cardStates.E149.extraData.owedFences` 累加 K，`computeBonusScore` 直接 +K 原始 VP；`offered` 标记防止重触发 | 端的 fencing action 是 UI stub（`shared/actions/effects/fencing.ts:65-72`），fence 系统不模型化"每玩家围栏储备"；要复刻 BGA 玩家选边放置流程需要 fence 系统重写（≥1 周），远超 master-plan §8 Sprint 3 的 3 day 估算；数量级合理（4p max +6 VP ≈ BGA 1-2 pastures × 1-3 VP = 1-6 VP；略高估但在范围内） | 重写 fence 系统：引入"reserve fences per player"模型 + fencing flow 支持"midnight 模式跳付费 + 跨玩家 source"，再把 E149 切回 BGA 行为 |
+| A14 Carpenter's Hammer（2026-04-30 owner 决议） | BGA 标 `banned=true`：卡池过滤，不发到玩家手里 | 不实现 banned 字段，A14 保留在卡池中可被玩家抽到；A14 自身的 4-modifier 折扣效果（reed/wood/clay/stone in min 2 rooms）已与 BGA 对齐 | banned 是独立的 schema/dealHands 工作量（types.ts 加字段 + dealHands 过滤 + UI 标识），与 A14 折扣实现无冲突；owner 决议优先简化 schema，不引入 banned 概念 | 在 `shared/cards/types.ts` 加 `banned?: boolean`、`shared/game/deal-cards.ts` 在发牌时过滤 banned=true 的卡、UI 在卡池预览中标灰，再把 A14 标 banned |
 
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 
