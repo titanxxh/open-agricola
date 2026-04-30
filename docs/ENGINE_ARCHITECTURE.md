@@ -1803,6 +1803,57 @@ trade 通过 `cookeryTrades: Record<cardId, Trade[]>` 全局注册，每条 `Tra
 ### 与 E85 MasterTanner 的天然联动
 
 E85 监听 exchange action 的 before/after phase；E53 触发的 exchange leaf 走同一个 dispatch 路径，所以 E53 转 boar→food 时 E85 自动看到 boar diff 并按规则 push food 到自己的 stack。两卡解耦，仅通过统一的 exchange action / cookeryTrades 注册表交互。
+## 15.3 viaCardJump worker-less variant (Sprint 5 mech-E)
+
+`shared/actions/effects/place-farmer.ts` 的 viaCardJump 分支接受 `workerId` optional。当未传时（worker-less 模式）：
+
+- 跳过 `removeWorkerRef` / `addWorkerRef` / `recordRoundPlacement` / `incPlacedFarmers`
+- 跳过 `computeAllowedPlacementSpaces` 校验（调用方负责验证 target 空间合法）
+- 仍累加 `actionContext.jumpChain` + 返回 `{type:'flow', flow}`，flow 为 target action 的 `expandFlow` leaf
+- cascade dispatch（match place-farmer after listener）照常跑
+
+`jumpLeaf()` helper 同步：`workerId` 字段从必填改为 optional；`actionContext.workerId` 仅在传入时落地。
+
+**用例**：A151 Minstrel 在 returning home phase 触发，没 farmer 在手可借。worker-less 模式让 engine 跑指定空间的完整 flow（如 sheep-market 的 accumulation 自动清零、grain-utilization 的 OR(sow, bake-bread)、major-improvement 的 improvement-any、fencing 的 fence flow），第三方卡 listener 也照常 fire。
+
+**不在范围**：worker-less 模式不修改任何 stats（placedFarmers / familySize / workersAvailable 都不动），也不写 round-placement 历史。这是 BGA `useActionSpaceNode` 的真实语义——"使用空间的完整效果，不是落子"。
+
+### 使用此机制的卡
+
+A151 Minstrel（returning home phase 触发，仅当唯一一个 stage-1 空间未占用）。
+
+## 15.4 gain action 三合一 (Sprint 5 mech-E)
+
+`shared/actions/effects/gain.ts` 的 `gain` action 接受三个可选参数控制 dispatch：
+
+- `recipientPlayerId?: string` — 单一收件人；默认 `context.player.id`
+- `recipientMode?: 'self' | 'others'` — `'others'` 表示"所有其他玩家 each"
+- `payerId?: string` — 同时扣 payer 资源（用于"对手 pay 给 owner"语义；clamp 在 0）
+
+历史上这三种 dispatch 是 3 个独立 effect（`gain` / `gain-trigger-player` / `gain-other-players`），2026-04-30 Sprint 5 mech-E 合并；后两个 effect 文件已删除。`gain` 的 logKey 按 `recipientMode` 选择：`others` 走 `log.cardEffectOtherPlayersGain`，其它走 `log.cardEffectGain`。
+
+调用方约定：
+
+```ts
+{ type: 'leaf', actionId: 'gain', params: { food: 1, recipientMode: 'others' }, sourceCard: ... }
+{ type: 'leaf', actionId: 'gain', params: { grain: 1, recipientPlayerId: triggerId }, sourceCard: ... }
+{ type: 'leaf', actionId: 'gain', params: { food: 1, recipientPlayerId: ownerId, payerId: triggerId }, sourceCard: ... }
+```
+
+`addCardResourceGained` / `addResourcesFromCards` / `trackWorkPhaseBuildingResources` 按 recipient 是否为 source player 分流。
+
+## 15.5 BonusModifier conditions 评估扩展 (Sprint 5 mech-E)
+
+`shared/actions/effects/pay.ts` 的 `getModifiersForCostType` 在非-construct cost type（renovation / improvement / fencing / stables / plow / occupation）按 BonusModifier `conditions` 字段实时过滤。支持的 conditions key：
+
+- `minNumRooms: number` — 评估为 `player.rooms < N` 不通过
+- `houseTypeWood / houseTypeClay / houseTypeStone: 1` — 评估为 `player.houseType !== expected` 不通过
+
+construct 路径不变（仍由 `room-payment.ts` 的 `bonusAppliesToRoomCount` 在每次 build 调用时按 `roomCount`（含本次 build）评估，因为 `minNumRooms` 在 construct 上下文是"本次 build 至少 N 个房间"）。
+
+这是 `pay.ts` line 490 TODO 的部分 fix（仅 `BonusModifier.conditions` 覆盖）；`Bonus.conditions`（ComplexCost 内传递的字段）仍未在 `computeAllBuyableCombinations` 评估，留 follow-up。
+
+**用例**：C13 WoodSlideHammer 持 `conditions: { houseTypeWood: 1, minNumRooms: 5 }`：木屋且 ≥5 间时 stone:2 折扣激活；renovate 后 houseType 变 clay/stone，modifier 自动失效（无需手动从 `activeModifiers` 移除）。
 
 ## 16. 当前结论
 

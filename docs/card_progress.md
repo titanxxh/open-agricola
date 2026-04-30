@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 Sprint 5 mech-E — 6 张 P1 单卡修批次 + gain action 三合一 + viaCardJump worker-less**：B115 TinsmithMaster（删 selection 全 field 自动 +1，对齐 BGA `actAddAdditionalGood`）/ C13 WoodSlideHammer（改 BonusModifier 加 conditions { houseTypeWood, minNumRooms:5 } + bump discount stone:1 → stone:2，扩 `getModifiersForCostType` 对非-construct 路径实时评估 conditions）/ B29 CookeryLesson（per-round 改 per-action token 跟踪，cookedActionToken / lessonsActionToken 防 turn1+turn2 错奖）/ B138 ForestGuardian + C51 FishingNet（用合并后 `gain` + `payerId` 真让对手扣 food）/ A151 Minstrel（用 viaCardJump worker-less 真对齐 BGA `useActionSpaceNode`，accumulation 自动清零、ReplaceHook / computeCosts / 第三方 listener 都按直接落子路径触发）。两处主路径改：(1) 合并 3 个 gain action 到统一 gain（删 gain-trigger-player.ts + gain-other-players.ts；参数化 recipientPlayerId / recipientMode / payerId；14 张 caller 卡迁移）；(2) viaCardJump 扩展 worker-less 模式（workerId optional）；(3) BonusModifier conditions 在非-construct 路径实时评估（修 line 490 TODO 部分）。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-mech-e-misc-fixes-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-e-misc-fixes.md`。
 - **2026-04-30 Sprint 5 stub-test 基础设施 + 机制 A 完整测试套补齐**：`shared/actions/hooks.ts` 加 `unregisterActionHook(id: string)` 5 行（按 id splice `actionHooks` 数组；找不到时 silently no-op）；新建 `server/__tests__/place-farmer-jump-stub-coverage.test.ts` 含 4 个 stub-based 测试场景。**关键 fix（commit `fbcb6c44`）**：jump effect execute 内部加 cascade dispatch 调用 — farmer 移动到第二格后通过 `getMatchingListeners + executeCardListener` 收集 second-place 的 place-farmer after listener flows，wrap 进返回 SEQ。这模拟 `runPlaceFarmerAfterHooks`（game-core 顶层 dispatch 是 one-shot，jump 后切到 flow-engine 不再 fire）在 jump 路径的等价行为。现在 A→B→C 链能真触发，jumpChain 防递归**真起作用**（之前是"hook never fired so no recursion"，现在是"hook fired but jumpChain blocks"）。listener 反注册 API 早就有（`CardRegistry.registerListener` / `removeListenersWhere` / `unload`，registry.ts:67-133），所以本批不需要新增 listener 反注册 API。mech-A spec §6.5 / §8.2 同步更新反映 cascade via jump effect 的真实路径。**实现 hook 注册顺序细节**：GameSession 构造调 `clearActionHooks()`（game-core.ts:284），所以 stub action hook 必须在 `new GameSession()` 之后注册。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-stub-test-infra-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-stub-test-infra.md`。
 - **2026-04-30 Sprint 5 mech-B — A4 Baseboards / D83 Pigswill / D117 WoodExpert 接入现有 alt-cost 基础设施**：A4 / D83 cost 改 `altCosts:[{food:2},{grain:1}]`（BGA OR-ed payment）；D117 computeCosts 改返回 `trades:[{from:{food:1}, to:{wood:2}, max:1}]`，让玩家可选用替代付法（pay 主路径自然枚举多 PaymentSolution + selectPayment choice prompt）。`getImprovementWoodCost` 扩展扫 `altCosts`，使 D117 helper 也识别含 wood 的 altCosts 形态 minor。基础设施 100% 已存在（`ComplexCost.fees` / `Trade` / `computeAllBuyableCombinations` / `resolvePaymentSolutionSelection`），本批纯单卡接入，0 主路径改动。新增 `server/__tests__/A4_Baseboards-session.test.ts` (4 例) / `D83_Pigswill-session.test.ts` (4 例) / `D117_WoodExpert-session.test.ts` (6 例)。**~~已知偏离~~ ✅ 2026-04-30 后续修复（pay-helpers commit `e529b103`）**：`resolveCardPreviewCost` 短路逻辑已修；`resolveCardCostWithModifiers` 现接受 ComplexCost 输入，listener 收集到的 `trades` / `bonuses` 会 append 进 ComplexCost.trades / bonuses；`result.costs` patch 仍只走 flat 路径（ComplexCost 上 patch 哪个 fee 语义不明，留作 follow-up）。D117 trade 现已对 altCosts-form minor（如 B43 Chophouse）生效，`D117_WoodExpert-session.test.ts` 场景 5/6 改回 spec 原意：B43 食物=10 wood=2 clay=2 时 ≥3 个 PaymentSolution（wood-base + wood-trade + clay-base），clay=0 时 ≥2 个（wood-base + wood-trade，clay-alt 不可付）。spec / plan: `docs/superpowers/specs/2026-04-30-sprint-5-mech-b-alternative-cost-trades-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-b-alternative-cost-trades.md`。
 - **2026-04-30 Sprint 5 mech-C — anytime-exchange 重命名为 exchange + E53 BoarSpear 重写**：`anytime-exchange` action（id + nameKey/descriptionKey）去掉 `anytime-` 前缀对齐 `reorganize`（另一 anytime action 无前缀）；常量名 `anytimeExchangeAction` 保留。`exchange.execute` 加 `actionContext.tradeIds?: string[]` 限定能力——listener-triggered exchange leaf 通过 `actionContext: { tradeIds: ['CARD_ID'] }` 让 `buildExchangeOptions` 输出 filter 后只保留 `option.sourceCard ∈ tradeIds` 的项（cancel 选项总保留；若仅剩 cancel 返回 `fail`）。`getPlayerCookeryTrades` / `hasAffordableCookeryTrade` 同时读 `player.improvements + player.minorPlayed`，让 minor 卡（如 E53）也能 contribute trade。E53 注册 `{ from:{boar:1}, to:{food:4}, sourceId:'E53_BoarSpear' }` 到 `cookeryTrades`。E53 重写：原 `during/after` 双 listener + `extraOptions` + `'exchange'` actionId（typo，silently no-op）废弃，改为单 `after` listener on `gain/collect/receive`：检查 `result.resourcesGained.boar > 0` + `state.roundPhase !== 'breeding'`（BGA "outside of the breeding phase of a harvest"）+ per-action once via `readActionSnapshotToken`（同 token 二次 dispatch 不重弹），返回 SEQ optional → exchange leaf with `tradeIds=['E53_BoarSpear']`。E85 MasterTanner 自动联动（命名重构覆盖 6 张卡 listener actions：E85/C53/B29/A48/D36/D56；3 测试 actionId 字符串）。新增 `server/__tests__/E53_BoarSpear-session.test.ts`（7 例：non-boar no-op / 1-boar accept / multi-boar 受 reorg 容量限 / reject / token dedup / breeding 排除 / E53+E85 联动）；`shared/cards/__tests__/sourceCard-card-production.test.ts` 的 E53 用例重写匹配新单 listener 形态。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-mech-c-exchange-rename-boar-spear-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-c-exchange-rename-boar-spear.md`。
@@ -245,15 +246,15 @@
 The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 hour of work or wider mechanism changes; tracked here so a future PR can pick them up:
 
 - ~~**A129 Swagman** — needs SEQ semantics + once-per-turn flag covering both spaces~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf + place-farmer.viaCardJump; jumpChain self-check)
-- **A151 Minstrel** — sheep-market accumulation clearance + grain-utilization SEQ-vs-OR re-check (audit's claim of OR-vs-SEQ contradicts BGA `ActionGrainUtilization` which is also `NODE_OR + forcePassAfterOne`); needs second pass to either close as already-correct or implement accumulation clearing
+- ~~**A151 Minstrel** — sheep-market accumulation clearance + grain-utilization SEQ-vs-OR re-check~~ — ✅ **Sprint 5 mech-E** done (rewrote with viaCardJump worker-less mode; engine expands target space's flow so accumulation auto-clears, ReplaceHook / computeCosts / third-party listeners all run as on a direct placement)
 - **B27 Toolbox** — ✅ Sprint 5 mech-D — once-per-turn semantics implemented via `effect.onEndTurn` + `effect.onBuy` + setFlag listeners (no longer fires on every construct / stables / fencing)
-- **B29 CookeryLesson** — needs `turnId` (per-placement) tracking instead of `cookedThisRound` (per-round) — requires per-action-token state machine extension
-- **B115 Tinsmith** — multi-field: "+1 to each field" requires per-field iteration in the listener
+- ~~**B29 CookeryLesson** — needs `turnId` (per-placement) tracking instead of `cookedThisRound` (per-round)~~ — ✅ **Sprint 5 mech-E** done (cookedActionToken / lessonsActionToken tracking via readActionSnapshotToken, USED_ACTION_TOKEN_KEY guards double-award)
+- ~~**B115 Tinsmith** — multi-field: "+1 to each field" requires per-field iteration in the listener~~ — ✅ **Sprint 5 mech-E** done (drop selection prompt; iterate every freshly sown field)
 - ~~**B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf helper + place-farmer.viaCardJump; second-space dispatch runs full ActionNode path)
-- **B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food (audit flagged as "must confirm")
+- ~~**B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - **B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths
 - **C23** — triggering condition deviation (need re-read of BGA file to identify)
-- **C51 FishingNet** — actually deduct trigger-player food
+- ~~**C51 FishingNet** — actually deduct trigger-player food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - ~~**D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade~~ — ✅ **Sprint 5 mech-B** done (computeCosts returns `trades` instead of forced cost patch; pay main path enumerates use-trade / no-trade solutions, player picks via standard selectPayment prompt); altCosts-form minors (B43 etc.) covered after pay-helpers `e529b103` (ComplexCost input now runs `computeCosts` listeners, trades/bonuses appended into ComplexCost arrays).
 - ~~**E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work~~ — ✅ **Sprint 5 mech-C** done (exchange action rename + `actionContext.tradeIds` filter; E53 single after-listener with breeding-phase guard + per-action-once via actionToken; E85 auto-couples)
 - **B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read
@@ -497,6 +498,28 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 
 `shared/actions/hooks.ts` 暴露 `unregisterActionHook(id: string)`，按 id splice 单条 hook；找不到时 silently no-op。配合现有 `CardRegistry.registerListener` / `removeListenersWhere` / `unload`（registry.ts:67-133）让 stub-based 测试能干净注册和清理 stub listener / hook，避免 `clearActionHooks()` 全清污染其他卡的 hook 注册。机制 A spec §6.4 / §6.5 / §6.5b 的 3 个 stub 场景由此落地（`server/__tests__/place-farmer-jump-stub-coverage.test.ts`）。注意：stub action hook 必须在 `new GameSession()` 之后注册，因为 GameCore 构造调 `clearActionHooks()`（game-core.ts:284）；stub listener 通过 `requireActiveCardRegistry().registerListener()` 注册到 active registry，GameSession 构造时通过 `existing.clone()` 自动继承。
 
+### gain action 三合一 + viaCardJump worker-less variant (Sprint 5 mech-E, 2026-04-30)
+
+**gain action 三合一**：`shared/actions/effects/gain.ts` 的 `gain` action 现接受三个可选参数控制 dispatch：
+
+- `recipientPlayerId?: string` — 单一收件人；默认 `context.player.id`
+- `recipientMode?: 'self' | 'others'` — `'others'` 表示"所有其他玩家 each"
+- `payerId?: string` — 同时扣 payer 资源（用于"对手 pay 给 owner"语义；clamp 在 0）
+
+历史上这三种 dispatch 是 3 个独立 effect（`gain` / `gain-trigger-player` / `gain-other-players`），2026-04-30 Sprint 5 mech-E 合并。`gain-trigger-player.ts` / `gain-other-players.ts` 已删除；14 张 caller 卡迁移（A29 / A50 / A132 / A154 / A156 / A159 / B138 / C29 / C38 / C51 / C142 / C152 / D128 / D139 / E160）+ card-listeners.ts logKey Set + i18n keys 同步清理。B138 ForestGuardian / C51 FishingNet 用 `payerId` 真扣对手 food（修 long-standing bug）。
+
+**BonusModifier conditions 评估扩展**：`getModifiersForCostType` 现对非-construct cost type（renovation / improvement / fencing / stables / plow / occupation）按 BonusModifier `conditions` 字段（`houseTypeWood/Clay/Stone` / `minNumRooms`）实时过滤。construct 路径不变（仍由 room-payment 在每次 build 调用时按 roomCount 评估，因为 minNumRooms 含义不同）。这是 line 490 TODO 的部分 fix，仅 BonusModifier.conditions 覆盖；`Bonus.conditions`（ComplexCost 内）仍未评估，留 follow-up。C13 WoodSlideHammer 受益：现 `conditions: { houseTypeWood: 1, minNumRooms: 5 }` 被实时检查，stone:2 折扣只在 5 间木屋时显现。
+
+**viaCardJump worker-less 模式**：`shared/actions/effects/place-farmer.ts` 的 viaCardJump 分支接受 `workerId` optional。当未传时：
+
+- 跳过 `removeWorkerRef` / `addWorkerRef` / `recordRoundPlacement` / `incPlacedFarmers`
+- 跳过 `computeAllowedPlacementSpaces` 校验
+- 仍累加 `jumpChain` + 返回 expandFlow + 跑 cascade dispatch
+
+用例：A151 Minstrel 在 returning home phase 没 farmer 可借，用 worker-less 模式让 engine 跑指定空间的完整 flow（自动清空累积资源 / 触发其他卡 listener / 跑 ReplaceHook / computeCosts）。`jumpLeaf()` helper 同步把 `workerId` 改为 optional，调用方可省略。
+
+实现：`shared/actions/effects/gain.ts` rewrite + `shared/actions/effects/pay.ts` `getModifiersForCostType` 扩展 + `shared/actions/effects/place-farmer.ts` viaCardJump 分支 + `shared/cards/helpers/jump-leaf.ts` 签名调整 + `shared/cards/A/A151_Minstrel.ts` 重写。
+
 ---
 
 ## 4. 实现进度时间线
@@ -546,6 +569,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5 mech-D (B27 Toolbox turn-edge BGA 对齐) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 5 mech-B (A4/D83 altCosts + D117 trades) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 5 mech-C (anytime-exchange 重命名 → exchange + E53 BoarSpear) | 04-30 | 0 | 822 | 92.1% |
+| Sprint 5 mech-E (6-card collection batch + gain merge + viaCardJump worker-less) | 04-30 | 0 | 822 | 92.1% |
 
 ### 2026-04-17 Wave 1-9 明细
 
