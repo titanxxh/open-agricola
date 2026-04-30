@@ -1,7 +1,23 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import type { PlayerState } from '../../game/types'
 
 const CARD_ID = 'A38_WoolBlankets'
+
+const countSheepOnBoard = (player: PlayerState): number => {
+  let total = 0
+  for (const pasture of player.pastures) {
+    if (pasture.animalType === 'sheep') total += pasture.animalCount
+  }
+  if (player.houseAnimalType === 'sheep') total += player.houseAnimalCount
+  for (const animal of Object.values(player.stableAnimals ?? {})) {
+    if (animal === 'sheep') total += 1
+  }
+  return total
+}
+
+registerPrerequisite('5 Sheep', (player) => countSheepOnBoard(player) >= 5)
 
 export const A38_WoolBlankets = new MinorImprovement({
   id: CARD_ID,
@@ -11,7 +27,7 @@ export const A38_WoolBlankets = new MinorImprovement({
   category: "POINTS_PROVIDER",
   desc: ["During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."],
   cost: {},
-  prerequisite: "Wooden House",
+  prerequisite: "5 Sheep",
   extraVp: true,
 })
 
