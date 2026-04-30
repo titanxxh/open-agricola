@@ -1769,6 +1769,41 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 
 A129 Swagman / B130 FullPeasant / B150 LargeScaleFarmer / B152 JuniorArtist。
 
+## 15.2 exchange action 与 actionContext.tradeIds (Sprint 5 mech-C)
+
+`shared/actions/effects/exchange.ts` 的 anytime exchange action（id 原 `'anytime-exchange'`，2026-04-30 重命名为 `'exchange'`，去前缀对齐 `reorganize`）接受 `actionContext.tradeIds?: string[]` 限定显示哪些 trade。
+
+### 协议
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'exchange',
+  sourceCard: 'CARD_ID',
+  actionContext: { tradeIds: ['CARD_ID'] },
+}
+```
+
+`execute({ player, actionContext })` 内：
+
+1. 调 `buildExchangeOptions(player)` 拿到玩家所有可用 trade 的选项（每个选项的 `option.sourceCard = trade.sourceId`）。
+2. 若 `actionContext.tradeIds` 存在且非空，过滤为只保留 `option.sourceCard ∈ tradeIds` 的项；`'cancel'` 选项总是保留，让玩家能拒绝。
+3. 若 filter 后只剩 `cancel`（无任何可换 trade），返回 `{ type: 'fail', logKey: 'log.actionNoExchange' }` 不弹 prompt。
+4. 否则返回 `{ type: 'choice', options: filtered }`。
+
+### 注册
+
+trade 通过 `cookeryTrades: Record<cardId, Trade[]>` 全局注册，每条 `Trade` 带 `sourceId` 标识 source 卡。`getPlayerCookeryTrades(player)` 与 `hasAffordableCookeryTrade(player)` 同时遍历 `[...player.improvements, ...player.minorPlayed]`：让 minor 卡（如 E53 BoarSpear）也能 contribute trade，而不仅限于 major-improvement-based cookers。
+
+### 用例
+
+- **玩家主动触发 anytime exchange action**（不传 `actionContext.tradeIds`）：所有持有源卡的 trade 都可见——历史 cookery exchange 行为，零变化。
+- **卡 listener 触发 exchange leaf with `tradeIds=[CARD_ID]`**：仅显示该卡的 trade，避免污染玩家平时主动 exchange 的全部选项。E53 BoarSpear 是首个消费者：obtain（`gain` / `collect` / `receive`）after phase 检测到 `result.resourcesGained.boar > 0` 且非 breeding phase 时，弹 SEQ optional → exchange leaf with `tradeIds=['E53_BoarSpear']`，玩家只看到 boar→4food 这一条 trade。
+
+### 与 E85 MasterTanner 的天然联动
+
+E85 监听 exchange action 的 before/after phase；E53 触发的 exchange leaf 走同一个 dispatch 路径，所以 E53 转 boar→food 时 E85 自动看到 boar diff 并按规则 push food 到自己的 stack。两卡解耦，仅通过统一的 exchange action / cookeryTrades 注册表交互。
+
 ## 16. 当前结论
 
 项目的主设计应明确为：
