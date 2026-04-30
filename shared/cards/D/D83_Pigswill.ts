@@ -25,7 +25,7 @@ export const D83_Pigswill = new MinorImprovement({
   number: 83,
   category: 'LIVESTOCK_PROVIDER',
   desc: ['Each time you use the __Fencing__ action space, you also get 1 <PIG>.'],
-  cost: { food: 2 },
+  altCosts: [{ food: 2 }, { grain: 1 }],
   newSet: true,
 })
 
