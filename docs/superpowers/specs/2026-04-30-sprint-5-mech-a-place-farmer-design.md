@@ -122,17 +122,19 @@ execute: ({ state, player, actionContext }) => {
     // stats：jump 也算一次 farmer placement（与 game-core.ts:1936 takeAction 入口对齐）
     incPlacedFarmers(player)
 
-    // 第二格执行：返回 flow 让 engine 走完整 ActionNode 路径，
-    // 包括 applyComputeReplace / applyIsDoable / computeCosts / before / during / after listener。
-    // 不直接调 targetSpace.execute（那会绕开 ReplaceHook 等扩展点，导致 D117 / D138 / E134 类
-    // 修改 action 行为的卡对 jump 第二格不生效）。
+    // 第二格执行：返回 leaf with expandFlow，让 engine 在 buildFlowNode 时
+    // 把 leaf 替换成 target action 的 flow 子树（与 createEngine(actionId) 一致）。
+    // 这样 applyComputeReplace / applyIsDoable / computeCosts / before / during /
+    // after listener 全套 hook 序列正常 dispatch；同时透传 sourceCard +
+    // viaCardJump / jumpChain actionContext 给所有内嵌 leaves。
     return {
       type: 'flow',
       flow: {
         type: 'leaf',
         actionId: targetSpaceId,        // spaceId 在 action registry 里即 actionId
+        expandFlow: true,               // ← 让 engine 展开 action.flow
         sourceCard,
-        actionContext: { ...actionContext },  // 透传 viaCardJump / jumpChain 给第二格 hook
+        actionContext: { ...actionContext },
       },
     }
   }
@@ -153,7 +155,8 @@ execute: ({ state, player, actionContext }) => {
 - 第二格被 `addWorkerRef` 后视为已占（`isSpaceOccupied`），落地 `LANDS_ON_SECOND_SPACE` ruling
 - `ONE_JUMP_PER_TURN` ruling 由 jumpChain 自检自然保证（同 farmer 一次落子链不会重复触发同一卡）
 - **可达性与普通落子完全一致**：listener handler（弹 prompt 前）与 effect jump 分支（farmer 移动前）**都**用 `computeAllowedPlacementSpaces(state, player)` 作为唯一判定源，不写"半套"自定义可达性检查。`computeArgs` phase 的 listener hook 扩展（如未来某卡允许"已占可选"格）自动对 jump 生效，无需机制 A 单独适配。`computeArgs` listener 与机制 A 的 `after` listener phase 不同，不会自递归
-- **第二格执行轨迹与普通落子完全一致**：jump effect 自己只做 farmer 移动 + stats 簿记，不直接调 `targetSpace.execute`。它返回 `{ type:'flow', flow:{ type:'leaf', actionId: targetSpaceId, ... } }`，由 engine 接管创建新 ActionNode 走完整路径：`applyComputeReplace`（D117/D138/E134 类替换 / 替代付费）→ `applyIsDoable`（卡 isDoable 否决）→ `computeCosts`（替代成本 / 折扣）→ `before` phase listener → `space.execute` → `during/immediatelyAfter/after` phase。jump 与"玩家直接落第二格"路径产生**完全相同的 hook dispatch 序列**，唯一区别是 actionContext 多带 `viaCardJump` + `jumpChain`
+- **第二格执行轨迹与普通落子完全一致**：jump effect 自己只做 farmer 移动 + stats 簿记，不直接调 `targetSpace.execute`。它返回 `{ type:'flow', flow:{ type:'leaf', actionId: targetSpaceId, expandFlow: true, ... } }`，由 engine 接管创建新 ActionNode 走完整路径：`applyComputeReplace`（D117/D138/E134 类替换 / 替代付费）→ `applyIsDoable`（卡 isDoable 否决）→ `computeCosts`（替代成本 / 折扣）→ `before` phase listener → `space.execute` → `during/immediatelyAfter/after` phase。jump 与"玩家直接落第二格"路径产生**完全相同的 hook dispatch 序列**，唯一区别是 actionContext 多带 `viaCardJump` + `jumpChain`
+- **ActionFlow leaf `expandFlow` 字段**：jump leaf 设 `expandFlow:true`，engine 在 `buildFlowNode` 时展开 `registry.get(actionId).flow` 子树（与 `createEngine(actionId)` 路径对齐）；outer `actionContext` / `sourceCard` 通过 `engine.mergeContextIntoFlow` 透传到展开后的内嵌 leaves（深拷贝，不污染 module-level `action.flow` 常量）。inner leaf 已有的字段优先（merge 时 outer 不覆盖 inner）。target action 没有 `flow` 时（grain-seeds / day-laborer / traveling-players）自动 fallback 到原 ActionNode 路径
 
 **stats 系统交互**：
 
@@ -427,5 +430,6 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 - commit 5: B152 改造（含删 zeroSpaceListener）+ session 测试更新
 - commit 6: 防递归 / 串联触发链测试 + i18n
 - commit 7: 文档同步（card_progress + master-plan + ENGINE_ARCHITECTURE）
+- commit 8: engine: leaf expandFlow + place-farmer 删除 hoist DI（替换 Phase 7 的 actionLookup runtime DI 为 engine 层 leaf expandFlow 通用扩展点；新增 `engine.mergeContextIntoFlow` 把 outer context 透传给展开后的内嵌 leaves）
 
 每 commit 单独跑 `pnpm test:fast` + `pnpm run lint` + `pnpm run build`，全绿才 push。push 后等 GitHub Actions 通过。

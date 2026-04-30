@@ -617,6 +617,20 @@ export class Engine {
       return new PlayerSwitchNode(`ps-flow-${this.flowNodeCounter++}`, flow.targetPlayerId)
     }
     if (flow.type === 'leaf') {
+      if (flow.expandFlow) {
+        const definition = this.registry.get(flow.actionId)
+        if (definition?.flow) {
+          const inner = this.mergeContextIntoFlow(
+            definition.flow,
+            flow.actionContext,
+            flow.sourceCard,
+          )
+          return this.buildFlowNode(inner)
+        }
+        // Fallback: action has no inner flow (plain leaf action like
+        // grain-seeds / day-laborer / traveling-players). Drop into the
+        // standard ActionNode path below.
+      }
       const actionNode = new ActionNode(
         nextId(),
         flow.actionId,
@@ -666,6 +680,43 @@ export class Engine {
     const or = new OrNode(nextId(), children, flow.promptKey)
     const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
     return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+  }
+
+  /**
+   * Walk a flow subtree and stamp outer `actionContext` / `sourceCard` onto
+   * every leaf — used by the leaf `expandFlow` path so the inner flow's
+   * leaves carry jump metadata (viaCardJump / jumpChain / sourceCard) into
+   * downstream listeners. Outer context fields are merged with **inner
+   * priority**: any field already set on the inner leaf wins. Always returns
+   * a deep copy — never mutates the input flow (action.flow is a
+   * module-level constant).
+   */
+  private mergeContextIntoFlow(
+    flow: ActionFlow,
+    outerContext: Record<string, unknown> | undefined,
+    outerSourceCard: string | undefined,
+  ): ActionFlow {
+    if (flow.type === 'leaf') {
+      const merged = outerContext
+        ? { ...outerContext, ...(flow.actionContext ?? {}) }
+        : flow.actionContext
+          ? { ...flow.actionContext }
+          : undefined
+      return {
+        ...flow,
+        sourceCard: flow.sourceCard ?? outerSourceCard,
+        actionContext: merged,
+      }
+    }
+    if (flow.type === 'playerSwitch') {
+      return { ...flow }
+    }
+    return {
+      ...flow,
+      children: flow.children.map((c) =>
+        this.mergeContextIntoFlow(c, outerContext, outerSourceCard),
+      ),
+    }
   }
 
   private findChoiceNode(node: EngineNode): ChoiceNode | null {

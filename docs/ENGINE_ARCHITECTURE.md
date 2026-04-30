@@ -1712,12 +1712,13 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 
 ### 协议
 
-卡牌 listener 返回 jump leaf：
+卡牌 listener 返回 jump leaf（`shared/cards/helpers/jump-leaf.ts` 的 `jumpLeaf()`）：
 
 ```ts
 {
   type: 'leaf',
   actionId: 'place-farmer',
+  expandFlow: true,
   sourceCard: 'B130_FullPeasant',
   actionContext: {
     viaCardJump: true,
@@ -1737,7 +1738,7 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 3. mutate `actionContext.jumpChain = [...prev, sourceCard]`
 4. `removeWorkerRef(from)` + `addWorkerRef(target)` + `recordRoundPlacement`
 5. `incPlacedFarmers(player)`
-6. 返回 `{ type:'flow', flow }`，flow 取自 target action 的 `flow` 字段（如 `major-improvement → improvement-any`、`fencing → fence`、`grain-utilization → or(sow, bake-bread)`），fallback 为单 leaf；每个 leaf 都继承 `sourceCard` + `viaCardJump` actionContext，让 engine 走完整 ActionNode 路径
+6. 返回 `{ type:'flow', flow:{ type:'leaf', actionId: targetSpaceId, expandFlow: true, sourceCard, actionContext } }`。engine 在 `buildFlowNode` 看到 `expandFlow: true` 时，把这个 leaf 展开成 `registry.get(targetSpaceId).flow` 的节点子树（与 `createEngine(actionId)` 路径对齐），outer `actionContext` / `sourceCard` 通过 `engine.mergeContextIntoFlow` 透传到所有内嵌 leaves（深拷贝，inner 已有字段优先）。target action 没有 `flow` 时（grain-seeds / day-laborer / traveling-players）自动 fallback 到 `ActionNode(actionId)` 路径
 
 ### 防递归
 
@@ -1747,9 +1748,15 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 
 `actionToken` / `actionStartPlayerSnapshot` / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动 — jump 是同 action 延续。
 
-### 模块加载
+### 引擎扩展点：`ActionFlow` leaf `expandFlow`
 
-`shared/actions/index.ts` 在 lookup 表初始化后调用 `registerJumpActionLookup(getActionDefinition)` 注入 lookup，避免 `actions/index → internal-actions → effects/place-farmer → actions/index` 的循环依赖。
+为支持 jump（以及未来类似"借同一 leaf dispatch 进 target action 完整 flow"的机制），engine 给 `ActionFlow` leaf 加了可选 `expandFlow: boolean`。语义：
+
+- `expandFlow: true` 且 `registry.get(actionId).flow` 存在 → engine `buildFlowNode` 把 leaf 替换成 `action.flow` 的节点子树
+- `expandFlow: true` 但 action 无 `flow` → fallback 到原 `ActionNode(actionId)` 路径（plain leaf actions）
+- `expandFlow` 缺省 / `false` → 走原 `ActionNode` 路径，所有现有 leaf 行为不变
+
+实现细节：`engine.mergeContextIntoFlow` 递归遍历 inner flow，把 outer leaf 的 `actionContext` 和 `sourceCard` 注入到每个内嵌 leaf；merge 用 inner 优先（inner 已有的字段不被 outer 覆盖），并整体深拷贝（`action.flow` 是 module-level 常量，不允许污染）。
 
 ### 不在范围
 

@@ -1,7 +1,6 @@
 import type {
   ActionDefinition,
   ActionExecutionResult,
-  ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
@@ -12,43 +11,6 @@ import { smallestAvailableWorker } from '../../game/player'
 import { incPlacedFarmers } from '../../logic/stats'
 import { computeAllowedPlacementSpaces } from './placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
-
-// Inject the action lookup at runtime to avoid an import cycle with
-// shared/actions/index. `actions/index.ts` registers the lookup right after
-// its action map is built. Until then the jump branch's flow expansion falls
-// back to a single leaf, which is harmless for the unit-test path that
-// constructs the effect in isolation.
-let actionLookup: ((id: string) => ActionDefinition | undefined) | null = null
-
-export const registerJumpActionLookup = (
-  lookup: (id: string) => ActionDefinition | undefined,
-): void => {
-  actionLookup = lookup
-}
-
-/**
- * Walk an action's `flow` and stamp `sourceCard` + jump-aware `actionContext`
- * onto every leaf so listeners downstream of the jump still see the chain.
- */
-const applyJumpContextToFlow = (
-  flow: ActionFlow,
-  sourceCard: string,
-  baseContext: Record<string, unknown>,
-): ActionFlow => {
-  if (flow.type === 'leaf') {
-    const merged = { ...baseContext, ...(flow.actionContext ?? {}) }
-    return {
-      ...flow,
-      sourceCard: flow.sourceCard ?? sourceCard,
-      actionContext: merged,
-    }
-  }
-  if (flow.type === 'playerSwitch') return flow
-  return {
-    ...flow,
-    children: flow.children.map((c) => applyJumpContextToFlow(c, sourceCard, baseContext)),
-  }
-}
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
@@ -135,23 +97,24 @@ export const placeFarmerAction: ActionDefinition = {
       recordRoundPlacement(player, targetSpace.id, workerId)
       incPlacedFarmers(player)
 
-      // If the target action defines an inner flow (e.g. major-improvement → improvement-any,
-      // farm-expansion → or(construct, stables), fencing → fence, ...), insert that flow
-      // directly so the engine runs the second placement through the standard ActionNode
-      // path with full hook coverage. Otherwise fall back to a single leaf dispatch
-      // (handles plain leaf actions like grain-seeds / day-laborer / traveling-players).
-      const ctxForwarded = { ...actionContext }
-      const targetDef = actionLookup ? actionLookup(targetSpaceId) : undefined
-      const innerFlow = targetDef?.flow
-      const flow: ActionFlow = innerFlow
-        ? applyJumpContextToFlow(innerFlow, sourceCard, ctxForwarded)
-        : {
-            type: 'leaf',
-            actionId: targetSpaceId,
-            sourceCard,
-            actionContext: ctxForwarded,
-          }
-      return { type: 'flow', flow }
+      // Hand the second placement to the engine via a leaf with `expandFlow`.
+      // When the target action defines an inner flow, the engine's
+      // buildFlowNode expands it into the action's flow subtree (with
+      // sourceCard + actionContext merged into every inner leaf). When the
+      // target has no inner flow (grain-seeds / day-laborer / traveling-players),
+      // the engine falls back to the standard ActionNode path. This mirrors
+      // the `createEngine(actionId)` semantics used when the player triggers
+      // the action directly via takeAction.
+      return {
+        type: 'flow',
+        flow: {
+          type: 'leaf',
+          actionId: targetSpaceId,
+          expandFlow: true,
+          sourceCard,
+          actionContext: { ...actionContext },
+        },
+      }
     }
 
     if (actionContext?.fromSupply) {

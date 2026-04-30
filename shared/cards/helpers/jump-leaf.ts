@@ -20,6 +20,7 @@ export interface JumpLeafParams {
 export const jumpLeaf = (p: JumpLeafParams): ActionFlow => ({
   type: 'leaf',
   actionId: 'place-farmer',
+  expandFlow: true,
   sourceCard: p.sourceCard,
   actionContext: {
     viaCardJump: true,

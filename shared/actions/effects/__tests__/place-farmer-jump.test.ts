@@ -42,25 +42,25 @@ describe('place-farmer effect viaCardJump branch', () => {
     expect(targetSpace.takenBy).toEqual([{ playerId: player.id, workerId: '1' }])
     expect(player.stats!.placedFarmers).toBe(placedBefore + 1)
     expect(actionContext.jumpChain).toEqual(['B130_FullPeasant'])
-    if (result.type !== 'flow') {
-      throw new Error(`expected flow result, got ${result.type}`)
-    }
-    // fencing has an inner flow (`{seq: [{leaf actionId:'fence'}]}`); the jump branch
-    // hoists that flow so the engine runs the second placement through the standard
-    // ActionNode path. Every leaf inherits sourceCard + the jump actionContext.
-    const collectLeafContexts: { actionId: string; ctx: Record<string, unknown> }[] = []
-    const walk = (n: typeof result.flow): void => {
-      if (n.type === 'leaf') collectLeafContexts.push({ actionId: n.actionId, ctx: n.actionContext ?? {} })
-      else if (n.type !== 'playerSwitch') n.children.forEach(walk)
-    }
-    walk(result.flow)
-    expect(collectLeafContexts.some(e => e.actionId === 'fence')).toBe(true)
-    for (const entry of collectLeafContexts) {
-      expect(entry.ctx).toMatchObject({
-        viaCardJump: true,
-        sourceCard: 'B130_FullPeasant',
-        jumpChain: ['B130_FullPeasant'],
-      })
+    // The jump effect returns a leaf that defers expansion to the engine: when
+    // the engine builds this leaf it will (via expandFlow) substitute in the
+    // target action's flow subtree, propagating sourceCard + actionContext to
+    // every inner leaf. The unit-level assertion here only checks the leaf
+    // shape; the engine-level expansion is exercised in the parity smoke test
+    // (server/__tests__/place-farmer-jump-recursion.test.ts).
+    expect(result.type).toBe('flow')
+    if (result.type === 'flow') {
+      expect(result.flow.type).toBe('leaf')
+      if (result.flow.type === 'leaf') {
+        expect(result.flow.actionId).toBe('fencing')
+        expect(result.flow.expandFlow).toBe(true)
+        expect(result.flow.sourceCard).toBe('B130_FullPeasant')
+        expect(result.flow.actionContext).toMatchObject({
+          viaCardJump: true,
+          sourceCard: 'B130_FullPeasant',
+          jumpChain: ['B130_FullPeasant'],
+        })
+      }
     }
   })
 
