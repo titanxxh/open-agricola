@@ -41,7 +41,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
 
@@ -61,7 +61,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 2 boar (Fireplace trade index 1 = boar->2food)
@@ -80,7 +80,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 1 sheep (index 0) + 1 boar (index 1)
@@ -100,7 +100,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 2 cattle (Fireplace trade index 2 = cattle->3food)
@@ -117,7 +117,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 2 vegetable (Fireplace trade index 3 = vegetable->2food)
@@ -134,7 +134,7 @@ describe('D56_FatstockStretcher session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 1 sheep (index 0) + 1 cattle (index 2)
