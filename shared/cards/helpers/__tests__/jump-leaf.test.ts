@@ -12,6 +12,7 @@ describe('jumpLeaf', () => {
     expect(flow).toEqual({
       type: 'leaf',
       actionId: 'place-farmer',
+      expandFlow: true,
       sourceCard: 'B130_FullPeasant',
       actionContext: {
         viaCardJump: true,

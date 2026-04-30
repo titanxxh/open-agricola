@@ -1,7 +1,6 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../game/types'
 import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
 import { internalActionDefinitions } from './internal-actions'
-import { registerJumpActionLookup } from './effects/place-farmer'
 import { cattleMarket } from '../cards/action/round-cattle-market'
 import { clayPit } from '../cards/action/common-clay-pit'
 import { copse } from '../cards/action/common-copse'
@@ -105,11 +104,6 @@ export const actionDefinitions: ActionDefinition[] = baseActionDefinitions
 export const getActionDefinition = (
   actionId: string,
 ): ActionDefinition | undefined => actionDefinitionLookup.get(actionId)
-
-// Inject the action lookup into the place-farmer effect now that the lookup
-// map is fully populated. This avoids an import cycle (place-farmer cannot
-// import from this module directly because internal-actions re-exports it).
-registerJumpActionLookup(getActionDefinition)
 
 export const createActionSpaces = (playerCount?: number): ActionSpace[] =>
   actionDefinitions

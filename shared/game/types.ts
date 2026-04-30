@@ -396,6 +396,16 @@ export type ActionFlow =
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
       effectPreview?: ChoiceEffectPreview
+      /**
+       * Opt-in: when true and `registry.get(actionId).flow` exists, the engine
+       * expands this leaf into the action's inner flow subtree (mirroring
+       * `createEngine(actionId)` semantics). The outer leaf's `actionContext`
+       * and `sourceCard` are merged into every inner leaf so downstream
+       * listeners still see jump metadata. When false (default) or when the
+       * action has no inner flow, the engine falls back to the standard
+       * `ActionNode(actionId)` path.
+       */
+      expandFlow?: boolean
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
