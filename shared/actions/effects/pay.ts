@@ -420,13 +420,46 @@ export const getEffectiveCost = (
   return result
 }
 
+/**
+ * Evaluate a BonusModifier's `conditions` against the player. Returns true when
+ * conditions are satisfied (or no conditions present). The construct path runs
+ * a specialized check (`bonusAppliesToRoomCount`) that also evaluates
+ * `minNumRooms` against the room count being built; for non-construct cost
+ * types we evaluate the same fields against the player's existing room count.
+ */
+const bonusModifierConditionsApply = (
+  player: PlayerState,
+  conditions: Record<string, number> | undefined,
+): boolean => {
+  if (!conditions) return true
+  if (typeof conditions.minNumRooms === 'number' && player.rooms < conditions.minNumRooms) {
+    return false
+  }
+  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') {
+    return false
+  }
+  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') {
+    return false
+  }
+  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') {
+    return false
+  }
+  return true
+}
+
 export const getModifiersForCostType = (
   player: PlayerState,
   costType: CostModifierType,
 ): CostModifier[] => {
-  return player.activeModifiers?.filter((m) => 
-    m.appliesTo.includes(costType)
-  ) ?? []
+  const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
+  // For construct, callers (room-payment) evaluate conditions per build call
+  // because they depend on the room count being built. For other cost types
+  // (renovation / improvement / fencing / stables / plow / occupation),
+  // conditions are evaluated here against the player's current state.
+  if (costType === 'construct') return all
+  return all.filter((m) =>
+    m.type !== 'bonus' || bonusModifierConditionsApply(player, m.conditions),
+  )
 }
 
 export const applyCostModifiers = (

@@ -277,6 +277,7 @@ return {
 ### 3.7 A151 Minstrel — 改用 viaCardJump 真二次落子（worker-less 变体）
 
 **当前实现完全不对齐 BGA**：A151 当前用 inline simulation（同 mech-A 之前的 4 张卡老实现），自己手写 sheep-market gain leaf / grain-utilization OR 等模拟，没真触发空间完整 flow。导致：
+
 - 第二格累积资源不自动回收（sheep-market 累积 sheep 不清空、其他空间累积同样问题）
 - 第二格不触发其他卡 listener（cascade dispatch 断链）
 - ReplaceHook / computeCosts 等扩展点对 A151 第二格不生效
@@ -570,17 +571,17 @@ mutate state 在 effect handler 内不优雅，但跟 mech-A B152 zeroSpaceListe
 ### 5.3 风险点
 
 
-| 假设                                                                            | 验证方式                                                                                             |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `player.houseType` / `player.roomTiles` 字段名                                   | grep `state.players[].houseType` 确认；plan 阶段写测试时按 actual 类型                                       |
-| `addBonus` / `bonuses` 字段在 ComplexCost 上语义生效                                  | 现有 modifier 系统已用 BonusModifier，listener 返回 `bonuses` 由 `resolveCardCostWithModifiers` 收集 — 已存在路径 |
-| B29 现有 onRoundStart 清 cookedThisRound = false 行为是否对 cookedActionToken 适用      | 改 onRoundStart 清 `cookedActionToken = -1`（或 undefined）— 同样防御                                     |
-| viaCardJump worker-less 模式跑通：jumpLeaf 不传 workerId → 不消耗 worker / 不动 takenBy / 仍 expandFlow + cascade dispatch | A151 session 测试 sheep-market.resources.sheep === 0（自动清空）+ family-pool 不变 |
-| `place-farmer.ts` 跳过可达性二次校验（worker-less 模式）：returnHome phase 不在 work phase，computeAllowedPlacementSpaces 内部假设 work phase 可能不成立 | A151 session 测试覆盖 returnHome 触发路径 + 4 stage-1 action 各种 unoccupied 组合 |
-| 现有 gain-other-players callers（A29/A50/C38/C142/E160/card-listeners）迁移后 statsLog 仍正确 | 各卡现有 session 测试跑过；新加合并 gain effect 单元测试覆盖 recipientMode='others' 路径 stats / log key |
-| 现有 gain-trigger-player callers（A132/A154/A156/A159）迁移后行为不变（非 B138 / C51 类即不传 payerId） | 各卡现有 session 测试跑过 |
-| C13 modifier 删除后 modifier 系统的 cost-preview / scoring 等链路                      | grep `modifier` / `getCardModifiers(C13)` 看依赖；listener 路径独立                                      |
-| jumpLeaf helper workerId 改 optional 后 mech-A 4 张卡（A129/B130/B150/B152）不受影响 | jumpLeaf 4 张卡现有 session 测试跑过 |
+| 假设                                                                                                                             | 验证方式                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `player.houseType` / `player.roomTiles` 字段名                                                                                    | grep `state.players[].houseType` 确认；plan 阶段写测试时按 actual 类型                                       |
+| `addBonus` / `bonuses` 字段在 ComplexCost 上语义生效                                                                                   | 现有 modifier 系统已用 BonusModifier，listener 返回 `bonuses` 由 `resolveCardCostWithModifiers` 收集 — 已存在路径 |
+| B29 现有 onRoundStart 清 cookedThisRound = false 行为是否对 cookedActionToken 适用                                                       | 改 onRoundStart 清 `cookedActionToken = -1`（或 undefined）— 同样防御                                     |
+| viaCardJump worker-less 模式跑通：jumpLeaf 不传 workerId → 不消耗 worker / 不动 takenBy / 仍 expandFlow + cascade dispatch                  | A151 session 测试 sheep-market.resources.sheep === 0（自动清空）+ family-pool 不变                         |
+| `place-farmer.ts` 跳过可达性二次校验（worker-less 模式）：returnHome phase 不在 work phase，computeAllowedPlacementSpaces 内部假设 work phase 可能不成立 | A151 session 测试覆盖 returnHome 触发路径 + 4 stage-1 action 各种 unoccupied 组合                            |
+| 现有 gain-other-players callers（A29/A50/C38/C142/E160/card-listeners）迁移后 statsLog 仍正确                                            | 各卡现有 session 测试跑过；新加合并 gain effect 单元测试覆盖 recipientMode='others' 路径 stats / log key              |
+| 现有 gain-trigger-player callers（A132/A154/A156/A159）迁移后行为不变（非 B138 / C51 类即不传 payerId）                                          | 各卡现有 session 测试跑过                                                                                |
+| C13 modifier 删除后 modifier 系统的 cost-preview / scoring 等链路                                                                       | grep `modifier` / `getCardModifiers(C13)` 看依赖；listener 路径独立                                      |
+| jumpLeaf helper workerId 改 optional 后 mech-A 4 张卡（A129/B130/B150/B152）不受影响                                                     | jumpLeaf 4 张卡现有 session 测试跑过                                                                     |
 
 
 ## 6. 文档同步
