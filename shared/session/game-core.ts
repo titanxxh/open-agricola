@@ -688,8 +688,17 @@ export class GameCore {
     return buildRoomFarmInteraction(player, costOverride, actionContext)
   }
 
-  private buildStableInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    return buildStableFarmInteraction(player, costOverride)
+  private buildStableInteraction(
+    player: PlayerState,
+    costOverride?: Partial<Resource>,
+    actionContext?: Record<string, unknown>,
+  ): InteractionFarmSelection {
+    const zoneFilter = actionContext?.zoneFilter
+    const max = actionContext?.max
+    return buildStableFarmInteraction(player, costOverride, {
+      zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
+      max: typeof max === 'number' ? max : undefined,
+    })
   }
 
   private buildPlowInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
@@ -726,7 +735,7 @@ export class GameCore {
       case 'room':
         return this.buildRoomInteraction(player, pending.costOverride, pending.actionContext)
       case 'stable':
-        return this.buildStableInteraction(player, pending.costOverride)
+        return this.buildStableInteraction(player, pending.costOverride, pending.actionContext)
       case 'plow':
         return this.buildPlowInteraction(player, pending.costOverride)
       case 'sow':
