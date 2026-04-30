@@ -1,77 +1,19 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, PlayerState, Resource } from '../../game/types'
+import type { ActionFlow } from '../../game/types'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../game/space'
+import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
+import { computeAllowedPlacementSpaces } from '../../actions/effects/placement-availability'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B152_JuniorArtist'
 
-// B152 Junior Artist: Each time after you use the Day Laborer action space, you can pay 1 food
-// to use an unoccupied Traveling Players or Lessons action space with the same person.
-//
-// BGA (php): listens to PlaceFarmer on DayLaborer, returns optional SEQ:
-//   [pay 1 food, XOR[useActionSpace(ActionLessons4), useActionSpace(ActionLessons), useActionSpace(ActionTravelingPlayers)]]
-//
-// We inline each action's effect as leaf flow. For traveling-players we gain the accumulated
-// food. For lessons/lessons-4 we run play-occupation with its proper cost override.
-
-const getLessonsCostForSpace = (player: PlayerState, spaceId: string): Partial<Resource> => {
-  if (spaceId === 'lessons-4') {
-    const base = player.occupationPlayed.length <= 1 ? 1 : 2
-    return base > 0 ? { food: base } : {}
-  }
-  // lessons
-  const base = player.occupationPlayed.length === 0 ? 0 : 1
-  return base > 0 ? { food: base } : {}
-}
-
-const canPlaySomeOccupation = (player: PlayerState, cost: Partial<Resource>): boolean => {
-  // Check if any occupation in hand can be afforded (after paying the food for cost).
-  // We approximate affordability: must have enough food remaining after this cost + 1 (for the card's own pay).
-  const totalFood = player.resources.food ?? 0
-  const requiredFood = (cost.food ?? 0) + 1 // +1 for Junior Artist's own pay
-  if (totalFood < requiredFood) return false
-  // At least one occupation in hand
-  return player.occupationHand.length > 0
-}
-
-const buildChainedOption = (
-  context: CardListenerContext,
-  spaceId: string,
-): ActionFlow | null => {
-  const space = context.state.actionSpaces.find((s) => s.id === spaceId)
-  if (!space) return null
-  if (isSpaceOccupied(space)) return null
-  if (!space.canBeExecutedByPlayer(context.state, context.player)) return null
-
-  if (spaceId === 'lessons' || spaceId === 'lessons-4') {
-    const cost = getLessonsCostForSpace(context.player, spaceId)
-    if (!canPlaySomeOccupation(context.player, cost)) return null
-    return {
-      type: 'leaf',
-      actionId: 'play-occupation',
-      params: { costOverride: cost },
-      sourceCard: CARD_ID,
-      actionContext: { trueAction: false },
-    }
-  }
-
-  if (spaceId === 'traveling-players') {
-    const food = space.resources.food ?? 0
-    if (food <= 0) return null
-    return {
-      type: 'leaf',
-      actionId: 'gain',
-      params: { food },
-      sourceCard: CARD_ID,
-      actionContext: { trueAction: false, fromSpace: spaceId },
-    }
-  }
-
-  return null
-}
+// After Day Laborer the player may pay 1 food and physically jump the same farmer to
+// lessons-4 / lessons / traveling-players. Reachability is gated by
+// computeAllowedPlacementSpaces (lessons / lessons-4 self-check affordability via their
+// canBeExecutedByPlayer; traveling-players food drains naturally on its own execute path).
+const CANDIDATE_TARGETS = ['lessons-4', 'lessons', 'traveling-players'] as const
 
 const listener: CardListenerRegistration = {
   id: 'B152-junior-artist-after-place-farmer',
@@ -79,20 +21,29 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (isJumpChainContains(context, CARD_ID)) return
+
     if (context.space?.id !== 'day-laborer') return
     if ((context.player.resources.food ?? 0) < 1) return
 
-    const children: ActionFlow[] = []
-    for (const spaceId of ['lessons-4', 'lessons', 'traveling-players']) {
-      const option = buildChainedOption(context, spaceId)
-      if (option) children.push(option)
-    }
-    if (children.length === 0) return
+    const myRef = context.space?.takenBy.find(t => t.playerId === context.player.id)
+    if (!myRef) return
+
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    const candidates: ActionFlow[] = CANDIDATE_TARGETS
+      .filter(targetSpaceId => allowed.some(a => a.spaceId === targetSpaceId))
+      .map(targetSpaceId => jumpLeaf({
+        sourceCard: CARD_ID,
+        workerId: myRef.workerId,
+        targetSpaceId,
+      }))
+
+    if (candidates.length === 0) return
 
     const chained: ActionFlow =
-      children.length === 1
-        ? children[0]!
-        : { type: 'xor', children }
+      candidates.length === 1
+        ? candidates[0]!
+        : { type: 'xor', children: candidates }
 
     return {
       flow: {
@@ -106,20 +57,6 @@ const listener: CardListenerRegistration = {
       },
       sourceCard: CARD_ID,
     }
-  },
-}
-
-// When the traveling-players branch is taken, zero out the space's food after the gain.
-const zeroSpaceListener: CardListenerRegistration = {
-  id: 'B152-junior-artist-zero-traveling-players',
-  cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['gain'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionContext?.fromSpace !== 'traveling-players') return
-    const space = context.state.actionSpaces.find((s) => s.id === 'traveling-players')
-    if (!space) return
-    space.resources.food = 0
   },
 }
 
@@ -138,6 +75,6 @@ export const B152_JuniorArtist = new Occupation({
 })
 
 export const B152_JuniorArtist_impl = {
-  listeners: [listener, zeroSpaceListener],
+  listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
