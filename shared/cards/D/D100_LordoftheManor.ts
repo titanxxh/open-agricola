@@ -18,10 +18,10 @@ export const D100_LordoftheManor = new Occupation({
 export const D100_LordoftheManor_impl = {
   effect: {
   id: CARD_ID,
-  computePostScore: (_state, _player, categories) => {
+  computeBonusScore: (_state, _player, ctx) => {
     // 1 VP per standard category where score = 4 (max in standard range)
     const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles']
-    return categories.filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length
+    return (ctx.categories ?? []).filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length
   },
 },
   reaches: [] as readonly string[],
