@@ -16,8 +16,8 @@ export const C31_WritingChamber = new MinorImprovement({
 export const C31_WritingChamber_impl = {
   effect: {
   id: CARD_ID,
-  computePostScore: (_state, _player, categories) => {
-    const negativeTotal = categories.reduce((sum, cat) => sum + Math.min(0, cat.total), 0)
+  computeBonusScore: (_state, _player, ctx) => {
+    const negativeTotal = (ctx.categories ?? []).reduce((sum, cat) => sum + Math.min(0, cat.total), 0)
     return Math.min(7, Math.abs(negativeTotal))
   },
 },
