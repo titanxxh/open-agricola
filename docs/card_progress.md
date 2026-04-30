@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 Sprint 5 mech-B — A4 Baseboards / D83 Pigswill / D117 WoodExpert 接入现有 alt-cost 基础设施**：A4 / D83 cost 改 `altCosts:[{food:2},{grain:1}]`（BGA OR-ed payment）；D117 computeCosts 改返回 `trades:[{from:{food:1}, to:{wood:2}, max:1}]`，让玩家可选用替代付法（pay 主路径自然枚举多 PaymentSolution + selectPayment choice prompt）。`getImprovementWoodCost` 扩展扫 `altCosts`，使 D117 helper 也识别含 wood 的 altCosts 形态 minor。基础设施 100% 已存在（`ComplexCost.fees` / `Trade` / `computeAllBuyableCombinations` / `resolvePaymentSolutionSelection`），本批纯单卡接入，0 主路径改动。新增 `server/__tests__/A4_Baseboards-session.test.ts` (4 例) / `D83_Pigswill-session.test.ts` (4 例) / `D117_WoodExpert-session.test.ts` (6 例)。**已知偏离**：`resolveCardPreviewCost` 在 baseCost 已是 ComplexCost（即 altCosts 形态）时短路返回，`computeCosts` listener 不被触发，因此 D117 trade 当前**不**在 altCosts-form minor（如 B43 Chophouse）上注入。spec §3.3 假设的 altCosts 覆盖未在本批兑现；解除限制需要 pay-helpers.ts 主路径改动（让 ComplexCost 输入也跑 listener），违反本 sprint "0 主路径改动" 原则，留作 follow-up。spec / plan: `docs/superpowers/specs/2026-04-30-sprint-5-mech-b-alternative-cost-trades-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-b-alternative-cost-trades.md`。
 - **2026-04-30 Sprint 5 mech-D — B27 Toolbox BGA 对齐**：用 `effect.onEndTurn` / `effect.onBuy` + 新 `getFencesBuiltThisAction` helper 替代每次 construct / stables / fencing 都弹 prompt 的旧实现。B27 现在每个 work-phase turn 内若至少建过 1 个房间 / 围栏 / 牲畜栏，仅在 turn 末通过 `effect.onEndTurn`（由 `game-core.ts` `continueEndTurnHooks` dispatch）弹一次买 Joinery / Pottery / Basketmaker's Workshop 的 optional prompt；同时 `effect.onBuy` 覆盖"B27 在手 → 同 turn 先造、再打出 B27"的 BGA onBuy 边界（基于 per-action snapshot delta）。listener 仍然用 `phase: after` 但只 `setCardFlag`，不再每次返回 ActionFlow。三个 listener 也修正了 `actions: ['build-stables']` → `actions: ['stables']` 的 actionId 拼写 bug（之前从未匹配）。机制 A jump 天然兼容：jump 在原 takeAction step loop 内推进，`onEndTurn` 在整个 chain（含跳转后第二格 SEQ）完成后只 fire 一次。新增 `shared/cards/helpers/__tests__/action-snapshot.test.ts`（6 例）+ `server/__tests__/B27_Toolbox-session.test.ts`（5 例）。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-mech-d-turn-edge-phase-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-d-b27-toolbox-turn-edge.md`。
 - **2026-04-30 Sprint 5 mech-A — A129/B130/B150/B152 改用真二次落子机制 + place-farmer jump 模式**：新增 `shared/cards/helpers/jump-leaf.ts`（`jumpLeaf()` 构造 viaCardJump leaf；`isJumpChainContains()` listener 自检）。`shared/actions/effects/place-farmer.ts.execute` 新增 `viaCardJump` 分支：物理移动 farmer（`removeWorkerRef` + `addWorkerRef`）→ `actionContext.jumpChain` 累加 sourceCard（mutate）→ `incPlacedFarmers(player)` → 返回 `{type:'flow', flow}`，flow 取自 target action 的 `flow` 字段（如 major-improvement → improvement-any、fencing → fence、grain-utilization → or(sow, bake-bread)），fallback 单 leaf。jump 第二格走完整 ActionNode 路径，自然继承 `applyComputeReplace` / `applyIsDoable` / `computeCosts` / before listener；防递归靠 `isJumpChainContains(context, CARD_ID)`。可达性单一源 = `computeAllowedPlacementSpaces`（含 occupied-space extra option）。per-action 簿记不重置（actionToken / actionStartPlayerSnapshot / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动）。**架构落地**：engine 加 `ActionFlow` leaf `expandFlow` 字段，buildFlowNode 在 expandFlow 时把 leaf 展开成 action.flow 子树（`mergeContextIntoFlow` 透传 outer actionContext + sourceCard）；与 createEngine 路径对齐。**4 张卡改造**：A129 删 `buildGrainSeedsFlow`/`buildFarmExpansionFlow`/`onBeforeStartOfTurn` flag cleanup（原 ONE_JUMP_PER_TURN 实际是 no-op）；B130 删 inline `buildChainedFlow`；B150 同 B130；B152 删 `zeroSpaceListener`（traveling-players food drain 改靠原 action.execute 自然清零）+ `getLessonsCostForSpace` / `canPlaySomeOccupation` 手算（改为 `computeAllowedPlacementSpaces` 判定 lessons / lessons-4 自身可达性，含 cost）。**新基础设施 i18n**：5 条 key（4 卡 choice prompt + 1 log.cardJumpedToSpace）双语补齐。**测试**：`shared/cards/helpers/__tests__/jump-leaf.test.ts`（7 例）+ `shared/actions/effects/__tests__/place-farmer-jump.test.ts`（6 例：移动 / jumpChain 累加 / 三类 fail / family pool 不消耗）+ `server/__tests__/place-farmer-jump-recursion.test.ts`（A129 自跳防护 + B150 → major-improvement parity smoke）+ A129 / B130 / B150 / B152 各自 session test 加新断言（takenBy 物理移动 / placedFarmers +2 接受 / +1 拒绝 / family pool 不变）。**Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / stub computeReplace parity）** 标 follow-up（需 codebase 扩展 unregister API）。spec：`docs/superpowers/specs/2026-04-30-sprint-5-mech-a-place-farmer-design.md` / plan：`docs/superpowers/plans/2026-04-30-sprint-5-mech-a-place-farmer.md`。
 - **2026-04-30 — i18n 卡内 key 缺失补齐**：73 张卡引用的 74 个 i18n key 在 `shared/i18n/zh.ts` 和 `shared/i18n/en.ts` 双缺，本次全部补齐双语翻译。audit script S12 信号 73 → 0。同步修复 `scripts/audit-card-architecture.ts`：i18n 文件路径从 `client/i18n/` 更正为 `shared/i18n/`，正则改为支持嵌套对象中的叶节点 key 匹配。BGA `clienttranslate` 437 strings（系统日志 / PHP 端文案，与我们 TS frontend i18n 不映射）保持 deferred。spec：`docs/superpowers/specs/2026-04-30-i18n-card-keys-backfill-design.md`。
@@ -224,7 +225,7 @@
 | **C23** | 触发条件偏差 | P1 |
 | **C51 FishingNet** | 没真正从 trigger player 扣 food | P1 |
 | **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）— ✅ Sprint 5 PR-5 (drop sow leaf; seq now pay + plow only) | P1 |
-| **D117 WoodExpert** | 强制扣 1 食物替换 wood，BGA 是给 alternative trade 让玩家选（应改用 `Bonus.optional`）| P1 |
+| **D117 WoodExpert** | ✅ Sprint 5 mech-B — computeCosts 改返回 `trades:[{from:{food:1}, to:{wood:2}, max:1}]`，pay 主路径自然枚举 use-trade / no-trade 两条 PaymentSolution，玩家弹 selectPayment choice 选；altCosts 形态 minor 因 `resolveCardPreviewCost` 短路暂不覆盖，留 follow-up | P1 |
 | **D160 Midwife** | 缺"对手本轮首个 farmer"守卫，违反 desc 文本 — ✅ Sprint 5 PR-5 (listener checks `getRoundPlacementOrder(opponent).length === 1` in 'after' phase) | P1 |
 | **E53** | 缺 E85 联动 + meeple-id 跟踪 | P1 |
 | **E149 MidnightFencer** | stub-only（文件存在但 effect/listener 全无；与 §2.6 自报一致）— ✅ Sprint 3 done (rechecked: full onStartHarvest offer-flow + cardStates owedFences + computeBonusScore already in place; was misclassified as stub) | P0 |
@@ -237,7 +238,7 @@
 - **B42 ForestInn** — round ≤ 6 的 `isBuyable` 守卫未实现；vp 元数据已补 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `maxRound: 6`, picked up by existing meetsCardPrerequisites pipeline)
 - **C39 StudioBoat** — `prerequisite` enforce（"Build a fishing pond/wooden hut etc."） 未注册 handler；cost 已对齐 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `prerequisite: '1 Occupation'` + `occupationPrerequisites: { min: 1 }`; BGA's printed text is "1 Occupation", not the fishing-pond text mentioned in audit)
 
-**Sprint 5 PR-5 + mech-A + mech-D deferred to follow-up (16 cards remaining; 4 mech-A + 1 mech-D resolved)**:
+**Sprint 5 PR-5 + mech-A + mech-D + mech-B deferred to follow-up (15 cards remaining; 4 mech-A + 1 mech-D + 1 mech-B resolved)**:
 
 The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 hour of work or wider mechanism changes; tracked here so a future PR can pick them up:
 
@@ -251,13 +252,13 @@ The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 
 - **B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths
 - **C23** — triggering condition deviation (need re-read of BGA file to identify)
 - **C51 FishingNet** — actually deduct trigger-player food
-- **D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade
+- ~~**D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade~~ — ✅ **Sprint 5 mech-B** done (computeCosts returns `trades` instead of forced cost patch; pay main path enumerates use-trade / no-trade solutions, player picks via standard selectPayment prompt); altCosts-form minors (B43 etc.) not yet covered, follow-up.
 - **E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work
 - **B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read
 - **A1 Shelter, A22 Telegram, A38 WoolBlankets, A165 PigBreeder** wide-scan items — already partially fixed in Sprint 2 PR-2A; remaining tail not in this PR's scope
 - **E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"
 
-These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-day batch of medium-complexity items (B27 / B29 / B115 / D117) for a follow-up Sprint 5b.
+These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-day batch of medium-complexity items (B29 / B115) for a follow-up Sprint 5b.
 
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
@@ -274,13 +275,13 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 > - ~~**~50 张 category 字段批量不齐**~~ — ✅ **Sprint 4 PR-4B done**（实际 178 张，覆盖 A/B/C/D/E 全副）。BGA→ours 映射机械迁移完成，每张卡的 `category` 字段现在等于 BGA `$this->category` 字面量。覆盖测试 `shared/cards/__tests__/category-bga-alignment.test.ts` 178/178 绿。仅 UI 分组对齐，无任何行为/规则改动。详见 branch `sprint-pr-4b`。
 >
 > **P0 cost 偏差（12 张）** — A4 / D83 / C13 / D30 残留，其余 11 张 cost/prereq 字段已由 PR-1B 修复：
-> - **A4 Baseboards** — BGA `costs=[[food:2],[grain:1]]` 是择一，我方 `cost:{food:2, grain:1}` 强迫同时付（玩家加成本）— 待 Sprint 5（alternative-cost 机制）
+> - **A4 Baseboards** — BGA `costs=[[food:2],[grain:1]]` 是择一，我方 `cost:{food:2, grain:1}` 强迫同时付（玩家加成本）— ✅ Sprint 5 mech-B (改 altCosts:[{food:2},{grain:1}])
 > - **A38 WoolBlankets** — cost 已清空 ✅ PR-1B；prerequisite 写"Wooden House"（BGA 是"5 Sheep on farm"）— prereq 不在本 PR 范围
 > - **C3** 多 food:3 ✅ PR-1B / **C13** discount 应 stone:2 写成 stone:1（待 Sprint 5 isBuyable discount） / **C33** 缺 food:3 ✅ PR-1B / **C35** wood:1 写成 clay:1 ✅ PR-1B / **C48** 多 wood/clay ✅ PR-1B
-> - **D24** 缺 food:1 ✅ PR-1B / **D29** 缺 wood:1 ✅ PR-1B / **D39** 缺 wood:1 ✅ PR-1B / **D83** 缺 altCosts grain:1（待 Sprint 5 alternative-cost） / **D30** 缺 prerequisite "3 Occupations"（prereq 不在本 PR 范围）
+> - **D24** 缺 food:1 ✅ PR-1B / **D29** 缺 wood:1 ✅ PR-1B / **D39** 缺 wood:1 ✅ PR-1B / **D83** 缺 altCosts grain:1 — ✅ Sprint 5 mech-B (改 altCosts:[{food:2},{grain:1}]) / **D30** 缺 prerequisite "3 Occupations"（prereq 不在本 PR 范围）
 > - **E32** cost 类型错（BGA `STONE=>2,REED=>1`，TS 原 `clay:2, reed:1`） ✅ PR-1B / **E34** 缺 cost（BGA `WOOD=>1`） ✅ PR-1B
 >
-> **Sprint 1 PR-1B 注脚**：A4 / D83（alternative-cost 机制）/ C13（isBuyable discount）超出 cost-field PR 范围，已转 Sprint 5 跟进。
+> **Sprint 1 PR-1B 注脚**：A4 / D83（alternative-cost 机制）已 ✅ Sprint 5 mech-B / C13（isBuyable discount）超出 cost-field PR 范围，待 follow-up。
 >
 > **P0 players 字段错（4 张，与上轮 7 张同模式）**：A154 应 4+ / E154 应 4+ / C134 应 3+ / C158 应 4+ — ✅ 全部已修，Sprint 1 PR-1A on branch sprint-1-pr-1a
 >
@@ -536,6 +537,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 6 partial (A-deck extraVp ×21 + E30 mutation fix + D12↔D148) | 04-29 | 0 | 821 | 92.0% |
 | Sprint 5 mech-A (A129/B130/B150/B152 真二次落子 + place-farmer jump 模式) | 04-30 | 0 | 821 | 92.0% |
 | Sprint 5 mech-D (B27 Toolbox turn-edge BGA 对齐) | 04-30 | 0 | 822 | 92.1% |
+| Sprint 5 mech-B (A4/D83 altCosts + D117 trades) | 04-30 | 0 | 822 | 92.1% |
 
 ### 2026-04-17 Wave 1-9 明细
 
