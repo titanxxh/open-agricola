@@ -153,7 +153,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 `autoAdvanceRoundEnd(session, { maxIterations })` helper 把 `performRoundEnd` / `confirmHarvestFeed` / `confirmAnimalReorg` / `confirmNextPlayer` / `confirmPlayerSwitch` pendings 全消化到 `gameOver`。**会自动把 supply 里的动物放到 pasture/house/stable**（贪心 greedy），保证 `cattle` / `sheep` / `boar` 不被丢失。
 
-读 per-card bonus VP 要用 `getBonusBreakdownForSession(session, playerIndex)`（wraps `collectBonusScores` in `withCtx`）——直接跑 `computeScores(state).categories.cardStateBonusVp` 只拿到总和，丢失 cardId。
+读 per-card bonus VP 要用 `getBonusBreakdownForSession(session, playerIndex)`（wraps `runBonusSolver` in `withCtx`）——直接跑 `computeScores(state).categories.cardStateBonusVp` 只拿到总和，丢失 cardId。
 
 ### Listener 约定
 

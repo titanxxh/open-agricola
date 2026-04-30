@@ -38,7 +38,6 @@ Sprint 7   not started     130 张 P3 简化（master plan §0 默认不做）
 
 - ⚠ 残留：~21 张 P1 行为偏差（Sprint 5 deferred）
 - ❌ 残留：14 张 stub 未实现（Sprint 6 deferred）
-- 双轨重构（computePostScore vs computeBonusScore）未做
 - i18n 缺口 71+437 未补
 - Sprint 7 P3 130 张简化未启动
 

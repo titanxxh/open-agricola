@@ -167,7 +167,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onAllWorkersPlaced`
 - `resolveChoice`
 - `computeBonusScore`
-- `computePostScore`
+- `computeCostedBonus`
 - `computeSharedPostScore`
 - `computeExtraRoomCapacity`
 - `onComputeAnimalZones`
@@ -179,15 +179,15 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
-额外允许的 meta 字段（不在 `cardEffectHooks` 数组中，但 AST validator 放行）：`id`、`handHooks`、`scoringPriority`。
+额外允许的 meta 字段（不在 `cardEffectHooks` 数组中，但 AST validator 放行）：`id`、`handHooks`。
 
 **进阶 hook 说明**：
 
 
 | hook                                         | 签名特殊点                                                            | 用途                                                  |
 | -------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
-| `computeBonusScore`                          | `(state, player, ctx) => number`（返回 VP 数；`ctx.reserved` 可声明保留资源） | 终局加分（`collectBonusScores` 收集后并入 `cardStateBonusVp`） |
-| `computePostScore`                           | `(state, player, categories) => number`                          | 终局后续加分；可读其它分类小计再加                                   |
+| `computeBonusScore`                          | `(state, player, ctx) => number`（`ctx.categories` 只读）           | 终局加分（free bonus；solver 收集后并入 `cardStateBonusVp`）       |
+| `computeCostedBonus`                         | `(state, player, ctx) => BonusScoreLevel[]`                      | 终局花资源换 VP（申报 levels，solver 枚举最优组合）                    |
 | `computeSharedPostScore`                     | `(state, owner, summaries) => Array<{ playerId, score }>`        | 跨玩家加分（如对手最低分给你额外 VP）                                |
 | `computeExtraRoomCapacity`                   | 返回 `number`                                                      | 额外容纳空间                                              |
 | `onComputeAnimalZones`                       | 接收 `(zones, state, player)` 或 `(state, player, zones)`           | 动物分区扩展（双接口）                                         |
@@ -564,6 +564,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `docs/superpowers/specs/2026-04-30-bonus-score-merge-design.md`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
 | 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId                                                                                                               |
 | 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `docs/superpowers/specs/2026-04-19-architecture-three-layer-split-design.md` §16 内联描述迁出                                                                                                                                                                                             |
