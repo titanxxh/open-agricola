@@ -71,9 +71,9 @@ const createState = (player: PlayerState): GameState =>
 
 const createSpace = (): ActionSpace =>
   ({
-    id: 'anytime-exchange',
-    nameKey: 'actions.anytime-exchange.name',
-    descriptionKey: 'actions.anytime-exchange.description',
+    id: 'exchange',
+    nameKey: 'actions.exchange.name',
+    descriptionKey: 'actions.exchange.description',
     roundAvailable: 1,
     gainPerRound: {},
     canBeExecutedByPlayer: () => true,

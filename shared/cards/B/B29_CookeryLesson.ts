@@ -56,12 +56,12 @@ const awardBonusVp = (context: CardListenerContext): ActionHookResult | void => 
   }
 }
 
-// After anytime-exchange: mark cooking happened, check if lessons used → VP
+// After exchange: mark cooking happened, check if lessons used → VP
 const afterExchangeListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     markCookedThisRound(context)
     if (hasUsedLessonsThisRound(context)) {

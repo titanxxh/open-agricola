@@ -29,7 +29,7 @@ const beforeExchangeListener: CardListenerRegistration = {
   id: 'D36-breed-registry-before-exchange',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     writeCardExtraData(context.player, CARD_ID, 'sheepBeforeExchange', context.player.resources.sheep)
   },
@@ -40,7 +40,7 @@ const afterExchangeListener: CardListenerRegistration = {
   id: 'D36-breed-registry-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const sheepBefore = readCardExtraData<number>(context.player, CARD_ID, 'sheepBeforeExchange') ?? 0
     if (context.player.resources.sheep < sheepBefore) {

@@ -42,7 +42,7 @@ describe('E85_MasterTanner session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
 
@@ -64,7 +64,7 @@ describe('E85_MasterTanner session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 1 boar
@@ -80,7 +80,7 @@ describe('E85_MasterTanner session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 2 cattle (Fireplace trade index 2 = cattle->3food)
@@ -101,7 +101,7 @@ describe('E85_MasterTanner session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 2 sheep (Fireplace trade index 0 = sheep->2food)
@@ -120,7 +120,7 @@ describe('E85_MasterTanner session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 1 sheep (index 0) + 1 boar (index 1) + 1 cattle (index 2)
@@ -144,7 +144,7 @@ describe('E85_MasterTanner session', () => {
     enterActiveInteraction(session)
 
     // First exchange: cook 1 boar
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'bulk:1=1')
     expect(resp.ok).toBe(true)
@@ -153,7 +153,7 @@ describe('E85_MasterTanner session', () => {
     expect(stack.length).toBe(1)
 
     // Second exchange: cook 1 cattle
-    resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'bulk:2=1')
     expect(resp.ok).toBe(true)

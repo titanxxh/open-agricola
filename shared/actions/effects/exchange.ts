@@ -242,11 +242,14 @@ const cookeryTrades: Record<string, Trade[]> = {
     { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth2' },
     { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2' },
   ],
+  E53_BoarSpear: [
+    { from: { boar: 1 }, to: { food: 4 }, sourceId: 'E53_BoarSpear' },
+  ],
 }
 
 const getPlayerCookeryTrades = (player: PlayerState): Trade[] => {
   const trades: Trade[] = []
-  for (const cardId of player.improvements) {
+  for (const cardId of [...player.improvements, ...player.minorPlayed]) {
     const cardTrades = cookeryTrades[cardId]
     if (cardTrades) {
       trades.push(...cardTrades)
@@ -256,7 +259,7 @@ const getPlayerCookeryTrades = (player: PlayerState): Trade[] => {
 }
 
 const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
-  for (const cardId of player.improvements) {
+  for (const cardId of [...player.improvements, ...player.minorPlayed]) {
     const cardTrades = cookeryTrades[cardId]
     if (!cardTrades) continue
     for (const trade of cardTrades) {
@@ -367,17 +370,33 @@ const resolveExchangeChoice = (
 }
 
 export const anytimeExchangeAction: ActionDefinition = {
-  id: 'anytime-exchange',
-  nameKey: 'actions.anytime-exchange.name',
-  descriptionKey: 'actions.anytime-exchange.description',
+  id: 'exchange',
+  nameKey: 'actions.exchange.name',
+  descriptionKey: 'actions.exchange.description',
   roundAvailable: 1,
   gainPerRound: {},
   anytime: true,
   canBeExecutedByPlayer: (_, player) => hasAffordableCookeryTrade(player),
-  execute: ({ player }) => ({
-    type: 'choice',
-    promptKey: 'ui.interactionExchangeChoice',
-    options: buildExchangeOptions(player),
-  }),
+  execute: ({ player, actionContext }) => {
+    const allOptions = buildExchangeOptions(player)
+    const filterIds = actionContext?.tradeIds as string[] | undefined
+    const filtered = filterIds && filterIds.length > 0
+      ? allOptions.filter((opt) => {
+          if (opt.value === 'cancel') return true
+          return typeof opt.sourceCard === 'string' && filterIds.includes(opt.sourceCard)
+        })
+      : allOptions
+
+    const hasTradeOption = filtered.some((opt) => opt.value !== 'cancel')
+    if (filterIds && filterIds.length > 0 && !hasTradeOption) {
+      return { type: 'fail' as const, logKey: 'log.actionNoExchange' }
+    }
+
+    return {
+      type: 'choice' as const,
+      promptKey: 'ui.interactionExchangeChoice',
+      options: filtered,
+    }
+  },
   resolveChoice: ({ state, player }, choice) => resolveExchangeChoice(state, player, choice),
 }
