@@ -98,10 +98,11 @@ describe('C23_JobContract listener', () => {
     expect(lessonsSpace.takenBy[0]?.playerId).toBe('p2')
   })
 
-  it('does nothing when the player has no occupations in hand', () => {
+  it('still triggers fake-worker insertion at lessons even when occupationHand is empty', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
+    // empty occupationHand: BGA still places the fake worker on lessons
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])
@@ -110,8 +111,12 @@ describe('C23_JobContract listener', () => {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(result).toBeUndefined()
-    expect(lessonsSpace.takenBy).toEqual([])
+    expect(result).toBeDefined()
+    expect(result!.flow).toBeDefined()
+    // Lessons space is marked as occupied by this player (fake-worker), so
+    // other players cannot use it this round even though we have nothing
+    // playable in hand.
+    expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)
   })
 
   it('offers optional play-occupation flow and marks lessons as taken', () => {
