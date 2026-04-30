@@ -820,6 +820,7 @@ export const en = {
     interactionRiparianBuilderConstruct:
       'Riparian Builder: You may build 1 room; clay/stone rooms cost 1 clay / 2 stone less.',
     placeFarmerFail: 'Cannot place worker here',
+    cardJumpedToSpace: '{player} used {cardName} to jump {worker} to {targetSpace}',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
   },
