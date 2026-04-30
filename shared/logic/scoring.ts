@@ -281,9 +281,10 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
         !!x.effect?.computeCostedBonus,
       )
       .map(({ cardId, effect }) => ({ cardId, handler: effect.computeCostedBonus! }))
+    const playerForBonus = { ...player, resources: { ...player.resources } }
     const bonusScoreResult = solveBonusScoring({
       state,
-      player,
+      player: playerForBonus,
       ctx: bonusCtx,
       freeHandlers,
       costedHandlers,
@@ -296,7 +297,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       if (!card) return
       cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
       if (card.scoring) {
-        const resourceCount = Math.max(0, player.resources[card.scoring.resource] ?? 0)
+        const resourceCount = Math.max(0, playerForBonus.resources[card.scoring.resource] ?? 0)
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
