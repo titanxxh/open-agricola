@@ -1092,6 +1092,7 @@ export const en = {
     A129_Swagman: { choice: 'Swagman: jump to {targetSpace} (free)?' },
     B130_FullPeasant: { choice: 'Full Peasant: pay 1 food, jump to {targetSpace}?' },
     B150_LargeScaleFarmer: { choice: 'Large-Scale Farmer: pay 1 food, jump to {targetSpace}?' },
+    B152_JuniorArtist: { choice: 'Junior Artist: pay 1 food, jump to {targetSpace}?' },
     B3_Moonshine: {
       choice: 'Moonshine: Choose what to do with the drawn occupation',
       choicePlay: 'Play it (pay 2 food)',

@@ -45,49 +45,48 @@ const setup = (options?: {
   return session
 }
 
+const dayLaborerCtx = (s: ReturnType<GameSession['getState']>['state'], workerId = '1') => {
+  const space = s.actionSpaces.find((x) => x.id === 'day-laborer')!
+  space.takenBy = [{ playerId: s.players[0]!.id, workerId }]
+  return space
+}
+
 describe('B152_JuniorArtist session', () => {
   it('after day-laborer, offers optional chain when player has food and chain targets exist', () => {
     const session = setup({ withCard: true, food: 3, travelingPlayersFood: 2 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    // day-laborer auto-resolves (just gives food). Then B152 after-place-farmer fires.
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
-  it('accepting chain pays 1 food (and gains food from traveling-players if chosen)', () => {
+  it('accepting chain pays 1 food', () => {
     const session = setup({ withCard: true, food: 3, travelingPlayersFood: 2 })
     let resp = session.takeAction(0, 'day-laborer')
-    // day-laborer itself gives food (2 food in 2p? Actually day-laborer gives 2 food)
     const foodAfterDayLaborer = resp.state.players[0]!.resources.food
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
-    // Accept the optional seq by picking a non-skip option
     const accept = resp.pending.options.find((o) => o.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
-    // Next may be XOR between traveling-players / lessons etc. (or it may auto-resolve)
-    // After accept: 1 food has been paid
-    // If chain was (pay-resources, xor) the current pending might be the xor choice.
-    // We just verify food was deducted by 1
-    // (food = before - 1, but + whatever gain follows)
-    // We expect food >= foodAfterDayLaborer - 1 (pay happened)
+    // pay-resources runs as the first step of the optional seq
     const currentFood = resp.state.players[0]!.resources.food
-    expect(currentFood).toBeLessThanOrEqual(foodAfterDayLaborer - 1 + 10) // sanity check, deducted
+    expect(currentFood).toBeLessThanOrEqual(foodAfterDayLaborer - 1)
   })
 
   it('does not offer chain when player has 0 food (direct listener check)', () => {
     const session = setup({ withCard: true, food: 0, travelingPlayersFood: 2 })
     const s = session.getState().state
+    const space = dayLaborerCtx(s)
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
+      space,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
@@ -108,16 +107,22 @@ describe('B152_JuniorArtist session', () => {
     expect(resp.pending.type).not.toBe('choice')
   })
 
-  it('listener emits seq(pay, chain) with traveling-players gain option', () => {
-    const session = setup({ withCard: true, food: 3, travelingPlayersFood: 3 })
+  it('listener emits seq(pay, jumpLeaf-or-xor) targeting candidate spaces', () => {
+    const session = setup({
+      withCard: true,
+      food: 3,
+      travelingPlayersFood: 3,
+      occupationHand: [],
+    })
     const s = session.getState().state
+    const space = dayLaborerCtx(s)
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
+      space,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
@@ -126,123 +131,86 @@ describe('B152_JuniorArtist session', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children[0].actionId).toBe('pay-resources')
-    // The chain child should be either a leaf (if only 1 option) or an xor
-    const chain = flow.children[1]
-    // Find a traveling-players gain leaf somewhere
-    const findTp = (node: ActionFlow): boolean => {
+
+    const findJumpToTp = (node: ActionFlow): boolean => {
       if (!node) return false
-      if (node.actionId === 'gain' && node.params?.food === 3) return true
-      if (Array.isArray(node.children)) {
-        return node.children.some((c: ActionFlow) => findTp(c))
+      if (node.type === 'leaf' && node.actionId === 'place-farmer') {
+        const ctx = node.actionContext ?? {}
+        return ctx.viaCardJump === true && ctx.targetSpaceId === 'traveling-players'
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        return node.children.some((c) => findJumpToTp(c))
       }
       return false
     }
-    expect(findTp(chain)).toBe(true)
+    expect(findJumpToTp(flow.children[1])).toBe(true)
   })
 
-  it('listener emits lessons option when player has an occupation in hand', () => {
+  it('listener emits a jumpLeaf for lessons when player has occupation in hand', () => {
     const session = setup({
       withCard: true,
       food: 3,
       occupationHand: ['B130_FullPeasant'],
       travelingPlayersFood: 0,
     })
-    // Need to also import B130 so getOccupation finds it
     const s = session.getState().state
+    const space = dayLaborerCtx(s)
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
+      space,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
-    // May or may not produce a flow depending on whether occupation is registered
-    // If result is undefined, the test passes trivially (no options)
-    if (result) {
-      const flow = result.flow as ActionFlow
-      const findPlayOcc = (node: ActionFlow): boolean => {
-        if (!node) return false
-        if (node.actionId === 'play-occupation') return true
-        if (Array.isArray(node.children)) {
-          return node.children.some((c: ActionFlow) => findPlayOcc(c))
-        }
-        return false
+    if (!result) return  // ok if reachability rejects all candidates
+    const flow = result.flow as ActionFlow
+    const findJumpToLessons = (node: ActionFlow): boolean => {
+      if (!node) return false
+      if (node.type === 'leaf' && node.actionId === 'place-farmer') {
+        const ctx = node.actionContext ?? {}
+        return ctx.viaCardJump === true &&
+          (ctx.targetSpaceId === 'lessons' || ctx.targetSpaceId === 'lessons-4')
       }
-      expect(findPlayOcc(flow)).toBe(true)
+      if ('children' in node && Array.isArray(node.children)) {
+        return node.children.some((c) => findJumpToLessons(c))
+      }
+      return false
     }
+    expect(findJumpToLessons(flow)).toBe(true)
   })
 
-  it('does not produce chain when no unoccupied targets have content', () => {
+  it('does not produce chain when no candidate target is reachable', () => {
     const session = setup({
       withCard: true,
       food: 3,
       occupationHand: [],
-      travelingPlayersFood: 0, // no accumulated food
+      travelingPlayersFood: 0,
     })
     const s = session.getState().state
-    // Mark lessons occupied
     const lessons = s.actionSpaces.find((x) => x.id === 'lessons')
-    if (lessons) lessons.takenBy = s.players[1]!.id
+    if (lessons) lessons.takenBy = [{ playerId: s.players[1]!.id, workerId: 'w1' }]
     const lessons4 = s.actionSpaces.find((x) => x.id === 'lessons-4')
-    if (lessons4) lessons4.takenBy = s.players[1]!.id
+    if (lessons4) lessons4.takenBy = [{ playerId: s.players[1]!.id, workerId: 'w1' }]
+    const tp = s.actionSpaces.find((x) => x.id === 'traveling-players')
+    if (tp) tp.takenBy = [{ playerId: s.players[1]!.id, workerId: 'w1' }]
     session.loadState(s)
+
+    const post = session.getState().state
+    const space = dayLaborerCtx(post)
 
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
-      state: session.getState().state,
-      player: session.getState().state.players[0]!,
-      space: session.getState().state.actionSpaces.find((x) => x.id === 'day-laborer')!,
+      state: post,
+      player: post.players[0]!,
+      space,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
-  })
-
-  it('zero-space listener zeros traveling-players food after gain', async () => {
-    const session = setup({ withCard: true, food: 3, travelingPlayersFood: 5 })
-    const s = session.getState().state
-    const zeroListener = getRegisteredCardListeners().find(
-      (l) => l.id === 'B152-junior-artist-zero-traveling-players',
-    )
-    expect(zeroListener).toBeDefined()
-
-    const tp = s.actionSpaces.find((x) => x.id === 'traveling-players')!
-    expect(tp.resources.food).toBe(5)
-
-    executeCardListener(zeroListener!, {
-      state: s,
-      player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
-      actionId: 'gain',
-      phase: 'immediatelyAfter',
-      actionContext: { fromSpace: 'traveling-players', trueAction: false },
-      result: { type: 'ok' },
-    } as unknown as CardListenerContext)
-    expect(tp.resources.food).toBe(0)
-  })
-
-  it('zero-space listener does NOT zero when fromSpace is not traveling-players', () => {
-    const session = setup({ withCard: true, food: 3, travelingPlayersFood: 5 })
-    const s = session.getState().state
-    const zeroListener = getRegisteredCardListeners().find(
-      (l) => l.id === 'B152-junior-artist-zero-traveling-players',
-    )!
-    const tp = s.actionSpaces.find((x) => x.id === 'traveling-players')!
-
-    executeCardListener(zeroListener, {
-      state: s,
-      player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'day-laborer')!,
-      actionId: 'gain',
-      phase: 'immediatelyAfter',
-      actionContext: { trueAction: false }, // no fromSpace
-      result: { type: 'ok' },
-    } as unknown as CardListenerContext)
-    expect(tp.resources.food).toBe(5)
   })
 })
