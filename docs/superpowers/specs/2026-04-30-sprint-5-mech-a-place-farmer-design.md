@@ -149,6 +149,21 @@ execute: ({ state, player, actionContext }) => {
 - 资源类 stats（`addResourcesFromBoard` / `addResourcesFromCards` / `incHarvestedGrain` 等）由 gain / collect / receive effect 自身在 `targetSpace.execute()` 路径里调用，jump 自然记数 — **不需要在 jump 分支重复调**
 - `incRoomsBuilt` / `incMajorBuilt` / `incMinorBuilt` / `incOccupationBuilt` 由 construct / improvement / play-occupation effect 调用 — 同上，jump 跑 targetSpace.execute 时自然触发
 
+**per-action 簿记交互（关键正确性，不要误调）**：
+
+`game-core.ts:1925-1930` 的 takeAction 入口在每次新行动开始时设置 4 项 per-action 簿记：
+
+| 簿记 | 作用 | jump 是否重置 |
+|---|---|---|
+| `nextActionToken++` → `recordActionSnapshot(player, token)` | 单调递增 token，6 张卡（B29 / A43 / A74 / A111 / A167 / D166）通过 `readActionSnapshotToken` + `cardStates[CARD_ID].usedActionToken` 比对实现"per-action once"；快照里还存 `stableTiles.length` / `roomTiles.length`，供 `getRoomsBuiltThisAction` / `getStableTilesBuiltThisAction` 算差量（B27 Toolbox 等用） | **绝不**重置。jump 是同 action 的延续；翻新 token 会让 B29 在 jump 触发的 lessons 上**重复**奖 VP、Toolbox 的差量从 jump 落地点起算丢失第一格里造的房 |
+| `actionStartPlayerSnapshot = clonePlayer(player)` | 整个 action 起点的玩家快照，用于回滚 / 对比 | **不**重写。jump 起点仍是 action 起点 |
+| `_activeActionBonusSources = []` | 本次 action 收集到的 bonus source 累积器 | **不**清空。jump 第二格的 bonus source 累加到第一格的列表里 |
+| `cardEffectDeltasSinceFlush = { gains: {}, costs: {} }` | 卡牌效果在本 action 内造成的资源 delta 累积 | **不**清空。jump 第二格的 delta 继续累加 |
+
+**实现意义**：jump 走 effect 内部分支，本来就**不经过** takeAction 入口，4 项簿记天然不被重置。但这是隐式正确性；写清楚以防未来有人在 jump 分支误加 `recordActionSnapshot(player, this.nextActionToken++)` 之类，6 张依赖 actionToken 的卡会全部失效。
+
+**测试支撑**：`server/__tests__/place-farmer-jump-recursion.test.ts`（§6.4）增加一条断言 `readActionSnapshotToken(player)` 在 jump 前后**不变**；session 测试里如果触发到 B29 / B27，断言它们的 once-per-action 行为正确。
+
 ### 3.4 listener 防递归
 
 每张机制 A 卡 listener 第一行：
