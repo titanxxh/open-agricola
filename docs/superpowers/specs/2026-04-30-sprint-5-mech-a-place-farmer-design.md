@@ -113,6 +113,9 @@ execute: ({ state, player, actionContext }) => {
     addWorkerRef(targetSpace, player.id, workerId)
     recordRoundPlacement(player, targetSpace.id, workerId)
 
+    // stats：jump 也算一次 farmer placement（与 game-core.ts:1936 takeAction 入口对齐）
+    incPlacedFarmers(player)
+
     // 跑第二格 effect（可能返回 flow，engine 接管）
     return targetSpace.execute({ state, player, space: targetSpace })
   }
@@ -132,6 +135,12 @@ execute: ({ state, player, actionContext }) => {
 - jump 分支不进入 choice 分支（targetSpaceId 已定）
 - 第二格被 `addWorkerRef` 后视为已占（`isSpaceOccupied`），落地 `LANDS_ON_SECOND_SPACE` ruling
 - `ONE_JUMP_PER_TURN` ruling 由 jumpChain 自检自然保证（同 farmer 一次落子链不会重复触发同一卡）
+
+**stats 系统交互**：
+
+- `incPlacedFarmers(player)`：jump 也算 farmer 一次 placement（farmer 物理移到第二格 = 第二次落子）。`game-core.ts:1936` 在 takeAction 入口处 +1（对应第一格落子），jump 分支补一次（对应第二格落子）。**未补的话玩家 4 步行动里若有 1 jump，stats.placedFarmers 只 +4 不 +5，影响最终 stats 报表与依赖此字段的卡牌效果**
+- 资源类 stats（`addResourcesFromBoard` / `addResourcesFromCards` / `incHarvestedGrain` 等）由 gain / collect / receive effect 自身在 `targetSpace.execute()` 路径里调用，jump 自然记数 — **不需要在 jump 分支重复调**
+- `incRoomsBuilt` / `incMajorBuilt` / `incMinorBuilt` / `incOccupationBuilt` 由 construct / improvement / play-occupation effect 调用 — 同上，jump 跑 targetSpace.execute 时自然触发
 
 ### 3.4 listener 防递归
 
@@ -196,12 +205,14 @@ const listener: CardListenerRegistration = {
 
 ### 4.2 各卡差异
 
-| 卡 | 触发格 → 目标格映射 | 付费 | 第二格 |
-|---|---|---|---|
-| A129 Swagman | farm-expansion ↔ grain-seeds | 0 | targetSpace.execute（标准） |
-| B130 FullPeasant | grain-utilization ↔ fencing | 1 food | 标准 |
-| B150 LargeScaleFarmer | farm-expansion ↔ major-improvement | 1 food | 标准 |
-| B152 JuniorArtist | day-laborer → {lessons-4 / lessons / traveling-players} | 1 food | 标准 |
+
+| 卡                     | 触发格 → 目标格映射                                             | 付费     | 第二格                     |
+| --------------------- | ------------------------------------------------------- | ------ | ----------------------- |
+| A129 Swagman          | farm-expansion ↔ grain-seeds                            | 0      | targetSpace.execute（标准） |
+| B130 FullPeasant      | grain-utilization ↔ fencing                             | 1 food | 标准                      |
+| B150 LargeScaleFarmer | farm-expansion ↔ major-improvement                      | 1 food | 标准                      |
+| B152 JuniorArtist     | day-laborer → {lessons-4 / lessons / traveling-players} | 1 food | 标准                      |
+
 
 **B152 特殊点**：
 
@@ -221,12 +232,14 @@ const listener: CardListenerRegistration = {
 
 ### 4.4 行数估算
 
-| 卡 | 当前行数 | 改造后 |
-|---|---|---|
-| A129 Swagman | 91 | ~30 |
-| B130 FullPeasant | 104 | ~30 |
-| B150 LargeScaleFarmer | 101 | ~30 |
-| B152 JuniorArtist | 144 | ~50 |
+
+| 卡                     | 当前行数 | 改造后 |
+| --------------------- | ---- | --- |
+| A129 Swagman          | 91   | ~30 |
+| B130 FullPeasant      | 104  | ~30 |
+| B150 LargeScaleFarmer | 101  | ~30 |
+| B152 JuniorArtist     | 144  | ~50 |
+
 
 ## 5. UI 影响面
 
@@ -263,6 +276,7 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 - targetSpaceId 不存在 → fail
 - jumpChain 累加：从 undefined → ['CardX']
 - jumpChain 累加：从 ['CardA'] → ['CardA','CardX']
+- **stats**：jump 前 `player.stats.placedFarmers === N`，jump 后 `=== N+1`
 
 ### 6.2 helper 单元测试 — `shared/cards/helpers/__tests__/jump-leaf.test.ts`（新）
 
@@ -273,9 +287,9 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 每张卡至少测：
 
-1. **触发 + 接受**：第一格落子 → pending=choice (optional jump) → accept → 第一格 takenBy 空、第二格 takenBy 有该 worker、第二格效果资源正确到位、log 含 jump 条目
-2. **触发 + 拒绝**：accept 时选不跳 → 状态完全不变（食物不扣 / 第二格不动）
-3. **食物不够**（B130/B150/B152）：玩家 food=0 → pending=none，listener 不返回 flow
+1. **触发 + 接受**：第一格落子 → pending=choice (optional jump) → accept → 第一格 takenBy 空、第二格 takenBy 有该 worker、第二格效果资源正确到位、log 含 jump 条目、`player.stats.placedFarmers` 比第一格落子前 +2（一次入口 + 一次 jump）
+2. **触发 + 拒绝**：accept 时选不跳 → 状态完全不变（食物不扣 / 第二格不动）；`stats.placedFarmers` 只 +1
+3. **食物不够**（B130/B150/B152）：玩家 food=0 → pending=none，listener 不返回 flow；`stats.placedFarmers` +1
 4. **第二格被占**：另一玩家先放第二格 → 第一格落子后 pending=none
 5. **`canBeExecutedByPlayer` 拒绝**：B150 跳 major-improvement 玩家无任何 major 可买 → 不弹 prompt
 
@@ -286,7 +300,7 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 ### 6.5 串联触发链 session 测试
 
-注册测试 stub 卡 `__test_grain_seeds_observer__`，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
+注册测试 stub 卡 `__test_grain_seeds_observer_`_，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
 
 - 玩家直接落 grain-seeds → 痕迹被设
 - 玩家落 farm-expansion → A129 跳过去 → 痕迹**也**被设（验证 second-place dispatch 跑了，"Y 选项" 落地）
@@ -303,16 +317,19 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 ## 7. 风险点 / 待验证假设
 
-| 假设 | 验证方式 |
-|---|---|
-| `actionContext` 是 plain object 且 mutate 安全（不被 engine 序列化/克隆掉） | 单测：execute 内 mutate 后，hooks.after 看到的 ctx.actionContext.jumpChain 为新数组 |
-| `targetSpace.execute()` 返回 flow 时被 engine 正确 insertAfter 当前 leaf | session 测：B150 跳 major-improvement，玩家收到买 major 的 pending |
-| `workerId` 在玩家内全局唯一 | 看 `smallestAvailableWorker` 实现（已确认） |
-| `recordRoundPlacement` 第二次调用不破坏数据结构 | 单测 |
-| jump 期间引擎中断（玩家选 cancel 整个 SEQ）状态一致 | session 测：optional SEQ 拒绝时第一格 takenBy 不变 |
-| `actionContext` 可能被引擎 clone 进 pendingChoiceContext（engine.ts:1457-1462 / 1576-1581 / 1586-1591）— 若是浅 clone，mutate 仍生效；若深 clone 则 jumpChain 累加丢失 | 单测：B130 接受 optional 跳转后，jumpChain 累加可见于第二格 listener |
-| jump leaf execute 后 `hooks.after` dispatch 时，listener 收到的 `context.space` 指向第一格还是 targetSpace？若仍指向第一格，listener 内 `context.space?.id === '<targetSpaceId>'` 检查会失败，串联触发链（§3.4 选项 Y）落不了地 | 串联触发链 session 测试（§6.5）即在验证此假设；若失败，需在 jump leaf execute 内显式构造新 executionContext.space 或在 buildListenerEvent 增加跨 leaf space 透传 |
-| `recordRoundPlacement(player, targetSpace.id, workerId)` 同 workerId 在同一回合记录两次：`getRoundPlacementOrder` / `getRoundPlacementOrderEntries` 是否假设 workerId 唯一不重复？若有此假设，jump 后会破坏数据结构 | 看 `shared/cards/helpers/round-placement.ts` 实现；单测：jump 后 `getRoundPlacementOrder(player)` 返回 `[firstSpaceId, targetSpaceId]` 顺序正确 |
+
+| 假设                                                                                                                                                                                    | 验证方式                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `actionContext` 是 plain object 且 mutate 安全（不被 engine 序列化/克隆掉）                                                                                                                         | 单测：execute 内 mutate 后，hooks.after 看到的 ctx.actionContext.jumpChain 为新数组                                                            |
+| `targetSpace.execute()` 返回 flow 时被 engine 正确 insertAfter 当前 leaf                                                                                                                      | session 测：B150 跳 major-improvement，玩家收到买 major 的 pending                                                                          |
+| `workerId` 在玩家内全局唯一                                                                                                                                                                   | 看 `smallestAvailableWorker` 实现（已确认）                                                                                               |
+| `recordRoundPlacement` 第二次调用不破坏数据结构                                                                                                                                                   | 单测                                                                                                                                |
+| jump 期间引擎中断（玩家选 cancel 整个 SEQ）状态一致                                                                                                                                                    | session 测：optional SEQ 拒绝时第一格 takenBy 不变                                                                                          |
+| `actionContext` 可能被引擎 clone 进 pendingChoiceContext（engine.ts:1457-1462 / 1576-1581 / 1586-1591）— 若是浅 clone，mutate 仍生效；若深 clone 则 jumpChain 累加丢失                                       | 单测：B130 接受 optional 跳转后，jumpChain 累加可见于第二格 listener                                                                               |
+| jump leaf execute 后 `hooks.after` dispatch 时，listener 收到的 `context.space` 指向第一格还是 targetSpace？若仍指向第一格，listener 内 `context.space?.id === '<targetSpaceId>'` 检查会失败，串联触发链（§3.4 选项 Y）落不了地 | 串联触发链 session 测试（§6.5）即在验证此假设；若失败，需在 jump leaf execute 内显式构造新 executionContext.space 或在 buildListenerEvent 增加跨 leaf space 透传      |
+| `recordRoundPlacement(player, targetSpace.id, workerId)` 同 workerId 在同一回合记录两次：`getRoundPlacementOrder` / `getRoundPlacementOrderEntries` 是否假设 workerId 唯一不重复？若有此假设，jump 后会破坏数据结构      | 看 `shared/cards/helpers/round-placement.ts` 实现；单测：jump 后 `getRoundPlacementOrder(player)` 返回 `[firstSpaceId, targetSpaceId]` 顺序正确 |
+| 其他依赖 `stats.placedFarmers` 的下游（卡牌效果 / 评分 / 报表）是否对"jump 算第二次 placement"的语义有意见？BGA 把 jump 算入 farmer count，我们对齐 BGA 即可，但要验证我们仓库内没有"按 placedFarmers 等于落子轮数"的代码假设         | grep `stats.placedFarmers` 所有引用，若有"等于实际行动数"的依赖要重新评估；目前 §6.1 / §6.3 的 stats 断言会暴露任何下游 bug                              |
+
 
 ## 8. 范围与排除项
 
@@ -329,7 +346,7 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 - **farmer 移动动画**：登记成 TODO，后续 PR 处理
 - **机制 B / C / D**：alternative-cost trades / meeple-id obtain / turn-edge phase — 各自独立 sprint
-- **`countAsUse` 行为模型**：BGA 用来标记"该 farmer 已行动完毕"，影响某些卡判定；4 张机制 A 卡都不依赖这个标记，未来发现某卡需要再补
+- `**countAsUse` 行为模型**：BGA 用来标记"该 farmer 已行动完毕"，影响某些卡判定；4 张机制 A 卡都不依赖这个标记，未来发现某卡需要再补
 - **未参与机制 A 但监听 place-farmer 的卡**：不需要改，它们看到 second-place dispatch 时 actionContext.jumpChain 字段对它们的 listener handler 没有副作用
 
 ## 9. 文档同步具体内容
