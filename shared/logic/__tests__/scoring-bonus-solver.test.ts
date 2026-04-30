@@ -118,6 +118,7 @@ describe('solveBonusScoring', () => {
       ],
     })
     expect(result.totalScore).toBe(3)
+    expect(result.totalCost).toEqual({ wood: 2, clay: 2, stone: 2, reed: 2 })
   })
 
   it('lets free card see remaining resources after costed commit (D60 pattern)', () => {
@@ -175,5 +176,20 @@ describe('solveBonusScoring', () => {
     expect(player.resources.clay).toBe(1)
     expect(player.resources.stone).toBe(1)
     expect(player.resources.reed).toBe(1)
+  })
+
+  it('falls back to no-op when costed handler returns empty levels', () => {
+    const result = solveBonusScoring({
+      state: makeState(),
+      player: makePlayer({ wood: 5 }),
+      ctx,
+      freeHandlers: [],
+      costedHandlers: [
+        { cardId: 'BadCard', handler: () => [] },
+      ],
+    })
+    expect(result.totalScore).toBe(0)
+    expect(result.totalCost).toEqual({})
+    expect(result.entries).toEqual([{ cardId: 'BadCard', score: 0, cost: {} }])
   })
 })
