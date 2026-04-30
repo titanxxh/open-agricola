@@ -24,7 +24,11 @@ const CARD_ID = 'D117_WoodExpert'
 const getImprovementWoodCost = (cardId: string): number => {
   const minor = getMinorImprovementCard(cardId)
   if (minor) {
-    return minor.cost?.wood ?? 0
+    if (minor.cost?.wood && minor.cost.wood > 0) return minor.cost.wood
+    if (minor.altCosts) {
+      return Math.max(0, ...minor.altCosts.map((c) => c.wood ?? 0))
+    }
+    return 0
   }
   const major = getMajorCardEffect(cardId)
   if (major) {
@@ -43,9 +47,17 @@ const computeCostsListener: CardListenerRegistration = {
     if (!context.cardId) return
     const woodInCost = getImprovementWoodCost(context.cardId)
     if (woodInCost <= 0) return
-    // Substitute up to 2 wood for 1 food
-    const woodDiscount = Math.min(woodInCost, 2)
-    return { costs: { wood: -woodDiscount, food: 1 } }
+    return {
+      trades: [
+        {
+          from: { food: 1 },
+          to: { wood: 2 },
+          max: 1,
+          source: CARD_ID,
+          sourceId: CARD_ID,
+        },
+      ],
+    }
   },
 }
 
