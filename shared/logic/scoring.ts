@@ -261,8 +261,14 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       ],
     })
 
-    // Solve bonus scoring (free + costed). Solver mutates player.resources -= bestCost,
-    // so subsequent Major scoring + downstream reads see the post-solve remaining values.
+    // Solve bonus scoring (free + costed). Solver mutates `player.resources -= bestCost`
+    // on the object it receives. We pass a SHALLOW CLONE (resources spread one level)
+    // so `computeScores` stays a pure function — repeat invocations (e.g. UI re-render)
+    // must not double-deduct. Major scoring + free handlers downstream read the same
+    // clone, so they observe the post-solve remaining values.
+    //
+    // Invariant: solver and free/costed handlers MUST treat fields other than
+    // `resources` as read-only (they share references with the original player).
     const bonusCtx: BonusScoringContext = { categories: [...categories] }
     const allCardsForBonus = [
       ...player.improvements,
