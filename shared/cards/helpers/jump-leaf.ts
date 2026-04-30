@@ -3,19 +3,26 @@ import type { CardListenerContext } from '../card-listeners'
 
 export interface JumpLeafParams {
   sourceCard: string
-  workerId: string
+  /**
+   * Worker to relocate. When omitted (worker-less mode), the place-farmer jump
+   * branch skips worker mutation, placement reachability validation, and stats
+   * increments — the jump still expands the target space's full flow and
+   * dispatches cascade listeners. Worker-less mode is used by cards that fire
+   * during return-home phase (no farmer in hand) such as A151 Minstrel.
+   */
+  workerId?: string
   targetSpaceId: string
 }
 
 /**
  * Build a place-farmer leaf in jump mode (viaCardJump).
  * The place-farmer effect's jump branch:
- *   1. moves the worker from its current space to targetSpaceId
+ *   1. (worker mode only) moves the worker from its current space to targetSpaceId
  *   2. accumulates jumpChain (mutates actionContext)
- *   3. increments stats.placedFarmers
- *   4. returns a flow that runs the second placement through the engine's
- *      ActionNode path (so ReplaceHook / computeCosts / isDoable / before
- *      listener all dispatch identically to a direct placement).
+ *   3. (worker mode only) increments stats.placedFarmers
+ *   4. returns a flow that runs the placement through the engine's ActionNode
+ *      path (so ReplaceHook / computeCosts / isDoable / before listener all
+ *      dispatch identically to a direct placement).
  */
 export const jumpLeaf = (p: JumpLeafParams): ActionFlow => ({
   type: 'leaf',
@@ -25,7 +32,7 @@ export const jumpLeaf = (p: JumpLeafParams): ActionFlow => ({
   actionContext: {
     viaCardJump: true,
     sourceCard: p.sourceCard,
-    workerId: p.workerId,
+    ...(p.workerId !== undefined ? { workerId: p.workerId } : {}),
     targetSpaceId: p.targetSpaceId,
   },
 })
