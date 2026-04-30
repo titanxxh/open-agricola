@@ -1,5 +1,6 @@
-import type { ActionDefinition, FenceSegment, PlayerState } from '../../game/types'
+import type { ActionDefinition, FenceSegment, GameState, PlayerState } from '../../game/types'
 import { canAffordTypedFlatCost } from './pay-helpers'
+import { getCardEffect } from '../../cards/card-effects'
 
 export const maxFences = 15
 export const maxPastureCells = 15
@@ -36,9 +37,43 @@ export const getTotalPastureCells = (player: PlayerState) =>
 export const getPastureWoodCost = (stables: number, fenceCost: number) =>
   fenceCost + stables * stableWoodCost
 
-export const canStartFencing = (player: PlayerState) => {
+/**
+ * Sum of "free fences this player can build right now" contributed by any card
+ * that implements `computeFenceFreeAvailable` (e.g. E16 returns count of
+ * unused border edges). Mirrors BGA `getMaxBuildableFences` summing path.
+ */
+const computeFreeFencesAvailable = (state: GameState, player: PlayerState): number => {
+  let total = 0
+  for (const cardId of [...player.improvements, ...player.minorPlayed]) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.computeFenceFreeAvailable) continue
+    try {
+      total += effect.computeFenceFreeAvailable(state, player) ?? 0
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[fencing] custom card ${cardId} computeFenceFreeAvailable threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return total
+}
+
+export const canStartFencing = (state: GameState, player: PlayerState) => {
   if (getFenceCount(player) + minimumFenceSegments > maxFences) return false
   if (getTotalPastureCells(player) >= maxPastureCells) return false
+  // BGA-style: total max buildable = wood-affordable + sum(free fences).
+  // We can't perfectly preview the modifier-aware wood/fence ratio without
+  // running the solver, but the simple "(wood / 1) + freeFromCards >= 4"
+  // approximation matches BGA `getMaxBuildableFences` and unblocks E16-only
+  // entry. Cards that strictly require wood-payment (no free fences) keep the
+  // typed-flat-cost path via `canAffordTypedFlatCost` for accuracy.
+  const free = computeFreeFencesAvailable(state, player)
+  if (free > 0) {
+    const woodCount = player.resources.wood ?? 0
+    if (woodCount + free >= minimumFenceSegments) return true
+  }
   return canAffordTypedFlatCost(player, { wood: minimumFenceSegments }, 'fencing')
 }
 
@@ -61,7 +96,7 @@ export const fenceAction: ActionDefinition = {
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => canStartFencing(player),
+  canBeExecutedByPlayer: (state, player) => canStartFencing(state, player),
   execute: () => ({
     type: 'choice',
     promptKey: 'ui.interactionFenceSelect',

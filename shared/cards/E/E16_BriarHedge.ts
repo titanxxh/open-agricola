@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { isBorderEdge } from '../../game/farm'
+import { getAllEdgeIds } from '../../logic/farm/fence-validation'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E16_BriarHedge'
@@ -35,12 +36,24 @@ export const E16_BriarHedge = new MinorImprovement({
   prerequisite: '1 Animal of Each Type',
 })
 
+const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] }): number => {
+  const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
+  let count = 0
+  for (const edgeId of getAllEdgeIds()) {
+    if (!isBorderEdge(edgeId)) continue
+    if (built.has(edgeId)) continue
+    count += 1
+  }
+  return count
+}
+
 export const E16_BriarHedge_impl = {
   effect: {
   id: CARD_ID,
   computeFenceDiscount: (_state, _player, ctx) => {
     return ctx.newFenceEdges.filter(isBorderEdge).length
   },
+  computeFenceFreeAvailable: (_state, player) => countAvailableBorderEdges(player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

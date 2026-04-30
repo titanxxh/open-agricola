@@ -5,7 +5,7 @@ import {
   getFenceCount,
 } from '../effects/fencing'
 import { validateFenceSelection } from '../../logic/farm/fence-validation'
-import type { PlayerState, TradeModifier } from '../../game/types'
+import type { GameState, PlayerState, TradeModifier } from '../../game/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -25,6 +25,8 @@ const createPlayer = (): PlayerState => ({
 
 const hedgeKeeperModifier = { ...A88_HedgeKeeper.modifier } as TradeModifier
 
+const fakeState = { actionSpaces: [], players: [] } as unknown as GameState
+
 // Encloses the top-left tile (row 0, col 0) using 4 edges
 const tile00Edges = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
 
@@ -43,7 +45,7 @@ describe('fencing pasture', () => {
     const player = createPlayer()
     player.resources.wood = 1
     player.activeModifiers = [hedgeKeeperModifier]
-    expect(canStartFencing(player)).toBe(true)
+    expect(canStartFencing(fakeState, player)).toBe(true)
   })
 
   it('allows minimum-pasture fencing with Hedge Keeper discount (canStartFencing path)', () => {
@@ -54,6 +56,6 @@ describe('fencing pasture', () => {
     const player = createPlayer()
     player.resources.wood = 1
     player.activeModifiers = [hedgeKeeperModifier]
-    expect(canStartFencing(player)).toBe(true)
+    expect(canStartFencing(fakeState, player)).toBe(true)
   })
 })
