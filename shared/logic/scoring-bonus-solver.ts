@@ -27,6 +27,9 @@ export type SolverResult = {
   totalCost: Partial<Resource>
 }
 
+// Mirrors keyof Resource — keep in sync if Resource type changes.
+// REAL_RESOURCE_KEYS in shared/game/resource-keys.ts excludes 'food' ordering differs;
+// keep a local copy here to avoid coupling solver to resource-key conventions.
 const RESOURCE_KEYS: (keyof Resource)[] = [
   'food', 'wood', 'clay', 'stone', 'reed',
   'grain', 'vegetable',
@@ -62,13 +65,21 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
   const { state, player, ctx, freeHandlers, costedHandlers } = input
   const playerResourcesSnapshot: Partial<Resource> = { ...player.resources }
 
+  // Invariant per solve call — hoisted so both eval and commit loops share one object (M3)
+  const legacyCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
+
   // 1. Collect levels per costed card (call handlers once on snapshot state)
   const allLevels: { cardId: string; levels: BonusScoreLevel[] }[] = costedHandlers.map(({ cardId, handler }) => {
     let levels: BonusScoreLevel[]
     try {
       levels = handler(state, player, ctx)
-    } catch {
-      levels = [{ cost: {}, score: 0 }]
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[scoring-bonus-solver] custom card ${cardId} threw, skipping:`, err)
+        levels = [{ cost: {}, score: 0 }]
+      } else {
+        throw err
+      }
     }
     if (levels.length === 0) levels = [{ cost: {}, score: 0 }]
     return { cardId, levels }
@@ -85,13 +96,16 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
       const remaining = subtractResources(playerResourcesSnapshot, accCost)
       const playerClone = { ...player, resources: { ...player.resources, ...remaining } } as PlayerState
       const costedScore = accCombo.reduce((sum, { level }) => sum + level.score, 0)
-      const legacyCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
       let freeScore = 0
-      for (const { handler } of freeHandlers) {
+      for (const { cardId, handler } of freeHandlers) {
         try {
           freeScore += handler(state, playerClone, legacyCtx)
-        } catch {
-          // skip throwing handler in scoring; aligns with current collectBonusScores
+        } catch (err) {
+          if (cardId.startsWith('CUSTOM_')) {
+            console.warn(`[scoring-bonus-solver] custom card ${cardId} threw, skipping:`, err)
+          } else {
+            throw err
+          }
         }
       }
       const total = costedScore + freeScore
@@ -128,16 +142,21 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
   }
 
   // 4. Build entries — re-call free handlers on committed state for entry log
-  const commitCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
-  const freeEntries: SolverEntry[] = freeHandlers.map(({ cardId, handler }) => {
+  const freeEntries: SolverEntry[] = []
+  for (const { cardId, handler } of freeHandlers) {
     let score = 0
     try {
-      score = handler(state, player, commitCtx)
-    } catch {
-      score = 0
+      score = handler(state, player, legacyCtx)
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(`[scoring-bonus-solver] custom card ${cardId} threw, skipping:`, err)
+        score = 0
+      } else {
+        throw err
+      }
     }
-    return { cardId, score, cost: {} }
-  })
+    if (score !== 0) freeEntries.push({ cardId, score, cost: {} })
+  }
   const costedEntries: SolverEntry[] = bestCombo.map(({ cardId, level }) => ({
     cardId,
     score: level.score,
