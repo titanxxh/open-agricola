@@ -263,8 +263,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     // Solve bonus scoring (free + costed). Solver mutates player.resources -= bestCost,
     // so subsequent Major scoring + downstream reads see the post-solve remaining values.
-    const categoriesSnapshot = [...categories] as readonly typeof categories[number][]
-    const bonusCtx: BonusScoringContext = { categories: categoriesSnapshot }
+    const bonusCtx: BonusScoringContext = { categories: [...categories] }
     const allCardsForBonus = [
       ...player.improvements,
       ...player.minorPlayed,
