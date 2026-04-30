@@ -42,16 +42,22 @@
 ### 2.2 新架构（After）
 
 - 卡分两路：`computeBonusScore`（free, 50 张, 返回 number）+ `computeCostedBonus`（costed, 5 张, 返回 levels[]）
-- 求解器：枚举所有 costed 卡的 levels 笛卡尔积，过滤总 cost 超资源的组合，对每个组合算 free 卡 score（free 卡读 `player.resources` 中已扣后的剩余值，但**先用快照算所有组合再 commit**），取 max(costedScore + freeScore) 组合 = best combo
-- best combo 一旦确定，求解器 mutate `player.resources -= totalCost`
-- 后续步骤（cardStateBonusVp push、Major 卡 scoring、sharedPostScore）直接读 `player.resources`，看到已扣后的剩余值
+- 求解器：枚举所有 costed 卡的 levels 笛卡尔积，过滤总 cost 超资源的组合，对每个组合算 free 卡 score（free 卡读 player.resources 中已扣后的剩余值，但**先用快照算所有组合再 commit**），取 max(costedScore + freeScore) 组合 = best combo
+- best combo 一旦确定，求解器 mutate **传入的 player 对象的 `resources`**（在 `scoring.ts` 调用点这是一个 shallow clone，见 §2.3）
+- 后续步骤（cardStateBonusVp push、Major 卡 scoring、sharedPostScore）直接读那个**同一个 clone 的 `resources`**，看到已扣后的剩余值
 - 删除 `scoringPriority`、`ctx.reserved`
 
 ### 2.3 关键设计决策
 
-- **`player.resources` 真扣**：BGA 的 "reserve" 概念是实现细节限制，不是好设计；游戏已结束，扣不扣对玩家无感，但下游 D60 / Major scoring **必须**看到正确剩余值
-- **D60 不需特殊处理**：求解器 commit 后 D60 的 `computeBonusScore` 直接读 `player.resources.clay` 即可
-- **Major 卡 scoring**：当前在 `scoring.ts:273-277` 用 `player.resources - reserved`，改为直接 `player.resources`
+- **`computeScores` 必须是纯函数**：UI 可能多次调用（重渲染 / 状态比较）；如果 mutate 真实 `player.resources`，重复调用会重复扣资源。因此 `scoring.ts` 在调用求解器前做一次 shallow clone：
+  ```typescript
+  const playerForBonus = { ...player, resources: { ...player.resources } }
+  ```
+  把 `playerForBonus` 而非 `player` 传给求解器。**Major scoring 也读 `playerForBonus.resources`**（不读真实 `player.resources`）。求解器内部 mutate 这个 clone 是安全的——clone 在 `computeScores` 一次调用结束后就被丢弃。
+- **求解器与 handlers 的契约**：求解器 + free / costed handler 只允许 mutate `player.resources`（因为 scoring.ts 给的是带 resources 浅拷贝的 clone）。其他字段（`fields`、`cardStates`、`pastures` 等）共享 reference，**必须只读**。否则 mutation 会泄漏回真实 player。
+- **BGA 的 "reserve" 概念被淘汰**：BGA 的 reserve 是 PHP 实现细节限制，不是好设计；新架构通过"求解器在 clone 上 commit、下游同 clone 读"实现等效"取剩余资源"语义，更直观。
+- **D60 不需特殊处理**：求解器 commit 后 D60 的 `computeBonusScore` 直接读 `player.resources.clay`（这里 `player` 实参就是 clone，已扣过）即可。
+- **Major 卡 scoring**：当前在 `scoring.ts:273-277` 用 `player.resources - reserved`，改为直接 `playerForBonus.resources`（求解器已 commit 完）。
 - **求解器复杂度**：5 张 costed 各自的 level 数 ≤ 16（D132 penalty 上限），笛卡尔积 ≤ 4 × 4 × 4 × 4 × 16 ≈ 4096 组合，每个组合算 50 张 free 卡 score → ~200K ops / 玩家，单次 scoring 远 < 100ms
 
 ---
@@ -294,7 +300,17 @@ Major 卡 scoring（line 273-277）：
   }
 ```
 
-注意：求解器在 `collectBonusScores` 替换后已 commit 了 `player.resources -= totalCost`，因此 Major 卡 scoring 直接读 `player.resources` 即可。**关键顺序**：求解器必须在 Major scoring 之前跑——这本来就是当前顺序（bonus → cardStateBonusVp → ... → cards/cardsBonus 实际是更早 push 的，但 Major scoring 用的是 player.resources 当下值，求解器扣了之后下次读自然是更新后值）。
+注意：求解器在 `collectBonusScores` 替换后已 commit 了 `playerForBonus.resources -= totalCost`（在 `scoring.ts` 是 clone，不动真 player），Major 卡 scoring 改读同一个 `playerForBonus.resources` 即可。**关键顺序**：求解器必须在 Major scoring 之前跑——这本来就是当前顺序（bonus → cardStateBonusVp → ... → cards/cardsBonus 实际是更早 push 的，但 Major scoring 用 `playerForBonus.resources` 当下值，求解器扣了之后下次读自然是更新后值）。
+
+**为什么用 clone 而不是真 mutate**：`computeScores` 是纯函数（UI 多次调用不应重复扣资源）。在调用求解器之前，scoring.ts 做一次 shallow clone：
+
+```typescript
+const playerForBonus = { ...player, resources: { ...player.resources } }
+const bonusScoreResult = solveBonusScoring({ state, player: playerForBonus, ctx, freeHandlers, costedHandlers })
+// ... Major scoring 读 playerForBonus.resources
+```
+
+求解器内部 mutate `playerForBonus.resources` 是安全的；handlers 只允许 mutate `resources`，不得改 `fields` / `cardStates` / `pastures` 等（共享 reference）。
 
 **Wait — 顺序检查**：当前 scoring.ts 顺序：
 1. 标准 categories push (line 200-260)
