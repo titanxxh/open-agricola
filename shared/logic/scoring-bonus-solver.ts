@@ -1,6 +1,5 @@
 import type { GameState, PlayerState, Resource } from '../game/types'
 import type {
-  BonusScoreLevel,
   BonusScoringContext,
   BonusScoreHandler,
   CostedBonusHandler,
@@ -26,7 +25,7 @@ export type SolverResult = {
   totalCost: Partial<Resource>
 }
 
-export function solveBonusScoring(input: SolverInput): SolverResult {
+export function solveBonusScoring(_input: SolverInput): SolverResult {
   // Stub — replaced in Task 3
   return { entries: [], totalScore: 0, totalCost: {} }
 }
