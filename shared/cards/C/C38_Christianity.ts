@@ -21,9 +21,9 @@ export const C38_Christianity_impl = {
   onBuy: (_state, _player) => {
     return {
       type: 'leaf' as const,
-      actionId: 'gain-other-players',
+      actionId: 'gain',
       sourceCard: CARD_ID,
-      params: { food: 1 },
+      params: { recipientMode: 'others', food: 1 },
     }
   },
 },

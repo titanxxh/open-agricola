@@ -11,7 +11,7 @@ const beforeExchangeListener: CardListenerRegistration = {
   id: 'D56-fatstock-stretcher-before-exchange',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
     writeCardExtraData(context.player, CARD_ID, 'sheepBefore', context.player.resources.sheep)
     writeCardExtraData(context.player, CARD_ID, 'boarBefore', context.player.resources.boar)
@@ -22,7 +22,7 @@ const afterExchangeListener: CardListenerRegistration = {
   id: 'D56-fatstock-stretcher-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
     const sheepBefore = readCardExtraData<number>(context.player, CARD_ID, 'sheepBefore') ?? 0
     const boarBefore = readCardExtraData<number>(context.player, CARD_ID, 'boarBefore') ?? 0

@@ -49,7 +49,7 @@ const afterExchangeListener: CardListenerRegistration = {
   id: 'A48-shaving-horse-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: checkAndExchange,
 }
 

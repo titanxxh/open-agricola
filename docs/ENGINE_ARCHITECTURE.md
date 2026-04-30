@@ -1706,6 +1706,206 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 - `server/__tests__/ws-seat-binding.test.ts` — 7 个
 - 共 30 个新测试覆盖 filter 对齐、viewer 对称性、seat mismatch 拒绝、观察者隔离等场景。
 
+## 15.1 place-farmer jump mode (Sprint 5 mech-A)
+
+支持卡牌让玩家"借同一 farmer 跳到第二个 action space"的机制（BGA `useActionSpaceNode($space, $farmer)`）。
+
+### 协议
+
+卡牌 listener 返回 jump leaf（`shared/cards/helpers/jump-leaf.ts` 的 `jumpLeaf()`）：
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'place-farmer',
+  expandFlow: true,
+  sourceCard: 'B130_FullPeasant',
+  actionContext: {
+    viaCardJump: true,
+    sourceCard: 'B130_FullPeasant',
+    workerId: '1',
+    targetSpaceId: 'fencing',
+  },
+}
+```
+
+### effect 行为（`shared/actions/effects/place-farmer.ts`）
+
+`actionContext.viaCardJump === true` 进入 jump 分支：
+
+1. 反查 fromSpace（含 `(playerId, workerId)` 的格子）
+2. `computeAllowedPlacementSpaces` 二次校验 `targetSpaceId` 可达
+3. mutate `actionContext.jumpChain = [...prev, sourceCard]`
+4. `removeWorkerRef(from)` + `addWorkerRef(target)` + `recordRoundPlacement`
+5. `incPlacedFarmers(player)`
+6. 返回 `{ type:'flow', flow:{ type:'leaf', actionId: targetSpaceId, expandFlow: true, sourceCard, actionContext } }`。engine 在 `buildFlowNode` 看到 `expandFlow: true` 时，把这个 leaf 展开成 `registry.get(targetSpaceId).flow` 的节点子树（与 `createEngine(actionId)` 路径对齐），outer `actionContext` / `sourceCard` 通过 `engine.mergeContextIntoFlow` 透传到所有内嵌 leaves（深拷贝，inner 已有字段优先）。target action 没有 `flow` 时（grain-seeds / day-laborer / traveling-players）自动 fallback 到 `ActionNode(actionId)` 路径
+
+### 防递归
+
+`actionContext.jumpChain` 累加经过的 sourceCard。listener 自检 `isJumpChainContains(context, CARD_ID)`（`shared/cards/helpers/jump-leaf.ts`）。防 A→A 自跳与 A→B→A 任意长度间接循环。
+
+### per-action 簿记不重置
+
+`actionToken` / `actionStartPlayerSnapshot` / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动 — jump 是同 action 延续。
+
+### 引擎扩展点：`ActionFlow` leaf `expandFlow`
+
+为支持 jump（以及未来类似"借同一 leaf dispatch 进 target action 完整 flow"的机制），engine 给 `ActionFlow` leaf 加了可选 `expandFlow: boolean`。语义：
+
+- `expandFlow: true` 且 `registry.get(actionId).flow` 存在 → engine `buildFlowNode` 把 leaf 替换成 `action.flow` 的节点子树
+- `expandFlow: true` 但 action 无 `flow` → fallback 到原 `ActionNode(actionId)` 路径（plain leaf actions）
+- `expandFlow` 缺省 / `false` → 走原 `ActionNode` 路径，所有现有 leaf 行为不变
+
+实现细节：`engine.mergeContextIntoFlow` 递归遍历 inner flow，把 outer leaf 的 `actionContext` 和 `sourceCard` 注入到每个内嵌 leaf；merge 用 inner 优先（inner 已有的字段不被 outer 覆盖），并整体深拷贝（`action.flow` 是 module-level 常量，不允许污染）。
+
+### 不在范围
+
+- farmer 移动动画（前端 TODO）
+- `countAsUse` 行为模型（未来卡需要时再补）
+- server 重启时 jump 中途 pending 的恢复（架构层议题，非 jump 特有）
+- Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / 直接 stub computeReplace parity）需要 codebase 扩展运行时 unregister API；简单场景已在本 sprint 由 A129 自跳测试 + B150 → major-improvement 间接覆盖
+
+### 使用此机制的卡
+
+A129 Swagman / B130 FullPeasant / B150 LargeScaleFarmer / B152 JuniorArtist。
+
+## 15.2 exchange action 与 actionContext.tradeIds (Sprint 5 mech-C)
+
+`shared/actions/effects/exchange.ts` 的 anytime exchange action（id 原 `'anytime-exchange'`，2026-04-30 重命名为 `'exchange'`，去前缀对齐 `reorganize`）接受 `actionContext.tradeIds?: string[]` 限定显示哪些 trade。
+
+### 协议
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'exchange',
+  sourceCard: 'CARD_ID',
+  actionContext: { tradeIds: ['CARD_ID'] },
+}
+```
+
+`execute({ player, actionContext })` 内：
+
+1. 调 `buildExchangeOptions(player)` 拿到玩家所有可用 trade 的选项（每个选项的 `option.sourceCard = trade.sourceId`）。
+2. 若 `actionContext.tradeIds` 存在且非空，过滤为只保留 `option.sourceCard ∈ tradeIds` 的项；`'cancel'` 选项总是保留，让玩家能拒绝。
+3. 若 filter 后只剩 `cancel`（无任何可换 trade），返回 `{ type: 'fail', logKey: 'log.actionNoExchange' }` 不弹 prompt。
+4. 否则返回 `{ type: 'choice', options: filtered }`。
+
+### 注册
+
+trade 通过 `cookeryTrades: Record<cardId, Trade[]>` 全局注册，每条 `Trade` 带 `sourceId` 标识 source 卡。`getPlayerCookeryTrades(player)` 与 `hasAffordableCookeryTrade(player)` 同时遍历 `[...player.improvements, ...player.minorPlayed]`：让 minor 卡（如 E53 BoarSpear）也能 contribute trade，而不仅限于 major-improvement-based cookers。
+
+### 用例
+
+- **玩家主动触发 anytime exchange action**（不传 `actionContext.tradeIds`）：所有持有源卡的 trade 都可见——历史 cookery exchange 行为，零变化。
+- **卡 listener 触发 exchange leaf with `tradeIds=[CARD_ID]`**：仅显示该卡的 trade，避免污染玩家平时主动 exchange 的全部选项。E53 BoarSpear 是首个消费者：obtain（`gain` / `collect` / `receive`）after phase 检测到 `result.resourcesGained.boar > 0` 且非 breeding phase 时，弹 SEQ optional → exchange leaf with `tradeIds=['E53_BoarSpear']`，玩家只看到 boar→4food 这一条 trade。
+
+### 与 E85 MasterTanner 的天然联动
+
+E85 监听 exchange action 的 before/after phase；E53 触发的 exchange leaf 走同一个 dispatch 路径，所以 E53 转 boar→food 时 E85 自动看到 boar diff 并按规则 push food 到自己的 stack。两卡解耦，仅通过统一的 exchange action / cookeryTrades 注册表交互。
+## 15.3 viaCardJump worker-less variant (Sprint 5 mech-E)
+
+`shared/actions/effects/place-farmer.ts` 的 viaCardJump 分支接受 `workerId` optional。当未传时（worker-less 模式）：
+
+- 跳过 `removeWorkerRef` / `addWorkerRef` / `recordRoundPlacement` / `incPlacedFarmers`
+- 跳过 `computeAllowedPlacementSpaces` 校验（调用方负责验证 target 空间合法）
+- 仍累加 `actionContext.jumpChain` + 返回 `{type:'flow', flow}`，flow 为 target action 的 `expandFlow` leaf
+- cascade dispatch（match place-farmer after listener）照常跑
+
+`jumpLeaf()` helper 同步：`workerId` 字段从必填改为 optional；`actionContext.workerId` 仅在传入时落地。
+
+**用例**：A151 Minstrel 在 returning home phase 触发，没 farmer 在手可借。worker-less 模式让 engine 跑指定空间的完整 flow（如 sheep-market 的 accumulation 自动清零、grain-utilization 的 OR(sow, bake-bread)、major-improvement 的 improvement-any、fencing 的 fence flow），第三方卡 listener 也照常 fire。
+
+**不在范围**：worker-less 模式不修改任何 stats（placedFarmers / familySize / workersAvailable 都不动），也不写 round-placement 历史。这是 BGA `useActionSpaceNode` 的真实语义——"使用空间的完整效果，不是落子"。
+
+### 使用此机制的卡
+
+A151 Minstrel（returning home phase 触发，仅当唯一一个 stage-1 空间未占用）。
+
+## 15.4 gain action 三合一 (Sprint 5 mech-E)
+
+`shared/actions/effects/gain.ts` 的 `gain` action 接受三个可选参数控制 dispatch：
+
+- `recipientPlayerId?: string` — 单一收件人；默认 `context.player.id`
+- `recipientMode?: 'self' | 'others'` — `'others'` 表示"所有其他玩家 each"
+- `payerId?: string` — 同时扣 payer 资源（用于"对手 pay 给 owner"语义；clamp 在 0）
+
+历史上这三种 dispatch 是 3 个独立 effect（`gain` / `gain-trigger-player` / `gain-other-players`），2026-04-30 Sprint 5 mech-E 合并；后两个 effect 文件已删除。`gain` 的 logKey 按 `recipientMode` 选择：`others` 走 `log.cardEffectOtherPlayersGain`，其它走 `log.cardEffectGain`。
+
+调用方约定：
+
+```ts
+{ type: 'leaf', actionId: 'gain', params: { food: 1, recipientMode: 'others' }, sourceCard: ... }
+{ type: 'leaf', actionId: 'gain', params: { grain: 1, recipientPlayerId: triggerId }, sourceCard: ... }
+{ type: 'leaf', actionId: 'gain', params: { food: 1, recipientPlayerId: ownerId, payerId: triggerId }, sourceCard: ... }
+```
+
+`addCardResourceGained` / `addResourcesFromCards` / `trackWorkPhaseBuildingResources` 按 recipient 是否为 source player 分流。
+
+## 15.5 BonusModifier conditions 评估扩展 (Sprint 5 mech-E)
+
+`shared/actions/effects/pay.ts` 的 `getModifiersForCostType` 在非-construct cost type（renovation / improvement / fencing / stables / plow / occupation）按 BonusModifier `conditions` 字段实时过滤。支持的 conditions key：
+
+- `minNumRooms: number` — 评估为 `player.rooms < N` 不通过
+- `houseTypeWood / houseTypeClay / houseTypeStone: 1` — 评估为 `player.houseType !== expected` 不通过
+
+construct 路径不变（仍由 `room-payment.ts` 的 `bonusAppliesToRoomCount` 在每次 build 调用时按 `roomCount`（含本次 build）评估，因为 `minNumRooms` 在 construct 上下文是"本次 build 至少 N 个房间"）。
+
+这是 `pay.ts` line 490 TODO 的部分 fix（仅 `BonusModifier.conditions` 覆盖）；`Bonus.conditions`（ComplexCost 内传递的字段）仍未在 `computeAllBuyableCombinations` 评估，留 follow-up。
+
+**用例**：C13 WoodSlideHammer 持 `conditions: { houseTypeWood: 1, minNumRooms: 5 }`：木屋且 ≥5 间时 stone:2 折扣激活；renovate 后 houseType 变 clay/stone，modifier 自动失效（无需手动从 `activeModifiers` 移除）。
+
+## 15.6 stables effect — `actionContext.zoneFilter / max` (Sprint 5b)
+
+`shared/actions/effects/stables.ts` 接受 `actionContext` 上的两个可选字段：
+
+- `zoneFilter?: 'pasture-1'`：限定可放 stable 的 tile 子集；`'pasture-1'` 表示仅 size=1 的 pasture 内 cells（A1 Shelter 用）
+- `max?: number`：限定本次最多放几个 stable，会被 `buildStableFarmInteraction` 内的 `structuralMax` 取 min
+
+`costOverride: Partial<Resource>` 早期已支持（`buildStableFarmInteraction` 第 2 参数），`zoneFilter / max` 通过 `options` 第 3 参数加入。`game-core.ts buildStableInteraction` 透传 `pending.actionContext` 到 helper。9 张其他 `actionId:'stables'` 卡（E89/C94/C2/B16/B89/A150/A89/A15）不传新字段时维持原行为。
+
+### 调用约定
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'stables',
+  sourceCard: 'CARD_ID',
+  optional: true,
+  actionContext: {
+    max: 1,
+    costOverride: { wood: -99 },  // negative delta → final wood cost = 0
+    zoneFilter: 'pasture-1',
+  },
+}
+```
+
+## 15.7 fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b)
+
+`CardEffect` 接口新增可选 hook：
+
+```ts
+computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
+```
+
+返回该卡当前能贡献的「免费 fence 上限」。`canStartFencing(state, player)` 在 `shared/actions/effects/fencing.ts` 遍历 `[...player.improvements, ...player.minorPlayed]`，累加每张卡的 free count 计入 `maxBuildable`，对齐 BGA `getMaxBuildableFences`-style 算法：当 `wood + free >= minimumFenceSegments(=4)` 通过 entry-guard。
+
+### 与 `computeFenceDiscount` 双轨
+
+- **`computeFenceFreeAvailable(state, player)`**：entry-guard 阶段，返回上限（不要求 `ctx.newFenceEdges`）
+- **`computeFenceDiscount(state, player, ctx)`**：实际 payment 阶段，按真实选边算 discount
+
+E16 BriarHedge 同时提供两者；其他 fence-discount 卡（C16 / C88 / E74 等）按需贡献，不阻塞 5b。
+
+### 签名变化
+
+`canStartFencing` 第一参数从 `player` 改为 `state, player`。6 个 caller 全部同步：
+- `fenceAction.canBeExecutedByPlayer` (fencing.ts:64)
+- `B26_AgrarianFences.ts:116, 132`
+- `B94_StockProtector.ts:51`
+- `C88_CarpentersApprentice.ts:50`
+- 单元测试 `fencing.test.ts`
+
 ## 16. 当前结论
 
 项目的主设计应明确为：

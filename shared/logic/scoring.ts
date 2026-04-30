@@ -4,7 +4,9 @@ import { fieldHasCrop } from '../game/field'
 import { computeFencedRegions } from './farm'
 import { getMajorCardEffect } from '../cards/major'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types'
-import { collectBonusScores, getCardEffect } from '../cards/card-effects'
+import { getCardEffect } from '../cards/card-effects'
+import { solveBonusScoring } from './scoring-bonus-solver'
+import type { BonusScoringContext } from '../cards/card-effects'
 import { familySize } from '../game/player'
 
 type ScoreCategoryKey =
@@ -259,9 +261,40 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       ],
     })
 
-    // Collect bonus scores first — they reserve resources that Major improvements must deduct
-    const bonusScoreResult = collectBonusScores(state, player)
-    const reserved = bonusScoreResult.reserved
+    // Solve bonus scoring (free + costed). Solver mutates `player.resources -= bestCost`
+    // on the object it receives. We pass a SHALLOW CLONE (resources spread one level)
+    // so `computeScores` stays a pure function — repeat invocations (e.g. UI re-render)
+    // must not double-deduct. Major scoring + free handlers downstream read the same
+    // clone, so they observe the post-solve remaining values.
+    //
+    // Invariant: solver and free/costed handlers MUST treat fields other than
+    // `resources` as read-only (they share references with the original player).
+    const bonusCtx: BonusScoringContext = { categories: [...categories] }
+    const allCardsForBonus = [
+      ...player.improvements,
+      ...player.minorPlayed,
+      ...player.occupationPlayed,
+    ]
+    const freeHandlers = allCardsForBonus
+      .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
+      .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
+        !!x.effect?.computeBonusScore,
+      )
+      .map(({ cardId, effect }) => ({ cardId, handler: effect.computeBonusScore! }))
+    const costedHandlers = allCardsForBonus
+      .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
+      .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
+        !!x.effect?.computeCostedBonus,
+      )
+      .map(({ cardId, effect }) => ({ cardId, handler: effect.computeCostedBonus! }))
+    const playerForBonus = { ...player, resources: { ...player.resources } }
+    const bonusScoreResult = solveBonusScoring({
+      state,
+      player: playerForBonus,
+      ctx: bonusCtx,
+      freeHandlers,
+      costedHandlers,
+    })
 
     const cardEntries: ScoreEntry[] = []
     const cardBonusEntries: ScoreEntry[] = []
@@ -270,11 +303,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       if (!card) return
       cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
       if (card.scoring) {
-        const resourceCount = Math.max(
-          0,
-          (player.resources[card.scoring.resource] ?? 0) -
-            (reserved[card.scoring.resource] ?? 0),
-        )
+        const resourceCount = Math.max(0, playerForBonus.resources[card.scoring.resource] ?? 0)
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
@@ -325,7 +354,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       cardStateBonusVp += entry.score
     }
 
-    if (cardStateBonusVp > 0) {
+    if (cardStateBonusVp !== 0) {
       categories.push({
         key: 'cardStateBonusVp',
         total: cardStateBonusVp,
@@ -341,17 +370,6 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       quantity: beggingCount,
       entries: [{ type: 'quantity', quantity: beggingCount, score: beggingScore }],
     })
-
-    // Post-scoring card hooks
-    const allCards = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
-    let postScoreVp = 0
-    for (const cardId of allCards) {
-      const effect = getCardEffect(cardId)
-      if (effect?.computePostScore) {
-        postScoreVp += effect.computePostScore(state, player, categories)
-      }
-    }
-    applyPostScoreAdjustment(categories, postScoreVp)
 
     const total = categories.reduce((sum, category) => sum + category.total, 0)
     return {

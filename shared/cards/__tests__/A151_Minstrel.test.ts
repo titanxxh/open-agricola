@@ -60,7 +60,7 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('A151_Minstrel', () => {
-  it('returns optional improvement-any flow when exactly 1 stage-1 space is unoccupied (major-improvement)', () => {
+  it('returns jumpLeaf for major-improvement when exactly 1 stage-1 space is unoccupied', () => {
     const player = createPlayer()
     const state = createState(player)
     const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
@@ -68,7 +68,14 @@ describe('A151_Minstrel', () => {
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
-    expect(seq.children[0].actionId).toBe('improvement-any')
+    const leaf = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.type).toBe('leaf')
+    expect(leaf.actionId).toBe('place-farmer')
+    expect(leaf.expandFlow).toBe(true)
+    expect(leaf.actionContext?.viaCardJump).toBe(true)
+    expect(leaf.actionContext?.targetSpaceId).toBe('major-improvement')
+    expect(leaf.actionContext?.workerId).toBeUndefined()
+    expect(leaf.actionContext?.sourceCard).toBe(CARD_ID)
   })
 
   it('returns nothing when more than 1 stage-1 space is unoccupied', () => {
@@ -93,7 +100,7 @@ describe('A151_Minstrel', () => {
     expect(flow).toBeNull()
   })
 
-  it('returns gain sheep flow when sheep-market is the only unoccupied space', () => {
+  it('returns jumpLeaf for sheep-market when it is the only unoccupied space', () => {
     const player = createPlayer()
     const state = createState(player)
     // Make sheep-market unoccupied and major-improvement occupied
@@ -107,8 +114,9 @@ describe('A151_Minstrel', () => {
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
-    expect(seq.children[0].actionId).toBe('gain')
-    expect(seq.children[0].params.sheep).toBe(3)
+    const leaf = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.actionId).toBe('place-farmer')
+    expect(leaf.actionContext?.targetSpaceId).toBe('sheep-market')
+    expect(leaf.actionContext?.workerId).toBeUndefined()
   })
-
 })

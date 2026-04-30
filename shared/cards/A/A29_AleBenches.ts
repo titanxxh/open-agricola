@@ -29,7 +29,7 @@ export const A29_AleBenches_impl = {
       gain: { score: 1 },
       promptKey: 'ui.interactionAleBenches',
       followUp: [
-        { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain', params: { recipientMode: 'others', food: 1 }, sourceCard: CARD_ID },
       ],
     })
   },

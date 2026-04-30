@@ -60,6 +60,7 @@ describe('B130_FullPeasant session', () => {
 
   it('pays 1 food and chains to fence when accepting from grain-utilization', () => {
     const session = setup({ withCard: true, food: 3 })
+    const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
@@ -71,7 +72,40 @@ describe('B130_FullPeasant session', () => {
     resp = session.resolveChoice(0, accept!.value)
     // Food should be -1 after pay (from 3 to 2)
     expect(resp.state.players[0]!.resources.food).toBe(2)
-    // Next: fence action is presented (or an interaction)
+    // Mech-A: farmer physically jumped from grain-utilization to fencing.
+    const grainSpace = resp.state.actionSpaces.find((s) => s.id === 'grain-utilization')!
+    const fencingSpace = resp.state.actionSpaces.find((s) => s.id === 'fencing')!
+    expect(grainSpace.takenBy).toEqual([])
+    expect(fencingSpace.takenBy.length).toBe(1)
+    expect(fencingSpace.takenBy[0]!.playerId).toBe(resp.state.players[0]!.id)
+    // Both placements counted (entry +1, jump +1).
+    expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 2)
+  })
+
+  it('skipping the chain leaves the worker on grain-utilization (placedFarmers +1)', () => {
+    const session = setup({ withCard: true, food: 3 })
+    const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    if (resp.pending.type !== 'choice') return
+    resp = session.resolveChoice(0, '__skip__')
+    const grainSpace = resp.state.actionSpaces.find((s) => s.id === 'grain-utilization')!
+    const fencingSpace = resp.state.actionSpaces.find((s) => s.id === 'fencing')!
+    expect(grainSpace.takenBy.length).toBe(1)
+    expect(fencingSpace.takenBy).toEqual([])
+    expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 1)
+  })
+
+  it('does not consume family pool on jump (worker count unchanged)', () => {
+    const session = setup({ withCard: true, food: 3 })
+    const stateBefore = session.getState().state
+    const activeBefore = stateBefore.players[0]!.workers.filter((w) => w.isActive).length
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    if (resp.pending.type !== 'choice') return
+    const accept = resp.pending.options.find((o) => o.value !== '__skip__')!
+    resp = session.resolveChoice(0, accept.value)
+    expect(resp.state.players[0]!.workers.filter((w) => w.isActive).length).toBe(activeBefore)
   })
 
   it('does not offer chain when the other space is occupied', () => {

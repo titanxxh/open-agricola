@@ -22,6 +22,11 @@ export const A1_Shelter_impl = {
     actionId: 'stables',
     sourceCard: CARD_ID,
     optional: true,
+    actionContext: {
+      max: 1,
+      costOverride: { wood: -99 },
+      zoneFilter: 'pasture-1',
+    },
   }),
 },
   reaches: [] as readonly string[],

@@ -59,3 +59,53 @@ describe('A22_Telegram', () => {
     expect(player.cardStates?.[CARD_ID]?.extraData?.triggerRound).toBe(3)
   })
 })
+
+describe('A22_Telegram onBeforeStartOfTurn', () => {
+  const setupTriggerable = () => {
+    const player = createPlayer() as PlayerState & { workers?: { id: string; isActive: boolean; isNewborn: boolean }[] }
+    player.workers = [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+    ]
+    player.cardStates = { [CARD_ID]: { extraData: { triggerRound: 5 } } }
+    const state = createState(player as PlayerState)
+    state.round = 5
+    return { player: player as PlayerState, state }
+  }
+
+  it('fires when reserve has at least 1 worker (no actionSpaces taking workers)', () => {
+    const { player, state } = setupTriggerable()
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toBeTruthy()
+    expect(flow!.type).toBe('seq')
+  })
+
+  it('does NOT fire when all workers are placed (workersAvailable === 0)', () => {
+    const { player, state } = setupTriggerable()
+    state.actionSpaces = [
+      { id: 'a', takenBy: [{ playerId: 'p1', workerId: '1' }] },
+      { id: 'b', takenBy: [{ playerId: 'p1', workerId: '2' }] },
+    ] as unknown as GameState['actionSpaces']
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toBeFalsy()
+  })
+
+  it('does NOT fire when current round != triggerRound', () => {
+    const { player, state } = setupTriggerable()
+    state.round = 7
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toBeFalsy()
+  })
+
+  it('does NOT fire twice (once-per-game flag prevents repeat)', () => {
+    const { player, state } = setupTriggerable()
+    const effect = getCardEffect(CARD_ID)!
+    const first = effect.onBeforeStartOfTurn!(state, player)
+    expect(first).toBeTruthy()
+    const second = effect.onBeforeStartOfTurn!(state, player)
+    expect(second).toBeFalsy()
+  })
+})

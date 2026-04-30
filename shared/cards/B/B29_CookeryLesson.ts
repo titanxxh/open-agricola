@@ -3,46 +3,57 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import type { PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B29_CookeryLesson'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
+const COOKED_TOKEN_KEY = 'cookedActionToken'
+const LESSONS_TOKEN_KEY = 'lessonsActionToken'
 
 /**
  * B29 Cookery Lesson:
- * Each time you use a Lessons action space and a cooking improvement on the same turn,
- * you get 1 bonus VP.
+ * Each time you use a Lessons action space and a cooking improvement on the
+ * SAME TURN (one takeAction), you get 1 bonus VP.
  *
- * BGA:
- * - onBuy: if both lessons used AND cooked this turn → 1 VP (mark as used)
- * - afterExchange: if lessons used this turn → 1 VP
- * - afterPlaceFarmer (on Lessons space): if cooked this turn → 1 VP
- * - uses usableThisTurn / setUsedOnTurnId to fire at most once per action.
+ * BGA: 'on the same turn' = within one takeAction (one farmer placement and
+ * its triggered effects), not 'within the same round'. Tracking is per-action
+ * via the action snapshot token.
  *
- * Tracking: We use extraData to track if lessons was used and if cooking was used
- * this round, keyed by action token to ensure once-per-action triggering.
+ * - cookedActionToken: written on after-exchange (cooking)
+ * - lessonsActionToken: written on after-placeFarmer (lessons / lessons-4)
+ *
+ * VP awarded when both tokens equal the current actionToken in the same
+ * triggering listener call. USED_ACTION_TOKEN_KEY guards against double-award
+ * within the same action (the two listeners can both detect the match).
+ *
+ * onRoundStart resets all three tokens defensively (action tokens normally
+ * monotonically increase across the game so this is mostly cosmetic).
  */
 
 const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
 
-const hasUsedLessonsThisRound = (context: CardListenerContext): boolean => {
-  const placements = getRoundPlacementOrder(context.player)
-  return placements.some((spaceId) => LESSONS_SPACE_IDS.has(spaceId))
+const currentActionToken = (player: PlayerState) =>
+  readActionSnapshotToken(player)
+
+const tokenMatchesCurrent = (
+  player: PlayerState,
+  storedKey: string,
+): boolean => {
+  const cur = currentActionToken(player)
+  if (cur === undefined) return false
+  const stored = readCardExtraData<number>(player, CARD_ID, storedKey)
+  return stored === cur
 }
 
-const hasCookedThisRound = (context: CardListenerContext): boolean => {
-  // Check if there's a cooking exchange recorded this round
-  const token = readCardExtraData<boolean>(context.player, CARD_ID, 'cookedThisRound')
-  return !!token
-}
-
-const markCookedThisRound = (context: CardListenerContext): void => {
-  writeCardExtraData(context.player, CARD_ID, 'cookedThisRound', true)
+const writeCurrentToken = (player: PlayerState, storedKey: string): void => {
+  const cur = currentActionToken(player)
+  if (cur === undefined) return
+  writeCardExtraData(player, CARD_ID, storedKey, cur)
 }
 
 const awardBonusVp = (context: CardListenerContext): ActionHookResult | void => {
-  const actionToken = readActionSnapshotToken(context.player)
+  const actionToken = currentActionToken(context.player)
   if (actionToken === undefined) return
   if (readCardExtraData<number>(context.player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
   writeCardExtraData(context.player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
@@ -56,21 +67,23 @@ const awardBonusVp = (context: CardListenerContext): ActionHookResult | void => 
   }
 }
 
-// After anytime-exchange: mark cooking happened, check if lessons used → VP
+// After exchange: stamp cookedActionToken with current action token,
+// then award VP if lessons was already stamped this same action.
 const afterExchangeListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    markCookedThisRound(context)
-    if (hasUsedLessonsThisRound(context)) {
+    writeCurrentToken(context.player, COOKED_TOKEN_KEY)
+    if (tokenMatchesCurrent(context.player, LESSONS_TOKEN_KEY)) {
       return awardBonusVp(context)
     }
   },
 }
 
-// After place-farmer on Lessons: check if cooked this round → VP
+// After place-farmer on Lessons: stamp lessonsActionToken with current action
+// token, then award VP if cooked was already stamped this same action.
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-place-farmer',
   cardIds: [CARD_ID],
@@ -78,7 +91,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !LESSONS_SPACE_IDS.has(context.space.id)) return
-    if (hasCookedThisRound(context)) {
+    writeCurrentToken(context.player, LESSONS_TOKEN_KEY)
+    if (tokenMatchesCurrent(context.player, COOKED_TOKEN_KEY)) {
       return awardBonusVp(context)
     }
   },
@@ -104,22 +118,24 @@ export const B29_CookeryLesson_impl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'cookedThisRound', false)
+    writeCardExtraData(player, CARD_ID, COOKED_TOKEN_KEY, -1)
+    writeCardExtraData(player, CARD_ID, LESSONS_TOKEN_KEY, -1)
     writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, -1)
   },
   onBuy: (_state, player) => {
-    // onBuy: if both conditions already met, award VP immediately
-    if (hasUsedLessonsThisRound({ player } as CardListenerContext) &&
-        hasCookedThisRound({ player } as CardListenerContext)) {
-      const actionToken = readActionSnapshotToken(player)
-      if (actionToken !== undefined) {
-        writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-      }
-      return {
-        type: 'leaf',
-        actionId: 'bonus-vp',
-        sourceCard: CARD_ID,
-      }
+    // onBuy fires within an exchange/lessons triggering action. If both tokens
+    // already match the current action, award VP now.
+    const cur = readActionSnapshotToken(player)
+    if (cur === undefined) return
+    const cookedMatches = readCardExtraData<number>(player, CARD_ID, COOKED_TOKEN_KEY) === cur
+    const lessonsMatches = readCardExtraData<number>(player, CARD_ID, LESSONS_TOKEN_KEY) === cur
+    if (!cookedMatches || !lessonsMatches) return
+    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === cur) return
+    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, cur)
+    return {
+      type: 'leaf',
+      actionId: 'bonus-vp',
+      sourceCard: CARD_ID,
     }
   },
 },

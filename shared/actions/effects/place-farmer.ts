@@ -1,15 +1,18 @@
 import type {
   ActionDefinition,
   ActionExecutionResult,
+  ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
 } from '../../game/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addWorkerRef } from '../../game/space'
+import { addWorkerRef, removeWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
+import { incPlacedFarmers } from '../../logic/stats'
 import { computeAllowedPlacementSpaces } from './placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
@@ -63,6 +66,112 @@ export const placeFarmerAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     smallestAvailableWorker(state, player) !== null,
   execute: ({ state, player, actionContext }) => {
+    // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
+    // the engine runs the second placement through the standard ActionNode path.
+    if (actionContext?.viaCardJump) {
+      const sourceCard = actionContext.sourceCard as string | undefined
+      const workerId = actionContext.workerId as string | undefined
+      const targetSpaceId = actionContext.targetSpaceId as string | undefined
+      if (!sourceCard || !targetSpaceId) {
+        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      }
+
+      // worker-less mode: A151-style "use this action space" trigger during
+      // return-home phase, where there is no farmer in hand to relocate.
+      const isWorkerless = !workerId
+
+      let fromSpace: ActionSpace | undefined
+      if (!isWorkerless) {
+        fromSpace = state.actionSpaces.find(s =>
+          s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
+        )
+        if (!fromSpace) {
+          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        }
+      }
+      const targetSpace = state.actionSpaces.find(s => s.id === targetSpaceId)
+      if (!targetSpace) {
+        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      }
+
+      // Reachability check only applies to worker mode (worker-less is invoked
+      // by cards that have already verified the space is unoccupied / valid).
+      if (!isWorkerless) {
+        const allowed = computeAllowedPlacementSpaces(state, player)
+        if (!allowed.some(a => a.spaceId === targetSpaceId)) {
+          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        }
+      }
+
+      actionContext.jumpChain = [
+        ...((actionContext.jumpChain as string[] | undefined) ?? []),
+        sourceCard,
+      ]
+
+      if (!isWorkerless && fromSpace) {
+        removeWorkerRef(fromSpace, player.id, workerId!)
+        addWorkerRef(targetSpace, player.id, workerId!)
+        recordRoundPlacement(player, targetSpace.id, workerId!)
+        incPlacedFarmers(player)
+      }
+
+      // Cascade place-farmer after hooks for the second placement.
+      // game-core's runPlaceFarmerAfterHooks (game-core.ts:1629) is one-shot
+      // per top-level takeAction (only when isActionEngine). Once we hand the
+      // second placement off via expandFlow, engineSource flips to 'flow' and
+      // game-core won't dispatch place-farmer 'after' again. So we replicate
+      // the same dispatch here, keyed on the jump destination, so that
+      // third-party cards' place-farmer 'after' listeners (Y option) can fire
+      // and even chain another jump (A->B->C). jumpChain on actionContext is
+      // already accumulated above, so a card's self-check
+      // chain.includes(thisCardId) terminates A->B->A loops.
+      const cascadeListenerContext = {
+        state,
+        player,
+        space: targetSpace,
+        actionId: 'place-farmer',
+        phase: 'after' as const,
+        result: { type: 'ok' as const },
+        actionContext,
+      }
+      const matchedCascade = getMatchingListeners(cascadeListenerContext)
+      const cascadeFlows: ActionFlow[] = []
+      for (const entry of matchedCascade) {
+        const lresult = executeCardListener(entry.registration, cascadeListenerContext, {
+          ownerPlayerId: entry.ownerPlayerId,
+        })
+        if (lresult?.flow) {
+          cascadeFlows.push(lresult.flow)
+        }
+      }
+
+      // Hand the second placement to the engine via a leaf with `expandFlow`.
+      // When the target action defines an inner flow, the engine's
+      // buildFlowNode expands it into the action's flow subtree (with
+      // sourceCard + actionContext merged into every inner leaf). When the
+      // target has no inner flow (grain-seeds / day-laborer / traveling-players),
+      // the engine falls back to the standard ActionNode path. This mirrors
+      // the `createEngine(actionId)` semantics used when the player triggers
+      // the action directly via takeAction.
+      const targetLeaf: ActionFlow = {
+        type: 'leaf',
+        actionId: targetSpaceId,
+        expandFlow: true,
+        sourceCard,
+        actionContext: { ...actionContext },
+      }
+      if (cascadeFlows.length === 0) {
+        return { type: 'flow', flow: targetLeaf }
+      }
+      return {
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          children: [targetLeaf, ...cascadeFlows],
+        },
+      }
+    }
+
     if (actionContext?.fromSupply) {
       const supply = (player.workers ?? []).find((w) => !w.isActive)
       if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }

@@ -5,7 +5,7 @@ import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/game-core'
 
-describe('stats: gain-trigger-player records resourcesFromCards on target', () => {
+describe('stats: gain with recipientPlayerId records resourcesFromCards on target', () => {
   const advancePastPlayerSwitches = (
     session: GameSession,
     resp: SessionResponse,
@@ -16,7 +16,7 @@ describe('stats: gain-trigger-player records resourcesFromCards on target', () =
     return resp
   }
 
-  it('Publican (gain-trigger-player with sourceCard) credits opponent stats.resourcesFromCards', () => {
+  it('Publican (gain with recipientPlayerId + sourceCard) credits opponent stats.resourcesFromCards', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -78,9 +78,9 @@ describe('stats: gain-trigger-player records resourcesFromCards on target', () =
     resp = advancePastPlayerSwitches(session, resp)
 
     const after = session.getState().state
-    // Opponent (target of gain-trigger-player) should record 1 grain in resourcesFromCards.
+    // Opponent (recipientPlayerId target) should record 1 grain in resourcesFromCards.
     expect(after.players[1]!.stats.resourcesFromCards.grain).toBe(1)
-    // Owner did not gain via gain-trigger-player → no resourcesFromCards bump for owner from this path.
+    // Owner did not gain via recipientPlayerId path → no resourcesFromCards bump for owner from this path.
     expect(after.players[0]!.stats.resourcesFromCards.grain ?? 0).toBe(0)
   })
 })

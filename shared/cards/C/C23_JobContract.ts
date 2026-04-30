@@ -56,9 +56,10 @@ const listener: CardListenerRegistration = {
     const lessonsSpace = getLessonsSpace(context.state, context.player)
     if (!lessonsSpace) return
 
-    // Check the player has at least one occupation in hand
-    // (otherwise the lessons trigger is wasted).
-    if (context.player.occupationHand.length === 0) return
+    // BGA C23 does NOT gate on occupationHand: even with empty hand the fake
+    // worker still occupies the lessons space (cascading lessons-listeners on
+    // other cards e.g. A113 / B155 still fire). The optional play-occupation
+    // leaf is still safe to offer — the player can simply skip the seq.
 
     // Mark the lessons space as occupied by this player (fake-farmer).
     const worker = smallestAvailableWorker(context.state, context.player)

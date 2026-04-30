@@ -14,7 +14,7 @@ const CARD_ID = 'A154_Paymaster'
  * BGA: isListeningTo → PlaceFarmer on Fishing/TravelingPlayers.
  *      onOpponentAfterPlaceFarmer → optional: pay 1 grain → give to opponent → bonus VP.
  *
- * Uses gain-trigger-player to give grain to the opponent, then bonus-vp for owner.
+ * Uses gain with recipientPlayerId to give grain to the opponent, then bonus-vp for owner.
  */
 const FOOD_ACCUMULATION_SPACES = new Set(['fishing', 'traveling-players'])
 
@@ -38,8 +38,8 @@ const listener: CardListenerRegistration = {
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
           {
             type: 'leaf',
-            actionId: 'gain-trigger-player',
-            params: { grain: 1, targetPlayerId: triggerPlayerId },
+            actionId: 'gain',
+            params: { grain: 1, recipientPlayerId: triggerPlayerId },
             sourceCard: CARD_ID,
           },
           {

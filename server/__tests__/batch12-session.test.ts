@@ -103,19 +103,34 @@ describe('A129_Swagman session', () => {
     return session
   }
 
-  it('after grain-seeds gains grain and offers farm-expansion follow-up', () => {
-    const session = setup()
-    const s = session.getState().state
-    const grainBefore = s.players[0]!.resources.grain
-    let resp = session.takeAction(0, 'grain-seeds')
-    expect(resp.ok).toBe(true)
-    // Should get grain from the space action
-    // Walk through all pending choices, skipping optional ones
+  // Walk through the pending choices, accepting (or skipping) the Swagman jump prompt
+  // as `accept` controls. Once past the swagman seq, skip any remaining optional choices.
+  const driveSwagman = (
+    session: ReturnType<typeof setup>,
+    initialResp: ReturnType<ReturnType<typeof setup>['takeAction']>,
+    accept: boolean,
+  ) => {
+    let resp = initialResp
     let safety = 20
+    let swagmanSeen = false
     while (resp.pending.type === 'choice' && safety > 0) {
-      const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOpt) {
+      const opts = resp.pending.options ?? []
+      const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const swagmanOpt = opts.find((o: ActionChoiceOption) => o.sourceCard === 'A129_Swagman')
+      if (swagmanOpt && !swagmanSeen) {
+        swagmanSeen = true
+        if (accept) {
+          resp = session.resolveChoice(0, swagmanOpt.value)
+        } else if (skipOpt) {
+          resp = session.resolveChoice(0, '__skip__')
+        } else {
+          break
+        }
+      } else if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
+      } else if (opts.length > 0) {
+        // unrecognized mandatory choice (e.g. construct/stables OR) — pick first
+        resp = session.resolveChoice(0, opts[0]!.value)
       } else {
         break
       }
@@ -124,33 +139,47 @@ describe('A129_Swagman session', () => {
     while (resp.pending.type === 'confirmPlayerSwitch') {
       resp = session.confirmPlayerSwitch()
     }
-    const after = session.getState().state
-    // At minimum, gained grain from grain-seeds
-    expect(after.players[0]!.resources.grain).toBeGreaterThanOrEqual(grainBefore + 1)
+    return resp
+  }
+
+  it('accept: jumps grain-seeds → farm-expansion, moves the same farmer, +2 placedFarmers', () => {
+    const session = setup()
+    const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
+    const initial = session.takeAction(0, 'grain-seeds')
+    expect(initial.ok).toBe(true)
+    const resp = driveSwagman(session, initial, true)
+    const grainSeeds = resp.state.actionSpaces.find(s => s.id === 'grain-seeds')!
+    const farmExpansion = resp.state.actionSpaces.find(s => s.id === 'farm-expansion')!
+    expect(grainSeeds.takenBy).toEqual([])
+    expect(farmExpansion.takenBy.length).toBe(1)
+    expect(farmExpansion.takenBy[0]!.playerId).toBe(resp.state.players[0]!.id)
+    expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 2)
   })
 
-  it('after farm-expansion gains grain from swagman follow-up', () => {
+  it('decline: stays on grain-seeds, +1 placedFarmers', () => {
     const session = setup()
-    const s = session.getState().state
-    // Use farm-expansion (which offers construct or stables)
-    let resp = session.takeAction(0, 'farm-expansion')
-    expect(resp.ok).toBe(true)
-    // Walk through choices - should have construct/stables then swagman grain
-    let safety = 20
-    while (resp.pending.type === 'choice' && safety > 0) {
-      const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOpt) {
-        resp = session.resolveChoice(0, '__skip__')
-      } else {
-        break
-      }
-      safety--
-    }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
-    }
-    // Test just verifies no errors
-    expect(resp.ok).toBe(true)
+    const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
+    const initial = session.takeAction(0, 'grain-seeds')
+    expect(initial.ok).toBe(true)
+    const resp = driveSwagman(session, initial, false)
+    const grainSeeds = resp.state.actionSpaces.find(s => s.id === 'grain-seeds')!
+    const farmExpansion = resp.state.actionSpaces.find(s => s.id === 'farm-expansion')!
+    expect(grainSeeds.takenBy.length).toBe(1)
+    expect(farmExpansion.takenBy).toEqual([])
+    expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 1)
+  })
+
+  it('after farm-expansion accepting jump moves farmer to grain-seeds', () => {
+    const session = setup()
+    const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
+    const initial = session.takeAction(0, 'farm-expansion')
+    expect(initial.ok).toBe(true)
+    const resp = driveSwagman(session, initial, true)
+    const farmExpansion = resp.state.actionSpaces.find(s => s.id === 'farm-expansion')!
+    const grainSeeds = resp.state.actionSpaces.find(s => s.id === 'grain-seeds')!
+    expect(farmExpansion.takenBy).toEqual([])
+    expect(grainSeeds.takenBy.length).toBe(1)
+    expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 2)
   })
 })
 

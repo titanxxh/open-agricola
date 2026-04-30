@@ -7,7 +7,7 @@
 > 2026-04-19 第二轮同步：
 > - 拆分"官方卡可用"与"自定义卡沙盒可用"两套清单——之前的"helper 也作为全局函数注入"陈述对沙盒并不成立。
 > - 自定义卡沙盒**不注入** `familySize` / `workersAvailable` / `initCardState` 等任何项目内 helper；`state` / `player` 是 JSON 深拷贝的只读快照。
-> - 自定义卡沙盒**不识别** `computeBonusScore` / `computePostScore` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `computeLockedFarmTiles` / `computeFenceDiscount` / `handHooks` 等扩展 hook（`extractManifestFromCompiledCode` 用 `cardEffectHooks` 白名单过滤）。
+> - 自定义卡沙盒**不识别** `computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `computeLockedFarmTiles` / `computeFenceDiscount` / `handHooks` 等扩展 hook（`extractManifestFromCompiledCode` 用 `cardEffectHooks` 白名单过滤）。
 > - 自定义卡沙盒**不识别** `computeChoiceCandidates` / `anytime` 这两个 listener phase（`isActionHookPhase` 限制）。
 > - `bonus-vp` actionId 固定 +1，不接受 `amount` 参数；要 N 分就把 N 个 leaf 串入 seq。
 > - `PlayerState` 字段名是 `fenceSegments`（不是 `fences`）；`store-on-card` 写入 `cardStates[id].counters[resource]`，不是 `cardStates[id][resource]`。
@@ -76,7 +76,7 @@ const card = new MinorImprovement({ ... })
 | hook | 触发时机 |
 |------|----------|
 | `computeBonusScore` | 终局加分 |
-| `computePostScore` / `computeSharedPostScore` | 终局后分（依赖其他 category 已结算） |
+| `computeCostedBonus` / `computeSharedPostScore` | 终局花资源换 VP（costed）/ 跨玩家分调（shared） |
 | `computeExtraRoomCapacity` | 房间容量修改 |
 | `onComputeAnimalZones` | 动物分区计算 |
 | `onComputeSowableFields` / `onSowExtraField` | 额外可播种田 |
@@ -171,7 +171,7 @@ registerCardListener({
 
 `onBuy` / `onBeforeStartOfTurn` / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onBeforeFeed` / `onAfterFeed` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
 
-**沙盒不识别**（写了也不会触发）：`computeBonusScore` / `computePostScore` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `computeFenceDiscount` / `handHooks`。终局加分请改成在 `onAfterHarvest`（最后一轮）等阶段串多个 `bonus-vp` leaf 近似实现。
+**沙盒不识别**（写了也不会触发）：`computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `computeFenceDiscount` / `handHooks`。终局加分请改成在 `onAfterHarvest`（最后一轮）等阶段串多个 `bonus-vp` leaf 近似实现。
 
 #### 7.4 沙盒识别的 listener phase（`isActionHookPhase` 白名单）
 

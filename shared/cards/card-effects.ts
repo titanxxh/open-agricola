@@ -43,14 +43,14 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
  * non-standard signatures (scoring, animal zones, sowing, etc.) that cannot be
  * invoked via the generic `runCardEffectHook()` path.
  *
- * `handHooks` (meta-field) and `scoringPriority` (number) are deliberately excluded.
+ * `handHooks` (meta-field) is deliberately excluded.
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
-  | 'computeBonusScore' | 'computePostScore' | 'computeSharedPostScore'
+  | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
-  | 'computeLockedFarmTiles' | 'computeFenceDiscount'
+  | 'computeLockedFarmTiles' | 'computeFenceDiscount' | 'computeFenceFreeAvailable'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -80,14 +80,15 @@ export const cardEffectHooks: CardEffectField[] = [
   'onAllWorkersPlaced',
   'resolveChoice',
   'computeBonusScore',
-  'computePostScore',
   'computeSharedPostScore',
+  'computeCostedBonus',
   'computeExtraRoomCapacity',
   'onComputeAnimalZones',
   'onComputeSowableFields',
   'onSowExtraField',
   'computeLockedFarmTiles',
   'computeFenceDiscount',
+  'computeFenceFreeAvailable',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -101,21 +102,28 @@ export type ResolveChoiceHandler = (
   ctx: { sourceCard: string; actionContext?: Record<string, unknown> },
 ) => ActionFlow | void
 
-/**
- * Mutable context passed through all computeBonusScore handlers during scoring.
- *
- * Cards are processed in scoringPriority order (lower first). Each card greedily
- * takes max resources. This is optimal for the current card set because marginal
- * values are monotonically: DrudgeryReeve (1/2/2) ≥ Soldier (1/1/…) ≥ Major (0-1).
- * If a future card breaks this monotonicity, consider replacing greedy with
- * interactive player choice (matching BGA's BeforeEndOfGame flow).
- */
-export type ScoringContext = {
-  /** Resources already consumed by prior bonus-scoring cards (e.g. Soldier, DrudgeryReeve). */
-  reserved: Partial<Resource>
+/** A discrete (cost, score) option offered by a costed bonus card.
+ *  Solver picks at most one level per card; pays `cost`, awards `score` VP. */
+export type BonusScoreLevel = {
+  cost: Partial<Resource>
+  score: number
 }
 
-export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: ScoringContext) => number
+/** Read-only context passed to bonus-scoring handlers.
+ *  Standard categories (fields/pastures/.../cards/cardsBonus) are already computed. */
+export type BonusScoringContext = {
+  categories: readonly ScoreCategoryResult[]
+}
+
+/** Returns the discrete tier menu this card offers, given current scoring categories.
+ *  The solver finds the Pareto-optimal assignment across all costed-bonus cards. */
+export type CostedBonusHandler = (
+  state: GameState,
+  player: PlayerState,
+  ctx: BonusScoringContext,
+) => BonusScoreLevel[]
+
+export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: BonusScoringContext) => number
 export type SharedPostScoreHandler = (
   state: GameState,
   owner: PlayerState,
@@ -124,8 +132,6 @@ export type SharedPostScoreHandler = (
 
 export type CardEffect = {
   id: string
-  /** Lower values run first in computeBonusScore ordering (default: 100). */
-  scoringPriority?: number
   onBuy?: FlowEffectHandlerWithPayment
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
@@ -157,7 +163,7 @@ export type CardEffect = {
   onBeforeStartOfTurn?: FlowEffectHandler
   onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
-  computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
+  computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void | AnimalZone[]
@@ -173,6 +179,13 @@ export type CardEffect = {
     player: PlayerState,
     context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
   ) => number
+  /**
+   * Maximum number of free fence segments this card can currently provide
+   * (e.g. E16 returns the count of unused border edges). Used by the
+   * `canStartFencing` entry-guard to compute total buildable fences,
+   * mirroring BGA `getMaxBuildableFences`.
+   */
+  computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
   /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
@@ -344,52 +357,6 @@ export const runEndHarvestHooks = (state: GameState, player: PlayerState): void 
 
 export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onBeforeEndGame')
-
-export type BonusScoreResult = {
-  entries: { cardId: string; score: number }[]
-  reserved: Partial<Resource>
-}
-
-/**
- * Collect bonus VP from all cards that have computeBonusScore.
- * Cards are processed in scoringPriority order (lower = first).
- * A shared ScoringContext tracks reserved resources across cards.
- */
-export const collectBonusScores = (
-  state: GameState,
-  player: PlayerState,
-): BonusScoreResult => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  const withEffects = allCards
-    .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
-    .filter((item): item is { cardId: string; effect: CardEffect } =>
-      !!item.effect?.computeBonusScore,
-    )
-    .sort((a, b) => (a.effect.scoringPriority ?? 100) - (b.effect.scoringPriority ?? 100))
-
-  const ctx: ScoringContext = { reserved: {} }
-  const entries: { cardId: string; score: number }[] = []
-
-  for (const { cardId, effect } of withEffects) {
-    try {
-      const score = effect.computeBonusScore!(state, player, ctx)
-      if (score > 0) {
-        entries.push({ cardId, score })
-      }
-    } catch (err) {
-      if (isCustomCard(cardId)) {
-        console.warn(`[card-effects] custom card ${cardId} computeBonusScore threw, skipping:`, err)
-        continue
-      }
-      throw err
-    }
-  }
-  return { entries, reserved: ctx.reserved }
-}
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

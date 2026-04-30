@@ -40,8 +40,8 @@ describe('C53_GypsysCrock session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    // Take anytime-exchange action
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    // Take exchange action
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
 
@@ -63,7 +63,7 @@ describe('C53_GypsysCrock session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 4 sheep at once
@@ -82,7 +82,7 @@ describe('C53_GypsysCrock session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook 1 sheep (index 0) + 1 boar (index 1) + 1 vegetable (index 3)
@@ -104,7 +104,7 @@ describe('C53_GypsysCrock session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     // Cook only 1 sheep
@@ -123,7 +123,7 @@ describe('C53_GypsysCrock session', () => {
     const session = setup()
     enterActiveInteraction(session)
 
-    let resp = session.takeAnytimeAction(0, 'anytime-exchange')
+    let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'cancel')

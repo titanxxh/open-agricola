@@ -366,6 +366,18 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 - **A14/A33 banned 字段**（与深度池 A14 同）
 - **A100 bannedWeak（draft 模式）**
 
+### 5.7 2026-04-30 wide-scan tail 重审（B 17 张 + E 20 张）
+
+**背景**：原 wide-scan tail（§2.3 引用的「B 牌组其余 11 张」+「E 牌组其余 4 张」）的 sub-agent 详细输出 `output/tmp/audit-agent-b7.md` / `audit-agent-b10.md` 已丢失（output/tmp 是 gitignored）。Sprint 5 收尾期重跑 audit 脚本拿机械信号（S1/S6_lineRatio>1.5/S10_high），剔除 mech-A/B/C/D + Sprint 6 已修卡后，对 B 牌组 17 张 + E 牌组 20 张高优先级卡逐张做 BGA-vs-我方紧凑对比（≤90s/张，单 sub-agent 模式）。
+
+**B 牌组重审 17 张**（B103/B107/B108/B111/B128/B134/B137/B151/B156/B163/B26/B3/B30/B68/B72/B75/B82）：**全部 ✅ aligned**，0 张行为或元数据偏差。涉及 resource 后置赠送（B107/B111/B137）、choice 流控（B103/B156/B82）、state machine flag（B163）、format replace（B26）、手牌选择（B3）、virtual tile sow（B68）、pasture 耕种（B72）、cost preview（B75）、围栏变体（B30）等多种机制，均完整对齐。
+
+**E 牌组重审 20 张**（E101/E116/E118/E12/E142/E144/E156/E16/E160/E161/E165/E30/E36/E49/E68/E69/E70/E72/E91/E95/E96）：✅ aligned 16 张 / 🔀 close-already 2 张（E30 Sprint 6 / E96 Sprint 4）/ ~~🟡 simplified 1 张（E16 `canStartFencing` 仍需 wood≥4，与折扣解耦——已记录在 §2.5）~~ ✅ **Sprint 5b 已修**：`canStartFencing` 改签名 `(state, player)` 走新 `computeFenceFreeAvailable` hook 累加各卡 free fence 上限；E16 现在 0 wood + 有 border edge 即可进 fence action / 0 张 ⚠/❌ 偏差。
+
+**结论**：§2.3 deferred 列里的「B 牌组 wide-scan 11 张」+「E 牌组 wide-scan 4 张」经 Sprint 1-6 + Sprint 5b 累积修复后**实际无残留偏差**，可关闭。Sprint 5b 已收口：C23 守卫 ✅ / A38 metadata ✅ / A1 stables zoneFilter ✅ / A22 reserve guard + §2.5 登记 ✅ / E16 entry-guard ✅。A165 PigBreeder（round 12 breeding 模块）和 B155 ArtTeacher（occupation 入口扩展）推 Sprint 6/7。
+
+**caveat**：本次重审仍是紧凑模式（≤90s/张），非完整 5 维度对比。如未来发现具体 bug 再单卡复审。
+
 ## 6. 架构合规性总评
 
 - **§3 基础设施清单完备性（A2 输出）**：✅ 0 个 register* 函数未在 §3 登记。`registerPrerequisite` / `registerSelectionEffect` / `registerPlayerActionSpace` 全部已记。

@@ -14,7 +14,7 @@ const beforeExchangeListener: CardListenerRegistration = {
   id: 'E85-master-tanner-before-exchange',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
     writeCardExtraData(context.player, CARD_ID, 'boarBefore', context.player.resources.boar)
     writeCardExtraData(context.player, CARD_ID, 'cattleBefore', context.player.resources.cattle)
@@ -25,7 +25,7 @@ const afterExchangeListener: CardListenerRegistration = {
   id: 'E85-master-tanner-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['anytime-exchange'],
+  actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
     const boarBefore = readCardExtraData<number>(context.player, CARD_ID, 'boarBefore') ?? 0
     const cattleBefore = readCardExtraData<number>(context.player, CARD_ID, 'cattleBefore') ?? 0

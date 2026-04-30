@@ -36,8 +36,8 @@ const listener: CardListenerRegistration = {
           },
           {
             type: 'leaf',
-            actionId: 'gain-trigger-player',
-            params: { wood: 1, targetPlayerId: triggerPlayerId },
+            actionId: 'gain',
+            params: { wood: 1, recipientPlayerId: triggerPlayerId },
             sourceCard: CARD_ID,
           },
           gainLeaf(CARD_ID, { food: foodGain }),

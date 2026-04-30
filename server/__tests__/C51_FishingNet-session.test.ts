@@ -151,6 +151,32 @@ describe('C51_FishingNet session', () => {
     expect(after.players[0]!.cardStates?.C51_FishingNet?.flagged).toBeFalsy()
   })
 
+  it('opponent food is deducted by 1 when they use fishing (payerId fix)', () => {
+    const session = setup(1)
+    const s = session.getState().state
+    s.players[1]!.resources.food = 5
+    session.loadState(s)
+    const opponentFoodBefore = session.getState().state.players[1]!.resources.food
+
+    let resp = session.takeAction(1, 'fishing')
+    expect(resp.ok).toBe(true)
+
+    let safety = 20
+    while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
+      if (--safety <= 0) break
+      if (resp.pending.type === 'confirmPlayerSwitch') {
+        resp = session.confirmPlayerSwitch()
+      } else {
+        resp = session.confirmNextPlayer()
+      }
+    }
+
+    const after = session.getState().state
+    // Opponent gains 2 from fishing accumulation but pays 1 to FishingNet owner via payerId.
+    // Net: +2 - 1 = +1
+    expect(after.players[1]!.resources.food).toBe(opponentFoodBefore + 2 - 1)
+  })
+
   it('no extra food on fishing space when card is not flagged during return-home', () => {
     const session = new GameSession()
     const state = session.getState().state

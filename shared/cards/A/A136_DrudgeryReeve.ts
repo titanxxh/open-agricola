@@ -1,14 +1,12 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { BonusScoreLevel } from '../card-effects'
 
 const CARD_ID = 'A136_DrudgeryReeve'
 
-// BGA: remaining turns → wood gained on buy
-// 14 total rounds; remainingTurns = 14 - currentRound
 const WOOD_BY_REMAINING: number[] = [0, 1, 1, 2, 2, 2, 3, 3, 3, 4]
 
-// BGA: sets of building resources → bonus VP
 const BONUS_BY_SETS: number[] = [0, 1, 3, 5]
 
 export const A136_DrudgeryReeve = new Occupation({
@@ -25,29 +23,29 @@ export const A136_DrudgeryReeve = new Occupation({
 
 export const A136_DrudgeryReeve_impl = {
   effect: {
-  id: CARD_ID,
-  scoringPriority: 0, // before Soldier (priority 10) — higher marginal value per set
-  onBuy: (state, _player) => {
-    const remainingTurns = 14 - state.round
-    const wood = WOOD_BY_REMAINING[remainingTurns] ?? (remainingTurns >= 9 ? 4 : 0)
-    if (wood > 0) {
-      return gainLeaf(CARD_ID, { wood })
-    }
+    id: CARD_ID,
+    onBuy: (state, _player) => {
+      const remainingTurns = 14 - state.round
+      const wood = WOOD_BY_REMAINING[remainingTurns] ?? (remainingTurns >= 9 ? 4 : 0)
+      if (wood > 0) {
+        return gainLeaf(CARD_ID, { wood })
+      }
+    },
+    computeCostedBonus: (_state, player, _ctx) => {
+      const wood = player.resources.wood ?? 0
+      const clay = player.resources.clay ?? 0
+      const stone = player.resources.stone ?? 0
+      const reed = player.resources.reed ?? 0
+      const maxSets = Math.max(0, Math.min(wood, clay, stone, reed, 3))
+      const levels: BonusScoreLevel[] = []
+      for (let k = 0; k <= maxSets; k++) {
+        levels.push({
+          cost: k === 0 ? {} : { wood: k, clay: k, stone: k, reed: k },
+          score: BONUS_BY_SETS[k] ?? 0,
+        })
+      }
+      return levels
+    },
   },
-  computeBonusScore: (_state, player, ctx) => {
-    const wood = (player.resources.wood ?? 0) - (ctx.reserved.wood ?? 0)
-    const clay = (player.resources.clay ?? 0) - (ctx.reserved.clay ?? 0)
-    const stone = (player.resources.stone ?? 0) - (ctx.reserved.stone ?? 0)
-    const reed = (player.resources.reed ?? 0) - (ctx.reserved.reed ?? 0)
-    const sets = Math.max(0, Math.min(wood, clay, stone, reed, 3))
-    if (sets > 0) {
-      ctx.reserved.wood = (ctx.reserved.wood ?? 0) + sets
-      ctx.reserved.clay = (ctx.reserved.clay ?? 0) + sets
-      ctx.reserved.stone = (ctx.reserved.stone ?? 0) + sets
-      ctx.reserved.reed = (ctx.reserved.reed ?? 0) + sets
-    }
-    return BONUS_BY_SETS[sets] ?? 0
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

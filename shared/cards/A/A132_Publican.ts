@@ -29,8 +29,8 @@ const listener: CardListenerRegistration = {
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
           {
             type: 'leaf',
-            actionId: 'gain-trigger-player',
-            params: { grain: 1, targetPlayerId: triggerPlayerId },
+            actionId: 'gain',
+            params: { grain: 1, recipientPlayerId: triggerPlayerId },
             sourceCard: CARD_ID,
           },
           {

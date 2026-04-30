@@ -3,7 +3,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { readCardResourceStats } from '../helpers/card-state'
 import { payResourcesAction } from '../../actions/effects/pay-resources'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
-import { gainOtherPlayersAction } from '../../actions/effects/gain-other-players'
+import { gainAction } from '../../actions/effects/gain'
 
 import '../A/A29_AleBenches'
 
@@ -126,11 +126,11 @@ describe('A29_AleBenches', () => {
       expect(vpResult.logKey).toBe('log.cardEffectBonusVp')
     }
 
-    const gainResult = gainOtherPlayersAction.execute({
+    const gainResult = gainAction.execute({
       state,
       player: owner,
       space,
-      params: { food: 1 },
+      params: { recipientMode: 'others', food: 1 },
       sourceCard: 'A29_AleBenches',
     })
     expect(gainResult.type).toBe('ok')

@@ -335,11 +335,14 @@ export function scanI18nGaps(
   enContent: string,
 ): I18nGap[] {
   return usedKeys.map(key => {
-    const re = new RegExp(`['"\`]${key.replace(/\./g, '\\.')}['"\`]\\s*:`)
+    const leafKey = key.includes('.') ? key.split('.').pop()! : key
+    const leafRe = new RegExp(`['"\`]?${leafKey}['"\`]?\\s*:`)
+    const fullRe = new RegExp(`['"\`]${key.replace(/\./g, '\\.')}['"\`]\\s*:`)
+    const testContent = (content: string) => leafRe.test(content) || fullRe.test(content)
     return {
       key,
-      missingZh: !re.test(zhContent),
-      missingEn: !re.test(enContent),
+      missingZh: !testContent(zhContent),
+      missingEn: !testContent(enContent),
       bgaHasButOurMissing: false,
     }
   })
@@ -353,8 +356,8 @@ export interface I18nCache {
 let _i18nCache: I18nCache | null = null
 function getI18nCache(repoRoot: string): I18nCache {
   if (_i18nCache) return _i18nCache
-  const zhPath = path.join(repoRoot, 'client', 'i18n', 'zh.ts')
-  const enPath = path.join(repoRoot, 'client', 'i18n', 'en.ts')
+  const zhPath = path.join(repoRoot, 'shared', 'i18n', 'zh.ts')
+  const enPath = path.join(repoRoot, 'shared', 'i18n', 'en.ts')
   _i18nCache = {
     zh: fs.existsSync(zhPath) ? fs.readFileSync(zhPath, 'utf8') : '',
     en: fs.existsSync(enPath) ? fs.readFileSync(enPath, 'utf8') : '',
