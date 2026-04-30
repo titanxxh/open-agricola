@@ -1,6 +1,8 @@
 import { Occupation } from '../types'
 import { fieldIsEmpty } from '../../game/field'
 import type { CardImpl } from '../registry'
+import type { BonusScoreLevel } from '../card-effects'
+import { paretoOptimal } from '../helpers/pareto-bonus'
 
 const CARD_ID = 'C99_GardenDesigner'
 
@@ -17,25 +19,24 @@ export const C99_GardenDesigner = new Occupation({
 
 export const C99_GardenDesigner_impl = {
   effect: {
-  id: CARD_ID,
-  computeBonusScore: (_state, player, ctx) => {
-    const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
-    if (emptyFields === 0) return 0
-
-    const alreadyReserved = ctx.reserved.food ?? 0
-    let food = (player.resources.food ?? 0) - alreadyReserved
-    let vp = 0
-    for (let i = 0; i < emptyFields && food > 0; i++) {
-      if (food >= 7) { food -= 7; vp += 3 }
-      else if (food >= 4) { food -= 4; vp += 2 }
-      else if (food >= 1) { food -= 1; vp += 1 }
-    }
-    const foodUsed = (player.resources.food ?? 0) - alreadyReserved - food
-    if (foodUsed > 0) {
-      ctx.reserved.food = alreadyReserved + foodUsed
-    }
-    return vp
+    id: CARD_ID,
+    computeCostedBonus: (_state, player, _ctx) => {
+      const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
+      if (emptyFields === 0) return [{ cost: {}, score: 0 }]
+      const food = player.resources.food ?? 0
+      const raw: BonusScoreLevel[] = []
+      for (let n7 = 0; n7 <= emptyFields; n7++) {
+        for (let n4 = 0; n4 + n7 <= emptyFields; n4++) {
+          for (let n1 = 0; n1 + n4 + n7 <= emptyFields; n1++) {
+            const foodCost = 7 * n7 + 4 * n4 + 1 * n1
+            if (foodCost > food) continue
+            const score = 3 * n7 + 2 * n4 + 1 * n1
+            raw.push({ cost: foodCost === 0 ? {} : { food: foodCost }, score })
+          }
+        }
+      }
+      return paretoOptimal(raw)
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
