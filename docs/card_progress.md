@@ -39,7 +39,7 @@
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 38 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134） | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 55 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay + 2026-04-30 A14 banned 迁入 §2.5——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
-| 🔀 刻意偏离 BGA（§2.5） | 11 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| 🔀 刻意偏离 BGA（§2.5） | 12 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
 
@@ -47,6 +47,13 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 Sprint 5b — C23 / A38 / A1 / A22 / E16 tail-fixes**：
+  - **C23 JobContract**：删 `occupationHand.length === 0` 守卫，BGA `legacy isDoable` 不检查 occupation 在手——空手玩家也能让 lessons space 被假 worker 占用，让 A113 / B155 等 lessons-listener 卡能正确触发跨卡交互。
+  - **A38 WoolBlankets**：prereq 改 `Wooden House → 5 Sheep`，加 inline `countSheepOnBoard(player)` + `registerPrerequisite('5 Sheep', ...)`；scan player.pastures + houseAnimal + stableAnimals 三处 sheep 总和。
+  - **A1 Shelter**：onBuy 加 `actionContext: { max:1, costOverride:{wood:-99}, zoneFilter:'pasture-1' }`；stables effect 扩展 `actionContext.max + zoneFilter`，`buildStableFarmInteraction` 加可选第三参数 `{ zoneFilter, max }` 透传到 selectableTiles filter / structuralMax cap；`game-core.ts buildStableInteraction` 同步新参数透传 `pending.actionContext`。A1 现在仅在 size=1 pasture 中放免费 stable，且最多 1 个。
+  - **A22 Telegram**：加 `workersAvailable(state, player) === 0` 守卫（BGA `hasFarmerInReserve` 等价）；保留 `extraPlacement leaf` 模拟 `flagCardNode` 的偏差登记到 §2.5。
+  - **E16 Briar Hedge**：新增 `CardEffect.computeFenceFreeAvailable` hook；`canStartFencing` 改签名 `(state, player)`，遍历持卡 effect 累加 free fence 上限（BGA `getMaxBuildableFences`-style）；E16 实现返回 `countAvailableBorderEdges`。caller 同步 6 处（B26 ×2 / B94 / C88 / fenceAction.canBeExecutedByPlayer / 1 测试）。
+  - 测试新增：A38 8 例 / A1 6 例 / A22 4 例 / fencing-entry-guard 4 例 / C23 翻 1 例。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5b-tail-fixes-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5b-tail-fixes.md`。
 - **2026-04-30 Sprint 5 mech-E — 6 张 P1 单卡修批次 + gain action 三合一 + viaCardJump worker-less**：B115 TinsmithMaster（删 selection 全 field 自动 +1，对齐 BGA `actAddAdditionalGood`）/ C13 WoodSlideHammer（改 BonusModifier 加 conditions { houseTypeWood, minNumRooms:5 } + bump discount stone:1 → stone:2，扩 `getModifiersForCostType` 对非-construct 路径实时评估 conditions）/ B29 CookeryLesson（per-round 改 per-action token 跟踪，cookedActionToken / lessonsActionToken 防 turn1+turn2 错奖）/ B138 ForestGuardian + C51 FishingNet（用合并后 `gain` + `payerId` 真让对手扣 food）/ A151 Minstrel（用 viaCardJump worker-less 真对齐 BGA `useActionSpaceNode`，accumulation 自动清零、ReplaceHook / computeCosts / 第三方 listener 都按直接落子路径触发）。两处主路径改：(1) 合并 3 个 gain action 到统一 gain（删 gain-trigger-player.ts + gain-other-players.ts；参数化 recipientPlayerId / recipientMode / payerId；14 张 caller 卡迁移）；(2) viaCardJump 扩展 worker-less 模式（workerId optional）；(3) BonusModifier conditions 在非-construct 路径实时评估（修 line 490 TODO 部分）。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-mech-e-misc-fixes-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-e-misc-fixes.md`。
 - **2026-04-30 Sprint 5 stub-test 基础设施 + 机制 A 完整测试套补齐**：`shared/actions/hooks.ts` 加 `unregisterActionHook(id: string)` 5 行（按 id splice `actionHooks` 数组；找不到时 silently no-op）；新建 `server/__tests__/place-farmer-jump-stub-coverage.test.ts` 含 4 个 stub-based 测试场景。**关键 fix（commit `fbcb6c44`）**：jump effect execute 内部加 cascade dispatch 调用 — farmer 移动到第二格后通过 `getMatchingListeners + executeCardListener` 收集 second-place 的 place-farmer after listener flows，wrap 进返回 SEQ。这模拟 `runPlaceFarmerAfterHooks`（game-core 顶层 dispatch 是 one-shot，jump 后切到 flow-engine 不再 fire）在 jump 路径的等价行为。现在 A→B→C 链能真触发，jumpChain 防递归**真起作用**（之前是"hook never fired so no recursion"，现在是"hook fired but jumpChain blocks"）。listener 反注册 API 早就有（`CardRegistry.registerListener` / `removeListenersWhere` / `unload`，registry.ts:67-133），所以本批不需要新增 listener 反注册 API。mech-A spec §6.5 / §8.2 同步更新反映 cascade via jump effect 的真实路径。**实现 hook 注册顺序细节**：GameSession 构造调 `clearActionHooks()`（game-core.ts:284），所以 stub action hook 必须在 `new GameSession()` 之后注册。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-5-stub-test-infra-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-stub-test-infra.md`。
 - **2026-04-30 Sprint 5 mech-B — A4 Baseboards / D83 Pigswill / D117 WoodExpert 接入现有 alt-cost 基础设施**：A4 / D83 cost 改 `altCosts:[{food:2},{grain:1}]`（BGA OR-ed payment）；D117 computeCosts 改返回 `trades:[{from:{food:1}, to:{wood:2}, max:1}]`，让玩家可选用替代付法（pay 主路径自然枚举多 PaymentSolution + selectPayment choice prompt）。`getImprovementWoodCost` 扩展扫 `altCosts`，使 D117 helper 也识别含 wood 的 altCosts 形态 minor。基础设施 100% 已存在（`ComplexCost.fees` / `Trade` / `computeAllBuyableCombinations` / `resolvePaymentSolutionSelection`），本批纯单卡接入，0 主路径改动。新增 `server/__tests__/A4_Baseboards-session.test.ts` (4 例) / `D83_Pigswill-session.test.ts` (4 例) / `D117_WoodExpert-session.test.ts` (6 例)。**~~已知偏离~~ ✅ 2026-04-30 后续修复（pay-helpers commit `e529b103`）**：`resolveCardPreviewCost` 短路逻辑已修；`resolveCardCostWithModifiers` 现接受 ComplexCost 输入，listener 收集到的 `trades` / `bonuses` 会 append 进 ComplexCost.trades / bonuses；`result.costs` patch 仍只走 flat 路径（ComplexCost 上 patch 哪个 fee 语义不明，留作 follow-up）。D117 trade 现已对 altCosts-form minor（如 B43 Chophouse）生效，`D117_WoodExpert-session.test.ts` 场景 5/6 改回 spec 原意：B43 食物=10 wood=2 clay=2 时 ≥3 个 PaymentSolution（wood-base + wood-trade + clay-base），clay=0 时 ≥2 个（wood-base + wood-trade，clay-alt 不可付）。spec / plan: `docs/superpowers/specs/2026-04-30-sprint-5-mech-b-alternative-cost-trades-design.md` / `docs/superpowers/plans/2026-04-30-sprint-5-mech-b-alternative-cost-trades.md`。
@@ -309,7 +316,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（11 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned）
+### 2.5 🔀 刻意偏离 BGA（12 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -321,7 +328,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 |---|---|---|---|---|
 | C22 BasketChair | `onBuy` 时若本工作阶段已首置 farmer 于非 Meeting Place 格，则把该工人撤回到卡持有态，再给予额外 `place-farmer`（净消耗 2 个在家工人，释放 1 个格位）；BGA 允许 JobContract 伪人 meeple 互动、同轮工人用完后再激活 | (a) 不支持同轮再激活（heldWorker 用完即止）；(b) JobContract 的假人 meeple 清理未实现 | (a) 影响极少：需同轮两次 place-farmer + JobContract 共存；(b) JobContract 未实现，无实际影响 | (a) `onEndTurn` 监听放人计数，用完后重新激活一次；(b) 等 JobContract 实现后再处理假人清理 |
 | D161 CabbageBuyer | 按改良类型 3/2/1 售价 | 3/2/1 按打出改良的实际属性；仅在 house-redevelopment 生效 | 仅在 house-redevelopment 生效；farm-redev / 卡触发 renovate 不 offer | 给 farm-redev / standalone renovate 各加一条 offer 3 食物分支 |
-| E16 BriarHedge + `canStartFencing` | BGA `actFencing` 中 `maxBuyable = wood + borderFreePotential`，因此有 2–3 wood 时 E16 可让玩家进入围栏流程 | 我们 `canStartFencing` 仍要求 wood ≥ 4；E16 的折扣只在边 edge 选定后才被 `collectFenceDiscount` 应用，无法提前拉低入口门槛 | 入口守卫与折扣聚合解耦，改动范围最小；实际影响极小（仅在 2–3 wood 且 E16 已打出的特定边角场景） | `canStartFencing` 读 `collectFenceDiscount` 计算潜在折扣，动态降低最低 wood 要求 |
+| ~~E16 BriarHedge + `canStartFencing`~~ ✅ Sprint 5b 已修 | ~~BGA `actFencing` 中 `maxBuyable = wood + borderFreePotential`~~ | ~~我们 `canStartFencing` 仍要求 wood ≥ 4~~ → 现已通过 `computeFenceFreeAvailable` hook 累加各卡 free fence 上限，`canStartFencing(state, player)` 走 `wood + free >= 4` 路径 | — | — |
 | B85 FarmHand（返还占用者搬人） | D102 / E76 返还 FarmHand 时，BGA 显式把占用的 farmer "搬回其他房间"；若其他房间不够则拒绝返还 | 我们不跑显式搬人 UI——`familySize` 不变、capacity 通过 `computeExtraRoomCapacity` drops 1 → 下一次 family growth 天然阻塞；返还始终被允许 | 没有"哪个 farmer 住在哪个 tile" 的细粒度模型；加一条 UI 流程代价偏大 | 引入 farmer-to-tile 的 "housing assignments" 模型，D102 / E76 返还时带检查 + 可选迁移交互 |
 | A136 DrudgeryReeve（2026-04-29 Sprint 2.5 skip） | BGA `onPlayerBeforeEndOfGame` 弹 prompt：玩家选 0..min(W,C,S,R,3) 组（每组各 1 木 1 黏 1 石 1 苇 → 1/3/5 VP）| `computeBonusScore` auto-max — 取 `min(W,C,S,R,3)` 组并 `ctx.reserved` 预留资源 | scoring 阶段 food/wood/clay/stone/reed 不进其他 category 计分（resources 直接计数）；玩家最优策略 = max（每多一组都增加 VP，资源在 scoring 后无其他用途）；auto-max 与 BGA 玩家行为数学等价 | 加 scoring-phase pending choice 流（机制级，仅服务 5 张 interactive），并接入前端 prompt UI |
 | C133 Soldier（2026-04-29 Sprint 2.5 skip） | BGA 玩家选 0..min(wood, stone) 对（每对 → 1 VP） | auto-max — `min(wood, stone)` 对 + `ctx.reserved` | 同上：scoring 单调最优，auto-max 与玩家行为等价 | 同上 |
@@ -521,6 +528,14 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 
 实现：`shared/actions/effects/gain.ts` rewrite + `shared/actions/effects/pay.ts` `getModifiersForCostType` 扩展 + `shared/actions/effects/place-farmer.ts` viaCardJump 分支 + `shared/cards/helpers/jump-leaf.ts` 签名调整 + `shared/cards/A/A151_Minstrel.ts` 重写。
 
+### stables effect — `actionContext.zoneFilter / max` (Sprint 5b, 2026-04-30)
+
+`shared/actions/effects/stables.ts` 通过 `actionContext` 接受可选 `zoneFilter?: 'pasture-1'`（限定可放 zone）+ `max?: number`（限定本次最多放几个）。`buildStableFarmInteraction(player, costOverride?, options?)` 新加第三参数 `{ zoneFilter, max }` 透传到 selectableTiles filter / structuralMax cap；`game-core.ts buildStableInteraction` 同步透传 `pending.actionContext.zoneFilter / max`。`costOverride` 早期已支持。消费者：A1 Shelter（`'pasture-1'`，max:1，wood:-99 让最终费用为 0）。其他 9 张 `actionId:'stables'` 卡（E89/C94/C2/B16/B89/A150/A89/A15）不传新字段时维持原行为。
+
+### fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b, 2026-04-30)
+
+`CardEffect.computeFenceFreeAvailable?: (state, player) => number` 返回该卡当前能贡献的"免费 fence 上限"。`canStartFencing(state, player)` 遍历 `[...player.improvements, ...player.minorPlayed]` 累加 free 计入 maxBuildable，对齐 BGA `getMaxBuildableFences`：当 `wood + free >= 4` 时入口放行。E16 Briar Hedge 实现：`countAvailableBorderEdges(player)`。canStartFencing 签名加 state 参数，6 个 caller（B26 ×2 / B94 / C88 / fenceAction.canBeExecutedByPlayer / fencing.test.ts）同步。与 `computeFenceDiscount` 双轨：前者 entry-guard 阶段返回上限，后者实际 payment 阶段按真实选边算 discount。
+
 ---
 
 ## 4. 实现进度时间线
@@ -571,6 +586,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5 mech-B (A4/D83 altCosts + D117 trades) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 5 mech-C (anytime-exchange 重命名 → exchange + E53 BoarSpear) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 5 mech-E (6-card collection batch + gain merge + viaCardJump worker-less) | 04-30 | 0 | 822 | 92.1% |
+| Sprint 5b (C23/A38/A1/A22/E16 tail-fixes + stables actionContext + fencing entry-guard hook) | 04-30 | 0 | 822 | 92.1% |
 
 ### 2026-04-17 Wave 1-9 明细
 

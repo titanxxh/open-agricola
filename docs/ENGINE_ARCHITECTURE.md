@@ -1855,6 +1855,57 @@ construct 路径不变（仍由 `room-payment.ts` 的 `bonusAppliesToRoomCount` 
 
 **用例**：C13 WoodSlideHammer 持 `conditions: { houseTypeWood: 1, minNumRooms: 5 }`：木屋且 ≥5 间时 stone:2 折扣激活；renovate 后 houseType 变 clay/stone，modifier 自动失效（无需手动从 `activeModifiers` 移除）。
 
+## 15.6 stables effect — `actionContext.zoneFilter / max` (Sprint 5b)
+
+`shared/actions/effects/stables.ts` 接受 `actionContext` 上的两个可选字段：
+
+- `zoneFilter?: 'pasture-1'`：限定可放 stable 的 tile 子集；`'pasture-1'` 表示仅 size=1 的 pasture 内 cells（A1 Shelter 用）
+- `max?: number`：限定本次最多放几个 stable，会被 `buildStableFarmInteraction` 内的 `structuralMax` 取 min
+
+`costOverride: Partial<Resource>` 早期已支持（`buildStableFarmInteraction` 第 2 参数），`zoneFilter / max` 通过 `options` 第 3 参数加入。`game-core.ts buildStableInteraction` 透传 `pending.actionContext` 到 helper。9 张其他 `actionId:'stables'` 卡（E89/C94/C2/B16/B89/A150/A89/A15）不传新字段时维持原行为。
+
+### 调用约定
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'stables',
+  sourceCard: 'CARD_ID',
+  optional: true,
+  actionContext: {
+    max: 1,
+    costOverride: { wood: -99 },  // negative delta → final wood cost = 0
+    zoneFilter: 'pasture-1',
+  },
+}
+```
+
+## 15.7 fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b)
+
+`CardEffect` 接口新增可选 hook：
+
+```ts
+computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
+```
+
+返回该卡当前能贡献的「免费 fence 上限」。`canStartFencing(state, player)` 在 `shared/actions/effects/fencing.ts` 遍历 `[...player.improvements, ...player.minorPlayed]`，累加每张卡的 free count 计入 `maxBuildable`，对齐 BGA `getMaxBuildableFences`-style 算法：当 `wood + free >= minimumFenceSegments(=4)` 通过 entry-guard。
+
+### 与 `computeFenceDiscount` 双轨
+
+- **`computeFenceFreeAvailable(state, player)`**：entry-guard 阶段，返回上限（不要求 `ctx.newFenceEdges`）
+- **`computeFenceDiscount(state, player, ctx)`**：实际 payment 阶段，按真实选边算 discount
+
+E16 BriarHedge 同时提供两者；其他 fence-discount 卡（C16 / C88 / E74 等）按需贡献，不阻塞 5b。
+
+### 签名变化
+
+`canStartFencing` 第一参数从 `player` 改为 `state, player`。6 个 caller 全部同步：
+- `fenceAction.canBeExecutedByPlayer` (fencing.ts:64)
+- `B26_AgrarianFences.ts:116, 132`
+- `B94_StockProtector.ts:51`
+- `C88_CarpentersApprentice.ts:50`
+- 单元测试 `fencing.test.ts`
+
 ## 16. 当前结论
 
 项目的主设计应明确为：
