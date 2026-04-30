@@ -102,6 +102,29 @@ export type ResolveChoiceHandler = (
   ctx: { sourceCard: string; actionContext?: Record<string, unknown> },
 ) => ActionFlow | void
 
+/** A discrete (cost, score) option offered by a costed bonus card.
+ *  Solver picks at most one level per card; pays `cost`, awards `score` VP. */
+export type BonusScoreLevel = {
+  cost: Partial<Resource>
+  score: number
+}
+
+/** Read-only context passed to costed-bonus handlers.
+ *  Standard categories (fields/pastures/.../cards/cardsBonus) are already computed.
+ *  Distinct from `ScoringContext` (the legacy greedy-protocol mailbox below);
+ *  `ScoringContext` is removed in Task 16 of this refactor. */
+export type BonusScoringContext = {
+  categories: readonly ScoreCategoryResult[]
+}
+
+/** Returns the discrete tier menu this card offers, given current scoring categories.
+ *  The solver finds the Pareto-optimal assignment across all costed-bonus cards. */
+export type CostedBonusHandler = (
+  state: GameState,
+  player: PlayerState,
+  ctx: BonusScoringContext,
+) => BonusScoreLevel[]
+
 /**
  * Mutable context passed through all computeBonusScore handlers during scoring.
  *
@@ -111,21 +134,6 @@ export type ResolveChoiceHandler = (
  * If a future card breaks this monotonicity, consider replacing greedy with
  * interactive player choice (matching BGA's BeforeEndOfGame flow).
  */
-export type BonusScoreLevel = {
-  cost: Partial<Resource>
-  score: number
-}
-
-export type BonusScoringContext = {
-  categories: readonly ScoreCategoryResult[]
-}
-
-export type CostedBonusHandler = (
-  state: GameState,
-  player: PlayerState,
-  ctx: BonusScoringContext,
-) => BonusScoreLevel[]
-
 export type ScoringContext = {
   /** Resources already consumed by prior bonus-scoring cards (e.g. Soldier, DrudgeryReeve). */
   reserved: Partial<Resource>
