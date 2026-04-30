@@ -134,7 +134,7 @@ const CARD_IMPL = {
 | hook | 返回值 | 用途 |
 |------|--------|------|
 | computeBonusScore | \`(state, player, ctx) => number\` | 终局加分（返回 VP 数，不是 \`{score,label}\`） |
-| computePostScore | \`(state, player, categories) => number\` | 终局后续加分 |
+| computeCostedBonus | \`(state, player, ctx) => BonusScoreLevel[]\` | 终局花资源换 VP（声明 levels；solver 枚举最优组合） |
 | computeSharedPostScore | \`(state, owner, summaries) => Array<{playerId, score}>\` | 跨玩家加分 |
 | computeExtraRoomCapacity | \`number\` | 额外容纳空间 |
 | onComputeAnimalZones | 修改 zones 数组 | 动物分区扩展 |

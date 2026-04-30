@@ -722,6 +722,8 @@ isolate 入口对所有输入做了 `JSON.parse(JSON.stringify(value ?? null))`�
 - `LocalBrowserExecutor`（§7.2）即使没有真隔离，也建议保持"传 JSON 拷贝进去"的口径，避免本地能跑、上线（多人对局走 isolate）就崩的语义漂移。
 - `CardListenerContext` 里 `ownerPlayer` / `triggerPlayer` / `effectPlayer` 都是 JSON 拷贝。`scope: 'opponent'` / `scope: 'any'` 时 `context.player` 是**触发玩家**，不是卡主——判定卡主必须用 `context.ownerPlayer`。Prompt / 示例必须显式说明（已在 `llmPrompts.ts` 示例 10 / `CARD_DESIGN_PROMPT.md` §7.6 同步）。
 
+> 注：2026-04-30 之后 `computePostScore` 已合并入 `computeBonusScore` + `computeCostedBonus`。本节表格为 2026-04-19 当时状态。
+
 ### 16.3 沙盒识别的 hook / phase 是**白名单子集**，不是全集
 
 `extractManifestFromCompiledCode` 用 `cardEffectHooks` 数组过滤；`isActionHookPhase` 用硬编码 8 项过滤。结果：

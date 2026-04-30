@@ -35,9 +35,9 @@ const CARD_ID = 'CUSTOM_M4_CattleSteward'
 //    4 → 5 (one cow per matched-type pasture with ≥2 same-type animals).
 //    floor(5 / 2) = 2 — assertion still expects score=2.
 //
-// 5. collectBonusScores must run inside session.withCtx() (see
-//    getBonusBreakdownForSession) so getCardEffect resolves the custom card
-//    via sessionCardContext rather than the empty global registry.
+// 5. The bonus solver must run inside session.withCtx() (see session-helpers.ts:runBonusSolver)
+//    so getCardEffect resolves the custom card via sessionCardContext rather than
+//    the empty global registry.
 
 const fixture: CardFixture = {
   id: 'M4-endgame-vp',
@@ -123,8 +123,8 @@ const fixture: CardFixture = {
     if (final.gameOver !== true) {
       return { ok: false, reason: `expected gameOver=true, got ${final.gameOver}` }
     }
-    // collectBonusScores must run inside session.withCtx so the per-session
-    // custom-card effect registry is visible to getCardEffect.
+    // runBonusSolver must run inside session.withCtx (see session-helpers.ts:runBonusSolver)
+    // so the per-session custom-card effect registry is visible to getCardEffect.
     const p0Entries = getBonusBreakdownForSession(session, 0)
     const p1Entries = getBonusBreakdownForSession(session, 1)
     const p0Card = p0Entries.find((e) => e.cardId === CARD_ID)
