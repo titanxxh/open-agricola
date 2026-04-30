@@ -14,9 +14,9 @@ Sprint 5 P1 行为偏差 28 张已修 16/28（PR-5 7 + mech-A 4 + mech-D 1 + mec
 ## 2. 设计目标
 
 - 6 张卡逐张修 P1 偏差，对齐 BGA 行为
-- 唯一主路径改动：`gain-trigger-player.ts` effect 加可选 `payerId` 参数（轻量扩展，向后兼容）
+- 主路径改动：**合并 3 个 gain action（gain / gain-trigger-player / gain-other-players）到统一 gain action**，参数化 `recipientPlayerId` / `recipientMode` / `payerId`；删除两个冗余 effect 文件，~10 张 caller 卡迁移
 - 其他全是单卡内部修
-- ~4-6 小时工作量
+- ~6-8 小时工作量
 
 ## 3. 核心实现
 
@@ -274,7 +274,180 @@ return {
 
 `flag-card` leaf 不变（onReturnHome 时给 fishing 累积 +2 food）。
 
-### 3.7 A151 Minstrel — sheep-market 累积清零
+### 3.7 A151 Minstrel — 改用 viaCardJump 真二次落子（worker-less 变体）
+
+**当前实现完全不对齐 BGA**：A151 当前用 inline simulation（同 mech-A 之前的 4 张卡老实现），自己手写 sheep-market gain leaf / grain-utilization OR 等模拟，没真触发空间完整 flow。导致：
+- 第二格累积资源不自动回收（sheep-market 累积 sheep 不清空、其他空间累积同样问题）
+- 第二格不触发其他卡 listener（cascade dispatch 断链）
+- ReplaceHook / computeCosts 等扩展点对 A151 第二格不生效
+- 总之就是 mech-A 之前 4 张卡同模式的全部 bug
+
+**BGA 行为**（`A151_Minstrel.php`）：onStartReturnHome → 检查 4 张 stage-1 action（Fencing / GrainUtilization / SheepMarket / MajorImprovement）visible + unoccupied + 仅 1 个 → `useActionSpaceNode($spaceId)` 真跑空间完整 flow。**没传 farmer 参数** — 因为 returnHome 阶段玩家 farmers 都已落子，纯空间效果触发，不消耗 worker。
+
+**修法**：扩展 mech-A 的 viaCardJump 让 workerId 可选（worker-less 变体）；A151 用 jumpLeaf({ sourceCard, targetSpaceId }) 不传 workerId。
+
+#### 3.7.1 主路径扩展：viaCardJump worker-less 模式
+
+文件：`shared/actions/effects/place-farmer.ts` jump 分支头部改为：
+
+```ts
+if (actionContext?.viaCardJump) {
+  const sourceCard = actionContext.sourceCard as string | undefined
+  const workerId = actionContext.workerId as string | undefined  // ← 现在 optional
+  const targetSpaceId = actionContext.targetSpaceId as string | undefined
+  if (!sourceCard || !targetSpaceId) {
+    return { type: 'fail', logKey: 'log.placeFarmerFail' }
+  }
+
+  // worker-less 模式（A151 等：returnHome / 类似阶段无 farmer 可借）
+  // 标识：未传 workerId
+  const isWorkerless = !workerId
+
+  let fromSpace: ActionSpace | undefined
+  if (!isWorkerless) {
+    fromSpace = state.actionSpaces.find((s) =>
+      s.takenBy.some((t) => t.playerId === player.id && t.workerId === workerId),
+    )
+    if (!fromSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+  }
+  const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
+  if (!targetSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+
+  // 可达性二次校验：仅 worker 模式跑（worker-less 阶段如 returnHome 不在 work phase，computeAllowedPlacementSpaces 语义不适用）
+  if (!isWorkerless) {
+    const allowed = computeAllowedPlacementSpaces(state, player)
+    if (!allowed.some((a) => a.spaceId === targetSpaceId)) {
+      return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    }
+  }
+
+  // 累加 jumpChain（不变）
+  actionContext.jumpChain = [
+    ...((actionContext.jumpChain as string[]) ?? []),
+    sourceCard,
+  ]
+
+  // 移动 farmer + stats — 仅 worker 模式跑
+  if (!isWorkerless && fromSpace) {
+    removeWorkerRef(fromSpace, player.id, workerId!)
+    addWorkerRef(targetSpace, player.id, workerId!)
+    recordRoundPlacement(player, targetSpace.id, workerId!)
+    incPlacedFarmers(player)
+  }
+
+  // cascade dispatch（不变 — 仍触发其他卡 second-place listener）
+  // 返回 flow：第二格 expandFlow + cascadeFlows（不变）
+  ...
+}
+```
+
+#### 3.7.2 jumpLeaf helper 让 workerId optional
+
+文件：`shared/cards/helpers/jump-leaf.ts`
+
+```ts
+export interface JumpLeafParams {
+  sourceCard: string
+  workerId?: string  // ← 改 optional
+  targetSpaceId: string
+}
+
+export const jumpLeaf = (p: JumpLeafParams): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'place-farmer',
+  sourceCard: p.sourceCard,
+  expandFlow: true,
+  actionContext: {
+    viaCardJump: true,
+    sourceCard: p.sourceCard,
+    ...(p.workerId !== undefined ? { workerId: p.workerId } : {}),  // ← 仅传非 undefined
+    targetSpaceId: p.targetSpaceId,
+  },
+})
+```
+
+注：mech-A 4 张卡 listener 仍传 workerId — 行为不变（向后兼容）。
+
+#### 3.7.3 A151 重写
+
+文件：`shared/cards/A/A151_Minstrel.ts`，完全替换：
+
+```ts
+import { Occupation } from '../types'
+import { isSpaceOccupied } from '../../game/space'
+import { jumpLeaf } from '../helpers/jump-leaf'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'A151_Minstrel'
+
+// BGA A151_Minstrel.php 监听的 4 个 stage-1 action（returning home phase 时检查）
+const STAGE_1_ACTIONS = [
+  'sheep-market',
+  'grain-utilization',
+  'fencing',
+  'major-improvement',
+] as const
+
+export const A151_Minstrel = new Occupation({
+  id: CARD_ID,
+  name: 'Minstrel',
+  deck: 'A',
+  number: 151,
+  category: 'ACTIONS_BOOSTER',
+  desc: ['At the start of each returning home phase, if only one action space card on round space 1 to 4 is unoccupied, you can use that action space.'],
+  cost: {},
+  players: '4+',
+  newSet: true,
+})
+
+export const A151_Minstrel_impl = {
+  effect: {
+    id: CARD_ID,
+    onStartReturnHome: (state, _player) => {
+      const unoccupied: string[] = []
+      for (const actionId of STAGE_1_ACTIONS) {
+        const space = state.actionSpaces.find((s) => s.id === actionId)
+        if (!space) continue
+        // BGA isVisible: 该 action 已在当前 round 开放（roundActionOrder 顺序 ≤ 当前 round）
+        const roundOrder = state.roundActionOrder
+        const posIndex = roundOrder.indexOf(actionId)
+        if (posIndex < 0 || posIndex + 1 > state.round) continue
+        if (!isSpaceOccupied(space)) unoccupied.push(actionId)
+      }
+
+      // 严格"仅 1 个 unoccupied"
+      if (unoccupied.length !== 1) return
+
+      const targetSpaceId = unoccupied[0]!
+
+      // 用 viaCardJump worker-less 模式：让 engine 跑 targetSpaceId 的完整 flow
+      // （expandFlow → 累积资源自动回收 + 其他卡 listener 触发 + ReplaceHook 等）
+      return {
+        type: 'seq',
+        optional: true,
+        children: [
+          jumpLeaf({
+            sourceCard: CARD_ID,
+            targetSpaceId,
+            // workerId 不传 — worker-less 模式
+          }),
+        ],
+      }
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
+```
+
+**删除**：`buildFlowForSpace` 函数（不再 inline 模拟）；STAGE_1_ACTIONS 内联模拟逻辑全部删除。
+
+#### 3.7.4 关键不变量
+
+- **A151 走与 mech-A 4 张卡同样的 viaCardJump 路径** — 第二格行为 BGA 完全等价：累积资源回收（sheep-market sheep / fencing 资源等）/ 触发其他卡 listener / ReplaceHook / computeCosts 全部生效
+- **不消耗玩家 family pool**（worker-less 跳过 incPlacedFarmers / addWorkerRef）
+- **不占用第二格**（无 takenBy 记录） — returnHome 阶段语义自然（玩家在用空间但不"占"它）
+- **jumpChain 仍累加** — 防递归（如果未来某卡监听 stage-1 action 又 jump，链不死）
+- **mech-A 4 张卡向后兼容** — 它们仍传 workerId，行为不变
 
 文件：`shared/cards/A/A151_Minstrel.ts`
 
@@ -316,7 +489,7 @@ mutate state 在 effect handler 内不优雅，但跟 mech-A B152 zeroSpaceListe
 - **B115 不让玩家选**：BGA 是自动每 field +1，删 selection 路径；玩家无 prompt
 - **C13 检查 first renovation**：靠 `roomType === 'wood'` 自然保证（已翻新过 wood 之后 roomType 变 stone，不再触发）
 - **B29 per-action 跟踪**：lessonsActionToken / cookedActionToken 各 keyed by actionToken；同 action 内两个都 set 才奖 1 VP；onRoundStart 清两者保险
-- **A151 mutate state**：listener 内手工清 sheep-market 累积（同 mech-A B152 模式，可接受）；OR 路径不变
+- **A151 用 viaCardJump worker-less 模式**：与 mech-A 4 张卡同款机制，第二格走完整 ActionNode 路径；累积资源 / 其他卡 listener / ReplaceHook 自动正确；放弃原 inline 模拟
 
 ## 4. 测试策略
 
@@ -369,42 +542,52 @@ mutate state 在 effect handler 内不优雅，但跟 mech-A B152 zeroSpaceListe
 
 扩展 `server/__tests__/A151_Minstrel-session.test.ts`（如已存在）：
 
-- 4 stage-1 action 仅 sheep-market unoccupied + sheep 累积 5 → 玩家接受 → 玩家 sheep +5, sheep-market.resources.sheep === 0
-- 4 stage-1 action 0 个 unoccupied → 不触发
-- 4 stage-1 action 2+ 个 unoccupied → 不触发
-- grain-utilization 路径（OR sow / bake-bread）→ 玩家选 sow → field +crop（OR 行为正确）
+- 4 stage-1 action 仅 sheep-market unoccupied + sheep 累积 5 → 玩家接受 → 玩家 sheep +5, **sheep-market.resources.sheep === 0**（由 sheep-market space.execute 自动清零，验证 viaCardJump expandFlow 路径生效）
+- 4 stage-1 action 仅 fencing unoccupied → 玩家接受 → 进入 fence 选段子流程（验证 fencing.flow 被 expandFlow 展开）
+- 4 stage-1 action 仅 grain-utilization unoccupied → 玩家接受 → OR(sow, bake-bread) 弹 prompt
+- 4 stage-1 action 仅 major-improvement unoccupied → 玩家接受 → improvement-any 买 major prompt
+- 4 stage-1 action 0 / 2+ 个 unoccupied → 不触发
+- worker 不消耗：玩家 family-pool 在 returnHome 后不变（worker-less 模式）
+- jumpChain 累加：actionContext.jumpChain 含 'A151_Minstrel'
 
 ## 5. 范围与排除项
 
 ### 5.1 范围内
-- 1 主路径改：`gain-trigger-player.ts` 加 payerId
+
+- 主路径改 1：合并 3 个 gain action 到统一 gain（删 2 个冗余 effect 文件 + ~10 张 caller 迁移 + payerId 参数）
+- 主路径改 2：viaCardJump worker-less 模式（workerId optional）+ jumpLeaf helper signature 更新
 - 6 张卡 listener / effect / modifier 修
-- 6 个 session 测试场景
-- 文档同步：card_progress §2.0 / §2.3 / §8、master-plan §8
+- 6 张卡 session 测试场景
+- 文档同步：card_progress §2.0 / §2.3 / §7（基础设施加 viaCardJump worker-less + gain 三合一） / §8、master-plan §8、ENGINE_ARCHITECTURE 加 "viaCardJump worker-less variant" 一节
 
 ### 5.2 明确排除
+
 - **B155 ArtTeacher**（FOOD_TRAVEL 机制）— 单独 sprint
 - **C23**（先 BGA 重读再决定）— Sprint 5b 或 7
 - **wide-scan A 4 张 / B 11 张 / E 4 张** — 推 Sprint 7（每张需 BGA 复读再判断）
-- **A151 改用 mech-A viaCardJump 路径**（更优雅但 returnHome phase 玩家无 farmer，需要"虚拟 worker"扩展）— follow-up
-- **gain-trigger-player effect 命名**（"gain-trigger-player" + payerId 语义稍混乱；理论上重命名 `pay-and-gain` 更准）— 不在本 spec 范围（向后兼容优先）
+- **gain action 命名规范化** — "gain" 现在覆盖 self / other / specific 多语义，名字不太精确；如有未来工坊 / DSL 对接需求再考虑重命名为 `transfer` 或类似
 
 ### 5.3 风险点
 
-| 假设 | 验证方式 |
-|---|---|
-| `player.houseType` / `player.roomTiles` 字段名 | grep `state.players[].houseType` 确认；plan 阶段写测试时按 actual 类型 |
-| `addBonus` / `bonuses` 字段在 ComplexCost 上语义生效 | 现有 modifier 系统已用 BonusModifier，listener 返回 `bonuses` 由 `resolveCardCostWithModifiers` 收集 — 已存在路径 |
-| B29 现有 onRoundStart 清 cookedThisRound = false 行为是否对 cookedActionToken 适用 | 改 onRoundStart 清 `cookedActionToken = -1`（或 undefined）— 同样防御 |
-| A151 listener handler 内 mutate state.actionSpaces[].resources.sheep 是否在测试环境正确 | session 测试场景验证 sheep-market.resources.sheep === 0 |
-| `gain-trigger-player` 其他 caller（如 mech-A 之外的卡）传不传 payerId | grep `gain-trigger-player` 所有引用确认；现有不传 OK（向后兼容） |
-| C13 modifier 删除后 modifier 系统的 cost-preview / scoring 等链路 | grep `modifier` / `getCardModifiers(C13)` 看依赖；listener 路径独立 |
+
+| 假设                                                                            | 验证方式                                                                                             |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `player.houseType` / `player.roomTiles` 字段名                                   | grep `state.players[].houseType` 确认；plan 阶段写测试时按 actual 类型                                       |
+| `addBonus` / `bonuses` 字段在 ComplexCost 上语义生效                                  | 现有 modifier 系统已用 BonusModifier，listener 返回 `bonuses` 由 `resolveCardCostWithModifiers` 收集 — 已存在路径 |
+| B29 现有 onRoundStart 清 cookedThisRound = false 行为是否对 cookedActionToken 适用      | 改 onRoundStart 清 `cookedActionToken = -1`（或 undefined）— 同样防御                                     |
+| viaCardJump worker-less 模式跑通：jumpLeaf 不传 workerId → 不消耗 worker / 不动 takenBy / 仍 expandFlow + cascade dispatch | A151 session 测试 sheep-market.resources.sheep === 0（自动清空）+ family-pool 不变 |
+| `place-farmer.ts` 跳过可达性二次校验（worker-less 模式）：returnHome phase 不在 work phase，computeAllowedPlacementSpaces 内部假设 work phase 可能不成立 | A151 session 测试覆盖 returnHome 触发路径 + 4 stage-1 action 各种 unoccupied 组合 |
+| 现有 gain-other-players callers（A29/A50/C38/C142/E160/card-listeners）迁移后 statsLog 仍正确 | 各卡现有 session 测试跑过；新加合并 gain effect 单元测试覆盖 recipientMode='others' 路径 stats / log key |
+| 现有 gain-trigger-player callers（A132/A154/A156/A159）迁移后行为不变（非 B138 / C51 类即不传 payerId） | 各卡现有 session 测试跑过 |
+| C13 modifier 删除后 modifier 系统的 cost-preview / scoring 等链路                      | grep `modifier` / `getCardModifiers(C13)` 看依赖；listener 路径独立                                      |
+| jumpLeaf helper workerId 改 optional 后 mech-A 4 张卡（A129/B130/B150/B152）不受影响 | jumpLeaf 4 张卡现有 session 测试跑过 |
+
 
 ## 6. 文档同步
 
 ### 6.1 `docs/card_progress.md`
 
-- §2.0 加：`2026-04-30 Sprint 5 mech-E — 6 张 P1 单卡修批次（B115 TinsmithMaster / C13 WoodSlideHammer / B29 CookeryLesson / B138 ForestGuardian / C51 FishingNet / A151 Minstrel）。唯一主路径改：gain-trigger-player.ts 加可选 payerId 参数（向后兼容 — 不传时仅 target gain，传 payerId 时同时扣对手）。其他 5 张全是单卡内部修：B115 删 selection 路径全 field 自动 +1；C13 改 listener 替代静态 modifier，加 roomType==='wood' && rooms>=5 条件 + stone:2 折扣；B29 cookedThisRound 改 cookedActionToken（per-action keyed）+ lessonsActionToken 跟踪；B138 / C51 listener 加 payerId 让对手扣 food；A151 sheep-market 累积清零。详见 docs/superpowers/specs/2026-04-30-sprint-5-mech-e-misc-fixes-design.md。`
+- §2.0 加：`2026-04-30 Sprint 5 mech-E — 6 张 P1 单卡修批次（B115 TinsmithMaster / C13 WoodSlideHammer / B29 CookeryLesson / B138 ForestGuardian / C51 FishingNet / A151 Minstrel）。主路径改：(1) 合并 3 个 gain action（gain / gain-trigger-player / gain-other-players）到统一 gain，参数化 recipientPlayerId / recipientMode / payerId（删除 2 个冗余 effect 文件，~10 张 caller 卡迁移）；(2) viaCardJump 扩展 worker-less 模式（workerId optional），让 A151 这种 returnHome 阶段无 farmer 可借的卡也能复用 mech-A 路径。卡修：B115 删 selection 路径全 field 自动 +1；C13 改 listener 替代静态 modifier，加 roomType==='wood' && rooms>=5 条件 + stone:2 折扣；B29 cookedThisRound 改 cookedActionToken（per-action keyed）+ lessonsActionToken 跟踪；B138 / C51 caller 改用合并后的 gain 加 payerId 让对手扣 food；A151 完全重写用 jumpLeaf 单 leaf 触发，删 inline simulate 模拟（accumulation 资源 / 其他卡 listener / ReplaceHook 由 viaCardJump expandFlow 自动正确）。详见 docs/superpowers/specs/2026-04-30-sprint-5-mech-e-misc-fixes-design.md。`
 - §2.3 把 6 张卡都标 ✅ Sprint 5 mech-E
 - §8 时间线加新行（实现数 22/28 = 78% Sprint 5 完成度）
 
@@ -412,18 +595,19 @@ mutate state 在 effect handler 内不优雅，但跟 mech-A B152 zeroSpaceListe
 
 - Sprint 5 行：partially done 数从 16/28 更新到 22/28；spec / plan 列加 mech-E 路径；实际工时 + ~5h (mech-E)
 
-### 6.3 不需要改 `docs/ENGINE_ARCHITECTURE.md`
+### 6.3 ENGINE_ARCHITECTURE.md 加两节
 
-`gain-trigger-player` 加 payerId 是 effect 内部参数扩展，未引入新 hook phase / 新协议层 — 不需要文档同步。
+- "gain action 三合一" — 描述合并后 recipientPlayerId / recipientMode / payerId 协议
+- "viaCardJump worker-less variant" — 描述 workerId optional 时跳过 worker mutation，仍跑 expandFlow + cascade dispatch（A151 用例）
 
 ## 7. 提交粒度
 
-- commit 1: `feat(gain-trigger-player)`: add optional payerId for opponent-deduct semantics（含 effect 单测）
-- commit 2: `refactor(B138, C51)`: pass payerId to gain-trigger-player（含 session 测试 — B138 / C51 行为修复）
+- commit 1: `refactor(gain)`: merge gain-trigger-player + gain-other-players into unified gain action with recipientPlayerId / recipientMode / payerId（含 effect 单测 + ~10 张 caller 卡迁移 + 删除 2 个冗余 effect 文件）
+- commit 2: `refactor(B138, C51)`: pass recipientPlayerId + payerId for opponent-deduct semantics（含 session 测试 — B138 / C51 行为修复）
 - commit 3: `refactor(B115)`: drop selection, auto-add 1 crop to every freshly sown field（含测试）
 - commit 4: `refactor(C13)`: use computeCosts listener for renovation discount（含条件检查 + 测试）
 - commit 5: `refactor(B29)`: per-action token tracking instead of per-round（含测试）
-- commit 6: `refactor(A151)`: clear sheep-market accumulation when consumed via Minstrel（含测试）
-- commit 7: `docs`: sync mech-E across card_progress / master-plan
+- commit 6: `feat(jump,A151)`: viaCardJump worker-less variant + A151 rewrite via jumpLeaf（含 helper signature 更新 + A151 session 测试）
+- commit 7: `docs`: sync mech-E across card_progress / master-plan / ENGINE_ARCHITECTURE
 
 每 commit 单独跑 `pnpm test:fast` + `pnpm run lint` + `pnpm run build` 全绿才下一步。
