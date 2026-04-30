@@ -372,8 +372,9 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 - **farmer 移动动画**：登记成 TODO，后续 PR 处理
 - **机制 B / C / D**：alternative-cost trades / meeple-id obtain / turn-edge phase — 各自独立 sprint
-- `**countAsUse` 行为模型**：BGA 用来标记"该 farmer 已行动完毕"，影响某些卡判定；4 张机制 A 卡都不依赖这个标记，未来发现某卡需要再补
+- **`countAsUse` 行为模型**：BGA 用来标记"该 farmer 已行动完毕"，影响某些卡判定；4 张机制 A 卡都不依赖这个标记，未来发现某卡需要再补
 - **未参与机制 A 但监听 place-farmer 的卡**：不需要改，它们看到 second-place dispatch 时 actionContext.jumpChain 字段对它们的 listener handler 没有副作用
+- **server 进程重启时 jump 中途 pending 的恢复**：当前仓库的房间持久化（SQLite / JSON）只存 `serializeState(state)`（`shared/game/serialization.ts:21-31`）—— 仅 `GameState`，**不**含 `Engine.snapshot()`。`pendingChoiceContext`（含 `actionContext.jumpChain`）只在 in-memory engine 实例里。客户端断线 → server 没崩时一切正常；server 进程重启则**所有** pending 状态（不只 jump）都会丢，这是仓库已知架构限制，与机制 A 同性质。要解决需另起 sprint 扩展 `serializeState` 含 `engineSnapshot`，让所有 pending 跨重启恢复——超出本 spec 范围
 
 ## 9. 文档同步具体内容
 
