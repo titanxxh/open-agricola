@@ -113,7 +113,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.space?.id !== 'grain-utilization') return
     if (context.doable) return
     // Make sow doable if fencing is possible (the card adds fence as an alternative)
-    if (canStartFencing(context.player)) {
+    if (canStartFencing(context.state, context.player)) {
       return { doable: true }
     }
   },
@@ -129,7 +129,7 @@ const isDoableBakeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-utilization') return
     if (context.doable) return
-    if (canStartFencing(context.player)) {
+    if (canStartFencing(context.state, context.player)) {
       return { doable: true }
     }
   },

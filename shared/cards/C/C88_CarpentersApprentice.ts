@@ -47,7 +47,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
         wood: (context.player.resources.wood ?? 0) + freeFences,
       },
     }
-    if (!canStartFencing(previewPlayer)) return
+    if (!canStartFencing(context.state, previewPlayer)) return
     return { doable: true }
   },
 }

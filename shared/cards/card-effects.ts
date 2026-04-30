@@ -50,7 +50,7 @@ export type CardEffectField = CardEffectHook
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
-  | 'computeLockedFarmTiles' | 'computeFenceDiscount'
+  | 'computeLockedFarmTiles' | 'computeFenceDiscount' | 'computeFenceFreeAvailable'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -88,6 +88,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onSowExtraField',
   'computeLockedFarmTiles',
   'computeFenceDiscount',
+  'computeFenceFreeAvailable',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -178,6 +179,13 @@ export type CardEffect = {
     player: PlayerState,
     context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
   ) => number
+  /**
+   * Maximum number of free fence segments this card can currently provide
+   * (e.g. E16 returns the count of unused border edges). Used by the
+   * `canStartFencing` entry-guard to compute total buildable fences,
+   * mirroring BGA `getMaxBuildableFences`.
+   */
+  computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
   /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
