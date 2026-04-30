@@ -111,9 +111,30 @@ const computeCostsListener: CardListenerRegistration = {
 
 **`max: 1` 边界**：当目标 minor 的 wood 成本只有 1（如 B27 Toolbox cost wood:1）时，trade 用 1 次会让 wood -2 但只有 1 wood 要付 → 实际花 0 wood + 1 food，这等价 BGA "wood -= 2 capped at 0"。`generateTradeCombinations` 的 capping 已实现（pay.ts 内）。
 
-**altCosts 边界**：当目标 minor 用 `altCosts: [...]` 而非 `cost:{wood:...}`（如 B43_Chophouse altCosts: [{wood:2}, {clay:2}]）时，本 spec 简化为：D117 handler 仍只读 `card.cost?.wood`，对 altCosts 路径暂不生效。BGA `D117.php:34` 是 iterate `args['costs']['trades']` 派生，依赖 BGA 把所有付法转成 trade 形态；我们的模型 fees / trades 是平行字段，不一致。覆盖 altCosts 的精细化处理推到 follow-up — 本 spec 只对纯 `cost:{wood}` minor 生效，已覆盖大多数主流 minor。
+**altCosts 同样生效**：D117 handler 不只看 `card.cost?.wood`，也扫 `card.altCosts: [...]` 找含 wood 的 alt（如 B43_Chophouse altCosts:[{wood:2}, {clay:2}]）。修法：扩展 `getImprovementWoodCost` helper：
 
-`getImprovementWoodCost` 等 helper 已经存在，无需改动。
+```ts
+const getImprovementWoodCost = (cardId: string): number => {
+  const minor = getMinorImprovementCard(cardId)
+  if (minor) {
+    if (minor.cost?.wood && minor.cost.wood > 0) return minor.cost.wood
+    if (minor.altCosts) {
+      return Math.max(0, ...minor.altCosts.map(c => c.wood ?? 0))
+    }
+    return 0
+  }
+  const major = getMajorCardEffect(cardId)
+  if (major) {
+    const costs = Array.isArray(major.cost) ? major.cost : [major.cost ?? {}]
+    return costs.reduce((m, c) => Math.max(m, (c as Record<string, number>).wood ?? 0), 0)
+  }
+  return 0
+}
+```
+
+回到 D117 handler：检查 `getImprovementWoodCost(cardId) > 0` 决定是否注册 trade。pay 主路径的 `computeAllBuyableCombinations` 在 `generateTradeCombinations` 里**对每条 fee 独立枚举 trade combo**：含 wood 的 fee 自动派生 wood→food 替代 solution，不含 wood 的 fee 不受影响。所以单条 trade `{from food:1, to wood:2, max:1}` 注册即可，无需为不同 alt 生成多条 trade。
+
+**`max: 1` 边界**：当目标 minor 的 wood 成本只有 1（如 B27 Toolbox cost wood:1）时，trade 用 1 次会让 wood -2 但只有 1 wood 要付 → 实际花 0 wood + 1 food，这等价 BGA "wood -= 2 capped at 0"。`generateTradeCombinations` 的 capping 已实现（pay.ts 内）。
 
 ### 3.4 关键不变量
 
@@ -153,6 +174,7 @@ setup：玩家 occupationHand 含 D117 + 一个 wood-cost minor（如 cost wood:
 - **场景 3 only base affordable**：food=0 wood=2 → 自动选 solution A
 - **场景 4 wood=1 cost minor**：minor cost wood:1 → trade max=1 但 wood 只需 1 → 玩家可选 (wood:1) 或 (wood:0 + food:1)
 - **场景 5 大 minor cost wood:5**：trade 最多换 2 wood → solution A (wood:5) / solution B (wood:3 + food:1)
+- **场景 6 altCosts 含 wood 的 minor**：买 B43_Chophouse（altCosts:[{wood:2}, {clay:2}]）→ 应弹 choice：solution A (wood:2) / solution B (wood:0 + food:1) / solution C (clay:2) — 三个，玩家选；clay alt 不受 trade 影响
 
 ### 4.4 fast / slow 项目分配
 
@@ -178,7 +200,6 @@ setup：玩家 occupationHand 含 D117 + 一个 wood-cost minor（如 cost wood:
 - **C13 WoodSlideHammer**：是 renovation discount bug（BGA `onPlayerComputeCostsRenovation` 给 stone -2 discount），跟 alt-cost 无关；应作为单独单卡修
 - **`altCosts` + `cost` 字段共存的语义**：现有路径只看 altCosts 或 cost 之一，本 spec 不引入复合声明
 - **trade 多次使用同一资源**：D117 trade max=1，不涉及 max ≥ 2 场景；如未来卡需要 max=N，已由 `generateTradeCombinations` 支持，不需本 spec 验证
-- **D117 对 altCosts minor 的覆盖**：D117 handler 当前读 `card.cost?.wood`，对 `altCosts: [{wood:N}, ...]` 形态的 minor（如 B43_Chophouse）暂不生效。BGA 的 trade-based 模型与我们 fees / trades 平行模型不完全等价；精细化覆盖推到 follow-up。本 spec 只对纯 `cost: { wood }` minor 生效（覆盖大多数主流 minor）
 
 ### 5.3 风险点
 
