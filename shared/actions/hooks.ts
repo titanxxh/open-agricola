@@ -99,6 +99,11 @@ export const clearActionHooks = () => {
   actionHooks.length = 0
 }
 
+export const unregisterActionHook = (id: string): void => {
+  const idx = actionHooks.findIndex((h) => h.id === id)
+  if (idx >= 0) actionHooks.splice(idx, 1)
+}
+
 export const getRegisteredActionHooks = () => [...actionHooks]
 
 const matchesHook = (
