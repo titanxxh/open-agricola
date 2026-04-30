@@ -122,8 +122,19 @@ execute: ({ state, player, actionContext }) => {
     // stats：jump 也算一次 farmer placement（与 game-core.ts:1936 takeAction 入口对齐）
     incPlacedFarmers(player)
 
-    // 跑第二格 effect（可能返回 flow，engine 接管）
-    return targetSpace.execute({ state, player, space: targetSpace })
+    // 第二格执行：返回 flow 让 engine 走完整 ActionNode 路径，
+    // 包括 applyComputeReplace / applyIsDoable / computeCosts / before / during / after listener。
+    // 不直接调 targetSpace.execute（那会绕开 ReplaceHook 等扩展点，导致 D117 / D138 / E134 类
+    // 修改 action 行为的卡对 jump 第二格不生效）。
+    return {
+      type: 'flow',
+      flow: {
+        type: 'leaf',
+        actionId: targetSpaceId,        // spaceId 在 action registry 里即 actionId
+        sourceCard,
+        actionContext: { ...actionContext },  // 透传 viaCardJump / jumpChain 给第二格 hook
+      },
+    }
   }
 
   // ── 原 fromSupply 分支 ──
@@ -142,6 +153,7 @@ execute: ({ state, player, actionContext }) => {
 - 第二格被 `addWorkerRef` 后视为已占（`isSpaceOccupied`），落地 `LANDS_ON_SECOND_SPACE` ruling
 - `ONE_JUMP_PER_TURN` ruling 由 jumpChain 自检自然保证（同 farmer 一次落子链不会重复触发同一卡）
 - **可达性与普通落子完全一致**：listener handler（弹 prompt 前）与 effect jump 分支（farmer 移动前）**都**用 `computeAllowedPlacementSpaces(state, player)` 作为唯一判定源，不写"半套"自定义可达性检查。`computeArgs` phase 的 listener hook 扩展（如未来某卡允许"已占可选"格）自动对 jump 生效，无需机制 A 单独适配。`computeArgs` listener 与机制 A 的 `after` listener phase 不同，不会自递归
+- **第二格执行轨迹与普通落子完全一致**：jump effect 自己只做 farmer 移动 + stats 簿记，不直接调 `targetSpace.execute`。它返回 `{ type:'flow', flow:{ type:'leaf', actionId: targetSpaceId, ... } }`，由 engine 接管创建新 ActionNode 走完整路径：`applyComputeReplace`（D117/D138/E134 类替换 / 替代付费）→ `applyIsDoable`（卡 isDoable 否决）→ `computeCosts`（替代成本 / 折扣）→ `before` phase listener → `space.execute` → `during/immediatelyAfter/after` phase。jump 与"玩家直接落第二格"路径产生**完全相同的 hook dispatch 序列**，唯一区别是 actionContext 多带 `viaCardJump` + `jumpChain`
 
 **stats 系统交互**：
 
@@ -325,10 +337,18 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 
 ### 6.5 串联触发链 session 测试
 
-注册测试 stub 卡 `__test_grain_seeds_observer_`_，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
+注册测试 stub 卡 `__test_grain_seeds_observer__`，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
 
 - 玩家直接落 grain-seeds → 痕迹被设
 - 玩家落 farm-expansion → A129 跳过去 → 痕迹**也**被设（验证 second-place dispatch 跑了，"Y 选项" 落地）
+
+### 6.5b ReplaceHook / computeCosts / isDoable 完整链 session 测试
+
+验证 jump 第二格执行走完整 ActionNode 路径（关键正确性，§3 关键不变量"第二格执行轨迹"）：
+
+- **ReplaceHook**：注册 stub 卡 X 在 `computeReplace` phase 监听第二格 actionId，返回 `{ actionId: 'X-replacement-action' }`；玩家通过 jump 到第二格，断言执行的是 'X-replacement-action' 而非原 actionId
+- **computeCosts**：注册 stub 卡 Y 在 `computeCosts` phase 监听第二格 actionId，返回 `{ costs: { food: 1 } }` 替代成本；玩家 jump 到第二格执行需付费的动作，断言玩家被扣 1 food（而非原成本）
+- **isDoable 否决**：注册 stub 卡 Z 在 `isDoable` phase 监听第二格 actionId 返回 `{ doable: false }`；玩家通过 jump 到第二格 → engine 因 isDoable=false 进 'blocked' 状态。验证 ReplaceHook / isDoable 等扩展点对 jump 与普通落子等价生效
 
 ### 6.6 现有测试更新
 
