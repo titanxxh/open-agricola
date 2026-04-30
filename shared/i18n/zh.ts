@@ -476,7 +476,6 @@ export const zh = {
     'discard-from-hand': { name: '弃手牌', description: '从手牌中弃掉 1 张' },
     'reserve-fence-bonus': { name: '预留围栏优惠', description: '为当前围栏行动预留来源卡牌上的免费围栏' },
     'store-on-card': { name: '存放到卡牌', description: '把资源放到来源卡牌上' },
-    'gain-other-players': { name: '给予其他玩家资源', description: '让每位其他玩家获得指定资源' },
     'house-redevelopment': { name: '住宅改建', description: '改建并可追加改良' },
     'farm-redevelopment': { name: '农场改建', description: '改建房屋' },
     'renovate-house': { name: '住宅翻修', description: '把住宅升级到下一档材质' },

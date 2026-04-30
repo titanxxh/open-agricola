@@ -170,8 +170,8 @@ describe('priority plan implementations', () => {
     expect(flow.children[1]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
     expect(flow.children[2]).toMatchObject({
       type: 'leaf',
-      actionId: 'gain-other-players',
-      params: { food: 1 },
+      actionId: 'gain',
+      params: { recipientMode: 'others', food: 1 },
     })
   })
 

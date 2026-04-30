@@ -40,8 +40,8 @@ const listener: CardListenerRegistration = {
           },
           {
             type: 'leaf',
-            actionId: 'gain-trigger-player',
-            params: { food: 1, targetPlayerId: triggerPlayerId },
+            actionId: 'gain',
+            params: { food: 1, recipientPlayerId: triggerPlayerId },
             sourceCard: CARD_ID,
           },
           {

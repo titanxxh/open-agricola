@@ -28,7 +28,7 @@ export const C29_BeerTable_impl = {
         payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
-        { type: 'leaf', actionId: 'gain-other-players', params: { food: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain', params: { recipientMode: 'others', food: 1 }, sourceCard: CARD_ID },
       ],
     }
   },

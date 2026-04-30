@@ -28,29 +28,79 @@ export const gainAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, params, sourceCard }) => {
-    const gain = (params ?? gainConfigByActionId.get(space.id)) as Partial<Resource> | undefined
+    const {
+      recipientPlayerId,
+      recipientMode,
+      payerId,
+      ...rawGain
+    } = (params ?? {}) as {
+      recipientPlayerId?: string
+      recipientMode?: 'self' | 'others'
+      payerId?: string
+    } & Partial<Resource>
+
+    const gain = (Object.keys(rawGain).length > 0
+      ? rawGain
+      : gainConfigByActionId.get(space.id)) as Partial<Resource> | undefined
+    if (!gain) {
+      return { type: 'ok' as const, resourcesGained: {} }
+    }
+
     const gained: Record<string, number> = {}
-    if (gain) {
-      Object.keys(gain).forEach((key) => {
-        const amount = gain[key as keyof typeof gain] ?? 0
-        if (amount > 0) {
-          gained[key] = amount
-        }
-      })
-      gainResources(player, gain)
-      trackWorkPhaseBuildingResources(state, player.id, gained)
-      if (sourceCard) {
-        addCardResourceGained(player, sourceCard, gained)
-        addResourcesFromCards(player, gained)
-      } else {
-        addResourcesFromBoard(player, gained)
+    Object.keys(gain).forEach((key) => {
+      const amount = gain[key as keyof typeof gain] ?? 0
+      if (amount > 0) {
+        gained[key] = amount
+      }
+    })
+
+    let recipients: PlayerState[]
+    if (recipientMode === 'others') {
+      recipients = state.players.filter((entry) => entry.id !== player.id)
+    } else if (recipientPlayerId) {
+      const target = state.players.find((p) => p.id === recipientPlayerId)
+      recipients = target ? [target] : []
+    } else {
+      recipients = [player]
+    }
+
+    if (payerId) {
+      const payer = state.players.find((p) => p.id === payerId)
+      if (payer) {
+        Object.entries(gained).forEach(([key, amount]) => {
+          const k = key as keyof Resource
+          payer.resources[k] = Math.max(0, payer.resources[k] - amount)
+        })
       }
     }
+
+    for (const recipient of recipients) {
+      gainResources(recipient, gain)
+      if (recipient.id === player.id) {
+        trackWorkPhaseBuildingResources(state, recipient.id, gained)
+      }
+      if (sourceCard) {
+        addResourcesFromCards(recipient, gained)
+      } else if (recipient.id === player.id) {
+        addResourcesFromBoard(recipient, gained)
+      }
+    }
+
+    if (sourceCard && recipients.length > 0) {
+      const totalGain = Object.fromEntries(
+        Object.entries(gained).map(([k, v]) => [k, v * recipients.length]),
+      ) as Partial<Resource>
+      addCardResourceGained(player, sourceCard, totalGain)
+    }
+
     if (sourceCard) {
+      const logKey = recipientMode === 'others'
+        ? 'log.cardEffectOtherPlayersGain'
+        : 'log.cardEffectGain'
       return {
         type: 'ok' as const,
         resourcesGained: gained,
-        logKey: 'log.cardEffectGain',
+        logKey,
         logParams: { gain: gained, cardId: sourceCard },
       }
     }

@@ -32,8 +32,6 @@ import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
 import { storeOnCardAction } from './effects/store-on-card'
-import { gainOtherPlayersAction } from './effects/gain-other-players'
-import { gainTriggerPlayerAction } from './effects/gain-trigger-player'
 import { scytheHarvestFieldAction } from './effects/scythe-harvest-field'
 import { grainThiefProtectAction } from './effects/grain-thief-protect'
 import { moveFarmerToSpaceAction } from './effects/move-farmer-to-space'
@@ -85,8 +83,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   reserveFenceBonusAction,
   payGrainAnyAction,
   storeOnCardAction,
-  gainOtherPlayersAction,
-  gainTriggerPlayerAction,
   scytheHarvestFieldAction,
   grainThiefProtectAction,
   moveFarmerToSpaceAction,

@@ -218,7 +218,7 @@ const AUTO_LOGGED_CARD_EFFECT_ACTIONS = new Map<string, Set<string>>([
   ['log.cardEffectGain', new Set(['gain', 'take-from-card'])],
   ['log.cardEffectBonusVp', new Set(['bonus-vp'])],
   ['log.cardEffectPay', new Set(['pay-resources'])],
-  ['log.cardEffectOtherPlayersGain', new Set(['gain-other-players'])],
+  ['log.cardEffectOtherPlayersGain', new Set(['gain'])],
 ])
 
 export const shouldSkipImmediateListenerLog = (
