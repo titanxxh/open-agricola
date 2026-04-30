@@ -137,13 +137,15 @@ describe('B150_LargeScaleFarmer session', () => {
     )
     const session = setup({ withCard: true, food: 0 })
     const s = session.getState().state
+    const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
+    placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'major-improvement')!,
+      space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
@@ -156,13 +158,15 @@ describe('B150_LargeScaleFarmer session', () => {
     )
     const session = setup({ withCard: true, food: 3, farmExpOccupied: true })
     const s = session.getState().state
+    const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
+    placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'major-improvement')!,
+      space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
@@ -170,19 +174,21 @@ describe('B150_LargeScaleFarmer session', () => {
   })
 
 
-  it('emits valid flow with correct sourceCard (direct listener check)', async () => {
+  it('emits valid jump flow with correct sourceCard (direct listener check)', async () => {
     const { getRegisteredCardListeners, executeCardListener } = await import(
       '../../shared/cards/card-listeners'
     )
     const session = setup({ withCard: true, food: 3 })
     const s = session.getState().state
+    const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
+    placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
       state: s,
       player: s.players[0]!,
-      space: s.actionSpaces.find((x) => x.id === 'major-improvement')!,
+      space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
     } as unknown as CardListenerContext)
@@ -191,10 +197,18 @@ describe('B150_LargeScaleFarmer session', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    // First child is pay-resources 1 food
+    // First child: pay 1 food
     expect(flow.children[0].actionId).toBe('pay-resources')
     expect(flow.children[0].params).toEqual({ food: 1 })
-    // Second child is farm-expansion OR(construct, stables)
-    expect(flow.children[1].type).toBe('or')
+    // Second child: place-farmer leaf in jump mode targeting farm-expansion
+    const jump = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(jump.type).toBe('leaf')
+    expect(jump.actionId).toBe('place-farmer')
+    expect(jump.actionContext).toMatchObject({
+      viaCardJump: true,
+      sourceCard: CARD_ID,
+      workerId: '1',
+      targetSpaceId: 'farm-expansion',
+    })
   })
 })
