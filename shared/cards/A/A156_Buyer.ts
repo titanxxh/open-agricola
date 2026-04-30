@@ -32,8 +32,8 @@ const listener: CardListenerRegistration = {
           payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
           {
             type: 'leaf',
-            actionId: 'gain-trigger-player',
-            params: { food: 1, targetPlayerId: triggerPlayerId },
+            actionId: 'gain',
+            params: { food: 1, recipientPlayerId: triggerPlayerId },
             sourceCard: CARD_ID,
           },
           gainLeaf(CARD_ID, { [resource]: 1 }),

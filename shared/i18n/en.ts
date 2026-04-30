@@ -495,7 +495,6 @@ export const en = {
     'discard-from-hand': { name: 'Discard From Hand', description: 'Discard 1 card from your hand' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },
     'store-on-card': { name: 'Store On Card', description: 'Place resources on the source card' },
-    'gain-other-players': { name: 'Gain Other Players', description: 'Give the specified resources to every other player' },
     'house-redevelopment': { name: 'House Redevelopment', description: 'Renovate and optionally improve' },
     'farm-redevelopment': { name: 'Farm Redevelopment', description: 'Renovate your house' },
     'renovate-house': { name: 'Renovate House', description: 'Upgrade your house to the next material tier' },
