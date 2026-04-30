@@ -1050,6 +1050,7 @@ export const zh = {
     B154_SheepKeeper: { anytime: '牧羊人：7+羊 → 3 分 + 2 食物' },
     A129_Swagman: { choice: '流浪汉：跳到 {targetSpace}（免费）？' },
     B130_FullPeasant: { choice: '全能农夫：付 1 食物跳到 {targetSpace}？' },
+    B150_LargeScaleFarmer: { choice: '大型农场主：付 1 食物跳到 {targetSpace}？' },
     B3_Moonshine: {
       choice: '私酿酒：为抽到的职业选择处理方式',
       choicePlay: '打出它（支付 2 食物）',
