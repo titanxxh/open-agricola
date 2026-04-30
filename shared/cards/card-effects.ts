@@ -47,7 +47,7 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
-  | 'computeBonusScore' | 'computePostScore' | 'computeSharedPostScore'
+  | 'computeBonusScore' | 'computePostScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles' | 'computeFenceDiscount'
@@ -82,6 +82,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeBonusScore',
   'computePostScore',
   'computeSharedPostScore',
+  'computeCostedBonus',
   'computeExtraRoomCapacity',
   'onComputeAnimalZones',
   'onComputeSowableFields',
@@ -110,6 +111,21 @@ export type ResolveChoiceHandler = (
  * If a future card breaks this monotonicity, consider replacing greedy with
  * interactive player choice (matching BGA's BeforeEndOfGame flow).
  */
+export type BonusScoreLevel = {
+  cost: Partial<Resource>
+  score: number
+}
+
+export type BonusScoringContext = {
+  categories: readonly ScoreCategoryResult[]
+}
+
+export type CostedBonusHandler = (
+  state: GameState,
+  player: PlayerState,
+  ctx: BonusScoringContext,
+) => BonusScoreLevel[]
+
 export type ScoringContext = {
   /** Resources already consumed by prior bonus-scoring cards (e.g. Soldier, DrudgeryReeve). */
   reserved: Partial<Resource>
@@ -157,6 +173,7 @@ export type CardEffect = {
   onBeforeStartOfTurn?: FlowEffectHandler
   onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
+  computeCostedBonus?: CostedBonusHandler
   computePostScore?: (state: GameState, player: PlayerState, categories: ScoreCategoryResult[]) => number
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
