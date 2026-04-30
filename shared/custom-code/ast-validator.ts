@@ -44,7 +44,6 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
   ...cardEffectHooks,
   'id',
   'handHooks',
-  'scoringPriority',
 ])
 
 /** Allowed values inside listener.phases arrays. */

@@ -4,7 +4,6 @@ import type {
   BonusScoringContext,
   BonusScoreHandler,
   CostedBonusHandler,
-  ScoringContext,
 } from '../cards/card-effects'
 
 export type SolverInput = {
@@ -65,9 +64,6 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
   const { state, player, ctx, freeHandlers, costedHandlers } = input
   const playerResourcesSnapshot: Partial<Resource> = { ...player.resources }
 
-  // Invariant per solve call — hoisted so both eval and commit loops share one object (M3)
-  const legacyCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
-
   // 1. Collect levels per costed card (call handlers once on snapshot state)
   const allLevels: { cardId: string; levels: BonusScoreLevel[] }[] = costedHandlers.map(({ cardId, handler }) => {
     let levels: BonusScoreLevel[]
@@ -99,7 +95,7 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
       let freeScore = 0
       for (const { cardId, handler } of freeHandlers) {
         try {
-          freeScore += handler(state, playerClone, legacyCtx)
+          freeScore += handler(state, playerClone, ctx)
         } catch (err) {
           if (cardId.startsWith('CUSTOM_')) {
             console.warn(`[scoring-bonus-solver] custom card ${cardId} threw, skipping:`, err)
@@ -146,7 +142,7 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
   for (const { cardId, handler } of freeHandlers) {
     let score = 0
     try {
-      score = handler(state, player, legacyCtx)
+      score = handler(state, player, ctx)
     } catch (err) {
       if (cardId.startsWith('CUSTOM_')) {
         console.warn(`[scoring-bonus-solver] custom card ${cardId} threw, skipping:`, err)
