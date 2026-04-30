@@ -38,7 +38,7 @@ Sprint 7   not started     130 张 P3 简化（master plan §0 默认不做）
 
 - ⚠ 残留：~21 张 P1 行为偏差（Sprint 5 deferred）
 - ❌ 残留：14 张 stub 未实现（Sprint 6 deferred）
-- i18n 缺口 71+437 未补
+- i18n 缺口 437 BGA `clienttranslate` 未补（73 张卡内 key 已修，2026-04-30）
 - Sprint 7 P3 130 张简化未启动
 
 **Follow-up 路线**：上述 deferred 项作为后续 sprint 单独立项；本 master plan 主体 P0+P1（核心机制 + 关键 bug）已闭环，残留为 P2/P3 范围细节。
