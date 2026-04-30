@@ -118,13 +118,12 @@ describe('D132_HideFarmer session', () => {
     expect(bonusCat).toBeUndefined()
   })
 
-  it('deducts food from player resources', () => {
+  it('does not mutate player resources (scoring is non-destructive)', () => {
     const player = createPlayer()
     player.occupationPlayed = [CARD_ID]
     player.resources.food = 10
 
     computeScores(createState(player))
-    // food should be deducted: paid 10 for 10 of 13 empty spaces
-    expect(player.resources.food).toBe(0)
+    expect(player.resources.food).toBe(10)
   })
 })
