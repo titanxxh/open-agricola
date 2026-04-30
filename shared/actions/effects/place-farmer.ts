@@ -6,8 +6,9 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addWorkerRef } from '../../game/space'
+import { addWorkerRef, removeWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
+import { incPlacedFarmers } from '../../logic/stats'
 import { computeAllowedPlacementSpaces } from './placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
@@ -63,6 +64,50 @@ export const placeFarmerAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     smallestAvailableWorker(state, player) !== null,
   execute: ({ state, player, actionContext }) => {
+    // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
+    // the engine runs the second placement through the standard ActionNode path.
+    if (actionContext?.viaCardJump) {
+      const sourceCard = actionContext.sourceCard as string | undefined
+      const workerId = actionContext.workerId as string | undefined
+      const targetSpaceId = actionContext.targetSpaceId as string | undefined
+      if (!sourceCard || !workerId || !targetSpaceId) {
+        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      }
+
+      const fromSpace = state.actionSpaces.find(s =>
+        s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
+      )
+      const targetSpace = state.actionSpaces.find(s => s.id === targetSpaceId)
+      if (!fromSpace || !targetSpace) {
+        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      }
+
+      const allowed = computeAllowedPlacementSpaces(state, player)
+      if (!allowed.some(a => a.spaceId === targetSpaceId)) {
+        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      }
+
+      actionContext.jumpChain = [
+        ...((actionContext.jumpChain as string[] | undefined) ?? []),
+        sourceCard,
+      ]
+
+      removeWorkerRef(fromSpace, player.id, workerId)
+      addWorkerRef(targetSpace, player.id, workerId)
+      recordRoundPlacement(player, targetSpace.id, workerId)
+      incPlacedFarmers(player)
+
+      return {
+        type: 'flow',
+        flow: {
+          type: 'leaf',
+          actionId: targetSpaceId,
+          sourceCard,
+          actionContext: { ...actionContext },
+        },
+      }
+    }
+
     if (actionContext?.fromSupply) {
       const supply = (player.workers ?? []).find((w) => !w.isActive)
       if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }
