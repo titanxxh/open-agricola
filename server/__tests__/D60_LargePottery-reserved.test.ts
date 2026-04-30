@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getCardEffect, type ScoringContext } from '../../shared/cards/card-effects'
+import { getCardEffect, type BonusScoringContext } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D60_LargePottery'
 
@@ -12,7 +12,7 @@ const CARD_ID = 'D60_LargePottery'
 // directly via player.resources to mimic that flow (no more ctx.reserved bridge).
 
 describe('D60_LargePottery computeBonusScore', () => {
-  const ctx: ScoringContext = { reserved: {} }
+  const ctx: BonusScoringContext = { categories: [] }
 
   it('clay=5 → 2 VP (matches scoresMap 5→2)', () => {
     const session = new GameSession()

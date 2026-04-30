@@ -26,7 +26,8 @@ import { registerExecutorBackedCustomCard } from '../../server/custom-code/runti
 import { createInitialState } from '../../shared/logic/state'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 import { rewriteCardId } from './extract'
-import { collectBonusScores, type BonusScoreResult } from '../../shared/cards/card-effects'
+import { getCardEffect } from '../../shared/cards/card-effects'
+import { solveBonusScoring } from '../../shared/logic/scoring-bonus-solver'
 import {
   setWorkersAtHome,
   markAllWorkersUsed,
@@ -287,16 +288,47 @@ export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): Build
   return { session, cardData: compiled.cardData, manifest: compiled.manifest }
 }
 
+function runBonusSolver(
+  state: GameState,
+  player: PlayerState,
+): { cardId: string; score: number }[] {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const freeHandlers = allCards
+    .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
+    .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
+      !!x.effect?.computeBonusScore,
+    )
+    .map(({ cardId, effect }) => ({ cardId, handler: effect.computeBonusScore! }))
+  const costedHandlers = allCards
+    .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
+    .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
+      !!x.effect?.computeCostedBonus,
+    )
+    .map(({ cardId, effect }) => ({ cardId, handler: effect.computeCostedBonus! }))
+  const playerForBonus = { ...player, resources: { ...player.resources } }
+  const result = solveBonusScoring({
+    state,
+    player: playerForBonus,
+    ctx: { categories: [] },
+    freeHandlers,
+    costedHandlers,
+  })
+  return result.entries.map(({ cardId, score }) => ({ cardId, score }))
+}
+
 export function getBonusBreakdown(
   state: GameState,
   player: PlayerState,
 ): { cardId: string; score: number }[] {
-  const result: BonusScoreResult = collectBonusScores(state, player)
-  return result.entries
+  return runBonusSolver(state, player)
 }
 
 /**
- * Variant for fixtures that have a session: runs collectBonusScores INSIDE
+ * Variant for fixtures that have a session: runs the bonus solver INSIDE
  * `session.withCtx(...)` so per-session custom-card effects are visible to
  * `getCardEffect()`. Without this, custom cards return empty bonus entries
  * because their effects are registered to sessionCtx (not the global
@@ -310,7 +342,7 @@ export function getBonusBreakdownForSession(
     const state = session.getState().state
     const player = state.players[playerIndex]
     if (!player) return []
-    return collectBonusScores(state, player).entries
+    return runBonusSolver(state, player)
   })
 }
 

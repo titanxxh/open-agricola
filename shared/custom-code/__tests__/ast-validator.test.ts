@@ -66,12 +66,11 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'superPhase'"))).toBe(true)
   })
 
-  it('accepts handHooks and scoringPriority as meta fields', () => {
+  it('accepts handHooks as a meta field', () => {
     const code = `
       const CARD_IMPL = {
         effect: {
           id: 'test',
-          scoringPriority: 50,
           handHooks: ['onRoundStart'],
           onRoundStart: (state, player) => {},
         },
@@ -79,6 +78,20 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     `
     const result = validateCardCode(code)
     expect(result.valid).toBe(true)
+  })
+
+  it('rejects scoringPriority as a deprecated meta field', () => {
+    const code = `
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          scoringPriority: 50,
+        },
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'scoringPriority'"))).toBe(true)
   })
 
   it('does not flag non-CARD_IMPL objects', () => {
