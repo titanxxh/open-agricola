@@ -1090,6 +1090,7 @@ export const en = {
     D129_LumberVirtuoso: { anytime: 'Lumber Virtuoso: Discard wood to 5 → Build Stables/Rooms' },
     E85_MasterTanner: { anytime: 'Master Tanner: Place food on card from cooked pig/cattle' },
     A129_Swagman: { choice: 'Swagman: jump to {targetSpace} (free)?' },
+    B130_FullPeasant: { choice: 'Full Peasant: pay 1 food, jump to {targetSpace}?' },
     B3_Moonshine: {
       choice: 'Moonshine: Choose what to do with the drawn occupation',
       choicePlay: 'Play it (pay 2 food)',
