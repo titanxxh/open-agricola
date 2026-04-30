@@ -49,9 +49,10 @@ export const D60_LargePottery_impl = {
     if (!player.improvements.includes('Major_Pottery')) return
     returnCardToBoard(player, 'Major_Pottery', state)
   },
-  computeBonusScore: (_state, player, ctx) => {
-    const reservedClay = ctx?.reserved?.clay ?? 0
-    const clay = Math.max(0, player.resources.clay - reservedClay)
+  computeBonusScore: (_state, player) => {
+    // Solver has already subtracted any costed-bonus reservations from
+    // playerForBonus.resources, so this read is the post-solve remaining clay.
+    const clay = player.resources.clay ?? 0
     if (clay >= 7) return 4
     if (clay >= 6) return 3
     if (clay >= 5) return 2
