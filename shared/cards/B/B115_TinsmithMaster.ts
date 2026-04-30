@@ -2,8 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../actions/effects/animals'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { PlayerState } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
 import type { CardImpl } from '../registry'
 
@@ -15,11 +14,10 @@ const CARD_ID = 'B115_TinsmithMaster'
  * EFFECT 1 (passive): Each pasture WITHOUT a stable gets +1 animal capacity.
  *   - Implemented via onComputeAnimalZones
  *
- * EFFECT 2 (after sow): Each time you sow, you can place 1 additional
- *   crop of the respective type in ONE field that was just sown.
- *   - If 1 field sown: auto-add 1 crop
- *   - If multiple: player selects which field gets the bonus
- *   - Implemented via after sow listener
+ * EFFECT 2 (after sow): BGA actAddAdditionalGood iterates every freshly sown
+ *   field and adds 1 crop to each — no player selection. We mirror this by
+ *   bumping every fresh field's top stack remaining by 1 directly in the
+ *   after-sow listener.
  */
 
 /** Initial remaining values for each crop type when freshly sown. */
@@ -32,52 +30,18 @@ const getFreshlySownFields = (context: CardListenerContext) =>
     return !!top && top.remaining === INITIAL_REMAINING[top.kind]
   })
 
-// Field effect: add 1 crop to the selected field (matching its crop type)
-registerSelectionEffect('tinsmith-master-bonus-crop', ({ player, positions }) => {
-  for (const key of positions) {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find((f) => f.row === r && f.col === c)
-    if (!field) continue
-    const top = fieldTopStack(field)
-    if (top) {
-      top.remaining += 1
-      break // only 1 field
-    }
-  }
-})
-
-// --- After sow: find freshly sown fields, add 1 bonus crop to one ---
+// --- After sow: every freshly sown field gets +1 crop directly ---
 const afterSowListener: CardListenerRegistration = {
   id: 'B115-tinsmith-master-after-sow',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-
     const freshFields = getFreshlySownFields(context)
     if (freshFields.length === 0) return
-
-    if (freshFields.length === 1) {
-      // Auto-add 1 crop to the top stack of the single field
-      const top = fieldTopStack(freshFields[0]!)
+    for (const field of freshFields) {
+      const top = fieldTopStack(field)
       if (top) top.remaining += 1
-      return
-    }
-
-    // Multiple fields sown — player selects which one gets the bonus
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'selection',
-        sourceCard: CARD_ID,
-        actionContext: {
-          selectionKind: 'farm-position',
-          positionFilter: 'has-crop',
-          maxSelections: 1,
-          selectionEffect: 'tinsmith-master-bonus-crop',
-        },
-      } as ActionFlow,
-      sourceCard: CARD_ID,
     }
   },
 }
