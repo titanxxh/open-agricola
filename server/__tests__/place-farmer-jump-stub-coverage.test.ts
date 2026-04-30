@@ -48,21 +48,30 @@ const setup2P = (...occupations: string[]) => {
   return { session, state: session.getState().state }
 }
 
-// Scenario 1: A->B->A indirect cycle.
+// Scenario 1: A->B->A indirect cycle - jumpChain self-check terminates the
+// loop on the second hop.
 //
-// Stub card listens on `place-farmer` after-phase (the same hook A129
-// uses) and, when the player is on grain-seeds, attempts to jump them
-// back to farm-expansion. With both A129 and the stub played:
+// Stub card listens on `place-farmer` after-phase and, when the farmer
+// has just landed on grain-seeds, attempts to jump back to farm-expansion.
+// Both A129 (entry-path jumper) and the stub are played by the player.
+//
 //   1. Player takes farm-expansion (entry placement).
-//   2. A129 listener fires (ctx.space=farm-expansion); jumps to grain-seeds.
-//   3. Sub-engine completes -> game-core's main loop is in flow-engine
-//      mode (engineSource.kind='flow'), so `runPlaceFarmerAfterHooks`
-//      is NOT re-invoked. The stub never gets a chance to fire its
-//      jump-back leaf.
-// The observable outcome: farmer ends on grain-seeds; farm-expansion
-// is empty. This documents that the listener-driven jump chain in
-// game-core is intentionally one-shot per top-level takeAction.
-describe('A->B->A indirect cycle - jumpChain self-check fires only on entry path', () => {
+//   2. game-core's runPlaceFarmerAfterHooks dispatches A129's listener;
+//      A129 jumps farmer to grain-seeds (jumpChain=['A129']).
+//   3. The jump effect (place-farmer.ts viaCardJump branch) re-dispatches
+//      place-farmer 'after' listeners keyed on the new space (grain-seeds).
+//      The stub's listener matches and emits a jumpLeaf back to
+//      farm-expansion. The cascade flow is appended to the SEQ alongside
+//      grain-seeds' own ActionNode expansion.
+//   4. The stub's jumpLeaf executes: farmer moves back to farm-expansion;
+//      jumpChain=['A129', STUB_ID].
+//   5. The jump effect dispatches once more on farm-expansion. A129's
+//      listener self-check (chain.includes('A129')) returns true, so it
+//      skips. No further jumps; chain terminates.
+//
+// Observable: farmer ends on farm-expansion; grain-seeds is empty;
+// only one worker is placed total.
+describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop', () => {
   const STUB_ID = '__test_jump_back_card__'
   const LISTENER_ID = 'stub-jump-back-listener'
 
@@ -97,7 +106,7 @@ describe('A->B->A indirect cycle - jumpChain self-check fires only on entry path
     )
   })
 
-  it('A129 jump terminates on grain-seeds; stub does not bounce back (one-shot after-hook)', () => {
+  it('A129 -> stub -> A129 chain bounces back to farm-expansion and terminates by jumpChain self-check', () => {
     const { session, state } = setup2P('A129_Swagman')
     state.players[0]!.occupationPlayed.push(STUB_ID)
     session.loadState(state)
@@ -106,24 +115,25 @@ describe('A->B->A indirect cycle - jumpChain self-check fires only on entry path
 
     const farm = resp.state.actionSpaces.find((s) => s.id === 'farm-expansion')!
     const grain = resp.state.actionSpaces.find((s) => s.id === 'grain-seeds')!
+    // Exactly one worker placed total (no duplication).
     expect(farm.takenBy.length + grain.takenBy.length).toBe(1)
-    expect(grain.takenBy.length).toBe(1)
-    expect(farm.takenBy).toEqual([])
+    // Final landing space is farm-expansion (stub bounced the farmer back).
+    expect(farm.takenBy.length).toBe(1)
+    expect(grain.takenBy).toEqual([])
   })
 })
 
-// Scenario 2: cascade dispatch - third-party listener visibility.
+// Scenario 2: cascade dispatch - third-party listener visibility on the
+// jump destination (the "Y option" in mech-A spec §6.5).
 //
 // Stub observer listens on `place-farmer` after for grain-seeds and
-// increments a trace counter via card extra-data. Two paths exercised:
+// increments a trace counter via card extra-data.
 //   (a) direct placement on grain-seeds: counter increments (sanity).
-//   (b) reach grain-seeds via A129 jump from farm-expansion:
-//       runPlaceFarmerAfterHooks fires once on entry (ctx.space=
-//       farm-expansion), so the observer's grain-seeds filter does NOT
-//       match. The second placement does NOT re-trigger after-hooks.
-// This makes explicit that game-core's place-farmer after-phase is keyed
-// to the takeAction entry space, not the eventual jump destination.
-describe('cascade dispatch - place-farmer after fires once keyed on entry space', () => {
+//   (b) reach grain-seeds via A129 jump from farm-expansion: jump effect's
+//       cascade dispatch (place-farmer.ts viaCardJump branch) keyed on the
+//       new space (grain-seeds) re-fires the place-farmer 'after' listener
+//       set, so the observer matches and the counter increments.
+describe('cascade dispatch - third-party place-farmer after listener fires on jump destination', () => {
   const STUB_OBS_ID = '__test_grain_seeds_observer__'
   const LISTENER_ID = 'stub-grain-seeds-observer-listener'
   const TRACE_KEY = 'observed'
@@ -164,7 +174,7 @@ describe('cascade dispatch - place-farmer after fires once keyed on entry space'
     expect(observed).toBeGreaterThanOrEqual(1)
   })
 
-  it('observer does NOT fire on jump-second-placement (after-hook is one-shot keyed to entry)', () => {
+  it('observer fires on jump-second-placement via cascade dispatch keyed on jump destination', () => {
     const { session, state } = setup2P('A129_Swagman')
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
@@ -176,9 +186,9 @@ describe('cascade dispatch - place-farmer after fires once keyed on entry space'
       STUB_OBS_ID,
       TRACE_KEY,
     )
-    // farmer landed on grain-seeds (via A129 jump) but the after-hook
-    // observer is keyed on ctx.space.id which is the entry space (farm-expansion).
-    expect(observed ?? 0).toBe(0)
+    // Cascade dispatch in the jump effect (place-farmer.ts) re-fires
+    // place-farmer 'after' listeners on the jump destination (grain-seeds).
+    expect(observed ?? 0).toBeGreaterThanOrEqual(1)
     const grain = resp.state.actionSpaces.find((s) => s.id === 'grain-seeds')!
     expect(grain.takenBy.length).toBe(1)
   })
