@@ -800,6 +800,7 @@ export const zh = {
     interactionOverachieverImprovement: '成就者：执行一次改良行动？',
     interactionRiparianBuilderConstruct: '河岸建筑师：你可以扩建 1 个房间；若扩建泥屋/石屋，分别少付 1 粘土/2 石头。',
     placeFarmerFail: '无法在此放置工人',
+    cardJumpedToSpace: '{player} 用 {cardName} 把 {worker} 跳到 {targetSpace}',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',
   },
