@@ -45,6 +45,8 @@ const collectListener: CardListenerRegistration = {
     const ownerId = context.ownerPlayer?.id
     if (!ownerId) return
 
+    const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
+
     return {
       flow: {
         type: 'seq',
@@ -52,7 +54,11 @@ const collectListener: CardListenerRegistration = {
           {
             type: 'leaf',
             actionId: 'gain',
-            params: { food: 1, recipientPlayerId: ownerId },
+            params: {
+              food: 1,
+              recipientPlayerId: ownerId,
+              payerId: triggerPlayerId,
+            },
             sourceCard: CARD_ID,
           },
         ],
