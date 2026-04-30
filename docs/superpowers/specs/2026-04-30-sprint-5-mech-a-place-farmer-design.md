@@ -338,12 +338,18 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 - **自跳防护**：玩家落 A129 触发格 → 接受跳转 → 第二格 dispatch 时 A129 不再触发（用 log 计数 / cardStates 痕迹断言只跳 1 次）
 - **间接循环防护**：注册 1 张测试 stub 卡 X 监听 A129 的目标格、构造跳回 A129 的源格；玩家落子 → A 跳 → X 跳回 → A 检测 chain.includes('A129')=true 终止；断言总跳数 ≤ 2
 
-### 6.5 串联触发链 session 测试
+### 6.5 cascade dispatch（Y 选项）— 第二格触发其他卡 place-farmer after listener
 
-注册测试 stub 卡 `__test_grain_seeds_observer__`，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
+**实现路径**：jump effect 的 execute 内部，在 farmer 物理移动到第二格 + recordRoundPlacement + incPlacedFarmers 之后、return flow 之前，显式调用 `getMatchingListeners` + `executeCardListener` 收集 second-place dispatch 的 listener flow，与第二格自身 ActionNode 路径一并 wrap 进返回的 SEQ flow。
 
-- 玩家直接落 grain-seeds → 痕迹被设
-- 玩家落 farm-expansion → A129 跳过去 → 痕迹**也**被设（验证 second-place dispatch 跑了，"Y 选项" 落地）
+这模拟 game-core 顶层 `runPlaceFarmerAfterHooks`（`game-core.ts:436-494` / 调用点 `:1629`）在 jump 路径下的等价行为——顶层 dispatch 是 one-shot，仅在 `engineSource.kind === 'action'`（首次落子）时跑一次；jump 把控制权交给 flow-engine 后，game-core 不再 fire after-hooks，所以必须在 jump effect 内部补这一步 dispatch。
+
+测试覆盖（`place-farmer-jump-stub-coverage.test.ts`）：注册测试 stub 卡 `__test_grain_seeds_observer__`，监听 `place-farmer after` + `space.id='grain-seeds'`，handler 写痕迹到 cardStates。
+
+- 玩家直接落 grain-seeds → 痕迹被设（baseline）
+- 玩家落 farm-expansion → A129 跳过去 → cascade dispatch 在 grain-seeds 触发 observer → 痕迹**也**被设（"Y 选项" 落地）
+
+⚠ **简化**：暂不复制 `runPlaceFarmerAfterHooks` 的 PlayerSwitchNode 包装机制（`game-core.ts:473-481`，用于支持 'opponent' scope 卡跨玩家触发）。当前 jump cascade 仅 same-player listener 工作。如果未来发现需要跨玩家 cascade（例如对手持有 'opponent' scope 卡监听本玩家 place-farmer），再补 PlayerSwitch 包装。
 
 ### 6.5b ReplaceHook / computeCosts / isDoable 完整链 session 测试
 
@@ -398,7 +404,7 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 - **`countAsUse` 行为模型**：BGA 用来标记"该 farmer 已行动完毕"，影响某些卡判定；4 张机制 A 卡都不依赖这个标记，未来发现某卡需要再补
 - **未参与机制 A 但监听 place-farmer 的卡**：不需要改，它们看到 second-place dispatch 时 actionContext.jumpChain 字段对它们的 listener handler 没有副作用
 - **server 进程重启时 jump 中途 pending 的恢复**：当前仓库的房间持久化（SQLite / JSON）只存 `serializeState(state)`（`shared/game/serialization.ts:21-31`）—— 仅 `GameState`，**不**含 `Engine.snapshot()`。`pendingChoiceContext`（含 `actionContext.jumpChain`）只在 in-memory engine 实例里。客户端断线 → server 没崩时一切正常；server 进程重启则**所有** pending 状态（不只 jump）都会丢，这是仓库已知架构限制，与机制 A 同性质。要解决需另起 sprint 扩展 `serializeState` 含 `engineSnapshot`，让所有 pending 跨重启恢复——超出本 spec 范围
-- ~~**Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / 直接 stub computeReplace parity）**~~：✅ 已在 Sprint 5 stub-test-infra 子项实现（2026-04-30）。新增 `unregisterActionHook(id)` 一个 5 行函数（listener 反注册 API `CardRegistry.registerListener` / `removeListenersWhere` / `unload` 早就存在），通过 `requireActiveCardRegistry()` 在测试里直接注册和清理 stub listener。3 个场景全部落地，且测试同时记录了引擎实际行为（after-hook 一次性、ctx.space 锚定 takeAction 入口、grain-seeds 的 ActionNode 实际是内部 gain）—— 这些细节 spec §6.4 / §6.5 / §6.5b 原文描述不准确，测试断言已按真实语义校正。详见 `docs/superpowers/specs/2026-04-30-sprint-5-stub-test-infra-design.md` + `server/__tests__/place-farmer-jump-stub-coverage.test.ts`
+- ~~**Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / 直接 stub computeReplace parity）**~~：✅ 已在 Sprint 5 stub-test-infra 子项实现（2026-04-30）。新增 `unregisterActionHook(id)` 一个 5 行函数（listener 反注册 API `CardRegistry.registerListener` / `removeListenersWhere` / `unload` 早就存在），通过 `requireActiveCardRegistry()` 在测试里直接注册和清理 stub listener。3 个场景全部落地。注：该 sub-sprint 经历两个 commit——第一版 commit `fe386fb1` 反映了引擎旧语义（after-hook 顶层一次性、cascade dispatch 在 jump 第二格不 fire），测试断言 `observer NOT fire` 与 `stub 没机会 bounce`；随后的 cascade-fix commit 在 `place-farmer.ts` jump 分支内部补了 second-place dispatch（见 §6.5），cascade FIRE 与 A→B→A 真正二次跳由此兑现，断言已重写为 `observer fires` 与 `farmer bounces back to farm-expansion`。详见 `docs/superpowers/specs/2026-04-30-sprint-5-stub-test-infra-design.md` + `server/__tests__/place-farmer-jump-stub-coverage.test.ts`
 
 ## 9. 文档同步具体内容
 
