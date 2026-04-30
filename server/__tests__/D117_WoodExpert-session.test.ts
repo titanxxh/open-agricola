@@ -88,13 +88,13 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
   })
 
-  // Known limitation: D117 trade does NOT apply to altCosts-form minors because
-  // resolveCardPreviewCost short-circuits when baseCost is already a ComplexCost
-  // (e.g. altCosts -> { fees }), so the computeCosts hook never runs for those.
-  // Scenarios 5/6 below assert the *current* behaviour (no trade injection on
-  // altCosts minors), not the spec-aspirational behaviour. Lifting this requires
-  // a main-path change in pay-helpers.ts that is explicitly out of scope here.
-  it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → only base alts (no D117 trade injected)', () => {
+  it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + wood-trade + clay-base', () => {
+    // After pay-helpers stops short-circuiting on ComplexCost, D117 trade is
+    // appended to the ComplexCost.trades list and computeAllBuyableCombinations
+    // enumerates it per fee. With food=10 wood=2 clay=2 we expect at least
+    // three meaningful solutions: wood:2 (no trade), wood:0+food:1 (trade), and
+    // clay:2 (no trade). pay.ts may emit additional combinations when trades
+    // are applied to non-wood fees; we only assert the spec-mandated three.
     const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.pending.type !== 'choice') return
@@ -102,32 +102,51 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    // Only the two base alts (wood:2 / clay:2); D117 trade is NOT injected.
-    expect(resp.pending.options.length).toBe(2)
-    const woodOpt = resp.pending.options.find((o) => {
-      const paid = (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
+    expect(resp.pending.options.length).toBeGreaterThanOrEqual(3)
+    const getPaid = (o: typeof resp.pending.options[number]) =>
+      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
         | Record<string, number>
         | undefined
-      return !!paid && (paid.wood ?? 0) === 2 && !paid.clay
+    const woodBase = resp.pending.options.find((o) => {
+      const paid = getPaid(o)
+      return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const clayOpt = resp.pending.options.find((o) => {
-      const paid = (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
-        | Record<string, number>
-        | undefined
-      return !!paid && (paid.clay ?? 0) === 2 && !paid.wood
+    const woodTrade = resp.pending.options.find((o) => {
+      const paid = getPaid(o)
+      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })
-    expect(woodOpt).toBeDefined()
-    expect(clayOpt).toBeDefined()
+    const clayBase = resp.pending.options.find((o) => {
+      const paid = getPaid(o)
+      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 2 && (paid.food ?? 0) === 0
+    })
+    expect(woodBase).toBeDefined()
+    expect(woodTrade).toBeDefined()
+    expect(clayBase).toBeDefined()
   })
 
-  it('altCosts minor + food=10 wood=2 clay=0 → only wood alt affordable, auto-select (no D117 trade)', () => {
+  it('altCosts minor + food=10 wood=2 clay=0 → wood-base + wood-trade (clay alt unaffordable)', () => {
+    // food=10 wood=2 clay=0 — wood-base (wood:2) and wood-trade (wood:0+food:1)
+    // are affordable; clay-base alt (clay:2) is not.
     const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.pending.type !== 'choice') return
     resp = session.resolveChoice(0, 'minor:B43_Chophouse')
-    // Single solution (wood:2) → auto-select; D117 trade not injected on altCosts path
-    expect(resp.pending.type).toBe('confirmNextPlayer')
-    expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.state.players[0]!.resources.food).toBe(10)
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    const getPaid = (o: typeof resp.pending.options[number]) =>
+      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
+        | Record<string, number>
+        | undefined
+    const woodBase = resp.pending.options.find((o) => {
+      const paid = getPaid(o)
+      return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
+    })
+    const woodTrade = resp.pending.options.find((o) => {
+      const paid = getPaid(o)
+      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
+    })
+    expect(woodBase).toBeDefined()
+    expect(woodTrade).toBeDefined()
   })
 })

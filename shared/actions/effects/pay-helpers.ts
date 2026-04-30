@@ -56,14 +56,18 @@ export const resolveCardCostWithModifiers = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  baseCost: Partial<Resource>,
+  baseCost: Partial<Resource> | ComplexCost,
   actionCardId?: string,
 ): Partial<Resource> | ComplexCost => {
   const context = buildCardCostListenerContext(state, player, actionId)
   const matched = getMatchingListeners(context)
-  let cost = { ...baseCost }
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
+  // For flat input we apply `costs` patches directly to `cost` so deltas
+  // (e.g. `{ reed: -1 }`) saturate at zero per applyCostOverride. For
+  // ComplexCost input we do not patch `cost` since which fee to patch is
+  // semantically ambiguous; only trades/bonuses are merged in that branch.
+  let cost: Partial<Resource> = isComplexCost(baseCost) ? {} : { ...baseCost }
 
   for (const entry of matched) {
     const listenerContext: CardListenerContext & {
@@ -77,7 +81,7 @@ export const resolveCardCostWithModifiers = (
     const result = executeCardListener(entry.registration, listenerContext, {
       ownerPlayerId: entry.ownerPlayerId,
     })
-    if (result?.costs) {
+    if (result?.costs && !isComplexCost(baseCost)) {
       cost = applyCostOverride(cost, result.costs)
     }
     if (result?.bonuses) {
@@ -86,6 +90,20 @@ export const resolveCardCostWithModifiers = (
     if (result?.trades) {
       collectedTrades.push(...result.trades)
     }
+  }
+
+  if (isComplexCost(baseCost)) {
+    if (collectedBonuses.length === 0 && collectedTrades.length === 0) {
+      return baseCost
+    }
+    const merged: ComplexCost = { ...baseCost }
+    if (collectedTrades.length > 0) {
+      merged.trades = [...(baseCost.trades ?? []), ...collectedTrades]
+    }
+    if (collectedBonuses.length > 0) {
+      merged.bonuses = [...(baseCost.bonuses ?? []), ...collectedBonuses]
+    }
+    return merged
   }
 
   if (collectedBonuses.length > 0 || collectedTrades.length > 0) {
@@ -366,7 +384,6 @@ export const resolveCardPreviewCost = (
   actionCardId?: string,
 ): Partial<Resource> | ComplexCost | null => {
   if (!baseCost) return null
-  if (isComplexCost(baseCost)) return baseCost
   return resolveCardCostWithModifiers(
     state,
     player,
