@@ -1706,6 +1706,62 @@ E2E 的职责是验证“多人链路是否真正打通”，而不是替代所�
 - `server/__tests__/ws-seat-binding.test.ts` — 7 个
 - 共 30 个新测试覆盖 filter 对齐、viewer 对称性、seat mismatch 拒绝、观察者隔离等场景。
 
+## 15.1 place-farmer jump mode (Sprint 5 mech-A)
+
+支持卡牌让玩家"借同一 farmer 跳到第二个 action space"的机制（BGA `useActionSpaceNode($space, $farmer)`）。
+
+### 协议
+
+卡牌 listener 返回 jump leaf：
+
+```ts
+{
+  type: 'leaf',
+  actionId: 'place-farmer',
+  sourceCard: 'B130_FullPeasant',
+  actionContext: {
+    viaCardJump: true,
+    sourceCard: 'B130_FullPeasant',
+    workerId: '1',
+    targetSpaceId: 'fencing',
+  },
+}
+```
+
+### effect 行为（`shared/actions/effects/place-farmer.ts`）
+
+`actionContext.viaCardJump === true` 进入 jump 分支：
+
+1. 反查 fromSpace（含 `(playerId, workerId)` 的格子）
+2. `computeAllowedPlacementSpaces` 二次校验 `targetSpaceId` 可达
+3. mutate `actionContext.jumpChain = [...prev, sourceCard]`
+4. `removeWorkerRef(from)` + `addWorkerRef(target)` + `recordRoundPlacement`
+5. `incPlacedFarmers(player)`
+6. 返回 `{ type:'flow', flow }`，flow 取自 target action 的 `flow` 字段（如 `major-improvement → improvement-any`、`fencing → fence`、`grain-utilization → or(sow, bake-bread)`），fallback 为单 leaf；每个 leaf 都继承 `sourceCard` + `viaCardJump` actionContext，让 engine 走完整 ActionNode 路径
+
+### 防递归
+
+`actionContext.jumpChain` 累加经过的 sourceCard。listener 自检 `isJumpChainContains(context, CARD_ID)`（`shared/cards/helpers/jump-leaf.ts`）。防 A→A 自跳与 A→B→A 任意长度间接循环。
+
+### per-action 簿记不重置
+
+`actionToken` / `actionStartPlayerSnapshot` / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动 — jump 是同 action 延续。
+
+### 模块加载
+
+`shared/actions/index.ts` 在 lookup 表初始化后调用 `registerJumpActionLookup(getActionDefinition)` 注入 lookup，避免 `actions/index → internal-actions → effects/place-farmer → actions/index` 的循环依赖。
+
+### 不在范围
+
+- farmer 移动动画（前端 TODO）
+- `countAsUse` 行为模型（未来卡需要时再补）
+- server 重启时 jump 中途 pending 的恢复（架构层议题，非 jump 特有）
+- Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / 直接 stub computeReplace parity）需要 codebase 扩展运行时 unregister API；简单场景已在本 sprint 由 A129 自跳测试 + B150 → major-improvement 间接覆盖
+
+### 使用此机制的卡
+
+A129 Swagman / B130 FullPeasant / B150 LargeScaleFarmer / B152 JuniorArtist。
+
 ## 16. 当前结论
 
 项目的主设计应明确为：

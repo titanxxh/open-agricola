@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 Sprint 5 mech-A — A129/B130/B150/B152 改用真二次落子机制 + place-farmer jump 模式**：新增 `shared/cards/helpers/jump-leaf.ts`（`jumpLeaf()` 构造 viaCardJump leaf；`isJumpChainContains()` listener 自检）。`shared/actions/effects/place-farmer.ts.execute` 新增 `viaCardJump` 分支：物理移动 farmer（`removeWorkerRef` + `addWorkerRef`）→ `actionContext.jumpChain` 累加 sourceCard（mutate）→ `incPlacedFarmers(player)` → 返回 `{type:'flow', flow}`，flow 取自 target action 的 `flow` 字段（如 major-improvement → improvement-any、fencing → fence、grain-utilization → or(sow, bake-bread)），fallback 单 leaf。jump 第二格走完整 ActionNode 路径，自然继承 `applyComputeReplace` / `applyIsDoable` / `computeCosts` / before listener；防递归靠 `isJumpChainContains(context, CARD_ID)`。可达性单一源 = `computeAllowedPlacementSpaces`（含 occupied-space extra option）。per-action 簿记不重置（actionToken / actionStartPlayerSnapshot / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动）。**架构落地**：`shared/actions/index.ts` 在 lookup 表初始化后 `registerJumpActionLookup(getActionDefinition)` 注入 lookup（避开 `internal-actions → place-farmer → actions/index` 循环依赖）。**4 张卡改造**：A129 删 `buildGrainSeedsFlow`/`buildFarmExpansionFlow`/`onBeforeStartOfTurn` flag cleanup（原 ONE_JUMP_PER_TURN 实际是 no-op）；B130 删 inline `buildChainedFlow`；B150 同 B130；B152 删 `zeroSpaceListener`（traveling-players food drain 改靠原 action.execute 自然清零）+ `getLessonsCostForSpace` / `canPlaySomeOccupation` 手算（改为 `computeAllowedPlacementSpaces` 判定 lessons / lessons-4 自身可达性，含 cost）。**新基础设施 i18n**：5 条 key（4 卡 choice prompt + 1 log.cardJumpedToSpace）双语补齐。**测试**：`shared/cards/helpers/__tests__/jump-leaf.test.ts`（7 例）+ `shared/actions/effects/__tests__/place-farmer-jump.test.ts`（6 例：移动 / jumpChain 累加 / 三类 fail / family pool 不消耗）+ `server/__tests__/place-farmer-jump-recursion.test.ts`（A129 自跳防护 + B150 → major-improvement parity smoke）+ A129 / B130 / B150 / B152 各自 session test 加新断言（takenBy 物理移动 / placedFarmers +2 接受 / +1 拒绝 / family pool 不变）。**Stub-based 完整测试套（A→B→A 间接循环 / cascade dispatch / stub computeReplace parity）** 标 follow-up（需 codebase 扩展 unregister API）。spec：`docs/superpowers/specs/2026-04-30-sprint-5-mech-a-place-farmer-design.md` / plan：`docs/superpowers/plans/2026-04-30-sprint-5-mech-a-place-farmer.md`。
 - **2026-04-30 — i18n 卡内 key 缺失补齐**：73 张卡引用的 74 个 i18n key 在 `shared/i18n/zh.ts` 和 `shared/i18n/en.ts` 双缺，本次全部补齐双语翻译。audit script S12 信号 73 → 0。同步修复 `scripts/audit-card-architecture.ts`：i18n 文件路径从 `client/i18n/` 更正为 `shared/i18n/`，正则改为支持嵌套对象中的叶节点 key 匹配。BGA `clienttranslate` 437 strings（系统日志 / PHP 端文案，与我们 TS frontend i18n 不映射）保持 deferred。spec：`docs/superpowers/specs/2026-04-30-i18n-card-keys-backfill-design.md`。
 - **2026-04-30 — Bonus scoring hook 双轨合并到求解器架构**：删除 `CardEffect.computePostScore` / `CardEffect.scoringPriority` / `ScoringContext.reserved` / `ScoringContext` / `BonusScoreResult` / `collectBonusScores` 全套 deprecated 类型与函数；新增 `computeCostedBonus: (state, player, ctx) => BonusScoreLevel[]` hook + `solveBonusScoring()` Pareto 求解器（`shared/logic/scoring-bonus-solver.ts`）。5 张 costed bonus 卡（A136 / C133 / E132 / C99 / D132）改为申报 levels[]，求解器枚举笛卡尔积找最优组合后扣 `playerForBonus.resources`（clone，保持 `computeScores` 纯函数）。50 张 free bonus 卡（含 4 张迁入：D100 / C31 / C135 / E159；以及 D60 LargePottery 删除 `ctx.reserved` 改读 `player.resources.clay`）保持单值返回 `(state, player, ctx) => number`。`computeSharedPostScore` 不动（A135 / C136 跨玩家分数调整，签名不同）。Cleanup: ast-validator 删 `'scoringPriority'` allow-list，`tests/llm-card-gen/session-helpers.ts` 加 `runBonusSolver` shim 替代 `collectBonusScores`，influence-zone 文档（llmPrompts / CUSTOM_CARD_SANDBOX / CARD_DESIGN_PROMPT / M4 fixture / llm-card-gen test doc）全部同步。spec / plan：`docs/superpowers/specs/2026-04-30-bonus-score-merge-design.md` / `docs/superpowers/plans/2026-04-30-bonus-score-merge.md`。
 - **2026-04-30 — A14 Carpenter's Hammer banned 字段决议不做**：BGA `banned=true` 的语义是"卡池过滤"（不发到玩家手里）。当前 A14 通过 4-modifier 实现折扣效果（reed/wood/clay/stone in min 2 rooms），保留在卡池中可被抽到。**owner 决议（2026-04-30）：不实施 banned schema + dealHands 过滤**——加 schema 字段、dealHands 过滤、UI 标识属于独立工作，与 A14 本身的折扣实现无冲突。A14 从 §2.4 deferred 迁入 §2.5 deliberate divergence；§1 总览 §2.4 / §2.5 数量同步；master-plan.md §1 / §8 deferred 列表同步清理。无代码改动，doc-only commit。
@@ -209,14 +210,14 @@
 
 | 卡牌 | 关键发现 | 优先级 |
 |---|---|---|
-| **A129 Swagman** | farm-expansion 用 OR 而 BGA 是 SEQ；未设 once-per-turn flag | P1 |
+| **A129 Swagman** | ✅ Sprint 5 mech-A — 改用 jumpLeaf + place-farmer.viaCardJump 真二次落子（farmer 物理移动 farm-expansion ↔ grain-seeds），防递归靠 jumpChain 自检 | P1 |
 | **A139 Hollow Warden** | 仅匹配 `hollow-4`，3+人模式下其它 hollow 累积格漏触发 — ✅ Sprint 5 PR-5 (listener now matches { hollow, hollow-4 }; +3p session test) | P1 |
 | **A150 Stagehand** | construct 硬编码 `maxRooms:1`，BGA 不限制 — ✅ Sprint 5 PR-5 (drop maxRooms cap + players: '4+'; test asserts maxSelections > 1) | P1 |
 | **A151 Minstrel** | sheep-market gain 未清累积；grain-utilization 用 OR 而 BGA 是 SEQ 允许同时 sow+bake | P1 |
 | **B27 Toolbox** | 每次构建都触发，未实现"turn 末一次性"语义 | P1 |
 | **B29 CookeryLesson** | "same turn" 被错误扩展成 "same round" | P1 |
 | **B115 Tinsmith** | 多 field 时只允许选 1 个，BGA 给每 field 各加 1 | P1 |
-| **B130 / B150 / B152** | `useActionSpace(other)` 语义被 inline 简化，丢"用 farmer 到另一格"的事件（同类问题）| P1 |
+| **B130 / B150 / B152** | ✅ Sprint 5 mech-A — 三张卡都改用 jumpLeaf + place-farmer.viaCardJump（B130: grain-utilization ↔ fencing；B150: farm-expansion ↔ major-improvement；B152: day-laborer → lessons-4 / lessons / traveling-players XOR），farmer 物理移动 + 第二格走完整 ActionNode 路径含 ReplaceHook / computeCosts / isDoable | P1 |
 | **B138 ForestGuardian** | 用 `gain-trigger-player` 可能没真扣对手食物（须确认） | P1 |
 | **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 |
 | **C23** | 触发条件偏差 | P1 |
@@ -235,16 +236,16 @@
 - **B42 ForestInn** — round ≤ 6 的 `isBuyable` 守卫未实现；vp 元数据已补 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `maxRound: 6`, picked up by existing meetsCardPrerequisites pipeline)
 - **C39 StudioBoat** — `prerequisite` enforce（"Build a fishing pond/wooden hut etc."） 未注册 handler；cost 已对齐 ✅ PR-1B — ✅ Sprint 5 PR-5 (added `prerequisite: '1 Occupation'` + `occupationPrerequisites: { min: 1 }`; BGA's printed text is "1 Occupation", not the fishing-pond text mentioned in audit)
 
-**Sprint 5 PR-5 deferred to follow-up (21 cards)**:
+**Sprint 5 PR-5 + mech-A deferred to follow-up (17 cards remaining; 4 mech-A cards now resolved)**:
 
 The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 hour of work or wider mechanism changes; tracked here so a future PR can pick them up:
 
-- **A129 Swagman** — needs SEQ semantics + once-per-turn flag covering both spaces; current OR + flag implementation doesn't model "use the other space directly with the same person"
+- ~~**A129 Swagman** — needs SEQ semantics + once-per-turn flag covering both spaces~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf + place-farmer.viaCardJump; jumpChain self-check)
 - **A151 Minstrel** — sheep-market accumulation clearance + grain-utilization SEQ-vs-OR re-check (audit's claim of OR-vs-SEQ contradicts BGA `ActionGrainUtilization` which is also `NODE_OR + forcePassAfterOne`); needs second pass to either close as already-correct or implement accumulation clearing
 - **B27 Toolbox** — needs once-per-turn semantics with onEndTurn cleanup; current implementation fires on every construct
 - **B29 CookeryLesson** — needs `turnId` (per-placement) tracking instead of `cookedThisRound` (per-round) — requires per-action-token state machine extension
 - **B115 Tinsmith** — multi-field: "+1 to each field" requires per-field iteration in the listener
-- **B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism for "execute another space's flow with the same person"; needs new helper or hook design
+- ~~**B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf helper + place-farmer.viaCardJump; second-space dispatch runs full ActionNode path)
 - **B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food (audit flagged as "must confirm")
 - **B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths
 - **C23** — triggering condition deviation (need re-read of BGA file to identify)
@@ -470,6 +471,22 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
   - 新增测试：serialization-filter (9) + privacy-broadcast (4) + privacy-http (10) + ws-seat-binding (7) = 30 新测试
   - 详见 `docs/ENGINE_ARCHITECTURE.md §15 Hand Privacy & Seat Binding`
 
+### place-farmer jump mode (Sprint 5 mech-A, 2026-04-30)
+
+`actionContext.viaCardJump=true` 时 `place-farmer` effect 进入 jump 分支：移动 worker（`removeWorkerRef` + `addWorkerRef`）+ 累加 `actionContext.jumpChain`（mutate）+ `incPlacedFarmers(player)` + 返回 `{type:'flow', flow}`，flow 取自 target action 的 `flow` 字段（如 `major-improvement → improvement-any` / `fencing → fence` / `grain-utilization → or(sow, bake-bread)`），fallback 单 leaf。第二格走完整 ActionNode 路径自然继承 `applyComputeReplace` / `applyIsDoable` / `computeCosts` / before listener。
+
+防递归：listener 自检 `isJumpChainContains(context, CARD_ID)`（`shared/cards/helpers/jump-leaf.ts`）。
+
+可达性单一源：`computeAllowedPlacementSpaces`（含 occupied-space extra option）。
+
+per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeActionBonusSources` / `cardEffectDeltasSinceFlush` 都不动 — jump 是同 action 延续。
+
+落地 BGA ruling：`LANDS_ON_SECOND_SPACE`（farmer 物理移动）+ `ONE_JUMP_PER_TURN`（jumpChain 自检）。
+
+实现：`shared/actions/effects/place-farmer.ts` viaCardJump 分支 + `shared/cards/helpers/jump-leaf.ts`（`jumpLeaf()` / `isJumpChainContains()`）+ `shared/actions/index.ts` `registerJumpActionLookup` 注入 lookup（避开循环依赖）。
+
+消费者：A129 Swagman / B130 FullPeasant / B150 LargeScaleFarmer / B152 JuniorArtist。
+
 ---
 
 ## 4. 实现进度时间线
@@ -515,6 +532,7 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 | A123 FrameBuilder → bonus.choices + pay 系统 Bonus.choices 能力 | 04-20 | 0 | 821 | 92.0% |
 | 卡池按人数过滤 + C39 StudioBoat BGA 对齐 | 04-25 | 0 | 821 | 92.0% |
 | Sprint 6 partial (A-deck extraVp ×21 + E30 mutation fix + D12↔D148) | 04-29 | 0 | 821 | 92.0% |
+| Sprint 5 mech-A (A129/B130/B150/B152 真二次落子 + place-farmer jump 模式) | 04-30 | 0 | 821 | 92.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
