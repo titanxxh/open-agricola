@@ -165,40 +165,30 @@ describe('sourceCard card production contract', () => {
     }
   })
 
-  it('E53 Boar Spear tags both extra options and exchange follow-up with sourceCard', () => {
-    const duringListener = findListener('E53-boar-spear-during')
-    const afterListener = findListener('E53-boar-spear-after')
-    expect(duringListener).toBeDefined()
-    expect(afterListener).toBeDefined()
+  it('E53 Boar Spear tags exchange follow-up flow with sourceCard', () => {
+    const obtainListener = findListener('E53-boar-spear-after-obtain')
+    expect(obtainListener).toBeDefined()
     const player = createPlayer()
+    player.minorPlayed = ['E53_BoarSpear']
+    // Seed an action snapshot token so the once-per-action guard sees a valid token
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      __actionSnapshot__: { extraData: { token: 1 } },
+    }
 
-    const during = executeCardListener(duringListener!, {
-      state: createState([player]),
-      player,
-      space: createSpace('boar-market'),
-      actionId: 'gain',
-      phase: 'during',
-      result: { type: 'ok', resourcesGained: { boar: 2 } },
-    } as unknown as CardListenerContext)
-
-    expect(during?.extraOptions?.map((option) => option.sourceCard)).toEqual([
-      'E53_BoarSpear',
-      'E53_BoarSpear',
-    ])
-
-    const after = executeCardListener(afterListener!, {
+    const after = executeCardListener(obtainListener!, {
       state: createState([player]),
       player,
       space: createSpace('boar-market'),
       actionId: 'gain',
       phase: 'after',
-      choice: '1',
       result: { type: 'ok', resourcesGained: { boar: 2 } },
     } as unknown as CardListenerContext)
 
     expect(after?.sourceCard).toBe('E53_BoarSpear')
     expect(after?.flow).toMatchObject({
       type: 'seq',
+      optional: true,
       children: [{ type: 'leaf', actionId: 'exchange', sourceCard: 'E53_BoarSpear' }],
     })
   })

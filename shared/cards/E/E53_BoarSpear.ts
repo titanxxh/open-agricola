@@ -1,104 +1,65 @@
 import { MinorImprovement } from '../types'
-import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 
-const TRACKED_ACTIONS = ['collect', 'gain', 'receive'] as const
 const CARD_ID = 'E53_BoarSpear'
+const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
+const USED_TOKEN_KEY = 'E53UsedActionToken'
 
-const boarSpearDuringListener: CardListenerRegistration = {
-  id: 'E53-boar-spear-during',
-  phases: ['during' as ActionHookPhase],
-  actions: [...TRACKED_ACTIONS],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { actionId, player, result } = context
-    
-    if (!(TRACKED_ACTIONS as readonly string[]).includes(actionId)) return
-    
-    const obtainedBoar =
-      result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
-    if (obtainedBoar <= 0) return
-    
-    const cardState = player.cardStates?.['E53_BoarSpear'] ?? {}
-    const convertedCount = cardState.counters?.['converted'] ?? 0
-    
-    const availableBoars = obtainedBoar - convertedCount
-    if (availableBoars <= 0) return
-    
-    const options = []
-    for (let i = 1; i <= availableBoars; i++) {
-      options.push({
-        value: String(i),
-        labelKey: 'card.boarSpear.convert',
-        labelParams: { boar: i, food: i * 4 },
-        sourceCard: CARD_ID,
-      })
-    }
-    
-    if (options.length === 0) return
-    
-    return {
-      extraOptions: options,
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-const boarSpearAfterListener: CardListenerRegistration = {
-  id: 'E53-boar-spear-after',
+const obtainListener: CardListenerRegistration = {
+  id: 'E53-boar-spear-after-obtain',
+  cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { actionId, player, result, choice } = context
-    
-    if (!(TRACKED_ACTIONS as readonly string[]).includes(actionId)) return
-    
-    const obtainedBoar =
-      result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
+    if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return
+
+    const result = context.result
+    const obtainedBoar = result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
     if (obtainedBoar <= 0) return
-    
-    if (!choice) return
-    
-    const convertCount = parseInt(choice, 10)
-    if (isNaN(convertCount) || convertCount <= 0) return
-    
-    const cardState = player.cardStates?.['E53_BoarSpear'] ?? {}
-    const previousConverted = cardState.counters?.['converted'] ?? 0
-    
+
+    if (context.state.roundPhase === 'breeding') return
+
+    const token = readActionSnapshotToken(context.player)
+    if (token === undefined) return
+    const used = readCardExtraData<number>(context.player, CARD_ID, USED_TOKEN_KEY)
+    if (used === token) return
+    writeCardExtraData(context.player, CARD_ID, USED_TOKEN_KEY, token)
+
     return {
-      sourceCard: CARD_ID,
       flow: {
         type: 'seq',
+        optional: true,
+        choiceLabelKey: 'cards.E53_BoarSpear.choice',
         children: [
-          { 
-            type: 'leaf', 
-            actionId: 'exchange', 
-            optional: false,
-            promptKey: 'card.boarSpear.converting',
+          {
+            type: 'leaf',
+            actionId: 'exchange',
             sourceCard: CARD_ID,
+            actionContext: { tradeIds: ['E53_BoarSpear'] },
           },
         ],
       },
-      extraData: {
-        convertBoar: convertCount,
-        previousConverted,
-      },
+      sourceCard: CARD_ID,
     }
   },
 }
 
 export const E53_BoarSpear = new MinorImprovement({
-  id: "E53_BoarSpear",
-  name: "Boar Spear",
-  deck: "E",
+  id: CARD_ID,
+  name: 'Boar Spear',
+  deck: 'E',
   number: 53,
-  category: "FOOD",
-  desc: ["Each time you get at least 1 <PIG> outside of the breeding phase of a harvest, you can immediately turn them into 4 <FOOD> each."],
+  category: 'FOOD',
+  desc: ['Each time you get at least 1 <PIG> outside of the breeding phase of a harvest, you can immediately turn them into 4 <FOOD> each.'],
   vp: 1,
-  cost: {"wood":1,"stone":1},
+  cost: { wood: 1, stone: 1 },
 })
 
 export const E53_BoarSpear_impl = {
-  listeners: [boarSpearDuringListener, boarSpearAfterListener],
+  listeners: [obtainListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
