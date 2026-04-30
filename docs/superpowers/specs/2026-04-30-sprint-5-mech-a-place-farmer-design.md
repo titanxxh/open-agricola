@@ -102,6 +102,12 @@ execute: ({ state, player, actionContext }) => {
       return { type: 'fail', logKey: 'log.placeFarmerFail' }
     }
 
+    // 防御性二次校验：用普通落子同一套可达性判定（含 computeArgs listener hook 扩展）
+    const allowed = computeAllowedPlacementSpaces(state, player)
+    if (!allowed.some(a => a.spaceId === targetSpaceId)) {
+      return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    }
+
     // 累加 jumpChain（mutate actionContext，让 hooks.after dispatch 看到）
     actionContext.jumpChain = [
       ...((actionContext.jumpChain as string[]) ?? []),
@@ -135,6 +141,7 @@ execute: ({ state, player, actionContext }) => {
 - jump 分支不进入 choice 分支（targetSpaceId 已定）
 - 第二格被 `addWorkerRef` 后视为已占（`isSpaceOccupied`），落地 `LANDS_ON_SECOND_SPACE` ruling
 - `ONE_JUMP_PER_TURN` ruling 由 jumpChain 自检自然保证（同 farmer 一次落子链不会重复触发同一卡）
+- **可达性与普通落子完全一致**：listener handler（弹 prompt 前）与 effect jump 分支（farmer 移动前）**都**用 `computeAllowedPlacementSpaces(state, player)` 作为唯一判定源，不写"半套"自定义可达性检查。`computeArgs` phase 的 listener hook 扩展（如未来某卡允许"已占可选"格）自动对 jump 生效，无需机制 A 单独适配。`computeArgs` listener 与机制 A 的 `after` listener phase 不同，不会自递归
 
 **stats 系统交互**：
 
@@ -179,9 +186,10 @@ const listener: CardListenerRegistration = {
     const targetSpaceId = TRIGGER_PAIRS[fromSpaceId]
     if (!targetSpaceId) return
 
-    const targetSpace = context.state.actionSpaces.find(s => s.id === targetSpaceId)
-    if (!targetSpace || isSpaceOccupied(targetSpace)) return
-    if (!targetSpace.canBeExecutedByPlayer(context.state, context.player)) return
+    // 唯一可达性判定源：与普通落子一致（含 computeArgs listener hook 扩展）
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    if (!allowed.some(a => a.spaceId === targetSpaceId)) return
+
     if ((context.player.resources.food ?? 0) < 1) return
 
     const myRef = context.space?.takenBy.find(t => t.playerId === context.player.id)
@@ -290,8 +298,10 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 1. **触发 + 接受**：第一格落子 → pending=choice (optional jump) → accept → 第一格 takenBy 空、第二格 takenBy 有该 worker、第二格效果资源正确到位、log 含 jump 条目、`player.stats.placedFarmers` 比第一格落子前 +2（一次入口 + 一次 jump）
 2. **触发 + 拒绝**：accept 时选不跳 → 状态完全不变（食物不扣 / 第二格不动）；`stats.placedFarmers` 只 +1
 3. **食物不够**（B130/B150/B152）：玩家 food=0 → pending=none，listener 不返回 flow；`stats.placedFarmers` +1
-4. **第二格被占**：另一玩家先放第二格 → 第一格落子后 pending=none
-5. **`canBeExecutedByPlayer` 拒绝**：B150 跳 major-improvement 玩家无任何 major 可买 → 不弹 prompt
+4. **第二格被占且不在 allowed 列表**：另一玩家先放第二格 → `computeAllowedPlacementSpaces` 不含第二格 → listener 不返回 flow，pending=none
+5. **`canBeExecutedByPlayer` 拒绝**：B150 跳 major-improvement 玩家无任何 major 可买 → `computeAllowedPlacementSpaces` 不含 major-improvement → 不弹 prompt
+6. **可达性扩展生效**（前向兼容验证）：注册 stub 卡 X 在 `computeArgs` phase 注入 `<TARGET>:<targetSpaceId>` 的 OCCUPIED extraOption（即使第二格已占），断言 jump listener 仍弹 prompt → effect 也接受跳转。本场景验证机制 A 与"已占可选"主路径扩展自动协同
+7. **listener 进入时通过、jump 时被否决**（防御性二次校验）：构造 stub state 让 listener 进入后 state 改变（如对手在 hooks 中突然占用第二格 — 真实场景几乎不发生但要测 fail 路径），断言 effect 返回 fail 而非 partial state 污染
 
 ### 6.4 防递归 session 测试 — `server/__tests__/place-farmer-jump-recursion.test.ts`（新）
 
@@ -329,6 +339,7 @@ B130 跳 fencing → 玩家选 fence 段（fence flow 自身的 pending，已有
 | jump leaf execute 后 `hooks.after` dispatch 时，listener 收到的 `context.space` 指向第一格还是 targetSpace？若仍指向第一格，listener 内 `context.space?.id === '<targetSpaceId>'` 检查会失败，串联触发链（§3.4 选项 Y）落不了地 | 串联触发链 session 测试（§6.5）即在验证此假设；若失败，需在 jump leaf execute 内显式构造新 executionContext.space 或在 buildListenerEvent 增加跨 leaf space 透传      |
 | `recordRoundPlacement(player, targetSpace.id, workerId)` 同 workerId 在同一回合记录两次：`getRoundPlacementOrder` / `getRoundPlacementOrderEntries` 是否假设 workerId 唯一不重复？若有此假设，jump 后会破坏数据结构      | 看 `shared/cards/helpers/round-placement.ts` 实现；单测：jump 后 `getRoundPlacementOrder(player)` 返回 `[firstSpaceId, targetSpaceId]` 顺序正确 |
 | 其他依赖 `stats.placedFarmers` 的下游（卡牌效果 / 评分 / 报表）是否对"jump 算第二次 placement"的语义有意见？BGA 把 jump 算入 farmer count，我们对齐 BGA 即可，但要验证我们仓库内没有"按 placedFarmers 等于落子轮数"的代码假设         | grep `stats.placedFarmers` 所有引用，若有"等于实际行动数"的依赖要重新评估；目前 §6.1 / §6.3 的 stats 断言会暴露任何下游 bug                              |
+| `computeAllowedPlacementSpaces` 在 jump 场景被调用两次（listener 进入 + effect 二次校验），每次都会跑 `computeArgs` phase 全部 listener hook —— 性能开销与潜在副作用（hook 内不该有 side effect 但可能有） | 单测：mock listener 计数器，断言 jump 一次跳转最多触发 N 次 computeArgs（接受场景 = listener 进入 1 次 + effect 1 次 = 2 次，可接受） |
 
 
 ## 8. 范围与排除项
