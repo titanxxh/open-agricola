@@ -137,6 +137,11 @@ export type CostedBonusHandler = (
 export type ScoringContext = {
   /** Resources already consumed by prior bonus-scoring cards (e.g. Soldier, DrudgeryReeve). */
   reserved: Partial<Resource>
+  /** Read-only snapshot of standard categories (fields/pastures/.../cards/cardsBonus).
+   *  Free bonus cards that need to read other categories' totals (e.g. D100,
+   *  C31, C135) read from here. Same shape as BonusScoringContext.categories.
+   *  Will be unified into BonusScoringContext in Task 16 of this refactor. */
+  categories: readonly ScoreCategoryResult[]
 }
 
 export type BonusScoreHandler = (state: GameState, player: PlayerState, ctx: ScoringContext) => number
@@ -396,7 +401,7 @@ export const collectBonusScores = (
     )
     .sort((a, b) => (a.effect.scoringPriority ?? 100) - (b.effect.scoringPriority ?? 100))
 
-  const ctx: ScoringContext = { reserved: {} }
+  const ctx: ScoringContext = { reserved: {}, categories: [] }
   const entries: { cardId: string; score: number }[] = []
 
   for (const { cardId, effect } of withEffects) {

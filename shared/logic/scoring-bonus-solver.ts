@@ -85,7 +85,7 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
       const remaining = subtractResources(playerResourcesSnapshot, accCost)
       const playerClone = { ...player, resources: { ...player.resources, ...remaining } } as PlayerState
       const costedScore = accCombo.reduce((sum, { level }) => sum + level.score, 0)
-      const legacyCtx: ScoringContext = { reserved: {} }
+      const legacyCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
       let freeScore = 0
       for (const { handler } of freeHandlers) {
         try {
@@ -128,7 +128,7 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
   }
 
   // 4. Build entries — re-call free handlers on committed state for entry log
-  const commitCtx: ScoringContext = { reserved: {} }
+  const commitCtx: ScoringContext = { reserved: {}, categories: ctx.categories }
   const freeEntries: SolverEntry[] = freeHandlers.map(({ cardId, handler }) => {
     let score = 0
     try {
