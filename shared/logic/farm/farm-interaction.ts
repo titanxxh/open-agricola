@@ -111,20 +111,46 @@ export const buildRoomFarmInteraction = (
 export const buildStableFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  options?: {
+    /**
+     * Restrict selectable tiles to a sub-zone of the farm. Currently supports
+     * `'pasture-1'` — only tiles inside size=1 pastures (used by A1 Shelter).
+     */
+    zoneFilter?: 'pasture-1'
+    /**
+     * Hard-cap how many stables can be placed in this interaction (overrides
+     * the structural 4-stable cap if smaller). Used by A1 Shelter (max=1).
+     */
+    max?: number
+  },
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   const lockedKeys = collectLockedFarmTileKeys(player)
-  const selectableTiles = getAllTilePositions().filter((tile) => {
+  let selectableTiles = getAllTilePositions().filter((tile) => {
     const key = positionKey(tile)
     return !occupied.has(key) && !lockedKeys.has(key)
   })
+  if (options?.zoneFilter === 'pasture-1') {
+    const oneSizePastureCells = new Set<string>()
+    for (const pasture of player.pastures) {
+      if (pasture.size === 1) {
+        for (const cell of pasture.tiles ?? []) {
+          oneSizePastureCells.add(positionKey(cell))
+        }
+      }
+    }
+    selectableTiles = selectableTiles.filter((tile) =>
+      oneSizePastureCells.has(positionKey(tile)),
+    )
+  }
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
   const structuralMax = Math.min(
     selectableTiles.length,
     Math.max(0, 4 - normalized.stableTiles.length),
+    options?.max ?? Number.POSITIVE_INFINITY,
   )
   let resourceMax = 0
   for (let count = 1; count <= structuralMax; count += 1) {
