@@ -1,61 +1,48 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import type { ActionFlow } from '../../game/types'
+import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
+import { computeAllowedPlacementSpaces } from '../../actions/effects/placement-availability'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A129_Swagman'
 
-/**
- * A129 Swagman:
- * Immediately after each time you use the Farm Expansion or Grain Seeds action space,
- * you can use the respective other space with the same person (even if it is occupied).
- *
- * BGA:
- * - afterPlaceFarmer on FarmExpansion → can optionally jump to GrainSeeds and execute it
- * - afterPlaceFarmer on GrainSeeds → can optionally jump to FarmExpansion and execute it
- * - Flag prevents repeated use per round
- *
- * Implementation: After place-farmer on one space, offer the other space's action flow
- * as an optional follow-up. The "jump" is conceptual — we just execute the other
- * space's action flow inline. Flag prevents re-trigger.
- */
+const TRIGGER_PAIRS: Record<string, string> = {
+  'farm-expansion': 'grain-seeds',
+  'grain-seeds': 'farm-expansion',
+}
 
-const FARM_EXPANSION_ID = 'farm-expansion'
-const GRAIN_SEEDS_ID = 'grain-seeds'
-
-const buildGrainSeedsFlow = (): ActionFlow => gainLeaf(CARD_ID, { grain: 1 })
-
-const buildFarmExpansionFlow = (): ActionFlow => ({
-  type: 'or',
-  children: [
-    { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
-    { type: 'leaf', actionId: 'stables', sourceCard: CARD_ID },
-  ],
-})
-
-const afterPlaceFarmerListener: CardListenerRegistration = {
+const listener: CardListenerRegistration = {
   id: 'A129-swagman-after-place-farmer',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    const spaceId = context.space?.id
-    if (spaceId !== FARM_EXPANSION_ID && spaceId !== GRAIN_SEEDS_ID) return
+    if (isJumpChainContains(context, CARD_ID)) return
 
-    // Determine the other space's flow
-    const otherFlow = spaceId === FARM_EXPANSION_ID
-      ? buildGrainSeedsFlow()
-      : buildFarmExpansionFlow()
+    const fromSpaceId = context.space?.id
+    if (!fromSpaceId) return
+    const targetSpaceId = TRIGGER_PAIRS[fromSpaceId]
+    if (!targetSpaceId) return
+
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    if (!allowed.some(a => a.spaceId === targetSpaceId)) return
+
+    const myRef = context.space?.takenBy.find(t => t.playerId === context.player.id)
+    if (!myRef) return
 
     return {
       flow: {
         type: 'seq',
         optional: true,
-        children: [otherFlow],
+        choiceLabelKey: 'cards.A129_Swagman.choice',
+        children: [
+          jumpLeaf({
+            sourceCard: CARD_ID,
+            workerId: myRef.workerId,
+            targetSpaceId,
+          }),
+        ],
       },
       sourceCard: CARD_ID,
     }
@@ -77,14 +64,6 @@ export const A129_Swagman = new Occupation({
 })
 
 export const A129_Swagman_impl = {
-  listeners: [afterPlaceFarmerListener],
-  effect: {
-  id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
-    }
-  },
-},
+  listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
