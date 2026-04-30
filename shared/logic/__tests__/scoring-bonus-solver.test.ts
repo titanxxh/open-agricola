@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { solveBonusScoring } from '../scoring-bonus-solver'
+import { paretoOptimal } from '../../cards/helpers/pareto-bonus'
 import type { GameState, PlayerState } from '../../game/types'
 import type { BonusScoringContext } from '../../cards/card-effects'
 
@@ -191,5 +192,19 @@ describe('solveBonusScoring', () => {
     expect(result.totalScore).toBe(0)
     expect(result.totalCost).toEqual({})
     expect(result.entries).toEqual([{ cardId: 'BadCard', score: 0, cost: {} }])
+  })
+})
+
+describe('paretoOptimal', () => {
+  it('keeps max-score level per cost vector', () => {
+    const result = paretoOptimal([
+      { cost: { food: 1 }, score: 1 },
+      { cost: { food: 1 }, score: 2 },
+      { cost: { food: 4 }, score: 2 },
+      { cost: { food: 4 }, score: 1 },
+    ])
+    expect(result).toHaveLength(2)
+    expect(result.find(l => l.cost.food === 1)?.score).toBe(2)
+    expect(result.find(l => l.cost.food === 4)?.score).toBe(2)
   })
 })
