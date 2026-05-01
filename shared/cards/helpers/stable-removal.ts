@@ -44,7 +44,7 @@ const clearFarmHandPosition = (player: PlayerState) => {
  * stable instead). Cards should prefer {@link removeStableOrFarmHandAtTile}
  * to handle both kinds uniformly.
  */
-export const removeStableAtTile = (
+const removeStableAtTile = (
   player: PlayerState,
   tile: FarmTilePosition,
 ): boolean => {
@@ -112,5 +112,3 @@ export const removeStableOrFarmHandAtTile = (
   return removeStableAtTile(player, tile) ? 'normal' : null
 }
 
-export const countRemovableStables = (player: PlayerState): number =>
-  player.stableTiles.length + (readFarmHandPosition(player) ? 1 : 0)

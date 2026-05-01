@@ -1,6 +1,6 @@
 import type { CardListenerRegistration } from '../card-listeners'
 
-export const CARD_ID = 'Stub_ComputeReplace_Decline'
+const CARD_ID = 'Stub_ComputeReplace_Decline'
 
 export const listener: CardListenerRegistration = {
   id: 'stub-compute-replace-decline',

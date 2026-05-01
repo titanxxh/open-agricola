@@ -45,14 +45,6 @@ export const writeCardInfobox = (
   ensureCardState(player, cardId).infobox = infobox
 }
 
-export const clearCardInfobox = (
-  player: PlayerState,
-  cardId: string,
-) => {
-  if (!player.cardStates?.[cardId]) return
-  delete player.cardStates[cardId]!.infobox
-}
-
 export const readCardExtraData = <T>(
   player: PlayerState,
   cardId: string,
@@ -100,7 +92,7 @@ const mergeResources = <T extends Record<string, number | undefined>>(
   return next as T
 }
 
-export const emptyCardResourceStats = (): CardResourceStats => ({
+const emptyCardResourceStats = (): CardResourceStats => ({
   used: 0,
   gained: {},
   paid: {},

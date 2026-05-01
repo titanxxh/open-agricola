@@ -28,7 +28,7 @@ const majorEffectMap = new Map<string, MajorCardEffect>(
 
 export const getMajorCardEffect = (id: string) => majorEffectMap.get(id)
 
-export const applyMajorEffectForImprovement = (
+const applyMajorEffectForImprovement = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
@@ -42,7 +42,7 @@ export const applyMajorEffectForImprovement = (
   return null
 }
 
-export const applyMajorEffectsForPlayer = (
+const applyMajorEffectsForPlayer = (
   state: GameState,
   player: PlayerState,
   hook: MajorEffectHook,
