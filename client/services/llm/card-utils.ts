@@ -253,13 +253,6 @@ function extractModifiers(objStr: string): unknown[] {
   return results
 }
 
-/** @deprecated Use extractCardFromResponse instead */
-export function extractCardJson(text: string): Record<string, unknown> | null {
-  const result = extractCardFromResponse(text)
-  if (!result) return null
-  return { card: result.card }
-}
-
 // ── Image generation ──────────────────────────────────────────────────────────
 
 /**

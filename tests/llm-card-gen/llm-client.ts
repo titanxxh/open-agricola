@@ -48,7 +48,7 @@ export interface CallLLMOptions {
   retryDelayMs?: number
 }
 
-export class LLMError extends Error {
+class LLMError extends Error {
   constructor(
     message: string,
     public readonly status?: number,

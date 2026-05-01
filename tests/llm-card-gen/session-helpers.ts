@@ -58,7 +58,7 @@ export interface CompiledCardArtifacts {
  * message on validation failure. cardId in the source is rewritten to match
  * the provided fixture cardId so registration is stable.
  */
-export function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
+function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
   const code = rewriteCardId(opts.llmGeneratedCode, opts.cardId)
   const result = validateAndCompileCustomCode(code, opts.cardId)
   if (!result.valid) {
@@ -84,99 +84,22 @@ export function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
 }
 
 /** Register the card globally so it can be discovered by the engine. */
-export function registerCard(cardData: CustomCardData): void {
-  registerCustomCard(cardData, { allowGlobal: true })
-  registerExecutorBackedCustomCard(cardData)
-}
-
 /** Clear any registered custom cards — call in afterEach. */
 export function resetCards(): void {
   clearCustomCards()
 }
 
 /** Build a fresh GameState with a deterministic seed. */
-export function freshState(seed = 42): GameState {
-  return createInitialState(seed)
-}
-
 /** Mark a card as played by the given player. */
-export function markCardPlayed(
-  state: GameState,
-  playerIndex: number,
-  cardId: string,
-  cardType: CardType,
-): void {
-  const player = state.players[playerIndex]
-  if (!player) throw new Error(`no player at index ${playerIndex}`)
-  if (cardType === 'minor') {
-    player.minorPlayed.push(cardId)
-  } else {
-    player.occupationPlayed.push(cardId)
-  }
-}
-
 /** Mutate player resources (e.g. set wood to 0 for a clean baseline). */
-export function setResources(
-  state: GameState,
-  playerIndex: number,
-  patch: Partial<Resource>,
-): void {
-  const player = state.players[playerIndex]
-  if (!player) throw new Error(`no player at index ${playerIndex}`)
-  for (const [key, value] of Object.entries(patch)) {
-    ;(player.resources as any)[key] = value
-  }
-}
-
 /**
  * Invoke an effect hook on the LLM card. Returns the result envelope from
  * the runtime — caller inspects `.ok` and `.result` (the ActionFlow the
  * hook returned, or scoring object for compute* hooks).
  */
-export function invokeEffectHook(
-  compiledCode: string,
-  cardId: string,
-  hookName: string,
-  state: GameState,
-  player: PlayerState,
-  extra?: any,
-) {
-  return invokeCustomCodeEffect({
-    compiledCode,
-    cardId,
-    hook: hookName as any,
-    state,
-    player,
-    extra,
-  } as any)
-}
-
 /**
  * Invoke a listener entry from the manifest by index (default 0 = first).
  */
-export function invokeListenerByIndex(
-  compiledCode: string,
-  cardId: string,
-  manifest: any,
-  listenerIndex: number,
-  context: any,
-) {
-  const listenerEntry = manifest.listeners?.[listenerIndex]
-  if (!listenerEntry) {
-    throw new Error(`no listener at index ${listenerIndex} in manifest`)
-  }
-  return invokeCustomCodeListener({
-    compiledCode,
-    cardId,
-    listenerKey: listenerEntry.key,
-    context,
-  } as any)
-}
-
-// ---------------------------------------------------------------------------
-// Session-level helpers (Task 1 additions)
-// ---------------------------------------------------------------------------
-
 export const FIXED_ROUND_ACTION_ORDER = [
   'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
   'wish-children', 'western-quarry', 'house-redevelopment',

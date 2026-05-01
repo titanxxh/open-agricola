@@ -30,11 +30,11 @@ const MONTH_TO_VARIANT: Record<number, string> = {
 
 const VARIANT_RE = /^(spring|summer|autumn|winter)-[1-3]$/;
 
-export function variantForMonth(month: number): string {
+function variantForMonth(month: number): string {
   return MONTH_TO_VARIANT[((month - 1) % 12 + 12) % 12 + 1];
 }
 
-export function resolveSeasonalVariant(date: Date = new Date()): string | null {
+function resolveSeasonalVariant(date: Date = new Date()): string | null {
   const params = new URLSearchParams(window.location.search);
   const override = params.get('bg');
   if (override === 'none') return null;

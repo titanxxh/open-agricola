@@ -19,7 +19,7 @@ const humanizeCardId = (id: string): string =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .trim()
 
-export const resolveCardName = (locale: Locale, id: string): CardRef | null => {
+const resolveCardName = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
     const name = t(locale, `${prefix}.${id}.name`)
     if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
@@ -103,7 +103,7 @@ const renderRichTemplate = (
     })
 }
 
-export const LogCardLink = ({
+const LogCardLink = ({
   locale,
   cardRef,
   children,
