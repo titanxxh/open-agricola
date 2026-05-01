@@ -1,7 +1,9 @@
 import { Occupation } from '../types'
 
+const CARD_ID = 'D108_StoneCarver'
+
 export const D108_StoneCarver = new Occupation({
-  id: 'D108_StoneCarver',
+  id: CARD_ID,
   name: 'Stone Carver',
   deck: 'D',
   number: 108,
@@ -9,4 +11,7 @@ export const D108_StoneCarver = new Occupation({
   desc: ['Each harvest, you can use this card to turn exactly 1 <STONE> into 3 <FOOD>.'],
   cost: {},
   players: '1+',
+  exchanges: [
+    { from: { stone: 1 }, to: { food: 3 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
+  ],
 })
