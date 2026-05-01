@@ -2,7 +2,7 @@ import type { GameState, PlayerState, Resource } from '../../../shared/game/type
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/logic/round'
 import { performHarvest } from '../../../shared/logic/round'
-import { breedAnimals } from '../../../shared/actions/effects/breed-animals'
+import { breedAnimals } from '../../../shared/actions/helpers/breed-animals'
 import { reap } from '../../../shared/actions/effects/reap'
 import { emptyResources } from '../../../shared/logic/state-constants'
 import { formatResources } from '../../../shared/logic/format'

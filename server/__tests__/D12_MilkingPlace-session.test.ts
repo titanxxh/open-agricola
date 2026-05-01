@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAnimalZones } from '../../shared/actions/effects/animals'
+import { computeAnimalZones } from '../../shared/actions/helpers/animal-zones'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D12_MilkingPlace'

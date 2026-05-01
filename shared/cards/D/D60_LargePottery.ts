@@ -1,4 +1,4 @@
-import { returnCardToBoard } from '../../actions/effects/pay'
+import { returnCardToBoard } from '../../actions/helpers/payment'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'

@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getTotalAnimalCapacity } from '../../actions/effects/animals'
+import { getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 

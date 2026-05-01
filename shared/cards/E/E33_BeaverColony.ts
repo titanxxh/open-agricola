@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { enforceAnimalCapacity, getPastureCapacity } from '../../actions/effects/animals'
-import type { AnimalZone } from '../../actions/effects/animals'
+import { enforceAnimalCapacity, getPastureCapacity } from '../../actions/helpers/animal-zones'
+import type { AnimalZone } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E33_BeaverColony'

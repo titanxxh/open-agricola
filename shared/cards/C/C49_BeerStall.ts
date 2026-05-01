@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { getLooseStableKeys } from '../../actions/effects/animals'
+import { getLooseStableKeys } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C49_BeerStall'

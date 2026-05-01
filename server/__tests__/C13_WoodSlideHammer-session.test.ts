@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { canRenovate } from '../../shared/actions/effects/renovation'
-import { getModifiersForCostType } from '../../shared/actions/effects/pay'
+import { getModifiersForCostType } from '../../shared/actions/helpers/payment'
 import type { BonusModifier } from '../../shared/game/types'
 
 import '../../shared/cards/C/C13_WoodSlideHammer'

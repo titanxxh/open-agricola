@@ -10,7 +10,7 @@ import {
   getCheapestSolution,
   returnCardToBoard,
   clearPaymentCache,
-} from '../pay'
+} from '../../helpers/payment'
 import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
 
 beforeEach(() => {

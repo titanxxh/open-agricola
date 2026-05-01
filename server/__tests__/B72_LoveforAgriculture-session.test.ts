@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAnimalZones } from '../../shared/actions/effects/animals'
+import { computeAnimalZones } from '../../shared/actions/helpers/animal-zones'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B72_LoveforAgriculture'
-import type { AnimalZone } from '../../shared/actions/effects/animals'
+import type { AnimalZone } from '../../shared/actions/helpers/animal-zones'
 import type { PendingAction } from '../../shared/game/types'
 
 type PastureCrop = { pastureId: string; crop: 'grain' | 'vegetable'; remaining: number }

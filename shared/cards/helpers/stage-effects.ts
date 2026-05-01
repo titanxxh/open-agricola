@@ -1,5 +1,5 @@
 import type { GameState, PlayerState, Resource } from '../../game/types'
-import { canPayResources, payResources } from '../../actions/effects/pay'
+import { canPayResources, payResources } from '../../actions/helpers/payment'
 import { incCounter, initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
 import { addCardResourcePaid } from './card-state'

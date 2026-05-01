@@ -2,7 +2,7 @@ import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, C
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
-import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from './pay'
+import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'

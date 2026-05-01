@@ -1,5 +1,5 @@
 import type { ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../../game/types.ts'
-import { applyCostOverride, isComplexCost } from '../../actions/effects/pay.ts'
+import { applyCostOverride, isComplexCost } from '../../actions/helpers/payment'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
   executeResolvedTypedFlatPayment,

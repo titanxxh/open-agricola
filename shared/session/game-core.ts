@@ -75,9 +75,9 @@ import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectH
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
-import { computeAnimalZones } from '../actions/effects/animals.ts'
+import { computeAnimalZones } from '../actions/helpers/animal-zones'
 import { reap } from '../actions/effects/reap.ts'
-import { breedAnimals } from '../actions/effects/breed-animals.ts'
+import { breedAnimals } from '../actions/helpers/breed-animals'
 import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
@@ -92,7 +92,7 @@ import {
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
 import {
   applyCostOverride,
-} from '../actions/effects/pay.ts'
+} from '../actions/helpers/payment'
 import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,

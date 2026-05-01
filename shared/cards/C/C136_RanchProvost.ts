@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
-import { computeAnimalZones } from '../../actions/effects/animals'
+import { computeAnimalZones } from '../../actions/helpers/animal-zones'
 
 const CARD_ID = 'C136_RanchProvost'
 

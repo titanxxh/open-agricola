@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { getLooseStableKeys } from '../../actions/effects/animals'
+import { getLooseStableKeys } from '../../actions/helpers/animal-zones'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 

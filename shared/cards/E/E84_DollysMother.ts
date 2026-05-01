@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { getTotalAnimalCapacity } from '../../actions/effects/animals'
+import { getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E84_DollysMother'

@@ -1,6 +1,6 @@
 import type { ActionDefinition, Resource } from '../../game/types'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
-import { canPayResources, payResources } from './pay'
+import { canPayResources, payResources } from '../helpers/payment'
 
 export const payResourcesAction: ActionDefinition = {
   id: 'pay-resources',
