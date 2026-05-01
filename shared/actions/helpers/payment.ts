@@ -455,12 +455,16 @@ const applyCostModifiers = (
       })
     } else if (mod.type === 'bonus') {
       const bonusMod = mod as BonusModifier
+      // bonusMod has already been pre-filtered by getModifiersForCostType's
+      // evaluateConditions (non-construct path), or by room-payment per build
+      // call (construct path). Do NOT propagate the conditions field onto the
+      // generated Bonus — computeAllBuyableCombinations would otherwise
+      // re-evaluate it redundantly.
       effectiveBonuses.push({
         discount: bonusMod.discount,
         choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
-        conditions: bonusMod.conditions,
       })
     }
   }
