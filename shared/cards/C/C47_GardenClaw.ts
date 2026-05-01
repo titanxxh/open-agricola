@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { fieldIsEmpty } from '../../game/field'
 import type { CardImpl } from '../registry'
 

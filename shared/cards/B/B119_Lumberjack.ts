@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { getFenceCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 

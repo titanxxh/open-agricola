@@ -4,7 +4,7 @@ import type {
   FutureMeepleRequest,
   GameState,
   Resource,
-} from '../../game/types'
+} from '../../../game/types'
 
 export const futureMeeplesNode = (request?: FutureMeepleRequest): ActionFlow => ({
   type: 'leaf',

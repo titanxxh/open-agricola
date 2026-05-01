@@ -1,5 +1,5 @@
-import type { ActionDefinition, Resource } from '../../game/types'
-import { initCardState } from '../../cards/__stubs__/helpers'
+import type { ActionDefinition, Resource } from '../../../game/types'
+import { initCardState } from '../../../cards/__stubs__/helpers'
 
 export const storeOnCardAction: ActionDefinition = {
   id: 'store-on-card',

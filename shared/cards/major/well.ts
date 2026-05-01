@@ -1,5 +1,5 @@
 import type { MajorCardEffect } from './types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 
 export const well: MajorCardEffect = {
   id: 'Major_Well',

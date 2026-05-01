@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { ActionDefinition, ActionFlow } from '../../game/types'
 import { fieldIsEmpty, fieldTopStack } from '../../game/field'
-import { registerAdHocAction } from '../../actions/effects/registry'
+import { registerAdHocAction } from '../../actions/effects/internal/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E73_Scythe'

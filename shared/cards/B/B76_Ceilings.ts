@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/future-meeples'
+import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/internal/future-meeples'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 

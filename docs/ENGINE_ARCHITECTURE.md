@@ -1988,7 +1988,7 @@ type SpecialEffectParams =
 
 ## 15.12 Ad-Hoc Action Registry (Sprint 6b)
 
-`shared/actions/effects/registry.ts` provides per-card `ActionDefinition` registration. Cards that need a single-card-specific action call `registerAdHocAction(def)` at module load time. ID convention: `'card_<CARD_ID>_<short-name>'`.
+`shared/actions/effects/internal/registry.ts` provides per-card `ActionDefinition` registration. Cards that need a single-card-specific action call `registerAdHocAction(def)` at module load time. ID convention: `'card_<CARD_ID>_<short-name>'`.
 
 Integration: `getActionDefinition(actionId)` in `shared/actions/index.ts` falls back to `getAdHocAction(actionId)` when the static lookup misses. This keeps single-card actions out of the static `internal-actions.ts` import list, preserving the "card encapsulation" principle (CLAUDE.md: 卡牌特殊性能在卡牌文件内部闭包).
 
@@ -2033,6 +2033,16 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 - `feed-family.ts` (harvest helper)
 
 `effects/` is now reserved for `ActionDefinition` exports. File count: 63 → 45 (close to BGA's 22 + necessary engine extensions).
+
+## 15.14.1 effects/ Layout: BGA-aligned root + internal/ (2026-05-01)
+
+`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（27 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（15 个）。
+
+- **顶层 22 个 BGA 一一对应**：`activate-card / collect / construct / exchange / fencing / first-player / gain / improvement / occupation / pay / place-farmer / place-future-meeples / place-meeples-from-supply / plow / reap / receive / renovation / reorganize / sow / special-effect / stables / wish-children`。
+- **顶层 5 个半特殊扩展**（语义上紧贴 BGA pay / breeding / collect / scoring，不下沉）：`pay-resources / animals / bake-bread / bonus-vp / breed-animals`。
+- **`internal/` 15 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card / registry`（registry 是 ad-hoc action 注册 helper）。
+
+新增 effect 时按以下决策：(a) 是否对应 BGA `modules/php/Actions/` 中的 PHP action 文件 → 是则放顶层；(b) 否则放 `effects/internal/`。`registerAdHocAction` 返回的 `card_*` 前缀 ad-hoc action 不进 effects/ 目录，直接由卡文件本地构造并注册。
 
 ## 15.15 CardExchange.triggers Array (Sprint 6b)
 

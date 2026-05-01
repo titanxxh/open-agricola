@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../game/types'
 import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
 import { internalActionDefinitions } from './internal-actions'
-import { getAdHocAction } from './effects/registry'
+import { getAdHocAction } from './effects/internal/registry'
 import { cattleMarket } from '../cards/action/round-cattle-market'
 import { clayPit } from '../cards/action/common-clay-pit'
 import { copse } from '../cards/action/common-copse'

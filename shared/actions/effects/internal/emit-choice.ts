@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition } from '../../../game/types'
 
 /**
  * `emit-choice` — a dedicated leaf action for cards that need to surface a
