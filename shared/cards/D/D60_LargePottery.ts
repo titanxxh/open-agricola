@@ -38,7 +38,7 @@ export const D60_LargePottery = new MinorImprovement({
   alsoCountsAs: ['major'],
   evenMoreSet: true,
   exchanges: [
-    { from: { clay: 1 }, to: { food: 2 }, trigger: 'anytime' },
+    { from: { clay: 1 }, to: { food: 2 }, triggers: ['anytime'] },
   ],
 })
 

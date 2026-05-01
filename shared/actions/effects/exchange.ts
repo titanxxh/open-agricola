@@ -14,7 +14,6 @@ import { canAffordFlatCost } from '../helpers/pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 import {
-  exchangeTriggers,
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
   type CardExchange,
@@ -259,7 +258,7 @@ export const getExchangesInWindow = (
   const out: Trade[] = []
   for (const cardId of playedCardIds(player)) {
     for (const ex of getCardExchanges(cardId)) {
-      if (exchangeTriggers(ex).includes(window)) {
+      if ((ex.triggers ?? []).includes(window)) {
         out.push(exchangeToTrade(ex, cardId))
       }
     }
@@ -293,6 +292,16 @@ const getPlayerCookeryTrades = (player: PlayerState): Trade[] =>
 
 const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
   for (const trade of getExchangesInWindow(player, 'anytime')) {
+    if (canAffordTrade(player, trade, 1)) return true
+  }
+  return false
+}
+
+const hasAffordableTradeForIds = (
+  player: PlayerState,
+  tradeIds: string[],
+): boolean => {
+  for (const trade of getExchangesByTradeIds(player, tradeIds)) {
     if (canAffordTrade(player, trade, 1)) return true
   }
   return false
@@ -424,7 +433,13 @@ export const anytimeExchangeAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   anytime: true,
-  canBeExecutedByPlayer: (_, player) => hasAffordableCookeryTrade(player),
+  canBeExecutedByPlayer: (_, player, ctx) => {
+    const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
+    if (tradeIds && tradeIds.length > 0) {
+      return hasAffordableTradeForIds(player, tradeIds) || hasAffordableCookeryTrade(player)
+    }
+    return hasAffordableCookeryTrade(player)
+  },
   execute: ({ player, actionContext }) => {
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const { options: allOptions } = buildExchangeOptions(player, filterIds)

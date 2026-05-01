@@ -58,12 +58,11 @@ export const E53_BoarSpear = new MinorImprovement({
   vp: 1,
   cost: { wood: 1, stone: 1 },
   exchanges: [
-    // E53 trade is surfaced both via the anytime cookery window (legacy
-    // behaviour preserved from the hardcoded `cookeryTrades` table) and via
-    // listener-driven `tradeIds: ['E53_BoarSpear']`. BGA narrows visibility
-    // to the listener-driven path only, but matching that requires UI churn
-    // outside Sprint 6a; tracked under simplifications.
-    { from: { boar: 1 }, to: { food: 4 }, sourceId: CARD_ID, triggers: ['anytime'] },
+    // Sprint 6b: Aligned to BGA — listener-only. The trade is invocable only
+    // via the `obtainListener` SEQ above (which dispatches `exchange` with
+    // `tradeIds: ['E53_BoarSpear']`); it is intentionally NOT surfaced in the
+    // anytime cookery window (`triggers: []`).
+    { from: { boar: 1 }, to: { food: 4 }, sourceId: CARD_ID, triggers: [] },
   ],
 })
 

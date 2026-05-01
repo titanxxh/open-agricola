@@ -82,7 +82,7 @@ import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation, exchangeTriggers } from '../cards/types.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
 import type { CardExchange } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCardEffect } from '../cards/major/index.ts'
@@ -2260,12 +2260,12 @@ export class GameCore {
       let exchange: import('../cards/types').CardExchange | undefined
       if (typeof sel.exchangeIndex === 'number') {
         const candidate = card.exchanges[sel.exchangeIndex]
-        if (candidate && exchangeTriggers(candidate).includes('harvest')) {
+        if (candidate && (candidate.triggers ?? []).includes('harvest')) {
           exchange = candidate
         }
       } else {
         exchange = (card.exchanges as CardExchange[]).find((ex) => {
-          if (!exchangeTriggers(ex).includes('harvest')) return false
+          if (!(ex.triggers ?? []).includes('harvest')) return false
           const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
           if (fromKeys.length !== 1) return false
           const fromKey = fromKeys[0]!

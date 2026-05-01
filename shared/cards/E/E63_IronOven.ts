@@ -18,7 +18,7 @@ export const E63_IronOven = new MinorImprovement({
   vp: 2,
   isBaking: true,
   exchanges: [
-    { from: { grain: 1 }, to: { food: 6 }, max: 1, trigger: 'bake-bread' },
+    { from: { grain: 1 }, to: { food: 6 }, max: 1, triggers: ['bake-bread'] },
   ],
 })
 

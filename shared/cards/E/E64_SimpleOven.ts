@@ -18,7 +18,7 @@ export const E64_SimpleOven = new MinorImprovement({
   vp: 1,
   isBaking: true,
   exchanges: [
-    { from: { grain: 1 }, to: { food: 3 }, max: 1, trigger: 'bake-bread' },
+    { from: { grain: 1 }, to: { food: 3 }, max: 1, triggers: ['bake-bread'] },
   ],
 })
 

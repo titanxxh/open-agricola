@@ -1,5 +1,5 @@
 import type { PlayerState } from '../../game/types'
-import { getRegisteredMinorImprovement, getRegisteredOccupation, exchangeTriggers } from '../types'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../types'
 
 export type BakeRate = {
   cardId: string
@@ -29,7 +29,7 @@ export const getPlayerBakeRates = (player: PlayerState): BakeRate[] => {
     const card = getRegisteredMinorImprovement(cardId)
     if (!card || !card.isBaking || !card.exchanges) continue
     for (const ex of card.exchanges) {
-      if (!exchangeTriggers(ex).includes('bake-bread')) continue
+      if (!(ex.triggers ?? []).includes('bake-bread')) continue
       const grainCost = (ex.from as Record<string, number>).grain ?? 0
       const foodGain = (ex.to as Record<string, number>).food ?? 0
       if (grainCost > 0 && foodGain > 0) {
@@ -46,7 +46,7 @@ export const getPlayerBakeRates = (player: PlayerState): BakeRate[] => {
     const card = getRegisteredOccupation(cardId)
     if (!card || !card.isBaking || !card.exchanges) continue
     for (const ex of card.exchanges) {
-      if (!exchangeTriggers(ex).includes('bake-bread')) continue
+      if (!(ex.triggers ?? []).includes('bake-bread')) continue
       const grainCost = (ex.from as Record<string, number>).grain ?? 0
       const foodGain = (ex.to as Record<string, number>).food ?? 0
       if (grainCost > 0 && foodGain > 0) {

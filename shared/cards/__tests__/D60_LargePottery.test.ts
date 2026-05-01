@@ -53,7 +53,7 @@ describe('D60_LargePottery', () => {
     expect(D60Card.alsoCountsAs).toEqual(['major'])
     expect(D60Card.category).toBe('FOOD_PROVIDER')
     expect(D60Card.exchanges).toEqual([
-      { from: { clay: 1 }, to: { food: 2 }, trigger: 'anytime' },
+      { from: { clay: 1 }, to: { food: 2 }, triggers: ['anytime'] },
     ])
   })
 
