@@ -9,7 +9,7 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../helpers/card-state'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B85_FarmHand'
@@ -119,7 +119,7 @@ const anytimeListener: CardListenerRegistration = {
               selectableTiles: candidates,
             },
           },
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

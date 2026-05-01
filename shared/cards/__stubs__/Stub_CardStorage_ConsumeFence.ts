@@ -1,7 +1,7 @@
 import type { CardListenerRegistration } from '../card-listeners'
 import { incCounter, initCardState } from './helpers'
 
-export const CARD_ID = 'Stub_CardStorage_ConsumeFence'
+const CARD_ID = 'Stub_CardStorage_ConsumeFence'
 
 export const computeCostsListener: CardListenerRegistration = {
   id: 'stub-card-storage-costs-fence',

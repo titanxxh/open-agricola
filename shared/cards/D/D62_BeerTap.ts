@@ -13,13 +13,19 @@ export const D62_BeerTap = new MinorImprovement({
   desc: ['When you play this card, you immediately get 2 <FOOD>. In the feeding phase of each harvest, you can turn 2/3/4 <GRAIN> into 3/6/9 <FOOD>.'],
   cost: { wood: 1 },
   newSet: true,
+  // Three tiers share the same sourceId so per-source `max:1` caps the whole
+  // card to a single tier per harvest (the consumer aggregates by sourceId).
+  exchanges: [
+    { from: { grain: 2 }, to: { food: 3 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
+    { from: { grain: 3 }, to: { food: 6 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
+    { from: { grain: 4 }, to: { food: 9 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
+  ],
 })
 
 export const D62_BeerTap_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
-  // TODO: implement harvest-time grain->food exchange (2/3/4 grain -> 3/6/9 food)
-},
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

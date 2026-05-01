@@ -1906,6 +1906,229 @@ E16 BriarHedge 同时提供两者；其他 fence-discount 卡（C16 / C88 / E74 
 - `C88_CarpentersApprentice.ts:50`
 - 单元测试 `fencing.test.ts`
 
+## 15.8 Cookery Exchange Metadata-Driven (Sprint 6a)
+
+All cookery trades live in card metadata (`exchanges: CardExchange[]`), not a central registry table. `CardExchange.triggers: ExchangeWindow[]` controls which window the trade appears in:
+
+- `'anytime'` — visible in anytime exchange action (e.g. Major Fireplace1/2 / CookingHearth1/2 / A60 / B32 / D59 / D25)
+- `'harvest'` — visible only in harvest feeding phase prompt (e.g. C59 / C105 / D62 / D108 / C109 / E109)
+- `'bake-bread'` — visible only in bake-bread action (e.g. E63 / E64 / D64 / Fireplace.grain entry)
+- `[]` (empty) — not visible in any window; only listener-triggered (E53 BoarSpear in BGA spec; legacy `'anytime'` retained in our impl)
+
+**Helpers** (`shared/actions/effects/exchange.ts`):
+- `getExchangesInWindow(player, window)` — scans played cards' metadata, returns `Trade[]` matching that window
+- `getExchangesByTradeIds(player, ids)` — force-include by sourceId regardless of triggers (for listener-driven invocations)
+
+**Sprint 6b cleanup (2026-04-30):** legacy `trigger?: ExchangeWindow` field + `exchangeTriggers()` compat helper removed. All cards now use `triggers: ExchangeWindow[]` directly; see §15.15.
+
+**Removed:** Hardcoded `cookeryTrades` table in `shared/actions/effects/exchange.ts:220-248`; hardcoded `'Major_Fireplace' / 'Major_CookingHearth'` ID prefix detection in `hasHarvestCooking` (now `hasAnyHarvestExchange` walks metadata).
+
+## 15.9 Harvest Exchange Selector Generalization (Sprint 6a)
+
+`shared/session/game-core.ts` `confirmHarvestFeed` selection schema:
+
+```ts
+{
+  resourceKey?: keyof Resource     // legacy single-resource forward-trade matcher
+  count: number
+  food?: number                    // legacy
+  sourceId?: string
+  exchangeIndex?: number           // NEW: pointer into card.exchanges[]
+}
+```
+
+When `exchangeIndex` is provided, the consumer applies the underlying CardExchange bidirectionally — subtract `from`, add `to` — supporting reverse trades (food → resources) and multi-key trades. When omitted, the consumer falls back to legacy `(resourceKey, food)` matching for forward-trade prompts. `gameTransport.confirmFeed` / `ws.ts feed` selection types updated accordingly.
+
+`buildHarvestFeedOptions` (client) now surfaces every harvest-window exchange with `exchangeIndex` + full `from` / `to`. Affordability gate: every `from` resource must be available.
+
+Feed-queue entry condition relaxed: players holding any harvest exchange enter the prompt even when `remaining = 0`, so reverse trades (e.g. C105 spending bonus food) are reachable after feeding is satisfied.
+
+First consumer: C105 BasketCarrier (`{ from: { food: 2 }, to: { wood: 1, reed: 1, grain: 1 } }`).
+
+## 15.10 family-growth Action Unification (Sprint 6a)
+
+Merged `wishChildrenAction` (id `'wish-children-growth'`) and `growFamilyWithoutRoomAction` (id `'grow-family-without-room'`) into single `familyGrowthAction` (id `'family-growth'`). Routed through `actionContext.skipRoomCheck: boolean`:
+
+- standard `wish-children` space: `actionContext.skipRoomCheck` undefined (default false; require freeRoom)
+- urgent `urgent-wish-children` space: `actionContext.skipRoomCheck = true` (no room required)
+
+BGA-aligned: BGA also uses single `WISHCHILDREN` action (urgent variant via `actionCardType`).
+
+Migration: 13+ caller sites updated — 2 spaces (wish-children + urgent-wish-children) + 5 listener cards (E113 Godmother / E92 FieldDoctor / E130 Overachiever / E151 DeliveryNurse / D150 GodlySpouse) + 7 dispatch cards (E22 GuestRoom / C24 BedintheGrainField / C92 AutumnMother / C127 Lover / B127 Seducer / D21 Recruitment / D92 ChildOmbudsman). Legacy `actionId` aliases (`wishChildrenAction` / `growFamilyWithoutRoomAction`) and i18n keys retained as wrapper exports for compatibility.
+
+## 15.11 special-effect Mutation Dispatcher (Sprint 6a)
+
+`shared/actions/effects/special-effect.ts` upgraded from no-op stub to discriminated-union dispatcher with 4 mutation kinds:
+
+```ts
+type SpecialEffectParams =
+  | { kind: 'increment-extra-data'; key: string; amount: number }
+  | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'set-flag'; flag: boolean }
+  | { kind: 'set-infobox'; text: string }
+```
+
+**Use case:** card SEQ children that must mutate `cardStates` only when the player accepts the optional path. Example (D92 ChildOmbudsman):
+
+```ts
+{
+  type: 'seq',
+  optional: true,
+  children: [
+    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'negativeScore', amount: 2 } },
+    { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID },
+  ],
+}
+```
+
+**Rationale:** previous pattern of `writeCardExtraData(...current + delta)` directly inside `listener.handler` violates "engine sees all mutations" — engine cannot distinguish accepted vs declined SEQ-optional. Routing through the leaf ensures the mutation only fires when the engine actually executes the child.
+
+(Cleanup of existing 4 cards still using direct mutation — E149 / E38 / D134 / C104 — landed in Sprint 6b; see §15.13.)
+
+## 15.12 Ad-Hoc Action Registry (Sprint 6b)
+
+`shared/actions/effects/internal/registry.ts` provides per-card `ActionDefinition` registration. Cards that need a single-card-specific action call `registerAdHocAction(def)` at module load time. ID convention: `'card_<CARD_ID>_<short-name>'`.
+
+Integration: `getActionDefinition(actionId)` in `shared/actions/index.ts` falls back to `getAdHocAction(actionId)` when the static lookup misses. This keeps single-card actions out of the static `internal-actions.ts` import list, preserving the "card encapsulation" principle (CLAUDE.md: 卡牌特殊性能在卡牌文件内部闭包).
+
+**Constraints:**
+
+- ID must start with `'card_'` (enforced; throws on register otherwise).
+- Duplicate registration throws (catches accidental double-load).
+- LLM workshop sandbox does NOT expose ad-hoc actions: `card_*` actionIds are blocked by `shared/custom-code/ast-validator.ts` actionId allowlist (no entry added).
+
+**Use cases (Sprint 6b inlines 4 single-card effects):** E112 GrainThief (`card_E112_GrainThief_protect`) / E73 Scythe (`card_E73_Scythe_harvest-field`) / B146 Illusionist (`card_B146_Illusionist_discard-from-hand`) / C69 LandConsolidation (`card_C69_LandConsolidation_swap`).
+
+## 15.13 special-effect targetPlayerId Routing + bonus-vp parity (Sprint 6b)
+
+`actionContext.targetPlayerId?: string` extends `special-effect` execute to mutate a specific player (default: `context.player` = actor). Used when a card listener's owner ≠ actor and the mutation should land on the owner. `bonus-vp` learns the same routing for parity.
+
+Example: D134 OysterEater listens to **all** players' fishing place-farmer; the cardStates `skipNextPlacement` and `bonusVp` counter must increment on the **owner** (card-holder), not the actor. The listener emits:
+
+```ts
+{
+  type: 'seq',
+  children: [
+    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'skipNextPlacement', amount: 1 },
+      actionContext: { targetPlayerId: ownerPlayerId } },
+    { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID,
+      actionContext: { targetPlayerId: ownerPlayerId } },
+  ],
+}
+```
+
+If `targetPlayerId` is unset or the player ID is not found in state, mutation falls back to `context.player`.
+
+**Listener-mutate prohibition (Sprint 6b):** listener handlers and `action.execute` MUST NOT call `writeCardExtraData / setCardFlag / writeCardInfobox` directly; mutations must travel as `special-effect` (or equivalent) leaves so the engine drives replay / SEQ-optional accept-decline / partial-log emission. Sprint 6b cleanup landed for E149 MidnightFencer, E38 RodCollection, D134 OysterEater, C104 Collector. D92 ChildOmbudsman was already compliant from 6a.
+
+## 15.14 Helper Directory Split (Sprint 6b)
+
+`shared/actions/helpers/` (new) holds non-`ActionDefinition` modules previously misplaced in `shared/actions/effects/`:
+
+- `pay-helpers.ts` / `cost-preview.ts` / `room-payment.ts` (pay infrastructure)
+- `placement-availability.ts` / `placement-constants.ts` (placement rules)
+- `selection-effect-registry.ts` (UI selection registry)
+- `feed-family.ts` (harvest helper)
+
+`effects/` is now reserved for `ActionDefinition` exports. File count: 63 → 45 (close to BGA's 22 + necessary engine extensions).
+
+## 15.14.1 effects/ Layout: BGA-aligned root + internal/ (2026-05-01)
+
+`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（21 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（14 个）。
+
+- **顶层 18 个 BGA 一一对应**（22 个减去 `pay` / `receive` / `place-future-meeples` / `place-meeples-from-supply`，外加 `wish-children` 改名为 `family-growth`）：`activate-card / collect / construct / exchange / family-growth / fencing / first-player / gain / improvement / occupation / place-farmer / plow / reap / renovation / reorganize / sow / special-effect / stables`。
+- **顶层 3 个半特殊扩展**（语义紧贴 BGA pay / collect / scoring，且自身导出 `ActionDefinition`，不下沉）：`pay-resources / bake-bread / bonus-vp`。
+- **`internal/` 14 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card`。
+- **`registry` (`registerAdHocAction`)** 不是 effect，2026-05-01 已外迁到 `helpers/ad-hoc-action-registry.ts`。
+
+### BGA 对应位但本仓库不实装为 effect 的（实际逻辑由其它路径承担）
+
+| BGA `Actions/*.php` | 我们对应位置 |
+|---|---|
+| `Pay.php`（836 行 ST_PAY 状态节点） | 算法层 `helpers/payment.ts` + leaf 层 `effects/pay-resources.ts`（节点树拆分） |
+| `Receive.php`（接收资源） | 直接走 `effects/gain.ts`（`gainResources / gainAction`），未单独建 receive effect |
+| `PlaceFutureMeeples.php`（130 行） | future-meeple 队列由 `effects/internal/future-meeples.ts` 承担（`futureMeeplesAction` + `queueFutureMeeples / resolveFutureMeepleRequests`） |
+| `PlaceMeeplesFromSupply.php`（147 行） | family-growth 后激活 worker 直接 inline 在 `effects/family-growth.ts` 内用 `activateSmallestInactive` |
+| `WishChildren.php` | 我们重命名为 `effects/family-growth.ts`（actionId `family-growth`；Sprint 6a 已统一 wish-children-growth + grow-family-without-room → family-growth），文件名跟着 actionId |
+
+历史上 receive / place-future-meeples / place-meeples-from-supply 的 .ts 文件曾以"未实装桩"形式存在，2026-05-01 死代码扫描后删除。
+
+新增 effect 时按以下决策：(a) 文件是否导出 `ActionDefinition` → 否则放 `helpers/`（见 §15.18）；(b) 是否对应 BGA `modules/php/Actions/` 中的 PHP action 文件 → 是则放顶层；(c) 否则放 `effects/internal/`。`registerAdHocAction` 返回的 `card_*` 前缀 ad-hoc action 不进 effects/ 目录，直接由卡文件本地构造并注册。
+
+## 15.15 CardExchange.triggers Array (Sprint 6b)
+
+`CardExchange.trigger?: ExchangeWindow` (legacy singular) and the `exchangeTriggers()` compat helper deleted. Only `triggers?: ExchangeWindow[]` remains. 18 carry-over cards from 6a migrated to array form. Empty array = listener-only (visible only via `actionContext.tradeIds`); E53 BoarSpear adopts this. `CanBeExecutedByPlayerContext` now carries `actionContext?: Record<string, unknown>` (engine.ts pass-through), so `anytimeExchangeAction.canBeExecutedByPlayer` can see listener-driven `tradeIds` and avoid spurious "no doable trade" early-resolves.
+
+## 15.16 OptionalNode 自动 lift over OrNode/XorNode (2026-05-01)
+
+`OptionalNode` 包 `OrNode`/`XorNode` 时，引擎不再走"做/不做 → 选哪个"两步交互，而是自动展平成"N 个分支 + skip"一步选择。
+
+- **proceed**：`OptionalNode` 的 child 是 `OrNode`/`XorNode` 时，立刻 `active=true` 并返回 `ok`，让 `nextUnresolved` 直接进入子节点；
+- **proceed (OrNode/XorNode)**：当父节点是 `OptionalNode` 时，options 列表末尾追加 `{ value: '__skip__', labelKey: 'ui.interactionOptionalSkip' }`；options 为空时同时 resolve 父 `OptionalNode`；
+- **resolveChoice (OrNode/XorNode)**：当 choice === `__skip__` 且父节点是 `OptionalNode` 时，调 `resolveSubtree(node)` 把 OrNode/XorNode 整棵子树标 resolved，再 resolve 父 `OptionalNode`。
+
+效果：卡牌侧可以用 `{ type: 'xor', optional: true, children: [...] }` / `{ type: 'or', optional: true, children: [...] }` 表达"N 选 1 或不做"，不必再用 `OrNode + 末尾 noop decline leaf` 的 workaround。`leaf + optional: true` 行为不变，仍是单 ActionNode 的"做/不做"双选项。
+
+`shared/actions/effects/noop.ts` 已删除——卡牌不应再依赖 `actionId: 'noop'` 占位 leaf。Decline / Skip 文案统一走 `ui.interactionOptionalSkip`。
+
+## 15.18 effects/ vs helpers/ 职责边界（2026-05-01）
+
+`shared/actions/` 下两个目录承担不同角色，文件归属严格按下面标准判断。
+
+### effects/ — 游戏原子动作
+
+**判断标准（必须全部满足）**：
+
+- 文件导出 `ActionDefinition`（含 `id` / `nameKey` / `execute` / 可选 `resolveChoice`）
+- `id` 是节点树 leaf 可 dispatch 的 actionId
+- 引擎走 hooks（`before` / `during` / `after` / `immediatelyAfter` /
+  `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`）能拦截
+- 卡牌可以通过 `actions: [<id>]` listener 监听这个动作
+
+**子目录划分**（见 §15.14.1）：
+
+- `effects/<file>.ts`（顶层）：与 BGA `modules/php/Actions/` 一一对应或语义紧贴的 24 个动作
+- `effects/internal/<file>.ts`：因节点树模型需要而扩展的 14 个 effect（如 `future-meeples` / `pop-card-stack` 等；BGA 对应位置由 PHP 状态机 transition 或内部方法承担，不暴露为独立 Action 类）
+
+### helpers/ — 共享算法 / 状态库
+
+**判断标准（任一即可）**：
+
+- 不导出 `ActionDefinition`，纯函数 / 纯类型
+- 被多个 effect 或卡牌内部 import 复用
+- 不在 ActionFlow 节点树里 dispatch，不能被 hooks 拦截
+
+**典型成员**：
+
+- `payment.ts`（826 行支付算法库；`payResources / canPayResources / computeAllBuyableCombinations / executePaymentSolution / applyCostModifiers / returnCardToBoard` 等；被 22 张卡 + 4 个 effect + 引擎 dispatcher 直接消费）
+- `pay-helpers.ts` / `cost-preview.ts` / `room-payment.ts`（pay 路径的 cost preview / room 专属支付）
+- `placement-availability.ts` / `placement-constants.ts`（落子可达性算法）
+- `selection-effect-registry.ts`（卡牌驱动 selection 的 handler 注册表）
+- `feed-family.ts`（收获喂食算法）
+- `animal-zones.ts`（牧场 / 房屋 / 棚圈动物分布与容量计算；被 11 张卡 + card-effects 中枢消费）
+- `breed-animals.ts`（收获繁殖子流程，唯一调用点 `shared/logic/round.ts`）
+- `ad-hoc-action-registry.ts`（卡内私有 actionId 的运行时注册器；4 张卡用 `card_*` 前缀注册自己的私有 action）
+
+### 对应 BGA 的对照
+
+BGA `Pay.php` 是 PHP 状态机节点（state `ST_PAY`，836 行），同时承担"算法 + 状态调度"两层语义。我们的节点树模型把这两层语义拆开：
+
+- **算法层** → `helpers/payment.ts`（不可 dispatch / 不可 listen）
+- **leaf 层** → `effects/pay-resources.ts`（可在 ActionFlow 中显式 `pay X 再 do Y`，可被 listener 监听 / hook 拦截）
+
+### 误入纠正规则
+
+如果 `effects/` 下的文件不满足 effect 标准（典型：纯算法库、纯类型、纯 helper），必须外迁到 `helpers/`。本仓库 2026-05-01 第二轮重构外迁的 4 个文件：
+
+- `effects/pay.ts` → `helpers/payment.ts`
+- `effects/animals.ts` → `helpers/animal-zones.ts`
+- `effects/breed-animals.ts` → `helpers/breed-animals.ts`
+- `effects/internal/registry.ts` → `helpers/ad-hoc-action-registry.ts`
+
+新增 effect 前必须自查：是否有 `ActionDefinition` export？是否能在节点树 dispatch？是否能挂 listener？任何一条不成立，写到 `helpers/`，不要污染 `effects/`。
+
 ## 16. 当前结论
 
 项目的主设计应明确为：

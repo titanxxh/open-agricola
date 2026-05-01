@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { getLooseStableKeys } from '../../actions/effects/animals'
+import { getLooseStableKeys } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C101_StallHolder'
@@ -24,7 +24,7 @@ const anytimeListener: CardListenerRegistration = {
           payLeaf({ cardId: CARD_ID, cost: { grain: 2 } }),
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           gainLeaf(CARD_ID, { food: foodGain }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

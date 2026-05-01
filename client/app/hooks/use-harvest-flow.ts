@@ -2,11 +2,6 @@ import type { GameState, PlayerState, Resource } from '../../../shared/game/type
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/logic/round'
 import { performHarvest } from '../../../shared/logic/round'
-import { breedAnimals } from '../../../shared/actions/effects/breed-animals'
-import { reap } from '../../../shared/actions/effects/reap'
-import { emptyResources } from '../../../shared/logic/state-constants'
-import { formatResources } from '../../../shared/logic/format'
-import { familySize, newbornCount } from '../../../shared/game/player'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
@@ -22,10 +17,23 @@ export type HarvestFeedPending = {
 export type HarvestFeedOption = {
   id: string
   sourceName: string
+  /**
+   * Legacy single-resource forward-trade fields. Kept for back-compat with
+   * the basic conversion + Major Fireplace prompt path.
+   */
   resourceKey: keyof Resource
   food: number
   max?: number
   sourceId?: string
+  /**
+   * Sprint 6a entry-index pointer (preferred when present). When set, the
+   * server applies the exchange bidirectionally — supporting reverse trades
+   * (food -> resources, e.g. C105) and multi-key conversions.
+   */
+  exchangeIndex?: number
+  /** Full from/to maps for prompt rendering of multi-key trades. */
+  from?: Partial<Resource>
+  to?: Partial<Resource>
 }
 
 export type HarvestContext = {
@@ -39,144 +47,6 @@ export const canFinalizeHarvest = (pendingFeedByPlayerId: Record<string, number>
   Object.values(pendingFeedByPlayerId).every((value) => value <= 0)
 
 export const runHarvestFlow = (state: GameState) => performHarvest(state)
-
-export const applyReapPhase = (nextState: GameState) => {
-  const summary: HarvestSummary['reap'] = []
-  nextState.players.forEach((player) => {
-    const beforeGrain = player.resources.grain
-    const beforeVegetable = player.resources.vegetable
-    reap(nextState, player)
-    const grain = player.resources.grain - beforeGrain
-    const vegetable = player.resources.vegetable - beforeVegetable
-    if (grain > 0 || vegetable > 0) {
-      summary.push({ player: player.name, grain, vegetable })
-    }
-  })
-  return summary
-}
-
-export const applyBreedPhase = (nextState: GameState) => {
-  const summary: HarvestSummary['breed'] = []
-  nextState.players.forEach((player) => {
-    const beforeSheep = player.resources.sheep
-    const beforeBoar = player.resources.boar
-    const beforeCattle = player.resources.cattle
-    breedAnimals(player)
-    const sheep = player.resources.sheep - beforeSheep
-    const boar = player.resources.boar - beforeBoar
-    const cattle = player.resources.cattle - beforeCattle
-    if (sheep > 0 || boar > 0 || cattle > 0) {
-      summary.push({ player: player.name, sheep, boar, cattle })
-    }
-  })
-  return summary
-}
-
-export const buildHarvestLogEntries = (params: {
-  locale: Locale
-  context: HarvestContext
-  breedSummary: HarvestSummary['breed']
-  nextState: GameState
-}) => {
-  const { locale, context, breedSummary, nextState } = params
-  const logEntries: GameState['log'] = []
-  logEntries.push({ key: 'log.harvestPhaseReap' })
-  context.reap.forEach((entry) => {
-    const resources = formatResources(
-      locale,
-      {
-        ...emptyResources,
-        grain: entry.grain,
-        vegetable: entry.vegetable,
-      },
-      true,
-    )
-    if (resources) {
-      logEntries.push({
-        key: 'log.harvestReapDetail',
-        params: { player: entry.player, resources },
-      })
-    }
-  })
-  logEntries.push({ key: 'log.harvestPhaseFeed' })
-  context.feed.forEach((entry) => {
-    entry.conversions.forEach((conversion) => {
-      const costResources = formatResources(
-        locale,
-        {
-          ...emptyResources,
-          [conversion.resourceKey]: conversion.count,
-        },
-        true,
-      )
-      const foodResources = formatResources(
-        locale,
-        {
-          ...emptyResources,
-          food: conversion.food,
-        },
-        true,
-      )
-      if (costResources && foodResources) {
-        logEntries.push({
-          key: 'log.harvestFeedConvert',
-          params: {
-            player: entry.player,
-            source: conversion.sourceName,
-            cost: costResources,
-            food: foodResources,
-          },
-        })
-      }
-    })
-    const resources = formatResources(
-      locale,
-      {
-        ...emptyResources,
-        food: entry.food,
-        grain: entry.grain,
-        vegetable: entry.vegetable,
-        sheep: entry.sheep,
-        boar: entry.boar,
-        cattle: entry.cattle,
-        begging: entry.begging,
-      },
-      true,
-    )
-    if (resources) {
-      logEntries.push({
-        key: 'log.harvestFeedDetail',
-        params: { player: entry.player, resources },
-      })
-    }
-  })
-  logEntries.push({ key: 'log.harvestPhaseBreed' })
-  breedSummary.forEach((entry) => {
-    const resources = formatResources(
-      locale,
-      {
-        ...emptyResources,
-        sheep: entry.sheep,
-        boar: entry.boar,
-        cattle: entry.cattle,
-      },
-      true,
-    )
-    if (resources) {
-      logEntries.push({
-        key: 'log.harvestBreedDetail',
-        params: { player: entry.player, resources },
-      })
-    }
-  })
-  logEntries.push({ key: 'log.harvest', params: { round: context.round } })
-  for (let index = logEntries.length - 1; index >= 0; index -= 1) {
-    const entry = logEntries[index]
-    if (entry) {
-      nextState.log.unshift(entry)
-    }
-  }
-}
 
 export const buildHarvestFeedOptions = (
   player: PlayerState,
@@ -240,222 +110,64 @@ export const buildHarvestFeedOptions = (
     addOption(sourceName, 'boar', source.boar, source.id)
     addOption(sourceName, 'cattle', source.cattle, source.id)
   })
-  // Harvest-trigger exchanges from played minors/occupations
+  // Harvest-trigger exchanges from played minors/occupations.
+  // Sprint 6a: surface every harvest-window exchange as an entry-index
+  // pointer so the server can apply it bidirectionally (forward + reverse).
+  // Legacy single-key forward trades still populate `resourceKey`/`food` for
+  // back-compat with prompts that read those fields.
+  const addExchangeOption = (
+    cardId: string,
+    ex: import('../../../shared/cards/types').CardExchange,
+    idx: number,
+  ) => {
+    const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+    // Affordability gate: every `from` resource must be present (>=1 unit).
+    for (const k of fromKeys) {
+      const need = (ex.from as Partial<Resource>)[k] ?? 0
+      if (need > 0 && player.resources[k] < need) return
+    }
+    // Legacy compat: report `resourceKey`/`food` only for single-input,
+    // food-output trades. Reverse / multi-key trades still attach the
+    // entry-index pointer; the server prefers it when present.
+    let resourceKey: keyof Resource = (fromKeys[0] ?? 'food') as keyof Resource
+    let food = 0
+    if (fromKeys.length === 1) {
+      const k = fromKeys[0]!
+      const fromCount = (ex.from as Partial<Resource>)[k] ?? 0
+      const foodOut = (ex.to as Partial<Resource>).food ?? 0
+      if (fromCount === 1 && foodOut > 0) {
+        resourceKey = k
+        food = foodOut
+      }
+    }
+    options.push({
+      id: `${cardId}-harvest-ex${idx}`,
+      sourceName: cardLabel(cardId),
+      resourceKey,
+      food,
+      max: ex.max,
+      sourceId: cardId,
+      exchangeIndex: idx,
+      from: { ...ex.from },
+      to: { ...ex.to },
+    })
+  }
   for (const cardId of player.minorPlayed) {
     const card = getRegisteredMinorImprovement(cardId)
     if (!card?.exchanges) continue
-    for (const ex of card.exchanges) {
-      if (ex.trigger !== 'harvest') continue
-      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-      if (fromKeys.length !== 1) continue
-      const fromKey = fromKeys[0]!
-      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
-      const foodOut = (ex.to as Partial<Resource>).food ?? 0
-      if (fromCount !== 1 || foodOut <= 0) continue
-      if (player.resources[fromKey] <= 0) continue
-      options.push({
-        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
-        sourceName: cardLabel(cardId),
-        resourceKey: fromKey,
-        food: foodOut,
-        max: ex.max,
-        sourceId: cardId,
-      })
-    }
+    card.exchanges.forEach((ex, idx) => {
+      if (!(ex.triggers ?? []).includes('harvest')) return
+      addExchangeOption(cardId, ex, idx)
+    })
   }
   for (const cardId of player.occupationPlayed) {
     const card = getRegisteredOccupation(cardId)
     if (!card?.exchanges) continue
-    for (const ex of card.exchanges) {
-      if (ex.trigger !== 'harvest') continue
-      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-      if (fromKeys.length !== 1) continue
-      const fromKey = fromKeys[0]!
-      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
-      const foodOut = (ex.to as Partial<Resource>).food ?? 0
-      if (fromCount !== 1 || foodOut <= 0) continue
-      if (player.resources[fromKey] <= 0) continue
-      options.push({
-        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
-        sourceName: cardLabel(cardId),
-        resourceKey: fromKey,
-        food: foodOut,
-        max: ex.max,
-        sourceId: cardId,
-      })
-    }
+    card.exchanges.forEach((ex, idx) => {
+      if (!(ex.triggers ?? []).includes('harvest')) return
+      addExchangeOption(cardId, ex, idx)
+    })
   }
   return options
 }
 
-export const startHarvestCore = (nextState: GameState) => {
-  const reapSummary = applyReapPhase(nextState)
-  const feedSummary: HarvestSummary['feed'] = []
-  const pending: HarvestFeedPending[] = []
-  nextState.players.forEach((player, index) => {
-    const size = familySize(player)
-    const newborns = newbornCount(player)
-    const newbornPenalty = Math.min(newborns, size)
-    let required = Math.max(0, size * 2 - newbornPenalty)
-    const useFood = Math.min(player.resources.food, required)
-    player.resources.food -= useFood
-    required -= useFood
-    if (required > 0) {
-      const hasCookingSource = player.improvements.some(
-        (id) =>
-          id === 'Major_Fireplace1' ||
-          id === 'Major_Fireplace2' ||
-          id === 'Major_CookingHearth1' ||
-          id === 'Major_CookingHearth2',
-      )
-      const hasHarvestExchange = (() => {
-        for (const cardId of player.minorPlayed) {
-          const card = getRegisteredMinorImprovement(cardId)
-          if (!card?.exchanges) continue
-          for (const ex of card.exchanges) {
-            if (ex.trigger !== 'harvest') continue
-            const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-            if (fromKeys.length !== 1) continue
-            const fromKey = fromKeys[0]!
-            if (player.resources[fromKey] > 0) return true
-          }
-        }
-        for (const cardId of player.occupationPlayed) {
-          const card = getRegisteredOccupation(cardId)
-          if (!card?.exchanges) continue
-          for (const ex of card.exchanges) {
-            if (ex.trigger !== 'harvest') continue
-            const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-            if (fromKeys.length !== 1) continue
-            const fromKey = fromKeys[0]!
-            if (player.resources[fromKey] > 0) return true
-          }
-        }
-        return false
-      })()
-      const canConvert =
-        player.resources.grain > 0 ||
-        player.resources.vegetable > 0 ||
-        (hasCookingSource &&
-          (player.resources.sheep > 0 ||
-            player.resources.boar > 0 ||
-            player.resources.cattle > 0 ||
-            player.resources.vegetable > 0)) ||
-        hasHarvestExchange
-      if (canConvert) {
-        pending.push({
-          playerIndex: index,
-          playerName: player.name,
-          remaining: required,
-          foodUsed: useFood,
-        })
-      } else {
-        player.resources.begging += required
-        feedSummary.push({
-          player: player.name,
-          food: useFood,
-          grain: 0,
-          vegetable: 0,
-          sheep: 0,
-          boar: 0,
-          cattle: 0,
-          begging: required,
-          conversions: [],
-        })
-      }
-    } else if (useFood > 0) {
-      feedSummary.push({
-        player: player.name,
-        food: useFood,
-        grain: 0,
-        vegetable: 0,
-        sheep: 0,
-        boar: 0,
-        cattle: 0,
-        begging: 0,
-        conversions: [],
-      })
-    }
-  })
-  const context: HarvestContext = {
-    round: nextState.round,
-    reap: reapSummary,
-    feed: feedSummary,
-    pending,
-  }
-  return { nextState, context }
-}
-
-export const confirmHarvestFeedCore = (params: {
-  nextState: GameState
-  context: HarvestContext
-  countsOverride?: Record<string, number>
-  harvestFeedCounts: Record<string, number>
-  options: HarvestFeedOption[]
-}) => {
-  const { nextState, context, countsOverride, harvestFeedCounts, options } = params
-  const current = context.pending[0]
-  if (!current) return null
-  const player = nextState.players[current.playerIndex]
-  if (!player) return null
-  const costTotals: Partial<Resource> = {}
-  let foodFromConversions = 0
-  const conversions: {
-    sourceName: string
-    resourceKey: keyof Resource
-    count: number
-    food: number
-  }[] = []
-  options.forEach((option) => {
-    const count = countsOverride?.[option.id] ?? harvestFeedCounts[option.id] ?? 0
-    if (count <= 0) return
-    costTotals[option.resourceKey] = (costTotals[option.resourceKey] ?? 0) + count
-    const food = count * option.food
-    foodFromConversions += food
-    conversions.push({
-      sourceName: option.sourceName,
-      resourceKey: option.resourceKey,
-      count,
-      food,
-    })
-  })
-  Object.entries(costTotals).forEach(([key, value]) => {
-    if (!value) return
-    const resourceKey = key as keyof Resource
-    player.resources[resourceKey] -= value
-  })
-  const remaining = Math.max(0, current.remaining - foodFromConversions)
-  const extraFood = Math.max(0, foodFromConversions - current.remaining)
-  if (extraFood > 0) {
-    player.resources.food += extraFood
-  }
-  player.resources.begging += remaining
-  const nextFeed = [
-    ...context.feed,
-    {
-      player: current.playerName,
-      food: current.foodUsed,
-      grain: costTotals.grain ?? 0,
-      vegetable: costTotals.vegetable ?? 0,
-      sheep: costTotals.sheep ?? 0,
-      boar: costTotals.boar ?? 0,
-      cattle: costTotals.cattle ?? 0,
-      begging: remaining,
-      conversions,
-    },
-  ]
-  const nextPending = context.pending.slice(1)
-  return {
-    nextState,
-    nextContext: {
-      ...context,
-      feed: nextFeed,
-      pending: nextPending,
-    } as HarvestContext,
-  }
-}
-
-export const findPendingAnimalPlayerIndex = (
-  state: GameState,
-  hasPendingAnimals: (player: PlayerState) => boolean,
-) => state.players.findIndex((player) => hasPendingAnimals(player))

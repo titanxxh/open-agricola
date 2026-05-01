@@ -1,7 +1,6 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D134_OysterEater'
@@ -32,14 +31,25 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     const owner = context.ownerPlayer ?? context.player
-    // Record a pending skip for the card owner (simplified bookkeeping).
-    const counters = owner.cardStates?.[CARD_ID]?.extraData ?? {}
-    const pending = typeof counters.skipNextPlacement === 'number'
-      ? counters.skipNextPlacement
-      : 0
-    writeCardExtraData(owner, CARD_ID, 'skipNextPlacement', pending + 1)
     return {
-      flow: { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'increment-extra-data', key: 'skipNextPlacement', amount: 1 },
+            actionContext: { targetPlayerId: owner.id },
+          },
+          {
+            type: 'leaf',
+            actionId: 'bonus-vp',
+            sourceCard: CARD_ID,
+            actionContext: { targetPlayerId: owner.id },
+          },
+        ],
+      },
       sourceCard: CARD_ID,
     }
   },

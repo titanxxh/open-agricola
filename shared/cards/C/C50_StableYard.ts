@@ -13,7 +13,7 @@ export const C50_StableYard = new MinorImprovement({
   vp: 1,
   prerequisite: "3 Stables and 3 Pastures",
   exchanges: [
-    { from: { sheep: 1, boar: 1 }, to: { cattle: 1 }, trigger: 'anytime' },
+    { from: { sheep: 1, boar: 1 }, to: { cattle: 1 }, triggers: ['anytime'] },
   ],
   newSet: true,
 })

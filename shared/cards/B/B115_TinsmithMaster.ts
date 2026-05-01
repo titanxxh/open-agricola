@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { AnimalZone } from '../../actions/effects/animals'
+import type { AnimalZone } from '../../actions/helpers/animal-zones'
 import type { PlayerState } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
 import type { CardImpl } from '../registry'

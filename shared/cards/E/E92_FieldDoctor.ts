@@ -39,19 +39,24 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'E92-field-doctor-replace-wish-children',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['wish-children-growth'],
+  actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!checkRoomsSurroundedByFields(context)) return
     // Only activate if player actually needs the "without room" bypass
     if (context.player.rooms > familySize(context.player)) return
     return {
-      actionId: 'grow-family-without-room',
+      actionId: 'family-growth',
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'grow-family-without-room', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'family-growth',
+            sourceCard: CARD_ID,
+            actionContext: { skipRoomCheck: true },
+          },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

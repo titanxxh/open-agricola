@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   queueFutureMeeples,
   resolveFutureMeepleRequests,
-} from '../future-meeples'
+} from '../internal/future-meeples'
 import { applyFutureMeeples } from '../../../logic/state-constants'
 import type { FarmTilePosition, GameState, PlayerState, Resource } from '../../../game/types'
 

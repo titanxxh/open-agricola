@@ -1,6 +1,7 @@
 import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
+import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C104_Collector'
@@ -8,6 +9,17 @@ const CARD_ID = 'C104_Collector'
 const RESOURCE_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
 
 const USES_TO_RESOURCES: Record<number, number> = { 1: 6, 2: 7, 3: 8, 4: 9 }
+
+const buildSelectionChoice = (needed: number) => ({
+  type: 'choice' as const,
+  promptKey: 'ui.interactionCollectorSelect',
+  promptParams: { needed },
+  options: RESOURCE_TYPES.map((r) => ({
+    value: r,
+    labelKey: `resources.${r}`,
+    sourceCard: CARD_ID,
+  })),
+})
 
 registerPlayerActionSpace({
   cardId: CARD_ID,
@@ -20,48 +32,46 @@ registerPlayerActionSpace({
       if (player.id !== ownerId) return false
       return (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) < 4
     },
+    // Read-only: peek at the next useCount to compute `needed`. Mutation
+    // (used += 1, begging += 1, resource gains) is deferred to resolveChoice
+    // so the engine drives all state changes via leaves.
     execute: ({ player }) => {
       const useCount = (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) + 1
-      writeCardExtraData(player, CARD_ID, 'used', useCount)
-      player.resources.begging += 1
       const needed = USES_TO_RESOURCES[useCount] ?? 6
-      return {
-        type: 'choice' as const,
-        promptKey: 'ui.interactionCollectorSelect',
-        promptParams: { needed },
-        options: RESOURCE_TYPES.map((r) => ({
-          value: r,
-          labelKey: `resources.${r}`,
-          sourceCard: CARD_ID,
-        })),
-      }
+      return buildSelectionChoice(needed)
     },
     resolveChoice: ({ player }, choice) => {
-      // Accept comma-separated bulk selection: "cattle,boar,sheep,stone,reed,vegetable"
-      const selections = choice.split(',').filter((s) => RESOURCE_TYPES.includes(s as typeof RESOURCE_TYPES[number]))
+      const selections = choice.split(',').filter((s) =>
+        RESOURCE_TYPES.includes(s as typeof RESOURCE_TYPES[number]),
+      )
       const unique = [...new Set(selections)]
-      const useCount = readCardExtraData<number>(player, CARD_ID, 'used') ?? 1
+      // execute() did not yet bump `used`, so the live counter still reflects
+      // prior uses. Compute the next needed count the same way execute did.
+      const useCount = (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) + 1
       const needed = USES_TO_RESOURCES[useCount] ?? 6
       if (unique.length !== needed) {
-        // Wrong count — re-present the choice
-        return {
-          type: 'choice' as const,
-          promptKey: 'ui.interactionCollectorSelect',
-          promptParams: { needed },
-          options: RESOURCE_TYPES.map((r) => ({
-            value: r,
-            labelKey: `resources.${r}`,
+        return buildSelectionChoice(needed)
+      }
+      const gainParams: Record<string, number> = { begging: 1 }
+      for (const res of unique) gainParams[res] = 1
+      const flow: ActionFlow = {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
             sourceCard: CARD_ID,
-          })),
-        }
+            params: { kind: 'increment-extra-data', key: 'used', amount: 1 },
+          },
+          {
+            type: 'leaf',
+            actionId: 'gain',
+            sourceCard: CARD_ID,
+            params: gainParams,
+          },
+        ],
       }
-      // All selections made — give 1 of each selected resource
-      const gained: Record<string, number> = {}
-      for (const res of unique) {
-        (player.resources as Record<string, number>)[res] = ((player.resources as Record<string, number>)[res] ?? 0) + 1
-        gained[res] = 1
-      }
-      return { type: 'ok' as const, resourcesGained: gained }
+      return { type: 'flow', flow }
     },
   }),
 })

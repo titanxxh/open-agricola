@@ -312,6 +312,12 @@ export type CanBeExecutedByPlayerContext = {
    * as the trigger for its food-for-resource substitution).
    */
   sourceCard?: string
+  /**
+   * Listener-driven actionContext (e.g. `tradeIds` for E53 BoarSpear's
+   * listener-only exchange). Sprint 6b: forwarded so doable checks see the
+   * same metadata the engine will pass to `execute()`.
+   */
+  actionContext?: Record<string, unknown>
 }
 
 export type CanBeExecutedByPlayer = (

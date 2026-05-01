@@ -463,14 +463,34 @@ return {
 | `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
 | `pay-resources`            | 同上，扣资源                                                                            |
-| `gain-other-players`       | 给其它每位玩家各发资源（不含自己）                                                                 |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-card-stack`          | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
-| `write-card-extra-data`    | 写入 `player.cardStates[CARD_ID].extraData`                                         |
-| `hold-worker-on-card`      | 将工人标记为被卡牌持有（不回家）                                                                  |
-| `release-worker-from-card` | 释放被卡牌持有的工人                                                                        |
-| `flag-card`                | 设置 `player.cardStates[CARD_ID].flagged = true`，常用于 anytime 一次性                    |
+| `special-effect`           | **唯一的 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
+
+> Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。Workshop 生成的卡若仍引用旧 actionId，AST validator 会报错——改用 `special-effect`。
+
+### 6.1 `special-effect` `params.kind` 完整列表
+
+```ts
+// 设/清除 player.cardStates[sourceCard].flagged
+{ kind: 'set-flag', flag: true }
+{ kind: 'set-flag', flag: false }
+
+// 设 player.cardStates[sourceCard].infobox（空字符串等价 clear）
+{ kind: 'set-infobox', text: '✓' }
+{ kind: 'set-infobox', text: '' }
+
+// 写 player.cardStates[sourceCard].extraData[key]
+{ kind: 'set-extra-data', key: 'foo', value: 1 }
+
+// player.cardStates[sourceCard].extraData[key] += amount
+{ kind: 'increment-extra-data', key: 'used', amount: 1 }
+```
+
+可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
+
+> **`card_*` 前缀 ad-hoc actions**（Sprint 6b）：repo-internal 单卡专用 actions（如 `card_E112_GrainThief_protect`）通过 `registerAdHocAction()` 注册，仅在主仓库代码中可见。Workshop 生成的卡 **不能** dispatch `card_*` actionId——AST validator 不放行。如果需要单卡 mutation，请用 `special-effect` 或标准 `gain`。
 
 
 ---

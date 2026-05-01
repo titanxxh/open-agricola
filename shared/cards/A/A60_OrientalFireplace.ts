@@ -30,9 +30,9 @@ export const A60_OrientalFireplace = new MinorImprovement({
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_CookingHearth1', 'Major_CookingHearth2'],
   alsoCountsAs: ['major'],
   exchanges: [
-    { from: { vegetable: 1 }, to: { food: 4 }, trigger: 'anytime' },
-    { from: { sheep: 1 }, to: { food: 3 }, trigger: 'anytime' },
-    { from: { cattle: 1 }, to: { food: 5 }, trigger: 'anytime' },
-    { from: { grain: 1 }, to: { food: 2 }, trigger: 'bake-bread' },
+    { from: { vegetable: 1 }, to: { food: 4 }, triggers: ['anytime'] },
+    { from: { sheep: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 5 }, triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] },
   ],
 })

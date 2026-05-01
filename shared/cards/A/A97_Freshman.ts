@@ -21,7 +21,7 @@ const computeReplaceListener: CardListenerRegistration = {
         promptKey: 'ui.interactionFreshmanOccupation',
         choiceLabelKey: 'ui.interactionFreshmanOccupation',
         children: [
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           {
             type: 'leaf',
             actionId: 'play-occupation',
@@ -43,7 +43,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
     return {
-      flow: { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID },
+      flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
       sourceCard: CARD_ID,
     }
   },

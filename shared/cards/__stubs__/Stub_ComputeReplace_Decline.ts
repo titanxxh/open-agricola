@@ -1,6 +1,6 @@
 import type { CardListenerRegistration } from '../card-listeners'
 
-export const CARD_ID = 'Stub_ComputeReplace_Decline'
+const CARD_ID = 'Stub_ComputeReplace_Decline'
 
 export const listener: CardListenerRegistration = {
   id: 'stub-compute-replace-decline',
@@ -12,12 +12,11 @@ export const listener: CardListenerRegistration = {
     return {
       decline: true,
       alternativeFlow: {
-        type: 'seq',
+        type: 'leaf',
+        actionId: 'gain',
+        params: { food: 1 },
+        sourceCard: CARD_ID,
         choiceLabelKey: 'actions.gain.name',
-        children: [
-          { type: 'leaf', actionId: 'mark-card-observed', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'gain', params: { food: 1 } },
-        ],
       },
     }
   },

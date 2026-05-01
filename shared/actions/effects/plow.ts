@@ -1,12 +1,6 @@
 import type { ActionCostPreview, ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
-import { getAllTilePositions, getNextEmptyTileForPlayer, positionKey } from '../../game/farm'
-import { canExecuteWithCostPreview } from './cost-preview'
-
-export const addField = (player: PlayerState) => {
-  const next = getNextEmptyTileForPlayer(player)
-  if (!next) return
-  player.fields.push({ stacks: [], row: next.row, col: next.col })
-}
+import { getAllTilePositions, positionKey } from '../../game/farm'
+import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 
 const getOccupiedKeys = (player: PlayerState) => {
   const keys = new Set<string>()
@@ -54,7 +48,7 @@ export const getPlowableTiles = (player: PlayerState) => {
   })
 }
 
-export const plowCostPreview: ActionCostPreview = {
+const plowCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) => getPlowableTiles(player).length > 0,
   getBaseCost: () => ({}),
 }

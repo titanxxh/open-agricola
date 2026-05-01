@@ -18,6 +18,13 @@ export const cookingHearth1: MajorCardEffect = {
     '[__Bake Bread__ action:]',
     '<GRAIN> <ARROW> 3<FOOD>',
   ],
+  exchanges: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth1', triggers: ['anytime'] },
+    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1', triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth1', triggers: ['anytime'] },
+    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1', triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1', triggers: ['bake-bread'] },
+  ],
 }
 
 export const cookingHearth2: MajorCardEffect = {
@@ -27,4 +34,5 @@ export const cookingHearth2: MajorCardEffect = {
     fee: { clay: 5 },
     cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'] },
   },
+  exchanges: cookingHearth1.exchanges?.map((ex) => ({ ...ex, sourceId: 'Major_CookingHearth2' })),
 }

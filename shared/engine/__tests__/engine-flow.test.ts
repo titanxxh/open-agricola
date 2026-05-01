@@ -228,8 +228,8 @@ describe('Engine flow nodes', () => {
     }
     const skip: ActionDefinition = {
       id: 'skip',
-      nameKey: 'actions.noop.name',
-      descriptionKey: 'actions.noop.description',
+      nameKey: 'actions.set-first-player.name',
+      descriptionKey: 'actions.set-first-player.description',
       roundAvailable: 1,
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,

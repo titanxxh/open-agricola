@@ -70,9 +70,9 @@ describe('C42_RavenousHunger', () => {
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(3)
-    expect(children[0].actionId).toBe('flag-card')
+    expect(children[0]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
     expect(children[1].actionId).toBe('place-farmer')
-    expect(children[2].actionId).toBe('unflag-card')
+    expect(children[2]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: false } })
   })
 
   it('does not trigger on non-vegetable-seeds spaces', () => {

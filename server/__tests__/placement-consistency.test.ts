@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAllowedPlacementSpaces } from '../../shared/actions/effects/placement-availability'
+import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'

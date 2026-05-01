@@ -2,7 +2,7 @@ import type { CardListenerRegistration } from '../card-listeners'
 import { requireActiveCardRegistry } from '../active-registry'
 import { incCounter } from './helpers'
 
-export const CARD_ID = 'Stub_Construct_TrueAction'
+const CARD_ID = 'Stub_Construct_TrueAction'
 
 export const listener: CardListenerRegistration = {
   id: 'stub-construct-true-action',

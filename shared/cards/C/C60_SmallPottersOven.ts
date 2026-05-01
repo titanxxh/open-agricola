@@ -3,7 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 import { getMajorCardEffect } from '../major'
-import { canAffordCost } from '../../actions/effects/pay-helpers'
+import { canAffordCost } from '../../actions/helpers/pay-helpers'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 

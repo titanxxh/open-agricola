@@ -210,7 +210,7 @@ export const validateAndCompileCustomCode = (
   }
 }
 
-export const extractManifestFromCompiledCode = (
+const extractManifestFromCompiledCode = (
   compiledCode: string,
   cardId: string,
 ): CustomCodeManifest => {
@@ -279,7 +279,3 @@ __result = __listener && typeof __listener.handler === 'function'
   }
 }
 
-export const parseEffectHook = (value: string): CardEffectField | null =>
-  cardEffectHooks.includes(value as CardEffectField)
-    ? value as CardEffectField
-    : null

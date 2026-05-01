@@ -49,7 +49,7 @@ const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> =
 const buildBonusVpFlow = (count: number) => ({
   type: 'seq' as const,
   children: [
-    { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
+    { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
     ...Array.from({ length: count }, () => ({
       type: 'leaf' as const,
       actionId: 'bonus-vp',
@@ -59,23 +59,13 @@ const buildBonusVpFlow = (count: number) => ({
 })
 
 const buildSpecialFoodFlow = (count: number, ambiguous: boolean): ActionFlow => {
-  if (!ambiguous) {
-    return buildBonusVpFlow(count)
-  }
+  const flow = buildBonusVpFlow(count)
+  if (!ambiguous) return flow
   return {
-    type: 'xor',
+    ...flow,
+    optional: true,
     promptKey: 'ui.interactionReclamationPlowAmbiguous',
-    children: [
-      {
-        ...buildBonusVpFlow(count),
-        choiceLabelKey: 'ui.interactionReclamationPlowUse',
-      },
-      {
-        type: 'leaf',
-        actionId: 'noop',
-        choiceLabelKey: 'ui.interactionReclamationPlowDecline',
-      },
-    ],
+    choiceLabelKey: 'ui.interactionReclamationPlowUse',
   }
 }
 

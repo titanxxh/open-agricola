@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { resolveFutureMeepleRequests } from '../../shared/actions/effects/future-meeples'
+import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
 import { applyFutureMeeples } from '../../shared/logic/state'
 
 import '../../shared/cards/B/B107_Manservant'

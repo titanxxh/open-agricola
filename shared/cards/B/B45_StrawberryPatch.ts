@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B45_StrawberryPatch'

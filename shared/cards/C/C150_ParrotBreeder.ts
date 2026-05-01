@@ -9,7 +9,7 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C150_ParrotBreeder'
@@ -101,7 +101,7 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

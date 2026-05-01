@@ -361,7 +361,7 @@ export const cloneState = (state: GameState): GameState => {
   return normalizeState(raw)
 }
 
-export const createInitialPlayers = (
+const createInitialPlayers = (
   seed: number,
   options: InitialStateOptions = {},
 ): PlayerState[] => {
@@ -432,7 +432,7 @@ export const createInitialPlayers = (
   })
 }
 
-export const createRoundSnapshot = (state: GameState): GameState => {
+const createRoundSnapshot = (state: GameState): GameState => {
   const snapshot = cloneState(state)
   snapshot.roundStartSnapshot = null
   return snapshot

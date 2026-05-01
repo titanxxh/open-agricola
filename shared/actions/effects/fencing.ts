@@ -1,5 +1,5 @@
 import type { ActionDefinition, FenceSegment, GameState, PlayerState } from '../../game/types'
-import { canAffordTypedFlatCost } from './pay-helpers'
+import { canAffordTypedFlatCost } from '../helpers/pay-helpers'
 import { getCardEffect } from '../../cards/card-effects'
 
 export const maxFences = 15
@@ -15,27 +15,8 @@ export const getPalisadeCount = <T extends { fenceSegments: FenceSegment[] }>(
   p: T,
 ): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'palisade' ? 1 : 0), 0)
 
-const pastureLayouts = [
-  { size: 1, fences: 4 },
-  { size: 2, fences: 6 },
-  { size: 3, fences: 8 },
-  { size: 4, fences: 8 },
-  { size: 5, fences: 12 },
-  { size: 6, fences: 10 },
-  { size: 8, fences: 12 },
-  { size: 9, fences: 12 },
-  { size: 10, fences: 14 },
-  { size: 12, fences: 14 },
-  { size: 15, fences: 16 },
-]
-
-export const getPastureLayouts = () => pastureLayouts
-
 export const getTotalPastureCells = (player: PlayerState) =>
   player.pastures.reduce((sum, pasture) => sum + pasture.size, 0)
-
-export const getPastureWoodCost = (stables: number, fenceCost: number) =>
-  fenceCost + stables * stableWoodCost
 
 /**
  * Sum of "free fences this player can build right now" contributed by any card
@@ -75,19 +56,6 @@ export const canStartFencing = (state: GameState, player: PlayerState) => {
     if (woodCount + free >= minimumFenceSegments) return true
   }
   return canAffordTypedFlatCost(player, { wood: minimumFenceSegments }, 'fencing')
-}
-
-export const canBuildPasture = (
-  player: PlayerState,
-  size: number,
-  stables: number,
-  fenceCost: number,
-) => {
-  const totalCells = getTotalPastureCells(player)
-  const woodCost = getPastureWoodCost(stables, fenceCost)
-  if (getFenceCount(player) + fenceCost > maxFences) return false
-  if (totalCells + size > maxPastureCells) return false
-  return canAffordTypedFlatCost(player, { wood: woodCost }, 'fencing')
 }
 
 export const fenceAction: ActionDefinition = {

@@ -9,7 +9,7 @@ type LocaleSelectProps = {
   className?: string
 }
 
-export function LocaleSelect({ locale, setLocale, className }: LocaleSelectProps) {
+function LocaleSelect({ locale, setLocale, className }: LocaleSelectProps) {
   return (
     <SelectButton<Locale>
       value={locale}

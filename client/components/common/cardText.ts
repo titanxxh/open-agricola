@@ -10,7 +10,7 @@ const cardNameKeyPattern =
 const cardAnytimeKeyPattern =
   /^cards\.([^.]+)\.anytime$/
 
-export const humanizeCardId = (cardId: string): string =>
+const humanizeCardId = (cardId: string): string =>
   cardId
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')

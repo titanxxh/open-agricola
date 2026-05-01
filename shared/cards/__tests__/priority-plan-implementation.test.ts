@@ -205,7 +205,7 @@ describe('priority plan implementations', () => {
 
     expect(result?.flow?.type).toBe('seq')
     if (result?.flow?.type !== 'seq') return
-    expect(result.flow.children[0]).toMatchObject({ type: 'leaf', actionId: 'flag-card' })
+    expect(result.flow.children[0]).toMatchObject({ type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
     expect(result.flow.children[1]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
   })
 

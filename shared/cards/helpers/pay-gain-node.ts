@@ -208,27 +208,7 @@ export const payThenGainActionFlow = ({
   ])
 }
 
-export const payThenGainFlow = ({
-  cardId,
-  cost,
-  gain,
-  promptKey,
-  choiceLabelKey,
-  choiceLabelParams,
-  followUp,
-}: PayGainNodeOptions): ActionHookResult =>
-  ({
-    flow: buildSequenceNode(promptKey, payThenGainActionFlow({
-      cardId,
-      cost,
-      gain,
-      choiceLabelKey,
-      choiceLabelParams,
-      followUp,
-    }).children, true),
-  })
-
-export const payThenActionActionFlow = ({
+const payThenActionActionFlow = ({
   cardId,
   cost,
   action,
@@ -264,7 +244,7 @@ export const payThenActionFlow = ({
     }).children, true),
   })
 
-export const returnToSpaceThenGainActionFlow = ({
+const returnToSpaceThenGainActionFlow = ({
   cardId,
   cost,
   gain,

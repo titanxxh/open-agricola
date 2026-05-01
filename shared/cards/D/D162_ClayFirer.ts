@@ -16,8 +16,8 @@ export const D162_ClayFirer = new Occupation({
   cost: {},
   players: '4+',
   exchanges: [
-    { from: { clay: 2 }, to: { stone: 1 }, trigger: 'anytime' },
-    { from: { clay: 3 }, to: { stone: 2 }, trigger: 'anytime' },
+    { from: { clay: 2 }, to: { stone: 1 }, triggers: ['anytime'] },
+    { from: { clay: 3 }, to: { stone: 2 }, triggers: ['anytime'] },
   ],
 })
 

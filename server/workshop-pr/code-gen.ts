@@ -82,7 +82,7 @@ export type CardLocaleEntry = {
 
 export type CardLocales = Record<string, CardLocaleEntry>
 
-export function readLocalesFromCardJson(cardJson: string | undefined): CardLocales | null {
+function readLocalesFromCardJson(cardJson: string | undefined): CardLocales | null {
   if (!cardJson) return null
   let parsed: { locales?: unknown } = {}
   try {
@@ -188,7 +188,7 @@ function getNumericObjectProperty(object: ts.ObjectLiteralExpression, key: strin
   return null
 }
 
-export function normalizeWorkshopEffectCode(
+function normalizeWorkshopEffectCode(
   source: string,
   cardId: string,
   opts: { locales?: CardLocales | null } = {},
@@ -628,7 +628,7 @@ export function patchCommunityCardsMarkdown(
   return source.slice(0, idx) + row + '\n' + source.slice(idx)
 }
 
-export function patchCommunityAutoCatalog(
+function patchCommunityAutoCatalog(
   source: string,
   args: { card_id: string },
 ): string {

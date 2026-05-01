@@ -6,13 +6,13 @@ import type {
   PlayerState,
   Resource,
 } from '../../game/types'
-import { canExecuteWithCostPreview } from './cost-preview'
+import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import {
   canAffordTypedFlatCost,
   executeResolvedTypedFlatPayment,
   payTypedFlatCost,
   resolveCostPaymentSelection,
-} from './pay-helpers'
+} from '../helpers/pay-helpers'
 
 const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
 
@@ -132,14 +132,7 @@ export const renovateHouse = (
   return true
 }
 
-/** Convenience helper for direct (non-engine) renovation, used by tests. */
-export const renovate = (player: PlayerState): ActionExecutionResult => {
-  if (!canRenovate(player)) return { type: 'fail', logKey: 'log.renovationFail' }
-  if (!renovateHouse(player)) return { type: 'fail', logKey: 'log.renovationFail' }
-  return { type: 'ok' }
-}
-
-export const renovateHouseCostPreview: ActionCostPreview = {
+const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) =>
     player.houseType === 'wood' || player.houseType === 'clay',
   canExecute: ({ player, params }, costOverride) => {

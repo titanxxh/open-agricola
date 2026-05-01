@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { readCardExtraData } from '../../../cards/helpers/card-state'
-import { registerSelectionEffect } from '../selection-effect-registry'
-import { selectionAction } from '../selection'
+import { registerSelectionEffect } from '../../helpers/selection-effect-registry'
+import { selectionAction } from '../internal/selection'
 import type { PlayerState } from '../../../game/types'
 
 const createMockPlayer = (): PlayerState => ({
@@ -101,7 +101,7 @@ describe('selection action with occupation-hand kind', () => {
 
   it('resolveChoice propagates a flow returned by the effect handler', () => {
     const player = createMockPlayer()
-    const testFlow = { type: 'leaf' as const, actionId: 'noop', sourceCard: 'TEST' }
+    const testFlow = { type: 'leaf' as const, actionId: 'special-effect', sourceCard: 'TEST' }
 
     registerSelectionEffect('test-flow-effect', () => testFlow)
 

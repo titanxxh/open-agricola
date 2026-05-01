@@ -7,7 +7,7 @@ import { getProvider, PROVIDERS, listModelsFor } from './registry'
 import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
 
 export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef, Capabilities, ModelDef } from './types'
-export { PROVIDERS, getProvider, listProviders, listModelsFor, defaultModelFor } from './registry'
+export { PROVIDERS, getProvider, listModelsFor, defaultModelFor } from './registry'
 
 export async function* streamChat(
   messages: ChatMessage[],
@@ -94,7 +94,6 @@ export const PROVIDER_KEY_HINTS = Object.fromEntries(
 // ── Re-export card-utils ────────────────────────────────────────────────────
 export {
   extractCardFromResponse,
-  extractCardJson,
   translateCardContent,
   buildCardArtPrompt,
 } from './card-utils'

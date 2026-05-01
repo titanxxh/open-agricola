@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getTotalAnimalCapacity } from '../../actions/effects/animals'
+import { getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -40,8 +40,7 @@ export const D167_PureBreeder_impl = {
         choiceLabelParams: { animal: t },
       }))
     if (children.length === 0) return
-    children.push({ type: 'leaf', actionId: 'noop', choiceLabelKey: 'ui.interactionDecline' })
-    return { type: 'xor', children }
+    return { type: 'xor', optional: true, children }
   },
 },
   reaches: [] as readonly string[],

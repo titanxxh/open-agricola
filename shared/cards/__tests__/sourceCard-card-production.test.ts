@@ -124,7 +124,7 @@ describe('sourceCard card production contract', () => {
     })
   })
 
-  it('E73 Scythe includes sourceCard on every harvest choice, including decline', () => {
+  it('E73 Scythe includes sourceCard on every harvest choice', () => {
     const player = createPlayer()
     player.minorPlayed = ['E73_Scythe']
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }] as any
@@ -132,7 +132,8 @@ describe('sourceCard card production contract', () => {
 
     expect(flow?.type).toBe('xor')
     if (flow?.type !== 'xor') return
-    expect(flow.children).toHaveLength(2)
+    expect(flow.optional).toBe(true)
+    expect(flow.children).toHaveLength(1)
     for (const child of flow.children) {
       expect(child).toMatchObject({ type: 'leaf', sourceCard: 'E73_Scythe' })
     }

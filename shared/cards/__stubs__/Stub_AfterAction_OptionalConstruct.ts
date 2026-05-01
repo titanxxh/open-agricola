@@ -1,7 +1,7 @@
 import type { CardListenerRegistration } from '../card-listeners'
 import { incCounter } from './helpers'
 
-export const CARD_ID = 'Stub_AfterAction_OptionalConstruct'
+const CARD_ID = 'Stub_AfterAction_OptionalConstruct'
 
 export const listener: CardListenerRegistration = {
   id: 'stub-after-action-optional-construct',

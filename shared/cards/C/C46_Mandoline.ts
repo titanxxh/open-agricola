@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C46_Mandoline'
@@ -29,7 +29,7 @@ const anytimeListener: CardListenerRegistration = {
             count: 2,
             resources: { food: 1 },
           }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

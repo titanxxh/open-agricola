@@ -26,7 +26,7 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           // Flag card so computeCosts zeroes out major costs
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           // Move 6 food from card counter to player supply, then discard
           {
             type: 'leaf',
@@ -48,7 +48,7 @@ const anytimeListener: CardListenerRegistration = {
             actionContext: { trueAction: false },
           },
           // Unflag card
-          { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       },
       sourceCard: CARD_ID,

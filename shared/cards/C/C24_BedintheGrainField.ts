@@ -30,7 +30,7 @@ export const C24_BedintheGrainField_impl = {
     if (player.rooms <= familySize(player)) return
     return {
       type: 'leaf',
-      actionId: 'wish-children-growth',
+      actionId: 'family-growth',
       sourceCard: CARD_ID,
     }
   },

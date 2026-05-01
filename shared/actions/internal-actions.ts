@@ -1,8 +1,8 @@
 import type { ActionDefinition } from '../game/types'
-import { futureMeeplesAction } from './effects/future-meeples'
+import { futureMeeplesAction } from './effects/internal/future-meeples'
 import { collectAction } from './effects/collect'
 import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from './effects/gain'
-import { wishChildrenAction, growFamilyWithoutRoomAction } from './effects/wish-children'
+import { wishChildrenAction, growFamilyWithoutRoomAction, familyGrowthAction } from './effects/family-growth'
 import { minorImprovementAction, improvementAnyAction } from './effects/improvement'
 import { playOccupationAction } from './effects/occupation'
 import { renovateHouseAction } from './effects/renovation'
@@ -17,35 +17,21 @@ import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
 import { payResourcesAction } from './effects/pay-resources'
-import { returnToSpaceAction } from './effects/return-to-space'
+import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
-import { takeFromCardAction } from './effects/take-from-card'
-import { markCardObservedAction } from './effects/mark-card-observed'
-import { flagCardAction } from './effects/flag-card'
-import { unflagCardAction } from './effects/unflag-card'
-import { setCardInfoboxAction } from './effects/set-card-infobox'
-import { clearCardInfoboxAction } from './effects/clear-card-infobox'
-import { noopAction } from './effects/noop'
-import { emitChoiceAction } from './effects/emit-choice'
-import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
-import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
-import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
-import { payGrainAnyAction } from './effects/pay-grain-any'
-import { storeOnCardAction } from './effects/store-on-card'
-import { scytheHarvestFieldAction } from './effects/scythe-harvest-field'
-import { grainThiefProtectAction } from './effects/grain-thief-protect'
-import { moveFarmerToSpaceAction } from './effects/move-farmer-to-space'
-import { popCardStackAction } from './effects/pop-card-stack'
-import { pushCardStackAction } from './effects/push-to-card-stack'
-import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
-import { selectionAction } from './effects/selection'
-import { discardFromHandAction } from './effects/discard-from-hand'
-import { swapFieldGrainToVegAction } from './effects/swap-field-crop'
-import { spendWorkerAction } from './effects/spend-worker'
-import { pushCardStackAction as pushCardStackBatchAction } from './effects/push-card-stack'
-import { writeCardExtraDataAction } from './effects/write-card-extra-data'
-import { holdWorkerOnCardAction } from './effects/hold-worker-on-card'
-import { releaseWorkerFromCardAction } from './effects/release-worker-from-card'
+import { takeFromCardAction } from './effects/internal/take-from-card'
+import { emitChoiceAction } from './effects/internal/emit-choice'
+import { returnFirstWorkerHomeAction } from './effects/internal/return-first-worker-home'
+import { recallPlacedWorkerAction } from './effects/internal/recall-placed-worker'
+import { reserveFenceBonusAction } from './effects/internal/reserve-fence-bonus'
+import { storeOnCardAction } from './effects/internal/store-on-card'
+import { moveFarmerToSpaceAction } from './effects/internal/move-farmer-to-space'
+import { popCardStackAction } from './effects/internal/pop-card-stack'
+import { pushCardStackAction } from './effects/internal/push-to-card-stack'
+import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
+import { selectionAction } from './effects/internal/selection'
+import { spendWorkerAction } from './effects/internal/spend-worker'
+import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -55,6 +41,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bonusFoodAction,
   bonusGrainAction,
   wishChildrenAction,
+  familyGrowthAction,
   minorImprovementAction,
   improvementAnyAction,
   growFamilyWithoutRoomAction,
@@ -71,20 +58,11 @@ export const internalActionDefinitions: ActionDefinition[] = [
   returnToSpaceAction,
   bonusVpAction,
   takeFromCardAction,
-  markCardObservedAction,
-  flagCardAction,
-  unflagCardAction,
-  setCardInfoboxAction,
-  clearCardInfoboxAction,
-  noopAction,
   emitChoiceAction,
   returnFirstWorkerHomeAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,
-  payGrainAnyAction,
   storeOnCardAction,
-  scytheHarvestFieldAction,
-  grainThiefProtectAction,
   moveFarmerToSpaceAction,
   constructAction,
   placeFarmerAction,
@@ -94,10 +72,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
-  discardFromHandAction,
-  swapFieldGrainToVegAction,
-  pushCardStackBatchAction,
-  writeCardExtraDataAction,
-  holdWorkerOnCardAction,
-  releaseWorkerFromCardAction,
+  specialEffectAction,
 ]

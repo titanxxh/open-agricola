@@ -7,8 +7,8 @@ import {
 import {
   stubBonusChoiceModifier,
 } from '../Stub_BonusChoiceModifier'
-import { resolveCardCostWithModifiers } from '../../../actions/effects/pay-helpers'
-import { computeAllBuyableCombinations, clearPaymentCache } from '../../../actions/effects/pay'
+import { resolveCardCostWithModifiers } from '../../../actions/helpers/pay-helpers'
+import { computeAllBuyableCombinations, clearPaymentCache } from '../../../actions/helpers/payment'
 import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
 import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../active-registry'

@@ -10,11 +10,11 @@ import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
 import { incPlacedFarmers } from '../../logic/stats'
-import { computeAllowedPlacementSpaces } from './placement-availability'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'
 
-export { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
 /**
  * Low-level helper: place a worker belonging to `player` onto `space`.
@@ -24,7 +24,7 @@ export { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
  * respect the "space free" rule must check `isSpaceOccupied(space)` first.
  * (canUseOccupied paths bypass that check intentionally.)
  */
-export const placeFarmer = (
+const placeFarmer = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
@@ -36,25 +36,6 @@ export const placeFarmer = (
   addWorkerRef(space, player.id, worker.id)
   recordRoundPlacement(player, space.id, worker.id)
   return { type: 'ok' }
-}
-
-export type PlaceFarmerOnSpaceResult =
-  | { ok: true; space: ActionSpace }
-  | { ok: false; reason: 'invalid' | 'no-worker' }
-
-export function placeFarmerOnSpace(
-  state: GameState,
-  player: PlayerState,
-  spaceId: string,
-): PlaceFarmerOnSpaceResult {
-  const allowed = computeAllowedPlacementSpaces(state, player)
-  if (!allowed.some(a => a.spaceId === spaceId)) return { ok: false, reason: 'invalid' }
-  const space = state.actionSpaces.find(s => s.id === spaceId)!
-  const worker = smallestAvailableWorker(state, player)
-  if (!worker) return { ok: false, reason: 'no-worker' }
-  addWorkerRef(space, player.id, worker.id)
-  recordRoundPlacement(player, space.id, worker.id)
-  return { ok: true, space }
 }
 
 export const placeFarmerAction: ActionDefinition = {

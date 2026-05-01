@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getAssignedAnimalCount, getTotalAnimalCapacity } from '../../actions/effects/animals'
+import { getAssignedAnimalCount, getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A165_PigBreeder'

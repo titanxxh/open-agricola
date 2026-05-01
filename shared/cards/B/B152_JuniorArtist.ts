@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
-import { computeAllowedPlacementSpaces } from '../../actions/effects/placement-availability'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B152_JuniorArtist'

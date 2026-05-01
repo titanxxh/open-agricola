@@ -11,32 +11,23 @@ const afterWishChildrenListener: CardListenerRegistration = {
   id: 'D150-godly-spouse-after-wish-children',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['wish-children-growth'],
+  actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (getRoundPlacementOrder(context.player).length !== 2) return
 
     return {
       flow: {
-        type: 'xor',
+        type: 'leaf',
+        actionId: 'return-first-worker-home',
+        sourceCard: CARD_ID,
+        params: {
+          flagSourceCard: true,
+          logCardTrigger: true,
+        },
+        optional: true,
         promptKey: 'ui.interactionGodlySpouse',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'return-first-worker-home',
-            sourceCard: CARD_ID,
-            params: {
-              flagSourceCard: true,
-              logCardTrigger: true,
-            },
-            choiceLabelKey: 'ui.interactionGodlySpouseUse',
-          },
-          {
-            type: 'leaf',
-            actionId: 'noop',
-            choiceLabelKey: 'ui.interactionGodlySpouseSkip',
-          },
-        ],
+        choiceLabelKey: 'ui.interactionGodlySpouseUse',
       },
     }
   },
@@ -60,7 +51,7 @@ export const D150_GodlySpouse_impl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, _player) => {
-    return { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID }
+    return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }
   },
 },
   reaches: [] as readonly string[],

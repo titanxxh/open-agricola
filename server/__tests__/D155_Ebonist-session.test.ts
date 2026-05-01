@@ -14,6 +14,6 @@ describe('D155_Ebonist exchange metadata', () => {
     expect(xch.to?.food).toBe(1)
     expect(xch.to?.grain).toBe(1)
     expect(xch.max).toBe(1)
-    expect(xch.trigger).toBe('anytime')
+    expect(xch.triggers).toEqual(['anytime'])
   })
 })

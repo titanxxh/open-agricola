@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { runSelectionEffect } from '../../shared/actions/effects/selection-effect-registry'
+import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 import type { GameState, PlayerState , ActionFlow } from '../../shared/game/types'
 
 import '../../shared/cards/E/E76_LumberPile'

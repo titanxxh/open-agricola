@@ -5,7 +5,7 @@ import {
   getPlayerActionSpaceConfig,
   createPlayerActionSpaces,
 } from '../player-action-space'
-import { moveFarmerToSpaceAction } from '../../actions/effects/move-farmer-to-space'
+import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 
 // Import cards to register effects
 import '../A/A28_ForestSchool'

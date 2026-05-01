@@ -42,29 +42,22 @@ const beforeFenceListener: CardListenerRegistration = {
       sourceCard: CARD_ID,
       flow: {
         type: 'xor',
+        optional: true,
         promptKey: 'ui.interactionAshTrees',
-        children: [
-          ...Array.from({ length: stored }, (_, index) => {
-            const count = index + 1
-            return {
-              type: 'leaf' as const,
-              actionId: 'reserve-fence-bonus',
-              sourceCard: CARD_ID,
-              params: {
-                freeFences: count,
-                counterKey: 'fences',
-              },
-              choiceLabelKey: 'ui.interactionAshTreesUseCount',
-              choiceLabelParams: { count },
-            }
-          }),
-          {
-            type: 'leaf',
-            actionId: 'noop',
+        children: Array.from({ length: stored }, (_, index) => {
+          const count = index + 1
+          return {
+            type: 'leaf' as const,
+            actionId: 'reserve-fence-bonus',
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionAshTreesSkip',
-          },
-        ],
+            params: {
+              freeFences: count,
+              counterKey: 'fences',
+            },
+            choiceLabelKey: 'ui.interactionAshTreesUseCount',
+            choiceLabelParams: { count },
+          }
+        }),
       },
     }
   },

@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../game/types'
 import {
   queueFutureMeeplesFlow,
-} from '../../actions/effects/future-meeples'
+} from '../../actions/effects/internal/future-meeples'
 import {
   getStableTilesBuiltThisAction,
   readActionSnapshotToken,

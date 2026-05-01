@@ -8,8 +8,8 @@ import {
   canAffordCardPreviewCostByProvider,
   canAffordCost,
   resolveCardPreviewCostByProvider,
-} from '../../actions/effects/pay-helpers'
-import { computeAllBuyableCombinations, isComplexCost } from '../../actions/effects/pay'
+} from '../../actions/helpers/pay-helpers'
+import { computeAllBuyableCombinations, isComplexCost } from '../../actions/helpers/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 

@@ -10,13 +10,18 @@ const CARD_ID = 'C115_Sower'
 
 const updateInfobox = (reedCount: number): ActionFlow => {
   if (reedCount <= 0) {
-    return { type: 'leaf', actionId: 'clear-card-infobox', sourceCard: CARD_ID }
+    return {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-infobox', text: '' },
+    }
   }
   return {
     type: 'leaf',
-    actionId: 'set-card-infobox',
+    actionId: 'special-effect',
     sourceCard: CARD_ID,
-    params: { text: `${reedCount} Reed` },
+    params: { kind: 'set-infobox', text: `${reedCount} Reed` },
   }
 }
 
