@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
@@ -37,14 +37,13 @@ const opponentGrowsToFiveListener: CardListenerRegistration = {
   },
 }
 
-export const D157_PartyOrganizer = new MinorImprovement({
+export const D157_PartyOrganizer = new Occupation({
   id: CARD_ID,
   name: 'Party Organizer',
   deck: 'D',
   number: 157,
   category: 'FOOD_PROVIDER',
   desc: ["As soon as the next player but you gains their 5th person, you immediately get 8 <FOOD> (not retroactively). During scoring, if only you have 5 people, you get 3 bonus <SCORE>."],
-  cost: {},
   players: '4+',
   newSet: true,
 })
