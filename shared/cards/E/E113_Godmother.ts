@@ -11,7 +11,7 @@ const listener: CardListenerRegistration = {
   id: 'E113-godmother-after-wish-children',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['wish-children', 'wish-children-growth'],
+  actions: ['wish-children', 'family-growth'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },

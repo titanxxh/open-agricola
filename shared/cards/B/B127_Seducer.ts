@@ -27,8 +27,9 @@ export const B127_Seducer_impl = {
         payLeaf({ cardId: CARD_ID, cost: { stone: 1, grain: 1, vegetable: 1, sheep: 1 } }),
         {
           type: 'leaf' as const,
-          actionId: 'grow-family-without-room',
+          actionId: 'family-growth',
           sourceCard: CARD_ID,
+          actionContext: { skipRoomCheck: true },
         },
       ],
     }

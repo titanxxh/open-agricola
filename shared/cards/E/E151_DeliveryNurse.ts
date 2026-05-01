@@ -23,19 +23,24 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'E151-delivery-nurse-replace-wish-children',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['wish-children-growth'],
+  actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     const { sheep, boar, cattle } = context.player.resources
     if (!((sheep ?? 0) > 0 && (boar ?? 0) > 0 && (cattle ?? 0) > 0)) return
-    // Only activate if player has no room for a child (wish-children-growth would fail)
+    // Only activate if player has no room for a child (family-growth would fail)
     if (context.player.rooms > familySize(context.player)) return
     return {
-      actionId: 'grow-family-without-room',
+      actionId: 'family-growth',
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'grow-family-without-room', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'family-growth',
+            sourceCard: CARD_ID,
+            actionContext: { skipRoomCheck: true },
+          },
           { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
         ],
       },

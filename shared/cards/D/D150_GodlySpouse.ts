@@ -11,7 +11,7 @@ const afterWishChildrenListener: CardListenerRegistration = {
   id: 'D150-godly-spouse-after-wish-children',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['wish-children-growth'],
+  actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (getRoundPlacementOrder(context.player).length !== 2) return

@@ -449,6 +449,8 @@ export const zh = {
     },
     'urgent-wish-children': { name: '紧急渴望孩子', description: '无需房间也可增加 1 家庭成员' },
     'wish-children-growth': { name: '家庭增长', description: '增加 1 家庭成员' },
+    'family-growth': { name: '家庭增长', description: '增加 1 家庭成员' },
+    'grow-family-without-room': { name: '紧急家庭增长', description: '无需房间也可增加 1 家庭成员' },
     'minor-improvement': { name: '小改良', description: '打出 1 张小改良' },
     'major-improvement': { name: '大型改良', description: '建造一张大型改良' },
     fencing: { name: '围栏', description: '建造围栏圈地' },

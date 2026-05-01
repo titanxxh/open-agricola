@@ -14,7 +14,7 @@ const beforeWishChildrenListener: CardListenerRegistration = {
   id: 'E130-overachiever-before-wish-children',
   cardIds: [CARD_ID],
   phases: ['before'],
-  actions: ['wish-children-growth'],
+  actions: ['family-growth'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
       flow: { type: 'leaf', actionId: 'improvement-any', optional: true, promptKey: 'ui.interactionOverachieverImprovement', sourceCard: CARD_ID },
