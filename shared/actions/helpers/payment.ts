@@ -5,6 +5,7 @@ import type {
   ComplexCost,
   PaymentSolution,
   Trade,
+  TradeSideEffect,
   Bonus,
   ResourceKey,
   CostModifierType,
@@ -696,15 +697,39 @@ const buildBonusReductions = (
   return result
 }
 
+export const applyTradeSideEffect = (
+  state: GameState,
+  eff: TradeSideEffect,
+  times: number,
+): void => {
+  if (times <= 0) return
+  switch (eff.type) {
+    case 'drainSpace': {
+      const space = state.actionSpaces.find((s) => s.id === eff.spaceId)
+      if (!space?.resources) return
+      const cur = space.resources[eff.resource] ?? 0
+      space.resources[eff.resource] = Math.max(0, cur - times)
+      return
+    }
+  }
+}
+
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
-  options: { trackStats?: boolean; costType?: CostModifierType } = {},
+  options: { trackStats?: boolean; costType?: CostModifierType; state?: GameState } = {},
 ): string | undefined => {
   const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
   for (const key of paidKeys) {
     const amount = solution.resourcesPaid[key] ?? 0
     player.resources[key] -= amount
+  }
+  if (options.state) {
+    for (const { trade, times } of solution.tradesUsed) {
+      if (trade.sideEffect && times > 0) {
+        applyTradeSideEffect(options.state, trade.sideEffect, times)
+      }
+    }
   }
   if (solution.bonusUsed && player._activeActionBonusSources) {
     const seen = new Set(player._activeActionBonusSources)

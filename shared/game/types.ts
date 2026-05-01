@@ -33,12 +33,16 @@ export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
 
+export type TradeSideEffect =
+  | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }
+
 export type Trade = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
   source?: string
   sourceId?: string
+  sideEffect?: TradeSideEffect
 }
 
 export type BonusChoice = {
