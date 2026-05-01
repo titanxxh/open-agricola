@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 import type { CardImpl } from '../registry'
 

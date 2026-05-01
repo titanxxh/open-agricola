@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { positionKey } from '../../game/farm'
 import type { PlayerState } from '../../game/types'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty } from '../../game/field'
 import type { CardImpl } from '../registry'
 

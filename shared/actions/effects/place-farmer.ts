@@ -10,11 +10,11 @@ import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
 import { incPlacedFarmers } from '../../logic/stats'
-import { computeAllowedPlacementSpaces } from './placement-availability'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'
 
-export { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
 /**
  * Low-level helper: place a worker belonging to `player` onto `space`.

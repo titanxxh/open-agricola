@@ -1,6 +1,6 @@
 import type { ActionCostPreview, ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
 import { getAllTilePositions, getNextEmptyTileForPlayer, positionKey } from '../../game/farm'
-import { canExecuteWithCostPreview } from './cost-preview'
+import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 
 export const addField = (player: PlayerState) => {
   const next = getNextEmptyTileForPlayer(player)

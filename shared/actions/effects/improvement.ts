@@ -12,7 +12,7 @@ import {
   canAffordCost,
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
-} from './pay-helpers'
+} from '../helpers/pay-helpers'
 
 /** Cards that satisfy a Fireplace return requirement. */
 const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const

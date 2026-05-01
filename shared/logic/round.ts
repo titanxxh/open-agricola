@@ -1,6 +1,6 @@
 import { applyMajorEffectsToAllPlayers } from '../cards/major'
 import { breedAnimals } from '../actions/effects/breed-animals'
-import { feedFamily } from '../actions/effects/feed-family'
+import { feedFamily } from '../actions/helpers/feed-family'
 import { reap } from '../actions/effects/reap'
 import type { GameState, Resource } from '../game/types'
 

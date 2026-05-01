@@ -4,14 +4,14 @@ import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
-} from '../../actions/effects/pay-helpers.ts'
+} from '../../actions/helpers/pay-helpers.ts'
 import {
   buildRoomCostPerUnit,
   buildTotalRoomCost,
   executeResolvedRoomPayment,
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
-} from '../../actions/effects/room-payment.ts'
+} from '../../actions/helpers/room-payment.ts'
 import { stableWoodCost } from '../../actions/effects/fencing.ts'
 import {
   normalizePlayerFarm,

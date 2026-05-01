@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import type { ActionFlow, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'

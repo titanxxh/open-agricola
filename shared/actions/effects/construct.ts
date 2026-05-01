@@ -1,6 +1,6 @@
 import type { ActionCostPreview, ActionDefinition, PlayerState, Resource } from '../../game/types'
-import { canAffordCost } from './pay-helpers'
-import { getBuildRoomCost, getMaxBuildableRooms } from './room-payment'
+import { canAffordCost } from '../helpers/pay-helpers'
+import { getBuildRoomCost, getMaxBuildableRooms } from '../helpers/room-payment'
 
 export const canAfford = (player: PlayerState, cost: Partial<Resource>) =>
   canAffordCost(player, cost)

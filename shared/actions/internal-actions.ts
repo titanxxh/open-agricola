@@ -42,10 +42,7 @@ import { selectionAction } from './effects/selection'
 import { discardFromHandAction } from './effects/discard-from-hand'
 import { swapFieldGrainToVegAction } from './effects/swap-field-crop'
 import { spendWorkerAction } from './effects/spend-worker'
-import { pushCardStackAction as pushCardStackBatchAction } from './effects/push-card-stack'
 import { writeCardExtraDataAction } from './effects/write-card-extra-data'
-import { holdWorkerOnCardAction } from './effects/hold-worker-on-card'
-import { releaseWorkerFromCardAction } from './effects/release-worker-from-card'
 import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -98,9 +95,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   selectionAction,
   discardFromHandAction,
   swapFieldGrainToVegAction,
-  pushCardStackBatchAction,
   writeCardExtraDataAction,
-  holdWorkerOnCardAction,
-  releaseWorkerFromCardAction,
   specialEffectAction,
 ]
