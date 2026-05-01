@@ -6,9 +6,6 @@ export const setStartPlayer = (state: GameState, player: PlayerState) => {
   })
 }
 
-export const setFirstPlayer = (state: GameState, player: PlayerState) =>
-  setStartPlayer(state, player)
-
 export const setFirstPlayerAction: ActionDefinition = {
   id: 'set-first-player',
   nameKey: 'actions.set-first-player.name',
@@ -17,7 +14,7 @@ export const setFirstPlayerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player }) => {
-    setFirstPlayer(state, player)
+    setStartPlayer(state, player)
     state.log.unshift({
       key: 'log.startPlayer',
       params: { player: player.name },

@@ -18,7 +18,7 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
   return { type: 'ok', logKey: 'log.buildStable' }
 }
 
-export const stablesCostPreview: ActionCostPreview = {
+const stablesCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) => player.stableTiles.length < 4,
   getBaseCost: () => ({ wood: stableWoodCost }),
 }

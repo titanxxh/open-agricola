@@ -1,9 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
-
-export const reorganize = (player: PlayerState): ActionExecutionResult => {
-  void player
-  return { type: 'ok' }
-}
+import type { ActionDefinition } from '../../game/types'
 
 export const anytimeReorgAction: ActionDefinition = {
   id: 'anytime-reorg',
