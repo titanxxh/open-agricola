@@ -2036,12 +2036,24 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 
 ## 15.14.1 effects/ Layout: BGA-aligned root + internal/ (2026-05-01)
 
-`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（24 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（14 个）。
+`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（21 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（14 个）。
 
-- **顶层 21 个 BGA 一一对应**（22 个减去 `pay`——`pay` 没有 ActionDefinition、属于纯算法库，已外迁到 `helpers/payment.ts`）：`activate-card / collect / construct / exchange / fencing / first-player / gain / improvement / occupation / place-farmer / place-future-meeples / place-meeples-from-supply / plow / reap / receive / renovation / reorganize / sow / special-effect / stables / wish-children`。
+- **顶层 18 个 BGA 一一对应**（22 个减去 `pay` / `receive` / `place-future-meeples` / `place-meeples-from-supply`，外加 `wish-children` 改名为 `family-growth`）：`activate-card / collect / construct / exchange / family-growth / fencing / first-player / gain / improvement / occupation / place-farmer / plow / reap / renovation / reorganize / sow / special-effect / stables`。
 - **顶层 3 个半特殊扩展**（语义紧贴 BGA pay / collect / scoring，且自身导出 `ActionDefinition`，不下沉）：`pay-resources / bake-bread / bonus-vp`。
 - **`internal/` 14 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card`。
 - **`registry` (`registerAdHocAction`)** 不是 effect，2026-05-01 已外迁到 `helpers/ad-hoc-action-registry.ts`。
+
+### BGA 对应位但本仓库不实装为 effect 的（实际逻辑由其它路径承担）
+
+| BGA `Actions/*.php` | 我们对应位置 |
+|---|---|
+| `Pay.php`（836 行 ST_PAY 状态节点） | 算法层 `helpers/payment.ts` + leaf 层 `effects/pay-resources.ts`（节点树拆分） |
+| `Receive.php`（接收资源） | 直接走 `effects/gain.ts`（`gainResources / gainAction`），未单独建 receive effect |
+| `PlaceFutureMeeples.php`（130 行） | future-meeple 队列由 `effects/internal/future-meeples.ts` 承担（`futureMeeplesAction` + `queueFutureMeeples / resolveFutureMeepleRequests`） |
+| `PlaceMeeplesFromSupply.php`（147 行） | family-growth 后激活 worker 直接 inline 在 `effects/family-growth.ts` 内用 `activateSmallestInactive` |
+| `WishChildren.php` | 我们重命名为 `effects/family-growth.ts`（actionId `family-growth`；Sprint 6a 已统一 wish-children-growth + grow-family-without-room → family-growth），文件名跟着 actionId |
+
+历史上 receive / place-future-meeples / place-meeples-from-supply 的 .ts 文件曾以"未实装桩"形式存在，2026-05-01 死代码扫描后删除。
 
 新增 effect 时按以下决策：(a) 文件是否导出 `ActionDefinition` → 否则放 `helpers/`（见 §15.18）；(b) 是否对应 BGA `modules/php/Actions/` 中的 PHP action 文件 → 是则放顶层；(c) 否则放 `effects/internal/`。`registerAdHocAction` 返回的 `card_*` 前缀 ad-hoc action 不进 effects/ 目录，直接由卡文件本地构造并注册。
 
