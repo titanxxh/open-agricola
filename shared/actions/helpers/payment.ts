@@ -388,13 +388,18 @@ const canCoverCost = (
 }
 
 /**
- * Evaluate a BonusModifier's `conditions` against the player. Returns true when
- * conditions are satisfied (or no conditions present). The construct path runs
- * a specialized check (`bonusAppliesToRoomCount`) that also evaluates
- * `minNumRooms` against the room count being built; for non-construct cost
- * types we evaluate the same fields against the player's existing room count.
+ * Evaluate `conditions` (player-state dimension). Returns true when conditions
+ * are satisfied (or absent). Used by:
+ *   - getModifiersForCostType (non-construct path) to pre-filter BonusModifier
+ *   - computeAllBuyableCombinations to evaluate ComplexCost.bonuses inline
+ *     conditions on Bonus / BonusChoice.
+ *
+ * The construct path does NOT call this helper: room-payment.ts's
+ * `bonusAppliesToRoomCount` evaluates `minNumRooms` against the build-time
+ * roomCount (semantically "after building N rooms"), which differs from the
+ * player-state evaluation here.
  */
-const bonusModifierConditionsApply = (
+export const evaluateConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
 ): boolean => {
@@ -425,7 +430,7 @@ export const getModifiersForCostType = (
   // conditions are evaluated here against the player's current state.
   if (costType === 'construct') return all
   return all.filter((m) =>
-    m.type !== 'bonus' || bonusModifierConditionsApply(player, m.conditions),
+    m.type !== 'bonus' || evaluateConditions(player, m.conditions),
   )
 }
 
