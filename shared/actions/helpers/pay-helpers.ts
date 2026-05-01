@@ -25,7 +25,7 @@ import {
 } from '../helpers/payment'
 import { executeCardListener, getMatchingListeners, type CardListenerContext } from '../../cards/card-listeners'
 
-export const buildCardCostListenerContext = (
+const buildCardCostListenerContext = (
   state: GameState,
   player: PlayerState,
   actionId: string,
@@ -130,7 +130,7 @@ export const canAffordCost = (
   return canPayCost(player, cost)
 }
 
-export const resolveFlatCost = (
+const resolveFlatCost = (
   baseCost: Partial<Resource>,
   costOverride?: Partial<Resource>,
 ) => applyCostOverride(baseCost, costOverride)
@@ -375,7 +375,7 @@ export const canAffordActionPreviewCost = (
     resolveActionPreviewCost(context, getBaseCost, costOverride),
   )
 
-export const resolveCardPreviewCost = (
+const resolveCardPreviewCost = (
   state: GameState,
   player: PlayerState,
   actionId: string,
@@ -411,7 +411,7 @@ export const resolveCardPreviewCostByProvider = (
     actionCardId,
   )
 
-export const canAffordCardPreviewCost = (
+const canAffordCardPreviewCost = (
   state: GameState,
   player: PlayerState,
   actionId: string,
@@ -455,7 +455,7 @@ export const canAffordCardPreviewCostByProvider = (
     costType,
   )
 
-export const payCardPreviewCost = (
+const payCardPreviewCost = (
   state: GameState,
   player: PlayerState,
   actionId: string,

@@ -104,7 +104,7 @@ const bonusAppliesToRoomCount = (
   return true
 }
 
-export const ROOM_PAYMENT_OPTION_PREFIX = 'pay:room'
+const ROOM_PAYMENT_OPTION_PREFIX = 'pay:room'
 
 type SelectedRoomPayment = {
   type: 'selected'
@@ -370,7 +370,7 @@ export const buildTotalRoomCost = (
   return player ? applyRoomCountBonuses(player, totalCost, roomCount) : totalCost
 }
 
-export const canAffordRoomCount = (
+const canAffordRoomCount = (
   player: PlayerState,
   costPerRoom: RoomUnitCost,
   roomCount: number,

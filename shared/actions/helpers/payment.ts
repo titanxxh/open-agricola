@@ -77,7 +77,7 @@ const RESOURCE_ID: Record<string, number> = {
   sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10
 }
 
-export const PAYMENT_RESOURCE_ORDER: ResourceKey[] = [
+const PAYMENT_RESOURCE_ORDER: ResourceKey[] = [
   'wood',
   'clay',
   'reed',
@@ -386,40 +386,6 @@ const canCoverCost = (
   return keys.every((key) => (resources[key] ?? 0) >= (cost[key] ?? 0))
 }
 
-export const applyTradeModifier = (
-  baseTrades: Trade[],
-  modifier: TradeModifier,
-): Trade[] => {
-  const modifiedTrades: Trade[] = []
-  const sources = modifier.cardId
-
-  for (const baseTrade of baseTrades) {
-    modifiedTrades.push({ ...baseTrade })
-  }
-
-  const newTrade: Trade = {
-    from: modifier.from,
-    to: modifier.to,
-    max: modifier.max ?? 1,
-    source: sources,
-    sourceId: modifier.cardId,
-  }
-  modifiedTrades.push(newTrade)
-
-  return modifiedTrades
-}
-
-export const getEffectiveCost = (
-  baseCost: ComplexCost,
-): ComplexCost => {
-  const result: ComplexCost = { ...baseCost }
-
-  if (!result.trades) result.trades = []
-  if (!result.bonuses) result.bonuses = []
-
-  return result
-}
-
 /**
  * Evaluate a BonusModifier's `conditions` against the player. Returns true when
  * conditions are satisfied (or no conditions present). The construct path runs
@@ -462,7 +428,7 @@ export const getModifiersForCostType = (
   )
 }
 
-export const applyCostModifiers = (
+const applyCostModifiers = (
   baseCost: ComplexCost,
   modifiers: CostModifier[],
 ): ComplexCost => {
