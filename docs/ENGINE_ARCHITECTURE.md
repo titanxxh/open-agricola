@@ -1851,9 +1851,23 @@ A151 Minstrel（returning home phase 触发，仅当唯一一个 stage-1 空间�
 
 construct 路径不变（仍由 `room-payment.ts` 的 `bonusAppliesToRoomCount` 在每次 build 调用时按 `roomCount`（含本次 build）评估，因为 `minNumRooms` 在 construct 上下文是"本次 build 至少 N 个房间"）。
 
-这是 `pay.ts` line 490 TODO 的部分 fix（仅 `BonusModifier.conditions` 覆盖）；`Bonus.conditions`（ComplexCost 内传递的字段）仍未在 `computeAllBuyableCombinations` 评估，留 follow-up。
+**Follow-up resolved (2026-05-01)**：`Bonus.conditions` / `BonusChoice.conditions`（ComplexCost 路径内嵌字段）现也在 `computeAllBuyableCombinations` 评估（`shared/actions/helpers/payment.ts`）。`payment.ts:523-527` TODO 已删。
 
 **用例**：C13 WoodSlideHammer 持 `conditions: { houseTypeWood: 1, minNumRooms: 5 }`：木屋且 ≥5 间时 stone:2 折扣激活；renovate 后 houseType 变 clay/stone，modifier 自动失效（无需手动从 `activeModifiers` 移除）。
+
+### 15.5.1 Conditions 评估路径分工
+
+| 路径 | 评估位置 | 维度 |
+|---|---|---|
+| Construct cost (build-room) | `shared/actions/helpers/room-payment.ts` `bonusAppliesToRoomCount` | player + 当前 build 的 `roomCount`（含本次 build） |
+| 非-construct cost via `BonusModifier` | `shared/actions/helpers/payment.ts` `getModifiersForCostType` | player-state（前置 filter） |
+| `ComplexCost.bonuses` 内嵌 `Bonus.conditions` / `BonusChoice.conditions` | `shared/actions/helpers/payment.ts` `computeAllBuyableCombinations` | player-state（每次 expand 评估） |
+
+`evaluateConditions(player, conditions)` 是后两条路径共用 helper（`payment.ts` export）。construct 路径独立：`roomCount` 维度无法在 `ComplexCost.bonuses` 阶段一次性评估。
+
+`applyCostModifiers` 从 `BonusModifier` 生成 `Bonus` 时**不**propagate `conditions` 字段——modifier 路径已前置 filter，propagate 会导致 evaluator 重复评估。卡牌注入 `bonuses` 用 conditions 时直接写在 ComplexCost 上即可（spec 路径），无需走 modifier。
+
+**已知限制**：renovate-house / engine-driven action 路径下 `computeCosts` listener 返回 `bonuses:[...]` 不会被引擎消费——引擎仅汇总 `costs` (cost delta) 字段并通过 `executionContext.costs` 透传给 action.execute。需要按 player-state conditions 折扣的卡当前应继续用 `BonusModifier` (card definition 上的 `modifier` 字段)，由 `getModifiersForCostType` 路径前置评估 conditions。
 
 ## 15.6 stables effect — `actionContext.zoneFilter / max` (Sprint 5b)
 
