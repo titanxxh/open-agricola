@@ -20,7 +20,6 @@ import { payResourcesAction } from './effects/pay-resources'
 import { returnToSpaceAction } from './effects/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { takeFromCardAction } from './effects/take-from-card'
-import { markCardObservedAction } from './effects/mark-card-observed'
 import { emitChoiceAction } from './effects/emit-choice'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
 import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
@@ -59,7 +58,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   returnToSpaceAction,
   bonusVpAction,
   takeFromCardAction,
-  markCardObservedAction,
   emitChoiceAction,
   returnFirstWorkerHomeAction,
   recallPlacedWorkerAction,

@@ -481,7 +481,6 @@ export const en = {
     'return-to-space': { name: 'Return Resource', description: 'Return resources from your supply to the current action space' },
     'bonus-vp': { name: 'Gain Bonus VP', description: 'Gain 1 bonus victory point for the source card' },
     'take-from-card': { name: 'Take From Card', description: 'Move stored resources from the source card to your supply' },
-    'mark-card-observed': { name: 'Mark Card Observed', description: 'Increase the observed counter for the source card' },
     'grain-thief-protect': { name: 'Protect Grain', description: 'Skip reaping the grain field and gain 1 grain instead' },
     'scythe-harvest-field': { name: 'Scythe Harvest', description: 'Harvest the entire top stack of one field at once' },
     'swap-field-grain-to-veg': { name: 'Swap Field Crop', description: 'Trade a fully sown grain field for 1 vegetable' },

@@ -12,12 +12,11 @@ export const listener: CardListenerRegistration = {
     return {
       decline: true,
       alternativeFlow: {
-        type: 'seq',
+        type: 'leaf',
+        actionId: 'gain',
+        params: { food: 1 },
+        sourceCard: CARD_ID,
         choiceLabelKey: 'actions.gain.name',
-        children: [
-          { type: 'leaf', actionId: 'mark-card-observed', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'gain', params: { food: 1 } },
-        ],
       },
     }
   },
