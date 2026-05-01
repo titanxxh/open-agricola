@@ -1,9 +1,15 @@
 import { Occupation } from '../types'
+import { futureMeeplesNode } from '../../actions/effects/future-meeples'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E139_BunnyBreeder'
 
+/**
+ * E139 Bunny Breeder — On buy, choose a single future round n+i (1 <= i <=
+ * 14 - n). Place i food on that round's space; at the start of that round,
+ * the player gains the food. XOR optional: player may decline.
+ */
 export const E139_BunnyBreeder = new Occupation({
   id: CARD_ID,
   name: 'Bunny Breeder',
@@ -16,29 +22,30 @@ export const E139_BunnyBreeder = new Occupation({
 
 export const E139_BunnyBreeder_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const turnsLeft = 14 - state.round
-    if (turnsLeft <= 0) return
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const turnsLeft = 14 - state.round
+      if (turnsLeft <= 0) return
 
-    const xorChildren: ActionFlow[] = []
-    for (let i = 1; i <= turnsLeft; i++) {
-      // Pre-queue future meeple and offer a corresponding gain node (approximation)
-      xorChildren.push({
-        type: 'leaf' as const,
-        actionId: 'gain',
-        sourceCard: CARD_ID,
-        params: { food: i },
-        // TODO: should place i food on round targetRound space, not gain immediately
-      })
-    }
-
-    return {
-      type: 'xor' as const,
-      optional: true,
-      children: xorChildren,
-    }
+      // Engine XOR child execution path: each child carries an inline
+      // FutureMeepleRequest in params; futureMeeplesAction.execute reads the
+      // request and queues + resolves it. Only the chosen child executes.
+      const children: ActionFlow[] = []
+      for (let i = 1; i <= turnsLeft; i += 1) {
+        children.push(
+          futureMeeplesNode({
+            cardId: CARD_ID,
+            playerId: player.id,
+            entries: [{ round: state.round + i, resources: { food: i } }],
+          }),
+        )
+      }
+      return {
+        type: 'xor',
+        optional: true,
+        children,
+      }
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
