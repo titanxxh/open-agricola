@@ -57,6 +57,14 @@ export const E53_BoarSpear = new MinorImprovement({
   desc: ['Each time you get at least 1 <PIG> outside of the breeding phase of a harvest, you can immediately turn them into 4 <FOOD> each.'],
   vp: 1,
   cost: { wood: 1, stone: 1 },
+  exchanges: [
+    // E53 trade is surfaced both via the anytime cookery window (legacy
+    // behaviour preserved from the hardcoded `cookeryTrades` table) and via
+    // listener-driven `tradeIds: ['E53_BoarSpear']`. BGA narrows visibility
+    // to the listener-driven path only, but matching that requires UI churn
+    // outside Sprint 6a; tracked under simplifications.
+    { from: { boar: 1 }, to: { food: 4 }, sourceId: CARD_ID, triggers: ['anytime'] },
+  ],
 })
 
 export const E53_BoarSpear_impl = {

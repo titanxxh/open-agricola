@@ -1,5 +1,6 @@
 import type { Resource, ComplexCost } from '../../game/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
+import type { CardExchange } from '../types'
 
 export type MajorEffectHook = CardEffectHook
 
@@ -15,4 +16,5 @@ export type MajorCardEffect = CardEffect & {
     resource: keyof Resource
     map: Record<string, number>
   }
+  exchanges?: CardExchange[]
 }

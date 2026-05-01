@@ -10,6 +10,7 @@ import { familySize, newbornCount } from '../../../shared/game/player'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
+  exchangeTriggers,
 } from '../../../shared/cards/types'
 
 export type HarvestFeedPending = {
@@ -245,7 +246,7 @@ export const buildHarvestFeedOptions = (
     const card = getRegisteredMinorImprovement(cardId)
     if (!card?.exchanges) continue
     for (const ex of card.exchanges) {
-      if (ex.trigger !== 'harvest') continue
+      if (!exchangeTriggers(ex).includes('harvest')) continue
       const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
       if (fromKeys.length !== 1) continue
       const fromKey = fromKeys[0]!
@@ -267,7 +268,7 @@ export const buildHarvestFeedOptions = (
     const card = getRegisteredOccupation(cardId)
     if (!card?.exchanges) continue
     for (const ex of card.exchanges) {
-      if (ex.trigger !== 'harvest') continue
+      if (!exchangeTriggers(ex).includes('harvest')) continue
       const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
       if (fromKeys.length !== 1) continue
       const fromKey = fromKeys[0]!
@@ -313,7 +314,7 @@ export const startHarvestCore = (nextState: GameState) => {
           const card = getRegisteredMinorImprovement(cardId)
           if (!card?.exchanges) continue
           for (const ex of card.exchanges) {
-            if (ex.trigger !== 'harvest') continue
+            if (!exchangeTriggers(ex).includes('harvest')) continue
             const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
             if (fromKeys.length !== 1) continue
             const fromKey = fromKeys[0]!
@@ -324,7 +325,7 @@ export const startHarvestCore = (nextState: GameState) => {
           const card = getRegisteredOccupation(cardId)
           if (!card?.exchanges) continue
           for (const ex of card.exchanges) {
-            if (ex.trigger !== 'harvest') continue
+            if (!exchangeTriggers(ex).includes('harvest')) continue
             const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
             if (fromKeys.length !== 1) continue
             const fromKey = fromKeys[0]!

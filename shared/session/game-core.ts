@@ -82,7 +82,8 @@ import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation, exchangeTriggers } from '../cards/types.ts'
+import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
@@ -580,21 +581,11 @@ export class GameCore {
     })
   }
 
-  private hasHarvestCooking(player: PlayerState) {
-    if (
-      player.improvements.some(
-        (id) => id.startsWith('Major_Fireplace') || id.startsWith('Major_CookingHearth'),
-      )
+  private hasAnyHarvestExchange(player: PlayerState) {
+    return (
+      getExchangesInWindow(player, 'harvest').length > 0 ||
+      getExchangesInWindow(player, 'anytime').length > 0
     )
-      return true
-    for (const cardId of player.minorPlayed) {
-      const card = getRegisteredMinorImprovement(cardId)
-      if (!card?.exchanges) continue
-      for (const ex of card.exchanges) {
-        if (ex.trigger === 'harvest') return true
-      }
-    }
-    return false
   }
 
   private findNextHarvestReorgPlayer(afterPlayerIndex: number) {
@@ -1471,9 +1462,11 @@ export class GameCore {
         continue
       }
 
-      const hasCooking = this.hasHarvestCooking(player)
-      const canConvert = player.resources.grain > 0 || player.resources.vegetable > 0 ||
-        (hasCooking && (player.resources.sheep > 0 || player.resources.boar > 0 || player.resources.cattle > 0))
+      const hasHarvestExchange = this.hasAnyHarvestExchange(player)
+      const canConvert =
+        player.resources.grain > 0 ||
+        player.resources.vegetable > 0 ||
+        hasHarvestExchange
 
       if (canConvert) {
         feedQueue.push({ index: i, remaining, foodUsed: useFood })
@@ -2225,7 +2218,7 @@ export class GameCore {
             : undefined
       if (!card?.exchanges) return sel
       const exchange = card.exchanges.find((ex) => {
-        if (ex.trigger !== 'harvest') return false
+        if (!exchangeTriggers(ex).includes('harvest')) return false
         const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
         if (fromKeys.length !== 1) return false
         const fromKey = fromKeys[0]!

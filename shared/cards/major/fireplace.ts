@@ -14,10 +14,18 @@ export const fireplace1: MajorCardEffect = {
     '[__Bake Bread__ action:]',
     '<GRAIN> <ARROW> 2<FOOD>',
   ],
+  exchanges: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1', triggers: ['anytime'] },
+    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1', triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace1', triggers: ['anytime'] },
+    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1', triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1', triggers: ['bake-bread'] },
+  ],
 }
 
 export const fireplace2: MajorCardEffect = {
   ...fireplace1,
   id: 'Major_Fireplace2',
   cost: { clay: 3 },
+  exchanges: fireplace1.exchanges?.map((ex) => ({ ...ex, sourceId: 'Major_Fireplace2' })),
 }
