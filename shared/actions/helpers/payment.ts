@@ -492,10 +492,6 @@ const validateBonus = (bonus: Bonus): void => {
   if (hasChoices && (bonus.choices!.length === 0)) {
     throw new Error('Bonus.choices must be a non-empty array')
   }
-  // TODO(cost-modifier-coverage): Bonus.conditions / BonusChoice.conditions is
-  // propagated through applyBonusModifier and applyCostModifiers but not yet
-  // evaluated by computeAllBuyableCombinations. See
-  // docs/superpowers/specs/2026-04-20-cost-modifier-coverage-design.md §"out of scope".
 }
 
 export const computeAllBuyableCombinations = (
@@ -539,6 +535,12 @@ export const computeAllBuyableCombinations = (
       let bonusPaths: BonusPath[] = [{ cost: baseFee, sources: [] }]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
+        // Bonus-level conditions: if not satisfied, the entire bonus is a
+        // no-op for this player (preserve existing bonusPaths unchanged).
+        if (!evaluateConditions(player, bonus.conditions)) {
+          continue
+        }
+
         const expanded: BonusPath[] = []
         // If optional, include a "skip" path that keeps the existing costs.
         if (bonus.optional) {
@@ -546,10 +548,22 @@ export const computeAllBuyableCombinations = (
             expanded.push({ cost: path.cost, sources: [...path.sources] })
           }
         }
-        // For each existing path, try each candidate discount.
-        const candidates: { discount: Partial<Resource>; sources?: string[] }[] =
+        // BonusChoice-level conditions: filter candidates whose conditions
+        // are not satisfied. If all candidates are filtered out, the bonus
+        // is treated as inapplicable (continue without polluting bonusPaths).
+        const rawCandidates: {
+          discount: Partial<Resource>
+          sources?: string[]
+          conditions?: Record<string, number>
+        }[] =
           bonus.choices ??
           [{ discount: bonus.discount!, sources: bonus.sources }]
+        const candidates = rawCandidates.filter((c) =>
+          evaluateConditions(player, c.conditions),
+        )
+        if (candidates.length === 0) {
+          continue
+        }
         for (const path of bonusPaths) {
           for (const candidate of candidates) {
             const nextCost = applyBonus(path.cost, candidate.discount)
