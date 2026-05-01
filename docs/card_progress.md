@@ -16,11 +16,11 @@
 | A | 180 | 158 | 4 | 0 | 0 |
 | B | 180 | 159 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
-| D | 181 | 159 | 1 | 1 | 0 |
-| E | 169 | 159 | 0 | 2 | 1 |
-| **总计** | **892** | **828** | **5** | **3** | **0** |
+| D | 181 | 160 | 1 | 0 | 0 |
+| E | 169 | 160 | 0 | 1 | 1 |
+| **总计** | **892** | **830** | **5** | **1** | **0** |
 
-**截至 2026-04-30 Sprint 6a：828/892 = 92.8%。**（Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139；同期重写 D92。同期登记 4 个通用机制：cookery exchange metadata 字段统一、harvest selector 通用化、family-growth 统一、special-effect mutation dispatcher。）
+**截至 2026-05-01 Sprint 6c：830/892 = 93.0%。**（Sprint 6c 新增 2 张：D94 HenpeckedHusband + E155 Visionary——D94 监听 construct after 触发 return-first-worker-home；E155 isDoable phase 拦截 round<11 + 任一对手未 grown 时的 family-growth。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139；同期重写 D92。同期登记 4 个通用机制：cookery exchange metadata 字段统一、harvest selector 通用化、family-growth 统一、special-effect mutation dispatcher。）
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -47,6 +47,11 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-01 Sprint 6c — D94 HenpeckedHusband + E155 Visionary 两张 stub 卡补实现**：
+  - **D94 HenpeckedHusband**：替换 stub listener 为 `phases:['after']` + `actions:['construct']`，handler 在 `getRoundPlacementOrder(player).length === 2`（恰好放完第二个农夫到 farm-expansion + 触发 construct）时返回 `return-first-worker-home` leaf。Meeting Place 例外完全靠现有 `MEETING_PLACE_IDS` Set 在 return-first-worker-home action 内部判定，listener 不再做额外过滤。0 主路径改动，0 hook/action 新增。
+  - **E155 Visionary**：追加 isDoable phase listener `actions:['family-growth']`，当 `state.round < 11` 且任一对手 `familySize === 2`（仍未 grown 过）时返回 `{ doable: false }` 阻断 family-growth；其他场景 silently return undefined 让默认 doability 生效。覆盖所有 family-growth 入口（Sprint 6a 已统一 actionId）：常规/urgent wish-children + D92 / E22 / E151 / E92 / C92 / C24 / C127 / B127 / D21 listener 派发。原 onBuy（round ≤ 4 给 1 stone + 1 vegetable + 2 boar）保留。
+  - 测试新增：D94 4 例（length === 2 触发 / length === 1 跳过 / length === 3 跳过 / meeting-place 时 listener 仍 fire 但 return-first-worker-home action 自身判 no-op）+ E155 5 例（round 5 + 对手未 grown → block / round 5 + 对手已 grown → allow / round 11 + 对手未 grown → allow / round ≤ 4 onBuy 给资源 / round 5+ onBuy no-op）。
+  - effects/ 文件数：0 变化（45 → 45），完全卡内闭环。spec / plan：`docs/superpowers/specs/2026-05-01-sprint-6c-d94-e155-design.md` / `docs/superpowers/plans/2026-05-01-sprint-6c-d94-e155.md`。
 - **2026-04-30 Sprint 6b — effects/ 反模式清理 + 6a follow-up**：
   - **Batch A — dead code + helper relocation**：删除 3 个真 dead 文件（`push-card-stack` / `hold-worker-on-card` / `release-worker-from-card`，0 actionId caller），新建 `shared/actions/helpers/` 目录把 7 个非 ActionDefinition helper 文件迁出 effects/（pay-helpers / cost-preview / room-payment / placement-availability / placement-constants / selection-effect-registry / feed-family）+ 配套 helper 测试。
   - **Batch B — ad-hoc action registry**：新增 `shared/actions/effects/registry.ts` 提供 `registerAdHocAction(def)` / `getAdHocAction(id)`，id 强制 `card_` 前缀；接入 `getActionDefinition` lookup fallback（`shared/actions/index.ts`）。4 张单卡 effect 内联到卡文件并删 effects 文件：E112 GrainThief（grain-thief-protect）/ E73 Scythe（scythe-harvest-field）/ B146 Illusionist（discard-from-hand）/ C69 LandConsolidation（swap-field-grain-to-veg）。LLM workshop ast-validator 不放行 `card_*` 前缀，单卡 ad-hoc action 是 repo-internal-only。
@@ -193,7 +198,7 @@
 > - **D 牌组 getExchangeResources 简化（≥4 张：D35/D38/D45/D84）** — 只看 `player.resources.{animal}` 忽略场上动物（pasture/stable）。BGA 含场上+supply。**修复路线：建一个共享 helper `getEffectiveExchangeAnimals(player, kind)`**
 > - **C 牌组跨卡协作机制缺失（多张：C18/C25/C27/C49/C75/C84/C130）** — sharedScoring / forceSkip / computeReplace / farm-hand stable / Wolf 联动 / reorganize / hollow 二人版等机制
 >
-> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / A165 / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / D94 / ~~D108~~ ✅ Sprint 6a / D131 / ~~D157~~ ✅ Sprint 6a / E58 / E134 / ~~E139~~ ✅ Sprint 6a / E153 / E155（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写）
+> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / A165 / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / D131 / ~~D157~~ ✅ Sprint 6a / E58 / E134 / ~~E139~~ ✅ Sprint 6a / E153 / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修）
 >
 > **2026-04-28 深度池 40 张**（保留以下）：
 
@@ -632,6 +637,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5b (C23/A38/A1/A22/E16 tail-fixes + stables actionContext + fencing entry-guard hook) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 6a (cookery exchange metadata 化 + 6 张 stub 卡 + family-growth 统一 + special-effect dispatcher) | 04-30 | +6 | 828 | 92.8% |
 | Sprint 6b (effects/ cleanup + 6a follow-up: 4 batch + 2 收尾, 63→45 files) | 04-30 | 0 | 828 | 92.8% |
+| Sprint 6c (D94 HenpeckedHusband + E155 Visionary 两张 stub 补实现) | 05-01 | +2 | 830 | 93.0% |
 
 ### 2026-04-17 Wave 1-9 明细
 
