@@ -462,7 +462,6 @@ export const zh = {
     'return-to-space': { name: '放回资源', description: '将自己供给区中的资源放回当前行动格' },
     'bonus-vp': { name: '获得加分', description: '为来源卡牌获得 1 点额外分数' },
     'take-from-card': { name: '从卡牌取资源', description: '把来源卡牌上存放的资源移到自己的供给区' },
-    'mark-card-observed': { name: '标记卡牌观测', description: '为来源卡牌增加一次观测计数' },
     'grain-thief-protect': { name: '保护谷物', description: '阻止当前谷物田被收割并改取 1 谷物' },
     'scythe-harvest-field': { name: '镰刀收割', description: '一次收完一块田顶层的所有作物' },
     'swap-field-grain-to-veg': { name: '田地置换', description: '把一块满谷物田换成一格蔬菜' },

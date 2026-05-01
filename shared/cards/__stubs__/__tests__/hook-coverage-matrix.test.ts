@@ -27,7 +27,6 @@ import { getFenceCount } from '../../../actions/effects/fencing'
 import { requireActiveCardRegistry } from '../../active-registry'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
-const markCardObservedAction = internalActionDefinitions.find(a => a.id === 'mark-card-observed')!
 
 const runToCompletion = (engine: Engine, context: { state: GameState; player: PlayerState; space: ActionSpace }) => {
   let step = engine.proceed(context)
@@ -691,7 +690,6 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const registry = new ActionRegistry()
     registry.register(sowAction)
     if (gainAction) registry.register(gainAction)
-    if (markCardObservedAction) registry.register(markCardObservedAction)
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'sow')),
       registry,
@@ -716,7 +714,6 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
 
     expect(player.fields.length).toBe(originalFieldCount)
     expect(player.resources.food).toBe(1)
-    expect(player.cardStates?.[DECLINE_ID]?.counters?.observedCount).toBe(1)
   })
 
   it('does not decline when card not played', () => {
