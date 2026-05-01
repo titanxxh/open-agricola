@@ -1,5 +1,3 @@
-import type { PlayerFarmState } from '../shared/logic/farm/fence-validation'
-
 export type ApiValidationError = {
   code: string
   message: string
@@ -71,7 +69,3 @@ export const validateMultiTilePayload = (payload: {
   return null
 }
 
-export const hasPlayer = (
-  players: PlayerFarmState[] | undefined,
-  playerId: string | undefined,
-) => !!playerId && Array.isArray(players) && players.some((item) => item.id === playerId)

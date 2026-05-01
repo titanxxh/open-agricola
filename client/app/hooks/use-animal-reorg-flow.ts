@@ -46,7 +46,7 @@ export const applyAnimalReorgToPlayer = (params: {
   player.resources.cattle = totals.cattle
 }
 
-export const getReorgFenceExtraWood = (promptKey: string | undefined, spaceId: string) =>
+const getReorgFenceExtraWood = (promptKey: string | undefined, spaceId: string) =>
   promptKey === 'ui.interactionFenceSelect' && spaceId === 'farm-redevelopment' ? 1 : 0
 
 export const buildPendingChoiceFromReorgProgress = (

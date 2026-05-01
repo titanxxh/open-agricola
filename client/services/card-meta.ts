@@ -122,11 +122,6 @@ const getCustomCardMeta = (id: string): CardMeta | undefined => {
 export const getCardMeta = (id: string): CardMeta | undefined =>
   manifestCache?.[id] ?? getCustomCardMeta(id)
 
-export const isCardsManifestReady = (): boolean => manifestCache !== null
-
-export const getAllCardMetas = (): Record<string, CardMeta> | null =>
-  manifestCache
-
 /** Test-only helper: discard cache + in-flight promise. Do not call from runtime. */
 export const __resetCardsManifestCache = (): void => {
   manifestCache = null
