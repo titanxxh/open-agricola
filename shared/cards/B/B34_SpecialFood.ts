@@ -59,23 +59,13 @@ const buildBonusVpFlow = (count: number) => ({
 })
 
 const buildSpecialFoodFlow = (count: number, ambiguous: boolean): ActionFlow => {
-  if (!ambiguous) {
-    return buildBonusVpFlow(count)
-  }
+  const flow = buildBonusVpFlow(count)
+  if (!ambiguous) return flow
   return {
-    type: 'xor',
+    ...flow,
+    optional: true,
     promptKey: 'ui.interactionReclamationPlowAmbiguous',
-    children: [
-      {
-        ...buildBonusVpFlow(count),
-        choiceLabelKey: 'ui.interactionReclamationPlowUse',
-      },
-      {
-        type: 'leaf',
-        actionId: 'noop',
-        choiceLabelKey: 'ui.interactionReclamationPlowDecline',
-      },
-    ],
+    choiceLabelKey: 'ui.interactionReclamationPlowUse',
   }
 }
 

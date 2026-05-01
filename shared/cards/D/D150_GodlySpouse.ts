@@ -18,25 +18,16 @@ const afterWishChildrenListener: CardListenerRegistration = {
 
     return {
       flow: {
-        type: 'xor',
+        type: 'leaf',
+        actionId: 'return-first-worker-home',
+        sourceCard: CARD_ID,
+        params: {
+          flagSourceCard: true,
+          logCardTrigger: true,
+        },
+        optional: true,
         promptKey: 'ui.interactionGodlySpouse',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'return-first-worker-home',
-            sourceCard: CARD_ID,
-            params: {
-              flagSourceCard: true,
-              logCardTrigger: true,
-            },
-            choiceLabelKey: 'ui.interactionGodlySpouseUse',
-          },
-          {
-            type: 'leaf',
-            actionId: 'noop',
-            choiceLabelKey: 'ui.interactionGodlySpouseSkip',
-          },
-        ],
+        choiceLabelKey: 'ui.interactionGodlySpouseUse',
       },
     }
   },

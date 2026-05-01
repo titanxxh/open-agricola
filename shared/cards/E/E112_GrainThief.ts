@@ -63,22 +63,13 @@ export const E112_GrainThief_impl = {
     const children: ActionFlow[] = grainFields.map(({ field, index }) => {
       const grainStack = fieldFindStackOfKind(field, 'grain')
       return {
-        type: 'xor' as const,
-        children: [
-          {
-            type: 'leaf' as const,
-            actionId: PROTECT_ACTION_ID,
-            params: { fieldIndex: index },
-            sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.grainThiefProtect',
-            choiceLabelParams: { remaining: grainStack?.remaining ?? 0 },
-          },
-          {
-            type: 'leaf' as const,
-            actionId: 'noop',
-            choiceLabelKey: 'ui.grainThiefNormalHarvest',
-          },
-        ],
+        type: 'leaf' as const,
+        actionId: PROTECT_ACTION_ID,
+        params: { fieldIndex: index },
+        sourceCard: CARD_ID,
+        optional: true,
+        choiceLabelKey: 'ui.grainThiefProtect',
+        choiceLabelParams: { remaining: grainStack?.remaining ?? 0 },
       }
     })
     return { type: 'seq', children }

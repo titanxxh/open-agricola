@@ -2038,6 +2038,18 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 
 `CardExchange.trigger?: ExchangeWindow` (legacy singular) and the `exchangeTriggers()` compat helper deleted. Only `triggers?: ExchangeWindow[]` remains. 18 carry-over cards from 6a migrated to array form. Empty array = listener-only (visible only via `actionContext.tradeIds`); E53 BoarSpear adopts this. `CanBeExecutedByPlayerContext` now carries `actionContext?: Record<string, unknown>` (engine.ts pass-through), so `anytimeExchangeAction.canBeExecutedByPlayer` can see listener-driven `tradeIds` and avoid spurious "no doable trade" early-resolves.
 
+## 15.16 OptionalNode 自动 lift over OrNode/XorNode (2026-05-01)
+
+`OptionalNode` 包 `OrNode`/`XorNode` 时，引擎不再走"做/不做 → 选哪个"两步交互，而是自动展平成"N 个分支 + skip"一步选择。
+
+- **proceed**：`OptionalNode` 的 child 是 `OrNode`/`XorNode` 时，立刻 `active=true` 并返回 `ok`，让 `nextUnresolved` 直接进入子节点；
+- **proceed (OrNode/XorNode)**：当父节点是 `OptionalNode` 时，options 列表末尾追加 `{ value: '__skip__', labelKey: 'ui.interactionOptionalSkip' }`；options 为空时同时 resolve 父 `OptionalNode`；
+- **resolveChoice (OrNode/XorNode)**：当 choice === `__skip__` 且父节点是 `OptionalNode` 时，调 `resolveSubtree(node)` 把 OrNode/XorNode 整棵子树标 resolved，再 resolve 父 `OptionalNode`。
+
+效果：卡牌侧可以用 `{ type: 'xor', optional: true, children: [...] }` / `{ type: 'or', optional: true, children: [...] }` 表达"N 选 1 或不做"，不必再用 `OrNode + 末尾 noop decline leaf` 的 workaround。`leaf + optional: true` 行为不变，仍是单 ActionNode 的"做/不做"双选项。
+
+`shared/actions/effects/noop.ts` 已删除——卡牌不应再依赖 `actionId: 'noop'` 占位 leaf。Decline / Skip 文案统一走 `ui.interactionOptionalSkip`。
+
 ## 16. 当前结论
 
 项目的主设计应明确为：

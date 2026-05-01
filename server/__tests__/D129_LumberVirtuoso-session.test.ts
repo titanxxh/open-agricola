@@ -85,14 +85,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
-    // Activate the optional flow (choose non-skip option)
-    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(activateOption).toBeDefined()
-    resp = session.resolveChoice(0, activateOption!.value)
-
-    // With wood house, we get XOR: stables (first) vs construct (second)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    // One-step XOR: stables / construct / skip
     const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
@@ -118,13 +111,6 @@ describe('D129_LumberVirtuoso session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
-    // Activate the optional flow
-    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(activateOption).toBeDefined()
-    resp = session.resolveChoice(0, activateOption!.value)
-
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
     const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 

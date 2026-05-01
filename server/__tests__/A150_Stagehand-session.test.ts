@@ -73,16 +73,9 @@ describe('A150_Stagehand session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
-    // First choice: optional wrapping — pick any non-skip to activate the XOR
-    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(activateOption).toBeDefined()
-    resp = session.resolveChoice(0, activateOption!.value)
-
-    // Second choice: the XOR with fence, stables, construct
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    // One-step XOR: fence, stables, construct, skip
     const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
-    expect(xorOptions.length).toBe(3) // fence, stables, construct
+    expect(xorOptions.length).toBe(3)
 
     // Choose construct (find it by label)
     const constructOption = xorOptions.find((o: ActionChoiceOption) => o.labelKey?.includes('construct'))

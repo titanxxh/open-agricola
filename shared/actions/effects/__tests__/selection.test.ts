@@ -101,7 +101,7 @@ describe('selection action with occupation-hand kind', () => {
 
   it('resolveChoice propagates a flow returned by the effect handler', () => {
     const player = createMockPlayer()
-    const testFlow = { type: 'leaf' as const, actionId: 'noop', sourceCard: 'TEST' }
+    const testFlow = { type: 'leaf' as const, actionId: 'special-effect', sourceCard: 'TEST' }
 
     registerSelectionEffect('test-flow-effect', () => testFlow)
 

@@ -11,8 +11,8 @@ export const setFirstPlayer = (state: GameState, player: PlayerState) =>
 
 export const setFirstPlayerAction: ActionDefinition = {
   id: 'set-first-player',
-  nameKey: 'actions.noop.name',
-  descriptionKey: 'actions.noop.description',
+  nameKey: 'actions.set-first-player.name',
+  descriptionKey: 'actions.set-first-player.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
