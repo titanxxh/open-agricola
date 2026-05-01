@@ -434,7 +434,7 @@ export const getModifiersForCostType = (
   )
 }
 
-const applyCostModifiers = (
+export const applyCostModifiers = (
   baseCost: ComplexCost,
   modifiers: CostModifier[],
 ): ComplexCost => {
