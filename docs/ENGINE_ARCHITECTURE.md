@@ -2108,7 +2108,7 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 - `selection-effect-registry.ts`（卡牌驱动 selection 的 handler 注册表）
 - `feed-family.ts`（收获喂食算法）
 - `animal-zones.ts`（牧场 / 房屋 / 棚圈动物分布与容量计算；被 11 张卡 + card-effects 中枢消费）
-- `breed-animals.ts`（收获繁殖子流程，唯一调用点 `shared/logic/round.ts`）
+  > 2026-05-01 Sprint 5c：`breed-animals.ts` 已删除；繁殖统一走 `effects/breed.ts`（exports `breed()` core / `breedAction` / `breedLeaf`）。harvest 通过跨玩家 SEQ([PlayerSwitch + breedLeaf('harvest')]) 经 engine；A165 PigBreeder 用 `effect.onAfterRoundEnd` 返回 `breedLeaf(CARD_ID, ['boar'])`。breedAction.execute 在繁殖发生时 return `{type:'animalReorg'}` 让 game-core 自动设 pending，engine `after` phase listener 自然 fire 给 onBreed-aware 卡。
 - `ad-hoc-action-registry.ts`（卡内私有 actionId 的运行时注册器；4 张卡用 `card_*` 前缀注册自己的私有 action）
 
 ### 对应 BGA 的对照
@@ -2128,6 +2128,36 @@ BGA `Pay.php` 是 PHP 状态机节点（state `ST_PAY`，836 行），同时承�
 - `effects/internal/registry.ts` → `helpers/ad-hoc-action-registry.ts`
 
 新增 effect 前必须自查：是否有 `ActionDefinition` export？是否能在节点树 dispatch？是否能挂 listener？任何一条不成立，写到 `helpers/`，不要污染 `effects/`。
+
+## 15.19 Trade.sideEffect 数据驱动 dispatcher (Sprint 5c)
+
+`Trade` 类型新增可选 `sideEffect?: TradeSideEffect` 字段，用于把"应用此 trade 时除了改 player 资源外还需要做的副作用"以数据形式声明。当前唯一变体：
+
+```ts
+type TradeSideEffect =
+  | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }
+```
+
+`shared/actions/helpers/payment.ts` 新增 `applyTradeSideEffect(state, eff, times)` switch dispatcher：`drainSpace` 把指定 `actionSpaces.id` 上的指定资源减 `times`（clamp 到 0）。`executePaymentSolution` 在应用 `solution.tradesUsed` 时调它（仅当 caller 传入 `state` 参数才生效；老 caller 不传 state 时无副作用，向后兼容）。
+
+`payTypedFlatCost` / `payCardPreviewCost` / `executeResolvedTypedFlatPayment` 三个 wrapper 都新增可选 `state` 参数把它向下透传。
+
+落地用例：B155 ArtTeacher computeCosts listener 注入 `{ from:{}, to:{food:1}, max:tpFood, sideEffect:drainSpace('traveling-players','food') }` trade。玩家选用时 payment 路径自动从 traveling-players 抽 food，不需要每张这类卡在 listener 里手动 mutate `state.actionSpaces`。
+
+新增 effect 类型只需在 `applyTradeSideEffect` switch 加 case + 在 `TradeSideEffect` union 加 variant。
+
+## 15.20 onAfterRoundEnd hook (CardEffect) (Sprint 5c)
+
+`CardEffectHook` 联合（`shared/cards/card-effects.ts`）已含 `'onAfterRoundEnd'`；`CardEffect.onAfterRoundEnd?: FlowEffectHandler`。`runCardEffectHook` 通过 generic handler 派发，return value 是 `ActionFlow | void`。
+
+在 `game-core.ts` 中：
+
+- `finalizeRound` → `continueAfterRoundEnd` → `continueStageHook('onAfterRoundEnd', ...)`
+- `continueStageHook` 调 `runCardEffectHook(state, player, cardId, hook)`，若 effect 返回 ActionFlow 则 `startStageFlow(flow, 'onAfterRoundEnd', ...)`
+- `resumeStageFlow` 的 `'onAfterRoundEnd'` case 完成后回到 `continueAfterRoundEnd` 继续下一卡 / 玩家
+- engine 跑 leaf 时若 leaf return `{type:'animalReorg'}`（如 `breedAction`），game-core line 1738 自动设 `pending = animalReorg`
+
+落地用例：A165 PigBreeder `effect.onAfterRoundEnd`：检查 `state.round===12 + boar≥2 + free capacity > 0`，return `breedLeaf(CARD_ID, ['boar'])`。
 
 ## 16. 当前结论
 

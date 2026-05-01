@@ -37,7 +37,7 @@
 |---|---|---|---|
 | ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 38 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134） | 行为与 BGA 偏差，是 bug | 排期修 |
+| ⚠ 行为偏差待修（§2.3） | 36 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134；Sprint 5c 完整对齐 A165 + B155） | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 55 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay + 2026-04-30 A14 banned 迁入 §2.5——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
 | 🔀 刻意偏离 BGA（§2.5） | 12 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
@@ -46,6 +46,17 @@
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
+
+- **2026-05-01 Sprint 5c — A165 PigBreeder + B155 ArtTeacher 完整对齐 BGA + 4 处通用扩展**：
+  - **A165 PigBreeder**：删 `effect.onRoundEnd` 直接 +=1，改用 `effect.onAfterRoundEnd` 返回 `breedLeaf(CARD_ID, ['boar'])`。`breedAction.execute` 在 boar+=1 后 return `{type:'animalReorg'}`，game-core line 1738 既有 stage-flow leaf 自动 pending → 玩家做 reorg。Engine `after` phase listener 在 leaf 完成时自然 fire（dispatcher.ts:222），actionContext 含 sourceCard='A165_PigBreeder' / animalTypes=['boar']，给 onBreed-aware 卡（含未来 ChampionBreeder 改写）提供事件链入口。
+  - **B155 ArtTeacher**：删 `before lessons/lessons-4` 强制 drain listener，改用 `computeCosts` listener on play-occupation 注入 trade `{from:{}, to:{food:1}, max:tpFood, sideEffect:drainSpace(traveling-players, food)}`。覆盖任何 occupation cost 入口（不止 lessons / lessons-4 / anytime occupation）。Note: payment 路径 auto-pick 第一个 buyable solution 而非 prompt，导致玩家在「自付 food vs B155 trade」等价时不被显式问选——视为 acceptable simplification，资源会计与 BGA 一致；玩家选择权的通用化留给后续 sprint。
+  - **4 处通用扩展**（数据驱动、非 cardId 分支）：
+    1. `shared/actions/effects/breed.ts` — 统一 breed effect (`breed()` core / `breedAction` / `breedLeaf`)；harvest + A165 共用；删除 `helpers/breed-animals.ts`。
+    2. `Trade.sideEffect.drainSpace` — `applyTradeSideEffect` 数据驱动 dispatcher in `payment.ts`；`executePaymentSolution` 新增 optional `state` 参数，沿 `payTypedFlatCost` / `payCardPreviewCost` / `executeResolvedTypedFlatPayment` 链路传透。
+    3. `CardEffect.onAfterRoundEnd?: FlowEffectHandler` — round 末延迟动作类卡通用 hook（实际类型 + game-core stage chain 已在仓库存在；本 sprint 仅 A165 接入）。
+    4. harvest path 迁移到 leaf flow — harvest breed 现在通过 `SEQ([PlayerSwitch + breedLeaf('harvest')])` 走 engine；新增 `'onBreedPhase'` StageResumeState hook + resumeStageFlow case 路由回 `continueEndHarvestEffects`。删旧的 `applyBreedPhase` 和 ad-hoc `hasPendingAnimals` 检查。
+  - **测试**：A165 7 case（5 unit + 2 session-integration 含 onBreed-style listener 触发）+ B155 7 case + breed core unit 4 + applyTradeSideEffect unit 4 + 全 harvest 回归（fast 1900 / slow 1350 全绿）。
+  - spec / plan：`docs/superpowers/specs/2026-05-01-sprint-5c-a165-b155-design.md` / `docs/superpowers/plans/2026-05-01-sprint-5c-a165-b155.md`。
 
 - **2026-05-01 — 死代码清理 + family-growth 文件重命名**：删除 6 个完全死的文件（173 行）：`effects/place-future-meeples.ts` / `effects/place-meeples-from-supply.ts`（重复内容、无 ActionDefinition、0 引用，BGA `PlaceFutureMeeples.php` / `PlaceMeeplesFromSupply.php` 对应位实际由 `effects/internal/future-meeples.ts` + `family-growth.ts` inline `activateSmallestInactive` 承担）/ `effects/receive.ts`（实际接收逻辑由 `gain.ts` 承担）/ `actions/hooks/builtin-noop-hooks.ts`（`registerBuiltinNoopHooks` 函数从未被调用）/ `client/components/controls/GameControls.tsx`（孤儿 React 组件）/ `server/card-file-manager.ts`（workshop 旧的"卡牌写到 .ts 文件 + 动态 import"持久化已被内存 custom-registry 替代）。同时把 `effects/wish-children.ts` 重命名为 `effects/family-growth.ts`，对齐 Sprint 6a 已统一的 actionId `family-growth`（仍然导出 `wishChildrenAction / growFamilyWithoutRoomAction / familyGrowthAction` 三个 ActionDefinition，仅文件名变化）；只有 `internal-actions.ts` 一处 import 路径同步改动。`ENGINE_ARCHITECTURE.md` §15.14.1 更新数字 24 → 21（顶层 18 BGA 对应 + 3 半特殊），新增 "BGA 对应位但本仓库不实装为 effect" 子表说明 4 个对应位的实际承担者。fast 1892 / slow 1344 全绿。effects/ 文件数 38 → 35（顶层）。
 - **2026-05-01 — effects/ 第二轮纠正：外迁 4 个误入的 helper**：4 个未导出 `ActionDefinition` 的文件从 `effects/` 外迁到 `shared/actions/helpers/`：`effects/pay.ts`（826 行支付算法库，被 22 张卡 + 4 effect + dispatcher 直接 import）→ `helpers/payment.ts`；`effects/animals.ts`（牧场/动物 zone helper，11 张卡用）→ `helpers/animal-zones.ts`；`effects/breed-animals.ts`（收获繁殖子流程）→ `helpers/breed-animals.ts`；`effects/internal/registry.ts`（ad-hoc action 注册器，4 张卡用）→ `helpers/ad-hoc-action-registry.ts`。配套测试 `effects/__tests__/registry.test.ts` → `helpers/__tests__/registry.test.ts`。修正 §15.14.1 中 5 → 3 个"半特殊扩展"（仅 `pay-resources / bake-bread / bonus-vp` 留顶层）；`ENGINE_ARCHITECTURE.md` 新增 §15.18 明确 effects/ vs helpers/ 边界（effect = ActionDefinition + 可 dispatch + 可 listen；helper = 纯算法/状态库）。47 个文件改了 import 路径，零行为改动。fast 1892 / slow 1344 全绿。
@@ -260,7 +271,7 @@
 | **B115 Tinsmith** | 多 field 时只允许选 1 个，BGA 给每 field 各加 1 | P1 |
 | **B130 / B150 / B152** | ✅ Sprint 5 mech-A — 三张卡都改用 jumpLeaf + place-farmer.viaCardJump（B130: grain-utilization ↔ fencing；B150: farm-expansion ↔ major-improvement；B152: day-laborer → lessons-4 / lessons / traveling-players XOR），farmer 物理移动 + 第二格走完整 ActionNode 路径含 ReplaceHook / computeCosts / isDoable | P1 |
 | **B138 ForestGuardian** | 用 `gain-trigger-player` 可能没真扣对手食物（须确认） | P1 |
-| **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 |
+| **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 | ✅ **Sprint 5c** done (computeCosts listener on play-occupation injecting trade with sideEffect.drainSpace; covers all occupation entries) |
 | **C23** | 触发条件偏差 | P1 |
 | **C51 FishingNet** | 没真正从 trigger player 扣 food | P1 |
 | **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）— ✅ Sprint 5 PR-5 (drop sow leaf; seq now pay + plow only) | P1 |
@@ -288,13 +299,13 @@ The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 
 - ~~**B115 Tinsmith** — multi-field: "+1 to each field" requires per-field iteration in the listener~~ — ✅ **Sprint 5 mech-E** done (drop selection prompt; iterate every freshly sown field)
 - ~~**B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf helper + place-farmer.viaCardJump; second-space dispatch runs full ActionNode path)
 - ~~**B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
-- **B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths
+- ~~**B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths~~ — ✅ **Sprint 5c** done (computeCosts listener on play-occupation + Trade.sideEffect.drainSpace; covers any occupation cost entry)
 - **C23** — triggering condition deviation (need re-read of BGA file to identify)
 - ~~**C51 FishingNet** — actually deduct trigger-player food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - ~~**D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade~~ — ✅ **Sprint 5 mech-B** done (computeCosts returns `trades` instead of forced cost patch; pay main path enumerates use-trade / no-trade solutions, player picks via standard selectPayment prompt); altCosts-form minors (B43 etc.) covered after pay-helpers `e529b103` (ComplexCost input now runs `computeCosts` listeners, trades/bonuses appended into ComplexCost arrays).
 - ~~**E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work~~ — ✅ **Sprint 5 mech-C** done (exchange action rename + `actionContext.tradeIds` filter; E53 single after-listener with breeding-phase guard + per-action-once via actionToken; E85 auto-couples)
 - **B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read
-- **A1 Shelter, A22 Telegram, A38 WoolBlankets, A165 PigBreeder** wide-scan items — already partially fixed in Sprint 2 PR-2A; remaining tail not in this PR's scope
+- **A1 Shelter, A22 Telegram, A38 WoolBlankets, ~~A165 PigBreeder~~ ✅ Sprint 5c** wide-scan items — A1/A22/A38 partially fixed in Sprint 2 PR-2A; A165 fully aligned via onAfterRoundEnd + breedLeaf in Sprint 5c
 - **E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"
 
 These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-day batch of medium-complexity items (B29 / B115) for a follow-up Sprint 5b.
