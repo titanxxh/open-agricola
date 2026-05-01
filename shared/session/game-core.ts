@@ -83,7 +83,9 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation, exchangeTriggers } from '../cards/types.ts'
+import type { CardExchange } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
+import { getMajorCardEffect } from '../cards/major/index.ts'
 import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
@@ -2262,7 +2264,7 @@ export class GameCore {
           exchange = candidate
         }
       } else {
-        exchange = card.exchanges.find((ex) => {
+        exchange = (card.exchanges as CardExchange[]).find((ex) => {
           if (!exchangeTriggers(ex).includes('harvest')) return false
           const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
           if (fromKeys.length !== 1) return false

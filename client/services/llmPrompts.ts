@@ -166,7 +166,7 @@ const CARD_IMPL = {
 
 ### 可监听的行动（actions）
 
-collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、play-occupation、place-farmer、wish-children、wish-children-growth、bake-bread
+collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、play-occupation、place-farmer、wish-children、wish-children-growth、family-growth、bake-bread
 
 ### handler 的 context 字段
 
