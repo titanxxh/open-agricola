@@ -1,5 +1,5 @@
 import { applyMajorEffectsToAllPlayers } from '../cards/major'
-import { breedAnimals } from '../actions/helpers/breed-animals'
+import { breed } from '../actions/effects/breed'
 import { feedFamily } from '../actions/helpers/feed-family'
 import { reap } from '../actions/effects/reap'
 import type { GameState, Resource } from '../game/types'
@@ -84,7 +84,7 @@ export const performHarvest = (state: GameState): HarvestSummary => {
     }
 
     const beforeBreed = snapshotResources(player.resources)
-    breedAnimals(player)
+    breed(state, player, { sourceCard: 'harvest' })
     const breedSheep = player.resources.sheep - beforeBreed.sheep
     const breedBoar = player.resources.boar - beforeBreed.boar
     const breedCattle = player.resources.cattle - beforeBreed.cattle

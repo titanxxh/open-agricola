@@ -29,7 +29,7 @@ const DEFAULT_TYPES: ReadonlyArray<BreedAnimalType> = ['sheep', 'boar', 'cattle'
  * such as A165 PigBreeder (sourceCard='A165_PigBreeder').
  */
 export const breed = (
-  _state: GameState,
+  _state: GameState | null,
   player: PlayerState,
   opts: BreedOptions,
 ): { breedSummary: HarvestBreedSummary } => {
@@ -70,6 +70,13 @@ export const breedAction: ActionDefinition = {
     if (sourceCard === 'harvest') {
       state.harvestBreedSummary ??= {}
       state.harvestBreedSummary[player.id] = breedSummary
+      // Match legacy applyBreedPhase log entry. Skip when no resources bred.
+      if (breedSummary.animalCount > 0) {
+        state.log.unshift({
+          key: 'log.harvestBreedDetail',
+          params: { player: player.name, resources: breedSummary.resources },
+        })
+      }
     }
     if (breedSummary.animalCount > 0) {
       return { type: 'animalReorg', sourceId: `card:${sourceCard}` }
