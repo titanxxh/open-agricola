@@ -1906,6 +1906,86 @@ E16 BriarHedge 同时提供两者；其他 fence-discount 卡（C16 / C88 / E74 
 - `C88_CarpentersApprentice.ts:50`
 - 单元测试 `fencing.test.ts`
 
+## 15.8 Cookery Exchange Metadata-Driven (Sprint 6a)
+
+All cookery trades live in card metadata (`exchanges: CardExchange[]`), not a central registry table. `CardExchange.triggers: ExchangeWindow[]` controls which window the trade appears in:
+
+- `'anytime'` — visible in anytime exchange action (e.g. Major Fireplace1/2 / CookingHearth1/2 / A60 / B32 / D59 / D25)
+- `'harvest'` — visible only in harvest feeding phase prompt (e.g. C59 / C105 / D62 / D108 / C109 / E109)
+- `'bake-bread'` — visible only in bake-bread action (e.g. E63 / E64 / D64 / Fireplace.grain entry)
+- `[]` (empty) — not visible in any window; only listener-triggered (E53 BoarSpear in BGA spec; legacy `'anytime'` retained in our impl)
+
+**Helpers** (`shared/actions/effects/exchange.ts`):
+- `getExchangesInWindow(player, window)` — scans played cards' metadata, returns `Trade[]` matching that window
+- `getExchangesByTradeIds(player, ids)` — force-include by sourceId regardless of triggers (for listener-driven invocations)
+
+**Compatibility helper** (`shared/cards/types.ts`): `exchangeTriggers(ex)` normalises both new `triggers: ExchangeWindow[]` and legacy single-form `trigger: ExchangeWindow` (≈18 cards predate Sprint 6a; preserved without churn).
+
+**Removed:** Hardcoded `cookeryTrades` table in `shared/actions/effects/exchange.ts:220-248`; hardcoded `'Major_Fireplace' / 'Major_CookingHearth'` ID prefix detection in `hasHarvestCooking` (now `hasAnyHarvestExchange` walks metadata).
+
+## 15.9 Harvest Exchange Selector Generalization (Sprint 6a)
+
+`shared/session/game-core.ts` `confirmHarvestFeed` selection schema:
+
+```ts
+{
+  resourceKey?: keyof Resource     // legacy single-resource forward-trade matcher
+  count: number
+  food?: number                    // legacy
+  sourceId?: string
+  exchangeIndex?: number           // NEW: pointer into card.exchanges[]
+}
+```
+
+When `exchangeIndex` is provided, the consumer applies the underlying CardExchange bidirectionally — subtract `from`, add `to` — supporting reverse trades (food → resources) and multi-key trades. When omitted, the consumer falls back to legacy `(resourceKey, food)` matching for forward-trade prompts. `gameTransport.confirmFeed` / `ws.ts feed` selection types updated accordingly.
+
+`buildHarvestFeedOptions` (client) now surfaces every harvest-window exchange with `exchangeIndex` + full `from` / `to`. Affordability gate: every `from` resource must be available.
+
+Feed-queue entry condition relaxed: players holding any harvest exchange enter the prompt even when `remaining = 0`, so reverse trades (e.g. C105 spending bonus food) are reachable after feeding is satisfied.
+
+First consumer: C105 BasketCarrier (`{ from: { food: 2 }, to: { wood: 1, reed: 1, grain: 1 } }`).
+
+## 15.10 family-growth Action Unification (Sprint 6a)
+
+Merged `wishChildrenAction` (id `'wish-children-growth'`) and `growFamilyWithoutRoomAction` (id `'grow-family-without-room'`) into single `familyGrowthAction` (id `'family-growth'`). Routed through `actionContext.skipRoomCheck: boolean`:
+
+- standard `wish-children` space: `actionContext.skipRoomCheck` undefined (default false; require freeRoom)
+- urgent `urgent-wish-children` space: `actionContext.skipRoomCheck = true` (no room required)
+
+BGA-aligned: BGA also uses single `WISHCHILDREN` action (urgent variant via `actionCardType`).
+
+Migration: 13+ caller sites updated — 2 spaces (wish-children + urgent-wish-children) + 5 listener cards (E113 Godmother / E92 FieldDoctor / E130 Overachiever / E151 DeliveryNurse / D150 GodlySpouse) + 7 dispatch cards (E22 GuestRoom / C24 BedintheGrainField / C92 AutumnMother / C127 Lover / B127 Seducer / D21 Recruitment / D92 ChildOmbudsman). Legacy `actionId` aliases (`wishChildrenAction` / `growFamilyWithoutRoomAction`) and i18n keys retained as wrapper exports for compatibility.
+
+## 15.11 special-effect Mutation Dispatcher (Sprint 6a)
+
+`shared/actions/effects/special-effect.ts` upgraded from no-op stub to discriminated-union dispatcher with 4 mutation kinds:
+
+```ts
+type SpecialEffectParams =
+  | { kind: 'increment-extra-data'; key: string; amount: number }
+  | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'set-flag'; flag: boolean }
+  | { kind: 'set-infobox'; text: string }
+```
+
+**Use case:** card SEQ children that must mutate `cardStates` only when the player accepts the optional path. Example (D92 ChildOmbudsman):
+
+```ts
+{
+  type: 'seq',
+  optional: true,
+  children: [
+    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'negativeScore', amount: 2 } },
+    { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID },
+  ],
+}
+```
+
+**Rationale:** previous pattern of `writeCardExtraData(...current + delta)` directly inside `listener.handler` violates "engine sees all mutations" — engine cannot distinguish accepted vs declined SEQ-optional. Routing through the leaf ensures the mutation only fires when the engine actually executes the child.
+
+(Cleanup of existing 4 cards still using direct mutation — E149 / E38 / D134 / C104 — tracked as follow-up; not in 6a.)
+
 ## 16. 当前结论
 
 项目的主设计应明确为：
