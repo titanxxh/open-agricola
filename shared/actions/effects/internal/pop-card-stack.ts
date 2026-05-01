@@ -1,9 +1,9 @@
-import type { ActionDefinition, Resource } from '../../game/types'
-import { popFromCardStack } from '../../cards/helpers/card-state'
-import { addCardResourceGained } from '../../cards/helpers/card-state'
-import { gainResources } from './gain'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
-import { addResourcesFromCards } from '../../logic/stats'
+import type { ActionDefinition, Resource } from '../../../game/types'
+import { popFromCardStack } from '../../../cards/helpers/card-state'
+import { addCardResourceGained } from '../../../cards/helpers/card-state'
+import { gainResources } from '../gain'
+import { trackWorkPhaseBuildingResources } from '../../../logic/work-phase-resources'
+import { addResourcesFromCards } from '../../../logic/stats'
 
 export const popCardStackAction: ActionDefinition = {
   id: 'pop-card-stack',

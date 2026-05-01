@@ -1,6 +1,6 @@
-import type { ActionDefinition } from '../../game/types'
-import { writeCardExtraData } from '../../cards/helpers/card-state'
-import { runSelectionEffect } from '../helpers/selection-effect-registry'
+import type { ActionDefinition } from '../../../game/types'
+import { writeCardExtraData } from '../../../cards/helpers/card-state'
+import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
 export const selectionAction: ActionDefinition = {
   id: 'selection',

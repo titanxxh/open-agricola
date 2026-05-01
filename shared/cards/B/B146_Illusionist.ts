@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../game/types'
-import { registerAdHocAction } from '../../actions/effects/registry'
+import { registerAdHocAction } from '../../actions/effects/internal/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B146_Illusionist'

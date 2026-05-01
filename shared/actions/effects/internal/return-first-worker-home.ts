@@ -1,7 +1,7 @@
-import type { ActionDefinition } from '../../game/types'
-import { setCardFlag } from '../../cards/helpers/card-state'
-import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
-import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
+import type { ActionDefinition } from '../../../game/types'
+import { setCardFlag } from '../../../cards/helpers/card-state'
+import { getRoundPlacementDetails } from '../../../cards/helpers/round-placement'
+import { removeWorkerRef, spaceHasPlayer } from '../../../game/space'
 
 const MEETING_PLACE_IDS = new Set(['meeting-place'])
 

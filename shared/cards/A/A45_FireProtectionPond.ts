@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A45_FireProtectionPond'

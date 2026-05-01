@@ -1,7 +1,7 @@
-import type { ActionDefinition, ActionSpace, GameState } from '../../game/types'
-import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { smallestAvailableWorker, workersAvailable } from '../../game/player'
-import { addWorkerRef } from '../../game/space'
+import type { ActionDefinition, ActionSpace, GameState } from '../../../game/types'
+import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
+import { smallestAvailableWorker, workersAvailable } from '../../../game/player'
+import { addWorkerRef } from '../../../game/space'
 
 const emptyResources = () => ({
   wood: 0,

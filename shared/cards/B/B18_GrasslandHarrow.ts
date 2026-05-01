@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/future-meeples'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'

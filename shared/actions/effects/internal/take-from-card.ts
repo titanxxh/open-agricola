@@ -1,9 +1,9 @@
-import type { ActionDefinition, Resource } from '../../game/types'
-import { initCardState } from '../../cards/__stubs__/helpers'
-import { addCardResourceGained } from '../../cards/helpers/card-state'
-import { gainResources } from './gain'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
-import { addResourcesFromCards } from '../../logic/stats'
+import type { ActionDefinition, Resource } from '../../../game/types'
+import { initCardState } from '../../../cards/__stubs__/helpers'
+import { addCardResourceGained } from '../../../cards/helpers/card-state'
+import { gainResources } from '../gain'
+import { trackWorkPhaseBuildingResources } from '../../../logic/work-phase-resources'
+import { addResourcesFromCards } from '../../../logic/stats'
 
 const canTakeFromCard = (
   counters: Record<string, number> | undefined,

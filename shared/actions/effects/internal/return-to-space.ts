@@ -1,4 +1,4 @@
-import type { ActionDefinition, Resource } from '../../game/types'
+import type { ActionDefinition, Resource } from '../../../game/types'
 
 const canReturnResourcesToSpace = (
   resources: Partial<Resource>,

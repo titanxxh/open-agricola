@@ -3,7 +3,7 @@ import {
   resolveFutureMeepleRequests,
   removeFutureMeeples,
   buildFutureEntries,
-} from '../effects/future-meeples'
+} from '../effects/internal/future-meeples'
 import type { GameState } from '../../game/types'
 
 const createMinimalState = (overrides: Partial<GameState> = {}): GameState =>

@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionDefinition, ActionFlow } from '../../game/types'
 import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../game/field'
-import { registerAdHocAction } from '../../actions/effects/registry'
+import { registerAdHocAction } from '../../actions/effects/internal/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E112_GrainThief'

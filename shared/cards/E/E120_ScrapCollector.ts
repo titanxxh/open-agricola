@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/future-meeples'
+import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 

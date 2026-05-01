@@ -1,5 +1,5 @@
-import type { ActionDefinition } from '../../game/types'
-import { incRoomsBuilt } from '../../logic/stats'
+import type { ActionDefinition } from '../../../game/types'
+import { incRoomsBuilt } from '../../../logic/stats'
 
 /**
  * Card-specific action for B85_FarmHand.

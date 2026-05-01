@@ -1,5 +1,5 @@
-import type { ActionDefinition } from '../../game/types'
-import { storePendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
+import type { ActionDefinition } from '../../../game/types'
+import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 
 export const reserveFenceBonusAction: ActionDefinition = {
   id: 'reserve-fence-bonus',

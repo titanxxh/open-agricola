@@ -1,5 +1,5 @@
-import type { ActionDefinition } from '../../game/types'
-import { pushToCardStack } from '../../cards/helpers/card-state'
+import type { ActionDefinition } from '../../../game/types'
+import { pushToCardStack } from '../../../cards/helpers/card-state'
 
 export const pushCardStackAction: ActionDefinition = {
   id: 'push-to-card-stack',
