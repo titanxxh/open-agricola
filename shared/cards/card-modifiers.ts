@@ -2,10 +2,6 @@ import type { CostModifier } from '../game/types'
 import { getOccupationCard } from './catalog'
 import { getMinorImprovementCard } from './catalog'
 
-export const getCardModifier = (cardId: string): CostModifier | undefined => {
-  return getCardModifiers(cardId)[0]
-}
-
 export const getCardModifiers = (cardId: string): CostModifier[] => {
   const occupation = getOccupationCard(cardId)
   if (occupation) {

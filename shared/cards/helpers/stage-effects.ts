@@ -1,8 +1,6 @@
 import type { GameState, PlayerState, Resource } from '../../game/types'
-import { canPayResources, payResources } from '../../actions/helpers/payment'
-import { incCounter, initCardState } from '../__stubs__/helpers'
+import { initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
-import { addCardResourcePaid } from './card-state'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -21,35 +19,6 @@ export const hasCardCounter = (
   cardId: string,
   key: string,
 ) => (player.cardStates?.[cardId]?.counters?.[key] ?? 0) > 0
-
-export const applyStagePayGain = (
-  player: PlayerState,
-  cost: Partial<Resource>,
-  gain: CardGain,
-  cardId?: string,
-) => {
-  if (!canPayResources(player, cost)) return false
-  payResources(player, cost)
-  if (cardId) {
-    addCardResourcePaid(player, cardId, cost)
-  }
-  applyCardGain(player, gain, cardId)
-  return true
-}
-
-export const payForCardBonusVp = (
-  player: PlayerState,
-  cardId: string,
-  resource: keyof Resource,
-  count: number,
-) => {
-  const amount = Math.min(player.resources[resource] ?? 0, count)
-  if (amount <= 0) return 0
-  player.resources[resource] -= amount
-  addCardResourcePaid(player, cardId, { [resource]: amount })
-  incCounter(player, cardId, 'bonusVp', amount)
-  return amount
-}
 
 export const createSingleHarvestExchange = (
   resource: keyof Resource,

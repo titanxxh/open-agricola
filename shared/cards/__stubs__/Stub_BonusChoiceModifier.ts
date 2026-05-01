@@ -1,6 +1,6 @@
 import type { BonusModifier } from '../../game/types'
 
-export const STUB_BONUS_CHOICE_MODIFIER_CARD = 'Stub_BonusChoiceModifier'
+const STUB_BONUS_CHOICE_MODIFIER_CARD = 'Stub_BonusChoiceModifier'
 
 // BonusModifier with choices for appliesTo: ['construct']. Use by pushing onto
 // player.activeModifiers in tests.
