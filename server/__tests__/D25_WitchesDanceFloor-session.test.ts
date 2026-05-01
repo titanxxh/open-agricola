@@ -122,7 +122,7 @@ describe('D25_WitchesDanceFloor session', () => {
     it('card definition has isCookery=true and at least one anytime exchange with food output', () => {
       expect(D25_WitchesDanceFloor.isCookery).toBe(true)
       const anytimeExchanges = (D25_WitchesDanceFloor.exchanges ?? []).filter(
-        (ex) => ex.trigger === 'anytime',
+        (ex) => (ex.triggers ?? []).includes('anytime'),
       )
       expect(anytimeExchanges.length).toBeGreaterThan(0)
       const hasFoodOutput = anytimeExchanges.some(

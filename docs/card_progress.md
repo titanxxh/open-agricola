@@ -47,6 +47,15 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-04-30 Sprint 6b — effects/ 反模式清理 + 6a follow-up**：
+  - **Batch A — dead code + helper relocation**：删除 3 个真 dead 文件（`push-card-stack` / `hold-worker-on-card` / `release-worker-from-card`，0 actionId caller），新建 `shared/actions/helpers/` 目录把 7 个非 ActionDefinition helper 文件迁出 effects/（pay-helpers / cost-preview / room-payment / placement-availability / placement-constants / selection-effect-registry / feed-family）+ 配套 helper 测试。
+  - **Batch B — ad-hoc action registry**：新增 `shared/actions/effects/registry.ts` 提供 `registerAdHocAction(def)` / `getAdHocAction(id)`，id 强制 `card_` 前缀；接入 `getActionDefinition` lookup fallback（`shared/actions/index.ts`）。4 张单卡 effect 内联到卡文件并删 effects 文件：E112 GrainThief（grain-thief-protect）/ E73 Scythe（scythe-harvest-field）/ B146 Illusionist（discard-from-hand）/ C69 LandConsolidation（swap-field-grain-to-veg）。LLM workshop ast-validator 不放行 `card_*` 前缀，单卡 ad-hoc action 是 repo-internal-only。
+  - **Batch C — special-effect 取代 5 个 card-state leaf**：51 caller `flag-card`(39) / `unflag-card`(8) / `set-card-infobox`(2) / `clear-card-infobox`(1) / `write-card-extra-data` 全替换为 `actionId: 'special-effect'` + kind 参数化 leaf；删 5 个 effect 文件 + i18n keys + internal-actions 注册；A17 ReclamationPlow 因 `params.infoboxText` 复合形态拆为 SEQ（set-flag → set-infobox）。effects/ 缩到 45 文件（接近 BGA Actions/ 22 + 必要扩展）。
+  - **Batch D — listener mutate cleanup**：4 张违反"listener / execute 不直 mutate cardStates"的卡修复——E149 MidnightFencer（resolveChoice 返回 special-effect leaf 而非直接写 `owedFences`；onStartHarvest SEQ 含 set-extra-data offered=true）；E38 RodCollection（after-collect listener 返回 `flow` 含 special-effect increment 而非直 mutate `woodCount`）；D134 OysterEater（去掉 listener 内 `writeCardExtraData`，SEQ 走 special-effect + bonus-vp，两者都用 `actionContext.targetPlayerId` 路由到 owner，不依赖 actor）；C104 Collector（PlayerActionCard execute 不立即 mutate `used` / `begging` / 资源；resolveChoice 返回 `{ type: 'flow', flow }` 包含 special-effect increment + gain leaf，让引擎驱动所有副作用）。
+  - **special-effect `actionContext.targetPlayerId`**：special-effect.execute 现接 `actionContext.targetPlayerId?: string` 路由到指定玩家（默认 actor，`state.players` 查不到时 fallback 到 actor）。bonus-vp 同步加同名路由，让 D134 owner 累加 bonusVp。
+  - **6a follow-up① — `CardExchange.triggers` 数组化**：18 张卡用 `trigger: 'X'` 单数 legacy 语法迁移到 `triggers: ['X']` 数组；删 `CardExchange.trigger?: ExchangeWindow` 字段 + `exchangeTriggers()` helper（5 caller 改为 `(ex.triggers ?? [])`）。
+  - **6a follow-up② — E53 listener-only**：E53 BoarSpear `triggers: []`（listener-driven 唯一），对齐 BGA listener-only 语义（trade 不再出现在 anytime cookery 选项里，仅通过 listener 派发的 `actionContext.tradeIds: ['E53_BoarSpear']` 加白名单）；`anytimeExchangeAction.canBeExecutedByPlayer` 加 `actionContext.tradeIds` 感知，避免 SEQ optional doable check 把 listener-driven 形态当不可达跳过。`CanBeExecutedByPlayerContext` 新加 `actionContext?: Record<string, unknown>` 字段（与 `sourceCard` 同等地位的元数据透传），`engine.ts` 1 处 doable check 同步加传 `actionContext`。
+  - effects/ 文件数 63 → 45（−18）。spec / plan：`docs/superpowers/specs/2026-04-30-sprint-6b-effects-cleanup-design.md` / `docs/superpowers/plans/2026-04-30-sprint-6b-effects-cleanup.md`。
 - **2026-04-30 Sprint 6a — Cookery exchange metadata 化 + 6 张 stub 卡 + family-growth 统一 + special-effect 升级**：
   - **C109 SchnappsDistiller / D108 StoneCarver / D62 BeerTap**：纯 metadata 加 `exchanges` 字段（vegetable→5 food / stone→3 food / 3 档 grain→food），D62 三 entries 共享 sourceId max:1 自然 cap 整张卡 1 次，onBuy +2 food 保留。
   - **C105 BasketCarrier**：反向 trade（食物→3 资源）；触发 cookery selector 通用化（entry-index based + 双向 apply），`game-core.ts` 删 `hasHarvestCooking` 硬编码。`confirmHarvestFeed` selection 加可选 `exchangeIndex`，consumer 优先按 entry-index 走双向 apply（fallback 到 legacy `(resourceKey, food)` 匹配）。feed-queue 入队条件：玩家有 harvest exchange 即使 remaining=0 也入队，让 reverse trade 可执行。
@@ -546,6 +555,26 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 
 `shared/actions/effects/stables.ts` 通过 `actionContext` 接受可选 `zoneFilter?: 'pasture-1'`（限定可放 zone）+ `max?: number`（限定本次最多放几个）。`buildStableFarmInteraction(player, costOverride?, options?)` 新加第三参数 `{ zoneFilter, max }` 透传到 selectableTiles filter / structuralMax cap；`game-core.ts buildStableInteraction` 同步透传 `pending.actionContext.zoneFilter / max`。`costOverride` 早期已支持。消费者：A1 Shelter（`'pasture-1'`，max:1，wood:-99 让最终费用为 0）。其他 9 张 `actionId:'stables'` 卡（E89/C94/C2/B16/B89/A150/A89/A15）不传新字段时维持原行为。
 
+### Ad-hoc action registry — `registerAdHocAction` (Sprint 6b, 2026-04-30)
+
+`shared/actions/effects/registry.ts` 提供 `registerAdHocAction(def)` / `getAdHocAction(id)` / `getAllAdHocActions()`。id 强制 `card_` 前缀；接入 `getActionDefinition` lookup fallback（`shared/actions/index.ts`）。LLM workshop sandbox 不暴露（ast-validator actionId allowlist 不含 `card_*` 前缀）。用例：4 张单卡专用 effect 内联到卡文件实现"卡牌内部闭环"——E112 GrainThief / E73 Scythe / B146 Illusionist / C69 LandConsolidation。
+
+### special-effect `actionContext.targetPlayerId` 跨玩家路由 (Sprint 6b, 2026-04-30)
+
+`shared/actions/effects/special-effect.ts` 的 `execute` 现读 `actionContext.targetPlayerId?: string`，让 mutation 落到指定玩家（`state.players.find(p => p.id === id)`，找不到 fallback 到 actor）。`bonus-vp.ts` 同步加同名路由。用例：D134 OysterEater 给 owner（card-holder）累加 `skipNextPlacement` + bonusVp，actor（fishing 触发玩家）可能不是 owner。
+
+### `CardExchange.triggers` 数组化收尾 (Sprint 6b, 2026-04-30)
+
+`shared/cards/types.ts` 的 `CardExchange.trigger?: ExchangeWindow`（单数 legacy）字段 + `exchangeTriggers()` helper 删除，仅保留 `triggers?: ExchangeWindow[]` 数组。18 张 6a 时遗留单数语法的卡迁移完成。E53 BoarSpear 设 `triggers: []`（listener-only），对齐 BGA `tradeIds`-driven 语义。`anytimeExchangeAction.canBeExecutedByPlayer` 接 `actionContext.tradeIds`，让 SEQ optional doable check 在 listener-driven 形态下也可达。
+
+### `shared/actions/helpers/` 目录 (Sprint 6b, 2026-04-30)
+
+新建目录承接非-`ActionDefinition` 模块（pay-helpers / cost-preview / room-payment / placement-availability / placement-constants / selection-effect-registry / feed-family），让 `shared/actions/effects/` 仅保留 ActionDefinition exports。effects/ 缩到 45 文件（63 → 45），接近 BGA Actions/ 22。
+
+### `CanBeExecutedByPlayerContext.actionContext` (Sprint 6b, 2026-04-30)
+
+`shared/game/types.ts` 的 `CanBeExecutedByPlayerContext` 加 `actionContext?: Record<string, unknown>` 字段（与 `sourceCard` 同等地位的元数据透传）；`shared/engine/engine.ts` 1 处 doable check 同步加传 `actionContext`。让 listener-driven action（如 E53 exchange + tradeIds）的可达性检查能看到与 `execute()` 相同的 actionContext。
+
 ### fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b, 2026-04-30)
 
 `CardEffect.computeFenceFreeAvailable?: (state, player) => number` 返回该卡当前能贡献的"免费 fence 上限"。`canStartFencing(state, player)` 遍历 `[...player.improvements, ...player.minorPlayed]` 累加 free 计入 maxBuildable，对齐 BGA `getMaxBuildableFences`：当 `wood + free >= 4` 时入口放行。E16 Briar Hedge 实现：`countAvailableBorderEdges(player)`。canStartFencing 签名加 state 参数，6 个 caller（B26 ×2 / B94 / C88 / fenceAction.canBeExecutedByPlayer / fencing.test.ts）同步。与 `computeFenceDiscount` 双轨：前者 entry-guard 阶段返回上限，后者实际 payment 阶段按真实选边算 discount。
@@ -602,6 +631,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5 mech-E (6-card collection batch + gain merge + viaCardJump worker-less) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 5b (C23/A38/A1/A22/E16 tail-fixes + stables actionContext + fencing entry-guard hook) | 04-30 | 0 | 822 | 92.1% |
 | Sprint 6a (cookery exchange metadata 化 + 6 张 stub 卡 + family-growth 统一 + special-effect dispatcher) | 04-30 | +6 | 828 | 92.8% |
+| Sprint 6b (effects/ cleanup + 6a follow-up: 4 batch + 2 收尾, 63→45 files) | 04-30 | 0 | 828 | 92.8% |
 
 ### 2026-04-17 Wave 1-9 明细
 
