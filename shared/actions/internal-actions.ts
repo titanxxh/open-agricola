@@ -46,6 +46,7 @@ import { pushCardStackAction as pushCardStackBatchAction } from './effects/push-
 import { writeCardExtraDataAction } from './effects/write-card-extra-data'
 import { holdWorkerOnCardAction } from './effects/hold-worker-on-card'
 import { releaseWorkerFromCardAction } from './effects/release-worker-from-card'
+import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -100,4 +101,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   writeCardExtraDataAction,
   holdWorkerOnCardAction,
   releaseWorkerFromCardAction,
+  specialEffectAction,
 ]
