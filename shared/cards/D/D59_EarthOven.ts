@@ -31,10 +31,10 @@ export const D59_EarthOven = new MinorImprovement({
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
   alsoCountsAs: ['major'],
   exchanges: [
-    { from: { vegetable: 1 }, to: { food: 3 }, trigger: 'anytime' },
-    { from: { sheep: 1 }, to: { food: 2 }, trigger: 'anytime' },
-    { from: { boar: 1 }, to: { food: 3 }, trigger: 'anytime' },
-    { from: { cattle: 1 }, to: { food: 3 }, trigger: 'anytime' },
-    { from: { grain: 1 }, to: { food: 2 }, trigger: 'bake-bread' },
+    { from: { vegetable: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+    { from: { sheep: 1 }, to: { food: 2 }, triggers: ['anytime'] },
+    { from: { boar: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] },
   ],
 })

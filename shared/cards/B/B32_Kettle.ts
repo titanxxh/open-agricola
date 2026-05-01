@@ -16,8 +16,8 @@ export const B32_Kettle = new MinorImprovement({
   cost: { clay: 1 },
   prerequisite: '1 Grain Field',
   exchanges: [
-    { from: { grain: 1 }, to: { food: 3 }, trigger: 'anytime' },
-    { from: { grain: 3 }, to: { food: 4 }, trigger: 'anytime' },
-    { from: { grain: 5 }, to: { food: 5 }, trigger: 'anytime' },
+    { from: { grain: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+    { from: { grain: 3 }, to: { food: 4 }, triggers: ['anytime'] },
+    { from: { grain: 5 }, to: { food: 5 }, triggers: ['anytime'] },
   ],
 })

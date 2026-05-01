@@ -1040,7 +1040,10 @@ export class Engine {
         action.canBeExecutedByPlayer(
           executionContext.state,
           executionContext.player,
-          { sourceCard: executionContext.sourceCard },
+          {
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          },
         ),
       )
       if (!doable) {
@@ -1207,7 +1210,10 @@ export class Engine {
         action.canBeExecutedByPlayer(
           executionContext.state,
           executionContext.player,
-          { sourceCard: executionContext.sourceCard },
+          {
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          },
         ),
       )
       if (!doable) {

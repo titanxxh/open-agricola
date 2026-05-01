@@ -18,7 +18,7 @@ export const D64_BakingCourse = new MinorImprovement({
   cost: {},
   prerequisite: "1 Occupation",
   occupationPrerequisites: { min: 1 },
-  exchanges: [{ from: { grain: 1 }, to: { food: 2 }, trigger: 'bake-bread' }],
+  exchanges: [{ from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] }],
   isBaking: true,
 })
 

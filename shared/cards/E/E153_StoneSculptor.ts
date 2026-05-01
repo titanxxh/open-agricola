@@ -19,6 +19,6 @@ export const E153_StoneSculptor = new Occupation({
   exchanges: [
     // TODO: trigger should be 'harvest' but our system only supports 'anytime' | 'bake-bread'.
     // TODO: exchange should also grant 1 bonus SCORE VP, not currently supported.
-    { from: { stone: 1 }, to: { food: 1 }, max: 1, trigger: 'anytime' },
+    { from: { stone: 1 }, to: { food: 1 }, max: 1, triggers: ['anytime'] },
   ],
 })

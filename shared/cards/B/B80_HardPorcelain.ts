@@ -11,8 +11,8 @@ export const B80_HardPorcelain = new MinorImprovement({
   desc: ['At any time, you can exchange 2/3/4 <CLAY> for 1/2/3 <STONE>.'],
   cost: { clay: 1 },
   exchanges: [
-    { from: { clay: 2 }, to: { stone: 1 }, trigger: 'anytime' },
-    { from: { clay: 3 }, to: { stone: 2 }, trigger: 'anytime' },
-    { from: { clay: 4 }, to: { stone: 3 }, trigger: 'anytime' },
+    { from: { clay: 2 }, to: { stone: 1 }, triggers: ['anytime'] },
+    { from: { clay: 3 }, to: { stone: 2 }, triggers: ['anytime'] },
+    { from: { clay: 4 }, to: { stone: 3 }, triggers: ['anytime'] },
   ],
 })

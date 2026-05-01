@@ -19,8 +19,8 @@ export const B104_SheepWalker = new Occupation({
   cost: {},
   players: '1+',
   exchanges: [
-    { from: { sheep: 1 }, to: { boar: 1 }, trigger: 'anytime' },
-    { from: { sheep: 1 }, to: { vegetable: 1 }, trigger: 'anytime' },
-    { from: { sheep: 1 }, to: { stone: 1 }, trigger: 'anytime' },
+    { from: { sheep: 1 }, to: { boar: 1 }, triggers: ['anytime'] },
+    { from: { sheep: 1 }, to: { vegetable: 1 }, triggers: ['anytime'] },
+    { from: { sheep: 1 }, to: { stone: 1 }, triggers: ['anytime'] },
   ],
 })
