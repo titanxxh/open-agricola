@@ -53,7 +53,7 @@ export const countUnusedFarmyardSpaces = (player: PlayerState) =>
 export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
   countUnusedFarmyardSpaces(player) === 0
 
-export const getNextEmptyTile = (
+const getNextEmptyTile = (
   roomTiles: FarmTilePosition[],
   fields: Field[],
   stableTiles: FarmTilePosition[] = [],

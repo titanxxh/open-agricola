@@ -1,7 +1,7 @@
 import { FARM_COLS, FARM_ROWS } from '../game/farm'
 import type { FarmTilePosition } from '../game/types'
 
-export const edgeBetweenTiles = (from: FarmTilePosition, to: FarmTilePosition) => {
+const edgeBetweenTiles = (from: FarmTilePosition, to: FarmTilePosition) => {
   if (from.row === to.row) {
     const row = from.row
     if (to.col === from.col + 1) return `V-${row}-${to.col}`

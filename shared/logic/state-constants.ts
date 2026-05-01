@@ -9,12 +9,10 @@
 // `../cards/register-all`, `../actions/index`, or anything that transitively
 // reaches card implementations. Type-only imports from pure modules are fine.
 
-import type { ActionSpace, FenceSegment, GameState, PlayerState, Resource } from '../game/types'
+import type { FenceSegment, GameState, PlayerState, Resource } from '../game/types'
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from './rng'
 import { tryAddRoomTile } from './farm/build-room-helper'
-
-export { createSeed, createRng, shuffleWithRng } from './rng'
 
 export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
   if (!Array.isArray(input)) return []
@@ -60,7 +58,7 @@ export const resourceKeyList: (keyof Resource)[] = [
   'begging',
 ]
 
-export const roundStageSlots = [
+const roundStageSlots = [
   { stage: 1, count: 4 },
   { stage: 2, count: 3 },
   { stage: 3, count: 2 },
@@ -69,7 +67,7 @@ export const roundStageSlots = [
   { stage: 6, count: 1 },
 ]
 
-export const roundStageActions: Record<number, string[]> = {
+const roundStageActions: Record<number, string[]> = {
   1: ['sheep-market', 'grain-utilization', 'fencing', 'major-improvement'],
   2: ['wish-children', 'western-quarry', 'house-redevelopment'],
   3: ['vegetable-seeds', 'pig-market'],
@@ -77,28 +75,6 @@ export const roundStageActions: Record<number, string[]> = {
   5: ['cultivation', 'urgent-wish-children'],
   6: ['farm-redevelopment'],
 }
-
-export const baseActionOrder = [
-  'forest',
-  'copse',
-  'grove',
-  'clay-pit',
-  'hollow',
-  'hollow-4',
-  'reed-bank',
-  'fishing',
-  'traveling-players',
-  'day-laborer',
-  'meeting-place',
-  'lessons',
-  'lessons-3',
-  'lessons-4',
-  'farmland',
-  'grain-seeds',
-  'farm-expansion',
-  'resource-market',
-  'resource-market-4',
-]
 
 export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
 export type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
@@ -142,11 +118,6 @@ export const createRoundOpenById = (order: (string | null)[]) =>
       .map((id, index) => (id ? [id, index + 1] : null))
       .filter((item): item is [string, number] => item !== null),
   )
-
-export const isActionForPlayerCount = (
-  space: ActionSpace,
-  playerCount: number,
-) => !space.players || space.players.includes(playerCount)
 
 export const defaultPlayerColors: PlayerState['color'][] = [
   'red',
