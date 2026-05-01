@@ -1,10 +1,59 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../game/types'
+import { registerAdHocAction } from '../../actions/effects/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B146_Illusionist'
+const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
+
+const discardFromHandAction: ActionDefinition = {
+  id: DISCARD_ACTION_ID,
+  nameKey: 'actions.discard-from-hand.name',
+  descriptionKey: 'actions.discard-from-hand.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player }) => {
+    const options: ActionChoiceOption[] = [
+      ...player.occupationHand.map((id) => ({
+        value: `occ:${id}`,
+        labelKey: `occupations.${id}.name`,
+      })),
+      ...player.minorHand.map((id) => ({
+        value: `min:${id}`,
+        labelKey: `minors.${id}.name`,
+      })),
+    ]
+    if (options.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
+    return {
+      type: 'choice',
+      promptKey: 'ui.interactionDiscardFromHand',
+      options,
+    }
+  },
+  resolveChoice: ({ player }, choice) => {
+    if (choice.startsWith('occ:')) {
+      const cardId = choice.slice(4)
+      if (!player.occupationHand.includes(cardId)) {
+        return { type: 'fail', logKey: 'log.actionFail' }
+      }
+      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
+      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+    }
+    if (choice.startsWith('min:')) {
+      const cardId = choice.slice(4)
+      if (!player.minorHand.includes(cardId)) {
+        return { type: 'fail', logKey: 'log.actionFail' }
+      }
+      player.minorHand = player.minorHand.filter((id) => id !== cardId)
+      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+    }
+    return { type: 'fail', logKey: 'log.actionFail' }
+  },
+}
+registerAdHocAction(discardFromHandAction)
 
 /**
  * B146 Illusionist (Occupation, 3+):
@@ -70,7 +119,7 @@ const listener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf',
-          actionId: 'discard-from-hand',
+          actionId: DISCARD_ACTION_ID,
           sourceCard: CARD_ID,
         },
         {

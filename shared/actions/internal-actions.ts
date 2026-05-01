@@ -32,15 +32,11 @@ import { recallPlacedWorkerAction } from './effects/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/reserve-fence-bonus'
 import { payGrainAnyAction } from './effects/pay-grain-any'
 import { storeOnCardAction } from './effects/store-on-card'
-import { scytheHarvestFieldAction } from './effects/scythe-harvest-field'
-import { grainThiefProtectAction } from './effects/grain-thief-protect'
 import { moveFarmerToSpaceAction } from './effects/move-farmer-to-space'
 import { popCardStackAction } from './effects/pop-card-stack'
 import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 import { selectionAction } from './effects/selection'
-import { discardFromHandAction } from './effects/discard-from-hand'
-import { swapFieldGrainToVegAction } from './effects/swap-field-crop'
 import { spendWorkerAction } from './effects/spend-worker'
 import { writeCardExtraDataAction } from './effects/write-card-extra-data'
 import { specialEffectAction } from './effects/special-effect'
@@ -82,8 +78,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   reserveFenceBonusAction,
   payGrainAnyAction,
   storeOnCardAction,
-  scytheHarvestFieldAction,
-  grainThiefProtectAction,
   moveFarmerToSpaceAction,
   constructAction,
   placeFarmerAction,
@@ -93,8 +87,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
-  discardFromHandAction,
-  swapFieldGrainToVegAction,
   writeCardExtraDataAction,
   specialEffectAction,
 ]

@@ -1,9 +1,39 @@
 import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionDefinition, ActionFlow } from '../../game/types'
 import { fieldIsEmpty, fieldTopStack } from '../../game/field'
+import { registerAdHocAction } from '../../actions/effects/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E73_Scythe'
+const HARVEST_ACTION_ID = 'card_E73_Scythe_harvest-field'
+
+const scytheHarvestFieldAction: ActionDefinition = {
+  id: HARVEST_ACTION_ID,
+  nameKey: 'actions.scythe-harvest-field.name',
+  descriptionKey: 'actions.scythe-harvest-field.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, params, sourceCard }) => {
+    const fieldIndex = params?.fieldIndex as number | undefined
+    if (fieldIndex === undefined) return { type: 'fail', logKey: 'log.actionFail' }
+    const field = player.fields[fieldIndex]
+    if (!field) return { type: 'fail', logKey: 'log.actionFail' }
+    const top = fieldTopStack(field)
+    if (!top || top.remaining <= 0) return { type: 'fail', logKey: 'log.actionFail' }
+    const crop = top.kind
+    const amount = top.remaining
+    player.resources[crop] = (player.resources[crop] ?? 0) + amount
+    field.stacks.pop()
+    return {
+      type: 'ok',
+      resourcesGained: { [crop]: amount },
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { [crop]: amount }, cardId: sourceCard },
+    }
+  },
+}
+registerAdHocAction(scytheHarvestFieldAction)
 
 export const E73_Scythe = new MinorImprovement({
   id: "E73_Scythe",
@@ -26,7 +56,7 @@ export const E73_Scythe_impl = {
       const top = fieldTopStack(field)
       return {
         type: 'leaf' as const,
-        actionId: 'scythe-harvest-field',
+        actionId: HARVEST_ACTION_ID,
         params: { fieldIndex: index },
         sourceCard: CARD_ID,
         choiceLabelKey: 'ui.interactionScytheField',
