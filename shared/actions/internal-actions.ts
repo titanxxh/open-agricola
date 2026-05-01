@@ -21,10 +21,6 @@ import { returnToSpaceAction } from './effects/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { takeFromCardAction } from './effects/take-from-card'
 import { markCardObservedAction } from './effects/mark-card-observed'
-import { flagCardAction } from './effects/flag-card'
-import { unflagCardAction } from './effects/unflag-card'
-import { setCardInfoboxAction } from './effects/set-card-infobox'
-import { clearCardInfoboxAction } from './effects/clear-card-infobox'
 import { noopAction } from './effects/noop'
 import { emitChoiceAction } from './effects/emit-choice'
 import { returnFirstWorkerHomeAction } from './effects/return-first-worker-home'
@@ -38,7 +34,6 @@ import { pushCardStackAction } from './effects/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/build-farmhand-room'
 import { selectionAction } from './effects/selection'
 import { spendWorkerAction } from './effects/spend-worker'
-import { writeCardExtraDataAction } from './effects/write-card-extra-data'
 import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -67,10 +62,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bonusVpAction,
   takeFromCardAction,
   markCardObservedAction,
-  flagCardAction,
-  unflagCardAction,
-  setCardInfoboxAction,
-  clearCardInfoboxAction,
   noopAction,
   emitChoiceAction,
   returnFirstWorkerHomeAction,
@@ -87,6 +78,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
-  writeCardExtraDataAction,
   specialEffectAction,
 ]
