@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E38_RodCollection'
@@ -14,8 +14,15 @@ const afterCollectListener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
-    const current = readCardExtraData<number>(context.player, CARD_ID, 'woodCount') ?? 0
-    writeCardExtraData(context.player, CARD_ID, 'woodCount', current + 2)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'increment-extra-data', key: 'woodCount', amount: 2 },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

@@ -41,54 +41,72 @@ describe('E149 MidnightFencer', () => {
     expect(flow).toBeUndefined()
   })
 
+  // Helpers to navigate the SEQ-wrapped flow returned by onStartHarvest.
+  const findEmitChoice = (flow: ActionFlow | void | undefined) => {
+    if (!flow || flow.type !== 'seq') return undefined
+    return flow.children.find(
+      (c): c is ActionFlow & { actionId: string; params: { options: unknown[] } } =>
+        c.type === 'leaf' && c.actionId === 'emit-choice',
+    )
+  }
+
   it('round 14 4-player: offers choice 0..6 (7 options total)', () => {
     const state = makeState(14, 4)
     const flow = getCardEffect(CARD_ID)?.onStartHarvest?.(state, state.players[0]!)
     expect(flow).toBeDefined()
-    const f = flow as ActionFlow & { actionId: string; params: { options: unknown[] } }
-    expect(f.actionId).toBe('emit-choice')
-    expect(f.params.options.length).toBe(7)
+    const emitChoice = findEmitChoice(flow)
+    expect(emitChoice).toBeDefined()
+    expect(emitChoice!.actionId).toBe('emit-choice')
+    expect((emitChoice!.params as { options: unknown[] }).options.length).toBe(7)
   })
 
   it('round 14 5-player: offers choice 0..8 (9 options total)', () => {
     const state = makeState(14, 5)
     const flow = getCardEffect(CARD_ID)?.onStartHarvest?.(state, state.players[0]!)
     expect(flow).toBeDefined()
-    const f = flow as ActionFlow & { params: { options: unknown[] } }
-    expect(f.params.options.length).toBe(9)
+    const emitChoice = findEmitChoice(flow)
+    expect((emitChoice!.params as { options: unknown[] }).options.length).toBe(9)
   })
 
-  it('round 14 second invocation in same game: no re-offer (offered flag)', () => {
+  it('round 14 second invocation flagged via cardStates: no re-offer', () => {
     const state = makeState(14, 4)
     const player = state.players[0]!
     const first = getCardEffect(CARD_ID)?.onStartHarvest?.(state, player)
     expect(first).toBeDefined()
+    // Engine would persist `offered=true` via the special-effect leaf inside
+    // the returned SEQ. Simulate that by setting the flag manually for the
+    // second invocation.
+    player.cardStates = { ...(player.cardStates ?? {}) }
+    player.cardStates[CARD_ID] = { extraData: { offered: true } }
     const second = getCardEffect(CARD_ID)?.onStartHarvest?.(state, player)
     expect(second).toBeUndefined()
   })
 
-  it('resolveChoice "3" sets owedFences to 3', () => {
+  it('resolveChoice "3" returns special-effect leaf incrementing owedFences by 3', () => {
     const player = makePlayer()
-    getCardEffect(CARD_ID)?.resolveChoice?.(
+    const flow = getCardEffect(CARD_ID)?.resolveChoice?.(
       {} as GameState,
       player,
       '3',
       { sourceCard: CARD_ID },
     )
-    const stored = player.cardStates?.[CARD_ID]?.extraData as { owedFences?: number } | undefined
-    expect(stored?.owedFences).toBe(3)
+    expect(flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'owedFences', amount: 3 },
+    })
   })
 
-  it('resolveChoice "0" leaves owedFences at 0', () => {
+  it('resolveChoice "0" returns no flow (no mutation needed)', () => {
     const player = makePlayer()
-    getCardEffect(CARD_ID)?.resolveChoice?.(
+    const flow = getCardEffect(CARD_ID)?.resolveChoice?.(
       {} as GameState,
       player,
       '0',
       { sourceCard: CARD_ID },
     )
-    const stored = player.cardStates?.[CARD_ID]?.extraData as { owedFences?: number } | undefined
-    expect(stored?.owedFences ?? 0).toBe(0)
+    expect(flow).toBeUndefined()
   })
 
   it('computeBonusScore returns owedFences value', () => {

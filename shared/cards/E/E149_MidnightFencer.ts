@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -53,13 +53,28 @@ export const E149_MidnightFencer_impl = {
       const numOpponents = state.players.length - 1
       if (numOpponents <= 0) return
       const max = 2 * numOpponents
-      writeCardExtraData(player, CARD_ID, KEY_OFFERED, true)
-      return buildOfferChoice(max)
+      return {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: KEY_OFFERED, value: true },
+          },
+          buildOfferChoice(max),
+        ],
+      }
     },
-    resolveChoice: (_state, player, choice) => {
+    resolveChoice: (_state, _player, choice) => {
       const k = parseInt(choice, 10)
       if (Number.isNaN(k) || k <= 0) return
-      writeCardExtraData(player, CARD_ID, KEY_OWED, readOwed(player) + k)
+      return {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'increment-extra-data', key: KEY_OWED, amount: k },
+      }
     },
     computeBonusScore: (_state, player) => readOwed(player),
   },
