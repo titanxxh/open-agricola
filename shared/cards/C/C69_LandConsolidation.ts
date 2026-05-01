@@ -1,10 +1,45 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionDefinition } from '../../game/types'
 import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
+import { registerAdHocAction } from '../../actions/effects/registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C69_LandConsolidation'
+const SWAP_ACTION_ID = 'card_C69_LandConsolidation_swap'
+
+const swapFieldGrainToVegAction: ActionDefinition = {
+  id: SWAP_ACTION_ID,
+  nameKey: 'actions.swap-field-grain-to-veg.name',
+  descriptionKey: 'actions.swap-field-grain-to-veg.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, params, sourceCard }) => {
+    const row = (params as { row?: number } | undefined)?.row
+    const col = (params as { col?: number } | undefined)?.col
+    if (row === undefined || col === undefined) {
+      return { type: 'fail', logKey: 'log.actionFail' }
+    }
+    const field = player.fields.find((f) => f.row === row && f.col === col)
+    if (!field || field.stacks.length !== 1) {
+      return { type: 'fail', logKey: 'log.actionFail' }
+    }
+    const stack = field.stacks[0]
+    if (!stack || stack.kind !== 'grain' || stack.remaining !== 3) {
+      return { type: 'fail', logKey: 'log.actionFail' }
+    }
+    stack.kind = 'vegetable'
+    stack.remaining = 1
+    return {
+      type: 'ok',
+      logKey: 'log.cardEffectGain',
+      logParams: { gain: { vegetable: 1 }, cardId: sourceCard },
+    }
+  },
+}
+registerAdHocAction(swapFieldGrainToVegAction)
 
 /**
  * C69 Land Consolidation (MinorImprovement, C, 69)
@@ -28,7 +63,7 @@ const anytimeListener: CardListenerRegistration = {
       return {
         flow: {
           type: 'leaf',
-          actionId: 'swap-field-grain-to-veg',
+          actionId: SWAP_ACTION_ID,
           params: { row: field.row, col: field.col },
           sourceCard: CARD_ID,
         },
@@ -42,7 +77,7 @@ const anytimeListener: CardListenerRegistration = {
         type: 'xor',
         children: qualifying.map((field) => ({
           type: 'leaf' as const,
-          actionId: 'swap-field-grain-to-veg',
+          actionId: SWAP_ACTION_ID,
           params: { row: field.row, col: field.col },
           sourceCard: CARD_ID,
           choiceLabelKey: 'ui.interactionFieldChoice',
