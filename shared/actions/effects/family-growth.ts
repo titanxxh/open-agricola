@@ -55,10 +55,6 @@ export const familyGrowthAction: ActionDefinition = {
   },
 }
 
-// Back-compat exports for any existing helper consumers.
-export const growFamily = growFamilyCore
-export const growFamilyWithoutRoom = growFamilyCore
-
 // Legacy aliases — deprecated. Same definition object exposed under prior
 // `id` strings so any cached references keep working until the next sweep.
 export const wishChildrenAction: ActionDefinition = {

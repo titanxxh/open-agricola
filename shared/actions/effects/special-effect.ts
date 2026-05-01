@@ -64,8 +64,3 @@ export const specialEffectAction: ActionDefinition = {
     }
   },
 }
-
-// Legacy re-export: previously exported as `specialEffect` (no-op stub) and
-// referenced in tests. Keep the function-shaped alias in case external
-// callers still import it; new code should use `specialEffectAction`.
-export const specialEffect = () => ({ type: 'ok' as const })

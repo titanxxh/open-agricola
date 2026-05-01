@@ -173,7 +173,7 @@ export const playOccupation = (
   }
 }
 
-export const getOccupationCost = (
+const getOccupationCost = (
   player: PlayerState,
   occupationId: string,
 ) => {

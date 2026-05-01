@@ -1,11 +1,7 @@
-import type { ActionCostPreview, ActionDefinition, PlayerState, Resource } from '../../game/types'
-import { canAffordCost } from '../helpers/pay-helpers'
+import type { ActionCostPreview, ActionDefinition } from '../../game/types'
 import { getBuildRoomCost, getMaxBuildableRooms } from '../helpers/room-payment'
 
-export const canAfford = (player: PlayerState, cost: Partial<Resource>) =>
-  canAffordCost(player, cost)
-
-export const constructCostPreview: ActionCostPreview = {
+const constructCostPreview: ActionCostPreview = {
   getBaseCost: ({ player }) => getBuildRoomCost(player.houseType),
   canExecute: (context, costOverride) =>
     getMaxBuildableRooms(context.player, costOverride) > 0,
