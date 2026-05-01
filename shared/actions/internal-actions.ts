@@ -19,6 +19,7 @@ import { setFirstPlayerAction } from './effects/first-player'
 import { payResourcesAction } from './effects/pay-resources'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
+import { breedAction } from './effects/breed'
 import { takeFromCardAction } from './effects/internal/take-from-card'
 import { emitChoiceAction } from './effects/internal/emit-choice'
 import { returnFirstWorkerHomeAction } from './effects/internal/return-first-worker-home'
@@ -57,6 +58,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   payResourcesAction,
   returnToSpaceAction,
   bonusVpAction,
+  breedAction,
   takeFromCardAction,
   emitChoiceAction,
   returnFirstWorkerHomeAction,
