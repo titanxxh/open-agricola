@@ -77,14 +77,9 @@ export const A84_Silage_impl = {
       choiceLabelParams: { animal: animalType },
     }))
 
-    children.push({
-      type: 'leaf',
-      actionId: 'noop',
-      choiceLabelKey: 'ui.interactionDecline',
-    })
-
     return {
       type: 'xor',
+      optional: true,
       promptKey: 'ui.interactionSilage',
       children,
     }

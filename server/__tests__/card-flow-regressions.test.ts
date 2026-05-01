@@ -37,12 +37,12 @@ describe('card flow regressions', () => {
     if (resp.pending.type !== 'choice') {
       throw new Error('expected reclamation plow choice')
     }
-    const skip = resp.pending.options.find((option) => option.labelKey === 'ui.interactionReclamationPlowSkip')
+    const skip = resp.pending.options.find((option) => option.labelKey === 'ui.interactionOptionalSkip')
     expect(skip).toBeDefined()
 
     resp = session.resolveChoice(0, skip!.value)
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')
+    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBeFalsy()
+    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBeUndefined()
     expect(resp.pending.type).toBe('confirmNextPlayer')
   })
 

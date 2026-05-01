@@ -80,7 +80,8 @@ describe('E74_AshTrees', () => {
 
     expect(result?.flow?.type).toBe('xor')
     if (result?.flow?.type !== 'xor') return
-    expect(result.flow.children).toHaveLength(5)
+    expect(result.flow.optional).toBe(true)
+    expect(result.flow.children).toHaveLength(4)
     expect(result.flow.children[0]).toMatchObject({
       type: 'leaf',
       actionId: 'reserve-fence-bonus',

@@ -63,13 +63,7 @@ export const E73_Scythe_impl = {
         choiceLabelParams: { crop: top?.kind ?? null, amount: top?.remaining ?? 0 },
       }
     })
-    children.push({
-      type: 'leaf',
-      actionId: 'noop',
-      sourceCard: CARD_ID,
-      choiceLabelKey: 'ui.interactionDecline',
-    })
-    return { type: 'xor', children }
+    return { type: 'xor', optional: true, children }
   },
 },
   reaches: [] as readonly string[],

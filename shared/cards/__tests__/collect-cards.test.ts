@@ -159,10 +159,9 @@ describe('Collect action card listeners', () => {
       
       return {
         flow: {
-          type: 'xor',
-          children: [
-            { type: 'leaf', actionId: 'plow', optional: true },
-          ],
+          type: 'leaf',
+          actionId: 'plow',
+          optional: true,
         },
       }
     },
@@ -301,8 +300,9 @@ describe('Collect action card listeners', () => {
       const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
       expect(result?.flow).toBeDefined()
-      expect(result?.flow?.type).toBe('xor')
-      expect((result?.flow as Extract<ActionFlow, { type: 'seq' }>)?.children?.[0]?.actionId).toBe('plow')
+      expect(result?.flow?.type).toBe('leaf')
+      expect((result?.flow as Extract<ActionFlow, { type: 'leaf' }>)?.actionId).toBe('plow')
+      expect((result?.flow as Extract<ActionFlow, { type: 'leaf' }>)?.optional).toBe(true)
     })
 
     it('allows plow when animals obtained and can accommodate in stable', () => {

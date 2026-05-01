@@ -990,7 +990,16 @@ export class Engine {
       ) {
         options.push({ value: '__done__', labelKey: 'ui.interactionFlowDone' })
       }
+      const parent = this.tree.findParent(node.id)
+      const optionalParent = parent instanceof OptionalNode ? parent : null
+      if (optionalParent && options.length > 0) {
+        options.push({ value: '__skip__', labelKey: 'ui.interactionOptionalSkip' })
+      }
       if (options.length === 0) {
+        if (optionalParent) {
+          optionalParent.resolve()
+          return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+        }
         return { type: 'blocked', nodeId: node.id }
       }
       this.pendingChoiceNodeId = node.id
@@ -1014,6 +1023,12 @@ export class Engine {
       if (node.active) {
         // 当 active 为 true 时，子节点会被 nextUnresolved 返回
         // 返回 ok 让引擎继续处理子节点
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+      // 当 child 是 OrNode/XorNode 时，跳过 "do/skip" 这一步——
+      // 让 OrNode/XorNode 直接呈现 "N 个分支 + skip" 一层选择
+      if (node.child instanceof OrNode || node.child instanceof XorNode) {
+        node.active = true
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       const actionNode = this.findActionNode(node.child)
@@ -1405,6 +1420,18 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.pendingChoiceOwnerNodeId = null
           this.pendingChoiceContext = null
           return { type: 'ok' }
+        }
+        if (choice === '__skip__') {
+          const parent = this.tree.findParent(node.id)
+          if (parent instanceof OptionalNode) {
+            this.resolveSubtree(node)
+            parent.resolve()
+            this.pendingChoiceNodeId = null
+            this.pendingChoiceActionId = null
+            this.pendingChoiceOwnerNodeId = null
+            this.pendingChoiceContext = null
+            return { type: 'ok' }
+          }
         }
         const targetNode = node.children.find((item) => item.id === choice)
         const child = targetNode ? this.findActionNode(targetNode) : null

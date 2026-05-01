@@ -40,8 +40,7 @@ export const D167_PureBreeder_impl = {
         choiceLabelParams: { animal: t },
       }))
     if (children.length === 0) return
-    children.push({ type: 'leaf', actionId: 'noop', choiceLabelKey: 'ui.interactionDecline' })
-    return { type: 'xor', children }
+    return { type: 'xor', optional: true, children }
   },
 },
   reaches: [] as readonly string[],

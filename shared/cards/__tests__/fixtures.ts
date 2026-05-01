@@ -70,7 +70,7 @@ export function mkFlow(partial: Partial<ActionFlow> & { type?: ActionFlow['type'
   if (type === 'leaf') {
     return {
       type: 'leaf',
-      actionId: 'noop',
+      actionId: 'special-effect',
       ...(partial as Partial<Extract<ActionFlow, { type: 'leaf' }>>),
     }
   }
