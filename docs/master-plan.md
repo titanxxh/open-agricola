@@ -11,7 +11,7 @@
 
 ## 0. 概览
 
-- **范围**：审查发现 ⚠ 行为偏差 44 张 + ❌ 数值/元数据 83 张 + 16 张 stub + i18n / category / sharedScoring / getExchangeResources 系统性问题 + 5 张 P0 玩法完全错。
+- **范围**：审查发现 ⚠ 行为偏差 44 张 + ❌ 数值/元数据 83 张 + 16 张 stub + i18n / category / sharedScoring 系统性问题 + 5 张 P0 玩法完全错。（注：原 audit 报的"getExchangeResources 系统性简化"已 PR-4C 推翻——`player.resources.{animal}` 在我方已聚合 board+supply，等价 BGA `$player->getExchangeResources()`，不是 gap，见 §8 row 4。）
 - **非范围**：130 张 P3 简化实现（默认不做，本计划留口子）。
 - **总工作量估算**：P0+P1+P2 合计 30 person-day（不含 P3）。
 - **单 owner 推荐排期**：5 周完成 P0+P1+P2。
