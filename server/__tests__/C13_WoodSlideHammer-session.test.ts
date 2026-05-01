@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { canRenovate } from '../../shared/actions/effects/renovation'
-import { getModifiersForCostType } from '../../shared/actions/helpers/payment'
+import {
+  applyCostModifiers,
+  computeAllBuyableCombinations,
+  getModifiersForCostType,
+} from '../../shared/actions/helpers/payment'
 import type { BonusModifier } from '../../shared/game/types'
 
 import '../../shared/cards/C/C13_WoodSlideHammer'
@@ -100,5 +104,65 @@ describe('C13_WoodSlideHammer — renovation -2 stone discount gated by conditio
 
     const mods = getModifiersForCostType(player, 'renovation')
     expect(mods).toHaveLength(0)
+  })
+})
+
+describe('C13_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E follow-up)', () => {
+  // These cases verify the conditions chain end-to-end on the unified
+  // ComplexCost.bonuses payment path. The C13 BonusModifier flows through:
+  //   getModifiersForCostType → applyCostModifiers → computeAllBuyableCombinations
+  // After Task 3 (stop propagating conditions), the generated Bonus has no
+  // conditions field; the pre-filter at getModifiersForCostType now decides
+  // sufficiency. These cases lock in that semantics.
+
+  it('5 wood rooms + stone payment → C13 surfaces a -2 stone discount path', () => {
+    const { player } = setupOwner()
+    player.houseType = 'wood'
+    player.rooms = 5
+    player.resources = { ...player.resources, stone: 5, reed: 2 }
+
+    // Drive the payment evaluator directly with a synthetic stone-flavoured
+    // renovation cost (matching wood→stone direct path that A87 Conservator
+    // would surface). Without C13 the player would pay 5 stone; with C13 the
+    // bonus path reduces it to 3.
+    const mods = getModifiersForCostType(player, 'renovation')
+    expect(mods).toHaveLength(1)
+    const effective = applyCostModifiers({ fee: { stone: 5, reed: 1 } }, mods)
+    // Generated Bonus must NOT carry conditions (Task 3 guarantee).
+    expect(effective.bonuses).toBeDefined()
+    expect(effective.bonuses!.length).toBe(1)
+    expect(effective.bonuses![0].conditions).toBeUndefined()
+
+    const sols = computeAllBuyableCombinations(player, { fee: { stone: 5, reed: 1 } }, undefined, 'renovation')
+    expect(sols.length).toBeGreaterThan(0)
+    // At least one solution applies the C13 discount → stone paid <= 3.
+    expect(sols.some((s) => (s.resourcesPaid.stone ?? 0) <= 3)).toBe(true)
+  })
+
+  it('4 wood rooms → C13 filtered out at getModifiersForCostType, no discount surfaces', () => {
+    const { player } = setupOwner()
+    player.houseType = 'wood'
+    player.rooms = 4
+    player.resources = { ...player.resources, stone: 5, reed: 2 }
+
+    const mods = getModifiersForCostType(player, 'renovation')
+    expect(mods).toHaveLength(0)
+    const sols = computeAllBuyableCombinations(player, { fee: { stone: 4, reed: 1 } }, undefined, 'renovation')
+    // No bonus path → all solutions pay full stone (and full reed).
+    expect(sols.length).toBeGreaterThan(0)
+    expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 4)).toBe(true)
+  })
+
+  it('houseType clay (already renovated once) → C13 filtered out, clay→stone pays full', () => {
+    const { player } = setupOwner()
+    player.houseType = 'clay'
+    player.rooms = 5
+    player.resources = { ...player.resources, stone: 6, reed: 2 }
+
+    const mods = getModifiersForCostType(player, 'renovation')
+    expect(mods).toHaveLength(0)
+    const sols = computeAllBuyableCombinations(player, { fee: { stone: 5, reed: 1 } }, undefined, 'renovation')
+    expect(sols.length).toBeGreaterThan(0)
+    expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
 })
