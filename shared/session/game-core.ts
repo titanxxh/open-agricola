@@ -1302,7 +1302,7 @@ export class GameCore {
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
         if (!flow) continue
         this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
         return true
@@ -1322,7 +1322,7 @@ export class GameCore {
     for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
       const cardId = cards[currentCardIndex]
       if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook)
+      const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
       if (!flow) continue
       this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
       return true
