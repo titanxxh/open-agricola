@@ -1455,14 +1455,22 @@ export class GameCore {
       player.resources.food -= useFood
       const remaining = required - useFood
 
+      const hasHarvestExchange = this.hasAnyHarvestExchange(player)
+
       if (remaining <= 0) {
-        if (useFood > 0) {
-          this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
+        // Even when feeding is satisfied, give the player a chance to
+        // engage harvest exchanges (e.g. C105 reverse trade spending bonus
+        // food → resources). Only skip if there's nothing useful to do.
+        if (!hasHarvestExchange) {
+          if (useFood > 0) {
+            this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
+          }
+          continue
         }
+        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
         continue
       }
 
-      const hasHarvestExchange = this.hasAnyHarvestExchange(player)
       const canConvert =
         player.resources.grain > 0 ||
         player.resources.vegetable > 0 ||
@@ -2196,7 +2204,23 @@ export class GameCore {
     return this.respond()
   }
 
-  confirmHarvestFeed(playerIndex: number, selections: { resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string }[]): SessionResponse {
+  confirmHarvestFeed(
+    playerIndex: number,
+    selections: {
+      resourceKey?: keyof Resource
+      count: number
+      food?: number
+      sourceName?: string
+      sourceId?: string
+      /**
+       * Optional entry-index pointer into `card.exchanges[]` (Sprint 6a). When
+       * provided, the consumer applies the exchange bidirectionally (subtract
+       * `from`, add `to`) — needed for reverse trades like C105 BasketCarrier.
+       * When omitted, falls back to legacy `(resourceKey, food)` matching.
+       */
+      exchangeIndex?: number
+    }[],
+  ): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
     }
@@ -2204,56 +2228,133 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // Enforce per-card exchange `max` for harvest-trigger exchanges.
-    // Aggregate counts per sourceId to cap against the declared max (e.g. C59
-    // SchnappsDistillery allows converting at most 1 vegetable per harvest).
+    // Resolve each selection to its underlying CardExchange entry. Either path
+    // (entry-index pointer or legacy resourceKey/food matching) yields the
+    // same `exchange` reference used downstream for cap-enforcement and
+    // bidirectional resource application.
+    const lookupCard = (sourceId: string) => {
+      if (player.improvements.includes(sourceId)) {
+        return getMajorCardEffect(sourceId)
+      }
+      if (player.minorPlayed.includes(sourceId)) {
+        return getRegisteredMinorImprovement(sourceId)
+      }
+      if (player.occupationPlayed.includes(sourceId)) {
+        return getRegisteredOccupation(sourceId)
+      }
+      return undefined
+    }
+
+    // Enforce per-card exchange `max` (sourceId-level aggregate cap so that
+    // multi-tier cards like D62 BeerTap collapse to one tier per harvest).
     const perSourceUsed = new Map<string, number>()
-    const cappedSelections = selections.map((sel) => {
+    type ResolvedSel = (typeof selections)[number] & {
+      _exchange?: import('../cards/types').CardExchange
+    }
+    const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel
-      const card =
-        player.minorPlayed.includes(sel.sourceId)
-          ? getRegisteredMinorImprovement(sel.sourceId)
-          : player.occupationPlayed.includes(sel.sourceId)
-            ? getRegisteredOccupation(sel.sourceId)
-            : undefined
+      const card = lookupCard(sel.sourceId)
       if (!card?.exchanges) return sel
-      const exchange = card.exchanges.find((ex) => {
-        if (!exchangeTriggers(ex).includes('harvest')) return false
-        const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-        if (fromKeys.length !== 1) return false
-        const fromKey = fromKeys[0]!
-        if (fromKey !== sel.resourceKey) return false
-        const foodOut = (ex.to as Partial<Resource>).food ?? 0
-        return foodOut === sel.food
-      })
-      if (!exchange || exchange.max === undefined) return sel
-      const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
-      const remaining = Math.max(0, exchange.max - usedSoFar)
-      const capped = Math.min(sel.count, remaining)
-      perSourceUsed.set(sel.sourceId, usedSoFar + capped)
-      return { ...sel, count: capped }
+      let exchange: import('../cards/types').CardExchange | undefined
+      if (typeof sel.exchangeIndex === 'number') {
+        const candidate = card.exchanges[sel.exchangeIndex]
+        if (candidate && exchangeTriggers(candidate).includes('harvest')) {
+          exchange = candidate
+        }
+      } else {
+        exchange = card.exchanges.find((ex) => {
+          if (!exchangeTriggers(ex).includes('harvest')) return false
+          const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+          if (fromKeys.length !== 1) return false
+          const fromKey = fromKeys[0]!
+          if (fromKey !== sel.resourceKey) return false
+          const foodOut = (ex.to as Partial<Resource>).food ?? 0
+          return foodOut === (sel.food ?? 0)
+        })
+      }
+      if (!exchange) return sel
+      let capped = sel.count
+      if (exchange.max !== undefined) {
+        const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
+        const remaining = Math.max(0, exchange.max - usedSoFar)
+        capped = Math.min(sel.count, remaining)
+        perSourceUsed.set(sel.sourceId, usedSoFar + capped)
+      }
+      return { ...sel, count: capped, _exchange: exchange }
     })
 
     let totalFood = 0
     const usedResources: Partial<Resource> = { food: this.pending.foodUsed }
     for (const sel of cappedSelections) {
       if (sel.count <= 0) continue
-      const available = player.resources[sel.resourceKey]
-      const used = Math.min(sel.count, available)
-      player.resources[sel.resourceKey] -= used
-      totalFood += used * sel.food
-      usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
-      incResourceConverted(player, sel.resourceKey, used)
-      addFoodFromConversion(player, sel.resourceKey, used * sel.food)
-      this.state.log.unshift({
-        key: 'log.harvestFeedConvert',
-        params: {
-          player: player.name,
-          source: sel.sourceName ?? 'Harvest conversion',
-          cost: { [sel.resourceKey]: used },
-          food: { food: used * sel.food },
-        },
-      })
+      const exchange = sel._exchange
+      if (exchange) {
+        // Bidirectional application: subtract `from`, add `to`. Caps per-key
+        // by player's available resources (per-key `from` quantity allowed).
+        let times = sel.count
+        for (const [k, v] of Object.entries(exchange.from)) {
+          const need = (v as number) * times
+          const have = (player.resources as Record<string, number>)[k] ?? 0
+          if (need > have) {
+            // Scale down to whole-times that the player can actually afford.
+            times = Math.min(times, Math.floor(have / Math.max(1, v as number)))
+          }
+        }
+        if (times <= 0) continue
+        // Subtract `from`
+        const costMap: Record<string, number> = {}
+        for (const [k, v] of Object.entries(exchange.from)) {
+          const total = (v as number) * times
+          ;(player.resources as Record<string, number>)[k] -= total
+          costMap[k] = total
+          usedResources[k as keyof Resource] = (usedResources[k as keyof Resource] ?? 0) + total
+          incResourceConverted(player, k as keyof Resource, total)
+        }
+        // Add `to`
+        const gainMap: Record<string, number> = {}
+        for (const [k, v] of Object.entries(exchange.to)) {
+          const total = (v as number) * times
+          ;(player.resources as Record<string, number>)[k] += total
+          gainMap[k] = total
+          if (k === 'food') {
+            totalFood += total
+            // Per-key conversion stat: only meaningful for forward (* -> food)
+            // trades; reverse trades log under usedResources but skip food
+            // conversion stats.
+            const fromKey0 = (Object.keys(exchange.from)[0] ?? null) as
+              | keyof Resource
+              | null
+            if (fromKey0) addFoodFromConversion(player, fromKey0, total)
+          }
+        }
+        this.state.log.unshift({
+          key: 'log.harvestFeedConvert',
+          params: {
+            player: player.name,
+            source: sel.sourceName ?? 'Harvest conversion',
+            cost: costMap,
+            food: gainMap,
+          },
+        })
+      } else if (sel.resourceKey && typeof sel.food === 'number') {
+        // Legacy single-resource forward-trade fallback (no exchange resolved).
+        const available = player.resources[sel.resourceKey]
+        const used = Math.min(sel.count, available)
+        player.resources[sel.resourceKey] -= used
+        totalFood += used * sel.food
+        usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
+        incResourceConverted(player, sel.resourceKey, used)
+        addFoodFromConversion(player, sel.resourceKey, used * sel.food)
+        this.state.log.unshift({
+          key: 'log.harvestFeedConvert',
+          params: {
+            player: player.name,
+            source: sel.sourceName ?? 'Harvest conversion',
+            cost: { [sel.resourceKey]: used },
+            food: { food: used * sel.food },
+          },
+        })
+      }
     }
     const required = this.pending.remaining
     const deficit = Math.max(0, required - totalFood)

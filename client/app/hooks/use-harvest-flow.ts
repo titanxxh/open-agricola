@@ -23,10 +23,23 @@ export type HarvestFeedPending = {
 export type HarvestFeedOption = {
   id: string
   sourceName: string
+  /**
+   * Legacy single-resource forward-trade fields. Kept for back-compat with
+   * the basic conversion + Major Fireplace prompt path.
+   */
   resourceKey: keyof Resource
   food: number
   max?: number
   sourceId?: string
+  /**
+   * Sprint 6a entry-index pointer (preferred when present). When set, the
+   * server applies the exchange bidirectionally — supporting reverse trades
+   * (food -> resources, e.g. C105) and multi-key conversions.
+   */
+  exchangeIndex?: number
+  /** Full from/to maps for prompt rendering of multi-key trades. */
+  from?: Partial<Resource>
+  to?: Partial<Resource>
 }
 
 export type HarvestContext = {
@@ -241,50 +254,63 @@ export const buildHarvestFeedOptions = (
     addOption(sourceName, 'boar', source.boar, source.id)
     addOption(sourceName, 'cattle', source.cattle, source.id)
   })
-  // Harvest-trigger exchanges from played minors/occupations
+  // Harvest-trigger exchanges from played minors/occupations.
+  // Sprint 6a: surface every harvest-window exchange as an entry-index
+  // pointer so the server can apply it bidirectionally (forward + reverse).
+  // Legacy single-key forward trades still populate `resourceKey`/`food` for
+  // back-compat with prompts that read those fields.
+  const addExchangeOption = (
+    cardId: string,
+    ex: import('../../../shared/cards/types').CardExchange,
+    idx: number,
+  ) => {
+    const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+    // Affordability gate: every `from` resource must be present (>=1 unit).
+    for (const k of fromKeys) {
+      const need = (ex.from as Partial<Resource>)[k] ?? 0
+      if (need > 0 && player.resources[k] < need) return
+    }
+    // Legacy compat: report `resourceKey`/`food` only for single-input,
+    // food-output trades. Reverse / multi-key trades still attach the
+    // entry-index pointer; the server prefers it when present.
+    let resourceKey: keyof Resource = (fromKeys[0] ?? 'food') as keyof Resource
+    let food = 0
+    if (fromKeys.length === 1) {
+      const k = fromKeys[0]!
+      const fromCount = (ex.from as Partial<Resource>)[k] ?? 0
+      const foodOut = (ex.to as Partial<Resource>).food ?? 0
+      if (fromCount === 1 && foodOut > 0) {
+        resourceKey = k
+        food = foodOut
+      }
+    }
+    options.push({
+      id: `${cardId}-harvest-ex${idx}`,
+      sourceName: cardLabel(cardId),
+      resourceKey,
+      food,
+      max: ex.max,
+      sourceId: cardId,
+      exchangeIndex: idx,
+      from: { ...ex.from },
+      to: { ...ex.to },
+    })
+  }
   for (const cardId of player.minorPlayed) {
     const card = getRegisteredMinorImprovement(cardId)
     if (!card?.exchanges) continue
-    for (const ex of card.exchanges) {
-      if (!exchangeTriggers(ex).includes('harvest')) continue
-      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-      if (fromKeys.length !== 1) continue
-      const fromKey = fromKeys[0]!
-      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
-      const foodOut = (ex.to as Partial<Resource>).food ?? 0
-      if (fromCount !== 1 || foodOut <= 0) continue
-      if (player.resources[fromKey] <= 0) continue
-      options.push({
-        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
-        sourceName: cardLabel(cardId),
-        resourceKey: fromKey,
-        food: foodOut,
-        max: ex.max,
-        sourceId: cardId,
-      })
-    }
+    card.exchanges.forEach((ex, idx) => {
+      if (!exchangeTriggers(ex).includes('harvest')) return
+      addExchangeOption(cardId, ex, idx)
+    })
   }
   for (const cardId of player.occupationPlayed) {
     const card = getRegisteredOccupation(cardId)
     if (!card?.exchanges) continue
-    for (const ex of card.exchanges) {
-      if (!exchangeTriggers(ex).includes('harvest')) continue
-      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-      if (fromKeys.length !== 1) continue
-      const fromKey = fromKeys[0]!
-      const fromCount = (ex.from as Partial<Resource>)[fromKey] ?? 0
-      const foodOut = (ex.to as Partial<Resource>).food ?? 0
-      if (fromCount !== 1 || foodOut <= 0) continue
-      if (player.resources[fromKey] <= 0) continue
-      options.push({
-        id: `${cardId}-harvest-${fromKey}-${foodOut}`,
-        sourceName: cardLabel(cardId),
-        resourceKey: fromKey,
-        food: foodOut,
-        max: ex.max,
-        sourceId: cardId,
-      })
-    }
+    card.exchanges.forEach((ex, idx) => {
+      if (!exchangeTriggers(ex).includes('harvest')) return
+      addExchangeOption(cardId, ex, idx)
+    })
   }
   return options
 }
