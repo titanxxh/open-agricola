@@ -41,7 +41,7 @@ const computeReplaceListener: CardListenerRegistration = {
             sourceCard: CARD_ID,
             actionContext: { skipRoomCheck: true },
           },
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

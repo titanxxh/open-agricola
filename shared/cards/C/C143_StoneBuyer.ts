@@ -20,7 +20,7 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           payLeaf({ cardId: CARD_ID, cost: { food: 2 } }),
           gainLeaf(CARD_ID, { stone: 1 }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,
@@ -49,7 +49,7 @@ export const C143_StoneBuyer_impl = {
     children: [
       payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
       gainLeaf(CARD_ID, { stone: 2 }),
-      { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
+      { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
     ],
   }),
   onBeforeStartOfTurn: (_state, player) => {

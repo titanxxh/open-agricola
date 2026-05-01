@@ -58,9 +58,9 @@ export const D126_FieldCultivator_impl = {
     // Update infobox after pops
     children.push({
       type: 'leaf',
-      actionId: 'set-card-infobox',
+      actionId: 'special-effect',
       sourceCard: CARD_ID,
-      params: { text: `${Math.max(0, stack.length - popsNeeded)} goods` },
+      params: { kind: 'set-infobox', text: `${Math.max(0, stack.length - popsNeeded)} goods` },
     })
 
     return { type: 'seq', children }

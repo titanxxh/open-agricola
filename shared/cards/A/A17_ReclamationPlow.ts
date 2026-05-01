@@ -57,11 +57,22 @@ const buildReclamationPlowUseFlow = (ambiguous: boolean): ActionFlow => ({
           choiceLabelKey: 'ui.interactionReclamationPlowDecline',
         }
       : {
-          type: 'leaf',
-          actionId: 'flag-card',
-          sourceCard: CARD_ID,
-          params: { infoboxText: USED_INFOBOX },
+          type: 'seq',
           choiceLabelKey: 'ui.interactionReclamationPlowSkip',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: { kind: 'set-flag', flag: true },
+            },
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: { kind: 'set-infobox', text: USED_INFOBOX },
+            },
+          ],
         },
   ],
 })

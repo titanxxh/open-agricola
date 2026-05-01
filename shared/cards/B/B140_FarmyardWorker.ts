@@ -16,7 +16,7 @@ const farmyardListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     return {
-      flow: { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+      flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
       sourceCard: CARD_ID,
     }
   },

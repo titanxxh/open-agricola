@@ -21,7 +21,7 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1, food: 2 } }),
           { type: 'leaf', actionId: 'build-farmhand-room', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

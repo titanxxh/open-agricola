@@ -29,7 +29,7 @@ const anytimeListener: CardListenerRegistration = {
             count: 2,
             resources: { food: 1 },
           }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,

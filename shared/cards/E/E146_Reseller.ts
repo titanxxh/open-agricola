@@ -33,7 +33,7 @@ const listener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         children: [
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           gainChildren.length === 1
             ? gainChildren[0]!
             : { type: 'xor', children: gainChildren },

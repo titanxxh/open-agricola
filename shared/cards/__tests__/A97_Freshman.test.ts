@@ -97,7 +97,7 @@ describe('A97_Freshman', () => {
       promptKey: 'ui.interactionFreshmanOccupation',
       choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [
-        { type: 'leaf', actionId: 'flag-card', sourceCard: 'A97_Freshman' },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A97_Freshman', params: { kind: 'set-flag', flag: true } },
         {
           type: 'leaf',
           actionId: 'play-occupation',
@@ -129,8 +129,9 @@ describe('A97_Freshman', () => {
 
     expect(result?.flow).toEqual({
       type: 'leaf',
-      actionId: 'unflag-card',
+      actionId: 'special-effect',
       sourceCard: 'A97_Freshman',
+      params: { kind: 'set-flag', flag: false },
     })
   })
 
