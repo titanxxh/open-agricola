@@ -94,4 +94,48 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(specialEffectAction.execute(makeCtx(player, undefined, CARD_ID)).type).toBe('fail')
     expect(specialEffectAction.execute(makeCtx(player, { foo: 1 }, CARD_ID)).type).toBe('fail')
   })
+
+  it('targetPlayerId routes mutation to specified player', () => {
+    const p1 = makePlayer()
+    const p2 = makePlayer()
+    p2.id = 'p2'
+    const state = { players: [p1, p2] } as unknown as GameState
+
+    // Default: mutation goes to context.player (p1)
+    specialEffectAction.execute({
+      state,
+      player: p1,
+      space: { id: 'special-effect' } as ActionSpace,
+      sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'foo', amount: 5 },
+    })
+    expect(readCardExtraData<number>(p1, CARD_ID, 'foo')).toBe(5)
+    expect(readCardExtraData<number>(p2, CARD_ID, 'foo')).toBeUndefined()
+
+    // With targetPlayerId='p2', mutation goes to p2
+    specialEffectAction.execute({
+      state,
+      player: p1,
+      space: { id: 'special-effect' } as ActionSpace,
+      sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'foo', amount: 7 },
+      actionContext: { targetPlayerId: 'p2' },
+    })
+    expect(readCardExtraData<number>(p1, CARD_ID, 'foo')).toBe(5)
+    expect(readCardExtraData<number>(p2, CARD_ID, 'foo')).toBe(7)
+  })
+
+  it('targetPlayerId falls back to actor when player id not found', () => {
+    const p1 = makePlayer()
+    const state = { players: [p1] } as unknown as GameState
+    specialEffectAction.execute({
+      state,
+      player: p1,
+      space: { id: 'special-effect' } as ActionSpace,
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: true },
+      actionContext: { targetPlayerId: 'nonexistent' },
+    })
+    expect(isCardFlagged(p1, CARD_ID)).toBe(true)
+  })
 })

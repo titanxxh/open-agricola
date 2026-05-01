@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition, GameState, PlayerState } from '../../game/types'
 import {
   setCardFlag,
   writeCardInfobox,
@@ -11,6 +11,17 @@ export type SpecialEffectParams =
   | { kind: 'set-extra-data'; key: string; value: unknown }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
+
+const resolveTargetPlayer = (
+  state: GameState | undefined,
+  actor: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+): PlayerState => {
+  const targetId = actionContext?.targetPlayerId
+  if (typeof targetId !== 'string' || !targetId) return actor
+  const target = state?.players?.find((p) => p.id === targetId)
+  return target ?? actor
+}
 
 /**
  * Sprint 6a: `special-effect` is the canonical engine-mediated mutation
@@ -28,26 +39,27 @@ export const specialEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, sourceCard, params }) => {
+  execute: ({ state, player, sourceCard, params, actionContext }) => {
     if (!sourceCard) return { type: 'fail', logKey: 'log.specialEffectFail' }
     const p = params as SpecialEffectParams | undefined
     if (!p || typeof p !== 'object' || !('kind' in p)) {
       return { type: 'fail', logKey: 'log.specialEffectFail' }
     }
+    const target = resolveTargetPlayer(state, player, actionContext)
     switch (p.kind) {
       case 'increment-extra-data': {
-        const current = readCardExtraData<number>(player, sourceCard, p.key) ?? 0
-        writeCardExtraData(player, sourceCard, p.key, current + p.amount)
+        const current = readCardExtraData<number>(target, sourceCard, p.key) ?? 0
+        writeCardExtraData(target, sourceCard, p.key, current + p.amount)
         return { type: 'ok' }
       }
       case 'set-extra-data':
-        writeCardExtraData(player, sourceCard, p.key, p.value)
+        writeCardExtraData(target, sourceCard, p.key, p.value)
         return { type: 'ok' }
       case 'set-flag':
-        setCardFlag(player, sourceCard, p.flag)
+        setCardFlag(target, sourceCard, p.flag)
         return { type: 'ok' }
       case 'set-infobox':
-        writeCardInfobox(player, sourceCard, p.text)
+        writeCardInfobox(target, sourceCard, p.text)
         return { type: 'ok' }
     }
   },
