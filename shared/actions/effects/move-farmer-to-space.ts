@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionSpace } from '../../game/types'
 import { addWorkerRef, spaceHasPlayer } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'
-import { computeAllowedPlacementSpaces, type AllowedPlacement } from './placement-availability'
+import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../helpers/placement-availability'
 
 /**
  * Move a farmer from a source action space to another selectable action space and execute it.

@@ -4,7 +4,7 @@ import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
   payTypedFlatCost,
-} from './pay-helpers'
+} from '../helpers/pay-helpers'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'

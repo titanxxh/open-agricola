@@ -103,12 +103,12 @@ import {
 } from '../actions/effects/occupation.ts'
 import {
   resolveTypedFlatPaymentSelection,
-} from '../actions/effects/pay-helpers.ts'
+} from '../actions/helpers/pay-helpers.ts'
 import {
   buildRoomCostPerUnit,
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
-} from '../actions/effects/room-payment.ts'
+} from '../actions/helpers/room-payment.ts'
 import {
   getFenceCount,
   getPalisadeCount,
@@ -128,8 +128,8 @@ import { readPendingFenceBonus } from '../cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
-import { computeAllowedPlacementSpaces } from '../actions/effects/placement-availability.ts'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/effects/placement-constants.ts'
+import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 import { validatePlowSelection } from '../logic/farm/plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from '../logic/farm/validators.ts'
 import { validateFenceSelection } from '../logic/farm/fence-validation.ts'

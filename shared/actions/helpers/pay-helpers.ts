@@ -22,7 +22,7 @@ import {
   isComplexCost,
   payResources,
   sortPaymentSolutions,
-} from './pay'
+} from '../effects/pay'
 import { executeCardListener, getMatchingListeners, type CardListenerContext } from '../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (

@@ -2,8 +2,8 @@ import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, Player
 import { getNextEmptyTileForPlayer } from '../../game/farm'
 import { payResources } from './pay'
 import { stableWoodCost } from './fencing'
-import { canExecuteWithCostPreview } from './cost-preview'
-import { canAffordCost } from './pay-helpers'
+import { canExecuteWithCostPreview } from '../helpers/cost-preview'
+import { canAffordCost } from '../helpers/pay-helpers'
 
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)

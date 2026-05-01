@@ -9,7 +9,7 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/placement-constants'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C150_ParrotBreeder'

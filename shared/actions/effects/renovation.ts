@@ -6,13 +6,13 @@ import type {
   PlayerState,
   Resource,
 } from '../../game/types'
-import { canExecuteWithCostPreview } from './cost-preview'
+import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import {
   canAffordTypedFlatCost,
   executeResolvedTypedFlatPayment,
   payTypedFlatCost,
   resolveCostPaymentSelection,
-} from './pay-helpers'
+} from '../helpers/pay-helpers'
 
 const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
 

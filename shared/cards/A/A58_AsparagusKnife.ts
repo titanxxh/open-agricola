@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../game/types'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../game/field'
 import type { CardImpl } from '../registry'
 

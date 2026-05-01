@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerSelectionEffect } from '../../actions/effects/selection-effect-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTotalRemaining } from '../../game/field'
 import type { CardImpl } from '../registry'
 

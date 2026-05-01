@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
-import { computeAllowedPlacementSpaces } from '../../actions/effects/placement-availability'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A129_Swagman'

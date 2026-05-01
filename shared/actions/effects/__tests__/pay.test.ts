@@ -11,7 +11,7 @@ import {
   returnCardToBoard,
   clearPaymentCache,
 } from '../pay'
-import { buildPaymentChoiceResult, payTypedFlatCost } from '../pay-helpers'
+import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
 
 beforeEach(() => {
   clearPaymentCache()

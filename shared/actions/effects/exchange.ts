@@ -10,7 +10,7 @@ import type {
 } from '../../game/types'
 import { payResources } from './pay'
 import { gainResources } from './gain'
-import { canAffordFlatCost } from './pay-helpers'
+import { canAffordFlatCost } from '../helpers/pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 import {

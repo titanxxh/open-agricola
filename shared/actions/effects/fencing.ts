@@ -1,5 +1,5 @@
 import type { ActionDefinition, FenceSegment, GameState, PlayerState } from '../../game/types'
-import { canAffordTypedFlatCost } from './pay-helpers'
+import { canAffordTypedFlatCost } from '../helpers/pay-helpers'
 import { getCardEffect } from '../../cards/card-effects'
 
 export const maxFences = 15
