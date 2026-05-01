@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import type { ComplexCost, PlayerState, Resource } from '../../../game/types'
+import type {
+  BonusModifier,
+  ComplexCost,
+  PlayerState,
+  Resource,
+} from '../../../game/types'
 import {
+  applyCostModifiers,
   computeAllBuyableCombinations,
   clearPaymentCache,
 } from '../payment'
@@ -146,5 +152,23 @@ describe('Bonus.conditions / BonusChoice.conditions evaluation', () => {
     }
     const sols = computeAllBuyableCombinations(player, cost)
     expect(sols.some((s) => (s.resourcesPaid.wood ?? 0) === 2)).toBe(true)
+  })
+})
+
+describe('applyCostModifiers stops propagating redundant conditions', () => {
+  it('7. BonusModifier with conditions generates a Bonus without conditions', () => {
+    const baseCost: ComplexCost = { fee: { stone: 4 } }
+    const modifier: BonusModifier = {
+      type: 'bonus',
+      cardId: 'C13_WoodSlideHammer',
+      appliesTo: ['renovation'],
+      discount: { stone: 2 },
+      conditions: { houseTypeWood: 1, minNumRooms: 5 },
+    }
+    const result = applyCostModifiers(baseCost, [modifier])
+    expect(result.bonuses).toBeDefined()
+    expect(result.bonuses!.length).toBe(1)
+    expect(result.bonuses![0].conditions).toBeUndefined()
+    expect(result.bonuses![0].discount).toEqual({ stone: 2 })
   })
 })
