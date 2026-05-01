@@ -487,6 +487,7 @@ export const en = {
     'mark-card-observed': { name: 'Mark Card Observed', description: 'Increase the observed counter for the source card' },
     'flag-card': { name: 'Flag Card', description: 'Mark the source card as used' },
     'unflag-card': { name: 'Unflag Card', description: 'Clear the used mark from the source card' },
+    'special-effect': { name: 'Card Effect', description: 'Trigger a card-specific state mutation' },
     'set-card-infobox': { name: 'Set Card Infobox', description: 'Set the infobox text shown on the source card' },
     'clear-card-infobox': { name: 'Clear Card Infobox', description: 'Remove the infobox text shown on the source card' },
     noop: { name: 'No Effect', description: 'Do nothing' },

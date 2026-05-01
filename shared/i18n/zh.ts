@@ -468,6 +468,7 @@ export const zh = {
     'mark-card-observed': { name: '标记卡牌观测', description: '为来源卡牌增加一次观测计数' },
     'flag-card': { name: '标记卡牌', description: '将来源卡牌标记为已使用' },
     'unflag-card': { name: '清除卡牌标记', description: '清除来源卡牌的已使用标记' },
+    'special-effect': { name: '卡牌效果', description: '触发来源卡牌的特殊状态变更' },
     'set-card-infobox': { name: '设置卡牌标签', description: '设置显示在来源卡牌上的 infobox 文本' },
     'clear-card-infobox': { name: '清除卡牌标签', description: '移除显示在来源卡牌上的 infobox 文本' },
     noop: { name: '无效果', description: '不执行任何效果' },
