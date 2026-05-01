@@ -6,7 +6,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../game/types.ts'
-import { applyCostOverride } from '../../actions/effects/pay.ts'
+import { applyCostOverride } from '../../actions/helpers/payment'
 import { canAffordTypedFlatCost } from '../../actions/helpers/pay-helpers.ts'
 import { getMaxBuildableRooms } from '../../actions/helpers/room-payment.ts'
 import { readCardExtraData } from '../../cards/helpers/card-state.ts'

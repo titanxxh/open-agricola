@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionDefinition } from '../../game/types'
 import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
-import { registerAdHocAction } from '../../actions/effects/internal/registry'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C69_LandConsolidation'

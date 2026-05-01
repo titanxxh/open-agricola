@@ -3,7 +3,7 @@ import { A123_FrameBuilder } from '../A/A123_FrameBuilder'
 import {
   computeAllBuyableCombinations,
   clearPaymentCache,
-} from '../../actions/effects/pay'
+} from '../../actions/helpers/payment'
 import type {
   BonusModifier,
   ComplexCost,

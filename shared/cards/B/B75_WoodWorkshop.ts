@@ -9,7 +9,7 @@ import {
   canAffordCost,
   resolveCardPreviewCostByProvider,
 } from '../../actions/helpers/pay-helpers'
-import { computeAllBuyableCombinations, isComplexCost } from '../../actions/effects/pay'
+import { computeAllBuyableCombinations, isComplexCost } from '../../actions/helpers/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 

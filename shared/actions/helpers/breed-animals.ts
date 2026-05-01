@@ -1,5 +1,5 @@
 import type { ActionExecutionResult, HarvestBreedSummary, PlayerState } from '../../game/types'
-import { getTotalAnimalCapacity } from './animals'
+import { getTotalAnimalCapacity } from './animal-zones'
 
 export const breedAnimals = (
   player: PlayerState,

@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { returnCardToBoard } from '../../actions/effects/pay'
+import { returnCardToBoard } from '../../actions/helpers/payment'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import {
   setCardFlag,

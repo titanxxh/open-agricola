@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { computeAnimalZones } from '../../actions/effects/animals'
+import { computeAnimalZones } from '../../actions/helpers/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B98_OrganicFarmer'

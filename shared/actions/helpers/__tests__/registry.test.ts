@@ -5,7 +5,7 @@ import {
   getAdHocAction,
   getAllAdHocActions,
   _resetAdHocRegistry,
-} from '../internal/registry'
+} from '../../helpers/ad-hoc-action-registry'
 
 const makeDef = (id: string): ActionDefinition => ({
   id,

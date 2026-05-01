@@ -17,7 +17,7 @@ import {
   canPayCost,
   getModifiersForCostType,
   isComplexCost,
-} from '../effects/pay'
+} from '../helpers/payment'
 
 export type RoomUnitCost = Partial<Resource> | ComplexCost
 

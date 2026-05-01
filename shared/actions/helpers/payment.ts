@@ -15,7 +15,7 @@ import type {
 import {
   convertResources,
   hasValidResources,
-} from './exchange'
+} from '../effects/exchange'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { recordPaymentStats } from '../../cards/helpers/payment-stats'
 

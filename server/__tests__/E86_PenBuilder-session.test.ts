@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAnimalZones } from '../../shared/actions/effects/animals'
+import { computeAnimalZones } from '../../shared/actions/helpers/animal-zones'
 
 import '../../shared/cards/E/E86_PenBuilder'
 import type { AnytimeAction } from '../../shared/game/types';
-import type { AnimalZone } from '../../shared/actions/effects/animals'
+import type { AnimalZone } from '../../shared/actions/helpers/animal-zones'
 
 describe('E86_PenBuilder session', () => {
   const setup = () => {

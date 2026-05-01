@@ -1,5 +1,5 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
-import type { AnimalZone } from '../actions/effects/animals'
+import type { AnimalZone } from '../actions/helpers/animal-zones'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
 import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'

@@ -2036,13 +2036,14 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 
 ## 15.14.1 effects/ Layout: BGA-aligned root + internal/ (2026-05-01)
 
-`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（27 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（15 个）。
+`shared/actions/effects/` 顶层只放与 BGA `modules/php/Actions/` 一一对应或紧密相关的 `ActionDefinition`（24 个）；其它"我们额外扩展、BGA Actions/ 中无对应"的 effect 一律放到 `effects/internal/` 子目录（14 个）。
 
-- **顶层 22 个 BGA 一一对应**：`activate-card / collect / construct / exchange / fencing / first-player / gain / improvement / occupation / pay / place-farmer / place-future-meeples / place-meeples-from-supply / plow / reap / receive / renovation / reorganize / sow / special-effect / stables / wish-children`。
-- **顶层 5 个半特殊扩展**（语义上紧贴 BGA pay / breeding / collect / scoring，不下沉）：`pay-resources / animals / bake-bread / bonus-vp / breed-animals`。
-- **`internal/` 15 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card / registry`（registry 是 ad-hoc action 注册 helper）。
+- **顶层 21 个 BGA 一一对应**（22 个减去 `pay`——`pay` 没有 ActionDefinition、属于纯算法库，已外迁到 `helpers/payment.ts`）：`activate-card / collect / construct / exchange / fencing / first-player / gain / improvement / occupation / place-farmer / place-future-meeples / place-meeples-from-supply / plow / reap / receive / renovation / reorganize / sow / special-effect / stables / wish-children`。
+- **顶层 3 个半特殊扩展**（语义紧贴 BGA pay / collect / scoring，且自身导出 `ActionDefinition`，不下沉）：`pay-resources / bake-bread / bonus-vp`。
+- **`internal/` 14 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card`。
+- **`registry` (`registerAdHocAction`)** 不是 effect，2026-05-01 已外迁到 `helpers/ad-hoc-action-registry.ts`。
 
-新增 effect 时按以下决策：(a) 是否对应 BGA `modules/php/Actions/` 中的 PHP action 文件 → 是则放顶层；(b) 否则放 `effects/internal/`。`registerAdHocAction` 返回的 `card_*` 前缀 ad-hoc action 不进 effects/ 目录，直接由卡文件本地构造并注册。
+新增 effect 时按以下决策：(a) 文件是否导出 `ActionDefinition` → 否则放 `helpers/`（见 §15.18）；(b) 是否对应 BGA `modules/php/Actions/` 中的 PHP action 文件 → 是则放顶层；(c) 否则放 `effects/internal/`。`registerAdHocAction` 返回的 `card_*` 前缀 ad-hoc action 不进 effects/ 目录，直接由卡文件本地构造并注册。
 
 ## 15.15 CardExchange.triggers Array (Sprint 6b)
 
@@ -2059,6 +2060,62 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 效果：卡牌侧可以用 `{ type: 'xor', optional: true, children: [...] }` / `{ type: 'or', optional: true, children: [...] }` 表达"N 选 1 或不做"，不必再用 `OrNode + 末尾 noop decline leaf` 的 workaround。`leaf + optional: true` 行为不变，仍是单 ActionNode 的"做/不做"双选项。
 
 `shared/actions/effects/noop.ts` 已删除——卡牌不应再依赖 `actionId: 'noop'` 占位 leaf。Decline / Skip 文案统一走 `ui.interactionOptionalSkip`。
+
+## 15.18 effects/ vs helpers/ 职责边界（2026-05-01）
+
+`shared/actions/` 下两个目录承担不同角色，文件归属严格按下面标准判断。
+
+### effects/ — 游戏原子动作
+
+**判断标准（必须全部满足）**：
+
+- 文件导出 `ActionDefinition`（含 `id` / `nameKey` / `execute` / 可选 `resolveChoice`）
+- `id` 是节点树 leaf 可 dispatch 的 actionId
+- 引擎走 hooks（`before` / `during` / `after` / `immediatelyAfter` /
+  `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`）能拦截
+- 卡牌可以通过 `actions: [<id>]` listener 监听这个动作
+
+**子目录划分**（见 §15.14.1）：
+
+- `effects/<file>.ts`（顶层）：与 BGA `modules/php/Actions/` 一一对应或语义紧贴的 24 个动作
+- `effects/internal/<file>.ts`：因节点树模型需要而扩展的 14 个 effect（如 `future-meeples` / `pop-card-stack` 等；BGA 对应位置由 PHP 状态机 transition 或内部方法承担，不暴露为独立 Action 类）
+
+### helpers/ — 共享算法 / 状态库
+
+**判断标准（任一即可）**：
+
+- 不导出 `ActionDefinition`，纯函数 / 纯类型
+- 被多个 effect 或卡牌内部 import 复用
+- 不在 ActionFlow 节点树里 dispatch，不能被 hooks 拦截
+
+**典型成员**：
+
+- `payment.ts`（826 行支付算法库；`payResources / canPayResources / computeAllBuyableCombinations / executePaymentSolution / applyCostModifiers / returnCardToBoard` 等；被 22 张卡 + 4 个 effect + 引擎 dispatcher 直接消费）
+- `pay-helpers.ts` / `cost-preview.ts` / `room-payment.ts`（pay 路径的 cost preview / room 专属支付）
+- `placement-availability.ts` / `placement-constants.ts`（落子可达性算法）
+- `selection-effect-registry.ts`（卡牌驱动 selection 的 handler 注册表）
+- `feed-family.ts`（收获喂食算法）
+- `animal-zones.ts`（牧场 / 房屋 / 棚圈动物分布与容量计算；被 11 张卡 + card-effects 中枢消费）
+- `breed-animals.ts`（收获繁殖子流程，唯一调用点 `shared/logic/round.ts`）
+- `ad-hoc-action-registry.ts`（卡内私有 actionId 的运行时注册器；4 张卡用 `card_*` 前缀注册自己的私有 action）
+
+### 对应 BGA 的对照
+
+BGA `Pay.php` 是 PHP 状态机节点（state `ST_PAY`，836 行），同时承担"算法 + 状态调度"两层语义。我们的节点树模型把这两层语义拆开：
+
+- **算法层** → `helpers/payment.ts`（不可 dispatch / 不可 listen）
+- **leaf 层** → `effects/pay-resources.ts`（可在 ActionFlow 中显式 `pay X 再 do Y`，可被 listener 监听 / hook 拦截）
+
+### 误入纠正规则
+
+如果 `effects/` 下的文件不满足 effect 标准（典型：纯算法库、纯类型、纯 helper），必须外迁到 `helpers/`。本仓库 2026-05-01 第二轮重构外迁的 4 个文件：
+
+- `effects/pay.ts` → `helpers/payment.ts`
+- `effects/animals.ts` → `helpers/animal-zones.ts`
+- `effects/breed-animals.ts` → `helpers/breed-animals.ts`
+- `effects/internal/registry.ts` → `helpers/ad-hoc-action-registry.ts`
+
+新增 effect 前必须自查：是否有 `ActionDefinition` export？是否能在节点树 dispatch？是否能挂 listener？任何一条不成立，写到 `helpers/`，不要污染 `effects/`。
 
 ## 16. 当前结论
 

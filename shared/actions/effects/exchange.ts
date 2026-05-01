@@ -8,7 +8,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
-import { payResources } from './pay'
+import { payResources } from '../helpers/payment'
 import { gainResources } from './gain'
 import { canAffordFlatCost } from '../helpers/pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
