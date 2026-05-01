@@ -48,6 +48,14 @@ export type Trade = {
 export type BonusChoice = {
   discount: Partial<Resource>
   sources?: string[]
+  /**
+   * Player-state conditions evaluated by `computeAllBuyableCombinations`
+   * (`shared/actions/helpers/payment.ts`). Supported keys:
+   *   - `minNumRooms` — player.rooms >= N
+   *   - `houseTypeWood` / `houseTypeClay` / `houseTypeStone` — player.houseType match
+   * For roomCount-dependent gating in the construct path, prefer a
+   * `BonusModifier` — `room-payment.ts` evaluates per build call.
+   */
   conditions?: Record<string, number>
 }
 
@@ -56,6 +64,14 @@ export type Bonus = {
   choices?: BonusChoice[]
   optional?: boolean
   sources?: string[]
+  /**
+   * Player-state conditions evaluated by `computeAllBuyableCombinations`
+   * (`shared/actions/helpers/payment.ts`). Supported keys:
+   *   - `minNumRooms` — player.rooms >= N
+   *   - `houseTypeWood` / `houseTypeClay` / `houseTypeStone` — player.houseType match
+   * For roomCount-dependent gating in the construct path, prefer a
+   * `BonusModifier` — `room-payment.ts` evaluates per build call.
+   */
   conditions?: Record<string, number>
 }
 
