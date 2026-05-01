@@ -77,7 +77,7 @@ import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerL
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
 import { computeAnimalZones } from '../actions/helpers/animal-zones'
 import { reap } from '../actions/effects/reap.ts'
-import { breedAnimals } from '../actions/helpers/breed-animals'
+import { breedLeaf } from '../actions/effects/breed'
 import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
@@ -173,6 +173,7 @@ type StageResumeState = {
     | 'onEndHarvestFeedingPhase'
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
+    | 'onBreedPhase'
   playerIndex: number
   cardIndex: number
 }
@@ -1610,6 +1611,9 @@ export class GameCore {
       case 'onAllWorkersPlaced':
         this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onBreedPhase':
+        this.continueEndHarvestEffects()
+        return
     }
   }
 
@@ -2500,29 +2504,30 @@ export class GameCore {
       if (player) runAfterFeedHooks(this.state, player)
     })
     this.state.log.unshift({ key: 'log.harvestPhaseBreed' })
-    this.applyBreedPhase()
+    this.state.harvestBreedSummary = {}
 
-    const pendingAnimal = harvestOrder.find((index) => {
-      const player = this.state.players[index]
-      return !!player && this.hasPendingAnimals(player)
-    }) ?? -1
-    if (pendingAnimal !== -1) {
-      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
+    const flow = this.buildHarvestBreedFlow(harvestOrder)
+    if (flow) {
+      this.startStageFlow(flow, 'onBreedPhase', 0, 0)
       return this.respond()
     }
-
     return this.continueEndHarvestEffects()
   }
 
-  private applyBreedPhase() {
-    this.state.harvestBreedSummary = {}
-    this.getHarvestPlayerIndices().forEach((index) => {
-      const p = this.state.players[index]
-      if (!p) return
-      const result = breedAnimals(p)
-      this.state.harvestBreedSummary![p.id] = result.breedSummary
-      this.logHarvestResourceEntry('log.harvestBreedDetail', p, result.breedSummary.resources)
-    })
+  private buildHarvestBreedFlow(harvestOrder: number[]): ActionFlow | null {
+    const players = harvestOrder
+      .map((idx) => this.state.players[idx])
+      .filter((p): p is PlayerState => !!p)
+    if (players.length === 0) return null
+    const children: ActionFlow[] = []
+    for (const p of players) {
+      children.push({ type: 'playerSwitch', targetPlayerId: p.id })
+      children.push(breedLeaf('harvest'))
+    }
+    if (children.length === 1) {
+      return children[0]
+    }
+    return { type: 'seq', children }
   }
 
   private finalizeRound(): SessionResponse {
