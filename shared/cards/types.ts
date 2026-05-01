@@ -2,11 +2,33 @@ import type { Resource, CostModifier } from '../game/types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
+export type ExchangeWindow = 'anytime' | 'harvest' | 'bake-bread'
+
 export type CardExchange = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
-  trigger?: 'bake-bread' | 'anytime' | 'harvest'
+  sourceId?: string
+  /**
+   * Single-window form; preserved for legacy card files. Helper layer treats
+   * `trigger: 'anytime'` as `triggers: ['anytime']`.
+   */
+  trigger?: ExchangeWindow
+  /**
+   * Multi-window form (preferred). Empty array (or both fields omitted) means
+   * the exchange is only invocable via listener-triggered `tradeIds`
+   * (e.g. E53 BoarSpear, which lives outside any visible cookery window).
+   */
+  triggers?: ExchangeWindow[]
+}
+
+/**
+ * Normalize `CardExchange` to its triggers array (handling legacy `trigger`).
+ */
+export const exchangeTriggers = (ex: CardExchange): readonly ExchangeWindow[] => {
+  if (ex.triggers && ex.triggers.length > 0) return ex.triggers
+  if (ex.trigger) return [ex.trigger]
+  return []
 }
 
 export type CardPrerequisites = {

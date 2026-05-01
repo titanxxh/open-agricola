@@ -13,6 +13,14 @@ import { gainResources } from './gain'
 import { canAffordFlatCost } from './pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
+import {
+  exchangeTriggers,
+  getRegisteredMinorImprovement,
+  getRegisteredOccupation,
+  type CardExchange,
+  type ExchangeWindow,
+} from '../../cards/types'
+import { getMajorCardEffect } from '../../cards/major'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -214,57 +222,78 @@ export const reverseTrade = (trade: Trade): Trade => ({
 })
 
 // ============================================
-// Anytime Cookery Trades
+// Anytime Cookery Trades (metadata-driven)
 // ============================================
 
-const cookeryTrades: Record<string, Trade[]> = {
-  Major_Fireplace1: [
-    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
-    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
-    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace1' },
-    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
-  ],
-  Major_Fireplace2: [
-    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
-    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
-    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace2' },
-    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace2' },
-  ],
-  Major_CookingHearth1: [
-    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth1' },
-    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1' },
-    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth1' },
-    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth1' },
-  ],
-  Major_CookingHearth2: [
-    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth2' },
-    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2' },
-    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth2' },
-    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2' },
-  ],
-  E53_BoarSpear: [
-    { from: { boar: 1 }, to: { food: 4 }, sourceId: 'E53_BoarSpear' },
-  ],
+const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
+  from: ex.from,
+  to: ex.to,
+  max: ex.max,
+  sourceId: ex.sourceId ?? fallbackId,
+})
+
+const getCardExchanges = (cardId: string): readonly CardExchange[] => {
+  const major = getMajorCardEffect(cardId)
+  if (major?.exchanges) return major.exchanges
+  const minor = getRegisteredMinorImprovement(cardId)
+  if (minor?.exchanges) return minor.exchanges
+  const occ = getRegisteredOccupation(cardId)
+  if (occ?.exchanges) return occ.exchanges
+  return []
 }
 
-const getPlayerCookeryTrades = (player: PlayerState): Trade[] => {
-  const trades: Trade[] = []
-  for (const cardId of [...player.improvements, ...player.minorPlayed]) {
-    const cardTrades = cookeryTrades[cardId]
-    if (cardTrades) {
-      trades.push(...cardTrades)
+const playedCardIds = (player: PlayerState): readonly string[] => [
+  ...player.improvements,
+  ...player.minorPlayed,
+  ...player.occupationPlayed,
+]
+
+/**
+ * Scan all played cards for exchanges visible in the given window.
+ * Returns Trade-shaped entries (sourceId always populated).
+ */
+export const getExchangesInWindow = (
+  player: PlayerState,
+  window: ExchangeWindow,
+): Trade[] => {
+  const out: Trade[] = []
+  for (const cardId of playedCardIds(player)) {
+    for (const ex of getCardExchanges(cardId)) {
+      if (exchangeTriggers(ex).includes(window)) {
+        out.push(exchangeToTrade(ex, cardId))
+      }
     }
   }
-  return trades
+  return out
 }
 
-const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
-  for (const cardId of [...player.improvements, ...player.minorPlayed]) {
-    const cardTrades = cookeryTrades[cardId]
-    if (!cardTrades) continue
-    for (const trade of cardTrades) {
-      if (canAffordTrade(player, trade, 1)) return true
+/**
+ * Listener-driven exchange lookup: force-include exchanges whose `sourceId`
+ * matches the supplied tradeIds, regardless of `triggers` (so triggers:[]
+ * entries like E53 BoarSpear are still reachable via this path).
+ */
+export const getExchangesByTradeIds = (
+  player: PlayerState,
+  tradeIds: string[],
+): Trade[] => {
+  const out: Trade[] = []
+  for (const cardId of playedCardIds(player)) {
+    for (const ex of getCardExchanges(cardId)) {
+      const sourceId = ex.sourceId ?? cardId
+      if (tradeIds.includes(sourceId)) {
+        out.push(exchangeToTrade(ex, cardId))
+      }
     }
+  }
+  return out
+}
+
+const getPlayerCookeryTrades = (player: PlayerState): Trade[] =>
+  getExchangesInWindow(player, 'anytime')
+
+const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
+  for (const trade of getExchangesInWindow(player, 'anytime')) {
+    if (canAffordTrade(player, trade, 1)) return true
   }
   return false
 }
@@ -300,8 +329,27 @@ const recordCookeryConversion = (
   }
 }
 
-const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
-  const trades = getPlayerCookeryTrades(player)
+const buildExchangeOptions = (
+  player: PlayerState,
+  tradeIds?: string[],
+): { options: ActionChoiceOption[]; trades: Trade[] } => {
+  // Anytime cookery first; if tradeIds provided, merge listener-driven trades
+  // (these may have empty triggers, e.g. E53 BoarSpear).
+  const trades: Trade[] = getPlayerCookeryTrades(player)
+  if (tradeIds && tradeIds.length > 0) {
+    const seen = new Set<string>()
+    for (const t of trades) {
+      const key = `${t.sourceId}|${JSON.stringify(t.from)}|${JSON.stringify(t.to)}`
+      seen.add(key)
+    }
+    for (const t of getExchangesByTradeIds(player, tradeIds)) {
+      const key = `${t.sourceId}|${JSON.stringify(t.from)}|${JSON.stringify(t.to)}`
+      if (!seen.has(key)) {
+        trades.push(t)
+        seen.add(key)
+      }
+    }
+  }
   const options: ActionChoiceOption[] = []
   for (let i = 0; i < trades.length; i++) {
     const trade = trades[i]
@@ -315,19 +363,20 @@ const buildExchangeOptions = (player: PlayerState): ActionChoiceOption[] => {
     })
   }
   options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
-  return options
+  return { options, trades }
 }
 
 const resolveExchangeChoice = (
   state: GameState,
   player: PlayerState,
   choice: string,
+  tradeIds?: string[],
 ): ActionExecutionResult => {
   if (choice === 'cancel') {
     return { type: 'ok' }
   }
+  const { trades } = buildExchangeOptions(player, tradeIds)
   if (choice.startsWith('bulk:')) {
-    const trades = getPlayerCookeryTrades(player)
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
     let gained: Partial<Resource> = {}
@@ -352,7 +401,6 @@ const resolveExchangeChoice = (
   if (choice.startsWith('trade:')) {
     const parts = choice.split(':')
     const index = Number(parts[1])
-    const trades = getPlayerCookeryTrades(player)
     const trade = trades[index]
     if (!trade) return { type: 'ok' }
     const count = parts[2] ? Number(parts[2]) : 1
@@ -378,8 +426,8 @@ export const anytimeExchangeAction: ActionDefinition = {
   anytime: true,
   canBeExecutedByPlayer: (_, player) => hasAffordableCookeryTrade(player),
   execute: ({ player, actionContext }) => {
-    const allOptions = buildExchangeOptions(player)
     const filterIds = actionContext?.tradeIds as string[] | undefined
+    const { options: allOptions } = buildExchangeOptions(player, filterIds)
     const filtered = filterIds && filterIds.length > 0
       ? allOptions.filter((opt) => {
           if (opt.value === 'cancel') return true
@@ -398,5 +446,6 @@ export const anytimeExchangeAction: ActionDefinition = {
       options: filtered,
     }
   },
-  resolveChoice: ({ state, player }, choice) => resolveExchangeChoice(state, player, choice),
+  resolveChoice: ({ state, player, actionContext }, choice) =>
+    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined),
 }
