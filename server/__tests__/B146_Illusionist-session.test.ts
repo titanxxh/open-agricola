@@ -3,8 +3,10 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
 
 import '../../shared/cards/B/B146_Illusionist'
-import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import { getActionDefinition } from '../../shared/actions/index'
 import type { ActionFlow } from '../../shared/game/types'
+
+const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 
 
 const CARD_ID = 'B146_Illusionist'
@@ -179,7 +181,7 @@ describe('B146_Illusionist listener handler', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
-    expect(flow.children[0].actionId).toBe('discard-from-hand')
+    expect(flow.children[0].actionId).toBe(DISCARD_ACTION_ID)
     expect(flow.children[0].sourceCard).toBe(CARD_ID)
     expect(flow.children[1].actionId).toBe('gain')
     expect(flow.children[1].params).toEqual({ wood: 1 })
@@ -277,7 +279,7 @@ describe('B146_Illusionist listener handler', () => {
 // Direct tests of the discard-from-hand action registration (leaf payload).
 describe('discard-from-hand action', () => {
   it('is registered via internalActionDefinitions and exposes choice', () => {
-    const def = internalActionDefinitions.find((d) => d.id === 'discard-from-hand')
+    const def = getActionDefinition(DISCARD_ACTION_ID)
     expect(def).toBeDefined()
 
     const player = createPlayer('p1')
@@ -299,7 +301,7 @@ describe('discard-from-hand action', () => {
   })
 
   it('resolveChoice removes the chosen occupation from hand', () => {
-    const def = internalActionDefinitions.find((d) => d.id === 'discard-from-hand')!
+    const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper']
 
@@ -314,7 +316,7 @@ describe('discard-from-hand action', () => {
   })
 
   it('resolveChoice removes the chosen minor card from hand', () => {
-    const def = internalActionDefinitions.find((d) => d.id === 'discard-from-hand')!
+    const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.minorHand = ['A1_AnimalPen', 'A2_Basket']
 
@@ -329,7 +331,7 @@ describe('discard-from-hand action', () => {
   })
 
   it('resolveChoice fails when choice points at a card not in hand', () => {
-    const def = internalActionDefinitions.find((d) => d.id === 'discard-from-hand')!
+    const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.occupationHand = ['A9_SheepFarmer']
 

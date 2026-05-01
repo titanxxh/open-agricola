@@ -43,7 +43,7 @@ describe('C143_StoneBuyer session', () => {
     expect(children[0].params).toEqual({ food: 1 })
     expect(children[1].actionId).toBe('gain')
     expect(children[1].params).toEqual({ stone: 2 })
-    expect(children[2].actionId).toBe('flag-card')
+    expect(children[2]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
   })
 
   it('anytime not available same round when flagged from onBuy', () => {

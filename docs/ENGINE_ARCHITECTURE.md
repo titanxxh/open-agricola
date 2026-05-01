@@ -1919,7 +1919,7 @@ All cookery trades live in card metadata (`exchanges: CardExchange[]`), not a ce
 - `getExchangesInWindow(player, window)` — scans played cards' metadata, returns `Trade[]` matching that window
 - `getExchangesByTradeIds(player, ids)` — force-include by sourceId regardless of triggers (for listener-driven invocations)
 
-**Compatibility helper** (`shared/cards/types.ts`): `exchangeTriggers(ex)` normalises both new `triggers: ExchangeWindow[]` and legacy single-form `trigger: ExchangeWindow` (≈18 cards predate Sprint 6a; preserved without churn).
+**Sprint 6b cleanup (2026-04-30):** legacy `trigger?: ExchangeWindow` field + `exchangeTriggers()` compat helper removed. All cards now use `triggers: ExchangeWindow[]` directly; see §15.15.
 
 **Removed:** Hardcoded `cookeryTrades` table in `shared/actions/effects/exchange.ts:220-248`; hardcoded `'Major_Fireplace' / 'Major_CookingHearth'` ID prefix detection in `hasHarvestCooking` (now `hasAnyHarvestExchange` walks metadata).
 
@@ -1984,7 +1984,59 @@ type SpecialEffectParams =
 
 **Rationale:** previous pattern of `writeCardExtraData(...current + delta)` directly inside `listener.handler` violates "engine sees all mutations" — engine cannot distinguish accepted vs declined SEQ-optional. Routing through the leaf ensures the mutation only fires when the engine actually executes the child.
 
-(Cleanup of existing 4 cards still using direct mutation — E149 / E38 / D134 / C104 — tracked as follow-up; not in 6a.)
+(Cleanup of existing 4 cards still using direct mutation — E149 / E38 / D134 / C104 — landed in Sprint 6b; see §15.13.)
+
+## 15.12 Ad-Hoc Action Registry (Sprint 6b)
+
+`shared/actions/effects/registry.ts` provides per-card `ActionDefinition` registration. Cards that need a single-card-specific action call `registerAdHocAction(def)` at module load time. ID convention: `'card_<CARD_ID>_<short-name>'`.
+
+Integration: `getActionDefinition(actionId)` in `shared/actions/index.ts` falls back to `getAdHocAction(actionId)` when the static lookup misses. This keeps single-card actions out of the static `internal-actions.ts` import list, preserving the "card encapsulation" principle (CLAUDE.md: 卡牌特殊性能在卡牌文件内部闭包).
+
+**Constraints:**
+
+- ID must start with `'card_'` (enforced; throws on register otherwise).
+- Duplicate registration throws (catches accidental double-load).
+- LLM workshop sandbox does NOT expose ad-hoc actions: `card_*` actionIds are blocked by `shared/custom-code/ast-validator.ts` actionId allowlist (no entry added).
+
+**Use cases (Sprint 6b inlines 4 single-card effects):** E112 GrainThief (`card_E112_GrainThief_protect`) / E73 Scythe (`card_E73_Scythe_harvest-field`) / B146 Illusionist (`card_B146_Illusionist_discard-from-hand`) / C69 LandConsolidation (`card_C69_LandConsolidation_swap`).
+
+## 15.13 special-effect targetPlayerId Routing + bonus-vp parity (Sprint 6b)
+
+`actionContext.targetPlayerId?: string` extends `special-effect` execute to mutate a specific player (default: `context.player` = actor). Used when a card listener's owner ≠ actor and the mutation should land on the owner. `bonus-vp` learns the same routing for parity.
+
+Example: D134 OysterEater listens to **all** players' fishing place-farmer; the cardStates `skipNextPlacement` and `bonusVp` counter must increment on the **owner** (card-holder), not the actor. The listener emits:
+
+```ts
+{
+  type: 'seq',
+  children: [
+    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+      params: { kind: 'increment-extra-data', key: 'skipNextPlacement', amount: 1 },
+      actionContext: { targetPlayerId: ownerPlayerId } },
+    { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID,
+      actionContext: { targetPlayerId: ownerPlayerId } },
+  ],
+}
+```
+
+If `targetPlayerId` is unset or the player ID is not found in state, mutation falls back to `context.player`.
+
+**Listener-mutate prohibition (Sprint 6b):** listener handlers and `action.execute` MUST NOT call `writeCardExtraData / setCardFlag / writeCardInfobox` directly; mutations must travel as `special-effect` (or equivalent) leaves so the engine drives replay / SEQ-optional accept-decline / partial-log emission. Sprint 6b cleanup landed for E149 MidnightFencer, E38 RodCollection, D134 OysterEater, C104 Collector. D92 ChildOmbudsman was already compliant from 6a.
+
+## 15.14 Helper Directory Split (Sprint 6b)
+
+`shared/actions/helpers/` (new) holds non-`ActionDefinition` modules previously misplaced in `shared/actions/effects/`:
+
+- `pay-helpers.ts` / `cost-preview.ts` / `room-payment.ts` (pay infrastructure)
+- `placement-availability.ts` / `placement-constants.ts` (placement rules)
+- `selection-effect-registry.ts` (UI selection registry)
+- `feed-family.ts` (harvest helper)
+
+`effects/` is now reserved for `ActionDefinition` exports. File count: 63 → 45 (close to BGA's 22 + necessary engine extensions).
+
+## 15.15 CardExchange.triggers Array (Sprint 6b)
+
+`CardExchange.trigger?: ExchangeWindow` (legacy singular) and the `exchangeTriggers()` compat helper deleted. Only `triggers?: ExchangeWindow[]` remains. 18 carry-over cards from 6a migrated to array form. Empty array = listener-only (visible only via `actionContext.tradeIds`); E53 BoarSpear adopts this. `CanBeExecutedByPlayerContext` now carries `actionContext?: Record<string, unknown>` (engine.ts pass-through), so `anytimeExchangeAction.canBeExecutedByPlayer` can see listener-driven `tradeIds` and avoid spurious "no doable trade" early-resolves.
 
 ## 16. 当前结论
 
