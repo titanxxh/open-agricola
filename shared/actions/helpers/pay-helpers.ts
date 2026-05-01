@@ -331,8 +331,9 @@ export const executeResolvedTypedFlatPayment = (
   player: PlayerState,
   payment: Extract<TypedFlatPaymentSelection, { type: 'selected' }>,
   costType?: CostModifierType,
+  state?: GameState,
 ) => {
-  executePaymentSolution(player, payment.solution, { costType })
+  executePaymentSolution(player, payment.solution, { costType, state })
 }
 
 export const canAffordTypedFlatCost = (
@@ -348,6 +349,7 @@ export const payTypedFlatCost = (
   player: PlayerState,
   baseCost: Partial<Resource>,
   costType?: CostModifierType,
+  state?: GameState,
 ) => {
   const resolved = resolveTypedFlatPaymentSolution(player, baseCost, costType)
   if (!resolved) return false
@@ -355,7 +357,7 @@ export const payTypedFlatCost = (
     payResources(player, resolved.directCost)
     return true
   }
-  executePaymentSolution(player, resolved.solution, { costType })
+  executePaymentSolution(player, resolved.solution, { costType, state })
   return true
 }
 
@@ -474,7 +476,7 @@ const payCardPreviewCost = (
   )
   if (previewCost === null) return false
   if (!isComplexCost(previewCost)) {
-    return payTypedFlatCost(player, previewCost, costType)
+    return payTypedFlatCost(player, previewCost, costType, state)
   }
   const solution = computeAllBuyableCombinations(
     player,
@@ -483,7 +485,7 @@ const payCardPreviewCost = (
     costType,
   )[0]
   if (!solution) return false
-  executePaymentSolution(player, solution, { costType })
+  executePaymentSolution(player, solution, { costType, state })
   return true
 }
 
