@@ -33,11 +33,11 @@ const anytimeListener: CardListenerRegistration = {
           // Pay the food back → net 0 for player, card loses 1 food
           { type: 'leaf', actionId: 'pay-resources', params: { food: 1 }, sourceCard: CARD_ID },
           // Flag card (once per round)
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           // Grow family without room
           { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID, actionContext: { skipRoomCheck: true } },
           // Update infobox
-          { type: 'leaf', actionId: 'set-card-infobox', sourceCard: CARD_ID, params: { text: `${newCount} Food` } },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-infobox', text: `${newCount} Food` } },
         ],
       },
       sourceCard: CARD_ID,

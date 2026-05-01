@@ -38,13 +38,13 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         children: [
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           {
             type: 'leaf',
             actionId: 'place-farmer',
             sourceCard: CARD_ID,
           },
-          { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       } as ActionFlow,
       sourceCard: CARD_ID,

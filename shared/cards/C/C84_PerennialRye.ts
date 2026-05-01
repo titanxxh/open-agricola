@@ -30,7 +30,7 @@ const anytimeListener: CardListenerRegistration = {
       children: [
         payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
         gainLeaf(CARD_ID, { [type]: 1 }),
-        { type: 'leaf' as const, actionId: 'flag-card', sourceCard: CARD_ID },
+        { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
       ],
     }))
 

@@ -71,8 +71,9 @@ const listener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf',
-          actionId: 'flag-card',
+          actionId: 'special-effect',
           sourceCard: CARD_ID,
+          params: { kind: 'set-flag', flag: true },
         },
         {
           type: 'leaf',

@@ -22,7 +22,7 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           { type: 'leaf', actionId: 'bake-bread', sourceCard: CARD_ID },
         ],
       },

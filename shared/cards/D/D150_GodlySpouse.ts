@@ -60,7 +60,7 @@ export const D150_GodlySpouse_impl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, _player) => {
-    return { type: 'leaf', actionId: 'unflag-card', sourceCard: CARD_ID }
+    return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }
   },
 },
   reaches: [] as readonly string[],
