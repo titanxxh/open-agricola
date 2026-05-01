@@ -58,7 +58,7 @@ const computeReplaceListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'wish-children-growth',
+            actionId: 'family-growth',
             sourceCard: CARD_ID,
           },
         ],

@@ -35,7 +35,7 @@ const anytimeListener: CardListenerRegistration = {
           // Flag card (once per round)
           { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
           // Grow family without room
-          { type: 'leaf', actionId: 'grow-family-without-room', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID, actionContext: { skipRoomCheck: true } },
           // Update infobox
           { type: 'leaf', actionId: 'set-card-infobox', sourceCard: CARD_ID, params: { text: `${newCount} Food` } },
         ],

@@ -28,8 +28,9 @@ export const C127_Lover_impl = {
         payLeaf({ cardId: CARD_ID, cost: { food: roundsLeft } }),
         {
           type: 'leaf' as const,
-          actionId: 'grow-family-without-room',
+          actionId: 'family-growth',
           sourceCard: CARD_ID,
+          actionContext: { skipRoomCheck: true },
         },
       ],
     }

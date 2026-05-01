@@ -11,6 +11,6 @@ export const urgentWishChildren: ActionDefinition = {
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [{ type: 'leaf', actionId: 'grow-family-without-room' }],
+    children: [{ type: 'leaf', actionId: 'family-growth', actionContext: { skipRoomCheck: true } }],
   },
 }
