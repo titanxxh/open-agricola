@@ -25,7 +25,13 @@ export interface GameTransport {
     animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
   }[]): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
-    resourceKey: keyof Resource; count: number; food: number; sourceName?: string; sourceId?: string
+    resourceKey?: keyof Resource;
+    count: number;
+    food?: number;
+    sourceName?: string;
+    sourceId?: string;
+    /** Sprint 6a entry-index pointer; server applies bidirectionally. */
+    exchangeIndex?: number;
   }[]): Promise<GameSyncPayload>
   confirmNextPlayer(): Promise<GameSyncPayload>
   confirmPlayerSwitch(): Promise<GameSyncPayload>

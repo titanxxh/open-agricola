@@ -913,6 +913,8 @@ export const GameContainerApi = () => {
           food: option.food,
           sourceName: option.sourceName,
           sourceId: option.sourceId,
+          // Sprint 6a entry-index pointer: server applies bidirectionally.
+          exchangeIndex: option.exchangeIndex,
         }))
         .filter((entry) => entry.count > 0),
     [harvestFeedCounts, harvestFeedOptions],
