@@ -47,10 +47,8 @@
     "canvas": "^3.2.1",
     "isolated-vm": "^6.1.2",
     "nanoid": "^5.1.7",
-    "pngjs": "^7.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tesseract.js": "^7.0.0",
     "tsx": "^4.20.5",
     "typescript": "~5.9.3",
     "ws": "^8.19.0"
@@ -73,7 +71,6 @@
     "globals": "^16.5.0",
     "jsdom": "^25.0.1",
     "playwright": "^1.58.2",
-    "puppeteer": "^24.37.5",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
     "vitest": "^4.1.2"
@@ -83,7 +80,6 @@
       "better-sqlite3",
       "canvas",
       "isolated-vm",
-      "puppeteer",
       "esbuild"
     ]
   }
