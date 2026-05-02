@@ -221,7 +221,7 @@
 > - **D 牌组 getExchangeResources 简化（≥4 张：D35/D38/D45/D84）** — 只看 `player.resources.{animal}` 忽略场上动物（pasture/stable）。BGA 含场上+supply。**修复路线：建一个共享 helper `getEffectiveExchangeAnimals(player, kind)`**
 > - **C 牌组跨卡协作机制缺失（多张：C18/C25/C27/C49/C75/C84/C130）** — sharedScoring / forceSkip / computeReplace / farm-hand stable / Wolf 联动 / reorganize / hollow 二人版等机制
 >
-> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / A165 / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / D131 / ~~D157~~ ✅ Sprint 6a / E58 / E134 / ~~E139~~ ✅ Sprint 6a / E153 / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修）
+> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / ~~A165~~ ✅ Sprint 2 PR-2A / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / D131 / ~~D157~~ ✅ Sprint 6a / E58 / ~~E134~~ ✅ Sprint 2 PR-2D / ~~E139~~ ✅ Sprint 6a / E153 / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修）
 >
 > **2026-04-28 深度池 40 张**（保留以下）：
 
