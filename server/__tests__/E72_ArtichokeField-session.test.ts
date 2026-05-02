@@ -183,6 +183,81 @@ describe('E72_ArtichokeField session', () => {
       expect(cardCrop).toBeNull()
     })
 
+    /**
+     * BGA-equivalence verification (Sprint 5e):
+     *
+     * BGA implements ArtichokeField as a Reap-event listener that fires
+     * "+1 food if harvested>=1 from this card" once per harvest field
+     * phase. Our implementation routes the +1 food through the
+     * onHarvestFieldPhase callback alongside the +1 crop.
+     *
+     * Spot-check claim from `docs/sprint-5d-audit-report.md`: per-harvest
+     * food output is identical (1 bonus per harvest with crop>=1, regardless
+     * of dispatch path).
+     *
+     * This test verifies the totals across the full life of a 3-grain
+     * field and a 2-vegetable field by repeatedly invoking the
+     * onHarvestFieldPhase hook (the engine drives one call per harvest
+     * round). If totals match BGA expectations the structural deviation
+     * is non-observable and can be demoted to deliberate divergence.
+     */
+    it('multi-harvest food totals equal BGA expectation (3 grain → 3 food bonus)', () => {
+      const session = setup()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.minorPlayed.push(CARD_ID)
+      player.resources.food = 0
+      player.resources.grain = 0
+      player.cardStates[CARD_ID] = {
+        extraData: { cardCrop: { crop: 'grain', remaining: 3 } },
+      }
+      session.loadState(state)
+
+      const effect = getCardEffect(CARD_ID)!
+      // Drive 4 harvests — last one is a no-op once remaining=0.
+      for (let i = 0; i < 4; i++) {
+        effect.onHarvestFieldPhase!(state, player)
+      }
+      expect(player.resources.grain).toBe(3)
+      expect(player.resources.food).toBe(3)
+      expect(player.cardStates[CARD_ID]?.extraData?.cardCrop).toBeNull()
+    })
+
+    it('multi-harvest food totals equal BGA expectation (2 vegetable → 2 food bonus)', () => {
+      const session = setup()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.minorPlayed.push(CARD_ID)
+      player.resources.food = 0
+      player.resources.vegetable = 0
+      player.cardStates[CARD_ID] = {
+        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+      }
+      session.loadState(state)
+
+      const effect = getCardEffect(CARD_ID)!
+      for (let i = 0; i < 3; i++) {
+        effect.onHarvestFieldPhase!(state, player)
+      }
+      expect(player.resources.vegetable).toBe(2)
+      expect(player.resources.food).toBe(2)
+      expect(player.cardStates[CARD_ID]?.extraData?.cardCrop).toBeNull()
+    })
+
+    it('no harvest crop → no bonus food (parity with BGA "harvested>=1" guard)', () => {
+      const session = setup()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.minorPlayed.push(CARD_ID)
+      player.resources.food = 0
+      // No cardCrop set — empty card field.
+      session.loadState(state)
+
+      const effect = getCardEffect(CARD_ID)!
+      effect.onHarvestFieldPhase!(state, player)
+      expect(player.resources.food).toBe(0)
+    })
+
     it('harvest gives bonus food via effect hook', () => {
       const session = setup()
       const state = session.getState().state
