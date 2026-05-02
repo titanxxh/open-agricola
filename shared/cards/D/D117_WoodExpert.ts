@@ -24,7 +24,8 @@ const CARD_ID = 'D117_WoodExpert'
 const getImprovementWoodCost = (cardId: string): number => {
   const minor = getMinorImprovementCard(cardId)
   if (minor) {
-    if (minor.cost?.wood && minor.cost.wood > 0) return minor.cost.wood
+    const cost = minor.cost as { wood?: number } | undefined
+    if (cost?.wood && cost.wood > 0) return cost.wood
     if (minor.altCosts) {
       return Math.max(0, ...minor.altCosts.map((c) => c.wood ?? 0))
     }

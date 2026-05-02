@@ -35,7 +35,8 @@ const hasPrintedClayCost = (cardId: string): boolean => {
   // Check minor improvements
   const minor = getRegisteredMinorImprovement(cardId)
   if (minor?.cost) {
-    return (minor.cost.clay ?? 0) > 0
+    const cost = minor.cost as { clay?: number }
+    return (cost.clay ?? 0) > 0
   }
 
   return false

@@ -1,12 +1,15 @@
-import type { MajorCardEffect } from './types'
+import type { MajorCardData } from './types'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
-export const joinery: MajorCardEffect = {
+export const joinery: MajorCardData = {
   id: 'Major_Joinery',
+  name: 'Joinery',
+  deck: 'major',
+  number: 8,
   cost: { wood: 2, stone: 2 },
   vp: 2,
   extraVp: true,
-  description: [
+  desc: [
     '[Harvest]',
     '<WOOD> <ARROW-1X> 2<FOOD>',
     '[Scoring]',

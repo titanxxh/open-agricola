@@ -93,7 +93,8 @@ const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMet
   type,
   category: card.category,
   desc: card.desc,
-  cost: card.cost,
+  // Custom cards use simple Partial<Resource> costs (ComplexCost is majors-only).
+  cost: card.cost as Record<string, number> | undefined,
   altCosts: card.altCosts,
   players: card.players,
   newSet: card.newSet,
