@@ -1,7 +1,10 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import {
+  getReservedActionSpaces,
+  setReservedActionSpaces,
+} from '../helpers/card-state'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
 import type { CardImpl } from '../registry'
 
@@ -15,7 +18,7 @@ const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansio
  */
 const countStablesInReserve = (player: import('../../game/types').PlayerState): number => {
   const onFarm = player.stableTiles.length
-  const onSpaces = (readCardExtraData<string[]>(player, CARD_ID, 'spaces') ?? []).length
+  const onSpaces = getReservedActionSpaces(player, CARD_ID).length
   return Math.max(0, MAX_STABLES - onFarm - onSpaces)
 }
 
@@ -39,12 +42,11 @@ const listener: CardListenerRegistration = {
     )
     if (!ownerPlayer) return
 
-    const spaces = readCardExtraData<string[]>(ownerPlayer, CARD_ID, 'spaces')
-    if (!spaces?.includes(spaceId)) return
+    const spaces = getReservedActionSpaces(ownerPlayer, CARD_ID)
+    if (!spaces.includes(spaceId)) return
 
     // Remove this space from the list (stable collected)
-    const newSpaces = spaces.filter((s) => s !== spaceId)
-    writeCardExtraData(ownerPlayer, CARD_ID, 'spaces', newSpaces)
+    setReservedActionSpaces(ownerPlayer, CARD_ID, spaces.filter((s) => s !== spaceId))
 
     // Build the stable directly on the owner's farm
     const tile = getNextEmptyTileForPlayer(ownerPlayer)
@@ -78,7 +80,7 @@ export const E148_Lazybones_impl = {
     const reserve = countStablesInReserve(player)
     if (reserve === 0) return
     const placedSpaces = TRIGGER_SPACES.slice(0, Math.min(TRIGGER_SPACES.length, reserve))
-    writeCardExtraData(player, CARD_ID, 'spaces', placedSpaces)
+    setReservedActionSpaces(player, CARD_ID, placedSpaces)
   },
 },
   reaches: [] as readonly string[],
