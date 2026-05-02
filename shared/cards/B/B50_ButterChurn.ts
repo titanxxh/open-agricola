@@ -1,5 +1,6 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getAssignedAnimalsByType } from '../../game/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B50_ButterChurn'
@@ -21,12 +22,9 @@ export const B50_ButterChurn_impl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-
-    const sheep = player.resources.sheep ?? 0
-    const cattle = player.resources.cattle ?? 0
-    const gain = Math.floor(sheep / 3) + Math.floor(cattle / 2)
+    const animals = getAssignedAnimalsByType(player)
+    const gain = Math.floor(animals.sheep / 3) + Math.floor(animals.cattle / 2)
     if (gain <= 0) return
-
     return gainLeaf(CARD_ID, { food: gain })
   },
 },
