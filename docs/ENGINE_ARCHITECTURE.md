@@ -2143,20 +2143,23 @@ BGA `Pay.php` 是 PHP 状态机节点（state `ST_PAY`，836 行），同时承�
 
 新增 effect 前必须自查：是否有 `ActionDefinition` export？是否能在节点树 dispatch？是否能挂 listener？任何一条不成立，写到 `helpers/`，不要污染 `effects/`。
 
-## 15.19 Trade.sideEffect 数据驱动 dispatcher (Sprint 5c / 6d)
+## 15.19 Trade.sideEffect 数据驱动 dispatcher (Sprint 5c / 6d / 6e)
 
 `Trade` 类型可选 `sideEffect?: TradeSideEffect` 字段，把"应用此 trade 时除了改 player 资源外还需要做的副作用"以数据形式声明。当前变体：
 
 ```ts
 type TradeSideEffect =
-  | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }   // Sprint 5c
-  | { type: 'bonusVp'; amount: number }                              // Sprint 6d
+  | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }       // Sprint 5c
+  | { type: 'bonusVp'; amount: number }                                   // Sprint 6d
+  | { type: 'pushExtraDataValue';                                         // Sprint 6e
+      sourceCard: string; key: string; value: string }
 ```
 
 `shared/actions/helpers/payment.ts` 的 `applyTradeSideEffect(state, player, eff, times, sourceCard)` switch dispatcher：
 
 - `drainSpace`：把指定 `actionSpaces.id` 上的指定资源减 `times`（clamp 到 0）。
 - `bonusVp`：在 `cardStates[sourceCard].extraData.bonusVpEarned += amount * times` 累加（owner 维度统计）。`computeBonusScore` 读该字段算分。
+- `pushExtraDataValue` (Sprint 6e)：idempotent string-list push to `cardStates[sourceCard].extraData[key]`. 用于 C62 CookeryExtension 记录刚被消费的 cookery id，后续 `computeExchanges` listener invocation 会 filter 掉已 used 的 cookery；`times <= 0` noop。Generic — 任何需要"this source-tagged action consumed once" 语义的卡都可复用。
 
 dispatch 入口三处覆盖 work / anytime / harvest 三条 trade 应用路径：
 
@@ -2203,6 +2206,29 @@ stage hook（`onHarvestFieldPhase` / `onAfterReap` / `onEndHarvestFieldPhase` / 
 `minor-improvement.execute` 在 `buildPlayableMinorOptions` 之后调它合并候选，再用新内联 helper `canAffordInjectedImprovement` 做 affordability 过滤（识别 `major:` / `minor:` 前缀以及裸 id fallback）；`canBeExecutedByPlayer` 也 probe 注入候选让 action 在仅注入候选时仍可达；`resolveChoice` 改用 `playImprovement('any')` 自动处理 minor/major 双类型。
 
 落地用例：D131 CraftsmanshipPromoter listener on `actions:['minor-improvement']` 注入 5 张 BGA bottom-row major 候选（`Major_ClayOven` / `Major_StoneOven` / `Major_Joinery` / `Major_Pottery` / `Major_Basket`，列表来源 BGA `Improvement.php:112-119`）— 让 minor-improvement action 在该卡持有者侧扩出 major 选项，无需新建专属 action。
+
+## 15.23 computeExchanges listener phase + extraExchanges result (Sprint 6e)
+
+A new `ActionHookPhase` value `'computeExchanges'` lets cards inject runtime-derived `CardExchange` entries into the exchange pool without modifying the metadata-driven scan. Sister phase to `computeChoiceCandidates` (§15.22).
+
+`ActionHookResult.extraExchanges?: CardExchange[]` 携带 listener 的贡献。
+
+`shared/cards/card-listeners.ts` 暴露 collector：
+
+```ts
+export const collectComputeExchanges = (
+  state: GameState,
+  player: PlayerState,
+  window: string,           // 'anytime' | 'harvest' | 'bake-bread' | ...
+): Trade[] => { /* runs computeExchanges listeners, converts each
+                   extraExchanges entry through exchangeToTrade */ }
+```
+
+`shared/actions/effects/exchange.ts:getExchangesInWindow(player, window, state?)` 在 metadata 扫描结果之后 append `collectComputeExchanges(state, player, window)`。Old call sites（多为 unit tests，传 bare player 不带 state）继续看到 metadata-only pool —— 与今日行为完全一致。
+
+Listener 作者在 handler 里通过读 `ctx.extraData.window`（collector 注入）做 window filter；不需要 `actions:[...]` filter（exchange 不是 action-scoped 的）。
+
+落地用例：C62 CookeryExtension listener body filter `window === 'harvest'`，扫 `getPlayerCookeryCards(player)`，drop 已经在 `cardStates.C62.usedCookeryIds` 内的 cookery，doubles 合法 1-from anytime entry 的 food output（vegetable / sheep / boar / cattle），emits `CardExchange[]` 携带 `Trade.sideEffect.pushExtraDataValue` 让消费时把 cookery id 推入 used 列表。
 
 ## 16. 当前结论
 
