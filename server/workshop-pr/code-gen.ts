@@ -22,7 +22,7 @@ const KNOWN_HELPERS = new Set([
   'payLeaf',
   'spaceHasPlayer',
   'positionKey',
-  'getMajorCardEffect',
+  'getCardDefinition',
   'getCardStack',
   'readCardExtraData',
 ])
@@ -60,7 +60,7 @@ const HELPER_IMPORTS: Record<string, string> = {
   payLeaf: `import { payLeaf } from '../helpers/pay-gain-node'`,
   spaceHasPlayer: `import { spaceHasPlayer } from '../../game/space'`,
   positionKey: `import { positionKey } from '../../game/farm'`,
-  getMajorCardEffect: `import { getMajorCardEffect } from '../major'`,
+  getCardDefinition: `import { getCardDefinition } from '../catalog'`,
   getCardStack: `import { getCardStack } from '../helpers/card-state'`,
   readCardExtraData: `import { readCardExtraData } from '../helpers/card-state'`,
 }

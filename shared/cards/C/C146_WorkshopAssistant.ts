@@ -12,10 +12,30 @@ const CARD_ID = 'C146_WorkshopAssistant'
  * this card, one for each improvement you have built (max 6). Each time another
  * player renovates, you may move one such pair to your supply.
  *
- * Implementation uses store-on-card / take-from-card infrastructure. On buy,
- * auto-selects pairs in order (wood+clay, wood+reed, wood+stone, clay+reed,
- * clay+stone, reed+stone) up to min(6, numImprovements). BGA lets the player
- * choose pairs; we auto-pick for simplicity.
+ * BGA `C146_WorkshopAssistant::onBuy`:
+ *   - n = min(6, countAllImprovements())
+ *   - if n >= 6: auto-place all 6 pairs
+ *   - else: SPECIAL_EFFECT choosePairs args:[n] — emits an `argsChoosePairs`
+ *     UI prompt letting the owner pick exactly n pairs from the 6 possible
+ *     unique pairs. `actChoosePairs($chosenKeys, $n)` validates and creates
+ *     them.
+ *
+ * Our implementation auto-picks the first n pairs in fixed order
+ * (WC, WR, WS, CR, CS, RS) — BGA-incorrect when n < 6 because the player
+ * doesn't get to choose which pairs to place.
+ *
+ * **Deliberate divergence (Sprint 7a deferred):** implementing the BGA
+ * pair-picker requires multi-select choice infrastructure (pick K out of N
+ * options in a single interaction step). Our current `xor` / `choice`
+ * primitives only support pick-one. Adding this requires:
+ *   1. New flow node type or extension of ChoiceNode to a multi-select
+ *      pending state.
+ *   2. UI support in InteractionBar / pending-choice rendering.
+ *   3. game-core handling for the multi-select resolveChoice path.
+ * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked
+ * in card_progress §刻意不同.
+ *
+ * For this sprint, the auto-pick fallback is retained.
  *
  * When an opponent renovates, offer xor choice of one available pair to take.
  */

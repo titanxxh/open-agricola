@@ -1,12 +1,15 @@
-import type { MajorCardEffect } from './types'
+import type { MajorCardData } from './types'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
-export const pottery: MajorCardEffect = {
+export const pottery: MajorCardData = {
   id: 'Major_Pottery',
+  name: 'Pottery',
+  deck: 'major',
+  number: 9,
   cost: { clay: 2, stone: 2 },
   vp: 2,
   extraVp: true,
-  description: [
+  desc: [
     '[Harvest]',
     '<CLAY> <ARROW-1X> 2<FOOD>',
     '[Scoring]',

@@ -38,6 +38,23 @@ export function registerCustomCard(
   data: CustomCardData,
   options: RegisterCustomCardOptions = {},
 ): void {
+  // Inject modifier / modifiers into the active per-session CardRegistry so
+  // getCardModifiers (which reads only from the active registry post-D1)
+  // resolves the same data as built-in occupation/minor cards. Custom cards
+  // are not part of the catalog arrays passed to syncModifiersFromCatalog,
+  // so this runtime injection is the dedicated path for them.
+  const active = getActiveCardRegistry()
+  if (active) {
+    const { id, modifier, modifiers } = data.cardJson
+    const allMods = [
+      ...(modifiers ?? []),
+      ...(modifier ? [modifier] : []),
+    ]
+    if (allMods.length > 0) {
+      active.setModifiersForCard(id, allMods)
+    }
+  }
+
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {
     sessionCtx.registerCard(data)

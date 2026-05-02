@@ -3,7 +3,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMinorImprovementCard } from '../catalog'
-import { getMajorCardEffect } from '../major'
+import { getMajorCard } from '../major'
+import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D117_WoodExpert'
@@ -24,16 +25,19 @@ const CARD_ID = 'D117_WoodExpert'
 const getImprovementWoodCost = (cardId: string): number => {
   const minor = getMinorImprovementCard(cardId)
   if (minor) {
-    if (minor.cost?.wood && minor.cost.wood > 0) return minor.cost.wood
+    const cost = minor.cost as { wood?: number } | undefined
+    if (cost?.wood && cost.wood > 0) return cost.wood
     if (minor.altCosts) {
       return Math.max(0, ...minor.altCosts.map((c) => c.wood ?? 0))
     }
     return 0
   }
-  const major = getMajorCardEffect(cardId)
-  if (major) {
-    const costs = Array.isArray(major.cost) ? major.cost : [major.cost ?? {}]
-    return costs.reduce((m, c) => Math.max(m, (c as Record<string, number>).wood ?? 0), 0)
+  if (isMajorCardId(cardId)) {
+    const major = getMajorCard(cardId)
+    if (major) {
+      const costs = Array.isArray(major.cost) ? major.cost : [major.cost ?? {}]
+      return costs.reduce((m, c) => Math.max(m, (c as Record<string, number>).wood ?? 0), 0)
+    }
   }
   return 0
 }

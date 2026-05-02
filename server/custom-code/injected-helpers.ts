@@ -30,8 +30,8 @@ function positionKey(pos) {
   return String(pos.x) + ',' + String(pos.y);
 }
 
-// --- getMajorCardEffect — stub (sandbox has no access to major cards) ---
-function getMajorCardEffect(_cardId) {
+// --- getCardDefinition — stub (sandbox has no access to card catalog) ---
+function getCardDefinition(_cardId) {
   return null;
 }
 

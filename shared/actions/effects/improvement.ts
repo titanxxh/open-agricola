@@ -4,7 +4,8 @@ import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
-import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
+import { majorCardDefinitions } from '../../cards/major'
+import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
@@ -14,6 +15,7 @@ import {
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
+import { isMajorCardId } from '../../cards/helpers/card-type'
 
 /** Cards that satisfy a Fireplace return requirement. */
 const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
@@ -56,13 +58,17 @@ const getPlayedCardsForCost = (
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 
-const parseImprovementChoice = (choice: string) => {
+const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | null; id: string } => {
   if (choice.startsWith('major:')) {
-    return { kind: 'major' as const, id: choice.replace('major:', '') }
+    return { kind: 'major', id: choice.replace('major:', '') }
   }
   if (choice.startsWith('minor:')) {
-    return { kind: 'minor' as const, id: choice.replace('minor:', '') }
+    return { kind: 'minor', id: choice.replace('minor:', '') }
   }
+  // Bare id — infer kind from which catalog the id lives in. Falls back to
+  // null for ids not (yet) registered (e.g. fixture/test ids resolved later).
+  if (isMajorCardId(choice)) return { kind: 'major', id: choice }
+  if (getMinorImprovement(choice)) return { kind: 'minor', id: choice }
   return { kind: null, id: choice }
 }
 
@@ -204,7 +210,7 @@ const getMajorImprovementPreviewCost = (
     player,
     'improvement-any',
     improvementId,
-    () => getMajorCardEffect(improvementId)?.cost ?? null,
+    () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
   )
 }
@@ -327,7 +333,7 @@ const buildMajorImprovementOptions = (
   actionCardId = 'improvement-any',
   allowedPurchases?: string[],
 ) =>
-  majorCardEffects
+  majorCardDefinitions
     .filter((improvement) => available.includes(improvement.id))
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
@@ -547,7 +553,7 @@ const playMajorImprovement = (
   paymentChoice?: string,
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
-  const improvement = getMajorCardEffect(improvementId)
+  const improvement = getMajorCard(improvementId)
   if (!improvement) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
@@ -681,11 +687,11 @@ export const playImprovement = (
     const choiceIdx = parts[2]
     if (targetId && choiceIdx !== undefined) {
       const parsed = parseImprovementChoice(targetId)
-      if (parsed.kind === 'major' || getMajorCardEffect(parsed.id)) {
+      if (parsed.kind === 'major') {
         return playMajorImprovement(
           state,
           player,
-          parsed.kind === 'major' ? parsed.id : parsed.id,
+          parsed.id,
           actionCardId,
           choiceIdx,
           suppressOnBuyEffects,
@@ -726,8 +732,8 @@ export const playImprovement = (
     )
   }
 
-  const majorImprovement = allowMajor
-    ? getMajorCardEffect(parsed.id)
+  const majorImprovement = allowMajor && isMajorCardId(parsed.id)
+    ? getMajorCard(parsed.id)
     : undefined
   if (majorImprovement) {
     return playMajorImprovement(
@@ -813,7 +819,7 @@ const canAffordInjectedImprovement = (
     if (!minor) return false
     return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
   }
-  if (getMajorCardEffect(parsed.id)) {
+  if (isMajorCardId(parsed.id)) {
     return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
   }
   const minor = getMinorImprovement(parsed.id)

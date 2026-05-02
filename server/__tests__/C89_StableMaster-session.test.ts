@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/actions/helpers/animal-zones'
+import { runCardEffectHook } from '../../shared/cards/card-effects'
+import type { ActionFlow } from '../../shared/game/types'
 
 import '../../shared/cards/C/C89_StableMaster'
 
@@ -79,5 +81,62 @@ describe('C89_StableMaster session', () => {
     const stableZone = zones.find(z => z.zoneType === 'stable')
     expect(stableZone).toBeDefined()
     expect(stableZone!.capacity).toBe(1) // default, no bonus
+  })
+
+  it('onBuy returns optional stables flow with cost override -1 wood', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.occupationPlayed.push('C89_StableMaster')
+    player.resources.wood = 1
+    session.loadState(state)
+
+    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    expect(flow).not.toBeNull()
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.type).toBe('leaf')
+    expect(leaf.actionId).toBe('stables')
+    expect(leaf.optional).toBe(true)
+    expect(leaf.actionContext).toMatchObject({
+      max: 1,
+      costOverride: { wood: -1 },
+      trueAction: false,
+    })
+  })
+
+  it('onBuy skipped if player has 4 stables built', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.occupationPlayed.push('C89_StableMaster')
+    player.stableTiles = [
+      { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 },
+    ]
+    player.resources.wood = 5
+    session.loadState(state)
+
+    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    expect(flow).toBeNull()
+  })
+
+  it('onBuy skipped if player has no wood', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.occupationPlayed.push('C89_StableMaster')
+    player.resources.wood = 0
+    session.loadState(state)
+
+    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    expect(flow).toBeNull()
   })
 })

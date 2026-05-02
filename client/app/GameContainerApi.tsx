@@ -14,6 +14,7 @@ import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
+import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
@@ -871,30 +872,22 @@ export const GameContainerApi = () => {
     isHarvestFeedExchange,
   ])
 
-  const getHarvestFeedUsageByResource = useCallback((counts: Record<string, number>) => {
-    const usage: Partial<Record<keyof Resource, number>> = {}
-    harvestFeedOptions.forEach((option) => {
-      const count = counts[option.id] ?? 0
-      if (count <= 0) return
-      usage[option.resourceKey] = (usage[option.resourceKey] ?? 0) + count
-    })
-    return usage
-  }, [harvestFeedOptions])
-
   const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
     setHarvestFeedCounts((prev) => {
       const current = prev[id] ?? 0
       const option = harvestFeedOptions.find((entry) => entry.id === id)
       if (!option || !harvestFeedPlayer) return prev
-      const usage = getHarvestFeedUsageByResource(prev)
-      const available = harvestFeedPlayer.resources[option.resourceKey]
-      const usedByResource = usage[option.resourceKey] ?? 0
-      const max = current + Math.max(0, available - usedByResource)
+      const max = computeHarvestFeedCounterMax(
+        option,
+        harvestFeedOptions,
+        prev,
+        harvestFeedPlayer.resources,
+      )
       const nextValue = Math.max(0, Math.min(current + delta, max))
       if (nextValue === current) return prev
       return { ...prev, [id]: nextValue }
     })
-  }, [getHarvestFeedUsageByResource, harvestFeedOptions, harvestFeedPlayer])
+  }, [harvestFeedOptions, harvestFeedPlayer])
 
   const resetHarvestFeedCounts = useCallback(() => {
     const nextCounts: Record<string, number> = {}
@@ -908,20 +901,22 @@ export const GameContainerApi = () => {
     () =>
       harvestFeedOptions
         .map((option) => ({
-          resourceKey: option.resourceKey,
           count: harvestFeedCounts[option.id] ?? 0,
-          food: option.food,
           sourceName: option.sourceName,
           sourceId: option.sourceId,
-          // Sprint 6a entry-index pointer: server applies bidirectionally.
           exchangeIndex: option.exchangeIndex,
+          from: option.from,
+          to: option.to,
         }))
         .filter((entry) => entry.count > 0),
     [harvestFeedCounts, harvestFeedOptions],
   )
   const harvestFeedConvertedFood = useMemo(
     () =>
-      harvestFeedSelections.reduce((sum, entry) => sum + entry.count * entry.food, 0),
+      harvestFeedSelections.reduce(
+        (sum, entry) => sum + entry.count * ((entry.to.food as number) ?? 0),
+        0,
+      ),
     [harvestFeedSelections],
   )
   const harvestFeedBegging = Math.max(
@@ -932,7 +927,10 @@ export const GameContainerApi = () => {
     const resources = { ...emptyResources }
     resources.food = (harvestPending?.foodUsed ?? 0) + harvestFeedConvertedFood
     harvestFeedSelections.forEach((entry) => {
-      resources[entry.resourceKey] = (resources[entry.resourceKey] ?? 0) + entry.count
+      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
+        const key = k as keyof Resource
+        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
+      })
     })
     resources.begging = harvestFeedBegging
     return resources
@@ -1538,23 +1536,30 @@ export const GameContainerApi = () => {
               <div className="exchange-options">
                 {harvestFeedOptions.map((option) => {
                   const current = harvestFeedCounts[option.id] ?? 0
-                  const usage = getHarvestFeedUsageByResource(harvestFeedCounts)
-                  const available = harvestFeedPlayer?.resources[option.resourceKey] ?? 0
-                  const usedByResource = usage[option.resourceKey] ?? 0
-                  const limit = current + Math.max(0, available - usedByResource)
+                  const limit = harvestFeedPlayer
+                    ? computeHarvestFeedCounterMax(
+                        option,
+                        harvestFeedOptions,
+                        harvestFeedCounts,
+                        harvestFeedPlayer.resources,
+                      )
+                    : 0
                   const canAdd = current < limit
                   const canSubtract = current > 0
+                  const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
+                  const toResources: Partial<Resource> = { ...emptyResources, ...option.to }
                   return (
-                    <div key={option.id} className="exchange-row">
+                    <div
+                      key={option.id}
+                      className="exchange-row"
+                      data-testid={`harvest-feed-option-${option.sourceId}-ex${option.exchangeIndex}`}
+                    >
                       <div className="exchange-name">{option.sourceName}</div>
                       <div className="exchange-rate">
                         <span className="interaction-resource-exchange">
                           <ResourceLine
                             locale={locale}
-                            resources={{
-                              ...emptyResources,
-                              [option.resourceKey]: 1,
-                            }}
+                            resources={fromResources as Resource}
                             hideZero
                           />
                           <span className="interaction-resource-exchange-arrow" aria-hidden="true">
@@ -1562,10 +1567,7 @@ export const GameContainerApi = () => {
                           </span>
                           <ResourceLine
                             locale={locale}
-                            resources={{
-                              ...emptyResources,
-                              food: option.food,
-                            }}
+                            resources={toResources as Resource}
                             hideZero
                           />
                         </span>

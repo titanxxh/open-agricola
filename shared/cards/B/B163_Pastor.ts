@@ -1,11 +1,33 @@
 import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B163_Pastor'
+
+/** Shared predicate + flow used by both `effect.onBuy` and the after-construct
+ *  listener — mirrors BGA's `onBuy($p) { return $this->onAfterConstruct(...) }`. */
+const evaluatePastorTrigger = (
+  state: GameState,
+  ownerPlayer: PlayerState,
+): ActionFlow | null => {
+  if (isCardFlagged(ownerPlayer, CARD_ID)) return null
+  if (ownerPlayer.rooms !== 2) return null
+  const othersWith2Rooms = (state.players ?? []).filter(
+    (p) => p.id !== ownerPlayer.id && p.rooms === 2,
+  )
+  if (othersWith2Rooms.length > 0) return null
+  return {
+    type: 'seq',
+    children: [
+      gainLeaf(CARD_ID, { wood: 3, clay: 2, reed: 1, stone: 1 }),
+      { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+    ],
+  }
+}
 
 /**
  * B163 Pastor — One-time trigger: after any player constructs a room,
@@ -24,28 +46,9 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const ownerPlayer = context.ownerPlayer
     if (!ownerPlayer) return
-
-    if (isCardFlagged(ownerPlayer, CARD_ID)) return
-
-    // Check: owner must have exactly 2 rooms
-    if (ownerPlayer.rooms !== 2) return
-
-    // Check: owner must be the ONLY player with exactly 2 rooms
-    const othersWith2Rooms = (context.state.players ?? []).filter(
-      (p) => p.id !== ownerPlayer.id && p.rooms === 2,
-    )
-    if (othersWith2Rooms.length > 0) return
-
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          gainLeaf(CARD_ID, { wood: 3, clay: 2, reed: 1, stone: 1 }),
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
+    const flow = evaluatePastorTrigger(context.state, ownerPlayer)
+    if (!flow) return
+    return { flow, sourceCard: CARD_ID }
   },
 }
 
@@ -64,5 +67,12 @@ export const B163_Pastor = new Occupation({
 
 export const B163_Pastor_impl = {
   listeners: [listener],
+  effect: {
+    id: CARD_ID,
+    // BGA: `onBuy($p) { return $this->onAfterConstruct($p, []) }` — purchasing
+    // the card triggers the same evaluation as a construct event, so a player
+    // who is already alone at 2 rooms when buying gets the bonus immediately.
+    onBuy: (state, player) => evaluatePastorTrigger(state, player) ?? undefined,
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

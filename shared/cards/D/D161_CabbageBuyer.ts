@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { isEffectivelyMajor } from '../helpers/card-identity'
+import { cardCountsAs } from '../helpers/card-type'
 import type { PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -82,7 +82,7 @@ const tagImprovementListener: CardListenerRegistration = {
     const builtCardId = getBuiltCardId(context.choice)
     if (!builtCardId) return
 
-    if (isEffectivelyMajor(builtCardId)) {
+    if (cardCountsAs(builtCardId, 'major')) {
       inFlight.hasMajor = true
     } else {
       inFlight.hasMinor = true

@@ -19,6 +19,12 @@ const CARD_ID = 'B161_Weakling'
  *
  * We approximate by scanning state.actionSpaces for spaces with non-empty
  * gainPerRound (i.e. accumulating spaces) and totalling their resources.
+ *
+ * BGA also has `onPlayerComputeArgsPlaceFarmer` which adds
+ * `ignoreResources: true` to all visible action cards so the player can
+ * place onto resource-restricted spaces. We don't currently honor this
+ * flag in placement-availability (sprint-7a fallback per spec §220 — flagged
+ * for sprint-7b). Listed in card_progress.md §2.5 deliberate-divergence.
  */
 const isAccumulationSpace = (space: ActionSpace): boolean => {
   const gpr = space.gainPerRound ?? {}

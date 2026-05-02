@@ -73,15 +73,17 @@ describe('C132_TimberShingleMaker', () => {
     // Should have 3 options (1 wood for 1VP, 2 for 2VP, 3 for 3VP)
     expect(children).toHaveLength(3)
 
-    // First option: pay 1 wood, 1 bonus-vp
+    // First option: pay 1 wood, then increment-counter woodPlaced=1
     expect(children[0].type).toBe('seq')
     expect(children[0].children[0].actionId).toBe('pay-resources')
     expect(children[0].children[0].params).toEqual({ wood: 1 })
-    expect(children[0].children[1].actionId).toBe('bonus-vp')
+    expect(children[0].children[1].actionId).toBe('special-effect')
+    expect(children[0].children[1].params).toMatchObject({ kind: 'increment-counter', key: 'woodPlaced', amount: 1 })
 
-    // Third option: pay 3 wood, 3 bonus-vp
+    // Third option: pay 3 wood, then increment-counter woodPlaced=3
     expect(children[2].children[0].params).toEqual({ wood: 3 })
-    expect(children[2].children).toHaveLength(4) // pay + 3 bonus-vp
+    expect(children[2].children).toHaveLength(2) // pay + 1 SE
+    expect(children[2].children[1].params).toMatchObject({ kind: 'increment-counter', key: 'woodPlaced', amount: 3 })
   })
 
   it('does not trigger when house is not stone', () => {

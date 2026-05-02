@@ -2,8 +2,9 @@ import type { GameState, PlayerState, Resource } from '../game/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
 import { fieldHasCrop } from '../game/field'
 import { computeFencedRegions } from './farm'
-import { getMajorCardEffect } from '../cards/major'
+import { getMajorCard } from '../cards/major'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types'
+import { isMajorCardId } from '../cards/helpers/card-type'
 import { getCardEffect } from '../cards/card-effects'
 import { solveBonusScoring } from './scoring-bonus-solver'
 import type { BonusScoringContext } from '../cards/card-effects'
@@ -299,9 +300,12 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     const cardEntries: ScoreEntry[] = []
     const cardBonusEntries: ScoreEntry[] = []
     player.improvements.forEach((cardId) => {
-      const card = getMajorCardEffect(cardId)
+      // player.improvements only contains majors; defend against any
+      // minorImprovement that might have been mis-routed here.
+      if (!isMajorCardId(cardId)) return
+      const card = getMajorCard(cardId)
       if (!card) return
-      cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp })
+      cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp ?? 0 })
       if (card.scoring) {
         const resourceCount = Math.max(0, playerForBonus.resources[card.scoring.resource] ?? 0)
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)

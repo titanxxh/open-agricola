@@ -13,17 +13,13 @@
  */
 import type { CardListenerRegistration } from './card-listeners'
 import type { CardEffect } from './card-effects'
-
-export type TradeLikeModifier = {
-  type: string
-  cardId: string
-  [key: string]: unknown
-}
+import type { CardDefinition } from './types'
+import type { CostModifier } from '../game/types'
 
 export type CardImpl = {
   listeners?: CardListenerRegistration[]
   effect?: CardEffect
-  modifiers?: TradeLikeModifier[]
+  modifiers?: CostModifier[]
   reaches?: readonly string[]
 }
 
@@ -37,7 +33,7 @@ export type RegistrySnapshot = {
 export class CardRegistry {
   private readonly listenersByCard = new Map<string, CardListenerRegistration[]>()
   private readonly effectsByCard = new Map<string, CardEffect>()
-  private readonly modifiersByCard = new Map<string, TradeLikeModifier[]>()
+  private readonly modifiersByCard = new Map<string, CostModifier[]>()
 
   loadImpl(cardId: string, impl: CardImpl): void {
     if (impl.listeners && impl.listeners.length > 0) {
@@ -95,6 +91,52 @@ export class CardRegistry {
     }
   }
 
+  /** Set or replace the modifier list keyed by cardId. Empty list deletes. */
+  setModifiersForCard(cardId: string, modifiers: CostModifier[]): void {
+    if (modifiers.length > 0) {
+      this.modifiersByCard.set(cardId, modifiers)
+    } else {
+      this.modifiersByCard.delete(cardId)
+    }
+  }
+
+  /**
+   * Populate modifiersByCard from catalog card definitions. Reads
+   * `card.modifier` (singular) and `card.modifiers` (plural) fields and
+   * merges them. Majors don't carry modifier fields, so callers should
+   * pass occupation + minor arrays only.
+   *
+   * Called once per session by GameCore after loadByIds; replaces the old
+   * card-modifiers.ts catalog-direct-query path.
+   */
+  syncModifiersFromCatalog(
+    occupations: readonly CardDefinition[],
+    minors: readonly CardDefinition[],
+  ): void {
+    for (const card of [...occupations, ...minors]) {
+      const mods: CostModifier[] = [
+        ...(card.modifiers ?? []),
+        ...(card.modifier ? [card.modifier] : []),
+      ]
+      if (mods.length > 0) {
+        this.modifiersByCard.set(card.id, mods)
+      }
+    }
+  }
+
+  /**
+   * Register card effect bundles into the registry. Used to load majors
+   * (CardDefinition + CardEffect intersection) so getEffect resolves them
+   * after the legacy `getMajorCardEffect` fallback in card-effects.ts is
+   * removed. Each entry that has at least one CardEffect hook (anything
+   * besides id) is set as the effect for `entry.id`.
+   */
+  registerEffects(effects: readonly CardEffect[]): void {
+    for (const effect of effects) {
+      this.effectsByCard.set(effect.id, effect)
+    }
+  }
+
   /** Shallow clone: new CardRegistry with the same listener / effect / modifier entries. */
   clone(): CardRegistry {
     const copy = new CardRegistry()
@@ -144,7 +186,7 @@ export class CardRegistry {
     return this.effectsByCard.get(cardId)
   }
 
-  getModifiers(cardId: string): TradeLikeModifier[] {
+  getModifiers(cardId: string): CostModifier[] {
     return this.modifiersByCard.get(cardId) ?? []
   }
 

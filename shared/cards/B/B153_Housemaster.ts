@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { getMajorCardEffect } from '../major'
+import { getMajorCard } from '../major'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B153_Housemaster'
@@ -20,7 +20,7 @@ export const B153_Housemaster_impl = {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     const majorVps = player.improvements
-      .map((id) => getMajorCardEffect(id)?.vp ?? 0)
+      .map((id) => getMajorCard(id)?.vp ?? 0)
       .filter((vp) => vp > 0)
     if (majorVps.length === 0) return 0
     const sum = majorVps.reduce((a, b) => a + b, 0)

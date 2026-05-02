@@ -283,4 +283,78 @@ describe('A82_WorkCertificate session', () => {
                         (after.players[0]!.resources.stone - s.players[0]!.resources.stone)
     expect(totalGained).toBeGreaterThanOrEqual(0)
   })
+
+  it('decrements the source accumulation space when a resource is taken (BGA take-from-space parity)', () => {
+    const session = setup()
+    const s = session.getState().state
+
+    // Pre-record total building resources across all 4+ accumulation spaces.
+    const totalBuildingBefore = s.actionSpaces.reduce((sum, sp) => {
+      return sum +
+        (sp.resources.wood ?? 0) +
+        (sp.resources.clay ?? 0) +
+        (sp.resources.reed ?? 0) +
+        (sp.resources.stone ?? 0)
+    }, 0)
+    const playerBuildingBefore =
+      (s.players[0]!.resources.wood ?? 0) +
+      (s.players[0]!.resources.clay ?? 0) +
+      (s.players[0]!.resources.reed ?? 0) +
+      (s.players[0]!.resources.stone ?? 0)
+
+    let resp = session.takeAction(0, 'day-laborer')
+    expect(resp.ok).toBe(true)
+
+    let safety = 10
+    let acceptedTake = false
+    while (safety > 0) {
+      if (resp.pending.type === 'choice') {
+        const options = resp.pending.options ?? []
+        const takeOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        if (takeOpt) {
+          resp = session.resolveChoice(0, takeOpt.value)
+          acceptedTake = true
+          break
+        }
+        const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
+        if (skipOpt) {
+          resp = session.resolveChoice(0, '__skip__')
+          break
+        }
+        break
+      }
+      if (resp.pending.type === 'confirmPlayerSwitch') {
+        resp = session.confirmPlayerSwitch()
+      } else {
+        break
+      }
+      safety--
+    }
+    while (resp.pending.type === 'confirmPlayerSwitch') {
+      resp = session.confirmPlayerSwitch()
+    }
+
+    expect(acceptedTake).toBe(true)
+    const after = session.getState().state
+
+    const totalBuildingAfter = after.actionSpaces.reduce((sum, sp) => {
+      return sum +
+        (sp.resources.wood ?? 0) +
+        (sp.resources.clay ?? 0) +
+        (sp.resources.reed ?? 0) +
+        (sp.resources.stone ?? 0)
+    }, 0)
+    const playerBuildingAfter =
+      (after.players[0]!.resources.wood ?? 0) +
+      (after.players[0]!.resources.clay ?? 0) +
+      (after.players[0]!.resources.reed ?? 0) +
+      (after.players[0]!.resources.stone ?? 0)
+
+    const playerGained = playerBuildingAfter - playerBuildingBefore
+    expect(playerGained).toBeGreaterThanOrEqual(1)
+    // BGA parity: source space must be decremented by at least the amount the player gained
+    // from the A82 take. Day-laborer itself doesn't gain building resources, so the only
+    // way the action-space total can drop is via take-from-space.
+    expect(totalBuildingBefore - totalBuildingAfter).toBeGreaterThanOrEqual(playerGained)
+  })
 })

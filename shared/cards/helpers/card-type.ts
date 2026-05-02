@@ -1,36 +1,51 @@
 import type { PlayerState } from '../../game/types'
-import { getMajorCardEffect } from '../major'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
   type CardType,
 } from '../types'
+import { getMajorCard } from '../major'
 
 /**
- * Dual-type card helpers — mirror of BGA's PlayerCard::hasType($type) and
+ * Card-type helpers — mirror of BGA's PlayerCard::hasType($type) and
  * getOtherCardTypes() (see bga-agricola/modules/php/Models/PlayerCard.php).
  *
- * A card "counts as" a type when its primary type matches OR when its
- * `alsoCountsAs?: CardType[]` list includes that type. Today the only
- * dual-type cards are D60_LargePottery / D59_EarthOven / A60_OrientalFireplace,
- * each a minor that also counts as a major for prereq / cookery / baking
- * accounting. Scoring intentionally does NOT call this helper — dual-type
- * minors stay in `player.minorPlayed` and earn their printed VP once.
+ * Primary type is derived from which catalog the card lives in (majors /
+ * minors / occupations). A card additionally "counts as" extra types when its
+ * `alsoCountsAs?: CardType[]` list includes that type — used by dual-type
+ * cards (D60_LargePottery / D59_EarthOven / A60_OrientalFireplace /
+ * D25_WitchesDanceFloor / C60_SmallPottersOven, all minors that also count as
+ * major for prereq / cookery / baking accounting). Scoring intentionally does
+ * NOT call `cardCountsAs` — dual-type minors stay in `player.minorPlayed` and
+ * earn their printed VP once.
+ *
+ * `getCardPrimaryType` and the `is*CardId` helpers are the canonical "which
+ * pool does this id live in" query — prefer them over `id.startsWith('Major_')`
+ * etc. so card-id naming conventions stay an internal detail.
  */
 
-const getPrimaryType = (cardId: string): CardType | null => {
-  if (getMajorCardEffect(cardId)) return 'major'
+export const getCardPrimaryType = (cardId: string): CardType | null => {
+  if (getMajorCard(cardId)) return 'major'
   if (getRegisteredMinorImprovement(cardId)) return 'minor'
   if (getRegisteredOccupation(cardId)) return 'occupation'
   return null
 }
+
+export const isMajorCardId = (cardId: string): boolean =>
+  getCardPrimaryType(cardId) === 'major'
+
+export const isMinorCardId = (cardId: string): boolean =>
+  getCardPrimaryType(cardId) === 'minor'
+
+export const isOccupationCardId = (cardId: string): boolean =>
+  getCardPrimaryType(cardId) === 'occupation'
 
 const getAlsoCountsAs = (cardId: string): CardType[] | undefined =>
   getRegisteredMinorImprovement(cardId)?.alsoCountsAs
   ?? getRegisteredOccupation(cardId)?.alsoCountsAs
 
 export const cardCountsAs = (cardId: string, asType: CardType): boolean => {
-  if (getPrimaryType(cardId) === asType) return true
+  if (getCardPrimaryType(cardId) === asType) return true
   return getAlsoCountsAs(cardId)?.includes(asType) ?? false
 }
 

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace, Resource } from '../../shared/game/types'
 
-import '../../shared/cards/E/E5_NightLoot'
+import { E5_NightLoot } from '../../shared/cards/E/E5_NightLoot'
 import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'E5_NightLoot'
@@ -69,8 +69,10 @@ describe('E5_NightLoot session', () => {
     if (woodSpace) {
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('leaf')
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.wood).toBe(1)
+      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+      expect(leaf.actionId).toBe('take-from-space')
+      expect(leaf.actionContext?.resource).toBe('wood')
+      expect(leaf.actionContext?.amount).toBe(1)
     }
   })
 
@@ -126,9 +128,51 @@ describe('E5_NightLoot session', () => {
       const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
       // Should have exactly 1 pair: wood+stone
       expect(children.length).toBe(1)
-      const params = children[0].params
-      expect(params.wood).toBe(1)
-      expect(params.stone).toBe(1)
     }
   })
+
+  it('passing flag is removed from card metadata', () => {
+    expect((E5_NightLoot as { passing?: boolean }).passing).toBeFalsy()
+  })
+
+  it('onBuy uses take-from-space leaves that decrement accumulation spaces', () => {
+    // BGA `E5_NightLoot::actSelectResources` decrements the chosen
+    // accumulation space's resources. Our previous impl used gain leaves
+    // pulling from the general supply, so the accumulation space was left
+    // untouched (the player effectively double-banked the resource).
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+
+    const woodSpace = state.actionSpaces.find((s: ActionSpace) => (s.gainPerRound.wood ?? 0) > 0)
+    const stoneSpace = state.actionSpaces.find((s: ActionSpace) => (s.gainPerRound.stone ?? 0) > 0)
+    state.actionSpaces.forEach((s: ActionSpace) => {
+      s.resources.wood = 0
+      s.resources.clay = 0
+      s.resources.reed = 0
+      s.resources.stone = 0
+    })
+    if (woodSpace) woodSpace.resources.wood = 2
+    if (stoneSpace) stoneSpace.resources.stone = 1
+
+    session.loadState(state)
+    const effect = getCardEffect(CARD_ID)
+    const flow = effect!.onBuy!(state, player) as ActionFlow
+
+    if (!woodSpace || !stoneSpace) return
+    expect(flow.type).toBe('xor')
+    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
+    // Exactly 1 (wood+stone) pair candidate; must be a SEQ of 2
+    // take-from-space leaves, not a single gain leaf.
+    expect(children.length).toBe(1)
+    const child = children[0]
+    expect(child.type).toBe('seq')
+    const inner = (child as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(inner.length).toBe(2)
+    inner.forEach((leaf) => {
+      expect(leaf.type).toBe('leaf')
+      expect((leaf as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('take-from-space')
+    })
+  })
+
 })

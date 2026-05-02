@@ -27,11 +27,20 @@ import '../../../server/game/authoritative-session'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry } from '../active-registry'
 import { ALL_CARD_IMPLS } from '../register-all'
+import { allOccupationCards, allMinorImprovementCards } from '../catalog'
+import { majorCardDefinitions } from '../major'
 
 const defaultRegistry = new CardRegistry()
 for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
   defaultRegistry.loadImpl(cardId, impl)
 }
+// Mirror GameCore's per-session sync so unit tests reading getCardModifiers
+// without booting a full session see catalog-derived modifier data.
+defaultRegistry.syncModifiersFromCatalog(
+  allOccupationCards,
+  allMinorImprovementCards,
+)
+defaultRegistry.registerEffects(majorCardDefinitions)
 setActiveCardRegistry(defaultRegistry)
 
 // PR-4: preload cards-manifest.json so client components that call

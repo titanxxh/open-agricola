@@ -22,7 +22,9 @@ const listener: CardListenerRegistration = {
     if (!builtId) return
     const card = getMinorImprovementCard(builtId)
     if (!card) return
-    const allCosts = [card.cost, ...(card.altCosts ?? [])].filter(
+    // Minor improvements only ever carry Partial<Resource> costs.
+    const cardCost = card.cost as Partial<Record<string, number>> | undefined
+    const allCosts = [cardCost, ...(card.altCosts ?? [])].filter(
       (c): c is NonNullable<typeof c> => !!c && Object.keys(c).length > 0,
     )
     if (allCosts.length === 0) return

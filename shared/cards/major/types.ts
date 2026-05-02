@@ -1,20 +1,29 @@
 import type { Resource, ComplexCost } from '../../game/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
-import type { CardExchange } from '../types'
+import type { CardDefinition } from '../types'
 
-export type MajorEffectHook = CardEffectHook
+/**
+ * Hooks majors are allowed to register. Excludes `onBeforePlayerTurn`
+ * because that hook returns `{ skipTurn?: boolean } | void` rather than
+ * `ActionFlow | void`, and `applyMajorEffectForImprovement` assumes every
+ * hook is flow-shaped.
+ */
+export type MajorEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
 
-export type MajorCardEffect = CardEffect & {
-  cost: Partial<Resource> | ComplexCost
-  vp: number
-  extraVp: boolean
-  description: string[]
-  isCookery?: boolean
-  isBaking?: boolean
-  returnCards?: string[]
-  scoring?: {
-    resource: keyof Resource
-    map: Record<string, number>
+/**
+ * Major improvement card metadata. Majors carry both CardDefinition fields
+ * (id / name / deck / number / desc / vp / cost / exchanges / scoring / ...)
+ * and CardEffect hooks (onBuy / onHarvest / ...). Built as an intersection
+ * with CardDefinition so getCardDefinition can return majors via the unified
+ * catalog entry.
+ *
+ * `cost`, `vp`, `extraVp`, `desc` are required for majors (CardDefinition
+ * has them as optional / generic).
+ */
+export type MajorCardData = CardDefinition &
+  CardEffect & {
+    cost: Partial<Resource> | ComplexCost
+    vp: number
+    extraVp: boolean
+    desc: string[]
   }
-  exchanges?: CardExchange[]
-}

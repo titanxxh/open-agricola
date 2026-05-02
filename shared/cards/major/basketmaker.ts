@@ -1,12 +1,15 @@
-import type { MajorCardEffect } from './types'
+import type { MajorCardData } from './types'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
-export const basketmaker: MajorCardEffect = {
+export const basketmaker: MajorCardData = {
   id: 'Major_Basket',
+  name: 'Basketmaker',
+  deck: 'major',
+  number: 10,
   cost: { reed: 2, stone: 2 },
   vp: 2,
   extraVp: true,
-  description: [
+  desc: [
     '[Harvest]',
     '<REED> <ARROW-1X> 3<FOOD>',
     '[Scoring]',

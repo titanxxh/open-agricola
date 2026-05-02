@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
+  ActionSpace,
   GameState,
   PlayerState,
   Resource,
@@ -17,8 +18,9 @@ import {
   type CardExchange,
   type ExchangeWindow,
 } from '../../cards/types'
-import { getMajorCardEffect } from '../../cards/major'
-import { collectComputeExchanges } from '../../cards/card-listeners'
+import { getMajorCard } from '../../cards/major'
+import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
+import { isMajorCardId } from '../../cards/helpers/card-type'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -95,6 +97,34 @@ export const getMaxTradeTimes = (player: PlayerState, trade: Trade): number => {
   // Apply trade's max limit if specified
   const tradeMax = trade.max ?? Infinity
   return Math.min(maxFromResources, tradeMax)
+}
+
+/**
+ * Dispatch a 'trade-applied' synthetic event to card listeners after a trade
+ * is applied. Mirrors `dispatchReapListener`. Cards that need to know which
+ * specific trade source fired (e.g. E91 PlowBuilder gating on Joinery use)
+ * register a listener with `actions: ['trade-applied']`.
+ *
+ * Listener context includes `extraData.sourceId` (trade.sourceId or .source)
+ * and `extraData.times`.
+ */
+export const dispatchTradeAppliedListener = (
+  state: GameState,
+  player: PlayerState,
+  trade: Trade,
+  times: number,
+): void => {
+  if (times <= 0) return
+  const sourceId = trade.sourceId ?? trade.source ?? null
+  if (!sourceId) return
+  runCardListeners({
+    state,
+    player,
+    space: {} as ActionSpace,
+    actionId: 'trade-applied',
+    phase: 'immediatelyAfter',
+    extraData: { sourceId, times },
+  })
 }
 
 /**
@@ -208,8 +238,10 @@ export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => 
 })
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {
-  const major = getMajorCardEffect(cardId)
-  if (major?.exchanges) return major.exchanges
+  if (isMajorCardId(cardId)) {
+    const major = getMajorCard(cardId)
+    if (major?.exchanges) return major.exchanges
+  }
   const minor = getRegisteredMinorImprovement(cardId)
   if (minor?.exchanges) return minor.exchanges
   const occ = getRegisteredOccupation(cardId)
@@ -397,6 +429,7 @@ const resolveExchangeChoice = (
             trade.sourceId ?? trade.source ?? 'unknown',
           )
         }
+        dispatchTradeAppliedListener(state, player, trade, times)
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
@@ -423,6 +456,7 @@ const resolveExchangeChoice = (
           trade.sourceId ?? trade.source ?? 'unknown',
         )
       }
+      dispatchTradeAppliedListener(state, player, trade, times)
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     trackWorkPhaseBuildingResources(state, player.id, gained)

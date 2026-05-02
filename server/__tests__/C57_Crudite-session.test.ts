@@ -106,7 +106,11 @@ describe('C57_Crudite', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('anytime listener returns gain 4 food when qualifying veg field exists', () => {
+  it('anytime listener returns SEQ(remove-field-crop, gain 4 food) when qualifying veg field exists', () => {
+    // BGA: anytime route runs `actEatFieldVeg` which deletes the field veg
+    // and inserts gainNode([FOOD => 4]). We mirror via SEQ of:
+    //   special-effect remove-field-crop (decrements top vegetable stack)
+    //   gain food:4
     const listener = findListener('C57-crudite-anytime')
     expect(listener).toBeDefined()
 
@@ -122,9 +126,17 @@ describe('C57_Crudite', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 4 })
-    // Field is NOT modified by anytime handler (side-effect-free)
+    expect(result!.flow!.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children.length).toBe(2)
+    const seLeaf = children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(seLeaf.actionId).toBe('special-effect')
+    expect(seLeaf.params?.kind).toBe('remove-field-crop')
+    const gainLeafChild = children[1] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(gainLeafChild.actionId).toBe('gain')
+    expect(gainLeafChild.params).toEqual({ food: 4 })
+    // Field is NOT modified by listener handler (side-effect-free).
+    // The mutation happens when the engine actually executes the SE leaf.
     expect(player.fields[0]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 

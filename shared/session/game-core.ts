@@ -67,11 +67,13 @@ import { type CustomCardData, SessionCardContext, withSessionContext } from '../
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
+import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
+import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { handleSowExtraField, collectLockedFarmTileKeys, collectFenceDiscount, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
+import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
@@ -83,9 +85,12 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
-import type { CardExchange } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
-import { getMajorCardEffect } from '../cards/major/index.ts'
+import { getMajorCard } from '../cards/major/index.ts'
+import {
+  BASIC_CONVERSION_SOURCE_ID,
+  getBasicConversionExchange,
+} from '../cards/basic-conversion.ts'
 import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
@@ -312,6 +317,16 @@ export class GameCore {
         }
       }
     }
+    // Sync modifier definitions from catalog into per-session registry.
+    // Replaces the legacy card-modifiers.ts catalog-direct-query path; downstream
+    // callers (`getCardModifiers`) read from `active.getModifiers` only.
+    this.cardRegistry.syncModifiersFromCatalog(
+      allOccupationCards,
+      allMinorImprovementCards,
+    )
+    // Register majors as effect bundles so getCardEffect resolves them after
+    // the legacy getMajorCardEffect fallback is removed.
+    this.cardRegistry.registerEffects(majorCardDefinitions)
     setActiveCardRegistry(this.cardRegistry)
 
     // Register custom workshop cards into a per-session context (sandbox mode)
@@ -2235,18 +2250,11 @@ export class GameCore {
   confirmHarvestFeed(
     playerIndex: number,
     selections: {
-      resourceKey?: keyof Resource
       count: number
-      food?: number
       sourceName?: string
-      sourceId?: string
-      /**
-       * Optional entry-index pointer into `card.exchanges[]` (Sprint 6a). When
-       * provided, the consumer applies the exchange bidirectionally (subtract
-       * `from`, add `to`) — needed for reverse trades like C105 BasketCarrier.
-       * When omitted, falls back to legacy `(resourceKey, food)` matching.
-       */
-      exchangeIndex?: number
+      sourceId: string
+      /** Entry-index pointer into card.exchanges[] (D3 unified path). */
+      exchangeIndex: number
     }[],
   ): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
@@ -2256,21 +2264,24 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // Resolve each selection to its underlying CardExchange entry. Either path
-    // (entry-index pointer or legacy resourceKey/food matching) yields the
-    // same `exchange` reference used downstream for cap-enforcement and
-    // bidirectional resource application.
-    const lookupCard = (sourceId: string) => {
-      if (player.improvements.includes(sourceId)) {
-        return getMajorCardEffect(sourceId)
+    // Resolve each selection to its underlying CardExchange entry through the
+    // unified (sourceId, exchangeIndex) path. The synthetic '__basic__'
+    // sourceId resolves to the basic-conversion exchange table; everything
+    // else looks up the player's played majors / minors / occupations.
+    const lookupExchange = (
+      sourceId: string,
+      idx: number,
+    ): import('../cards/types').CardExchange | undefined => {
+      if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
+        return getBasicConversionExchange(idx)
       }
-      if (player.minorPlayed.includes(sourceId)) {
-        return getRegisteredMinorImprovement(sourceId)
-      }
-      if (player.occupationPlayed.includes(sourceId)) {
-        return getRegisteredOccupation(sourceId)
-      }
-      return undefined
+      let card:
+        | { exchanges?: readonly import('../cards/types').CardExchange[] }
+        | undefined
+      if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
+      else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
+      else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
+      return card?.exchanges?.[idx]
     }
 
     // Enforce per-card exchange `max` (sourceId-level aggregate cap so that
@@ -2281,25 +2292,7 @@ export class GameCore {
     }
     const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel
-      const card = lookupCard(sel.sourceId)
-      if (!card?.exchanges) return sel
-      let exchange: import('../cards/types').CardExchange | undefined
-      if (typeof sel.exchangeIndex === 'number') {
-        const candidate = card.exchanges[sel.exchangeIndex]
-        if (candidate && (candidate.triggers ?? []).includes('harvest')) {
-          exchange = candidate
-        }
-      } else {
-        exchange = (card.exchanges as CardExchange[]).find((ex) => {
-          if (!(ex.triggers ?? []).includes('harvest')) return false
-          const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-          if (fromKeys.length !== 1) return false
-          const fromKey = fromKeys[0]!
-          if (fromKey !== sel.resourceKey) return false
-          const foodOut = (ex.to as Partial<Resource>).food ?? 0
-          return foodOut === (sel.food ?? 0)
-        })
-      }
+      const exchange = lookupExchange(sel.sourceId, sel.exchangeIndex)
       if (!exchange) return sel
       let capped = sel.count
       if (exchange.max !== undefined) {
@@ -2374,24 +2367,6 @@ export class GameCore {
             sel.sourceId ?? exchange.sourceId ?? 'unknown',
           )
         }
-      } else if (sel.resourceKey && typeof sel.food === 'number') {
-        // Legacy single-resource forward-trade fallback (no exchange resolved).
-        const available = player.resources[sel.resourceKey]
-        const used = Math.min(sel.count, available)
-        player.resources[sel.resourceKey] -= used
-        totalFood += used * sel.food
-        usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
-        incResourceConverted(player, sel.resourceKey, used)
-        addFoodFromConversion(player, sel.resourceKey, used * sel.food)
-        this.state.log.unshift({
-          key: 'log.harvestFeedConvert',
-          params: {
-            player: player.name,
-            source: sel.sourceName ?? 'Harvest conversion',
-            cost: { [sel.resourceKey]: used },
-            food: { food: used * sel.food },
-          },
-        })
       }
     }
     const required = this.pending.remaining
@@ -2441,6 +2416,32 @@ export class GameCore {
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
     this.turnOwnerPlayerIndex = null
+
+    // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
+    // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
+    // skip, advance to the next eligible player. Cap at `players.length` to
+    // guarantee termination if every player is asked to skip.
+    let safety = this.state.players.length
+    while (safety-- > 0) {
+      const allWorkersUsedNow = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
+      if (allWorkersUsedNow) break
+      const current = this.state.players[this.state.currentPlayerIndex]
+      if (!current) break
+      if (workersAvailable(this.state, current) <= 0) {
+        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+        if (next === this.state.currentPlayerIndex) break
+        this.state.currentPlayerIndex = next
+        continue
+      }
+      if (!shouldSkipPlayerTurn(this.state, current)) break
+      this.state.log.unshift({
+        key: 'log.playerSkipped',
+        params: { playerName: current.name },
+      })
+      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+      if (next === this.state.currentPlayerIndex) break
+      this.state.currentPlayerIndex = next
+    }
 
     // Check if all workers are used (round end condition)
     const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
@@ -2779,8 +2780,26 @@ export class GameCore {
         const { edges, palisadeEdges, extraWood } = payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
         const safeEdges = Array.isArray(edges) ? edges : []
         const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
-        const freeFences =
+        const pendingFreeFences =
           readPendingFenceBonus(normalized)?.freeFences ?? 0
+        // Mirror applyFarmChoice: per-card hooks (E16, C1, C16…) extend the
+        // free-fence count via `computeFenceDiscount`, so payment preview must
+        // use the same total or `resolveTypedFlatPaymentSelection` will reject
+        // the payment for cards that bring wood costs to zero.
+        const existingEdgeIdsForDiscount = new Set(
+          (normalized.fenceSegments ?? []).map((seg) => seg.edge),
+        )
+        const newFenceEdgesPreview = safeEdges.filter(
+          (e) => !existingEdgeIdsForDiscount.has(e),
+        )
+        const newPalisadeEdgesPreview = safePalisadeEdges.filter(
+          (e) => !existingEdgeIdsForDiscount.has(e),
+        )
+        const hookFreeFences = collectFenceDiscount(this.state, normalized, {
+          newFenceEdges: newFenceEdgesPreview,
+          newPalisadeEdges: newPalisadeEdgesPreview,
+        })
+        const freeFences = pendingFreeFences + hookFreeFences
         const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
         const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
         const validated = validateFenceSelection(

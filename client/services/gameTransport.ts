@@ -1,5 +1,4 @@
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/protocol/game'
-import type { Resource } from '../../shared/game/types'
 import type { ClientCommand, ServerEvent } from '../../shared/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 
@@ -25,13 +24,11 @@ export interface GameTransport {
     animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
   }[]): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
-    resourceKey?: keyof Resource;
     count: number;
-    food?: number;
     sourceName?: string;
-    sourceId?: string;
-    /** Sprint 6a entry-index pointer; server applies bidirectionally. */
-    exchangeIndex?: number;
+    sourceId: string;
+    /** Entry-index pointer into card.exchanges[] (D3 unified path). */
+    exchangeIndex: number;
   }[]): Promise<GameSyncPayload>
   confirmNextPlayer(): Promise<GameSyncPayload>
   confirmPlayerSwitch(): Promise<GameSyncPayload>

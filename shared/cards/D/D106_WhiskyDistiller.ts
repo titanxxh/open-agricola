@@ -1,30 +1,42 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { initCardState } from '../__stubs__/helpers'
+import { payLeaf } from '../helpers/pay-gain-node'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D106_WhiskyDistiller'
 
+/**
+ * D106 Whisky Distiller (Sprint 7a F5+F6).
+ *
+ * BGA `Cards/D/D106_WhiskyDistiller.php`:
+ *   isListeningTo: isAnytime && Globals::getTurn() <= 12
+ *   onPlayerAtAnytime: SEQ(payNode([GRAIN=>1]), futureMeeplesNode([FOOD=>4], ['+2']))
+ *
+ * Pay 1 grain, push 4 food onto round (current+2). At the start of that round, the
+ * food is granted via the global future-meeples release path. We mirror this exactly
+ * via `futureMeeplesNode` with an inline single-entry request.
+ */
 const anytimeListener: CardListenerRegistration = {
   id: 'D106-whisky-distiller-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.round > 12) return // no round+2 would exist after round 12
+    if (context.state.round + 2 > 14) return
     if ((context.player.resources.grain ?? 0) < 1) return
     return {
       flow: {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
-          {
-            type: 'leaf',
-            actionId: 'store-on-card',
-            params: { pending: 1 },
-            sourceCard: CARD_ID,
-          },
+          futureMeeplesNode({
+            cardId: CARD_ID,
+            playerId: context.player.id,
+            entries: [
+              { round: context.state.round + 2, resources: { food: 4 } },
+            ],
+          }),
         ],
       },
       sourceCard: CARD_ID,
@@ -48,14 +60,7 @@ export const D106_WhiskyDistiller = new Occupation({
 export const D106_WhiskyDistiller_impl = {
   listeners: [anytimeListener],
   effect: {
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
-    if (pending <= 0) return
-    const counters = initCardState(player, CARD_ID)
-    counters.pending = pending - 1
-    return gainLeaf(CARD_ID, { food: 4 })
+    id: CARD_ID,
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

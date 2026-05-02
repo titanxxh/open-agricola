@@ -2,7 +2,7 @@ import { MinorImprovement, getRegisteredMinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, PlayerState } from '../../game/types'
-import { getMajorCardEffect } from '../major'
+import { getMajorCard } from '../major'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import {
   canAffordCardPreviewCostByProvider,
@@ -57,7 +57,7 @@ const canPlayAnyMajorImprovement = (context: CardListenerContext, player: Player
       player,
       'improvement-any',
       improvementId,
-      () => getMajorCardEffect(improvementId)?.cost ?? null,
+      () => getMajorCard(improvementId)?.cost ?? null,
       context.actionId,
     ),
   )

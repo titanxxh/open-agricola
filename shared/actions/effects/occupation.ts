@@ -180,7 +180,8 @@ const getOccupationCost = (
 ) => {
   const occupation = getOccupation(occupationId)
   if (!occupation) return null
-  const cost = { ...occupation.cost }
+  // Occupations only ever carry a Partial<Resource> cost (ComplexCost is majors-only).
+  const cost: Partial<Resource> = { ...(occupation.cost as Partial<Resource> | undefined) }
   for (const mod of player.activeModifiers ?? []) {
     if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
       for (const [key, discount] of Object.entries(mod.discount)) {

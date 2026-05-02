@@ -5,7 +5,9 @@ import { cardCountsAs, collectCardsAs } from '../card-type'
 import '../../major'
 import '../../D/D60_LargePottery'
 import '../../D/D59_EarthOven'
+import '../../D/D25_WitchesDanceFloor'
 import '../../A/A60_OrientalFireplace'
+import '../../C/C60_SmallPottersOven'
 import '../../B/B68_Beanfield'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
@@ -52,6 +54,16 @@ describe('cardCountsAs', () => {
   it('A60 OrientalFireplace counts as major via alsoCountsAs', () => {
     expect(cardCountsAs('A60_OrientalFireplace', 'major')).toBe(true)
     expect(cardCountsAs('A60_OrientalFireplace', 'minor')).toBe(true)
+  })
+
+  it('D25 WitchesDanceFloor counts as major via alsoCountsAs', () => {
+    expect(cardCountsAs('D25_WitchesDanceFloor', 'major')).toBe(true)
+    expect(cardCountsAs('D25_WitchesDanceFloor', 'minor')).toBe(true)
+  })
+
+  it('C60 SmallPottersOven counts as major via alsoCountsAs', () => {
+    expect(cardCountsAs('C60_SmallPottersOven', 'major')).toBe(true)
+    expect(cardCountsAs('C60_SmallPottersOven', 'minor')).toBe(true)
   })
 
   it('unknown id counts as nothing', () => {

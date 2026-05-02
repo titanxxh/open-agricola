@@ -1,5 +1,5 @@
 import type { ActionFlow, GameState, PlayerState } from '../../game/types'
-import type { MajorCardEffect, MajorEffectHook } from './types'
+import type { MajorCardData, MajorEffectHook } from './types'
 import { basketmaker } from './basketmaker'
 import { clayOven } from './clay-oven'
 import { cookingHearth1, cookingHearth2 } from './cooking-hearth'
@@ -9,7 +9,7 @@ import { pottery } from './pottery'
 import { stoneOven } from './stone-oven'
 import { well } from './well'
 
-export const majorCardEffects: MajorCardEffect[] = [
+export const majorCardDefinitions: MajorCardData[] = [
   fireplace1,
   fireplace2,
   cookingHearth1,
@@ -22,11 +22,20 @@ export const majorCardEffects: MajorCardEffect[] = [
   basketmaker,
 ]
 
-const majorEffectMap = new Map<string, MajorCardEffect>(
-  majorCardEffects.map((effect) => [effect.id, effect]),
+const majorDefinitionMap = new Map<string, MajorCardData>(
+  majorCardDefinitions.map((effect) => [effect.id, effect]),
 )
 
-export const getMajorCardEffect = (id: string) => majorEffectMap.get(id)
+/**
+ * Lightweight major-only lookup. Server paths use the unified
+ * `getCardDefinition` (which queries occupation / minor / major catalogs).
+ * Card / frontend code that only needs majors metadata should import this
+ * instead so vite tree-shaking can drop the rest of the catalog from the
+ * client bundle (`getCardDefinition` triggers all three card-data sources
+ * to be retained, ballooning the bundle).
+ */
+export const getMajorCard = (id: string): MajorCardData | undefined =>
+  majorDefinitionMap.get(id)
 
 const applyMajorEffectForImprovement = (
   state: GameState,
@@ -34,7 +43,7 @@ const applyMajorEffectForImprovement = (
   improvementId: string,
   hook: MajorEffectHook,
 ): ActionFlow | null => {
-  const effect = majorEffectMap.get(improvementId)
+  const effect = majorDefinitionMap.get(improvementId)
   const handler = effect?.[hook]
   if (handler) {
     return handler(state, player) ?? null

@@ -2,6 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import type { CardEffect } from '../card-effects'
 
 const CARD_ID = 'D134_OysterEater'
 
@@ -17,10 +18,12 @@ const CARD_ID = 'D134_OysterEater'
  * Implementation notes:
  * - The bonus VP is credited via the `bonus-vp` leaf flow (accumulates in
  *   player.cardStates[CARD_ID].counters.bonusVp and is picked up at scoring).
- * - The "must skip next placement" side effect is stored in extraData as a flag
- *   (skipNextPlacement = count remaining) for future integration with the
- *   placement pipeline. We do not currently have a placement-skip hook; recording
- *   the flag keeps the data available without modifying core paths.
+ * - The "must skip next placement" side effect is stored in
+ *   `cardStates.D134.extraData.skipNextPlacement` (count remaining). The
+ *   `onBeforePlayerTurn` hook reads this flag at the start of each labor
+ *   turn for the owner, decrements it by 1, and returns `{ skipTurn: true }`
+ *   so the engine advances to the next eligible player. Mirrors BGA
+ *   `Globals::setSkipNext` consumed in `stLabor()`.
  */
 const listener: CardListenerRegistration = {
   id: 'D134-oyster-eater-after-fishing',
@@ -66,7 +69,27 @@ export const D134_OysterEater = new Occupation({
   players: '3+',
 })
 
+const effect: CardEffect = {
+  id: CARD_ID,
+  onBeforePlayerTurn: (_state, player) => {
+    const remaining = (player.cardStates?.[CARD_ID]?.extraData as { skipNextPlacement?: number } | undefined)
+      ?.skipNextPlacement ?? 0
+    if (remaining <= 0) return
+    const cs = player.cardStates![CARD_ID]!
+    const extra = (cs.extraData ?? {}) as { skipNextPlacement?: number }
+    const next = remaining - 1
+    if (next <= 0) {
+      delete extra.skipNextPlacement
+    } else {
+      extra.skipNextPlacement = next
+    }
+    cs.extraData = extra
+    return { skipTurn: true }
+  },
+}
+
 export const D134_OysterEater_impl = {
   listeners: [listener],
+  effect,
   reaches: [] as readonly string[],
 } satisfies CardImpl
