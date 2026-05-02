@@ -102,6 +102,17 @@ function hashSolution(solution: PaymentSolution): number {
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
   }
+  if (solution.bonusChoiceIndex) {
+    const entries = Object.entries(solution.bonusChoiceIndex).sort(
+      (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+    )
+    for (const [k, v] of entries) {
+      for (const ch of k) {
+        h = ((h + ch.charCodeAt(0) * 23) * 31) >>> 0
+      }
+      h = ((h + (v + 1) * 41) * 31) >>> 0
+    }
+  }
   if (solution.cardUsed) {
     for (const ch of solution.cardUsed) {
       h = ((h + ch.charCodeAt(0) * 19) * 31) >>> 0
