@@ -67,13 +67,6 @@ const E16FenceListener: CardListenerRegistration = {
 }
 
 export const E16_BriarHedge_impl = {
-  effect: {
-  id: CARD_ID,
-  computeFenceDiscount: (_state, _player, ctx) => {
-    return ctx.newFenceEdges.filter(isBorderEdge).length
-  },
-  computeFenceFreeAvailable: (_state, player) => countAvailableBorderEdges(player),
-},
   listeners: [E16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
