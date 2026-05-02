@@ -720,6 +720,7 @@ import { E14_WoodSaw_impl } from './E/E14_WoodSaw'
 import { E150_RockBeater_impl } from './E/E150_RockBeater'
 import { E151_DeliveryNurse_impl } from './E/E151_DeliveryNurse'
 import { E152_BargainHunter_impl } from './E/E152_BargainHunter'
+import { E153_StoneSculptor_impl } from './E/E153_StoneSculptor'
 import { E154_Margrave_impl } from './E/E154_Margrave'
 import { E155_Visionary_impl } from './E/E155_Visionary'
 import { E156_ClaypitOwner_impl } from './E/E156_ClaypitOwner'
@@ -1540,6 +1541,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E150_RockBeater': E150_RockBeater_impl,
   'E151_DeliveryNurse': E151_DeliveryNurse_impl,
   'E152_BargainHunter': E152_BargainHunter_impl,
+  'E153_StoneSculptor': E153_StoneSculptor_impl,
   'E154_Margrave': E154_Margrave_impl,
   'E155_Visionary': E155_Visionary_impl,
   'E156_ClaypitOwner': E156_ClaypitOwner_impl,

@@ -92,6 +92,7 @@ import {
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
 import {
   applyCostOverride,
+  applyTradeSideEffect,
 } from '../actions/helpers/payment'
 import {
   isMajorImprovementPlayable,
@@ -2363,6 +2364,16 @@ export class GameCore {
             food: gainMap,
           },
         })
+        // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
+        if (exchange.sideEffect && times > 0) {
+          applyTradeSideEffect(
+            this.state,
+            player,
+            exchange.sideEffect,
+            times,
+            sel.sourceId ?? exchange.sourceId ?? 'unknown',
+          )
+        }
       } else if (sel.resourceKey && typeof sel.food === 'number') {
         // Legacy single-resource forward-trade fallback (no exchange resolved).
         const available = player.resources[sel.resourceKey]
