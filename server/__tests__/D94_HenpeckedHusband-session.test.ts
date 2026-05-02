@@ -21,7 +21,7 @@ const setup = () => {
 }
 
 describe('D94 HenpeckedHusband — listener', () => {
-  it('triggers return-first-worker-home when second placement (length === 2) is on construct', () => {
+  it('triggers recall-placed-worker (workerId of first placement) when second placement (length === 2) is on construct', () => {
     const { state, player } = setup()
     // Simulate prior placement on forest, then current placement on farm-expansion.
     recordRoundPlacement(player, 'forest', '1')
@@ -39,7 +39,9 @@ describe('D94 HenpeckedHusband — listener', () => {
     expect(result?.sourceCard).toBe(CARD_ID)
     const flow = result?.flow as { type: string; actionId?: string; params?: Record<string, unknown> } | undefined
     expect(flow?.type).toBe('leaf')
-    expect(flow?.actionId).toBe('return-first-worker-home')
+    expect(flow?.actionId).toBe('recall-placed-worker')
+    expect(flow?.params?.workerId).toBe('1')
+    expect(flow?.params?.noOpIfMissing).toBe(true)
     expect(flow?.params?.logCardTrigger).toBe(true)
   })
 
@@ -73,10 +75,10 @@ describe('D94 HenpeckedHusband — listener', () => {
     expect(handler(ctx)).toBeUndefined()
   })
 
-  it('return-first-worker-home leaves first worker untouched when on meeting-place (delegated to action)', () => {
-    // This is documenting that the handler delegates the meeting-place exception to the
-    // return-first-worker-home action itself, which already checks MEETING_PLACE_IDS.
-    // The listener still fires (returns the flow), the action is the one that no-ops.
+  it('drops workerId when first placement is on meeting-place (recall becomes no-op)', () => {
+    // The listener still fires (length === 2), but it computes the meeting-place
+    // exception itself by passing workerId: undefined; the recall-placed-worker
+    // action no-ops thanks to noOpIfMissing while log decoration still runs.
     const { state, player } = setup()
     recordRoundPlacement(player, 'meeting-place', '1')
     recordRoundPlacement(player, 'farm-expansion', '2')
@@ -89,9 +91,12 @@ describe('D94 HenpeckedHusband — listener', () => {
       phase: 'after' as ActionHookPhase,
     } as unknown as CardListenerContext
     const result = handler(ctx) as ActionHookResult | undefined
-    // Listener still fires (length === 2). The meeting-place exception is
-    // enforced inside the return-first-worker-home action.
     expect(result).toBeTruthy()
+    const flow = result?.flow as { type: string; actionId?: string; params?: Record<string, unknown> } | undefined
+    expect(flow?.actionId).toBe('recall-placed-worker')
+    expect(flow?.params?.workerId).toBeUndefined()
+    expect(flow?.params?.noOpIfMissing).toBe(true)
+
     const details = getRoundPlacementDetails(player)
     expect(details).toHaveLength(2)
     expect(details[0]!.spaceId).toBe('meeting-place')

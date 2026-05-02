@@ -1,6 +1,5 @@
 import { MinorImprovement } from '../types'
-import { getRoundPlacementDetails } from '../../cards/helpers/round-placement'
-import { removeWorkerRef, spaceHasPlayer } from '../../game/space'
+import { recallWorkerById } from '../helpers/recall-worker'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E3_TeaTime'
@@ -21,11 +20,13 @@ export const E3_TeaTime_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
+    // BGA reads the actual occupancy on Grain Utilization (not round-placement
+    // history). Grab whichever of this player's workers is sitting there and
+    // recall it via the shared helper.
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
-    if (!space || !spaceHasPlayer(space, player.id)) return
-    const placements = getRoundPlacementDetails(player)
-    const entry = placements.find(e => e.spaceId === 'grain-utilization')
-    removeWorkerRef(space, player.id, entry?.workerId)
+    const ref = space?.takenBy.find((t) => t.playerId === player.id)
+    if (!ref) return
+    recallWorkerById(state, player, ref.workerId)
   },
 },
   reaches: [] as readonly string[],
