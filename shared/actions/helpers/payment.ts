@@ -722,8 +722,10 @@ const buildBonusReductions = (
 
 export const applyTradeSideEffect = (
   state: GameState,
+  player: PlayerState,
   eff: TradeSideEffect,
   times: number,
+  sourceCard: string,
 ): void => {
   if (times <= 0) return
   switch (eff.type) {
@@ -732,6 +734,15 @@ export const applyTradeSideEffect = (
       if (!space?.resources) return
       const cur = space.resources[eff.resource] ?? 0
       space.resources[eff.resource] = Math.max(0, cur - times)
+      return
+    }
+    case 'bonusVp': {
+      player.cardStates ??= {}
+      player.cardStates[sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]
+      const cs = player.cardStates[sourceCard]
+      cs.extraData ??= {}
+      const cur = (cs.extraData.bonusVpEarned as number | undefined) ?? 0
+      cs.extraData.bonusVpEarned = cur + eff.amount * times
       return
     }
   }
@@ -750,7 +761,13 @@ export const executePaymentSolution = (
   if (options.state) {
     for (const { trade, times } of solution.tradesUsed) {
       if (trade.sideEffect && times > 0) {
-        applyTradeSideEffect(options.state, trade.sideEffect, times)
+        applyTradeSideEffect(
+          options.state,
+          player,
+          trade.sideEffect,
+          times,
+          trade.sourceId ?? trade.source ?? 'unknown',
+        )
       }
     }
   }
