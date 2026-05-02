@@ -82,8 +82,9 @@ export const buildRenovationPlan = (
 
 /**
  * Default next-target plan (no card adjustments). Wood→clay, clay→stone.
- * Kept for backward compatibility with callers that just need to probe
- * "is renovation possible?" or read the default `nextType`.
+ * Used by D13 Trowel / E87 MasterRenovator to probe the player's eligible
+ * renovation target, and internally as the fallback when no explicit target
+ * is supplied in `params`.
  */
 export const getRenovation = (player: PlayerState): RenovationPlan | null => {
   if (player.houseType === 'wood') return buildRenovationPlan(player, 'clay')

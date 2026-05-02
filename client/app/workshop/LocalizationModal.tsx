@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llmService'
+import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llm'
 import { useLocale } from '../../contexts/LocaleContext'
 
 type CardLocaleContent = {
