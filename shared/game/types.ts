@@ -113,6 +113,7 @@ export type PaymentSolution = {
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
+  bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
 
