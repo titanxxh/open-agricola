@@ -15,8 +15,15 @@ const setup = (opts?: { food?: number; grain?: number }) => {
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
+  // Stock building resources so multiple majors are affordable, ensuring the
+  // major-improvement choice prompt is shown (game-core auto-resolves when
+  // options.length === 1 and fails when it is 0).
   player.resources = {
     ...player.resources,
+    wood: 5,
+    clay: 5,
+    stone: 5,
+    reed: 5,
     food: opts?.food ?? 2,
     grain: opts?.grain ?? 0,
   }
