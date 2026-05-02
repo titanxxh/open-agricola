@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
+import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
+import { applyTradeSideEffect } from '../../shared/actions/helpers/payment'
 
 import '../../shared/cards/C/C62_CookeryExtension'
 
@@ -153,5 +154,56 @@ describe('C62 CookeryExtension', () => {
       (t) => t.sourceId === FIREPLACE1 && t.from?.vegetable === 1,
     )
     expect(fireplaceVeg?.to.food).toBe(2)
+  })
+})
+
+describe('C62 + harvest feed integration (simplified)', () => {
+  // Note: simplified per plan task 9 fallback. Driving the live
+  // confirmHarvestFeed path with derived sourceIds requires
+  // game-core.ts:lookupCard() to resolve composite sourceIds (e.g.
+  // 'C62_CookeryExtension::Major_Fireplace1') back to a card; today it only
+  // looks for sourceId directly in improvements/minorPlayed/occupationPlayed
+  // arrays, so derived trades are silently skipped. Rather than expand the
+  // main path, this test exercises the trade-application semantics directly:
+  // resolve the derived trade via getExchangesInWindow, apply it via
+  // applyTrade + applyTradeSideEffect (exactly what the harvest-feed path
+  // would dispatch), and assert the per-cookery flag + resource deltas.
+  it('applying a C62-derived trade: vegetable -1, food +4, usedCookeryIds=[Major_Fireplace1]', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const p1 = state.players[0]!
+    p1.minorPlayed = [...p1.minorPlayed, C62]
+    p1.improvements = [...p1.improvements, FIREPLACE1]
+    p1.cardStates = {
+      ...(p1.cardStates ?? {}),
+      [C62]: { extraData: { usedCookeryIds: [] } },
+    }
+    p1.resources.vegetable = 1
+    p1.resources.food = 0
+    session.loadState(state)
+
+    const trades = getExchangesInWindow(p1, 'harvest', state)
+    const derived = trades.find((t) => t.sourceId === `${C62}::${FIREPLACE1}` && t.from?.vegetable === 1)
+    expect(derived).toBeDefined()
+    expect(derived!.to.food).toBe(4)
+    expect(derived!.sideEffect).toEqual({
+      type: 'pushExtraDataValue',
+      sourceCard: C62,
+      key: 'usedCookeryIds',
+      value: FIREPLACE1,
+    })
+
+    applyTrade(p1, derived!, 1)
+    applyTradeSideEffect(state, p1, derived!.sideEffect!, 1, derived!.sourceId ?? 'unknown')
+
+    expect(p1.resources.vegetable).toBe(0)
+    expect(p1.resources.food).toBe(4)
+    expect(p1.cardStates?.[C62]?.extraData?.usedCookeryIds).toEqual([FIREPLACE1])
+
+    // After the side-effect dispatched, listener filters out Fireplace1.
+    const tradesAfter = getExchangesInWindow(p1, 'harvest', state)
+    const stillDerived = tradesAfter.find((t) => t.sourceId === `${C62}::${FIREPLACE1}`)
+    expect(stillDerived).toBeUndefined()
   })
 })
