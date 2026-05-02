@@ -84,3 +84,68 @@ describe('applyTradeSideEffect.bonusVp', () => {
     expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBeUndefined()
   })
 })
+
+describe('applyTradeSideEffect.pushExtraDataValue', () => {
+  it('pushes value into cardStates[sourceCard].extraData[key]', () => {
+    const state = baseState(0)
+    const player = makePlayer()
+    applyTradeSideEffect(
+      state,
+      player,
+      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      1,
+      'C62_CookeryExtension',
+    )
+    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
+  })
+
+  it('dedupes when same value is pushed twice', () => {
+    const state = baseState(0)
+    const player = makePlayer()
+    const eff = {
+      type: 'pushExtraDataValue' as const,
+      sourceCard: 'C62_CookeryExtension',
+      key: 'usedCookeryIds',
+      value: 'Major_Fireplace1',
+    }
+    applyTradeSideEffect(state, player, eff, 1, 'C62_CookeryExtension')
+    applyTradeSideEffect(state, player, eff, 1, 'C62_CookeryExtension')
+    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
+  })
+
+  it('appends a different value to existing list', () => {
+    const state = baseState(0)
+    const player = makePlayer()
+    applyTradeSideEffect(
+      state,
+      player,
+      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      1,
+      'C62_CookeryExtension',
+    )
+    applyTradeSideEffect(
+      state,
+      player,
+      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_CookingHearth1' },
+      1,
+      'C62_CookeryExtension',
+    )
+    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual([
+      'Major_Fireplace1',
+      'Major_CookingHearth1',
+    ])
+  })
+
+  it('no-op when times <= 0', () => {
+    const state = baseState(0)
+    const player = makePlayer()
+    applyTradeSideEffect(
+      state,
+      player,
+      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      0,
+      'C62_CookeryExtension',
+    )
+    expect(player.cardStates?.C62_CookeryExtension).toBeUndefined()
+  })
+})

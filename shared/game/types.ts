@@ -36,6 +36,7 @@ export type ResourceKey = keyof Resource
 export type TradeSideEffect =
   | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }
   | { type: 'bonusVp'; amount: number }
+  | { type: 'pushExtraDataValue'; sourceCard: string; key: string; value: string }
 
 export type Trade = {
   from: Partial<Resource>

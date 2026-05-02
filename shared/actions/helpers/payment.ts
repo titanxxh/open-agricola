@@ -745,6 +745,17 @@ export const applyTradeSideEffect = (
       cs.extraData.bonusVpEarned = cur + eff.amount * times
       return
     }
+    case 'pushExtraDataValue': {
+      player.cardStates ??= {}
+      player.cardStates[eff.sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]
+      const cs = player.cardStates[eff.sourceCard]
+      cs.extraData ??= {}
+      const existing = cs.extraData[eff.key]
+      const arr = Array.isArray(existing) ? (existing as string[]) : []
+      if (!arr.includes(eff.value)) arr.push(eff.value)
+      cs.extraData[eff.key] = arr
+      return
+    }
   }
 }
 
