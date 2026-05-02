@@ -47,6 +47,16 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-01 Sprint 5d — Sprint 5 deferred audit & cleanup（42 cards re-validated, audit-only）**：
+  - 4 parallel `general-purpose` sub-agents re-audited 42 cards (B-deck 17 + E-deck 21 + 4 already-fixed verifies C23/A1/A22/A38) at ≥120s/card, deeper than `card_desc_audit.md §5.7` 的 90s/card compact mode. Manual spot-check on 4 P1 deviations + sanity skim of 3 highest-LOC ✅ cards (B72/B3/C23). 0 verdict flips.
+  - **Verdict distribution**: ✅ 26 / 🟡 9 / ⚠ 7 / ❌ 0 / 🔍 0.
+  - **§5.7 conclusion ("0 ⚠/❌") NOT confirmed.** 4 new P1 bugs surfaced: **B163 Pastor** missing `effect.onBuy` immediate evaluation / **E161 ElderBaker** missing Stone Oven during minor-improvement carve-out (D131-style listener fix) / **E72 ArtichokeField** Reap event vs phase callback structural deviation (food math may already be correct — Sprint 5e to verify) / **E91 PlowBuilder** anytime not gated on `usedJoinery` flag (also missing Joinery upgrades support).
+  - **§2.3 propagation:** C23 / A1 / A22 / A38 marked ✅ Sprint 5b — Sprint 5b changelog claims confirmed in code. "B 牌组 wide-scan 11 张" + "E 牌组 wide-scan 4 张" aggregate entries replaced with 17-B-superset + 21-E-superset ✅/⚠ markers per audit verdict (original 11+4 names from lost agent-b7/b10.md absorbed into the §5.7 supersets).
+  - **master-plan §0 ⚠ residual:** "~1 张" → **4 张** (B163 / E72 / E91 / E161). Sprint 5d **uncovered more bugs than it closed** — bugs are concrete and actionable.
+  - **Sprint 5e follow-up spec stub:** `docs/superpowers/specs/2026-05-02-sprint-5e-followup-design.md` captures the 4 P1 with per-card fix sketches (~1.5 day total estimate).
+  - **§2.5/§2.4 candidates (recorded but not Sprint 5e):** B103/B26/E95 ⚠ P2; B108/B128/B137/E118/E142/E16/E36/E68/E70 🟡 simplified — see `docs/sprint-5d-audit-report.md` §"P2/P3 deviations".
+  - Audit report: `docs/sprint-5d-audit-report.md`. spec / plan: `docs/superpowers/specs/2026-05-01-sprint-5d-deferred-audit-design.md` / `docs/superpowers/plans/2026-05-01-sprint-5d-deferred-audit.md`.
+
 - **2026-05-01 Sprint 6e — C62 CookeryExtension 完整对齐 BGA + 1 generic listener phase + 1 sideEffect kind**：
   - **C62 CookeryExtension**：listener `phases:['computeExchanges']` on harvest window，扫 `getPlayerCookeryCards(player)`，filter anytime exchanges with `from ∈ {vegetable, sheep, boar, cattle}` 且 `fromQty===1`，doubles `to.food`，emits `CardExchange[]` with `triggers:['harvest']`、`max:1`、`sourceId='C62_CookeryExtension::<cookeryId>'`、`sideEffect:pushExtraDataValue` 记录该 cookery id。`effect.onStartHarvest` 重置 `cardStates.C62.extraData.usedCookeryIds = []`。Listener 每次 collect 时 filter 已 used 的 cookery → 一旦某 cookery 的衍生 trade 被消费，该 cookery 在本次 harvest 内剩余衍生项全部消失（per-cookery shared flag，对应 BGA `flag = $cookery->id`）。
   - **2 处通用扩展**：
@@ -301,7 +311,7 @@
 | **B130 / B150 / B152** | ✅ Sprint 5 mech-A — 三张卡都改用 jumpLeaf + place-farmer.viaCardJump（B130: grain-utilization ↔ fencing；B150: farm-expansion ↔ major-improvement；B152: day-laborer → lessons-4 / lessons / traveling-players XOR），farmer 物理移动 + 第二格走完整 ActionNode 路径含 ReplaceHook / computeCosts / isDoable | P1 |
 | **B138 ForestGuardian** | 用 `gain-trigger-player` 可能没真扣对手食物（须确认） | P1 |
 | **B155 ArtTeacher** | 抽 TP food 仅在 lessons 入口，遗漏其他 occupation play 路径 | P1 | ✅ **Sprint 5c** done (computeCosts listener on play-occupation injecting trade with sideEffect.drainSpace; covers all occupation entries) |
-| **C23** | 触发条件偏差 | P1 |
+| **C23 JobContract** | 触发条件偏差 | P1 | ✅ **Sprint 5b** done (drop `occupationHand.length === 0` guard); confirmed by Sprint 5d audit |
 | **C51 FishingNet** | 没真正从 trigger player 扣 food | P1 |
 | **D18 SteamPlow** | 多了 sow 节点，BGA 仅 plow（`shared/cards/D/D18_SteamPlow.ts:30-37` vs `Cards/Actions/ActionFarmland.php:15-17`）— ✅ Sprint 5 PR-5 (drop sow leaf; seq now pay + plow only) | P1 |
 | **D117 WoodExpert** | ✅ Sprint 5 mech-B — computeCosts 改返回 `trades:[{from:{food:1}, to:{wood:2}, max:1}]`，pay 主路径自然枚举 use-trade / no-trade 两条 PaymentSolution，玩家弹 selectPayment choice 选；后续修复（pay-helpers `e529b103`）让 ComplexCost 输入也跑 listener，trade 现已覆盖 B43 等 altCosts 形态 minor | P1 |
@@ -329,15 +339,15 @@ The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 
 - ~~**B130 / B150 / B152** — `useActionSpace(other)` semantic — wider mechanism~~ — ✅ **Sprint 5 mech-A** done (jumpLeaf helper + place-farmer.viaCardJump; second-space dispatch runs full ActionNode path)
 - ~~**B138 ForestGuardian** — verify `gain-trigger-player` actually deducts opponent food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - ~~**B155 ArtTeacher** — extend listener from lessons-only to all occupation play paths~~ — ✅ **Sprint 5c** done (computeCosts listener on play-occupation + Trade.sideEffect.drainSpace; covers any occupation cost entry)
-- **C23** — triggering condition deviation (need re-read of BGA file to identify)
+- ~~**C23 JobContract** — triggering condition deviation (need re-read of BGA file to identify)~~ — ✅ **Sprint 5b** done (drop `occupationHand.length === 0` guard — empty-hand players let lessons-listener cards fire correctly), confirmed by Sprint 5d audit
 - ~~**C51 FishingNet** — actually deduct trigger-player food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - ~~**D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade~~ — ✅ **Sprint 5 mech-B** done (computeCosts returns `trades` instead of forced cost patch; pay main path enumerates use-trade / no-trade solutions, player picks via standard selectPayment prompt); altCosts-form minors (B43 etc.) covered after pay-helpers `e529b103` (ComplexCost input now runs `computeCosts` listeners, trades/bonuses appended into ComplexCost arrays).
 - ~~**E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work~~ — ✅ **Sprint 5 mech-C** done (exchange action rename + `actionContext.tradeIds` filter; E53 single after-listener with breeding-phase guard + per-action-once via actionToken; E85 auto-couples)
-- **B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read
-- **A1 Shelter, A22 Telegram, A38 WoolBlankets, ~~A165 PigBreeder~~ ✅ Sprint 5c** wide-scan items — A1/A22/A38 partially fixed in Sprint 2 PR-2A; A165 fully aligned via onAfterRoundEnd + breedLeaf in Sprint 5c
-- **E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"
+- ~~**B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read~~ — **Sprint 5d audit** re-validated 17-B-deck superset (absorbing original 11): 13 ✅ / 3 🟡 / 1 ⚠ P1 (**B163 Pastor** → Sprint 5e backlog) + B103/B26 ⚠ P2 to §2.4. Original 11 names lost with `audit-agent-b7.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
+- ~~**A1 Shelter** ✅ Sprint 5b~~ (stables `actionContext.zoneFilter='pasture-1' + max:1`, confirmed by Sprint 5d audit), ~~**A22 Telegram** ✅ Sprint 5b~~ (`workersAvailable === 0` guard + reserve registration in §2.5, confirmed by Sprint 5d audit), ~~**A38 WoolBlankets** ✅ Sprint 5b~~ (prereq `Wooden House → 5 Sheep` + `countSheepOnBoard` helper, confirmed by Sprint 5d audit), ~~**A165 PigBreeder** ✅ Sprint 5c~~ — wide-scan items all closed
+- ~~**E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"~~ — **Sprint 5d audit** re-validated 21-E-deck superset (absorbing original 4): 11 ✅ / 6 🟡 / 4 ⚠ (3 P1: **E72 ArtichokeField** / **E91 PlowBuilder** / **E161 ElderBaker** → Sprint 5e backlog; 1 P2: E95 → §2.4). Original 4 names lost with `audit-agent-b10.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
 
-These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-day batch of medium-complexity items (B29 / B115) for a follow-up Sprint 5b.
+Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d audit** added 4 P1 fixes (B163/E72/E91/E161) to the queue via Sprint 5e — these are concrete, actionable, no longer aggregate. Sprint 5 deferred queue remaining size: **4 P1** (Sprint 5e), down from "15 cards / 11 wide-scan / 4 wide-scan" loose buckets.
 
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
@@ -692,6 +702,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 6c (D94 HenpeckedHusband + E155 Visionary 两张 stub 补实现) | 05-01 | +2 | 830 | 93.0% |
 | Sprint 6d (D131 + E58 + E153 三张 stub 补实现 + 3 处通用扩展: Trade.sideEffect.bonusVp / harvest skip helper / minor-improvement candidate injection) | 05-01 | +3 | 833 | 93.4% |
 | Sprint 6e (C62 CookeryExtension stub 补实现 + 2 处通用扩展: computeExchanges listener phase / pushExtraDataValue sideEffect kind) | 05-01 | +1 | 834 | 93.5% |
+| Sprint 5d (deferred audit & cleanup, 42 cards re-validated; 4 ✅-mark propagated; surfaced 4 P1 → Sprint 5e backlog) | 05-01 | 0 | 834 | 93.5% |
 
 ### 2026-04-17 Wave 1-9 明细
 
