@@ -8,6 +8,7 @@ import type {
 } from '../../game/types'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
 import {
+  canPayCost,
   canPayResources,
   executePaymentSolution,
   isComplexCost,
@@ -148,6 +149,15 @@ export const payAction: ActionDefinition = {
       if (isComplexCost(p.cost)) return p.cost.fee ?? {}
       return p.cost
     },
+    // ComplexCost may be affordable only via bonus/trade variants. The default
+    // `canPayResources(getBaseCost())` check would erroneously fail because it
+    // ignores those alternatives. Explicitly route ComplexCost through
+    // `canPayCost` so multi-solution payments stay doable inside seq nodes.
+    canExecute: ({ player, params }) => {
+      const p = normalizePayParams(params)
+      if (!p?.cost) return false
+      return canPayCost(player, p.cost, p.costType)
+    },
   },
   execute: ({ player, params, sourceCard, state }) => {
     const p = normalizePayParams(params)
@@ -189,5 +199,41 @@ export const payAction: ActionDefinition = {
       }
     }
     return { type: 'ok', resourcesPaid: flat }
+  },
+  // Multi-solution payments emit a `prompt.selectPayment` choice from
+  // `execute`; when the player picks a solution the engine routes the value
+  // here so we can re-run the cost selection with `paymentChoice` set, this
+  // time landing on the `selected` branch and actually mutating resources.
+  // Without this hook the engine's fallthrough would return `{type:'ok'}`
+  // without paying, leaving downstream `seq` leaves (e.g. apply-improvement)
+  // running on un-paid state.
+  resolveChoice: ({ player, params, sourceCard, state }, choice) => {
+    const p = normalizePayParams(params)
+    if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
+    if (!isComplexCost(p.cost)) {
+      // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
+      // and returned `ok`). Treat any stray invocation as a no-op success.
+      return { type: 'ok' }
+    }
+    const optionPrefix = p.optionPrefix ?? 'pay:generic'
+    const selection = resolveCostPaymentSelection(
+      player,
+      p.cost,
+      optionPrefix,
+      choice,
+      { type: 'fail', logKey: 'log.payFail' },
+      { costType: p.costType, includeReturnedCard: p.includeReturnedCard },
+    )
+    if (selection.type !== 'selected') {
+      return selection
+    }
+    return buildSelectedResult(
+      selection.solution,
+      sourceCard,
+      p.costType,
+      player,
+      state,
+      p.includeReturnedCard,
+    )
   },
 }
