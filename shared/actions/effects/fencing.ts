@@ -18,7 +18,7 @@ export const getTotalPastureCells = (player: PlayerState) =>
   player.pastures.reduce((sum, pasture) => sum + pasture.size, 0)
 
 export const canStartFencing = (
-  state: GameState,
+  _state: GameState,
   player: PlayerState,
   costOverride?: Partial<Resource>,
 ) => {

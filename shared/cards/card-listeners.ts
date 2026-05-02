@@ -314,7 +314,6 @@ export const collectComputeExchanges = (
 
 const makeDummySpace = (actionId: string): ActionSpace => ({
   id: `${actionId}-cost-preview`,
-  type: actionId as ActionSpace['type'],
   position: 0,
   players: [],
   available: true,
