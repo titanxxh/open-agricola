@@ -47,19 +47,15 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-05-03 Sprint 7b1 (in progress) — pay-as-effect + 8 after-pay 卡迁移**：
-  - 新 `pay` ActionDefinition 取代 `pay-resources`（improvement flow `seq:[pay, apply-improvement]`，pay 失败 idempotent）
-  - `PaymentSolution.bonusChoiceIndex` 字段（generic per-card chosen index）
-  - `_activeActionBonusSources` 字段保留（兼容 PR-3/4 callsite），新加 `extraData.bonusUsed` 透传契约文档（Task 2.4 plan 偏差：未删字段）
-  - **E123 升级**：从 top-1 简化到 BGA full use-top-k（emit N+1 BonusChoice，cost = 资源类数 N）；§2.5 E123 simplification 行下线
-  - E54 / E122 / E128 listener 迁 `actions:['pay']`（after-pay phase）
-  - **PR-4 (2026-05-02 sprint-7b1-pr4 worktree)**：
-    - **B18 GrasslandHarrow** — onBuy 改 no-op，新 `actions:['pay']` after listener gate `sourceCard==CARD_ID`，从 supply 后 paid 状态算 reserve（wood+clay+stone+reed），queue future-meeple 至 `current+reserve`，clamp 14。BGA `onPlayerAfterPay` 一致语义（旧 onBuy 路径在 apply-improvement 调 activateCard 时 player.resources 已扣，行为等价）。`writeCardExtraData(targetRound)` 由 listener 写，onRoundStart 仍读它发 optional plow seq。
-    - **C148 MudWallower** — 第 4 个 listener `actions:['pay']` after，`result.resourcesPaid.boar > 0` 时调 `syncHeldDownward`。覆盖 BeggingCard pay / cooking pay / 任意 boar-pay 路径。永不上调 cap（与现有 exchange/place-farmer listener 同语义）。
-    - **D74 RoyalWood** — 由 PR-2 (commit `5392b5d7`) 通过 `actions:['pay']` listener 已迁完，PR-4 跳过。
-    - **Tasks 4.1-4.5 farm-choice engine 化 (room/fence/stable/plow ChoiceNode + apply-*-build leaf + farmPayment 字段废弃) deferred to 7b1c sprint**：实施时识别到主路径破坏 ≥ 30 处（45 文件 grep 命中 `commitFarmChoice|farmPayment`），且单类改动评估 4h × 4 + ad-hoc pending 通道废弃 + 前端 PaymentChoicePrompt 统一 `pay:room/fence/stable/plow` prefix 远超 1 day 预算。`actionContext.farmPayment` 暂保留。Plan §6 Risks 1 「ComplexCost UI 双轨」也推后处理。
-  - **PR-4 测试**：B18 pay-listener 7 例 + C148 pay-listener 6 例；旧 B18-session 重写 4 例（onRoundStart 经由 listener 触发）；regression fast/slow/lint/build 全绿。
-- **2026-05-02 fence-cost-unification（基建 refactor）**：把 fence 折扣从 `CardEffect.computeFenceDiscount` / `computeFenceFreeAvailable` 双轨 hook 迁到统一的 `computeCosts` listener phase（actions: `['fence']`），与 construct 走同一 cost preview 模型。E16 BriarHedge / C16 FieldFences / C1 Overhaul 改为 listener 实现；`canStartFencing(state, player, costOverride?)` 成为权威入口；新增 `collectComputeCostsForFarmChoice` helper 服务 commit/apply 路径；`fenceAction.costPreview` 替换 entry-guard 散点判定。`CardEffect` 删除两个 fence 相关 hook 字段，`collectFenceDiscount` 聚合器删除。详见 ENGINE_ARCHITECTURE.md §15.7。
+- **2026-05-02 Sprint 7b2 F2 — C-deck 6 卡 fix**：
+  - **C140 PackagingArtist**：把 `before` 监听 minor-improvement 的"另加一个 bake-bread leaf" 改为 `computeReplace` + `decline + alternativeFlow: bake-bread`（BGA-aligned 替换语义，参考 B103 / E24）；新增 `isDoable` listener 让 minor-improvement 在玩家无 minor 卡时仍 doable（BGA `onPlayerIsDoable` 等价）。BGA `onPlayerComputeArgsPlaceFarmer` 把 ActionMajorImprovement 加进 minor 池一项不实现，登记 §2.5。
+  - **C27 Blueprint**：保留原 `computeCosts stone:-1` 折扣（trade-clone 简化登记 §2.5），新增 `computeChoiceCandidates` listener（参考 D131）注入 Joinery / Pottery / Basket 到 minor-improvement 选项列表，覆盖"minor-improvement action 上建 major"路径。
+  - **C52 HuntsmansHat**：把 `phase: 'immediatelyAfter', actions:['collect']` + `space.id === 'pig-market'` 限制改为 generic `phase: 'after', actions: ['gain', 'collect', 'receive']` + `resourcesGained.boar > 0` 检查（参考 E53 BoarSpear）。AnimalMarket flow 改造（sheep+food xor boar+food xor pay-food→cattle）不实现——我们没 AnimalMarket 行动格——登记 §2.5。
+  - **C63 CraftBrewery**：把 imperative `fieldDecrementTop` 改为 `special-effect` leaf (`kind: 'remove-field-crop', crop: 'grain', minRemaining: 1`)，让 field decrement 走 engine 路由（保留 undo / replay）。多 grain field 玩家选 field 简化登记 §2.5。
+  - **C80 RockyTerrain**：保留 plow listener；新增 `improvement-any` / `occupation` placeholder listeners 镜像 BGA hook 表面，但因我方卡模型无 `isField` 标记，placeholder 永远 noop——登记 §2.5。
+  - **C94 StableCleaner**：复用现有 `actionContext.costOverride` 扩展点（`buildStableFarmInteraction` / `commitFarmChoice` 已通过 `applyCostOverride` 读取），传 `{ wood: -1, food: 1 }` 把 base `{ wood: 2 }` 翻成 `{ wood: 1, food: 1 }` per stable；anytime gate 加 1-food 资源守卫。**未改 stables.ts 主路径**——卡内闭环。
+  - **测试**：6 张卡各 1 commit + session test；fast 1963 全绿 / slow 1569 全绿 / lint 0 errors / build 全绿。
+
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
     - `pairedSpaceIdFor(state, baseId)` helper（`shared/cards/helpers/space-pairing.ts`）—— 4p 行动格变体解析，给 F9 5 卡用
@@ -460,7 +456,7 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（13 张 + 2026-05-02 Sprint 7 27 张 simplifications + 2026-05-02 Sprint 7a-c1c16 2 项 = 42 张）
+### 2.5 🔀 刻意偏离 BGA（13 张 + 2026-05-02 Sprint 7 27 张 simplifications + 2026-05-02 Sprint 7a-c1c16 2 项 + 2026-05-02 Sprint 7b2 F2 5 项 = 47 张）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -485,6 +481,11 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 | E72 ArtichokeField Reap-event vs phase callback（2026-05-02 Sprint 5e demote） | BGA `isListeningTo` Reap event with `harvested >= 1` guard，`onPlayerAfterReap` 返回 `gainNode([FOOD => 1])`；one Reap event per harvest field phase per field | `effect.onHarvestFieldPhase` 在 `+1 crop` 之后直接 `+1 food`，跳过 Reap event 派发 | structural-but-equivalent：3 例 verification test（3-grain → 3 grain + 3 food / 2-veg → 2 veg + 2 food / 空 field → 0 food）证明每 harvest 食物输出与 BGA 完全等价；`harvested >= 1` 守卫由"crop.remaining > 0 才执行"等价覆盖；total 食物 / 跨 harvest 数 / 空 field 行为全部数学等同 | route +1 food through Reap dispatch path（与 B132 EstateMaster 共用）— 实现复杂度高、行为零差，不值得 |
 | C1 Overhaul `min: n` 不强制（2026-05-02 Sprint 7a-c1c16） | BGA `FENCING args { min: n }` 强制玩家至少重建 n 段 fence | 我们的 onBuy SEQ 是 `optional: true`，玩家可选不重建（甚至 0 段）；fence 最小段数仍由 `validateFenceSelection` 兜底（≥4 才能围出 pasture，否则 `NO_NEW_FENCES` 拒绝） | BGA 的"min: n"是补偿玩家被 raze 的 fence 数；省略后 worst case 是玩家"白买卡 / 白付 1 wood"，与玩家利益不冲突。fencing leaf 的 optional accept/decline + farmSelect cancel 已经覆盖了"完全跳过"路径 | 给 fencing leaf 加 `params.min` 字段，commitFarmChoice fence 分支拒绝 `newFenceEdges.length < min` —— 通用扩展但仅 C1 使用，YAGNI |
 | C1 Overhaul `noWoodPalisades` 不强制（2026-05-02 Sprint 7a-c1c16） | BGA `FENCING args { noWoodPalisades: true }` 在该 fencing 流程中禁用 B30 wood palisade 替换 | 我们 fencing leaf 不读 `noWoodPalisades`；如果玩家同时打了 B30 + C1，C1 触发的 fencing 仍允许 wood-palisade 替换 | C1 prereq "2 occupations"，B30 是另一张 minor，二者共存属罕见。Raze 阶段已显式只删除 type='fence' segments（保留 palisade），核心规则未破坏 | 给 fencing leaf 加 `params.allowPalisades=false` 覆盖 B30 默认，commitFarmChoice + applyFarmChoice 同步读 |
+| C140 PackagingArtist ActionMajorImprovement merger（2026-05-02 Sprint 7b2 F2） | BGA `onPlayerComputeArgsPlaceFarmer` 把 `ActionMajorImprovement` 加入 minor pool（让 major-improvement 行动格也能被 C140 替换为 bake-bread）| 我们只在 minor-improvement action 上替换为 bake-bread；major-improvement 行动格不接入 | 需要"merge action card pool" 通用扩展点，仅 C140 一卡使用；computeReplace 已覆盖玩家显式选 minor-improvement 的主要路径 | 引入 hook 让 cards 在玩家行动选择阶段把"被替换的等价 action card"插入 minor 池，并在 dispatcher 处把 major-improvement space 触发的请求路由到 C140 的 computeReplace |
+| C27 Blueprint cost trade-clone（2026-05-02 Sprint 7b2 F2） | BGA `onPlayerComputeCardCosts` 把含 stone 的现有 trades 复制一份（stone-1，玩家可在原 cost 与折扣 cost 之间二选）| 我们直接 emit `costs: { stone: -1 }` 永久折扣，玩家没有"原 cost 路径" | trade-clone 涉及 ComplexCost.trades 双路径合并，对玩家而言折扣后 cost 严格 ≤ 原 cost，单选与二选效益等价；在交易/支付链上罕见出现"用 stone 之外的 trade 偏好原 cost"场景 | computeCosts listener 改为返回额外 `Trade` 项（保留原 cost trade、追加折扣 trade），让 ComplexCost 真正给玩家两条路径 |
+| C52 HuntsmansHat AnimalMarket placeFarmerFlow（2026-05-02 Sprint 7b2 F2） | BGA `onPlayerComputePlaceFarmerFlow` 在 `actionCardType == 'AnimalMarket'` 时把 flow 改为 XOR(sheep+food, boar+food, pay-food→cattle)；PigMarket 时在原 flow 后追加 +pig-count food | 我们没有 AnimalMarket 行动格（仅 sheep-market / pig-market / cattle-market 分别建模）；AnimalMarket 路径无适用对象，PigMarket 路径走通用 boar-gain listener 即可 | AnimalMarket 是 BGA 多人变体专属行动格，我方未实现该格 | 实现 AnimalMarket 行动格 + 注册 placeFarmerFlow hook 把 C52 接入 |
+| C63 CraftBrewery 多 grain field 玩家选（2026-05-02 Sprint 7b2 F2） | BGA `onPlayerHarvestFeedingPhase` 在多 grain field 时用 SE eatFieldGrain prompt 玩家选择 field | 我们用 `remove-field-crop` SE 自动选第一个含 grain 的 field，玩家不参与选择 | 实现 field-picker 需新 SE kind（`eat-field-grain`）+ harvest 阶段 pending choice 渲染 + UI 选择控件；多 field 场景只影响"先空哪片 field"的 cosmetic 选择，不影响 food/score 数 | 加 `eat-field-grain` SE kind（含 sources / fieldType 校验）+ pending choice + 前端 field 选择 UI |
+| C80 RockyTerrain field-card 触发（2026-05-02 Sprint 7b2 F2） | BGA `onPlayerAfterImprovement` / `onPlayerAfterOccupation` 在 played card `isField()` 时触发 +1 stone / -1 food | 我们卡模型无 `isField` 字段标记；新加的 improvement / occupation listener 是 placeholder，永不触发 | 我方暂未把任何卡标 `isField`（如 E70 CropRotationField / B131 等"play this card as a field" 卡）；为单卡接入需要先做 isField 标注 + sow-on-card / harvest-on-card 集成（独立基建） | 在 `shared/cards/types.ts` 加 `isField?: boolean`，把对应卡（CropRotationField 等）打标，再让 C80 listeners 检查 played card 的 isField 决定是否触发 |
 
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 
