@@ -15,7 +15,7 @@ function gainLeaf(cardId, resources) {
 }
 
 function payLeaf(opts) {
-  return { type: 'leaf', actionId: 'pay-resources', params: opts.cost, sourceCard: opts.cardId };
+  return { type: 'leaf', actionId: 'pay', params: opts.cost, sourceCard: opts.cardId };
 }
 
 // --- spaceHasPlayer — read-only predicate ---

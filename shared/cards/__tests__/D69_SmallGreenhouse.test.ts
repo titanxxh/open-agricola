@@ -81,7 +81,7 @@ describe('D69_SmallGreenhouse', () => {
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
-    const payLeaf = seq.children.find((c: ActionFlow) => c.actionId === 'pay-resources')
+    const payLeaf = seq.children.find((c: ActionFlow) => c.actionId === 'pay')
     expect(payLeaf).toBeDefined()
     expect(payLeaf.params).toEqual({ food: 1 })
     const gainLeaf = seq.children.find((c: ActionFlow) => c.actionId === 'gain')

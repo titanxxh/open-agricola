@@ -68,7 +68,7 @@ describe('C80_RockyTerrain', () => {
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ food: 1 })
     expect(children[1].actionId).toBe('gain')
     expect(children[1].params).toEqual({ stone: 1 })

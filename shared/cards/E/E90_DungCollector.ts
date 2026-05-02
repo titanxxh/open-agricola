@@ -28,7 +28,7 @@ export const E90_DungCollector_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { food: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
       ],
     }

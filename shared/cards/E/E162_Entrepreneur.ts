@@ -46,7 +46,7 @@ export const E162_Entrepreneur_impl = {
         choiceLabelKey: 'ui.interactionResourceExchange',
         choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { [gainResource]: 1 } },
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { food: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: 'food' } },
           gainLeaf(CARD_ID, { [gainResource]: 1 }),
         ],

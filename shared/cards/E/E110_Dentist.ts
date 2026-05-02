@@ -26,7 +26,7 @@ export const E110_Dentist_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { wood: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'push-to-card-stack', params: { item: 'wood' }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-infobox', text: `${getCardStack(player, CARD_ID).length + 1} Wood` } },
       ],

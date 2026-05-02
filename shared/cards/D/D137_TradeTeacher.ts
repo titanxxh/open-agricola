@@ -55,7 +55,7 @@ const makeComboOption = (goods: GoodKey[]): ActionFlow => {
     children: [
       {
         type: 'leaf',
-        actionId: 'pay-resources',
+        actionId: 'pay',
         sourceCard: CARD_ID,
         params: { food: totalCost },
       },

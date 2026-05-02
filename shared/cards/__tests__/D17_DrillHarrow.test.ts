@@ -74,7 +74,7 @@ describe('D17_DrillHarrow', () => {
       expect(flow.optional).toBe(true)
       expect(flow.children).toHaveLength(2)
       // First child: pay 3 food
-      expect(flow.children[0].actionId).toBe('pay-resources')
+      expect(flow.children[0].actionId).toBe('pay')
       expect(flow.children[0].params).toEqual({ food: 3 })
       expect(flow.children[0].sourceCard).toBe(CARD_ID)
       // Second child: plow

@@ -122,7 +122,7 @@ export const payLeaf = ({
   effectPreview?: ChoiceEffectPreview
 }): ActionFlow => ({
   type: 'leaf',
-  actionId: 'pay-resources',
+  actionId: 'pay',
   params: cost,
   sourceCard: cardId,
   choiceLabelKey,

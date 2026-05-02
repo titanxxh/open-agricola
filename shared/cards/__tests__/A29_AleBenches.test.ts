@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionSpace, GameState, PlayerState } from '../../game/types'
 import { readCardResourceStats } from '../helpers/card-state'
-import { payResourcesAction } from '../../actions/effects/pay-resources'
+import { payAction as payResourcesAction } from '../../actions/effects/pay'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { gainAction } from '../../actions/effects/gain'
 

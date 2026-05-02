@@ -24,7 +24,7 @@ export const C55_Studio_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { wood: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -33,7 +33,7 @@ export const C55_Studio_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { clay: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -42,7 +42,7 @@ export const C55_Studio_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { stone: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { stone: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',

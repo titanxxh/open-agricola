@@ -456,7 +456,7 @@ export const zh = {
     sow: { name: '播种', description: '在空田播种作物' },
     'bake-bread': { name: '烤面包', description: '使用改良烤面包' },
     'anytime-reorg': { name: '重整动物', description: '随时调整动物摆放' },
-    'pay-resources': { name: '支付资源', description: '从自己供给区支付资源' },
+    'pay': { name: '支付资源', description: '从自己供给区支付资源' },
     'return-to-space': { name: '放回资源', description: '将自己供给区中的资源放回当前行动格' },
     'bonus-vp': { name: '获得加分', description: '为来源卡牌获得 1 点额外分数' },
     breed: { name: '繁殖', description: '繁殖动物（收获 + 繁殖类卡共用的内部行动）' },

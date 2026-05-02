@@ -28,14 +28,14 @@ export const D107_Bellfounder_impl = {
         {
           type: 'seq',
           children: [
-            { type: 'leaf', actionId: 'pay-resources', params: { clay: allClay }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'pay', params: { clay: allClay }, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
           ],
         },
         {
           type: 'seq',
           children: [
-            { type: 'leaf', actionId: 'pay-resources', params: { clay: allClay }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'pay', params: { clay: allClay }, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },
           ],
         },

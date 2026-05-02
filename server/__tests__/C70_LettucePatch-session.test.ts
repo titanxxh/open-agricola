@@ -153,7 +153,7 @@ describe('C70_LettucePatch session', () => {
       expect(children).toHaveLength(2)
       // First child: pay 1 vegetable
       expect(children[0].type).toBe('leaf')
-      expect(children[0].actionId).toBe('pay-resources')
+      expect(children[0].actionId).toBe('pay')
       expect(children[0].params).toEqual({ vegetable: 1 })
       // Second child: gain 4 food
       expect(children[1].type).toBe('leaf')

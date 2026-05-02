@@ -179,7 +179,7 @@ describe('D93_SheepInspector listener', () => {
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(3)
     expect(flow.children[0]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
-    expect(flow.children[1].actionId).toBe('pay-resources')
+    expect(flow.children[1].actionId).toBe('pay')
     expect(flow.children[1].params).toEqual({ sheep: 1, food: 2 })
     expect(flow.children[2].actionId).toBe('recall-placed-worker')
     expect(flow.children[2].params.excludeSpaceId).toBe('farmland')
