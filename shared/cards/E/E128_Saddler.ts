@@ -6,14 +6,15 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E128_Saddler'
 
+// 7b1 migration: listens on `actions: ['pay']` with costType=major-improvement.
 const listener: CardListenerRegistration = {
-  id: 'E128-saddler-after-improvement',
+  id: 'E128-saddler-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['pay'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const choice = context.choice
-    if (!choice || !choice.startsWith('major:')) return
+    const ctx = context as unknown as { costType?: string }
+    if (ctx.costType !== 'major-improvement') return
     return {
       ...payThenActionFlow({
         cardId: CARD_ID,
