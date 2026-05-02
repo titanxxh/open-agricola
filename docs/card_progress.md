@@ -20,7 +20,7 @@
 | E | 169 | 162 | 0 | 0 | 0 |
 | **总计** | **892** | **834** | **5** | **0** | **0** |
 
-**截至 2026-05-01 Sprint 6e：834/892 = 93.5%。**（Sprint 6e 新增 1 张：C62 CookeryExtension（computeExchanges listener phase 注入 doubled-food harvest trades + per-cookery flag via pushExtraDataValue sideEffect kind）。Sprint 6d 新增 3 张：D131 / E58 / E153。Sprint 6c 新增 2 张：D94 / E155。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139。）
+**截至 2026-05-02 Sprint 7a：834/892 = 93.5%。**（Sprint 7a 是 Sprint 7 audit P0/P1 follow-up 的修复 sprint，不是新实现，修 ~50 ⚠/❌ 卡 → ✅/§2.5；详见 §2.0 / §8。Sprint 6e 新增 1 张：C62 CookeryExtension。Sprint 6d 新增 3 张：D131 / E58 / E153。Sprint 6c 新增 2 张：D94 / E155。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139。）
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -47,7 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-05-03 Sprint 7a (in progress) — §2.2 audit followup, Phase A 完成**：
+- **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
     - `pairedSpaceIdFor(state, baseId)` helper（`shared/cards/helpers/space-pairing.ts`）—— 4p 行动格变体解析，给 F9 5 卡用
     - `take-from-space` ActionFlow leaf（`shared/actions/effects/internal/`）—— 从 action space 扣资源 + 加 player supply（A82/E5/C156 用）
@@ -70,7 +70,7 @@
     - **C148 MudWallower**：add 2 `after` listeners (exchange / place-farmer with order=10) calling `syncHeldDownward(player)` — `held = min(held, player.resources.boar)`, only downward. Mirrors BGA `decreaseRoom` / `decreaseRoomAll` permanence: cap never grows back even after breeding raises pig count. Reorganize-only path (no place-farmer / exchange) deferred to 7b — no clean hookable phase yet (would require dispatcher change in `confirmAnimalReorg`).
     - **E123 ResourceHoarder**：fix over-pop bug — previously after-pay popped unconditionally on every construct/improvement/renovate, draining the stack even when the cost did not include the top resource. Switch computeCosts listener from flat `costs` override to optional `Bonus[]` with `sources: [CARD_ID]`. After-pay listener now gates pop on `_activeActionBonusSources` containing CARD_ID — the canonical "this card's bonus actually fired" signal. Deliberate divergence from BGA: BGA emits N choices (use top 0..N items); we emit only single "use top 1" option (deferred to 7b — see §2.5).
   - **测试**：fast 1970 全绿 / slow 该批次 +30+ 例 / lint 0 errors / build 全绿
-  - Sprint 7a 收尾合并完成（4 family + C1+C16 撤回 deferred 已合并 sprint-7a-phase-1）。E123 多选 + C148 reorg sync 推 7b。
+  - **PR #51 rebase merged 2026-05-02 11:20:49Z**（merge SHA `6317cd89`）。5 family batch + C1+C16 + F11 3 张共 ~50 卡 + 4 处通用扩展全部合入 main。E123 多选 push/pop + C148 reorg-only path 推 7b。C6 / C146 仍 deferred 7b。
   - spec / plan：`docs/superpowers/specs/2026-05-03-sprint-7a-design.md` / `docs/superpowers/plans/2026-05-03-sprint-7a.md`
 
 - **2026-05-02 Sprint 7 — §2.2 simplification re-validation audit（131 张 deep-audited, audit-only）**：
@@ -795,6 +795,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5d (deferred audit & cleanup, 42 cards re-validated; 4 ✅-mark propagated; surfaced 4 P1 → Sprint 5e backlog) | 05-01 | 0 | 834 | 93.5% |
 | Sprint 5e (Sprint 5d audit P1 follow-up — 4 ⚠ closed: B163 effect.onBuy / E161 computeChoiceCandidates / E91 trade-applied gate + dispatchTradeAppliedListener / E72 verified equivalent → §2.5 demote) | 05-02 | 0 | 834 | 93.5% |
 | Sprint 7 (§2.2 simplification audit, 131 cards re-validated; 29 → §2.0 / 27 → §2.5 / 50 ⚠ + 11 ❌ → Sprint 7a backlog / 14 名单 typo) | 05-02 | 0 | 834 | 93.5% |
+| Sprint 7a (§2.2 audit P0/P1 follow-up — 5 family batches + C1+C16 reclaimed + F11 3 cards + verify-only sweeps; ~50 ⚠/❌ → ✅/§2.5; 4 hooks/helpers: pairedSpaceIdFor / take-from-space leaf / onBeforePlayerTurn hook / getInvalidAnimals hook + remove-field-crop SE + place-farmer fromSupply pattern; PR #51 merged 6317cd89; E123 多选 + C148 reorg sync 推 7b; C6 / C146 仍 deferred 7b) | 05-02 | 0 | 834 | 93.5% |
 
 ### 2026-04-17 Wave 1-9 明细
 
