@@ -60,7 +60,7 @@ export type CardEffectField = CardEffectHook
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
-  | 'computeLockedFarmTiles' | 'computeFenceDiscount' | 'computeFenceFreeAvailable'
+  | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
 
 export const cardEffectHooks: CardEffectField[] = [
@@ -99,8 +99,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'onComputeSowableFields',
   'onSowExtraField',
   'computeLockedFarmTiles',
-  'computeFenceDiscount',
-  'computeFenceFreeAvailable',
   'getInvalidAnimals',
 ]
 
@@ -212,19 +210,6 @@ export type CardEffect = {
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
-  /** Extra free fence segments granted by a card (e.g. E16 BriarHedge for border edges). */
-  computeFenceDiscount?: (
-    state: GameState,
-    player: PlayerState,
-    context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
-  ) => number
-  /**
-   * Maximum number of free fence segments this card can currently provide
-   * (e.g. E16 returns the count of unused border edges). Used by the
-   * `canStartFencing` entry-guard to compute total buildable fences,
-   * mirroring BGA `getMaxBuildableFences`.
-   */
-  computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
   /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
@@ -430,33 +415,6 @@ export const computeExtraSowableFields = (player: PlayerState): ExtraSowableFiel
     }
   }
   return extras
-}
-
-export const collectFenceDiscount = (
-  state: GameState,
-  player: PlayerState,
-  context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
-): number => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  let total = 0
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    if (!effect?.computeFenceDiscount) continue
-    try {
-      total += effect.computeFenceDiscount(state, player, context)
-    } catch (err) {
-      if (isCustomCard(cardId)) {
-        console.warn(`[card-effects] custom card ${cardId} computeFenceDiscount threw, skipping:`, err)
-        continue
-      }
-      throw err
-    }
-  }
-  return Math.max(0, total)
 }
 
 /**
