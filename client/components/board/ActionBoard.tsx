@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
+import { RESERVED_ACTION_SPACES_KEY } from '../../../shared/cards/helpers/card-state'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
 
@@ -451,20 +452,29 @@ export const ActionBoard = ({
     )
   }
 
-  const lazyboneStablesBySpace = useMemo(() => {
+  /**
+   * Map action-space id → owner player for any card that has reserved that
+   * space (currently only E148_Lazybones, but the renderer scans the generic
+   * `reservedActionSpaces` cardState key so additional cards with the same
+   * mechanic require no change here).
+   */
+  const reservedStablesBySpace = useMemo(() => {
     const map = new Map<string, PlayerState>()
     for (const player of players) {
-      const spaces = (player.cardStates?.['E148_Lazybones']?.extraData as { spaces?: string[] } | undefined)?.spaces
-      if (!spaces) continue
-      for (const spaceId of spaces) {
-        map.set(spaceId, player)
+      const cardStates = player.cardStates ?? {}
+      for (const cardState of Object.values(cardStates)) {
+        const spaces = cardState?.extraData?.[RESERVED_ACTION_SPACES_KEY]
+        if (!Array.isArray(spaces)) continue
+        for (const spaceId of spaces) {
+          if (typeof spaceId === 'string') map.set(spaceId, player)
+        }
       }
     }
     return map
   }, [players])
 
   const renderStableMarker = (space: ActionSpace) => {
-    const owner = lazyboneStablesBySpace.get(space.id)
+    const owner = reservedStablesBySpace.get(space.id)
     if (!owner) return null
     return (
       <div className="lazybones-stable-marker" data-player-color={owner.color} title={`${owner.name}: Lazybones`}>

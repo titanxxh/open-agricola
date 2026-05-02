@@ -37,7 +37,7 @@ describe('E148_Lazybones session', () => {
     const owner = state.players[0]!
 
     expect(owner.occupationPlayed).toContain('E148_Lazybones')
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).toBeDefined()
     expect(spaces).toEqual(['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'])
     // Owner started with 0 stables on farm — 4 are now on action spaces
@@ -57,7 +57,7 @@ describe('E148_Lazybones session', () => {
 
     const updatedState = session.getState().state
     const updatedOwner = updatedState.players[0]!
-    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).toBeDefined()
     expect(spaces.length).toBe(2)
     // Only the first 2 target spaces should have stables
@@ -80,7 +80,7 @@ describe('E148_Lazybones session', () => {
 
     const updatedState = session.getState().state
     const updatedOwner = updatedState.players[0]!
-    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     // No stables available to place
     expect(spaces ?? []).toEqual([])
   })
@@ -96,7 +96,7 @@ describe('E148_Lazybones session', () => {
     expect(owner.stableTiles.length).toBe(1)
 
     // grain-seeds should be removed from the spaces list
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('grain-seeds')
     expect(spaces.length).toBe(3)
   })
@@ -110,7 +110,7 @@ describe('E148_Lazybones session', () => {
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(1)
 
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('day-laborer')
     expect(spaces.length).toBe(3)
   })
@@ -124,7 +124,7 @@ describe('E148_Lazybones session', () => {
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(1)
 
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('day-laborer')
     expect(spaces.length).toBe(3)
   })
@@ -139,7 +139,7 @@ describe('E148_Lazybones session', () => {
     // No stable should have been built
     expect(owner.stableTiles.length).toBe(0)
     // All 4 spaces should still be marked
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces.length).toBe(4)
   })
 
@@ -185,7 +185,7 @@ describe('E148_Lazybones session', () => {
     // Owner using the space should NOT trigger (scope: opponent)
     expect(owner.stableTiles.length).toBe(0)
     // Stable should still be on the space
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.spaces as string[]
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).toContain('grain-seeds')
   })
 })
