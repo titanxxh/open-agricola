@@ -296,7 +296,7 @@ type Props = {
   hasActionStartSnapshot: boolean
   anytimeActions: AnytimeAction[]
   takeAnytimeAction: (actionId: string) => void
-  hasWoodPalisadesCard?: boolean
+  canBuildPalisades?: boolean
   fencePlacementMode?: 'fence' | 'palisade'
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
 }
@@ -339,7 +339,7 @@ export const InteractionBar = ({
   hasActionStartSnapshot,
   anytimeActions,
   takeAnytimeAction,
-  hasWoodPalisadesCard = false,
+  canBuildPalisades = false,
   fencePlacementMode = 'fence',
   setFencePlacementMode,
 }: Props) => {
@@ -466,7 +466,7 @@ export const InteractionBar = ({
                   })}
                 </div>
               ) : null}
-              {isSelectingFences && hasWoodPalisadesCard && setFencePlacementMode ? (
+              {isSelectingFences && canBuildPalisades && setFencePlacementMode ? (
                 <div
                   className="fence-mode-toggle"
                   role="radiogroup"

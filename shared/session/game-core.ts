@@ -95,6 +95,7 @@ import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
+import { playerCanBuildPalisades } from '../cards/helpers/card-type'
 import {
   applyCostOverride,
   applyTradeSideEffect,
@@ -2810,7 +2811,7 @@ export class GameCore {
           freeFences,
           {
             skipPayment: true,
-            allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+            allowPalisades: playerCanBuildPalisades(normalized),
           },
           lockedKeys,
         )
