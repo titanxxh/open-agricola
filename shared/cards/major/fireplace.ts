@@ -1,13 +1,16 @@
-import type { MajorCardEffect } from './types'
+import type { MajorCardData } from './types'
 
-export const fireplace1: MajorCardEffect = {
+export const fireplace1: MajorCardData = {
   id: 'Major_Fireplace1',
+  name: 'Fireplace',
+  deck: 'major',
+  number: 1,
   cost: { clay: 2 },
   vp: 1,
   extraVp: false,
   isCookery: true,
   isBaking: true,
-  description: [
+  desc: [
     '[Anytime]',
     '<VEGETABLE> <ARROW> 2<FOOD>      <PIG> <ARROW> 2<FOOD>',
     '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>',
@@ -23,9 +26,10 @@ export const fireplace1: MajorCardEffect = {
   ],
 }
 
-export const fireplace2: MajorCardEffect = {
+export const fireplace2: MajorCardData = {
   ...fireplace1,
   id: 'Major_Fireplace2',
+  number: 2,
   cost: { clay: 3 },
   exchanges: fireplace1.exchanges?.map((ex) => ({ ...ex, sourceId: 'Major_Fireplace2' })),
 }
