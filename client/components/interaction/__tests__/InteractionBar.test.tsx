@@ -462,7 +462,7 @@ describe('InteractionBar', () => {
         hasActionStartSnapshot={false}
         anytimeActions={[]}
         takeAnytimeAction={noop}
-        hasWoodPalisadesCard={false}
+        canBuildPalisades={false}
         fencePlacementMode="fence"
         setFencePlacementMode={noop}
       />,
@@ -582,7 +582,7 @@ describe('InteractionBar', () => {
         hasActionStartSnapshot={false}
         anytimeActions={[]}
         takeAnytimeAction={noop}
-        hasWoodPalisadesCard={true}
+        canBuildPalisades={true}
         fencePlacementMode="fence"
         setFencePlacementMode={noop}
       />,

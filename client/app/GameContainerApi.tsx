@@ -12,6 +12,7 @@ import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
+import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
@@ -1862,7 +1863,7 @@ export const GameContainerApi = () => {
         hasActionStartSnapshot={hasActionStartSnapshot}
         anytimeActions={interaction.anytimeActions}
         takeAnytimeAction={takeAnytimeAction}
-        hasWoodPalisadesCard={!!currentPlayer?.minorPlayed?.includes('B30_WoodPalisades')}
+        canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}
         setFencePlacementMode={setFencePlacementMode}
       />

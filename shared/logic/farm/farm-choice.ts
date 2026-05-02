@@ -13,6 +13,7 @@ import {
   resolveRoomPaymentSelection,
 } from '../../actions/helpers/room-payment.ts'
 import { stableWoodCost } from '../../actions/effects/fencing.ts'
+import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import {
   normalizePlayerFarm,
   type PlayerFarmState,
@@ -142,7 +143,7 @@ export const applyFarmChoice = <T extends PlayerState>(
         totalFreeFences,
         {
           skipPayment: true,
-          allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+          allowPalisades: playerCanBuildPalisades(normalized),
         },
         lockedKeys,
       )
