@@ -3,6 +3,8 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { isBorderEdge } from '../../game/farm'
 import { getAllEdgeIds } from '../../logic/farm/fence-validation'
 import type { CardImpl } from '../registry'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'E16_BriarHedge'
 const countAllAnimalsOfType = (player: { resources: { sheep: number; boar: number; cattle: number }; pastures: Array<{ animalType: string | null; animalCount: number }>; houseAnimalType: string | null; houseAnimalCount: number; stableAnimals?: Record<string, string | null> }) => {
@@ -47,6 +49,23 @@ const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] 
   return count
 }
 
+const E16FenceListener: CardListenerRegistration = {
+  id: 'E16-fence-discount',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    const params = ctx.params as { newFenceEdges?: string[] } | undefined
+    const newFenceEdges = params?.newFenceEdges
+    if (newFenceEdges === undefined) {
+      const available = countAvailableBorderEdges(ctx.player)
+      return { costs: { wood: available === 0 ? 0 : -available } }
+    }
+    const borderCount = newFenceEdges.filter(isBorderEdge).length
+    return { costs: { wood: borderCount === 0 ? 0 : -borderCount } }
+  },
+}
+
 export const E16_BriarHedge_impl = {
   effect: {
   id: CARD_ID,
@@ -55,5 +74,6 @@ export const E16_BriarHedge_impl = {
   },
   computeFenceFreeAvailable: (_state, player) => countAvailableBorderEdges(player),
 },
+  listeners: [E16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
