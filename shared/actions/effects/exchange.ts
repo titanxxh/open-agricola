@@ -229,6 +229,7 @@ const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
   to: ex.to,
   max: ex.max,
   sourceId: ex.sourceId ?? fallbackId,
+  sideEffect: ex.sideEffect,
 })
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {

@@ -1,4 +1,4 @@
-import type { Resource, CostModifier } from '../game/types'
+import type { Resource, CostModifier, TradeSideEffect } from '../game/types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
@@ -15,6 +15,14 @@ export type CardExchange = {
    * lives outside any visible cookery window).
    */
   triggers?: ExchangeWindow[]
+  /**
+   * Optional side-effect dispatched via `applyTradeSideEffect` after the
+   * exchange resources are applied. E153 StoneSculptor uses
+   * `{ type: 'bonusVp', amount: 1 }` to write
+   * `cardStates[sourceId].extraData.bonusVpEarned += amount * times` for
+   * later read by `computeBonusScore`.
+   */
+  sideEffect?: TradeSideEffect
 }
 
 export type CardPrerequisites = {
