@@ -33,7 +33,7 @@ describe('canStartFencing entry-guard', () => {
     expect(canStartFencing(fakeState, player)).toBe(false)
   })
 
-  it('returns true when player has E16 BriarHedge and 0 wood (border-edge fences are free)', () => {
+  it('returns true when override.wood discount allows free fences (simulates dispatcher listener output)', () => {
     const player = createPlayer({
       resources: {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -41,10 +41,10 @@ describe('canStartFencing entry-guard', () => {
       },
       minorPlayed: ['E16_BriarHedge'],
     })
-    expect(canStartFencing(fakeState, player)).toBe(true)
+    expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(true)
   })
 
-  it('returns false when fence cap is already reached even with E16', () => {
+  it('returns false when fence cap is already reached even with override discount', () => {
     const fenceSegments = Array.from({ length: maxFences - 1 }, (_, i) => ({
       edge: `H-0-${i}`, type: 'fence' as const,
     }))
@@ -56,7 +56,7 @@ describe('canStartFencing entry-guard', () => {
       minorPlayed: ['E16_BriarHedge'],
       fenceSegments,
     })
-    expect(canStartFencing(fakeState, player)).toBe(false)
+    expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(false)
   })
 
   it('returns true when player has 4+ wood and no card discount', () => {
