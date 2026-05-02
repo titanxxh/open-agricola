@@ -54,16 +54,3 @@ export const familyGrowthAction: ActionDefinition = {
     return growFamilyCore(state, player, space.id)
   },
 }
-
-// Legacy aliases — deprecated. Same definition object exposed under prior
-// `id` strings so any cached references keep working until the next sweep.
-export const wishChildrenAction: ActionDefinition = {
-  ...familyGrowthAction,
-  id: 'wish-children-growth',
-}
-export const growFamilyWithoutRoomAction: ActionDefinition = {
-  ...familyGrowthAction,
-  id: 'grow-family-without-room',
-  // Always allow (the historical urgent-wish-children semantic).
-  execute: ({ state, player, space }) => growFamilyCore(state, player, space.id),
-}

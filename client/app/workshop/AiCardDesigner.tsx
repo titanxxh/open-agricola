@@ -21,7 +21,7 @@ import {
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS,
   type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
-} from '../../services/llmService'
+} from '../../services/llm'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'

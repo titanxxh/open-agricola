@@ -5,6 +5,7 @@ import type {
   ComplexCost,
   PaymentSolution,
   Trade,
+  TradeSideEffect,
   Bonus,
   ResourceKey,
   CostModifierType,
@@ -387,13 +388,18 @@ const canCoverCost = (
 }
 
 /**
- * Evaluate a BonusModifier's `conditions` against the player. Returns true when
- * conditions are satisfied (or no conditions present). The construct path runs
- * a specialized check (`bonusAppliesToRoomCount`) that also evaluates
- * `minNumRooms` against the room count being built; for non-construct cost
- * types we evaluate the same fields against the player's existing room count.
+ * Evaluate `conditions` (player-state dimension). Returns true when conditions
+ * are satisfied (or absent). Used by:
+ *   - getModifiersForCostType (non-construct path) to pre-filter BonusModifier
+ *   - computeAllBuyableCombinations to evaluate ComplexCost.bonuses inline
+ *     conditions on Bonus / BonusChoice.
+ *
+ * The construct path does NOT call this helper: room-payment.ts's
+ * `bonusAppliesToRoomCount` evaluates `minNumRooms` against the build-time
+ * roomCount (semantically "after building N rooms"), which differs from the
+ * player-state evaluation here.
  */
-const bonusModifierConditionsApply = (
+export const evaluateConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
 ): boolean => {
@@ -424,11 +430,11 @@ export const getModifiersForCostType = (
   // conditions are evaluated here against the player's current state.
   if (costType === 'construct') return all
   return all.filter((m) =>
-    m.type !== 'bonus' || bonusModifierConditionsApply(player, m.conditions),
+    m.type !== 'bonus' || evaluateConditions(player, m.conditions),
   )
 }
 
-const applyCostModifiers = (
+export const applyCostModifiers = (
   baseCost: ComplexCost,
   modifiers: CostModifier[],
 ): ComplexCost => {
@@ -449,12 +455,16 @@ const applyCostModifiers = (
       })
     } else if (mod.type === 'bonus') {
       const bonusMod = mod as BonusModifier
+      // bonusMod has already been pre-filtered by getModifiersForCostType's
+      // evaluateConditions (non-construct path), or by room-payment per build
+      // call (construct path). Do NOT propagate the conditions field onto the
+      // generated Bonus — computeAllBuyableCombinations would otherwise
+      // re-evaluate it redundantly.
       effectiveBonuses.push({
         discount: bonusMod.discount,
         choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
-        conditions: bonusMod.conditions,
       })
     }
   }
@@ -486,10 +496,6 @@ const validateBonus = (bonus: Bonus): void => {
   if (hasChoices && (bonus.choices!.length === 0)) {
     throw new Error('Bonus.choices must be a non-empty array')
   }
-  // TODO(cost-modifier-coverage): Bonus.conditions / BonusChoice.conditions is
-  // propagated through applyBonusModifier and applyCostModifiers but not yet
-  // evaluated by computeAllBuyableCombinations. See
-  // docs/superpowers/specs/2026-04-20-cost-modifier-coverage-design.md §"out of scope".
 }
 
 export const computeAllBuyableCombinations = (
@@ -533,6 +539,12 @@ export const computeAllBuyableCombinations = (
       let bonusPaths: BonusPath[] = [{ cost: baseFee, sources: [] }]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
+        // Bonus-level conditions: if not satisfied, the entire bonus is a
+        // no-op for this player (preserve existing bonusPaths unchanged).
+        if (!evaluateConditions(player, bonus.conditions)) {
+          continue
+        }
+
         const expanded: BonusPath[] = []
         // If optional, include a "skip" path that keeps the existing costs.
         if (bonus.optional) {
@@ -540,10 +552,22 @@ export const computeAllBuyableCombinations = (
             expanded.push({ cost: path.cost, sources: [...path.sources] })
           }
         }
-        // For each existing path, try each candidate discount.
-        const candidates: { discount: Partial<Resource>; sources?: string[] }[] =
+        // BonusChoice-level conditions: filter candidates whose conditions
+        // are not satisfied. If all candidates are filtered out, the bonus
+        // is treated as inapplicable (continue without polluting bonusPaths).
+        const rawCandidates: {
+          discount: Partial<Resource>
+          sources?: string[]
+          conditions?: Record<string, number>
+        }[] =
           bonus.choices ??
           [{ discount: bonus.discount!, sources: bonus.sources }]
+        const candidates = rawCandidates.filter((c) =>
+          evaluateConditions(player, c.conditions),
+        )
+        if (candidates.length === 0) {
+          continue
+        }
         for (const path of bonusPaths) {
           for (const candidate of candidates) {
             const nextCost = applyBonus(path.cost, candidate.discount)
@@ -696,15 +720,67 @@ const buildBonusReductions = (
   return result
 }
 
+export const applyTradeSideEffect = (
+  state: GameState,
+  player: PlayerState,
+  eff: TradeSideEffect,
+  times: number,
+  sourceCard: string,
+): void => {
+  if (times <= 0) return
+  switch (eff.type) {
+    case 'drainSpace': {
+      const space = state.actionSpaces.find((s) => s.id === eff.spaceId)
+      if (!space?.resources) return
+      const cur = space.resources[eff.resource] ?? 0
+      space.resources[eff.resource] = Math.max(0, cur - times)
+      return
+    }
+    case 'bonusVp': {
+      player.cardStates ??= {}
+      player.cardStates[sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]
+      const cs = player.cardStates[sourceCard]
+      cs.extraData ??= {}
+      const cur = (cs.extraData.bonusVpEarned as number | undefined) ?? 0
+      cs.extraData.bonusVpEarned = cur + eff.amount * times
+      return
+    }
+    case 'pushExtraDataValue': {
+      player.cardStates ??= {}
+      player.cardStates[eff.sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]
+      const cs = player.cardStates[eff.sourceCard]
+      cs.extraData ??= {}
+      const existing = cs.extraData[eff.key]
+      const arr = Array.isArray(existing) ? (existing as string[]) : []
+      if (!arr.includes(eff.value)) arr.push(eff.value)
+      cs.extraData[eff.key] = arr
+      return
+    }
+  }
+}
+
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
-  options: { trackStats?: boolean; costType?: CostModifierType } = {},
+  options: { trackStats?: boolean; costType?: CostModifierType; state?: GameState } = {},
 ): string | undefined => {
   const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
   for (const key of paidKeys) {
     const amount = solution.resourcesPaid[key] ?? 0
     player.resources[key] -= amount
+  }
+  if (options.state) {
+    for (const { trade, times } of solution.tradesUsed) {
+      if (trade.sideEffect && times > 0) {
+        applyTradeSideEffect(
+          options.state,
+          player,
+          trade.sideEffect,
+          times,
+          trade.sourceId ?? trade.source ?? 'unknown',
+        )
+      }
+    }
   }
   if (solution.bonusUsed && player._activeActionBonusSources) {
     const seen = new Set(player._activeActionBonusSources)

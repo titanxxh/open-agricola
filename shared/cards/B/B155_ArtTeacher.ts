@@ -5,47 +5,26 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B155_ArtTeacher'
+const TRAVELING_PLAYERS = 'traveling-players'
 
 /**
  * B155 Art Teacher (Occupation, 4+ players).
  *
  * BGA (B155_ArtTeacher.php):
  *   - onBuy → gain 1 wood + 1 reed.
- *   - onPlayerComputeCostsOccupation → add alternative trades where 1-N food
- *     of the occupation cost can be paid as FOOD_TRAVEL (food on the
+ *   - onPlayerComputeCostsOccupation → derive alternative trades where 1..N
+ *     food of the occupation cost can be paid as FOOD_TRAVEL (food on the
  *     Traveling Players accumulation space).
  *
- * Implementation strategy (no core changes):
- *   - play-occupation after-listener triggered when this card is played →
- *     gain 1 wood + 1 reed (onBuy analogue).
- *   - lessons/lessons-4 before-listener: if the traveling-players
- *     accumulation space has food, drain up to the occupation-cost amount
- *     from the space into the player's food supply. This effectively lets
- *     the player pay the occupation cost "from Traveling Players". We drain
- *     directly on state because the BGA effect consumes the TP food; engine
- *     payments then deduct from the player's (now-boosted) food pool, which
- *     is equivalent. Note: takeAction's before-phase dispatches with
- *     actionId = spaceId, so the listener matches on 'lessons' / 'lessons-4'.
- *
- * Limitations:
- *   - We cap the drain at the occupation cost to avoid free food laundering.
- *   - We cannot reject the lessons action if TP food wouldn't cover the cost
- *     alone; the player just has to make up the remainder from their own food.
+ * Implementation:
+ *   - play-occupation after-listener (existing) triggers the wood+reed gain.
+ *   - play-occupation computeCosts listener injects a Trade
+ *     {from:{}, to:{food:1}, max:tpFood, sideEffect:drainSpace(traveling-players,
+ *     food)}. The standard payment solver enumerates 0..tpFood uses, the
+ *     player picks via selectPayment, and applyTradeSideEffect drains TP food
+ *     equal to the chosen times. Covers any occupation cost entry (lessons /
+ *     lessons-4 / anytime occupation cards) without a separate before listener.
  */
-
-const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
-
-const getLessonsFoodCost = (
-  occupationsPlayed: number,
-  spaceId: string,
-  hasPaperMaker: boolean,
-): number => {
-  const base = spaceId === 'lessons-4'
-    ? occupationsPlayed <= 1 ? 1 : 2
-    : occupationsPlayed === 0 ? 0 : 1
-  const discount = hasPaperMaker ? 1 : 0
-  return Math.max(0, base - discount)
-}
 
 const onBuyListener: CardListenerRegistration = {
   id: 'B155-art-teacher-onbuy',
@@ -58,38 +37,31 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
-const beforeLessonsListener: CardListenerRegistration = {
-  id: 'B155-art-teacher-before-lessons',
+const computeCostsListener: CardListenerRegistration = {
+  id: 'B155-art-teacher-compute-costs',
   cardIds: [CARD_ID],
-  actions: ['lessons', 'lessons-4'],
-  phases: ['before' as ActionHookPhase],
+  actions: ['play-occupation'],
+  phases: ['computeCosts' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const spaceId = context.space?.id
-    if (!spaceId || !LESSONS_SPACE_IDS.has(spaceId)) return
-
-    const travelingPlayers = context.state.actionSpaces.find(
-      (s) => s.id === 'traveling-players',
-    )
-    const tpFood = travelingPlayers?.resources?.food ?? 0
-    if (tpFood <= 0 || !travelingPlayers) return
-
-    const hasPaperMaker = context.player.occupationPlayed.includes('B109_PaperMaker')
-    const foodCost = getLessonsFoodCost(
-      context.player.occupationPlayed.length,
-      spaceId,
-      hasPaperMaker,
-    )
-    if (foodCost <= 0) return
-
-    const transferred = Math.min(tpFood, foodCost)
-    if (transferred <= 0) return
-
-    // Drain TP space, credit player with equivalent food as a gain flow so
-    // the move is logged and visible to the UI.
-    travelingPlayers.resources.food = tpFood - transferred
+    const tp = context.state.actionSpaces.find((s) => s.id === TRAVELING_PLAYERS)
+    const tpFood = tp?.resources?.food ?? 0
+    if (tpFood <= 0) return
 
     return {
-      flow: gainLeaf(CARD_ID, { food: transferred }),
+      trades: [
+        {
+          from: {},
+          to: { food: 1 },
+          max: tpFood,
+          source: 'B155',
+          sourceId: CARD_ID,
+          sideEffect: {
+            type: 'drainSpace',
+            spaceId: TRAVELING_PLAYERS,
+            resource: 'food',
+          },
+        },
+      ],
       sourceCard: CARD_ID,
     }
   },
@@ -110,6 +82,6 @@ export const B155_ArtTeacher = new Occupation({
 })
 
 export const B155_ArtTeacher_impl = {
-  listeners: [onBuyListener, beforeLessonsListener],
-  reaches: [] as readonly string[],
+  listeners: [onBuyListener, computeCostsListener],
+  reaches: [TRAVELING_PLAYERS] as readonly string[],
 } satisfies CardImpl

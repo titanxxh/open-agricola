@@ -1,11 +1,10 @@
 /**
- * @deprecated For backward compatibility during PR-1 through PR-3.
- * New code should use `shared/session/game-core.ts` directly and inject
- * `registerExecutorBackedCustomCard` via constructor options.
- *
- * This wrapper preserves the existing positional `GameSession` API for the
- * 242+ session test files, while routing custom card registration through the
- * server's isolated-vm executor path.
+ * Server-side `GameSession` — thin wrapper around the shared `GameCore` that
+ * pre-injects `registerExecutorBackedCustomCard` so custom card code runs
+ * through the isolated-vm executor. Server entrypoints (HTTP / WS handlers)
+ * and 240+ session tests instantiate this class directly with a positional
+ * `(stateOrSeed?, customCards?, initialStateOptions?)` API; pure shared-side
+ * code uses `GameCore` directly.
  */
 import type { GameState } from '../../shared/game/types.ts'
 import type { InitialStateOptions } from '../../shared/logic/state.ts'

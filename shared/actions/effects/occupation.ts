@@ -138,6 +138,7 @@ export const playOccupation = (
         player,
         cost,
         'occupation',
+        state,
       )
   if (!paySucceeded) {
     return { type: 'fail', logKey: 'log.occupationFail' }

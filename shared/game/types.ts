@@ -33,17 +33,31 @@ export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
 
+export type TradeSideEffect =
+  | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }
+  | { type: 'bonusVp'; amount: number }
+  | { type: 'pushExtraDataValue'; sourceCard: string; key: string; value: string }
+
 export type Trade = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
   source?: string
   sourceId?: string
+  sideEffect?: TradeSideEffect
 }
 
 export type BonusChoice = {
   discount: Partial<Resource>
   sources?: string[]
+  /**
+   * Player-state conditions evaluated by `computeAllBuyableCombinations`
+   * (`shared/actions/helpers/payment.ts`). Supported keys:
+   *   - `minNumRooms` — player.rooms >= N
+   *   - `houseTypeWood` / `houseTypeClay` / `houseTypeStone` — player.houseType match
+   * For roomCount-dependent gating in the construct path, prefer a
+   * `BonusModifier` — `room-payment.ts` evaluates per build call.
+   */
   conditions?: Record<string, number>
 }
 
@@ -52,6 +66,14 @@ export type Bonus = {
   choices?: BonusChoice[]
   optional?: boolean
   sources?: string[]
+  /**
+   * Player-state conditions evaluated by `computeAllBuyableCombinations`
+   * (`shared/actions/helpers/payment.ts`). Supported keys:
+   *   - `minNumRooms` — player.rooms >= N
+   *   - `houseTypeWood` / `houseTypeClay` / `houseTypeStone` — player.houseType match
+   * For roomCount-dependent gating in the construct path, prefer a
+   * `BonusModifier` — `room-payment.ts` evaluates per build call.
+   */
   conditions?: Record<string, number>
 }
 

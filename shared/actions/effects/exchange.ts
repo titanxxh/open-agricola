@@ -8,9 +8,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
-import { payResources } from '../helpers/payment'
-import { gainResources } from './gain'
-import { canAffordFlatCost } from '../helpers/pay-helpers'
+import { applyTradeSideEffect } from '../helpers/payment'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 import {
@@ -20,6 +18,7 @@ import {
   type ExchangeWindow,
 } from '../../cards/types'
 import { getMajorCardEffect } from '../../cards/major'
+import { collectComputeExchanges } from '../../cards/card-listeners'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -46,32 +45,8 @@ const mergePositiveResources = (
   return next
 }
 
-/**
- * Legacy exchange function for backward compatibility
- * Exchange resources: pay cost, gain reward (times times)
- */
-export const exchangeResources = (
-  player: PlayerState,
-  cost: Partial<Resource>,
-  gain: Partial<Resource>,
-  times = 1,
-): ActionExecutionResult => {
-  if (times <= 0) {
-    return { type: 'ok' }
-  }
-  const scaledCost = scaleResources(cost, times)
-  if (!canAffordFlatCost(player, scaledCost)) {
-    return { type: 'ok' }
-  }
-  payResources(player, scaledCost)
-  // TODO: legacy path — does not record resourcesFromCards.
-  // Active path is the BGA-aligned trade system below; new code should use that.
-  gainResources(player, scaleResources(gain, times))
-  return { type: 'ok' }
-}
-
 // ============================================
-// Enhanced Trade System (BGA-aligned)
+// Trade System (BGA-aligned)
 // ============================================
 
 /**
@@ -224,11 +199,12 @@ export const reverseTrade = (trade: Trade): Trade => ({
 // Anytime Cookery Trades (metadata-driven)
 // ============================================
 
-const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
+export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
   from: ex.from,
   to: ex.to,
   max: ex.max,
   sourceId: ex.sourceId ?? fallbackId,
+  sideEffect: ex.sideEffect,
 })
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {
@@ -250,10 +226,16 @@ const playedCardIds = (player: PlayerState): readonly string[] => [
 /**
  * Scan all played cards for exchanges visible in the given window.
  * Returns Trade-shaped entries (sourceId always populated).
+ *
+ * If `state` is provided, also runs `computeExchanges` listeners and appends
+ * any runtime-derived trades (e.g. C62 CookeryExtension's doubled-food
+ * harvest derivations). Old call sites that don't pass state continue to see
+ * only metadata-driven trades.
  */
 export const getExchangesInWindow = (
   player: PlayerState,
   window: ExchangeWindow,
+  state?: GameState,
 ): Trade[] => {
   const out: Trade[] = []
   for (const cardId of playedCardIds(player)) {
@@ -262,6 +244,9 @@ export const getExchangesInWindow = (
         out.push(exchangeToTrade(ex, cardId))
       }
     }
+  }
+  if (state) {
+    out.push(...collectComputeExchanges(state, player, window))
   }
   return out
 }
@@ -287,11 +272,11 @@ export const getExchangesByTradeIds = (
   return out
 }
 
-const getPlayerCookeryTrades = (player: PlayerState): Trade[] =>
-  getExchangesInWindow(player, 'anytime')
+const getPlayerCookeryTrades = (player: PlayerState, state?: GameState): Trade[] =>
+  getExchangesInWindow(player, 'anytime', state)
 
-const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
-  for (const trade of getExchangesInWindow(player, 'anytime')) {
+const hasAffordableCookeryTrade = (player: PlayerState, state?: GameState): boolean => {
+  for (const trade of getExchangesInWindow(player, 'anytime', state)) {
     if (canAffordTrade(player, trade, 1)) return true
   }
   return false
@@ -300,6 +285,7 @@ const hasAffordableCookeryTrade = (player: PlayerState): boolean => {
 const hasAffordableTradeForIds = (
   player: PlayerState,
   tradeIds: string[],
+  _state?: GameState,
 ): boolean => {
   for (const trade of getExchangesByTradeIds(player, tradeIds)) {
     if (canAffordTrade(player, trade, 1)) return true
@@ -341,10 +327,11 @@ const recordCookeryConversion = (
 const buildExchangeOptions = (
   player: PlayerState,
   tradeIds?: string[],
+  state?: GameState,
 ): { options: ActionChoiceOption[]; trades: Trade[] } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
-  const trades: Trade[] = getPlayerCookeryTrades(player)
+  const trades: Trade[] = getPlayerCookeryTrades(player, state)
   if (tradeIds && tradeIds.length > 0) {
     const seen = new Set<string>()
     for (const t of trades) {
@@ -384,7 +371,7 @@ const resolveExchangeChoice = (
   if (choice === 'cancel') {
     return { type: 'ok' }
   }
-  const { trades } = buildExchangeOptions(player, tradeIds)
+  const { trades } = buildExchangeOptions(player, tradeIds, state)
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
@@ -401,6 +388,15 @@ const resolveExchangeChoice = (
       if (times > 0) {
         applyTrade(player, trade, times)
         recordCookeryConversion(player, trade, times)
+        if (trade.sideEffect) {
+          applyTradeSideEffect(
+            state,
+            player,
+            trade.sideEffect,
+            times,
+            trade.sourceId ?? trade.source ?? 'unknown',
+          )
+        }
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
@@ -418,6 +414,15 @@ const resolveExchangeChoice = (
     if (times > 0) {
       applyTrade(player, trade, times)
       recordCookeryConversion(player, trade, times)
+      if (trade.sideEffect) {
+        applyTradeSideEffect(
+          state,
+          player,
+          trade.sideEffect,
+          times,
+          trade.sourceId ?? trade.source ?? 'unknown',
+        )
+      }
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     trackWorkPhaseBuildingResources(state, player.id, gained)
@@ -433,16 +438,16 @@ export const anytimeExchangeAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   anytime: true,
-  canBeExecutedByPlayer: (_, player, ctx) => {
+  canBeExecutedByPlayer: (state, player, ctx) => {
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     if (tradeIds && tradeIds.length > 0) {
-      return hasAffordableTradeForIds(player, tradeIds) || hasAffordableCookeryTrade(player)
+      return hasAffordableTradeForIds(player, tradeIds, state) || hasAffordableCookeryTrade(player, state)
     }
-    return hasAffordableCookeryTrade(player)
+    return hasAffordableCookeryTrade(player, state)
   },
-  execute: ({ player, actionContext }) => {
+  execute: ({ state, player, actionContext }) => {
     const filterIds = actionContext?.tradeIds as string[] | undefined
-    const { options: allOptions } = buildExchangeOptions(player, filterIds)
+    const { options: allOptions } = buildExchangeOptions(player, filterIds, state)
     const filtered = filterIds && filterIds.length > 0
       ? allOptions.filter((opt) => {
           if (opt.value === 'cancel') return true

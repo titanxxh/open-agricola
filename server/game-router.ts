@@ -118,7 +118,12 @@ const enforceSeatBinding = (
   return true
 }
 
-/** @deprecated Use getSessionForRequest instead. Kept for test compatibility. */
+/**
+ * Test-only: inject a pre-built (typically seeded) session into the
+ * 'anonymous' slot so subsequent requests route to it. HTTP routes auto-create
+ * sessions when missing, so this is the only way to seed for deterministic
+ * tests. Production code paths use `getSessionForRequest` directly.
+ */
 export const setSession = (s: GameSession) => { userSessions.set('anonymous', s) }
 
 const readBody = (req: IncomingMessage): Promise<string> =>

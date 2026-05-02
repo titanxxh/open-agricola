@@ -16,15 +16,24 @@ export const E58_LunchtimeBeer = new MinorImprovement({
 
 export const E58_LunchtimeBeer_impl = {
   effect: {
-  id: CARD_ID,
-  onStartHarvest: (_state, _player) => {
-    return {
+    id: CARD_ID,
+    onStartHarvest: (state, _player) => ({
       type: 'seq',
       optional: true,
-      children: [gainLeaf(CARD_ID, { food: 1 })],
-    }
-    // TODO: should skip field+breeding phases when used
+      children: [
+        gainLeaf(CARD_ID, { food: 1 }),
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: {
+            kind: 'set-extra-data',
+            key: 'passFieldAndBreedRound',
+            value: state.round,
+          },
+        },
+      ],
+    }),
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

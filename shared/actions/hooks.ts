@@ -17,6 +17,7 @@ export type ActionHookPhase =
   | 'computeReplace'
   | 'isDoable'
   | 'anytime'
+  | 'computeExchanges'
 
 export const actionHookPhases: ActionHookPhase[] = [
   'before',
@@ -29,6 +30,7 @@ export const actionHookPhases: ActionHookPhase[] = [
   'computeReplace',
   'isDoable',
   'anytime',
+  'computeExchanges',
 ]
 
 export type ActionHookContext = ActionExecutionContext & {
@@ -46,6 +48,7 @@ export type ActionHookResult = {
   actionId?: string
   extraData?: Record<string, unknown>
   extraOptions?: ActionChoiceOption[]
+  extraExchanges?: import('../cards/types').CardExchange[]
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>

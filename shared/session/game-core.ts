@@ -77,7 +77,7 @@ import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerL
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
 import { computeAnimalZones } from '../actions/helpers/animal-zones'
 import { reap } from '../actions/effects/reap.ts'
-import { breedAnimals } from '../actions/helpers/breed-animals'
+import { breedLeaf } from '../actions/effects/breed'
 import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
@@ -92,6 +92,7 @@ import {
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
 import {
   applyCostOverride,
+  applyTradeSideEffect,
 } from '../actions/helpers/payment'
 import {
   isMajorImprovementPlayable,
@@ -173,6 +174,7 @@ type StageResumeState = {
     | 'onEndHarvestFeedingPhase'
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
+    | 'onBreedPhase'
   playerIndex: number
   cardIndex: number
 }
@@ -568,6 +570,24 @@ export class GameCore {
     return players.map((_, offset) => (startIdx + offset) % players.length)
   }
 
+  /**
+   * True when the player has a card that flagged them to skip the field +
+   * breeding phase of the current harvest. Cards register the skip by writing
+   * `cardStates[CARD_ID].extraData.passFieldAndBreedRound = state.round` (e.g.
+   * E58 LunchtimeBeer's onStartHarvest opt-in). The flag naturally expires
+   * next round — we compare against the current round on every check.
+   */
+  private hasPassFieldAndBreed(player: PlayerState): boolean {
+    const cardStates = player.cardStates ?? {}
+    for (const cardId of Object.keys(cardStates)) {
+      const round = cardStates[cardId]?.extraData?.passFieldAndBreedRound
+      if (typeof round === 'number' && round === this.state.round) {
+        return true
+      }
+    }
+    return false
+  }
+
   private hasPositiveResources(resources: Partial<Resource>) {
     return resourceKeyList.some((key) => (resources[key] ?? 0) > 0)
   }
@@ -585,8 +605,8 @@ export class GameCore {
 
   private hasAnyHarvestExchange(player: PlayerState) {
     return (
-      getExchangesInWindow(player, 'harvest').length > 0 ||
-      getExchangesInWindow(player, 'anytime').length > 0
+      getExchangesInWindow(player, 'harvest', this.state).length > 0 ||
+      getExchangesInWindow(player, 'anytime', this.state).length > 0
     )
   }
 
@@ -1301,7 +1321,7 @@ export class GameCore {
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
         if (!flow) continue
         this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
         return true
@@ -1321,7 +1341,7 @@ export class GameCore {
     for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
       const cardId = cards[currentCardIndex]
       if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook)
+      const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
       if (!flow) continue
       this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
       return true
@@ -1392,6 +1412,9 @@ export class GameCore {
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
+      // E58 LunchtimeBeer (and any future card) may flag a player to skip
+      // the field phase of the current harvest. Flagged players are not reaped.
+      if (this.hasPassFieldAndBreed(player)) return
       const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
@@ -1609,6 +1632,9 @@ export class GameCore {
         return
       case 'onAllWorkersPlaced':
         this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onBreedPhase':
+        this.continueEndHarvestEffects()
         return
     }
   }
@@ -2338,6 +2364,16 @@ export class GameCore {
             food: gainMap,
           },
         })
+        // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
+        if (exchange.sideEffect && times > 0) {
+          applyTradeSideEffect(
+            this.state,
+            player,
+            exchange.sideEffect,
+            times,
+            sel.sourceId ?? exchange.sourceId ?? 'unknown',
+          )
+        }
       } else if (sel.resourceKey && typeof sel.food === 'number') {
         // Legacy single-resource forward-trade fallback (no exchange resolved).
         const available = player.resources[sel.resourceKey]
@@ -2500,29 +2536,35 @@ export class GameCore {
       if (player) runAfterFeedHooks(this.state, player)
     })
     this.state.log.unshift({ key: 'log.harvestPhaseBreed' })
-    this.applyBreedPhase()
+    this.state.harvestBreedSummary = {}
 
-    const pendingAnimal = harvestOrder.find((index) => {
-      const player = this.state.players[index]
-      return !!player && this.hasPendingAnimals(player)
-    }) ?? -1
-    if (pendingAnimal !== -1) {
-      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'harvest-breed' }
+    // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
+    const breedOrder = harvestOrder.filter((index) => {
+      const p = this.state.players[index]
+      return p ? !this.hasPassFieldAndBreed(p) : false
+    })
+    const flow = this.buildHarvestBreedFlow(breedOrder)
+    if (flow) {
+      this.startStageFlow(flow, 'onBreedPhase', 0, 0)
       return this.respond()
     }
-
     return this.continueEndHarvestEffects()
   }
 
-  private applyBreedPhase() {
-    this.state.harvestBreedSummary = {}
-    this.getHarvestPlayerIndices().forEach((index) => {
-      const p = this.state.players[index]
-      if (!p) return
-      const result = breedAnimals(p)
-      this.state.harvestBreedSummary![p.id] = result.breedSummary
-      this.logHarvestResourceEntry('log.harvestBreedDetail', p, result.breedSummary.resources)
-    })
+  private buildHarvestBreedFlow(harvestOrder: number[]): ActionFlow | null {
+    const players = harvestOrder
+      .map((idx) => this.state.players[idx])
+      .filter((p): p is PlayerState => !!p)
+    if (players.length === 0) return null
+    const children: ActionFlow[] = []
+    for (const p of players) {
+      children.push({ type: 'playerSwitch', targetPlayerId: p.id })
+      children.push(breedLeaf('harvest'))
+    }
+    if (children.length === 1) {
+      return children[0]
+    }
+    return { type: 'seq', children }
   }
 
   private finalizeRound(): SessionResponse {

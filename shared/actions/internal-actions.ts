@@ -2,7 +2,7 @@ import type { ActionDefinition } from '../game/types'
 import { futureMeeplesAction } from './effects/internal/future-meeples'
 import { collectAction } from './effects/collect'
 import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from './effects/gain'
-import { wishChildrenAction, growFamilyWithoutRoomAction, familyGrowthAction } from './effects/family-growth'
+import { familyGrowthAction } from './effects/family-growth'
 import { minorImprovementAction, improvementAnyAction } from './effects/improvement'
 import { playOccupationAction } from './effects/occupation'
 import { renovateHouseAction } from './effects/renovation'
@@ -19,6 +19,7 @@ import { setFirstPlayerAction } from './effects/first-player'
 import { payResourcesAction } from './effects/pay-resources'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
+import { breedAction } from './effects/breed'
 import { takeFromCardAction } from './effects/internal/take-from-card'
 import { emitChoiceAction } from './effects/internal/emit-choice'
 import { returnFirstWorkerHomeAction } from './effects/internal/return-first-worker-home'
@@ -40,11 +41,9 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bonusWoodAction,
   bonusFoodAction,
   bonusGrainAction,
-  wishChildrenAction,
   familyGrowthAction,
   minorImprovementAction,
   improvementAnyAction,
-  growFamilyWithoutRoomAction,
   playOccupationAction,
   renovateHouseAction,
   fenceAction,
@@ -57,6 +56,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   payResourcesAction,
   returnToSpaceAction,
   bonusVpAction,
+  breedAction,
   takeFromCardAction,
   emitChoiceAction,
   returnFirstWorkerHomeAction,
