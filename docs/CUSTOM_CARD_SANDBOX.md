@@ -164,6 +164,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onAfterHarvest`
 - `onBeforeEndGame`
 - `onBeforeStartOfTurn`
+- `onBeforePlayerTurn`
 - `onAllWorkersPlaced`
 - `resolveChoice`
 - `computeBonusScore`
@@ -176,6 +177,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeLockedFarmTiles`
 - `computeFenceDiscount`
 - `computeFenceFreeAvailable`
+- `getInvalidAnimals`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
