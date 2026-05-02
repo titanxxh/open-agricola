@@ -98,7 +98,12 @@ describe('E123_ResourceHoarder session', () => {
     expect(result).toBeDefined()
     expect(result!.bonuses).toBeDefined()
     expect(result!.bonuses).toHaveLength(1)
-    expect(result!.bonuses![0]!.discount).toEqual({ clay: 1 })
+    // 7b1 use-top-k upgrade: bonuses[0] now carries N+1 BonusChoice entries.
+    // For stack [stone, clay, stone, reed, wood, clay] (N=6), choices[1]
+    // (k=1, top-1) is still the legacy "clay 1" discount.
+    expect(result!.bonuses![0]!.choices).toBeDefined()
+    expect(result!.bonuses![0]!.choices!).toHaveLength(7)
+    expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ clay: 1 })
     expect(result!.bonuses![0]!.optional).toBe(true)
     expect(result!.bonuses![0]!.sources).toEqual([CARD_ID])
   })
@@ -281,22 +286,22 @@ describe('E123_ResourceHoarder session', () => {
       actionId, phase,
     } as CardListenerContext)
 
-    // Top is clay
+    // Top is clay (k=1 entry of N+1 choices)
     let result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
-    expect(result!.bonuses![0]!.discount).toEqual({ clay: 1 })
+    expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ clay: 1 })
 
     // Pop clay
     executeCardListener(afterPayListener, mkContext('construct', 'after'))
 
     // Now top is wood
     result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
-    expect(result!.bonuses![0]!.discount).toEqual({ wood: 1 })
+    expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ wood: 1 })
 
     // Pop wood
     executeCardListener(afterPayListener, mkContext('construct', 'after'))
 
     // Now top is reed
     result = executeCardListener(costListener, mkContext('improvement-any', 'computeCosts'))
-    expect(result!.bonuses![0]!.discount).toEqual({ reed: 1 })
+    expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ reed: 1 })
   })
 })
