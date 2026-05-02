@@ -47,12 +47,9 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-05-02 Sprint 7b2 F3 — D + E-deck (4 张)**：D127 / E73 / E83 修；E148 defer 登记 §2.5。
-  - **D127 HardworkingMan**（前任 agent commit `913dd44c`）：`xor` → `or` flow，allow all-three children 组合执行（BGA `NODE_OR` 语义对齐）。
-  - **E73 Scythe**（commit `02b8027a`）：trigger 条件从 `!fieldIsEmpty` 改为 `fieldTotalRemaining(f) >= 2`（BGA `count(crops) >= 2` 等价）；harvest leaf 从"仅顶 stack `field.stacks.pop()`" 改为"全收所有 stacks（field.stacks=[]）"，对齐 BGA "harvest all crops" 语义；token 模型未引入（`setScytheField` PHP-side global），改为"卡内闭环"——选中 field 直接全部清空，主 reap 路径 `fieldTopStack(field)` 自然 skip 空 field。新增 `server/__tests__/E73_Scythe-session.test.ts` 6 例（trigger 条件 / 单 stack ≥2 / 多 stack 全收 / deep multi-stack / 不重复 reap）。
-  - **E83 ShepherdsWhistle**（commit `fc10443d`）：补 BGA reorganize fallback path——`hasEmptyUnfencedStable` 时直接 `gainLeaf({sheep:1})`（已对齐）；新加 `hasAnyUnfencedStable && !hasEmpty` 分支返回 `seq{optional, [anytime-reorg leaf, post-check leaf]}`；新 ad-hoc action `card_E83_ShepherdsWhistle_post-reorg-check` execute 时 re-check empty unfenced stable，是则返回 `{type:'flow', flow: gainLeaf}`。新增 `server/__tests__/E83_ShepherdsWhistle-session.test.ts` 5 例覆盖三条路径 + post-check leaf 行为。
-  - **E148 Lazybones defer 登记 §2.5**：spec 修复方向"加 SE moveStables choice (places⊂4) + receive/build-stable flow" 需要协议层多选 choice + cross-player stable-grant 基建（occupation onBuy 不能直接 emit pending；需 `play-occupation` listener 返 flow + multi-select pending kind + `give-stable-to-player` SE kind）。Risk §7.3 明确允许"工作量超 1d defer"。当前实现"自动放前 N 个 spaces" + listener `ownerPlayer.stableTiles.push(tile)` 在游戏结果上与 BGA 等价（4 marked spaces 触发后都是 +1 stable，玩家无理由偏离均匀放置；listener 给 owner stable on farm 等价 `receiveNode`），8 个 session 测试已锁定行为。登记 §2.5 两条偏离。
-  - 文件改动：`shared/cards/E/E73_Scythe.ts` / `shared/cards/E/E83_ShepherdsWhistle.ts` + 2 新 session test。effects/ 文件数无变化（用 ad-hoc registry）。fast / slow / lint / build 全绿。Spec / plan：`docs/superpowers/specs/2026-05-02-sprint-7b2-design.md` § 3.1 / `docs/superpowers/plans/2026-05-02-sprint-7b2.md` § Phase F3。
+- **2026-05-02 Sprint 7b2 F4 — B106 MoralCrusader confirmed §2.0 aligned（audit misreport）**：
+  - Sprint 7a verify-only 已确认实现对齐 BGA。本次 family agent 复核：`pnpm exec vitest run server/__tests__/B106_MoralCrusader-session.test.ts --project slow` 现有用例全部通过。
+  - audit `futureMeeples 扫描方向不一` 实际行为等价（玩家最优策略数学等同），属误报。无代码改动。
 
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
