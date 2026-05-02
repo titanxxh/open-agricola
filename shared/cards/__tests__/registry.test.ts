@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { CardRegistry, type CardImpl, type TradeLikeModifier } from '../registry'
+import { CardRegistry, type CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardEffect } from '../card-effects'
+import type { CostModifier } from '../../game/types'
 
 describe('CardRegistry', () => {
   it('stores listeners by cardId after loadImpl', () => {
@@ -67,7 +68,13 @@ describe('CardRegistry', () => {
         } satisfies CardListenerRegistration,
       ],
       effect: { id: cardId, onBuy: () => undefined } satisfies CardEffect,
-      modifiers: [{ type: 'trade', cardId } satisfies TradeLikeModifier],
+      modifiers: [{
+        type: 'trade',
+        cardId,
+        appliesTo: ['occupation'],
+        from: { wood: 1 },
+        to: { food: 1 },
+      } satisfies CostModifier],
     })
 
     it('removes listeners, effect, and modifiers in one call', () => {
