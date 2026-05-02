@@ -285,6 +285,14 @@ export type HarvestReapSummary = {
   resources: Partial<Resource>
   grainFields: number
   vegetableFields: number
+  /**
+   * Positions of every field tile that produced a crop in this reap pass.
+   * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like
+   * D63 Lynchet need exact tile positions, not just totals — using only
+   * grain/vegetable counts loses information when the player has multiple
+   * fields of the same crop type.
+   */
+  harvestedPositions?: { row: number; col: number }[]
 }
 
 export type HarvestBreedSummary = {
