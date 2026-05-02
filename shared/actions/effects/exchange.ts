@@ -8,7 +8,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
-import { payResources } from '../helpers/payment'
+import { payResources, applyTradeSideEffect } from '../helpers/payment'
 import { gainResources } from './gain'
 import { canAffordFlatCost } from '../helpers/pay-helpers'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
@@ -401,6 +401,15 @@ const resolveExchangeChoice = (
       if (times > 0) {
         applyTrade(player, trade, times)
         recordCookeryConversion(player, trade, times)
+        if (trade.sideEffect) {
+          applyTradeSideEffect(
+            state,
+            player,
+            trade.sideEffect,
+            times,
+            trade.sourceId ?? trade.source ?? 'unknown',
+          )
+        }
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
@@ -418,6 +427,15 @@ const resolveExchangeChoice = (
     if (times > 0) {
       applyTrade(player, trade, times)
       recordCookeryConversion(player, trade, times)
+      if (trade.sideEffect) {
+        applyTradeSideEffect(
+          state,
+          player,
+          trade.sideEffect,
+          times,
+          trade.sourceId ?? trade.source ?? 'unknown',
+        )
+      }
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     trackWorkPhaseBuildingResources(state, player.id, gained)
