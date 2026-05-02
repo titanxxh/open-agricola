@@ -488,6 +488,7 @@ import { D70_StrawManure } from './D/D70_StrawManure'
 import { D71_Changeover } from './D/D71_Changeover'
 import { D72_StableManure } from './D/D72_StableManure'
 import { D74_RoyalWood } from './D/D74_RoyalWood'
+import { D75_WoodField } from './D/D75_WoodField'
 import { D84_FeedPellets } from './D/D84_FeedPellets'
 import { D85_Reader } from './D/D85_Reader'
 import { D87_MasterBuilder } from './D/D87_MasterBuilder'
@@ -607,6 +608,7 @@ import { E74_AshTrees } from './E/E74_AshTrees'
 import { E75_StoneAxe } from './E/E75_StoneAxe'
 import { E76_LumberPile } from './E/E76_LumberPile'
 import { E78_SleightofHand } from './E/E78_SleightofHand'
+import { E80_RockGarden } from './E/E80_RockGarden'
 import { E81_AlchemistsLab } from './E/E81_AlchemistsLab'
 import { E82_Profiteering } from './E/E82_Profiteering'
 import { E83_ShepherdsWhistle } from './E/E83_ShepherdsWhistle'
@@ -1155,6 +1157,7 @@ export const minorImprovementCards = [
   D71_Changeover,
   D72_StableManure,
   D74_RoyalWood,
+  D75_WoodField,
   D78_ReedPond,
   D81_RoofLadder,
   D82_HuntingTrophy,
@@ -1206,6 +1209,7 @@ export const minorImprovementCards = [
   E75_StoneAxe,
   E76_LumberPile,
   E78_SleightofHand,
+  E80_RockGarden,
   E25_BumperCrop,
   E29_Heirloom,
   E32_Nave,
