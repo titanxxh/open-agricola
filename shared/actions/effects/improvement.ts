@@ -13,6 +13,7 @@ import {
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
+import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 
 /** Cards that satisfy a Fireplace return requirement. */
 const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
@@ -761,10 +762,25 @@ export const minorImprovementAction: ActionDefinition = {
   // pay-time will use. This lets per-card cost-modifier listeners (e.g. D95
   // Site Manager's food-for-resource substitution) participate in the
   // affordability probe instead of silently no-op'ing during doable check.
-  canBeExecutedByPlayer: (state, player, context) =>
-    buildPlayableMinorOptions(state, player, context?.sourceCard).length > 0,
+  canBeExecutedByPlayer: (state, player, context) => {
+    if (buildPlayableMinorOptions(state, player, context?.sourceCard).length > 0) {
+      return true
+    }
+    // Listener-injected candidates (e.g. D131 bottom-row majors) may extend
+    // the choice list. Probe affordability so the action stays available
+    // when only injected candidates are playable.
+    const extras = collectComputeChoiceCandidates(state, player, 'minor-improvement')
+    return extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value))
+  },
   execute: ({ state, player }) => {
-    const options = buildPlayableMinorOptions(state, player)
+    const baseOptions = buildPlayableMinorOptions(state, player)
+    // Listener-injected candidates (D131 etc.) — filter by per-option affordability.
+    const extras = collectComputeChoiceCandidates(state, player, 'minor-improvement')
+    const seen = new Set(baseOptions.map((o) => o.value))
+    const extraOptions = extras
+      .filter((opt) => !seen.has(opt.value))
+      .filter((opt) => canAffordInjectedImprovement(state, player, opt.value))
+    const options = [...baseOptions, ...extraOptions]
     if (options.length === 0) {
       return { type: 'ok' }
     }
@@ -775,7 +791,36 @@ export const minorImprovementAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ state, player }, choice) =>
-    playImprovement(state, player, choice, 'minor'),
+    playImprovement(state, player, choice, 'any'),
+}
+
+/**
+ * Affordability probe for listener-injected improvement candidates.
+ * Recognises `major:Major_X` / `minor:E78_Y` prefixes plus bare ids; falls
+ * back to whichever side resolves the id.
+ */
+const canAffordInjectedImprovement = (
+  state: GameState,
+  player: PlayerState,
+  rawValue: string,
+): boolean => {
+  const parsed = parseImprovementChoice(rawValue)
+  if (parsed.kind === 'major') {
+    return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
+  }
+  if (parsed.kind === 'minor') {
+    const minor = getMinorImprovement(parsed.id)
+    if (!minor) return false
+    return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
+  }
+  if (getMajorCardEffect(parsed.id)) {
+    return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
+  }
+  const minor = getMinorImprovement(parsed.id)
+  if (minor) {
+    return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
+  }
+  return false
 }
 
 export const improvementAnyAction: ActionDefinition = {
