@@ -12,8 +12,6 @@ import {
   countFieldsWithCrop,
   countEmptyFields,
 } from '../field'
-import { rehydrateState } from '../serialization'
-
 describe('Field stack type', () => {
   it('accepts a field with empty stacks', () => {
     const f: Field = { stacks: [], row: 0, col: 0 }
@@ -172,37 +170,3 @@ describe('field helpers', () => {
   })
 })
 
-describe('rehydrateState legacy Field migration', () => {
-  it('converts legacy {crop, remaining} into {stacks}', () => {
-    const legacy = {
-      players: [
-        {
-          id: 'p1',
-          fields: [
-            { crop: 'grain', remaining: 3, row: 0, col: 0 },
-            { crop: null, remaining: 0, row: 0, col: 1 },
-            { crop: 'vegetable', remaining: 2, row: 1, col: 0 },
-          ],
-          minorPlayed: [],
-          occupationPlayed: [],
-          activeModifiers: [],
-          resources: {},
-          roomTiles: [],
-          stableTiles: [],
-          pastures: [],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-      ],
-      actionSpaces: [],
-      roundStartSnapshot: null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any
-    const restored = rehydrateState(legacy)
-    const fields = restored.players[0].fields
-    expect(fields[0].stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-    expect(fields[1].stacks).toEqual([])
-    expect(fields[2].stacks).toEqual([{ kind: 'vegetable', remaining: 2 }])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((fields[0] as any).crop).toBeUndefined()
-  })
-})

@@ -22,10 +22,9 @@ export const A64_BarleyMill_impl = {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
     const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter((field) => {
-        const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
-        return fieldHasCrop(field, 'grain') && (fieldTotalRemaining(field) > 0 || legacyAmount > 0)
-      }).length
+      ?? player.fields.filter(
+        (field) => fieldHasCrop(field, 'grain') && fieldTotalRemaining(field) > 0,
+      ).length
     if (grainFields <= 0) return
     return {
       type: 'seq',

@@ -200,6 +200,21 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX idx_propose_audit_card ON github_propose_audit(workshop_card_id);
       `,
     },
+    {
+      version: 7,
+      // Drop legacy DSL/code columns from v2/v3 (no new writes since PR-2;
+      // CARD_DEF/CARD_IMPL declarative shape stores everything in card_json).
+      // Requires SQLite >= 3.35 for ALTER TABLE ... DROP COLUMN; better-sqlite3
+      // bundles a recent SQLite by default.
+      sql: `
+        ALTER TABLE workshop_cards DROP COLUMN effect_dsl;
+        ALTER TABLE workshop_cards DROP COLUMN effect_code;
+        ALTER TABLE workshop_cards DROP COLUMN compiled_code;
+        ALTER TABLE workshop_card_versions DROP COLUMN effect_dsl;
+        ALTER TABLE workshop_card_versions DROP COLUMN effect_code;
+        ALTER TABLE workshop_card_versions DROP COLUMN compiled_code;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

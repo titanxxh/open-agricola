@@ -17,10 +17,7 @@ const listener: CardListenerRegistration = {
     if (actionContext.checkedReplaceAction === true) return
     if (actionContext.maxSelections !== undefined || actionContext.cropType !== undefined) return
     const hasVegetable = context.player.fields.some(
-      (field) => {
-        const legacyAmount = (field as unknown as { amount?: number }).amount ?? 0
-        return fieldHasCrop(field, 'vegetable') && (fieldTotalRemaining(field) > 0 || legacyAmount > 0)
-      },
+      (field) => fieldHasCrop(field, 'vegetable') && fieldTotalRemaining(field) > 0,
     )
     if (!hasVegetable) return
     return { flow: gainLeaf(CARD_ID, { clay: 1, stone: 1 }), sourceCard: CARD_ID }
