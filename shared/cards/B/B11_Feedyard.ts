@@ -25,10 +25,19 @@ export const B11_Feedyard_impl = {
       zones.push({
         id: `card:${CARD_ID}`,
         zoneType: 'card',
+        cardId: CARD_ID,
         capacity: pastureCount,
         animalType: null,
         animalCount: 0,
       })
+    },
+    /**
+     * BGA `Cards/B/B11_Feedyard.php::getInvalidAnimals`:
+     * dynamic cap = pasture count; extras invalid.
+     */
+    getInvalidAnimals: (player, _zone, meeples) => {
+      const cap = player.pastures.length
+      return meeples.filter((_m, idx) => idx >= cap)
     },
     /**
      * BGA `onPlayerEndHarvest`: 1 food per unused spot on the card zone
