@@ -51,6 +51,7 @@ export const C70_LettucePatch = new MinorImprovement({
   cost: {},
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },
+  isField: true,
   desc: [
     'This card is a field that can only grow vegetables. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>.',
   ],

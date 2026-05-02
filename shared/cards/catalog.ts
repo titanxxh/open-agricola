@@ -1864,6 +1864,17 @@ export const getCardDefinition = (id: string): CardDefinition | undefined => {
   )
 }
 
+/**
+ * Mirror of BGA `Card::isField()`: returns true when the played card carries
+ * the `isField` metadata flag (set on minor improvements / occupations that
+ * BGA marks `$this->field = true`). Used by C80 Rocky Terrain so it can
+ * fire its plow trigger on Improvement / Occupation events whose card is
+ * itself a field.
+ */
+export const isFieldCard = (id: string): boolean => {
+  return getCardDefinition(id)?.isField === true
+}
+
 // Install the lookups on `types.ts` so `getRegisteredMinorImprovement` /
 // `getRegisteredOccupation` work without module-level side effects in the card
 // constructors. This runs once when catalog.ts is first imported.

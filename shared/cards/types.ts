@@ -58,6 +58,16 @@ export type CardDefinition = {
   extraVp?: boolean
   providesField?: boolean
   providesOccupation?: boolean
+  /**
+   * BGA `$this->field = true`: marks the card itself as a field. C80 Rocky
+   * Terrain triggers off `Improvement` / `Occupation` events whose played
+   * card has `isField === true` (treated as plowing a field). Cards that
+   * also act as a literal sowable field (B68/C70/E68/E69/E70/E72) carry
+   * `isField: true` plus `onComputeSowableFields` / `onSowExtraField` /
+   * `onHarvestFieldPhase` effects; field-only occupations (B113/B141)
+   * carry `isField: true` purely as metadata.
+   */
+  isField?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
   /**
@@ -134,6 +144,7 @@ export class CardBase {
   extraVp?: boolean
   providesField?: boolean
   providesOccupation?: boolean
+  isField?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
   mustBePlayedViaMajorImprovementAction?: boolean
@@ -180,6 +191,7 @@ export class CardBase {
     if (this.extraVp) def.extraVp = this.extraVp
     if (this.providesField) def.providesField = this.providesField
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
+    if (this.isField) def.isField = this.isField
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
     if (this.mustBePlayedViaMajorImprovementAction) def.mustBePlayedViaMajorImprovementAction = this.mustBePlayedViaMajorImprovementAction
