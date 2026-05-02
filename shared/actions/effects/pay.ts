@@ -24,6 +24,26 @@ export type PayParams = {
   includeReturnedCard?: boolean
 }
 
+/**
+ * Pay leaf success result includes `extraData.bonusUsed` (string[] of card ids
+ * whose BonusModifier.sources fired this payment), `bonusChoiceIndex`
+ * (per-card chosen variant index, only when the bonus had multiple choices),
+ * `feeIndex` (which fee variant in a fees[] array was paid), and
+ * `returnedCardId` (when `includeReturnedCard` was set on params and the
+ * payment consumed a card).
+ *
+ * Listeners on `actions: ['pay']` read these via `context.result.extraData`.
+ * This is the canonical signal for "the card I own contributed to this
+ * payment" — see E54_Contraband / E122_Cottar / E128_Saddler /
+ * E123_ResourceHoarder for examples.
+ *
+ * Legacy note: `player._activeActionBonusSources` is still maintained by
+ * `executePaymentSolution` for `log.actionDetail` attribution (read by
+ * `GameCore.buildActionDetailParts`) and the legacy `playOccupation` /
+ * `playImprovement` HTTP entries that don't go through the `pay` leaf.
+ * New listeners should not depend on it.
+ */
+
 const RESOURCE_KEYS = new Set([
   'wood',
   'clay',
