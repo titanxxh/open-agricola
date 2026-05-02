@@ -6,17 +6,30 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C52_HuntsmansHat'
 
-// BGA also modifies the AnimalMarket flow (sheep+food / boar+food / pay food→cattle).
-// We don't have a separate AnimalMarket action space, so only PigMarket is handled here.
+/**
+ * C52 Huntsman's Hat — For each new pig you get from the effect of an action
+ * space, you also get 1 food.
+ *
+ * BGA: `isListeningTo` matches any Gain event with `fromActionSpace` true,
+ * and `onPlayerAfterGain` sums obtained PIG meeples → emits gainNode([FOOD => N]).
+ * BGA also modifies the AnimalMarket placeFarmerFlow (sheep+food xor
+ * boar+food xor pay-food→cattle) — NOT implemented since we have no
+ * AnimalMarket action space (registered as §2.5 simplification).
+ *
+ * Implementation: generic listener on `phase: 'after'` for the union of
+ * `gain` / `collect` / `receive` actions (mirrors E53 BoarSpear pattern).
+ * Reads `result.resourcesGained.boar` and emits 1 food per boar gained.
+ */
+const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
 
 const huntsmansHatListener: CardListenerRegistration = {
-  id: 'C52-huntsmans-hat-after-collect',
+  id: 'C52-huntsmans-hat-after-boar-gain',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after' as ActionHookPhase],
+  actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { space, result } = context
-    if (space.id !== 'pig-market') return
+    if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return
+    const result = context.result
     const gained = result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
     if (gained <= 0) return
     return {
