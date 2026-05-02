@@ -1,16 +1,8 @@
-import { Occupation, getRegisteredMinorImprovement } from '../types'
-import { getMajorCardEffect } from '../major'
-import { collectCardsAs } from '../helpers/card-type'
+import { Occupation } from '../types'
+import { getPlayerCookeryCards } from '../helpers/cookery'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A101_CookeryOutfitter'
-
-const isCookeryCard = (cardId: string): boolean => {
-  const major = getMajorCardEffect(cardId)
-  if (major?.isCookery) return true
-  const minor = getRegisteredMinorImprovement(cardId)
-  return !!minor?.isCookery
-}
 
 export const A101_CookeryOutfitter = new Occupation({
   id: CARD_ID,
@@ -26,10 +18,11 @@ export const A101_CookeryOutfitter = new Occupation({
 
 export const A101_CookeryOutfitter_impl = {
   effect: {
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    return collectCardsAs(player, 'major').filter(isCookeryCard).length
+    id: CARD_ID,
+    computeBonusScore: (_state, player) => {
+      const improvements = player.improvements ?? []
+      return getPlayerCookeryCards(player).filter((c) => improvements.includes(c.id)).length
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
