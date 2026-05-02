@@ -111,4 +111,57 @@ describe('C130_OutskirtsDirector', () => {
 
     expect(result).toBeUndefined()
   })
+
+  // 3p variant: grove + hollow (no hollow-4)
+  it('3p variant: places 2 reed on hollow when using grove', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const groveSpace = createSpace('grove')
+    const hollowSpace = createSpace('hollow')
+    const state = {
+      round: 1, currentPlayerIndex: 0, players: [player],
+      actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
+      roundActionOrder: Array.from({ length: 14 }).map(() => null),
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [],
+      gameOver: false, workPhaseObtainedResources: {},
+    } as unknown as GameState
+
+    expect(hollowSpace.resources.reed).toBe(0)
+
+    executeCardListener(listener!, {
+      state, player, space: groveSpace,
+      actionId: 'place-farmer', phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(hollowSpace.resources.reed).toBe(2)
+  })
+
+  it('3p variant: places 2 reed on grove when using hollow', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const groveSpace = createSpace('grove')
+    const hollowSpace = createSpace('hollow')
+    const state = {
+      round: 1, currentPlayerIndex: 0, players: [player],
+      actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
+      roundActionOrder: Array.from({ length: 14 }).map(() => null),
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [],
+      gameOver: false, workPhaseObtainedResources: {},
+    } as unknown as GameState
+
+    expect(groveSpace.resources.reed).toBe(0)
+
+    executeCardListener(listener!, {
+      state, player, space: hollowSpace,
+      actionId: 'place-farmer', phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(groveSpace.resources.reed).toBe(2)
+  })
 })
