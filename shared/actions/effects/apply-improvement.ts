@@ -1,4 +1,8 @@
-import type { ActionDefinition, ActionExecutionResult } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../game/types'
+import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import { getMinorImprovement } from '../../game/minor-improvements'
+import { getCardModifiers } from '../../cards/card-modifiers'
+import { activateCard } from './activate-card'
 
 export type ApplyImprovementParams = {
   improvementId: string
@@ -12,6 +16,41 @@ const isApplyImprovementParams = (raw: unknown): raw is ApplyImprovementParams =
   return typeof r.improvementId === 'string' && (r.kind === 'major' || r.kind === 'minor')
 }
 
+const applyMajor = (state: GameState, player: PlayerState, improvementId: string) => {
+  if (!player.improvements.includes(improvementId)) {
+    player.improvements.push(improvementId)
+  }
+  state.availableMajorImprovements = state.availableMajorImprovements.filter(
+    (id) => id !== improvementId,
+  )
+  incMajorBuilt(player)
+}
+
+const applyMinor = (state: GameState, player: PlayerState, improvementId: string) => {
+  const handIdx = player.minorHand.indexOf(improvementId)
+  if (handIdx >= 0) player.minorHand.splice(handIdx, 1)
+  if (!player.minorPlayed.includes(improvementId)) {
+    player.minorPlayed.push(improvementId)
+  }
+  incMinorBuilt(player)
+  recordDraftPlayed(player, improvementId, state.round)
+
+  const minor = getMinorImprovement(improvementId)
+  if (minor?.providesOccupation) {
+    player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
+    if (!player.extraOccupationsFromCards.includes(improvementId)) {
+      player.extraOccupationsFromCards.push(improvementId)
+      incOccupationBuilt(player)
+    }
+  }
+
+  getCardModifiers(improvementId).forEach((modifier) => {
+    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
+      player.activeModifiers.push(modifier)
+    }
+  })
+}
+
 export const applyImprovementAction: ActionDefinition = {
   id: 'apply-improvement',
   nameKey: 'actions.apply-improvement.name',
@@ -23,21 +62,15 @@ export const applyImprovementAction: ActionDefinition = {
     if (!isApplyImprovementParams(params)) {
       return { type: 'fail', logKey: 'log.improvementFail' }
     }
-    const { improvementId, kind } = params
+    const { improvementId, kind, suppressOnBuyEffects } = params
     if (kind === 'major') {
-      if (!player.improvements.includes(improvementId)) {
-        player.improvements.push(improvementId)
-      }
-      state.availableMajorImprovements = state.availableMajorImprovements.filter(
-        (id) => id !== improvementId,
-      )
+      applyMajor(state, player, improvementId)
     } else {
-      const handIdx = player.minorHand.indexOf(improvementId)
-      if (handIdx >= 0) player.minorHand.splice(handIdx, 1)
-      if (!player.minorPlayed.includes(improvementId)) {
-        player.minorPlayed.push(improvementId)
-      }
+      applyMinor(state, player, improvementId)
     }
+    if (suppressOnBuyEffects) return { type: 'ok' }
+    const activation = activateCard(state, player, improvementId, 'onBuy')
+    if (activation.type === 'flow') return activation
     return { type: 'ok' }
   },
 }
