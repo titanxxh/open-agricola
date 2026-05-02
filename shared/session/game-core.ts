@@ -569,6 +569,24 @@ export class GameCore {
     return players.map((_, offset) => (startIdx + offset) % players.length)
   }
 
+  /**
+   * True when the player has a card that flagged them to skip the field +
+   * breeding phase of the current harvest. Cards register the skip by writing
+   * `cardStates[CARD_ID].extraData.passFieldAndBreedRound = state.round` (e.g.
+   * E58 LunchtimeBeer's onStartHarvest opt-in). The flag naturally expires
+   * next round — we compare against the current round on every check.
+   */
+  private hasPassFieldAndBreed(player: PlayerState): boolean {
+    const cardStates = player.cardStates ?? {}
+    for (const cardId of Object.keys(cardStates)) {
+      const round = cardStates[cardId]?.extraData?.passFieldAndBreedRound
+      if (typeof round === 'number' && round === this.state.round) {
+        return true
+      }
+    }
+    return false
+  }
+
   private hasPositiveResources(resources: Partial<Resource>) {
     return resourceKeyList.some((key) => (resources[key] ?? 0) > 0)
   }
@@ -1393,6 +1411,9 @@ export class GameCore {
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
+      // E58 LunchtimeBeer (and any future card) may flag a player to skip
+      // the field phase of the current harvest. Flagged players are not reaped.
+      if (this.hasPassFieldAndBreed(player)) return
       const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
@@ -2506,7 +2527,12 @@ export class GameCore {
     this.state.log.unshift({ key: 'log.harvestPhaseBreed' })
     this.state.harvestBreedSummary = {}
 
-    const flow = this.buildHarvestBreedFlow(harvestOrder)
+    // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
+    const breedOrder = harvestOrder.filter((index) => {
+      const p = this.state.players[index]
+      return p ? !this.hasPassFieldAndBreed(p) : false
+    })
+    const flow = this.buildHarvestBreedFlow(breedOrder)
     if (flow) {
       this.startStageFlow(flow, 'onBreedPhase', 0, 0)
       return this.respond()
