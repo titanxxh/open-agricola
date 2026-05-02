@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../../game/types'
 import { initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
+import { dispatchTradeAppliedListener } from '../../actions/effects/exchange'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -23,8 +24,26 @@ export const hasCardCounter = (
 export const createSingleHarvestExchange = (
   resource: keyof Resource,
   gain: CardGain,
-) => (_state: GameState, player: PlayerState) => {
+  options?: { sourceId?: string },
+) => (state: GameState, player: PlayerState) => {
   if ((player.resources[resource] ?? 0) <= 0) return
   player.resources[resource] -= 1
   applyCardGain(player, gain)
+  // BGA semantics: harvest-time conversions emit Exchange events. We mirror
+  // this by dispatching the synthetic 'trade-applied' listener so cards like
+  // E91 PlowBuilder can react to the source-card identity (e.g. Joinery).
+  if (options?.sourceId) {
+    const fromKey = resource as keyof Resource
+    dispatchTradeAppliedListener(
+      state,
+      player,
+      {
+        from: { [fromKey]: 1 } as Partial<Resource>,
+        to: gain as Partial<Resource>,
+        max: 1,
+        sourceId: options.sourceId,
+      },
+      1,
+    )
+  }
 }

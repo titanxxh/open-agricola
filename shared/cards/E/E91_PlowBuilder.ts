@@ -1,17 +1,41 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E91_PlowBuilder'
 
-// Joinery and its upgrades in this codebase
-const JOINERY_CARDS = ['Major_Joinery']
+// BGA isListeningTo gates `usedJoinery` on Exchange-event sourceId starting
+// with "Major_Joinery", catching base Major_Joinery and any future upgrades
+// produced by the same family. This codebase has no Joinery upgrade today
+// (verified: only `Major_Joinery` is referenced), so the prefix match remains
+// equivalent to a literal match while staying upgrade-safe.
+const JOINERY_SOURCE_PREFIX = 'Major_Joinery'
 
 // Inline harvest rounds to avoid circular dependency with logic/state
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
+
+/**
+ * BGA isListeningTo: catches Exchange events; if `trade.sourceId` belongs to
+ * the Joinery family, sets a per-harvest flag `usedJoinery=true`. Cleared at
+ * EndHarvestFeedingPhase. We mirror this with a `trade-applied` listener
+ * scoped to the card owner.
+ */
+const tradeAppliedListener: CardListenerRegistration = {
+  id: 'E91-plow-builder-trade-applied',
+  cardIds: [CARD_ID],
+  actions: ['trade-applied'],
+  phases: ['immediatelyAfter' as ActionHookPhase],
+  scope: 'player',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const sourceId = context.extraData?.sourceId
+    if (typeof sourceId !== 'string') return
+    if (!sourceId.startsWith(JOINERY_SOURCE_PREFIX)) return
+    writeCardExtraData(context.player, CARD_ID, 'usedJoinery', true)
+  },
+}
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E91-plow-builder-anytime',
@@ -20,9 +44,10 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!HARVEST_ROUNDS.includes(context.state.round)) return
-    // Check if player owns a Joinery-family card
-    const hasJoinery = context.player.improvements.some(id => JOINERY_CARDS.includes(id))
-    if (!hasJoinery) return
+    // BGA: anytime gate is `isFlagged('usedJoinery') && !isFlagged()`. The
+    // `usedJoinery` flag is set by the trade-applied listener above.
+    const usedJoinery = readCardExtraData<boolean>(context.player, CARD_ID, 'usedJoinery') === true
+    if (!usedJoinery) return
     if (context.player.resources.food < 1) return
     return {
       flow: {
@@ -50,12 +75,16 @@ export const E91_PlowBuilder = new Occupation({
 })
 
 export const E91_PlowBuilder_impl = {
-  listeners: [anytimeListener],
+  listeners: [tradeAppliedListener, anytimeListener],
   effect: {
-  id: CARD_ID,
-  onAfterHarvest: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
+    id: CARD_ID,
+    /** Clear both the per-use flag (anytime gate) and the per-harvest
+     *  `usedJoinery` flag at the end of the harvest. Mirrors BGA's
+     *  EndHarvestFeedingPhase reset. */
+    onAfterHarvest: (_state, player) => {
+      setCardFlag(player, CARD_ID, false)
+      writeCardExtraData(player, CARD_ID, 'usedJoinery', false)
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
