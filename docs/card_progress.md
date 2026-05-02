@@ -47,6 +47,10 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 7b2 F4 — B152 JuniorArtist confirmed §2.0 aligned（Sprint 5 mech-A jumpLeaf 已对齐）**：
+  - Sprint 5 mech-A 已通过 jumpLeaf + place-farmer.viaCardJump 重构（day-laborer → lessons-4 / lessons / traveling-players XOR），farmer 物理移动 + 第二格走完整 ActionNode 路径。
+  - 本次 family agent 复核：`pnpm exec vitest run server/__tests__/B152_JuniorArtist-session.test.ts --project slow` 现有用例全部通过。§2.3 line 363 已标 ✅ Sprint 5 mech-A，audit 残留 ⚠ 标签今日清除，确认归 §2.0 aligned。
+
 - **2026-05-02 Sprint 7b2 F4 — B106 MoralCrusader confirmed §2.0 aligned（audit misreport）**：
   - Sprint 7a verify-only 已确认实现对齐 BGA。本次 family agent 复核：`pnpm exec vitest run server/__tests__/B106_MoralCrusader-session.test.ts --project slow` 现有用例全部通过。
   - audit `futureMeeples 扫描方向不一` 实际行为等价（玩家最优策略数学等同），属误报。无代码改动。
