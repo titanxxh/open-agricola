@@ -605,8 +605,8 @@ export class GameCore {
 
   private hasAnyHarvestExchange(player: PlayerState) {
     return (
-      getExchangesInWindow(player, 'harvest').length > 0 ||
-      getExchangesInWindow(player, 'anytime').length > 0
+      getExchangesInWindow(player, 'harvest', this.state).length > 0 ||
+      getExchangesInWindow(player, 'anytime', this.state).length > 0
     )
   }
 
