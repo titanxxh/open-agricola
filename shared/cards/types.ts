@@ -60,6 +60,14 @@ export type CardDefinition = {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  /**
+   * BGA `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
+   * Shed enforces "this card can only be played via a Major Improvement
+   * action". When set, the minor cannot be bought through the
+   * `minor-improvement` action space (only via `improvement-any` / direct
+   * card-effect plays).
+   */
+  mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
   /** Majors-only: scoring tier table read by major-improvements scoring. */
@@ -128,6 +136,7 @@ export class CardBase {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
   scoring?: {
@@ -173,6 +182,7 @@ export class CardBase {
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
+    if (this.mustBePlayedViaMajorImprovementAction) def.mustBePlayedViaMajorImprovementAction = this.mustBePlayedViaMajorImprovementAction
     if (this.enablesPalisades) def.enablesPalisades = this.enablesPalisades
     if (this.alsoCountsAs) def.alsoCountsAs = this.alsoCountsAs
     if (this.locales) def.locales = this.locales
