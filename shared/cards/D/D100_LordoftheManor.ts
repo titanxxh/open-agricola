@@ -20,7 +20,10 @@ export const D100_LordoftheManor_impl = {
   id: CARD_ID,
   computeBonusScore: (_state, _player, ctx) => {
     // 1 VP per standard category where score = 4 (max in standard range)
-    const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles']
+    // BGA whitelist (`computeSpecialScore`): fields, pastures, grains,
+    // vegetables, sheeps, pigs, cattles, stables. Card desc explicitly: "The
+    // bonus point is also awarded for 4 fenced stables."
+    const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles', 'stables']
     return (ctx.categories ?? []).filter((cat) => standardCategories.includes(cat.key) && cat.total >= 4).length
   },
 },
