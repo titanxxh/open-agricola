@@ -863,11 +863,20 @@ const buildImprovementFlow = (
   if (!previewCost) return null
   const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
   const includeReturnedCard = isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
   const payParams: Record<string, unknown> = {
     cost: previewCost,
-    costType: kind === 'major' ? 'major-improvement' : 'minor-improvement',
+    costType,
     optionPrefix,
     includeReturnedCard,
+  }
+  // actionContext is propagated to listener events (engine.buildListenerEvent
+  // spreads actionContext into the listener context). After-pay listeners
+  // (E54 / E122 / E128 / E123 etc.) read `costType` from this to filter
+  // major/minor improvement payments.
+  const payActionContext: Record<string, unknown> = {
+    costType,
+    improvementKind: kind,
   }
   return {
     type: 'seq',
@@ -877,6 +886,7 @@ const buildImprovementFlow = (
         actionId: 'pay',
         sourceCard: id,
         params: payParams,
+        actionContext: payActionContext,
       },
       {
         type: 'leaf',
