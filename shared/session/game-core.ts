@@ -67,6 +67,7 @@ import { type CustomCardData, SessionCardContext, withSessionContext } from '../
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
+import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
@@ -315,6 +316,13 @@ export class GameCore {
         }
       }
     }
+    // Sync modifier definitions from catalog into per-session registry.
+    // Replaces the legacy card-modifiers.ts catalog-direct-query path; downstream
+    // callers (`getCardModifiers`) read from `active.getModifiers` only.
+    this.cardRegistry.syncModifiersFromCatalog(
+      allOccupationCards,
+      allMinorImprovementCards,
+    )
     setActiveCardRegistry(this.cardRegistry)
 
     // Register custom workshop cards into a per-session context (sandbox mode)
