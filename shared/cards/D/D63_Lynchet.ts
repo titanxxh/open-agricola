@@ -1,21 +1,19 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D63_Lynchet'
 
 /**
- * D63 Lynchet:
- * In the field phase of each harvest, you get 1 food for each harvested
- * field tile that is orthogonally adjacent to your house.
+ * D63 Lynchet (Sprint 7a F7).
  *
- * BGA: isActionEvent(Reap) && trigger == HARVEST && countFields > 0.
- * countFields: iterates harvested field positions, checks isAdjacentToType(roomType).
+ * BGA `Cards/D/D63_Lynchet.php::countFields($event)`:
+ *   $fields = $player->board()->getHarvestedFieldTilePositions($event['crops']);
+ *   foreach ($fields as $field) if (isAdjacentToType($field['x'], $field['y'], roomType)) $n++;
  *
- * Implementation: onAfterReap hook. After reap, fields with crop !== null were
- * harvested and still have remaining > 0. Fields depleted to remaining=0 had
- * their crop set to null. We use the reap summary totals to account for both.
+ * The reap summary now exposes `harvestedPositions` (Sprint 7a F7) — exact tile
+ * positions of every field that produced a crop this reap. We count those that
+ * are orthogonally adjacent to any room tile.
  */
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1
@@ -35,51 +33,22 @@ export const D63_Lynchet = new MinorImprovement({
 
 export const D63_Lynchet_impl = {
   effect: {
-  id: CARD_ID,
-  onAfterReap: (state, player) => {
+    id: CARD_ID,
+    onAfterReap: (state, player) => {
+      const summary = state.harvestReapSummary?.[player.id]
+      const positions = summary?.harvestedPositions ?? []
+      if (positions.length === 0) return
 
-    const summary = state.harvestReapSummary?.[player.id]
-    if (!summary) return
-    const totalHarvested = (summary.grainFields ?? 0) + (summary.vegetableFields ?? 0)
-    if (totalHarvested <= 0) return
+      const roomTiles = player.roomTiles ?? []
+      if (roomTiles.length === 0) return
 
-    const roomTiles = player.roomTiles ?? []
-    if (roomTiles.length === 0) return
-
-    // Count fields with crop still set (harvested but not depleted) that are adjacent to rooms
-    let adjacentHarvested = 0
-    let stillSownCount = 0
-
-    for (const field of player.fields) {
-      if (!fieldIsEmpty(field)) {
-        // This field was harvested and still has remaining > 0
-        stillSownCount++
-        if (roomTiles.some((rt) => isAdjacent(field, rt))) {
-          adjacentHarvested++
-        }
+      let n = 0
+      for (const pos of positions) {
+        if (roomTiles.some((rt) => isAdjacent(pos, rt))) n += 1
       }
-    }
-
-    // Some fields were depleted (remaining went from 1 to 0, crop set to null).
-    // These now look like empty fields. Count how many such depleted fields exist.
-    const depletedCount = totalHarvested - stillSownCount
-    if (depletedCount > 0) {
-      // Among empty fields (crop === null, remaining === 0) adjacent to rooms,
-      // some may be just-depleted harvested fields.
-      let adjacentEmpty = 0
-      for (const field of player.fields) {
-        if (fieldIsEmpty(field)) {
-          if (roomTiles.some((rt) => isAdjacent(field, rt))) {
-            adjacentEmpty++
-          }
-        }
-      }
-      adjacentHarvested += Math.min(depletedCount, adjacentEmpty)
-    }
-
-    if (adjacentHarvested <= 0) return
-    return gainLeaf(CARD_ID, { food: adjacentHarvested })
+      if (n <= 0) return
+      return gainLeaf(CARD_ID, { food: n })
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
+import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { reap } from '../../shared/actions/effects/reap'
 
 import '../../shared/cards/D/D63_Lynchet'
 import type { ActionFlow } from '../../shared/game/types'
@@ -8,97 +9,91 @@ import type { ActionFlow } from '../../shared/game/types'
 const CARD_ID = 'D63_Lynchet'
 
 describe('D63_Lynchet session', () => {
-  it('onAfterReap gives 1 food per harvested field adjacent to house', () => {
+  it('onAfterReap counts only adjacent harvested positions', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.resources.food = 5
-
-    // House at (0,0) and (0,1)
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
-    // Field at (1,0) — adjacent to room (0,0)
-    // Field at (1,1) — adjacent to room (0,1)
-    // Both still have crop after reap (remaining > 0)
-    player.fields = [
-      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
-      { row: 1, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-    ]
 
-    // Reap summary: 2 fields harvested
     state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 1, vegetable: 1 }, grainFields: 1, vegetableFields: 1 },
+      [player.id]: {
+        resources: { grain: 1, vegetable: 1 },
+        grainFields: 1,
+        vegetableFields: 1,
+        harvestedPositions: [
+          { row: 1, col: 0 }, // adjacent to (0,0)
+          { row: 1, col: 1 }, // adjacent to (0,1)
+        ],
+      },
     }
-
     session.loadState(state)
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
+    expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
 
-  it('gives food only for fields adjacent to rooms', () => {
+  it('counts only positions that are orthogonally adjacent to a room tile', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.resources.food = 5
-
-    // House at (0,0)
     player.roomTiles = [{ row: 0, col: 0 }]
-    // Field at (1,0) — adjacent to room (0,0)
-    // Field at (2,2) — NOT adjacent to any room
-    player.fields = [
-      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
-      { row: 2, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-    ]
 
     state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 1, vegetable: 1 }, grainFields: 1, vegetableFields: 1 },
+      [player.id]: {
+        resources: { grain: 2 },
+        grainFields: 2,
+        vegetableFields: 0,
+        harvestedPositions: [
+          { row: 1, col: 0 }, // adjacent
+          { row: 2, col: 2 }, // not adjacent
+        ],
+      },
     }
-
     session.loadState(state)
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
+    expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
-  it('handles depleted fields (remaining went to 0) adjacent to rooms', () => {
+  it('end-to-end: reap with mixed fields populates harvestedPositions and listener counts adjacents', () => {
+    // BGA fix scenario: 3 grain fields, only 2 of them adjacent to rooms.
+    // Old summary-only counting could not distinguish which fields were
+    // harvested when there are multiple grain fields with different
+    // adjacencies. The new harvestedPositions field makes it precise.
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.resources.food = 5
-
-    // House at (0,0)
     player.roomTiles = [{ row: 0, col: 0 }]
-    // Field at (1,0) — adjacent to room, was depleted (crop=null, remaining=0 after reap)
-    // Field at (2,2) — NOT adjacent
+
     player.fields = [
-      { row: 1, col: 0, stacks: [] },
-      { row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
+      // adjacent (1,0); will produce 1 grain
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+      // not adjacent (2,2); will produce 1 grain
+      { row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
+      // empty field; not harvested
+      { row: 3, col: 0, stacks: [] },
     ]
 
-    // 2 total harvested (1 grain from field that still has crop + 1 that was depleted)
-    state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 2 }, grainFields: 2, vegetableFields: 0 },
-    }
+    const result = reap(state, player)
+    expect(result.type).toBe('ok')
+    expect(result.reapSummary.harvestedPositions).toEqual([
+      { row: 1, col: 0 },
+      { row: 2, col: 2 },
+    ])
 
+    state.harvestReapSummary = { [player.id]: result.reapSummary }
     session.loadState(state)
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
-    // 1 depleted field adjacent to room + 0 still-sown fields adjacent to room = 1
+    expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
@@ -106,43 +101,33 @@ describe('D63_Lynchet session', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-
     player.roomTiles = [{ row: 0, col: 0 }]
-    player.fields = []
-
     state.harvestReapSummary = {
-      [player.id]: { resources: {}, grainFields: 0, vegetableFields: 0 },
+      [player.id]: { resources: {}, grainFields: 0, vegetableFields: 0, harvestedPositions: [] },
     }
-
     session.loadState(state)
-
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeNull()
   })
 
-
-  it('does not trigger when no harvested fields are adjacent to rooms', () => {
+  it('does not trigger when no harvested positions are adjacent to rooms', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-
-    // House at (0,0)
     player.roomTiles = [{ row: 0, col: 0 }]
-    // Field at (2,2) — NOT adjacent to room
-    player.fields = [{ row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] }]
-
     state.harvestReapSummary = {
-      [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
+      [player.id]: {
+        resources: { grain: 1 },
+        grainFields: 1,
+        vegetableFields: 0,
+        harvestedPositions: [{ row: 2, col: 2 }],
+      },
     }
-
     session.loadState(state)
-
     const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
     expect(flow).toBeNull()
   })
