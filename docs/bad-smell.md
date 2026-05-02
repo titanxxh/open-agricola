@@ -1,7 +1,7 @@
 # Bad Smell 清单：主路径中的单卡特殊逻辑
 
 > 调查日期：2026-05-02
-> 最近更新：2026-05-02（A3 + B 级 + card-type 工具统一已完成）
+> 最近更新：2026-05-02（A 级全部 + B 级 + card-type 工具统一已完成）
 > 范围：`shared/`（不含 `cards/`、`i18n/`）、`server/`、`client/`
 > 目的：枚举主路径里"含特定卡牌字面量 / 为单卡而生"的所有点，作为后续 sprint 清理依据
 >
@@ -11,8 +11,8 @@
 
 | 级别 | 状态 | 备注 |
 | --- | --- | --- |
-| A1 B30_WoodPalisades | ⏳ 待办 | 前后端三处字面量复制 |
-| A2 E148_Lazybones | ⏳ 待办 | 前端按卡名读 cardStates |
+| A1 B30_WoodPalisades | ✅ 已解决（`efeca3b0`） | 引入 `enablesPalisades` marker + `playerCanBuildPalisades()` |
+| A2 E148_Lazybones | ✅ 已解决（`09edf30d`） | 改用通用 `RESERVED_ACTION_SPACES_KEY`，渲染层遍历所有 cardStates |
 | A3 Major_Fireplace | ✅ 已解决（`04945238`） | majors 自己声明 `fireplaceIdentity`，主路径走 `isFireplaceIdentityCard()` |
 | B 级 主路径 `Major_` 前缀 | ✅ 已解决（`74ff5231`） | 引入 `isMajorCardId` + 修 `parseImprovementChoice` bare 推断 |
 | 卡内 `Major_` 前缀残留 | ✅ 已解决（`35ed327e`） | B95/C137/D80/D117/E156 五处 |
@@ -26,7 +26,11 @@
 
 ## A 级：主路径出现具体卡牌 ID 字面量
 
-### A1. `B30_WoodPalisades`（Wood Palisades 准入）
+### A1. `B30_WoodPalisades`（Wood Palisades 准入） ✅ 已解决
+
+> 解决于 commit `efeca3b0`。
+
+### 原问题
 
 字面量被三处独立 `includes(...)` 复制：
 
@@ -37,21 +41,34 @@
 | `client/app/GameContainerApi.tsx:1865` | `hasWoodPalisadesCard={!!currentPlayer?.minorPlayed?.includes('B30_WoodPalisades')}` |
 | `client/components/interaction/InteractionBar.tsx:318/361/488` | 接收 `hasWoodPalisadesCard` prop 并按此切换 UI |
 
-**问题**：主路径泄漏了"哪张卡能开 palisade"。前后端各一份字面量，新增同效果卡时三处都要改。
+主路径泄漏了"哪张卡能开 palisade"，前后端各一份字面量。
 
-**建议修法**：参照 `fireplaceIdentity` 思路，给 minor 加 `allowsPalisades?: boolean` marker；主路径改成"任一已打 minor 含此 marker"。
+### 解决方案
+
+- `shared/cards/types.ts`：CardDefinition / CardBase / toJSON 增加 `enablesPalisades?: boolean`
+- `shared/cards/B/B30_WoodPalisades.ts`：声明 marker
+- `shared/cards/helpers/card-type.ts`：新增 `playerCanBuildPalisades(player)`，遍历 minor/occupation/major 找 marker
+- 三处主路径全部替换；前端 prop 顺手 rename `hasWoodPalisadesCard` → `canBuildPalisades`
 
 ---
 
-### A2. `E148_Lazybones`（Lazybones 预占 stable 显示）
+### A2. `E148_Lazybones`（Lazybones 预占 stable 显示） ✅ 已解决
+
+> 解决于 commit `09edf30d`。
+
+### 原问题
 
 | 位置 | 代码 |
 | --- | --- |
 | `client/components/board/ActionBoard.tsx:457` | `(player.cardStates?.['E148_Lazybones']?.extraData as { spaces?: string[] }).spaces` |
 
-**问题**：前端直接按卡名读 `cardStates`，是单卡耦合到主路径渲染层的典型反模式。
+前端直接按卡名读 `cardStates`，单卡耦合到渲染层。
 
-**建议修法**：定义通用 cardState schema（如 `reservedSpaces: { spaces: string[]; visualKind: 'stable' }`），前端循环全部 `cardStates` 找带此 schema 的项；或后端将占用信息合并到 `ActionSpace.extraData`。
+### 解决方案
+
+- `shared/cards/helpers/card-state.ts`：新增 `RESERVED_ACTION_SPACES_KEY = 'reservedActionSpaces'` 常量 + `getReservedActionSpaces` / `setReservedActionSpaces` helpers（值为 `string[]` 行动位 ID）
+- `shared/cards/E/E148_Lazybones.ts`：改用工具读写（extraData key 由 `'spaces'` 改名为 `'reservedActionSpaces'`）
+- `client/components/board/ActionBoard.tsx`：改成遍历每个 player 的所有 `cardStates`，找带 `RESERVED_ACTION_SPACES_KEY` 的 entry —— 后续新增"预占 stable"卡牌无需改渲染层
 
 ---
 
@@ -190,9 +207,12 @@
 
 ## 后续优先级
 
-1. **A1（B30_WoodPalisades）**：前后端三处复制，新增 marker 字段后即可一并清掉，影响 fence 流程，需要回归测。
-2. **A2（E148_Lazybones）**：需要先设计通用 cardState schema，工作量最大。
-3. **C/D/E 级 + 边界 case**：低优先级，捎带清理。
+A 级 + B 级全部清理完成。剩余项：
+
+1. **C 级（`CUSTOM_` 前缀分支）**：5 处复制，结构合理但缺统一工具 — 抽 `isCustomCardId()` 即可。
+2. **D 级（`actions/effects/internal/` 单卡 leaf）**：review 是否参数化或挪到 cards/ 附近。
+3. **E 级（注释里的举例卡名）**：仅文档影响，捎带清理。
+4. **边界 case `breed.ts:70`** `'harvest'` 魔法字符串：换枚举 / 显式 flag。
 
 ---
 
@@ -208,7 +228,10 @@
 | 玩家场上"算作"某类型的卡 | `collectCardsAs(player, 'major')` | 同上 |
 | 卡名翻译（自动选 i18n namespace） | `getAnyCardDisplayName(locale, id)` | `client/components/common/cardText.ts` |
 | Fireplace 兼容卡（满足返还需求） | `isFireplaceIdentityCard(id)` | `shared/cards/helpers/card-type.ts` |
+| 玩家是否能建 palisade（B30 同款能力） | `playerCanBuildPalisades(player)` | 同上 |
+| 卡在某些 action space 上预占 marker（E148 同款能力） | `RESERVED_ACTION_SPACES_KEY` + `getReservedActionSpaces` / `setReservedActionSpaces` | `shared/cards/helpers/card-state.ts` |
 
 声明字段：
 - `alsoCountsAs?: CardType[]` —— minor/occupation 也算作其它类型（dual-type）
 - `fireplaceIdentity?: boolean` —— 满足"返还壁炉"cost slot
+- `enablesPalisades?: boolean` —— 解锁在 fence edge 上放木栅栏（wooden palisades）
