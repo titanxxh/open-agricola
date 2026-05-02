@@ -37,7 +37,7 @@ describe('shouldSkipImmediateListenerLog', () => {
         logKey: 'log.cardEffectTrigger',
         flow: {
           type: 'leaf',
-          actionId: 'return-first-worker-home',
+          actionId: 'recall-placed-worker',
           sourceCard: 'D150_GodlySpouse',
         },
       }),

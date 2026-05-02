@@ -23,7 +23,6 @@ import { breedAction } from './effects/breed'
 import { takeFromCardAction } from './effects/internal/take-from-card'
 import { takeFromSpaceAction } from './effects/internal/take-from-space'
 import { emitChoiceAction } from './effects/internal/emit-choice'
-import { returnFirstWorkerHomeAction } from './effects/internal/return-first-worker-home'
 import { recallPlacedWorkerAction } from './effects/internal/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/internal/reserve-fence-bonus'
 import { storeOnCardAction } from './effects/internal/store-on-card'
@@ -61,7 +60,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   takeFromCardAction,
   takeFromSpaceAction,
   emitChoiceAction,
-  returnFirstWorkerHomeAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,
   storeOnCardAction,

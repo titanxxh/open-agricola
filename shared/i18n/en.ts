@@ -484,7 +484,6 @@ export const en = {
     'scythe-harvest-field': { name: 'Scythe Harvest', description: 'Harvest the entire top stack of one field at once' },
     'swap-field-grain-to-veg': { name: 'Swap Field Crop', description: 'Trade a fully sown grain field for 1 vegetable' },
     'special-effect': { name: 'Card Effect', description: 'Trigger a card-specific state mutation' },
-    'return-first-worker-home': { name: 'Return First Worker Home', description: 'Return the first worker placed this round back home' },
     'recall-placed-worker': { name: 'Recall Placed Worker', description: 'Return one of your placed workers back home' },
     'discard-from-hand': { name: 'Discard From Hand', description: 'Discard 1 card from your hand' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },

@@ -2054,7 +2054,7 @@ If `targetPlayerId` is unset or the player ID is not found in state, mutation fa
 
 - **顶层 18 个 BGA 一一对应**（22 个减去 `pay` / `receive` / `place-future-meeples` / `place-meeples-from-supply`，外加 `wish-children` 改名为 `family-growth`）：`activate-card / collect / construct / exchange / family-growth / fencing / first-player / gain / improvement / occupation / place-farmer / plow / reap / renovation / reorganize / sow / special-effect / stables`。
 - **顶层 3 个半特殊扩展**（语义紧贴 BGA pay / collect / scoring，且自身导出 `ActionDefinition`，不下沉）：`pay-resources / bake-bread / bonus-vp`。
-- **`internal/` 14 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-first-worker-home / return-to-space / selection / spend-worker / store-on-card / take-from-card`。
+- **`internal/` 14 个**：`build-farmhand-room / emit-choice / future-meeples / move-farmer-to-space / pop-card-stack / push-to-card-stack / recall-placed-worker / reserve-fence-bonus / return-to-space / selection / spend-worker / store-on-card / take-from-card / take-from-space`。`recall-placed-worker` 接受 `workerId` 直接召回 / 不带时进入 choice 模式，并支持 `flagSourceCard` / `logCardTrigger` / `noOpIfMissing` / `targetCardHold` 装饰；`return-first-worker-home` 已合并入此 action（2026-05-02）。同步 helper `cards/helpers/recall-worker.ts:recallWorkerById` 供 onBuy 等同步路径直接调用，不必走 leaf。
 - **`registry` (`registerAdHocAction`)** 不是 effect，2026-05-01 已外迁到 `helpers/ad-hoc-action-registry.ts`。
 
 ### BGA 对应位但本仓库不实装为 effect 的（实际逻辑由其它路径承担）

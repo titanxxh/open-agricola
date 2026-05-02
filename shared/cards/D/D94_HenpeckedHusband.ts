@@ -2,27 +2,39 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
 
 const CARD_ID = 'D94_HenpeckedHusband'
+const MEETING_PLACE_PREFIX = 'meeting-place'
 
-// D94 Henpecked Husband: Each time you take a Build Rooms action with the second
-// person you place, return the first person you placed home, unless it is on the
-// Meeting Place action space. The meeting-place exception is enforced by the
-// return-first-worker-home action itself.
+// D94 Henpecked Husband: Each time you take a Build Rooms action with the
+// second person you place, return the first person you placed home, unless it
+// is on the Meeting Place action space.
 const listener: CardListenerRegistration = {
   id: 'D94-henpecked-husband-after-construct',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (getRoundPlacementOrder(context.player).length !== 2) return
+    const placements = getRoundPlacementDetails(context.player)
+    if (placements.length !== 2) return
+
+    // Drop workerId when first is on Meeting Place — recall becomes a no-op
+    // while the log decoration still fires.
+    const first = placements[0]!
+    const targetWorkerId =
+      first.spaceId.startsWith(MEETING_PLACE_PREFIX) ? undefined : first.workerId
+
     return {
       flow: {
         type: 'leaf',
-        actionId: 'return-first-worker-home',
+        actionId: 'recall-placed-worker',
         sourceCard: CARD_ID,
-        params: { logCardTrigger: true },
+        params: {
+          workerId: targetWorkerId,
+          noOpIfMissing: true,
+          logCardTrigger: true,
+        },
       },
       sourceCard: CARD_ID,
     }

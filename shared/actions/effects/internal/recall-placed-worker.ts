@@ -2,39 +2,74 @@ import type { ActionDefinition, ActionSpace } from '../../../game/types'
 import { getRoundPlacementDetails } from '../../../cards/helpers/round-placement'
 import { removeWorkerRef, spaceHasPlayer } from '../../../game/space'
 import { holdWorkerOnCard } from '../../../cards/helpers/card-held-workers'
+import { recallWorkerById } from '../../../cards/helpers/recall-worker'
+import { setCardFlag } from '../../../cards/helpers/card-state'
 
 type RecallPlacedWorkerParams = {
+  /**
+   * Direct mode — recall this specific worker. Caller is responsible for
+   * computing the workerId (e.g. via `getRoundPlacementDetails(player)[0]`)
+   * since a single space may host more than one of the player's workers.
+   * Skips the choice prompt and the candidate-space scan entirely.
+   */
+  workerId?: string
+  /**
+   * Direct-mode tolerance — if the named worker is no longer placed (already
+   * recalled by another effect, race etc.), return `ok` rather than `fail`.
+   * Decorations (flagSourceCard / logCardTrigger) still execute.
+   */
+  noOpIfMissing?: boolean
+
+  /** Choice-mode filters (only used when `workerId` is omitted). */
   excludeSpaceId?: string
   excludeMeetingPlace?: boolean
-  forceFirst?: boolean
+
+  /** Decorations applied after a successful recall (or after a no-op). */
   targetCardHold?: string
+  flagSourceCard?: boolean
+  logCardTrigger?: boolean
 }
 
 /**
- * Generic "recall a worker I placed this round back home" helper.
+ * Generic "recall a placed worker back home" helper.
  *
- * Added for D93_SheepInspector. The BGA server-side card takes a raw
- * `returnFarmer` SPECIAL_EFFECT with a dynamic `spaces` arg list; our engine
- * expresses the same thing via an ActionDefinition whose `execute` returns a
- * `choice` listing the player's currently-occupied action spaces and whose
- * `resolveChoice` unsets the chosen space's `takenBy` and increments
- * `workersAvailable`.
+ * Two modes:
+ *  - **Direct** — caller passes `workerId`; the action finds the space hosting
+ *    that worker and recalls it. Card listeners typically compute the workerId
+ *    via `getRoundPlacementDetails(player)` and pass it in. Pair with
+ *    `noOpIfMissing: true` for "fire-and-forget" semantics where the recall
+ *    becomes a no-op when the targeted worker is gone.
+ *  - **Choice** — caller omits `workerId`; the action lists the player's
+ *    occupied spaces (filtered by `excludeSpaceId` / `excludeMeetingPlace`)
+ *    as a choice and recalls the chosen one.
  *
- * Params:
- *   - excludeSpaceId?: string  — space to exclude (the one just placed)
- *   - excludeMeetingPlace?: boolean (default true) — matches BGA rule
- *   - forceFirst?: boolean — skip choice UI and recall the first placement of the round
- *   - targetCardHold?: string — card ID to hold the recalled worker on instead of returning it home
+ * `workerId` is preferred over a space id because a single space can host
+ * more than one of the player's workers; identifying by space alone is
+ * ambiguous.
  *
- * This helper is narrow by design: it does not pay any cost, flag any card,
- * or interact with "fake" meeples. Wrap it in a SEQ with pay / flag leaves
- * when a card needs those.
+ * Decoration params apply uniformly: `targetCardHold` parks the recalled
+ * worker on a card instead of returning it home; `flagSourceCard` flips the
+ * source card's flag to true; `logCardTrigger` emits a `log.cardEffectTrigger`
+ * with the source card id.
+ *
+ * The helper does not pay any cost — wrap in a SEQ when a card needs payment.
  */
 
 const MEETING_PLACE_PREFIXES = ['meeting-place']
 
 const isMeetingPlace = (spaceId: string) =>
   MEETING_PLACE_PREFIXES.some((prefix) => spaceId.startsWith(prefix))
+
+const finishOk = (
+  player: import('../../../game/types').PlayerState,
+  sourceCard: string | undefined,
+  p: RecallPlacedWorkerParams,
+) => {
+  if (sourceCard && p.flagSourceCard) setCardFlag(player, sourceCard, true)
+  return sourceCard && p.logCardTrigger
+    ? { type: 'ok' as const, logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
+    : { type: 'ok' as const, logKey: 'log.cardEffectTrigger' }
+}
 
 export const recallPlacedWorkerAction: ActionDefinition = {
   id: 'recall-placed-worker',
@@ -43,12 +78,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params }) => {
-    const p = params as RecallPlacedWorkerParams | undefined
-    const excludeSpaceId = p?.excludeSpaceId
-    const excludeMeetingPlace = p?.excludeMeetingPlace ?? true
-    const forceFirst = p?.forceFirst === true
-    const targetCardHold = p?.targetCardHold
+  execute: ({ state, player, params, sourceCard }) => {
+    const p = (params as RecallPlacedWorkerParams | undefined) ?? {}
+    const targetCardHold = p.targetCardHold
 
     const applyRelocation = (space: ActionSpace, workerId: string | undefined) => {
       const removed = removeWorkerRef(space, player.id, workerId)
@@ -57,24 +89,16 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       }
     }
 
-    if (forceFirst) {
-      const placements = getRoundPlacementDetails(player)
-      const first = placements[0]
-      if (!first) return { type: 'fail', logKey: 'log.actionFail' }
-      if (excludeMeetingPlace && isMeetingPlace(first.spaceId)) {
-        return { type: 'fail', logKey: 'log.actionFail' }
-      }
-      if (excludeSpaceId && first.spaceId === excludeSpaceId) {
-        return { type: 'fail', logKey: 'log.actionFail' }
-      }
-      const origin = state.actionSpaces.find((s) => s.id === first.spaceId)
-      if (!origin) return { type: 'fail', logKey: 'log.actionFail' }
-      if (!origin.takenBy.some((t) => t.playerId === player.id && t.workerId === first.workerId)) {
-        return { type: 'fail', logKey: 'log.actionFail' }
-      }
-      applyRelocation(origin, first.workerId)
-      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+    // ── Direct mode ────────────────────────────────────────────────
+    if (p.workerId !== undefined) {
+      const ok = recallWorkerById(state, player, p.workerId, { targetCardHold })
+      if (!ok && !p.noOpIfMissing) return { type: 'fail', logKey: 'log.actionFail' }
+      return finishOk(player, sourceCard, p)
     }
+
+    // ── Choice mode ────────────────────────────────────────────────
+    const excludeSpaceId = p.excludeSpaceId
+    const excludeMeetingPlace = p.excludeMeetingPlace ?? true
 
     const candidates = state.actionSpaces.filter((space) => {
       if (!spaceHasPlayer(space, player.id)) return false
@@ -88,9 +112,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     if (candidates.length === 1) {
       const only = candidates[0]!
       const placements = getRoundPlacementDetails(player)
-      const entry = placements.find(e => e.spaceId === only.id)
+      const entry = placements.find((e) => e.spaceId === only.id)
       applyRelocation(only, entry?.workerId)
-      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+      return finishOk(player, sourceCard, p)
     }
 
     return {
@@ -102,18 +126,18 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       })),
     }
   },
-  resolveChoice: ({ state, player, params }, choice) => {
-    const p = params as RecallPlacedWorkerParams | undefined
+  resolveChoice: ({ state, player, params, sourceCard }, choice) => {
+    const p = (params as RecallPlacedWorkerParams | undefined) ?? {}
     const target = state.actionSpaces.find(
       (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
     if (!target) return { type: 'fail', logKey: 'log.actionFail' }
     const placements = getRoundPlacementDetails(player)
-    const entry = placements.find(e => e.spaceId === target.id)
+    const entry = placements.find((e) => e.spaceId === target.id)
     const removed = removeWorkerRef(target, player.id, entry?.workerId)
-    if (removed && p?.targetCardHold) {
+    if (removed && p.targetCardHold) {
       holdWorkerOnCard(player, p.targetCardHold, removed.workerId)
     }
-    return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+    return finishOk(player, sourceCard, p)
   },
 }
