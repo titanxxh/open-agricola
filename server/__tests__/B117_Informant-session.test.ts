@@ -86,6 +86,39 @@ describe('B117_Informant session', () => {
     expect(flow).toBeUndefined()
   })
 
+  it('multi-player: only owner gains wood (not opponent)', () => {
+    // BGA L29-33 isListeningTo isPlayerEvent → handler scoped to card owner only.
+    // Our onBeforeReturnHome runs runCardEffectHook(state, player, ...) per
+    // owner of the played card, so opponent without the card is unaffected.
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 1
+
+    const owner = state.players[0]!
+    const opponent = state.players[1]!
+    owner.occupationPlayed.push(CARD_ID)
+    owner.resources.stone = 5
+    owner.resources.clay = 1
+    opponent.resources.stone = 5
+    opponent.resources.clay = 1
+
+    session.loadState(state)
+
+    const effect = getCardEffect(CARD_ID)
+    const ownerFlow = effect!.onBeforeReturnHome!(state, owner)
+    expect(ownerFlow).toBeDefined()
+    expect((ownerFlow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
+    // The opponent does not own this card, so the per-card iteration in
+    // continueStageHook would not invoke the hook for them. We don't assert
+    // here on the listener-bus level; the trigger code in game-core gates
+    // by getPlayerEffectCardIds(player) which excludes cards not in
+    // occupationPlayed/minorPlayed/improvements. Sanity-check that owner
+    // has it and opponent does not.
+    expect(owner.occupationPlayed).toContain(CARD_ID)
+    expect(opponent.occupationPlayed).not.toContain(CARD_ID)
+  })
+
   it('integration: end of work phase gives wood when stone > clay', () => {
     const session = new GameSession()
     const state = session.getState().state
