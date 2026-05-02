@@ -52,11 +52,18 @@ export const E86_PenBuilder_impl = {
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',
+      cardId: CARD_ID,
       capacity: discards * 2,
       animalType: null,
       animalCount: 0,
     })
   },
+  /**
+   * BGA `Cards/E/E86_PenBuilder.php::getInvalidAnimals` returns []:
+   * capacity dynamically reflects discards * 2 via onPlayerComputeDropZones.
+   * Mirror BGA exactly.
+   */
+  getInvalidAnimals: () => [],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
