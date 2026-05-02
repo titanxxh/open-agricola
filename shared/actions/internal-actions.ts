@@ -17,6 +17,7 @@ import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
 import { payResourcesAction } from './effects/pay-resources'
+import { payAction } from './effects/pay'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
@@ -54,6 +55,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   anytimeReorgAction,
   anytimeExchangeAction,
   payResourcesAction,
+  payAction,
   returnToSpaceAction,
   bonusVpAction,
   breedAction,
