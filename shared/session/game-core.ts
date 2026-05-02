@@ -87,6 +87,10 @@ import type { CardExchange } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCardEffect } from '../cards/major/index.ts'
 import {
+  BASIC_CONVERSION_SOURCE_ID,
+  getBasicConversionExchange,
+} from '../cards/basic-conversion.ts'
+import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
@@ -2256,21 +2260,23 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // Resolve each selection to its underlying CardExchange entry. Either path
-    // (entry-index pointer or legacy resourceKey/food matching) yields the
-    // same `exchange` reference used downstream for cap-enforcement and
-    // bidirectional resource application.
-    const lookupCard = (sourceId: string) => {
-      if (player.improvements.includes(sourceId)) {
-        return getMajorCardEffect(sourceId)
+    // Resolve each selection to its underlying CardExchange entry. The new
+    // path uses (sourceId, exchangeIndex); a legacy single-key matching path
+    // is retained for back-compat and removed in Task 6.
+    const lookupExchange = (
+      sourceId: string,
+      idx: number,
+    ): import('../cards/types').CardExchange | undefined => {
+      if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
+        return getBasicConversionExchange(idx)
       }
-      if (player.minorPlayed.includes(sourceId)) {
-        return getRegisteredMinorImprovement(sourceId)
-      }
-      if (player.occupationPlayed.includes(sourceId)) {
-        return getRegisteredOccupation(sourceId)
-      }
-      return undefined
+      let card:
+        | { exchanges?: readonly import('../cards/types').CardExchange[] }
+        | undefined
+      if (player.improvements.includes(sourceId)) card = getMajorCardEffect(sourceId)
+      else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
+      else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
+      return card?.exchanges?.[idx]
     }
 
     // Enforce per-card exchange `max` (sourceId-level aggregate cap so that
@@ -2281,16 +2287,24 @@ export class GameCore {
     }
     const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel
-      const card = lookupCard(sel.sourceId)
-      if (!card?.exchanges) return sel
       let exchange: import('../cards/types').CardExchange | undefined
       if (typeof sel.exchangeIndex === 'number') {
-        const candidate = card.exchanges[sel.exchangeIndex]
-        if (candidate && (candidate.triggers ?? []).includes('harvest')) {
-          exchange = candidate
+        const candidate = lookupExchange(sel.sourceId, sel.exchangeIndex)
+        if (candidate) {
+          const triggers = candidate.triggers ?? []
+          if (triggers.includes('harvest') || triggers.includes('anytime')) {
+            exchange = candidate
+          }
         }
       } else {
-        exchange = (card.exchanges as CardExchange[]).find((ex) => {
+        // Legacy (resourceKey, food) single-key matching path; Task 6 removes.
+        const card =
+          (player.improvements.includes(sel.sourceId) && getMajorCardEffect(sel.sourceId)) ||
+          (player.minorPlayed.includes(sel.sourceId) && getRegisteredMinorImprovement(sel.sourceId)) ||
+          (player.occupationPlayed.includes(sel.sourceId) && getRegisteredOccupation(sel.sourceId)) ||
+          undefined
+        const exchanges = (card && (card as { exchanges?: CardExchange[] }).exchanges) || undefined
+        exchange = exchanges?.find((ex) => {
           if (!(ex.triggers ?? []).includes('harvest')) return false
           const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
           if (fromKeys.length !== 1) return false
