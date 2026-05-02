@@ -240,3 +240,36 @@ export const getListenerById = (listenerId: string): CardListenerRegistration | 
   const active = getActiveCardRegistry()
   return active?.getAllListeners().find((l) => l.id === listenerId)
 }
+
+/**
+ * Run `computeChoiceCandidates` phase listeners for a given action and merge
+ * their `extraOptions`. This is a generic extension point for action handlers
+ * that build their own choice list via `execute()` (i.e. without the
+ * engine-managed `getBaseChoiceOptions` opt-in flow): the handler can call
+ * this helper to let cards inject extra candidates.
+ *
+ * Used by minor-improvement.execute so cards like D131 CraftsmanshipPromoter
+ * can inject bottom-row major candidates into the minor-improvement choice.
+ */
+export const collectComputeChoiceCandidates = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+): import('../game/types').ActionChoiceOption[] => {
+  const baseCtx: CardListenerContext = {
+    state,
+    player,
+    actionId,
+    phase: 'computeChoiceCandidates' as ActionHookPhase,
+  } as CardListenerContext
+  const out: import('../game/types').ActionChoiceOption[] = []
+  for (const matched of getMatchingListeners(baseCtx)) {
+    const result = executeCardListener(matched.registration, baseCtx, {
+      ownerPlayerId: matched.ownerPlayerId,
+    })
+    if (result?.extraOptions) {
+      out.push(...result.extraOptions)
+    }
+  }
+  return out
+}
