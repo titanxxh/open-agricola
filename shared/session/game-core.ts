@@ -85,6 +85,7 @@ import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
+import { getAssignedAnimalCount } from '../game/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -556,15 +557,8 @@ export class GameCore {
     return p.resources.sheep + p.resources.boar + p.resources.cattle
   }
 
-  private getAssignedAnimalCount(p: PlayerState) {
-    const pasture = p.pastures.reduce((s, pa) => s + pa.animalCount, 0)
-    const house = p.houseAnimalType && p.houseAnimalCount > 0 ? p.houseAnimalCount : 0
-    const stable = Object.values(p.stableAnimals ?? {}).filter(Boolean).length
-    return pasture + house + stable
-  }
-
   private hasPendingAnimals(p: PlayerState) {
-    return this.getAnimalCount(p) > this.getAssignedAnimalCount(p)
+    return this.getAnimalCount(p) > getAssignedAnimalCount(p)
   }
 
   private nextPlayerIdx(players: PlayerState[], current: number) {
