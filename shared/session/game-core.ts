@@ -83,7 +83,6 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
-import type { CardExchange } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCardEffect } from '../cards/major/index.ts'
 import {
@@ -2239,18 +2238,11 @@ export class GameCore {
   confirmHarvestFeed(
     playerIndex: number,
     selections: {
-      resourceKey?: keyof Resource
       count: number
-      food?: number
       sourceName?: string
-      sourceId?: string
-      /**
-       * Optional entry-index pointer into `card.exchanges[]` (Sprint 6a). When
-       * provided, the consumer applies the exchange bidirectionally (subtract
-       * `from`, add `to`) — needed for reverse trades like C105 BasketCarrier.
-       * When omitted, falls back to legacy `(resourceKey, food)` matching.
-       */
-      exchangeIndex?: number
+      sourceId: string
+      /** Entry-index pointer into card.exchanges[] (D3 unified path). */
+      exchangeIndex: number
     }[],
   ): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
@@ -2260,9 +2252,10 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // Resolve each selection to its underlying CardExchange entry. The new
-    // path uses (sourceId, exchangeIndex); a legacy single-key matching path
-    // is retained for back-compat and removed in Task 6.
+    // Resolve each selection to its underlying CardExchange entry through the
+    // unified (sourceId, exchangeIndex) path. The synthetic '__basic__'
+    // sourceId resolves to the basic-conversion exchange table; everything
+    // else looks up the player's played majors / minors / occupations.
     const lookupExchange = (
       sourceId: string,
       idx: number,
@@ -2287,33 +2280,7 @@ export class GameCore {
     }
     const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel
-      let exchange: import('../cards/types').CardExchange | undefined
-      if (typeof sel.exchangeIndex === 'number') {
-        const candidate = lookupExchange(sel.sourceId, sel.exchangeIndex)
-        if (candidate) {
-          const triggers = candidate.triggers ?? []
-          if (triggers.includes('harvest') || triggers.includes('anytime')) {
-            exchange = candidate
-          }
-        }
-      } else {
-        // Legacy (resourceKey, food) single-key matching path; Task 6 removes.
-        const card =
-          (player.improvements.includes(sel.sourceId) && getMajorCardEffect(sel.sourceId)) ||
-          (player.minorPlayed.includes(sel.sourceId) && getRegisteredMinorImprovement(sel.sourceId)) ||
-          (player.occupationPlayed.includes(sel.sourceId) && getRegisteredOccupation(sel.sourceId)) ||
-          undefined
-        const exchanges = (card && (card as { exchanges?: CardExchange[] }).exchanges) || undefined
-        exchange = exchanges?.find((ex) => {
-          if (!(ex.triggers ?? []).includes('harvest')) return false
-          const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-          if (fromKeys.length !== 1) return false
-          const fromKey = fromKeys[0]!
-          if (fromKey !== sel.resourceKey) return false
-          const foodOut = (ex.to as Partial<Resource>).food ?? 0
-          return foodOut === (sel.food ?? 0)
-        })
-      }
+      const exchange = lookupExchange(sel.sourceId, sel.exchangeIndex)
       if (!exchange) return sel
       let capped = sel.count
       if (exchange.max !== undefined) {
@@ -2388,24 +2355,6 @@ export class GameCore {
             sel.sourceId ?? exchange.sourceId ?? 'unknown',
           )
         }
-      } else if (sel.resourceKey && typeof sel.food === 'number') {
-        // Legacy single-resource forward-trade fallback (no exchange resolved).
-        const available = player.resources[sel.resourceKey]
-        const used = Math.min(sel.count, available)
-        player.resources[sel.resourceKey] -= used
-        totalFood += used * sel.food
-        usedResources[sel.resourceKey] = (usedResources[sel.resourceKey] ?? 0) + used
-        incResourceConverted(player, sel.resourceKey, used)
-        addFoodFromConversion(player, sel.resourceKey, used * sel.food)
-        this.state.log.unshift({
-          key: 'log.harvestFeedConvert',
-          params: {
-            player: player.name,
-            source: sel.sourceName ?? 'Harvest conversion',
-            cost: { [sel.resourceKey]: used },
-            food: { food: used * sel.food },
-          },
-        })
       }
     }
     const required = this.pending.remaining
