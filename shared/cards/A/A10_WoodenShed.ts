@@ -4,11 +4,11 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A10_WoodenShed'
 
-// A10 Wooden Shed: only playable while still in the wooden house; provides room for 1 person.
-// BGA additionally restricts play to the Major Improvement action — our model does not track
-// the source action space at improvement-play time for minors, so we enforce only the house-type
-// and room-capacity aspects here. ("No renovation" is also BGA-specific bookkeeping; the card
-// naturally becomes redundant once the house leaves wood.)
+// A10 Wooden Shed: only playable via the Major Improvement action while still in the wooden
+// house; provides room for 1 person. BGA `isBuyable` enforces actionType ∈ {Major, MajorOrMinor};
+// we model that with `mustBePlayedViaMajorImprovementAction` (blocks the `minor-improvement`
+// action space). "No renovation" is BGA-specific bookkeeping; the card naturally becomes
+// redundant once the house leaves wood.
 registerPrerequisite('Still in Wooden House', (player) => player.houseType === 'wood')
 
 export const A10_WoodenShed = new MinorImprovement({
@@ -20,6 +20,7 @@ export const A10_WoodenShed = new MinorImprovement({
   desc: ['This card can only be played via a __Major Improvement__ action. It provides room for one person. You may no longer renovate.'],
   cost: { wood: 2, reed: 1 },
   prerequisite: 'Still in Wooden House',
+  mustBePlayedViaMajorImprovementAction: true,
   evenMoreSet: true,
 })
 

@@ -63,6 +63,23 @@ const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | nul
 const resolveImprovementActionCardId = (mode: ImprovementPlayMode) =>
   mode === 'minor' ? 'minor-improvement' : 'improvement-any'
 
+/**
+ * BGA `isBuyable` actionType gate: cards flagged
+ * `mustBePlayedViaMajorImprovementAction` (e.g. A10 Wooden Shed) cannot be
+ * bought through the Minor-Improvement action space. Returns false when the
+ * caller's `actionCardId` is `'minor-improvement'` (BGA `actionType=Minor`).
+ *
+ * `improvement-any` (Major Improvement space) always allows it; card-effect
+ * plays without an actionCardId pass through (some listeners replay onBuy
+ * paths without the action context — those should not be blocked).
+ */
+const isBlockedByMajorImprovementActionGate = (
+  improvement: ResolvedMinorImprovement,
+  actionCardId: string | undefined,
+): boolean =>
+  !!improvement.mustBePlayedViaMajorImprovementAction
+    && actionCardId === 'minor-improvement'
+
 const getMinorImprovementBaseCost = (
   improvementId: string,
 ) => {
@@ -291,6 +308,7 @@ export const isMinorImprovementPlayable = (
     return false
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
@@ -306,6 +324,7 @@ const buildPlayableMinorOptions = (
         !!improvement,
     )
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -350,6 +369,7 @@ const buildMinorImprovementOptions = (
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -598,6 +618,9 @@ export const playMinorImprovement = (
   }
   if (improvement.mustBePlayedViaMinorAction && playContext !== 'minorAction') {
     return { type: 'fail', logKey: 'log.minorImprovementRequiresMinorAction' }
+  }
+  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
