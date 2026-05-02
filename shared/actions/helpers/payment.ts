@@ -638,16 +638,17 @@ export const computeAllBuyableCombinations = (
 
   for (const sol of rawSolutions) {
     const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
-    // Drop solutions whose net payment goes negative when costType is set —
-    // typically these are over-produced multi-trade combinations (e.g. two
-    // typed `stables` trades both converting to wood for a 2-wood fee that a
-    // single trade already covers). Single-trade legitimate-surplus paths are
-    // exempt: D117 Wood Expert deliberately trades 1 food → 2 wood credit
-    // for a 1-wood fee, paying 1 wood from credit and keeping the remaining
-    // 1 wood as `wood: -1` paid. The filter is single-trade-aware so the
-    // intentional credit surfaces while genuine overproduction is pruned.
+    // Drop solutions whose net payment goes negative when costType is set,
+    // unless the negative is the legitimate one-shot credit surplus from a
+    // single trade fired exactly once. D117 Wood Expert: trade 1 food → 2
+    // wood credit for a 1-wood fee, paying 1 wood from credit and keeping
+    // the remaining 1 wood as `wood: -1` paid. Genuine over-trades —
+    // multiple trade types stacked, OR the same trade fired multiple times
+    // beyond the fee — are pruned (e.g. typed-stables 2-trade combos and
+    // B155 ArtTeacher's 3-times-trade overpay).
     const tradesActuallyUsed = sol.tradesUsed.filter((entry) => entry.times > 0)
-    const exemptFromNegativeFilter = tradesActuallyUsed.length === 1
+    const exemptFromNegativeFilter =
+      tradesActuallyUsed.length === 1 && tradesActuallyUsed[0]!.times === 1
     if (
       costType
       && !exemptFromNegativeFilter
