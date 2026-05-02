@@ -6,6 +6,12 @@ import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
 } from '../../../shared/cards/types'
+import { getMajorCardEffect } from '../../../shared/cards/major'
+import {
+  BASIC_CONVERSION_SOURCE_ID,
+  basicConversionExchanges,
+} from '../../../shared/cards/basic-conversion'
+import type { CardExchange } from '../../../shared/cards/types'
 
 export type HarvestFeedPending = {
   playerIndex: number
@@ -17,23 +23,18 @@ export type HarvestFeedPending = {
 export type HarvestFeedOption = {
   id: string
   sourceName: string
-  /**
-   * Legacy single-resource forward-trade fields. Kept for back-compat with
-   * the basic conversion + Major Fireplace prompt path.
-   */
-  resourceKey: keyof Resource
-  food: number
+  sourceId: string
+  exchangeIndex: number
+  from: Partial<Resource>
+  to: Partial<Resource>
   max?: number
-  sourceId?: string
   /**
-   * Sprint 6a entry-index pointer (preferred when present). When set, the
-   * server applies the exchange bidirectionally — supporting reverse trades
-   * (food -> resources, e.g. C105) and multi-key conversions.
+   * Compat fields kept during the D3 migration (Task 5 removes them). Filled
+   * only for single-input, food-output trades so legacy UI code that still
+   * reads `option.resourceKey` / `option.food` keeps working.
    */
-  exchangeIndex?: number
-  /** Full from/to maps for prompt rendering of multi-key trades. */
-  from?: Partial<Resource>
-  to?: Partial<Resource>
+  resourceKey?: keyof Resource
+  food?: number
 }
 
 export type HarvestContext = {
@@ -48,126 +49,75 @@ export const canFinalizeHarvest = (pendingFeedByPlayerId: Record<string, number>
 
 export const runHarvestFlow = (state: GameState) => performHarvest(state)
 
+const isHarvestFeedTrigger = (ex: CardExchange) => {
+  const triggers = ex.triggers ?? []
+  return triggers.includes('harvest') || triggers.includes('anytime')
+}
+
+const playerCanAfford = (player: PlayerState, ex: CardExchange) => {
+  for (const [k, v] of Object.entries(ex.from)) {
+    const need = (v as number) ?? 0
+    if (need > 0 && player.resources[k as keyof Resource] < need) return false
+  }
+  return true
+}
+
 export const buildHarvestFeedOptions = (
   player: PlayerState,
   locale: Locale,
   cardLabel: (id: string) => string,
 ): HarvestFeedOption[] => {
   const options: HarvestFeedOption[] = []
-  const addOption = (
+  const basicSourceName = locale === 'zh' ? '基础转化' : 'Basic conversion'
+
+  const pushFromExchanges = (
+    sourceId: string,
     sourceName: string,
-    resourceKey: keyof Resource,
-    food: number,
-    idSuffix: string,
+    exchanges: readonly CardExchange[] | undefined,
   ) => {
-    if (player.resources[resourceKey] <= 0) return
-    options.push({
-      id: `${idSuffix}-${resourceKey}-${food}`,
-      sourceName,
-      resourceKey,
-      food,
+    if (!exchanges) return
+    exchanges.forEach((ex, idx) => {
+      if (!isHarvestFeedTrigger(ex)) return
+      if (!playerCanAfford(player, ex)) return
+      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
+      const isSingleFoodTrade =
+        fromKeys.length === 1 &&
+        ((ex.from as Partial<Resource>)[fromKeys[0]!] ?? 0) === 1 &&
+        ((ex.to as Partial<Resource>).food ?? 0) > 0
+      options.push({
+        id: `${sourceId}-ex${idx}`,
+        sourceName,
+        sourceId,
+        exchangeIndex: idx,
+        from: { ...ex.from },
+        to: { ...ex.to },
+        max: ex.max,
+        resourceKey: isSingleFoodTrade ? fromKeys[0]! : undefined,
+        food: isSingleFoodTrade ? ((ex.to as Partial<Resource>).food ?? 0) : undefined,
+      })
     })
   }
-  const basicSource =
-    locale === 'zh' ? '基础转化' : 'Basic conversion'
-  addOption(basicSource, 'grain', 1, 'basic')
-  addOption(basicSource, 'vegetable', 1, 'basic')
-  const cookingSources = [
-    {
-      id: 'Major_Fireplace1',
-      vegetable: 2,
-      sheep: 2,
-      boar: 2,
-      cattle: 3,
-    },
-    {
-      id: 'Major_Fireplace2',
-      vegetable: 2,
-      sheep: 2,
-      boar: 2,
-      cattle: 3,
-    },
-    {
-      id: 'Major_CookingHearth1',
-      vegetable: 3,
-      sheep: 2,
-      boar: 3,
-      cattle: 4,
-    },
-    {
-      id: 'Major_CookingHearth2',
-      vegetable: 3,
-      sheep: 2,
-      boar: 3,
-      cattle: 4,
-    },
-  ]
-  cookingSources.forEach((source) => {
-    if (!player.improvements.includes(source.id)) return
-    const sourceName = cardLabel(source.id)
-    addOption(sourceName, 'vegetable', source.vegetable, source.id)
-    addOption(sourceName, 'sheep', source.sheep, source.id)
-    addOption(sourceName, 'boar', source.boar, source.id)
-    addOption(sourceName, 'cattle', source.cattle, source.id)
-  })
-  // Harvest-trigger exchanges from played minors/occupations.
-  // Sprint 6a: surface every harvest-window exchange as an entry-index
-  // pointer so the server can apply it bidirectionally (forward + reverse).
-  // Legacy single-key forward trades still populate `resourceKey`/`food` for
-  // back-compat with prompts that read those fields.
-  const addExchangeOption = (
-    cardId: string,
-    ex: import('../../../shared/cards/types').CardExchange,
-    idx: number,
-  ) => {
-    const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-    // Affordability gate: every `from` resource must be present (>=1 unit).
-    for (const k of fromKeys) {
-      const need = (ex.from as Partial<Resource>)[k] ?? 0
-      if (need > 0 && player.resources[k] < need) return
-    }
-    // Legacy compat: report `resourceKey`/`food` only for single-input,
-    // food-output trades. Reverse / multi-key trades still attach the
-    // entry-index pointer; the server prefers it when present.
-    let resourceKey: keyof Resource = (fromKeys[0] ?? 'food') as keyof Resource
-    let food = 0
-    if (fromKeys.length === 1) {
-      const k = fromKeys[0]!
-      const fromCount = (ex.from as Partial<Resource>)[k] ?? 0
-      const foodOut = (ex.to as Partial<Resource>).food ?? 0
-      if (fromCount === 1 && foodOut > 0) {
-        resourceKey = k
-        food = foodOut
-      }
-    }
-    options.push({
-      id: `${cardId}-harvest-ex${idx}`,
-      sourceName: cardLabel(cardId),
-      resourceKey,
-      food,
-      max: ex.max,
-      sourceId: cardId,
-      exchangeIndex: idx,
-      from: { ...ex.from },
-      to: { ...ex.to },
-    })
+
+  // 1. Basic conversion (synthetic source)
+  pushFromExchanges(BASIC_CONVERSION_SOURCE_ID, basicSourceName, basicConversionExchanges)
+
+  // 2. Improvements (includes majors)
+  for (const cardId of player.improvements) {
+    const major = getMajorCardEffect(cardId)
+    pushFromExchanges(cardId, cardLabel(cardId), major?.exchanges)
   }
+
+  // 3. Minors
   for (const cardId of player.minorPlayed) {
     const card = getRegisteredMinorImprovement(cardId)
-    if (!card?.exchanges) continue
-    card.exchanges.forEach((ex, idx) => {
-      if (!(ex.triggers ?? []).includes('harvest')) return
-      addExchangeOption(cardId, ex, idx)
-    })
+    pushFromExchanges(cardId, cardLabel(cardId), card?.exchanges)
   }
+
+  // 4. Occupations
   for (const cardId of player.occupationPlayed) {
     const card = getRegisteredOccupation(cardId)
-    if (!card?.exchanges) continue
-    card.exchanges.forEach((ex, idx) => {
-      if (!(ex.triggers ?? []).includes('harvest')) return
-      addExchangeOption(cardId, ex, idx)
-    })
+    pushFromExchanges(cardId, cardLabel(cardId), card?.exchanges)
   }
+
   return options
 }
-
