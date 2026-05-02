@@ -114,6 +114,7 @@ const CARD_IMPL = {
 |------|----------|------|
 | onBuy | 打出此卡时 | 一次 |
 | onBeforeStartOfTurn | 每轮发新行动前 | 每轮 |
+| onBeforePlayerTurn | 玩家个人回合开始前（可返回 \`{skipTurn:true}\` 跳过本人回合） | 每行动 |
 | onRoundStart | 新一轮格子翻开后 | 每轮 |
 | onAllWorkersPlaced | 所有工人放置完成 | 每轮 |
 | onEndTurn | 每名玩家行动结束后 | 每行动 |
@@ -142,6 +143,7 @@ const CARD_IMPL = {
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
 | computeFenceDiscount | 返回折扣数 | 围栏折扣 |
 | computeFenceFreeAvailable | 返回上限免费 fence 数 | 围栏 entry-guard 加成 |
+| getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
 
