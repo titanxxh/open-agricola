@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
@@ -784,8 +784,12 @@ export const minorImprovementAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player }, choice) =>
-    playImprovement(state, player, choice, 'any'),
+  resolveChoice: ({ state, player, sourceCard }, choice) => {
+    const actionCardId = sourceCard ?? 'minor-improvement'
+    const flow = buildImprovementFlow(state, player, choice, actionCardId, false)
+    if (!flow) return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'flow', flow }
+  },
 }
 
 /**
@@ -815,6 +819,73 @@ const canAffordInjectedImprovement = (
     return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
   }
   return false
+}
+
+/**
+ * Resolve the player's improvement-any choice (e.g. `major:Major_Fireplace1`)
+ * into an engine flow `seq:[pay, apply-improvement]`. Returns `null` when the
+ * preview cost cannot be derived (e.g. catalog miss) so the legacy
+ * `playImprovement` entry can produce a `fail` result.
+ *
+ * Used by the WS / engine path; the HTTP `playImprovement` entry keeps its
+ * own legacy mutate-in-place flow so it works without engine dispatch.
+ */
+const buildImprovementFlow = (
+  state: GameState,
+  player: PlayerState,
+  choice: string,
+  actionCardId: string,
+  suppressOnBuyEffects: boolean,
+): ActionFlow | null => {
+  const parsed = parseImprovementChoice(choice)
+  let kind: 'major' | 'minor'
+  let id: string
+  if (parsed.kind === 'major') {
+    kind = 'major'
+    id = parsed.id
+  } else if (parsed.kind === 'minor') {
+    kind = 'minor'
+    id = parsed.id
+  } else {
+    if (isMajorCardId(parsed.id)) {
+      kind = 'major'
+      id = parsed.id
+    } else if (getMinorImprovement(parsed.id)) {
+      kind = 'minor'
+      id = parsed.id
+    } else {
+      return null
+    }
+  }
+  const previewCost = kind === 'major'
+    ? getMajorImprovementPreviewCost(state, player, id, actionCardId)
+    : getMinorImprovementPreviewCost(state, player, id, actionCardId)
+  if (!previewCost) return null
+  const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
+  const includeReturnedCard = isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const payParams: Record<string, unknown> = {
+    cost: previewCost,
+    costType: kind === 'major' ? 'major-improvement' : 'minor-improvement',
+    optionPrefix,
+    includeReturnedCard,
+  }
+  return {
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'pay',
+        sourceCard: id,
+        params: payParams,
+      },
+      {
+        type: 'leaf',
+        actionId: 'apply-improvement',
+        sourceCard: id,
+        params: { improvementId: id, kind, suppressOnBuyEffects },
+      },
+    ],
+  }
 }
 
 export const improvementAnyAction: ActionDefinition = {
@@ -863,14 +934,12 @@ export const improvementAnyAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player, sourceCard, params }, choice) =>
-    playImprovement(
-      state,
-      player,
-      choice,
-      'any',
-      undefined,
-      sourceCard,
-      (params as { suppressOnBuyEffects?: boolean } | undefined)?.suppressOnBuyEffects === true,
-    ),
+  resolveChoice: ({ state, player, sourceCard, params }, choice) => {
+    const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
+    const suppressOnBuyEffects =
+      (params as { suppressOnBuyEffects?: boolean } | undefined)?.suppressOnBuyEffects === true
+    const flow = buildImprovementFlow(state, player, choice, actionCardId, suppressOnBuyEffects)
+    if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
+    return { type: 'flow', flow }
+  },
 }

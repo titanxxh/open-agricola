@@ -12,6 +12,7 @@ import {
   executePaymentSolution,
   isComplexCost,
   payResources,
+  returnCardToBoard,
 } from '../helpers/payment'
 import { resolveCostPaymentSelection } from '../helpers/pay-helpers'
 
@@ -72,8 +73,12 @@ const buildSelectedResult = (
   costType: CostModifierType | undefined,
   player: import('../../game/types').PlayerState,
   state: import('../../game/types').GameState,
+  includeReturnedCard?: boolean,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
+  if (includeReturnedCard && solution.cardUsed) {
+    returnCardToBoard(player, solution.cardUsed, state)
+  }
   const resourcesPaid = solution.resourcesPaid
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
@@ -146,6 +151,7 @@ export const payAction: ActionDefinition = {
         p.costType,
         player,
         state,
+        p.includeReturnedCard,
       )
     }
     const flat = p.cost as Partial<Resource>
