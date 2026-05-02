@@ -2,24 +2,22 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import { isFieldCard } from '../catalog'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C80_RockyTerrain'
 
 /**
- * C80 Rocky Terrain — Each time you plow a field (tile or card), you can buy
- * 1 STONE for 1 FOOD.
+ * C80 Rocky Terrain (BGA `Cards/C/C80_RockyTerrain.php`):
+ *   "Each time you plow a field (tile or card), you can also buy 1 STONE for 1 FOOD."
  *
- * BGA: triggers on Plow / Improvement / Occupation events; the latter two
- * are gated by `PlayerCards::get($cardId)->isField()` so only "field card"
- * variants of improvements / occupations trigger the bonus.
- *
- * Implementation: plow listener is the canonical path. Improvement and
- * occupation listeners are registered as architectural placeholders — our
- * card model has no `isField` annotation; every BGA field-card is
- * implemented here as a regular minor / occupation, so these listeners
- * currently never fire (registered as §2.5 simplification — adding the
- * `isField` annotation is independent of C80 itself).
+ * Mirrors the BGA isListeningTo: Plow / Improvement / Occupation, with the
+ * latter two gated on the played card carrying `field=true` (BGA ruling
+ * "Playing field cards counts as plowing a field"). We mirror via the
+ * generic `isField` metadata flag (Sprint 7d basis) plus three listeners:
+ *   - after `plow`             — always fires (field tile plow)
+ *   - after `improvement-any`  — fires when the built improvement isField
+ *   - after `play-occupation`  — fires when the played occupation isField
  */
 
 const buyStoneForFood = (player: CardListenerContext['player']): ActionHookResult | void => {
@@ -40,29 +38,30 @@ const plowListener: CardListenerRegistration = {
     buyStoneForFood(context.player),
 }
 
-// Placeholder — would only fire if the played card carried an `isField`
-// marker. We never annotate cards that way (§2.5 simplification).
-const improvementFieldCardListener: CardListenerRegistration = {
-  id: 'C80-rocky-terrain-after-improvement-field-card',
+// improvement-any: context.choice is "minor:<id>" or "major:<id>"
+const improvementFieldListener: CardListenerRegistration = {
+  id: 'C80-rocky-terrain-after-improvement-field',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
-    // No card in our registry declares `isField` — placeholder for parity
-    // with BGA `onPlayerAfterImprovement` + `card->isField()` gate.
-    return
+  actions: ['improvement-any'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const choice = context.choice ?? ''
+    const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!builtId || !isFieldCard(builtId)) return
+    return buyStoneForFood(context.player)
   },
 }
 
-const occupationFieldCardListener: CardListenerRegistration = {
-  id: 'C80-rocky-terrain-after-occupation-field-card',
+// play-occupation: context.choice is the occupation id (no prefix)
+const occupationFieldListener: CardListenerRegistration = {
+  id: 'C80-rocky-terrain-after-occupation-field',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['occupation', 'play-occupation'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
-    // No card in our registry declares `isField` — placeholder for parity
-    // with BGA `onPlayerAfterOccupation` + `card->isField()` gate.
-    return
+  actions: ['play-occupation'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const playedId = context.choice
+    if (!playedId || !isFieldCard(playedId)) return
+    return buyStoneForFood(context.player)
   },
 }
 
@@ -79,6 +78,6 @@ export const C80_RockyTerrain = new MinorImprovement({
 })
 
 export const C80_RockyTerrain_impl = {
-  listeners: [plowListener, improvementFieldCardListener, occupationFieldCardListener],
+  listeners: [plowListener, improvementFieldListener, occupationFieldListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
