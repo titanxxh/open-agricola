@@ -49,7 +49,10 @@ const removeVegetableFromField = (player: { fields: Field[] }): boolean => {
  * Requires a vegetable field with >= 2 remaining.
  *
  * The handler is side-effect-free (no field mutation) because it runs during
- * availability checks. The returned flow only grants food.
+ * availability checks. The actual field decrement is done by the
+ * `special-effect remove-field-crop` leaf inside the returned flow, so the
+ * mutation only happens when the player actually picks the anytime entry
+ * and the engine executes the SEQ.
  */
 const anytimeListener: CardListenerRegistration = {
   id: 'C57-crudite-anytime',
@@ -58,7 +61,18 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!hasQualifyingVegetableField(context.player)) return
     return {
-      flow: gainLeaf(CARD_ID, { food: 4 }),
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'remove-field-crop', crop: 'vegetable', minRemaining: 2 },
+          },
+          gainLeaf(CARD_ID, { food: 4 }),
+        ],
+      },
       sourceCard: CARD_ID,
       labelKey: 'cards.C57_Crudite.anytime',
     }

@@ -19,7 +19,8 @@ const afterRenovateListener: CardListenerRegistration = {
     if (rooms <= 0) return
     if (context.player.resources.wood < 1) return
 
-    // XOR: pay 1 wood for 1 VP, pay 2 wood for 2 VP, ... pay N wood for N VP
+    // XOR: pay 1..N wood; each placed wood is worth 1 bonus VP via
+    // computeBonusScore reading cardStates.counters.woodPlaced.
     const maxWood = Math.min(rooms, context.player.resources.wood)
     const children: ActionFlow[] = []
     for (let i = 1; i <= maxWood; i++) {
@@ -27,11 +28,12 @@ const afterRenovateListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { wood: i } }),
-          ...Array.from({ length: i }, () => ({
-            type: 'leaf' as const,
-            actionId: 'bonus-vp',
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
             sourceCard: CARD_ID,
-          })),
+            params: { kind: 'increment-counter', key: 'woodPlaced', amount: i },
+          },
         ],
       })
     }

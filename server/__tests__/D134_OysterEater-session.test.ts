@@ -59,13 +59,16 @@ describe('D134_OysterEater session', () => {
     expect(after.players[0]!.cardStates?.D134_OysterEater?.counters?.bonusVp).toBe(1)
   })
 
-  it('records a skipNextPlacement flag after fishing trigger', () => {
+  it('records a skipNextPlacement flag after fishing trigger (before owner turn)', () => {
     const session = setup(1)
 
-    let resp = session.takeAction(1, 'fishing')
+    const resp = session.takeAction(1, 'fishing')
     expect(resp.ok).toBe(true)
-    resp = drainPending(session, resp)
-
+    // The flag is written by the increment-extra-data SE in the listener
+    // chain, which runs before the engine yields control. Inspect state
+    // immediately, without confirming the next-player transition (which
+    // would consume the flag via onBeforePlayerTurn — see
+    // D134_OysterEater-skip-deferred-session.test.ts).
     const after = session.getState().state
     const extra = after.players[0]!.cardStates?.D134_OysterEater?.extraData
     expect(extra?.skipNextPlacement).toBe(1)

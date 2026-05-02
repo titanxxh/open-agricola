@@ -73,7 +73,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
+import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
@@ -2416,6 +2416,32 @@ export class GameCore {
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
     this.turnOwnerPlayerIndex = null
+
+    // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
+    // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
+    // skip, advance to the next eligible player. Cap at `players.length` to
+    // guarantee termination if every player is asked to skip.
+    let safety = this.state.players.length
+    while (safety-- > 0) {
+      const allWorkersUsedNow = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
+      if (allWorkersUsedNow) break
+      const current = this.state.players[this.state.currentPlayerIndex]
+      if (!current) break
+      if (workersAvailable(this.state, current) <= 0) {
+        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+        if (next === this.state.currentPlayerIndex) break
+        this.state.currentPlayerIndex = next
+        continue
+      }
+      if (!shouldSkipPlayerTurn(this.state, current)) break
+      this.state.log.unshift({
+        key: 'log.playerSkipped',
+        params: { playerName: current.name },
+      })
+      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+      if (next === this.state.currentPlayerIndex) break
+      this.state.currentPlayerIndex = next
+    }
 
     // Check if all workers are used (round end condition)
     const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)

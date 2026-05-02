@@ -24,10 +24,11 @@ const stablesCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    // BGA `countCarpenterDiscounts`: only the 3rd and 4th stable get -1 wood.
+    // Players never build a 5th (max stable count is 4) but cap defensively.
     const stablesBuilt = context.player.stableTiles.length
-    if (stablesBuilt >= 2) {
-      return { costs: { wood: -1 } }
-    }
+    if (stablesBuilt < 2 || stablesBuilt >= 4) return
+    return { costs: { wood: -1 } }
   },
 }
 

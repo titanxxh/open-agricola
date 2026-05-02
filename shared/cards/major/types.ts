@@ -2,7 +2,13 @@ import type { Resource, ComplexCost } from '../../game/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
 import type { CardDefinition } from '../types'
 
-export type MajorEffectHook = CardEffectHook
+/**
+ * Hooks majors are allowed to register. Excludes `onBeforePlayerTurn`
+ * because that hook returns `{ skipTurn?: boolean } | void` rather than
+ * `ActionFlow | void`, and `applyMajorEffectForImprovement` assumes every
+ * hook is flow-shaped.
+ */
+export type MajorEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
 
 /**
  * Major improvement card metadata. Majors carry both CardDefinition fields

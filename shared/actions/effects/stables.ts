@@ -1,9 +1,10 @@
-import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState, Resource } from '../../game/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
 import { payResources } from '../helpers/payment'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { canAffordCost } from '../helpers/pay-helpers'
+import { applyCostOverride } from '../helpers/payment'
 
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
@@ -23,14 +24,22 @@ const stablesCostPreview: ActionCostPreview = {
   getBaseCost: () => ({ wood: stableWoodCost }),
 }
 
+const readCostOverride = (
+  actionContext?: Record<string, unknown>,
+): Partial<Resource> | undefined => {
+  const override = actionContext?.costOverride
+  if (!override || typeof override !== 'object') return undefined
+  return override as Partial<Resource>
+}
+
 export const stablesAction: ActionDefinition = {
   id: 'stables',
   nameKey: 'actions.stables.name',
   descriptionKey: 'actions.stables.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    canExecuteWithCostPreview(stablesCostPreview, { state, player }),
+  canBeExecutedByPlayer: (state, player, opts) =>
+    canExecuteWithCostPreview(stablesCostPreview, { state, player }, readCostOverride(opts?.actionContext)),
   costPreview: stablesCostPreview,
   execute: () => ({
     type: 'choice',
@@ -42,3 +51,6 @@ export const stablesAction: ActionDefinition = {
   }),
   resolveChoice: () => ({ type: 'ok' }),
 }
+
+// re-export for external callers building actionContext
+export { applyCostOverride }

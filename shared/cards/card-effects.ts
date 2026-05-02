@@ -17,6 +17,16 @@ export type ExtraSowableField = {
 
 export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
 
+/**
+ * Lightweight meeple shape consumed by `getInvalidAnimals`. Our model
+ * aggregates animals as `(animalType, animalCount)` per zone; per-meeple
+ * validation expands the aggregate into a list of these stubs so card
+ * authors can mirror BGA's `foreach($zone['meeples'] as $meeple)` loop.
+ */
+export type Meeple = {
+  type: 'sheep' | 'boar' | 'cattle'
+}
+
 export type PaymentInfo = {
   resourcesPaid: Partial<Resource>
   feeIndex?: number
@@ -34,6 +44,7 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onEndHarvest' | 'onAfterHarvest'
   | 'onBeforeEndGame'
   | 'onBeforeStartOfTurn'
+  | 'onBeforePlayerTurn'
   | 'onAllWorkersPlaced'
 
 /**
@@ -50,6 +61,7 @@ export type CardEffectField = CardEffectHook
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles' | 'computeFenceDiscount' | 'computeFenceFreeAvailable'
+  | 'getInvalidAnimals'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -76,6 +88,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onAfterHarvest',
   'onBeforeEndGame',
   'onBeforeStartOfTurn',
+  'onBeforePlayerTurn',
   'onAllWorkersPlaced',
   'resolveChoice',
   'computeBonusScore',
@@ -88,6 +101,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeLockedFarmTiles',
   'computeFenceDiscount',
   'computeFenceFreeAvailable',
+  'getInvalidAnimals',
 ]
 
 type EffectHandler = (state: GameState, player: PlayerState) => void
@@ -160,12 +174,38 @@ export type CardEffect = {
    *  Use to mutate state (e.g. give resources) so categories see them. */
   onBeforeEndGame?: EffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
+  /**
+   * Fires immediately before control switches to a new active player at the
+   * start of their labor turn. If any handler returns `{ skipTurn: true }`,
+   * `GameCore` skips that player's turn and advances to the next eligible
+   * player. Mirrors BGA `Globals::setSkipNext` consumed in `stLabor()`.
+   *
+   * Note: this is per-labor-turn (every `confirmNextPlayer`), distinct from
+   * `onBeforeStartOfTurn` which fires once per round at round start.
+   */
+  onBeforePlayerTurn?: (state: GameState, player: PlayerState) => { skipTurn?: boolean } | void
   onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
   onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void | AnimalZone[]
+  /**
+   * Per-card zone validation. Mirrors BGA `getInvalidAnimals($zone, $raise)`.
+   * Given the meeples currently in a card-owned zone, return the subset that
+   * violates this card's per-type / per-cap constraints. The reorg / capacity
+   * enforcement path consumes the result to evict invalid animals.
+   *
+   * Caller is `enforceAnimalCapacity` for any card-typed zone whose owner
+   * declares this hook. If unset, only the zone's static `capacity` field is
+   * applied (legacy behavior).
+   */
+  getInvalidAnimals?: (
+    player: PlayerState,
+    zone: AnimalZone,
+    meeples: Meeple[],
+    state: GameState,
+  ) => Meeple[]
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
   /** Handle sowing into an extra field returned by onComputeSowableFields. */
@@ -311,6 +351,37 @@ export const runAfterFeedHooks = (state: GameState, player: PlayerState): void =
 
 export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onBeforeEndGame')
+
+/**
+ * Run `onBeforePlayerTurn` listeners for every card the player owns and return
+ * `true` if any handler asked to skip the turn. Hooks are not allowed to push
+ * an ActionFlow here — only to signal skipTurn. Errors from custom cards are
+ * swallowed (consistent with other hook helpers).
+ */
+export const shouldSkipPlayerTurn = (state: GameState, player: PlayerState): boolean => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let skip = false
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.onBeforePlayerTurn
+    if (!handler) continue
+    try {
+      const result = handler(state, player)
+      if (result && result.skipTurn) skip = true
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} onBeforePlayerTurn threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return skip
+}
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

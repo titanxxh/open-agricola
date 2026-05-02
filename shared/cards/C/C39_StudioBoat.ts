@@ -99,6 +99,8 @@ export const C39_StudioBoat_impl = {
       if (!space) return
       space.resources.food = (space.resources.food ?? 0) + 1
     },
+    computeBonusScore: (_state, player) =>
+      player.cardStates?.[CARD_ID]?.counters?.bonusVp ?? 0,
   },
   listeners: [travelingPlayersOwnerVp],
   reaches: [] as readonly string[],

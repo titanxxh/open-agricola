@@ -1,8 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import type { PlayerState, GameState } from '../../shared/game/types'
 
 import '../../shared/cards/C/C88_CarpentersApprentice'
 import '../../shared/cards/B/B30_WoodPalisades'
+
+const stablesDiscount = (player: PlayerState): number => {
+  const listeners = getRegisteredCardListeners().filter((l) =>
+    l.cardIds?.includes('C88_CarpentersApprentice'),
+  )
+  const stableListener = listeners.find(
+    (l) =>
+      l.actions?.includes('stables') &&
+      l.phases?.includes('computeCosts'),
+  )
+  if (!stableListener) return 0
+  const ctx = {
+    state: {} as GameState,
+    player,
+    space: {} as never,
+    actionId: 'stables',
+    phase: 'computeCosts',
+  } as unknown as CardListenerContext
+  const result = stableListener.handler(ctx)
+  if (!result || typeof result !== 'object') return 0
+  const costs = (result as { costs?: { wood?: number } }).costs
+  return costs?.wood ?? 0
+}
 
 describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   it('freeFences discount fences only; palisades still cost full wood', () => {
@@ -66,5 +92,36 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     })
 
     expect(resp.ok).toBe(false)
+  })
+
+  describe('stables-cost listener cap (3rd & 4th stables only)', () => {
+    const makePlayer = (stables: number): PlayerState => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const p = state.players[0]!
+      p.occupationPlayed.push('C88_CarpentersApprentice')
+      p.stableTiles = Array.from({ length: stables }, (_, i) => ({ row: 0, col: i }))
+      return p
+    }
+
+    it('0 stables built → no discount on next stable (1st)', () => {
+      expect(stablesDiscount(makePlayer(0))).toBe(0)
+    })
+
+    it('1 stable built → no discount on next stable (2nd)', () => {
+      expect(stablesDiscount(makePlayer(1))).toBe(0)
+    })
+
+    it('2 stables built → -1 wood on next stable (3rd)', () => {
+      expect(stablesDiscount(makePlayer(2))).toBe(-1)
+    })
+
+    it('3 stables built → -1 wood on next stable (4th)', () => {
+      expect(stablesDiscount(makePlayer(3))).toBe(-1)
+    })
+
+    it('4 stables built → no further discount (cap)', () => {
+      expect(stablesDiscount(makePlayer(4))).toBe(0)
+    })
   })
 })

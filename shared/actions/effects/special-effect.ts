@@ -5,12 +5,21 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../../cards/helpers/card-state'
+import { incCounter } from '../../cards/__stubs__/helpers'
+import {
+  fieldFindStackOfKind,
+  fieldHasCrop,
+  fieldPopIfDepleted,
+} from '../../game/field'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
+  | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
+  | { kind: 'consume-fence'; count?: number }
 
 const resolveTargetPlayer = (
   state: GameState | undefined,
@@ -55,12 +64,48 @@ export const specialEffectAction: ActionDefinition = {
       case 'set-extra-data':
         writeCardExtraData(target, sourceCard, p.key, p.value)
         return { type: 'ok' }
+      case 'increment-counter':
+        incCounter(target, sourceCard, p.key, p.amount)
+        return { type: 'ok' }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
         return { type: 'ok' }
+      case 'remove-field-crop': {
+        // Used by C57 Crudite-style "discard 1 crop on top of another" effects.
+        // Picks the FIRST player field that has the crop with at least
+        // `minRemaining` left (default 2 — the BGA "stacked on another"
+        // semantics) and decrements its top stack by 1. No-op if no field
+        // qualifies.
+        const minRem = p.minRemaining ?? 2
+        const field = target.fields.find(
+          (f) =>
+            fieldHasCrop(f, p.crop) &&
+            (fieldFindStackOfKind(f, p.crop)?.remaining ?? 0) >= minRem,
+        )
+        if (!field) return { type: 'ok' }
+        const stack = fieldFindStackOfKind(field, p.crop)
+        if (!stack) return { type: 'ok' }
+        stack.remaining -= 1
+        fieldPopIfDepleted(field)
+        return { type: 'ok' }
+      }
+      case 'consume-fence': {
+        const count = p.count ?? 1
+        let removed = 0
+        for (let i = target.fenceSegments.length - 1; i >= 0 && removed < count; i -= 1) {
+          if (target.fenceSegments[i]!.type === 'fence') {
+            target.fenceSegments.splice(i, 1)
+            removed += 1
+          }
+        }
+        if (removed < count) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        return { type: 'ok' }
+      }
     }
   },
 }
