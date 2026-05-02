@@ -242,7 +242,7 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
               onChange={() => toggle(option.value)}
               disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
             />
-            <span className={`card-res-icon ${option.value}`} />
+            <span className={`res-icon res-icon-${option.value}`} />
             {translateCardText(locale, option.labelKey)}
           </label>
         ))}
