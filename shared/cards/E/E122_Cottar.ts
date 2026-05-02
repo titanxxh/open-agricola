@@ -8,12 +8,17 @@ const CARD_ID = 'E122_Cottar'
 
 // E122 Cottar: Each time you play or build an improvement, you get your choice of
 // 1 WOOD or 1 CLAY immediately after paying its cost.
+//
+// 7b1 migration: listens on `actions: ['pay']` with costType=major/minor-improvement.
 const listener: CardListenerRegistration = {
-  id: 'E122-cottar-after-improvement',
+  id: 'E122-cottar-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
+  actions: ['pay'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const ctx = context as unknown as { costType?: string }
+    const costType = ctx.costType
+    if (costType !== 'major-improvement' && costType !== 'minor-improvement') return
     return {
       flow: {
         type: 'xor',
