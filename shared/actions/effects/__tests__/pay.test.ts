@@ -12,6 +12,7 @@ import {
   clearPaymentCache,
 } from '../../helpers/payment'
 import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
+import { payAction } from '../pay'
 
 beforeEach(() => {
   clearPaymentCache()
@@ -863,3 +864,47 @@ describe('Integration: Cooking Hearth upgrade scenario', () => {
     expect(cardSolutions).toHaveLength(0)
   })
 })
+
+const callPay = (
+  player: PlayerState,
+  params: Record<string, unknown>,
+  extra: Partial<{ sourceCard: string; actionContext: Record<string, unknown> }> = {},
+) =>
+  payAction.execute({
+    state: {} as GameState,
+    player,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../game/types').ActionSpace,
+    params,
+    sourceCard: extra.sourceCard,
+    actionContext: extra.actionContext,
+  })
+
+describe('payAction', () => {
+  it('exists with id "pay"', () => {
+    expect(payAction.id).toBe('pay')
+  })
+
+  it('simple Partial<Resource>: pays from resources, returns ok', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const result = callPay(player, { cost: { wood: 2 } })
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(1)
+    if (result.type === 'ok') {
+      expect(result.resourcesPaid).toEqual({ wood: 2 })
+    }
+  })
+
+  it('simple Partial<Resource> insufficient: returns fail', () => {
+    const player = createMockPlayer({ wood: 1 })
+    const result = callPay(player, { cost: { wood: 2 } })
+    expect(result.type).toBe('fail')
+    expect(player.resources.wood).toBe(1)
+  })
+
+  it('missing cost params: returns fail', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const result = callPay(player, {})
+    expect(result.type).toBe('fail')
+  })
+})
+
