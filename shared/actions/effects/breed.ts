@@ -7,6 +7,7 @@ import type {
   PlayerState,
 } from '../../game/types'
 import { getTotalAnimalCapacity } from '../helpers/animal-zones'
+import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
 export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
 
@@ -79,6 +80,16 @@ export const breedAction: ActionDefinition = {
       }
     }
     if (breedSummary.animalCount > 0) {
+      return { type: 'animalReorg', sourceId: `card:${sourceCard}` }
+    }
+    // BGA: in round 14 (last harvest), some cards (B104 SheepWalker, B35
+    // HookKnife, A153 PigOwner, ...) force a reorg even with no newborn so the
+    // engine has a chance to evict mis-placed animals.
+    if (
+      sourceCard === 'harvest'
+      && state?.round === 14
+      && shouldEnforceReorganizeOnLastHarvest(state, player)
+    ) {
       return { type: 'animalReorg', sourceId: `card:${sourceCard}` }
     }
     return { type: 'ok' }

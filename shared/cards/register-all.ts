@@ -178,6 +178,7 @@ import { B100_Clutterer_impl } from './B/B100_Clutterer'
 import { B101_FurnitureCarpenter_impl } from './B/B101_FurnitureCarpenter'
 import { B102_Consultant_impl } from './B/B102_Consultant'
 import { B103_FieldMerchant_impl } from './B/B103_FieldMerchant'
+import { B104_SheepWalker_impl } from './B/B104_SheepWalker'
 import { B105_CaseBuilder_impl } from './B/B105_CaseBuilder'
 import { B106_MoralCrusader_impl } from './B/B106_MoralCrusader'
 import { B107_Manservant_impl } from './B/B107_Manservant'
@@ -1002,6 +1003,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B101_FurnitureCarpenter': B101_FurnitureCarpenter_impl,
   'B102_Consultant': B102_Consultant_impl,
   'B103_FieldMerchant': B103_FieldMerchant_impl,
+  'B104_SheepWalker': B104_SheepWalker_impl,
   'B105_CaseBuilder': B105_CaseBuilder_impl,
   'B106_MoralCrusader': B106_MoralCrusader_impl,
   'B107_Manservant': B107_Manservant_impl,
