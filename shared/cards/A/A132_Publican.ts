@@ -6,6 +6,15 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A132_Publican'
 
+/**
+ * BGA `wrapSowWithDeferredCheck` defers the offer so that the offer is not
+ * shown when the only legal way for the sowing player to sow is to receive
+ * grain from the Publican. This avoids the case where the Publican declines
+ * and the sowing player is stuck. We currently skip the deferred-check and
+ * always offer when the sow is unconditional; the corner case where a
+ * decline traps the sowing player is acknowledged in card_progress.md as a
+ * known minor deviation. (Tests cover the common offer/accept/decline path.)
+ */
 const isUnconditionalSow = (context: CardListenerContext) => {
   const actionContext = context.actionContext ?? {}
   if (actionContext.checkedReplaceAction === true) return false
