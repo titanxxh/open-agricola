@@ -47,6 +47,10 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 7b2 F4 — B133 VillagePeasant confirmed §2.0 aligned（commit b064d2df 已修）**：
+  - 2026-04-29 commit `b064d2df` (Sprint 2 PR-2A) 通过新增 `onBeforeEndGame` hook 让 B133 在 scoring 启动前给 N 个 vegetable 资源（之前 `computePostScore` 直接返 N raw VP，与 BGA `onPlayerBeforeEndOfGame` 给资源不等价）。
+  - 本次 family agent 复核：`pnpm exec vitest run server/__tests__/B133_VillagePeasant-session.test.ts --project slow` 现有用例全部通过；§2.3 line 340 早已标 ✅ Sprint 2 PR-2A，audit 残留 ⚠ 标签今日清除，确认归 §2.0 aligned。
+
 - **2026-05-02 Sprint 7b2 F4 — B152 JuniorArtist confirmed §2.0 aligned（Sprint 5 mech-A jumpLeaf 已对齐）**：
   - Sprint 5 mech-A 已通过 jumpLeaf + place-farmer.viaCardJump 重构（day-laborer → lessons-4 / lessons / traveling-players XOR），farmer 物理移动 + 第二格走完整 ActionNode 路径。
   - 本次 family agent 复核：`pnpm exec vitest run server/__tests__/B152_JuniorArtist-session.test.ts --project slow` 现有用例全部通过。§2.3 line 363 已标 ✅ Sprint 5 mech-A，audit 残留 ⚠ 标签今日清除，确认归 §2.0 aligned。
