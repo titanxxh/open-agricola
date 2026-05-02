@@ -8,9 +8,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
-import { payResources, applyTradeSideEffect } from '../helpers/payment'
-import { gainResources } from './gain'
-import { canAffordFlatCost } from '../helpers/pay-helpers'
+import { applyTradeSideEffect } from '../helpers/payment'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 import {
@@ -46,32 +44,8 @@ const mergePositiveResources = (
   return next
 }
 
-/**
- * Legacy exchange function for backward compatibility
- * Exchange resources: pay cost, gain reward (times times)
- */
-export const exchangeResources = (
-  player: PlayerState,
-  cost: Partial<Resource>,
-  gain: Partial<Resource>,
-  times = 1,
-): ActionExecutionResult => {
-  if (times <= 0) {
-    return { type: 'ok' }
-  }
-  const scaledCost = scaleResources(cost, times)
-  if (!canAffordFlatCost(player, scaledCost)) {
-    return { type: 'ok' }
-  }
-  payResources(player, scaledCost)
-  // TODO: legacy path — does not record resourcesFromCards.
-  // Active path is the BGA-aligned trade system below; new code should use that.
-  gainResources(player, scaleResources(gain, times))
-  return { type: 'ok' }
-}
-
 // ============================================
-// Enhanced Trade System (BGA-aligned)
+// Trade System (BGA-aligned)
 // ============================================
 
 /**

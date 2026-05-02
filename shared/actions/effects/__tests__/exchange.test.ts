@@ -7,7 +7,6 @@ import {
   hasValidResources,
   getPossibleTradeTimes,
   reverseTrade,
-  exchangeResources,
 } from '../exchange'
 import type { PlayerState, Resource, Trade } from '../../../game/types'
 
@@ -224,34 +223,3 @@ describe('reverseTrade', () => {
   })
 })
 
-describe('exchangeResources (legacy)', () => {
-  it('exchanges resources correctly', () => {
-    const player = createMockPlayer({ wood: 4, food: 0 })
-    const result = exchangeResources(player, { wood: 2 }, { food: 3 }, 1)
-    expect(result.type).toBe('ok')
-    expect(player.resources.wood).toBe(2)
-    expect(player.resources.food).toBe(3)
-  })
-
-  it('scales exchange by times', () => {
-    const player = createMockPlayer({ wood: 6, food: 0 })
-    exchangeResources(player, { wood: 2 }, { food: 3 }, 2)
-    expect(player.resources.wood).toBe(2)
-    expect(player.resources.food).toBe(6)
-  })
-
-  it('does nothing if times is 0 or negative', () => {
-    const player = createMockPlayer({ wood: 5 })
-    const result = exchangeResources(player, { wood: 2 }, { food: 3 }, 0)
-    expect(result.type).toBe('ok')
-    expect(player.resources.wood).toBe(5)
-  })
-
-  it('does nothing if player cannot afford', () => {
-    const player = createMockPlayer({ wood: 1 })
-    const result = exchangeResources(player, { wood: 2 }, { food: 3 }, 1)
-    expect(result.type).toBe('ok')
-    expect(player.resources.wood).toBe(1)
-    expect(player.resources.food).toBe(0)
-  })
-})
