@@ -86,7 +86,7 @@ import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/rou
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
-import { getCardDefinition } from '../cards/catalog.ts'
+import { getMajorCard } from '../cards/major/index.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
@@ -2278,7 +2278,7 @@ export class GameCore {
       let card:
         | { exchanges?: readonly import('../cards/types').CardExchange[] }
         | undefined
-      if (player.improvements.includes(sourceId)) card = getCardDefinition(sourceId)
+      if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
       else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
       return card?.exchanges?.[idx]

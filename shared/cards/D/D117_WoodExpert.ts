@@ -2,7 +2,8 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getMinorImprovementCard, getCardDefinition } from '../catalog'
+import { getMinorImprovementCard } from '../catalog'
+import { getMajorCard } from '../major'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D117_WoodExpert'
@@ -31,7 +32,7 @@ const getImprovementWoodCost = (cardId: string): number => {
     return 0
   }
   if (cardId.startsWith('Major_')) {
-    const major = getCardDefinition(cardId)
+    const major = getMajorCard(cardId)
     if (major) {
       const costs = Array.isArray(major.cost) ? major.cost : [major.cost ?? {}]
       return costs.reduce((m, c) => Math.max(m, (c as Record<string, number>).wood ?? 0), 0)
