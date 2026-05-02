@@ -31,11 +31,12 @@ describe('B89_Groom session', () => {
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.actionId).toBe('gain')
+    expect(leaf.params).toEqual({ wood: 1 })
   })
 
-  it('onBeforeStartOfTurn returns optional stable flow in stone house', () => {
+  it('onBeforeStartOfTurn in stone house returns single optional stables leaf with internal cost', () => {
     const session = setup({ houseType: 'stone' })
     const state = session.getState().state
     const player = state.players[0]!
@@ -43,14 +44,31 @@ describe('B89_Groom session', () => {
 
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
     expect(flow).not.toBeNull()
-    expect(flow!.type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-    // Should contain pay-resources and stables children
-    const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(2)
-    expect(children[0].actionId).toBe('pay')
-    expect(children[0].params).toEqual({ wood: 1 })
-    expect(children[1].actionId).toBe('stables')
+    // Should be a single optional stables leaf with actionContext carrying the
+    // cost override (mirrors BGA `args.costs={WOOD=>1, max=>1}`), not a
+    // sequence of pay-resources + stables.
+    expect(flow!.type).toBe('leaf')
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.actionId).toBe('stables')
+    expect(leaf.optional).toBe(true)
+    expect(leaf.actionContext?.max).toBe(1)
+    expect(leaf.actionContext?.costOverride).toEqual({ wood: 1 })
+  })
+
+  it('onBeforeStartOfTurn in stone house with 0 wood: still emits trigger (no upfront block)', () => {
+    const session = setup({ houseType: 'stone' })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.wood = 0
+
+    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
+    // BGA does not block at trigger time — payability is checked when player
+    // chooses to act. Effect must still emit the leaf.
+    expect(flow).not.toBeNull()
+    expect(flow!.type).toBe('leaf')
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.actionId).toBe('stables')
+    expect(leaf.optional).toBe(true)
   })
 
   it('onBeforeStartOfTurn does not trigger in clay house', () => {
@@ -68,16 +86,6 @@ describe('B89_Groom session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.wood = 3
-
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
-    expect(flow).toBeNull()
-  })
-
-  it('onBeforeStartOfTurn does not trigger without wood', () => {
-    const session = setup({ houseType: 'stone' })
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.resources.wood = 0
 
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
     expect(flow).toBeNull()
