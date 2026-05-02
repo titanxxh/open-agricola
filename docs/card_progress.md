@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 fence-cost-unification（基建 refactor）**：把 fence 折扣从 `CardEffect.computeFenceDiscount` / `computeFenceFreeAvailable` 双轨 hook 迁到统一的 `computeCosts` listener phase（actions: `['fence']`），与 construct 走同一 cost preview 模型。E16 BriarHedge / C16 FieldFences / C1 Overhaul 改为 listener 实现；`canStartFencing(state, player, costOverride?)` 成为权威入口；新增 `collectComputeCostsForFarmChoice` helper 服务 commit/apply 路径；`fenceAction.costPreview` 替换 entry-guard 散点判定。`CardEffect` 删除两个 fence 相关 hook 字段，`collectFenceDiscount` 聚合器删除。详见 ENGINE_ARCHITECTURE.md §15.7。
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
     - `pairedSpaceIdFor(state, baseId)` helper（`shared/cards/helpers/space-pairing.ts`）—— 4p 行动格变体解析，给 F9 5 卡用
@@ -732,9 +733,13 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 
 `shared/game/types.ts` 的 `CanBeExecutedByPlayerContext` 加 `actionContext?: Record<string, unknown>` 字段（与 `sourceCard` 同等地位的元数据透传）；`shared/engine/engine.ts` 1 处 doable check 同步加传 `actionContext`。让 listener-driven action（如 E53 exchange + tradeIds）的可达性检查能看到与 `execute()` 相同的 actionContext。
 
-### fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b, 2026-04-30)
+### fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b, 2026-04-30) — ⚠ **已废弃 2026-05-02**
 
-`CardEffect.computeFenceFreeAvailable?: (state, player) => number` 返回该卡当前能贡献的"免费 fence 上限"。`canStartFencing(state, player)` 遍历 `[...player.improvements, ...player.minorPlayed]` 累加 free 计入 maxBuildable，对齐 BGA `getMaxBuildableFences`：当 `wood + free >= 4` 时入口放行。E16 Briar Hedge 实现：`countAvailableBorderEdges(player)`。canStartFencing 签名加 state 参数，6 个 caller（B26 ×2 / B94 / C88 / fenceAction.canBeExecutedByPlayer / fencing.test.ts）同步。与 `computeFenceDiscount` 双轨：前者 entry-guard 阶段返回上限，后者实际 payment 阶段按真实选边算 discount。
+> Sprint 5b 当时引入的 `CardEffect.computeFenceFreeAvailable` + `computeFenceDiscount` 双轨 hook 已于 2026-05-02 fence-cost-unification 重构中删除，统一迁到 `computeCosts` listener phase（actions: `['fence']`）。`canStartFencing` 签名从 `(state, player)` 扩展为 `(state, player, costOverride?: Partial<Resource>)`：dispatcher 主路径走 listener override；isDoable 旁路 caller（B26 / B94 / C88）调 `collectComputeCostsForFarmChoice` 或本地 previewPlayer 等价计算。详见 ENGINE_ARCHITECTURE.md §15.7。
+
+### fence cost discount — `computeCosts` listener phase (2026-05-02)
+
+`CardEffect.computeFenceDiscount` / `computeFenceFreeAvailable` 两个 hook 字段及 `collectFenceDiscount` 聚合器已删除。E16 BriarHedge / C16 FieldFences / C1 Overhaul 改注册 listener `{ phases: ['computeCosts'], actions: ['fence'] }`，handler 按 `ctx.params.newFenceEdges` 是否存在分两 pass：未给 edges → 返回潜在最大段数（entry-guard 上限）；给了 edges → 按真实选边返回精确折扣段数。返回值用 `{ costs: { wood: -N } }` 表达（fence 每段 1 wood，调用方读 `Math.abs(override.wood)` 当 freeFences）。新增 helper `collectComputeCostsForFarmChoice(state, player, 'fence', { newFenceEdges, newPalisadeEdges }, space)` 给 commit/apply 路径用；`fenceAction.costPreview.canExecute(ctx, override)` 给 dispatcher 主路径用。详见 ENGINE_ARCHITECTURE.md §15.7。
 
 ---
 

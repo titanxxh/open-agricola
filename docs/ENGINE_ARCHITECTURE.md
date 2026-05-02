@@ -1156,8 +1156,7 @@ type ActionChoiceOption = {
 
 - `isDoable`：改变行动是否可执行
 - `computeReplace`：把一个行动替换成另一个行动
-- `computeCosts`：调整支付成本
-- `computeFenceDiscount`：围栏支付时由各卡牌返回免费 fence segment 数（聚合器 `collectFenceDiscount(state, player, ctx)`，`shared/cards/card-effects.ts`）；当前消费者：E16 BriarHedge（每条 border edge 折扣 1 wood，最多 4）、C16 FieldFences、C1 Overhaul
+- `computeCosts`：调整支付成本（围栏折扣 E16 BriarHedge / C16 FieldFences / C1 Overhaul 走同一 phase，详见 §15.7）
 - `computeArgs`：追加选项、额外参数（针对 `execute()` 已经返回 `choice` 的传统路径）
 - `computeChoiceCandidates`：针对 opt-in `getBaseChoiceOptions` 的 action，注入额外候选目标（见 §11.6.3）
 - `computeExchanges`：向 exchange 池注入运行时 `CardExchange`（详见 §15.23）
@@ -1895,31 +1894,47 @@ construct 路径不变（仍由 `room-payment.ts` 的 `bonusAppliesToRoomCount` 
 }
 ```
 
-## 15.7 fencing entry-guard — `computeFenceFreeAvailable` hook (Sprint 5b)
+## 15.7 Fence cost discount — `computeCosts` listener phase
 
-`CardEffect` 接口新增可选 hook：
+Fence 折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）通过统一的 `computeCosts`
+listener phase 实现，与 construct（B126 Carpenter 等）走同一 cost preview 模型。
+
+每张卡注册一个 listener：
 
 ```ts
-computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
+{
+  phases: ['computeCosts'],
+  actions: ['fence'],
+  handler: (ctx) => {
+    const newFenceEdges = ctx.params?.newFenceEdges as string[] | undefined
+    if (newFenceEdges === undefined) {
+      // Pass #1（entry-guard，dispatcher 在 Engine 主路径调用）
+      // 返回该卡当前能贡献的「潜在最大段数」当 wood delta
+    } else {
+      // Pass #2（commit，commitFarmChoice 通过 collectComputeCostsForFarmChoice 调用）
+      // 按真实 edge 集合返回精确折扣段数
+    }
+  }
+}
 ```
 
-返回该卡当前能贡献的「免费 fence 上限」。`canStartFencing(state, player)` 在 `shared/actions/effects/fencing.ts` 遍历 `[...player.improvements, ...player.minorPlayed]`，累加每张卡的 free count 计入 `maxBuildable`，对齐 BGA `getMaxBuildableFences`-style 算法：当 `wood + free >= minimumFenceSegments(=4)` 通过 entry-guard。
+调用入口：
 
-### 与 `computeFenceDiscount` 双轨
+- **Pass #1**：`Engine.proceed()` 在 fence ActionNode 入场时跑 `HookDispatcher.computeCosts`，
+  随后 `applyCostPreviewDoable` 用 override 喂给 `fenceAction.costPreview.canExecute(ctx, override)`，
+  最终调 `canStartFencing(state, player, override)`。
+- **Pass #2**：`GameSession.commitFarmChoice('fence', ...)` 与 `applyFarmChoice('fence', ...)`
+  通过 `collectComputeCostsForFarmChoice(state, player, 'fence', { newFenceEdges, newPalisadeEdges }, space)`
+  跑同一 phase（params 带 edges），按 `Math.abs(override.wood)` 取得 freeFences。
 
-- **`computeFenceFreeAvailable(state, player)`**：entry-guard 阶段，返回上限（不要求 `ctx.newFenceEdges`）
-- **`computeFenceDiscount(state, player, ctx)`**：实际 payment 阶段，按真实选边算 discount
+段数 ↔ wood delta 的语义映射：fence 每段固定 1 wood，listener 返回 `{ costs: { wood: -N } }`，
+调用方读 `Math.abs(override.wood ?? 0)` 当 freeFences。
 
-E16 BriarHedge 同时提供两者；其他 fence-discount 卡（C16 / C88 / E74 等）按需贡献，不阻塞 5b。
-
-### 签名变化
-
-`canStartFencing` 第一参数从 `player` 改为 `state, player`。6 个 caller 全部同步：
-- `fenceAction.canBeExecutedByPlayer` (fencing.ts:64)
-- `B26_AgrarianFences.ts:116, 132`
-- `B94_StockProtector.ts:51`
-- `C88_CarpentersApprentice.ts:50`
-- 单元测试 `fencing.test.ts`
+`canStartFencing` 签名为 `(state, player, costOverride?: Partial<Resource>)`。所有 caller 必须遵循此契约：
+- `fenceAction.canBeExecutedByPlayer(state, player)`：无 override 的下界估计（不含卡牌折扣）
+- `fenceAction.costPreview.canExecute(ctx, override)`：dispatcher 主路径，权威判定
+- `B26_AgrarianFences` 的 `isDoable` listener（`grain-utilization` 上的 sow / bake-bread）：先调 `collectComputeCostsForFarmChoice` 拿 override 再传给 `canStartFencing`，避免在删 effect 字段后退化
+- `B94_StockProtector` / `C88_CarpentersApprentice` 的 `isDoable` listener：先在本地 previewPlayer 上 `+= wood`，再调 `canStartFencing(state, previewPlayer)`，等价于 override 路径
 
 ## 15.8 Cookery Exchange Metadata-Driven (Sprint 6a)
 
