@@ -106,15 +106,6 @@ export const C1_Overhaul_impl = {
         ],
       }
     },
-    computeFenceDiscount: (_state, player, ctx) => {
-      if (!isC1Active(player)) return 0
-      const cap = getC1MaxRebuild(player)
-      return Math.min(ctx.newFenceEdges.length, cap)
-    },
-    computeFenceFreeAvailable: (_state, player) => {
-      if (!isC1Active(player)) return 0
-      return getC1MaxRebuild(player)
-    },
   },
   listeners: [C1FenceListener],
   reaches: [] as readonly string[],

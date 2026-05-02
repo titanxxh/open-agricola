@@ -89,21 +89,6 @@ export const C16_FieldFences_impl = {
         setFlagFlow(false),
       ],
     }),
-    computeFenceDiscount: (_state, player, ctx) => {
-      if (!isC16Active(player)) return 0
-      const fieldEdges = fieldEdgeIds(player.fields.map((f) => ({ row: f.row, col: f.col })))
-      return ctx.newFenceEdges.filter((edge) => fieldEdges.has(edge)).length
-    },
-    computeFenceFreeAvailable: (_state, player) => {
-      if (!isC16Active(player)) return 0
-      const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
-      const fieldEdges = fieldEdgeIds(player.fields.map((f) => ({ row: f.row, col: f.col })))
-      let count = 0
-      for (const edge of fieldEdges) {
-        if (!built.has(edge)) count += 1
-      }
-      return count
-    },
   },
   listeners: [C16FenceListener],
   reaches: [] as readonly string[],
