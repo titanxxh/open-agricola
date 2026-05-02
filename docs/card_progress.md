@@ -47,6 +47,16 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 5e — Sprint 5d audit P1 follow-up（4 张 ⚠ 全部关闭）**：
+  - **B163 Pastor**：加 `effect.onBuy` 复用 `evaluatePastorTrigger(state, ownerPlayer)` 共享谓词（rooms===2 + 无对手 2-rooms + !flagged），返回 `seq(gainLeaf({wood:3,clay:2,reed:1,stone:1}), set-flag)`。after-construct listener 同步重构走同一谓词。镜像 BGA `onBuy($p) { return $this->onAfterConstruct($p, []) }`。
+  - **E161 ElderBaker**：加 `computeChoiceCandidates` listener on `actions:['minor-improvement']` 注入 `Major_StoneOven` 候选（D131_CraftsmanshipPromoter 模式）。affordability gating 通过现有 minor-improvement choice filter（同 D131）。`reaches` 字段加 `Major_StoneOven`。
+  - **E91 PlowBuilder**：加 `actions:['trade-applied']` listener 当 `extraData.sourceId.startsWith('Major_Joinery')` 时 `writeCardExtraData(player, 'E91', 'usedJoinery', true)`；anytime listener 改为 `gates on usedJoinery flag`（之前仅检查 ownership）；`onAfterHarvest` 同时 reset `flagged + usedJoinery`。镜像 BGA `isFlagged('usedJoinery') && !isFlagged()`。
+  - **E72 ArtichokeField**：verify-first 路径——加 3 例 multi-harvest 总和验证（3-grain → 3 grain + 3 food；2-veg → 2 veg + 2 food；空 field → 0 food），结果与 BGA Reap-event 实现完全等价。**demote 到 §2.5 deliberate divergence "structural-but-equivalent"**——结构差，行为零差。
+  - **1 处通用扩展**：`dispatchTradeAppliedListener(state, player, trade, times)` in `shared/actions/effects/exchange.ts`（mirrors `dispatchReapListener`），在 `applyTrade` 之后派发 `actionId:'trade-applied'` listener 事件，`extraData = { sourceId, times }`。`createSingleHarvestExchange(resource, gain, options?: { sourceId? })` 接受 sourceId 并在 harvest-time conversion 之后 dispatch，让 Major_Joinery 的 `onHarvest` 自动派发（向后兼容：未传 sourceId 的 callers Pottery / Basket 行为不变）。
+  - **测试**：22 例新增 slow-tier session test（B163 6 + E161 6 + E72 3 + E91 7）。fast 1919 全绿，B163/E161/E72/E91 各自 spec 全过。
+  - **§2.3 propagation**：B163 / E161 / E91 加 ✅ Sprint 5e 标记；E72 strikethrough + 迁入 §2.5。**master-plan §0 ⚠ residual：4 → 0**。
+  - spec：`docs/superpowers/specs/2026-05-02-sprint-5e-followup-design.md`。PR：sprint-5e-followup。
+
 - **2026-05-01 Sprint 5d — Sprint 5 deferred audit & cleanup（42 cards re-validated, audit-only）**：
   - 4 parallel `general-purpose` sub-agents re-audited 42 cards (B-deck 17 + E-deck 21 + 4 already-fixed verifies C23/A1/A22/A38) at ≥120s/card, deeper than `card_desc_audit.md §5.7` 的 90s/card compact mode. Manual spot-check on 4 P1 deviations + sanity skim of 3 highest-LOC ✅ cards (B72/B3/C23). 0 verdict flips.
   - **Verdict distribution**: ✅ 26 / 🟡 9 / ⚠ 7 / ❌ 0 / 🔍 0.
@@ -343,11 +353,11 @@ The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 
 - ~~**C51 FishingNet** — actually deduct trigger-player food~~ — ✅ **Sprint 5 mech-E** done (gain action merge + payerId; opponent's food now actually deducted)
 - ~~**D117 WoodExpert** — switch from forced -1 wood / +1 food substitute to optional alternative trade via `Bonus.optional` so players can choose; current implementation always applies the trade~~ — ✅ **Sprint 5 mech-B** done (computeCosts returns `trades` instead of forced cost patch; pay main path enumerates use-trade / no-trade solutions, player picks via standard selectPayment prompt); altCosts-form minors (B43 etc.) covered after pay-helpers `e529b103` (ComplexCost input now runs `computeCosts` listeners, trades/bonuses appended into ComplexCost arrays).
 - ~~**E53** — needs E85 cross-card linkage + meeple-id tracking — cross-card mechanism work~~ — ✅ **Sprint 5 mech-C** done (exchange action rename + `actionContext.tradeIds` filter; E53 single after-listener with breeding-phase guard + per-action-once via actionToken; E85 auto-couples)
-- ~~**B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read~~ — **Sprint 5d audit** re-validated 17-B-deck superset (absorbing original 11): 13 ✅ / 3 🟡 / 1 ⚠ P1 (**B163 Pastor** → Sprint 5e backlog) + B103/B26 ⚠ P2 to §2.4. Original 11 names lost with `audit-agent-b7.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
+- ~~**B 牌组 wide-scan 11 张** (audit-agent-b7.md) — holder/field metadata-driven behavior offsets, individual cases need re-read~~ — **Sprint 5d audit** re-validated 17-B-deck superset (absorbing original 11): 13 ✅ / 3 🟡 / 1 ⚠ P1 (**B163 Pastor** → Sprint 5e backlog) + B103/B26 ⚠ P2 to §2.4. **Sprint 5e (2026-05-02)**：B163 ✅ done (`effect.onBuy` + shared evaluatePastorTrigger predicate). Original 11 names lost with `audit-agent-b7.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
 - ~~**A1 Shelter** ✅ Sprint 5b~~ (stables `actionContext.zoneFilter='pasture-1' + max:1`, confirmed by Sprint 5d audit), ~~**A22 Telegram** ✅ Sprint 5b~~ (`workersAvailable === 0` guard + reserve registration in §2.5, confirmed by Sprint 5d audit), ~~**A38 WoolBlankets** ✅ Sprint 5b~~ (prereq `Wooden House → 5 Sheep` + `countSheepOnBoard` helper, confirmed by Sprint 5d audit), ~~**A165 PigBreeder** ✅ Sprint 5c~~ — wide-scan items all closed
-- ~~**E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"~~ — **Sprint 5d audit** re-validated 21-E-deck superset (absorbing original 4): 11 ✅ / 6 🟡 / 4 ⚠ (3 P1: **E72 ArtichokeField** / **E91 PlowBuilder** / **E161 ElderBaker** → Sprint 5e backlog; 1 P2: E95 → §2.4). Original 4 names lost with `audit-agent-b10.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
+- ~~**E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"~~ — **Sprint 5d audit** re-validated 21-E-deck superset (absorbing original 4): 11 ✅ / 6 🟡 / 4 ⚠ (3 P1: **E72 ArtichokeField** / **E91 PlowBuilder** / **E161 ElderBaker** → Sprint 5e backlog; 1 P2: E95 → §2.4). **Sprint 5e (2026-05-02)**：E91 ✅ done (`trade-applied` listener + `cardStates.E91.extraData.usedJoinery` flag gate + `dispatchTradeAppliedListener` 通用扩展)；E161 ✅ done (`computeChoiceCandidates` listener inject Major_StoneOven, D131 模式)；~~E72~~ demoted to §2.5 (multi-harvest 总和与 BGA 完全等价，structural-but-equivalent). Original 4 names lost with `audit-agent-b10.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
 
-Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d audit** added 4 P1 fixes (B163/E72/E91/E161) to the queue via Sprint 5e — these are concrete, actionable, no longer aggregate. Sprint 5 deferred queue remaining size: **4 P1** (Sprint 5e), down from "15 cards / 11 wide-scan / 4 wide-scan" loose buckets.
+Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d audit** added 4 P1 fixes (B163/E72/E91/E161) to the queue via Sprint 5e — concrete, actionable, no longer aggregate. **Sprint 5e (2026-05-02) closed all 4** (3 fixed: B163/E91/E161; 1 demoted: E72). Sprint 5 deferred queue remaining size: **0 P1**, down from "15 cards / 11 wide-scan / 4 wide-scan" loose buckets via cumulative closure across 5/5b/5c/5e.
 
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
@@ -395,7 +405,7 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（12 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement）
+### 2.5 🔀 刻意偏离 BGA（13 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement + 2026-05-02 Sprint 5e E72 ArtichokeField）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -417,6 +427,7 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 | E149 MidnightFencer（2026-04-29 Sprint 3） | 第 14 轮 StartHarvest 触发 fencing flow，让玩家从对手 unbuilt fences 中拿最多 2 段免费放在自己农场（可超过 15 段上限），围出新 pasture 拿 VP | onStartHarvest 弹 choice 0..2×(numPlayers−1)，每选 K 在 `cardStates.E149.extraData.owedFences` 累加 K，`computeBonusScore` 直接 +K 原始 VP；`offered` 标记防止重触发 | 端的 fencing action 是 UI stub（`shared/actions/effects/fencing.ts:65-72`），fence 系统不模型化"每玩家围栏储备"；要复刻 BGA 玩家选边放置流程需要 fence 系统重写（≥1 周），远超 master-plan §8 Sprint 3 的 3 day 估算；数量级合理（4p max +6 VP ≈ BGA 1-2 pastures × 1-3 VP = 1-6 VP；略高估但在范围内） | 重写 fence 系统：引入"reserve fences per player"模型 + fencing flow 支持"midnight 模式跳付费 + 跨玩家 source"，再把 E149 切回 BGA 行为 |
 | A14 Carpenter's Hammer（2026-04-30 owner 决议） | BGA 标 `banned=true`：卡池过滤，不发到玩家手里 | 不实现 banned 字段，A14 保留在卡池中可被玩家抽到；A14 自身的 4-modifier 折扣效果（reed/wood/clay/stone in min 2 rooms）已与 BGA 对齐 | banned 是独立的 schema/dealHands 工作量（types.ts 加字段 + dealHands 过滤 + UI 标识），与 A14 折扣实现无冲突；owner 决议优先简化 schema，不引入 banned 概念 | 在 `shared/cards/types.ts` 加 `banned?: boolean`、`shared/game/deal-cards.ts` 在发牌时过滤 banned=true 的卡、UI 在卡池预览中标灰，再把 A14 标 banned |
 | A22 Telegram extraPlacement leaf（2026-04-30 Sprint 5b 登记） | BGA `Telegram::activate()` 用 `flagCardNode + Engine::insertAsChild($flow)` 让玩家这一回合可多放一次 worker（玩家自己选何时放） | onBeforeStartOfTurn 直接弹 SEQ optional + place-farmer leaf with `actionContext.extraPlacement: true`，玩家立即响应；保留 `workersAvailable === 0` 守卫等价 BGA `hasFarmerInReserve` | 两者实际游戏效果等价（都让玩家多放一次 worker，不消耗 family pool），我方语义更紧凑；不影响动画 / 计分 / 跨卡交互 | 引入 `flagCardNode` 等价机制（按 round 段持续延迟插入节点），把 A22 切到 lazy-insertion 模式 |
+| E72 ArtichokeField Reap-event vs phase callback（2026-05-02 Sprint 5e demote） | BGA `isListeningTo` Reap event with `harvested >= 1` guard，`onPlayerAfterReap` 返回 `gainNode([FOOD => 1])`；one Reap event per harvest field phase per field | `effect.onHarvestFieldPhase` 在 `+1 crop` 之后直接 `+1 food`，跳过 Reap event 派发 | structural-but-equivalent：3 例 verification test（3-grain → 3 grain + 3 food / 2-veg → 2 veg + 2 food / 空 field → 0 food）证明每 harvest 食物输出与 BGA 完全等价；`harvested >= 1` 守卫由"crop.remaining > 0 才执行"等价覆盖；total 食物 / 跨 harvest 数 / 空 field 行为全部数学等同 | route +1 food through Reap dispatch path（与 B132 EstateMaster 共用）— 实现复杂度高、行为零差，不值得 |
 
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 
@@ -703,6 +714,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 6d (D131 + E58 + E153 三张 stub 补实现 + 3 处通用扩展: Trade.sideEffect.bonusVp / harvest skip helper / minor-improvement candidate injection) | 05-01 | +3 | 833 | 93.4% |
 | Sprint 6e (C62 CookeryExtension stub 补实现 + 2 处通用扩展: computeExchanges listener phase / pushExtraDataValue sideEffect kind) | 05-01 | +1 | 834 | 93.5% |
 | Sprint 5d (deferred audit & cleanup, 42 cards re-validated; 4 ✅-mark propagated; surfaced 4 P1 → Sprint 5e backlog) | 05-01 | 0 | 834 | 93.5% |
+| Sprint 5e (Sprint 5d audit P1 follow-up — 4 ⚠ closed: B163 effect.onBuy / E161 computeChoiceCandidates / E91 trade-applied gate + dispatchTradeAppliedListener / E72 verified equivalent → §2.5 demote) | 05-02 | 0 | 834 | 93.5% |
 
 ### 2026-04-17 Wave 1-9 明细
 
