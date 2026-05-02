@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../game/types'
 import { workersAvailable } from '../../game/player'
+import { pairedSpaceIdFor } from '../helpers/space-pairing'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C130_OutskirtsDirector'
@@ -13,17 +14,9 @@ const CARD_ID = 'C130_OutskirtsDirector'
  * on the other space. If you do, you can immediately place another person.
  *
  * BGA: After PlaceFarmer on Grove → place 2 reed on Hollow (and vice versa).
- * For 4+ players, ActionHollow maps to 'hollow-4' in our system.
- *
- * Implementation note: The reed placement on the other space is applied as an
- * immediate side effect. The "place another person" is optional.
+ * In 4-player games, the Hollow accumulation space is 'hollow-4' (different
+ * gain rate). We use `pairedSpaceIdFor` to resolve the variant.
  */
-
-/** Map from triggering space to the "other" space where reed gets placed. */
-const PAIRED_SPACE: Record<string, string[]> = {
-  grove: ['hollow-4'],
-  'hollow-4': ['grove'],
-}
 
 const listener: CardListenerRegistration = {
   id: 'C130-outskirts-director-after-place-farmer',
@@ -32,9 +25,20 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (!spaceId || !PAIRED_SPACE[spaceId]) return
+    if (!spaceId) return
 
-    const otherSpaceIds = PAIRED_SPACE[spaceId]!
+    const groveIds = pairedSpaceIdFor(context.state, 'grove')
+    const hollowIds = pairedSpaceIdFor(context.state, 'hollow')
+
+    let otherSpaceIds: string[]
+    if (groveIds.includes(spaceId)) {
+      otherSpaceIds = hollowIds
+    } else if (hollowIds.includes(spaceId)) {
+      otherSpaceIds = groveIds
+    } else {
+      return
+    }
+
     // Find the first matching other space that exists
     const otherSpace = context.state.actionSpaces.find((s) =>
       otherSpaceIds.includes(s.id),
