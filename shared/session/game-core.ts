@@ -68,6 +68,7 @@ import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
+import { majorCardEffects } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
@@ -85,7 +86,7 @@ import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/rou
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
-import { getMajorCardEffect } from '../cards/major/index.ts'
+import { getCardDefinition } from '../cards/catalog.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
@@ -323,6 +324,9 @@ export class GameCore {
       allOccupationCards,
       allMinorImprovementCards,
     )
+    // Register majors as effect bundles so getCardEffect resolves them after
+    // the legacy getMajorCardEffect fallback is removed.
+    this.cardRegistry.registerEffects(majorCardEffects)
     setActiveCardRegistry(this.cardRegistry)
 
     // Register custom workshop cards into a per-session context (sandbox mode)
@@ -2274,7 +2278,7 @@ export class GameCore {
       let card:
         | { exchanges?: readonly import('../cards/types').CardExchange[] }
         | undefined
-      if (player.improvements.includes(sourceId)) card = getMajorCardEffect(sourceId)
+      if (player.improvements.includes(sourceId)) card = getCardDefinition(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
       else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
       return card?.exchanges?.[idx]

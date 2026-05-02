@@ -1,7 +1,6 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
 import type { AnimalZone } from '../actions/helpers/animal-zones'
 import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
-import { getMajorCardEffect } from './major'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../game/farm'
@@ -200,7 +199,7 @@ export const getCardEffect = (id: string): CardEffect | null => {
   const custom = sessionCtx?.customEffects.get(id)
   if (custom) return custom
   const active = getActiveCardRegistry()
-  return active?.getEffect(id) ?? getMajorCardEffect(id) ?? null
+  return active?.getEffect(id) ?? null
 }
 
 const isCustomCard = (id: string) => id.startsWith('CUSTOM_')
