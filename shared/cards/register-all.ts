@@ -639,6 +639,7 @@ import { D71_Changeover_impl } from './D/D71_Changeover'
 import { D72_StableManure_impl } from './D/D72_StableManure'
 import { D73_SupplyBoat_impl } from './D/D73_SupplyBoat'
 import { D74_RoyalWood_impl } from './D/D74_RoyalWood'
+import { D75_WoodField_impl } from './D/D75_WoodField'
 import { D76_SocialBenefits_impl } from './D/D76_SocialBenefits'
 import { D77_RecycledBrick_impl } from './D/D77_RecycledBrick'
 import { D78_ReedPond_impl } from './D/D78_ReedPond'
@@ -811,6 +812,7 @@ import { E77_Mattock_impl } from './E/E77_Mattock'
 import { E78_SleightofHand_impl } from './E/E78_SleightofHand'
 import { E79_FieldSpade_impl } from './E/E79_FieldSpade'
 import { E7_Pumpernickel_impl } from './E/E7_Pumpernickel'
+import { E80_RockGarden_impl } from './E/E80_RockGarden'
 import { E81_AlchemistsLab_impl } from './E/E81_AlchemistsLab'
 import { E82_Profiteering_impl } from './E/E82_Profiteering'
 import { E83_ShepherdsWhistle_impl } from './E/E83_ShepherdsWhistle'
@@ -1464,6 +1466,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D72_StableManure': D72_StableManure_impl,
   'D73_SupplyBoat': D73_SupplyBoat_impl,
   'D74_RoyalWood': D74_RoyalWood_impl,
+  'D75_WoodField': D75_WoodField_impl,
   'D76_SocialBenefits': D76_SocialBenefits_impl,
   'D77_RecycledBrick': D77_RecycledBrick_impl,
   'D78_ReedPond': D78_ReedPond_impl,
@@ -1636,6 +1639,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E78_SleightofHand': E78_SleightofHand_impl,
   'E79_FieldSpade': E79_FieldSpade_impl,
   'E7_Pumpernickel': E7_Pumpernickel_impl,
+  'E80_RockGarden': E80_RockGarden_impl,
   'E81_AlchemistsLab': E81_AlchemistsLab_impl,
   'E82_Profiteering': E82_Profiteering_impl,
   'E83_ShepherdsWhistle': E83_ShepherdsWhistle_impl,
