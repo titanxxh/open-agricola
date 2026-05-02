@@ -864,11 +864,18 @@ const buildImprovementFlow = (
   const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
   const includeReturnedCard = isComplexCost(previewCost) && !!previewCost.cards?.list?.length
   const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
+  // For costs that consume a card (e.g. CookingHearth requiring a Fireplace
+  // return), pay needs the eligible-card pool to enumerate `cardUsed`
+  // solutions. fireplaceIdentity minors (D25 etc.) live outside player.improvements
+  // so we precompute the pool here via the same helper the legacy
+  // playMajorImprovement / playMinorImprovement flow used.
+  const playedCards = getPlayedCardsForCost(player, previewCost)
   const payParams: Record<string, unknown> = {
     cost: previewCost,
     costType,
     optionPrefix,
     includeReturnedCard,
+    playedCards,
   }
   // actionContext is propagated to listener events (engine.buildListenerEvent
   // spreads actionContext into the listener context). After-pay listeners
