@@ -30,11 +30,18 @@ export const E11_PettingZoo_impl = {
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',
+      cardId: CARD_ID,
       capacity: player.rooms,
       animalType: null,
       animalCount: 0,
     })
   },
+  /**
+   * BGA `Cards/E/E11_PettingZoo.php::getInvalidAnimals` returns []:
+   * adjacency is enforced by gating zone registration in
+   * onPlayerComputeDropZones. Mirror BGA exactly.
+   */
+  getInvalidAnimals: () => [],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
