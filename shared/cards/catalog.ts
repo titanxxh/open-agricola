@@ -6,7 +6,7 @@ import {
   PlayerActionCard,
 } from './types'
 import type { CardDefinition } from './types'
-import { majorCardEffects } from './major'
+import { majorCardDefinitions } from './major'
 import { allCommunityCards } from './community/auto-catalog'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
 import { A11_MudPatch } from './A/A11_MudPatch'
@@ -1860,7 +1860,7 @@ export const getCardDefinition = (id: string): CardDefinition | undefined => {
   return (
     getMinorImprovementCard(id)
     ?? getOccupationCard(id)
-    ?? majorCardEffects.find((c) => c.id === id)
+    ?? majorCardDefinitions.find((c) => c.id === id)
   )
 }
 

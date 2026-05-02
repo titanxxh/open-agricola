@@ -4,7 +4,7 @@ import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
-import { majorCardEffects } from '../../cards/major'
+import { majorCardDefinitions } from '../../cards/major'
 import { getCardDefinition } from '../../cards/catalog'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
@@ -328,7 +328,7 @@ const buildMajorImprovementOptions = (
   actionCardId = 'improvement-any',
   allowedPurchases?: string[],
 ) =>
-  majorCardEffects
+  majorCardDefinitions
     .filter((improvement) => available.includes(improvement.id))
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),

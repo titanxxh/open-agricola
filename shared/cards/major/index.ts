@@ -9,7 +9,7 @@ import { pottery } from './pottery'
 import { stoneOven } from './stone-oven'
 import { well } from './well'
 
-export const majorCardEffects: MajorCardData[] = [
+export const majorCardDefinitions: MajorCardData[] = [
   fireplace1,
   fireplace2,
   cookingHearth1,
@@ -22,11 +22,9 @@ export const majorCardEffects: MajorCardData[] = [
   basketmaker,
 ]
 
-const majorEffectMap = new Map<string, MajorCardData>(
-  majorCardEffects.map((effect) => [effect.id, effect]),
+const majorDefinitionMap = new Map<string, MajorCardData>(
+  majorCardDefinitions.map((effect) => [effect.id, effect]),
 )
-
-export const getMajorCardEffect = (id: string) => majorEffectMap.get(id)
 
 const applyMajorEffectForImprovement = (
   state: GameState,
@@ -34,7 +32,7 @@ const applyMajorEffectForImprovement = (
   improvementId: string,
   hook: MajorEffectHook,
 ): ActionFlow | null => {
-  const effect = majorEffectMap.get(improvementId)
+  const effect = majorDefinitionMap.get(improvementId)
   const handler = effect?.[hook]
   if (handler) {
     return handler(state, player) ?? null

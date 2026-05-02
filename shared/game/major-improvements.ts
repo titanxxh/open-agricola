@@ -1,5 +1,5 @@
-import { majorCardEffects } from '../cards/major'
+import { majorCardDefinitions } from '../cards/major'
 
-export const majorImprovementIds = majorCardEffects.map(
+export const majorImprovementIds = majorCardDefinitions.map(
   (improvement) => improvement.id,
 )
