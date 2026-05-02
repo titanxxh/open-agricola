@@ -1,8 +1,39 @@
 import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
+import type { ActionChoiceOption } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E161_ElderBaker'
+
+/**
+ * BGA Desc: "You can build the Stone Oven major improvement even when taking a
+ * Minor Improvement action." Pattern mirrors D131 CraftsmanshipPromoter — inject
+ * a `major:` candidate into the minor-improvement choice list when owner has
+ * the card in play.
+ */
+const STONE_OVEN_ID = 'Major_StoneOven'
+
+const stoneOvenCandidateListener: CardListenerRegistration = {
+  id: 'E161-elder-baker-compute-choice-candidates',
+  cardIds: [CARD_ID],
+  actions: ['minor-improvement'],
+  phases: ['computeChoiceCandidates' as ActionHookPhase],
+  handler: (ctx) => {
+    if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
+    const available = ctx.state.availableMajorImprovements ?? []
+    if (!available.includes(STONE_OVEN_ID)) return
+    const extraOptions: ActionChoiceOption[] = [
+      {
+        value: `major:${STONE_OVEN_ID}`,
+        labelKey: `improvements.${STONE_OVEN_ID}.name`,
+        sourceCard: CARD_ID,
+      },
+    ]
+    return { extraOptions, sourceCard: CARD_ID }
+  },
+}
 
 registerPlayerActionSpace({
   cardId: CARD_ID,
@@ -31,15 +62,16 @@ export const E161_ElderBaker = new PlayerActionCard({
 
 export const E161_ElderBaker_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (state, _player) => {
-    const newSpaces = createPlayerActionSpaces(state)
-    for (const space of newSpaces) {
-      if (!state.actionSpaces.some((s) => s.id === space.id)) {
-        state.actionSpaces.push(space)
+    id: CARD_ID,
+    onBuy: (state, _player) => {
+      const newSpaces = createPlayerActionSpaces(state)
+      for (const space of newSpaces) {
+        if (!state.actionSpaces.some((s) => s.id === space.id)) {
+          state.actionSpaces.push(space)
+        }
       }
-    }
+    },
   },
-},
-  reaches: [] as readonly string[],
+  listeners: [stoneOvenCandidateListener],
+  reaches: [STONE_OVEN_ID] as readonly string[],
 } satisfies CardImpl
