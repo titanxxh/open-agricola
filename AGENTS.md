@@ -2,17 +2,13 @@
 
 本仓库的通用协作说明。Claude Code / Cursor / Codex 等 agent 读 `CLAUDE.md`（软链到本文件）。
 
-git 的 worktree都创建到项目的.worktree目录下。 开启superpowers:brainstorming skill时默认切换到一个新的worktree开始。
-
-**回答用中文！**
-
 ## 项目概述
 
 Open Agricola——React + TypeScript + Vite 前端 + Node.js WebSocket/HTTP 后端的 Agricola 桌游在线实现。后端权威状态 + 实时多人同步，附带 LLM 辅助卡牌工坊和用户认证。
 
 ## 架构基线
 
-- 遇到不确定的实现，优先参考 `output/bga-agricola`，除非 `docs/ENGINE_ARCHITECTURE.md` 已明确给出不同设计。
+- 遇到不确定的实现，优先参考 `../bga-agricola`，除非 `docs/ENGINE_ARCHITECTURE.md` 已明确给出不同设计。
 - 主设计以 `docs/ENGINE_ARCHITECTURE.md` 为准：
   - WebSocket 房间对局是主链路
   - 后端 `GameSession` 持有唯一权威 `GameState`
@@ -87,7 +83,9 @@ src/       前端：React UI、transport 抽象、hooks
 - `shared/protocol/ws.ts`——`ClientCommand`、`ServerEvent`
 - `shared/game/serialization.ts`——`serializeState()` / `rehydrateState()`
 
-### Action 系统（`shared/actions/`）
+### Action(effect) 系统（`shared/actions/`）
+
+effect禁止膨胀！
 
 行动从 `shared/actions/effects/*.ts`（每个效果一个文件）自动发现。每个 effect 文件导出含 `id`、`nameKey`、`flow`（节点树）和回合可用性的行动定义。Anytime 行动（如烤面包、交换）同样自动发现并合并到 action registry。行动工厂在 `shared/actions/factories/`（如 `createGainAction()`）生成通用行动模式。
 
@@ -264,9 +262,15 @@ pnpm run build  # tsc + vite build（/bga-img/* 警告是 cosmetic）
   - `refactor: ...`
 - commit message 描述简洁明了，**英文**。
 
-## Push 后 CI 验证
+## 开发与提交
 
-**硬性要求**：每次 `git push` 之后必须等到相关 GitHub Actions run 结束；**只要有 run 仍在进行或失败，当前任务都不算完成**。失败时立刻定位并修复，再继续其他工作。
+**硬性要求**：
+
+**永远使用rebase的方式，不要使用merge！**
+
+每次 `git push` 之前需要rebase main，发现冲突要先解决！先在本地跑一遍CI，败时立刻定位并修复，再继续其他工作。
+
+每次合入完main， `git push` 之后必须等到相关 GitHub Actions run 结束；**只要有 run 仍在进行或失败，当前任务都不算完成**。失败时立刻定位并修复，再继续其他工作。
 
 Actions 页面：[https://github.com/titanxxh/open-agricola/actions](https://github.com/titanxxh/open-agricola/actions)。
 
@@ -288,8 +292,6 @@ curl -sL -H "Authorization: Bearer $GH_TOKEN" \
   "https://api.github.com/repos/titanxxh/open-agricola/actions/runs/<RUN_ID>/logs" \
   -o /tmp/run.zip && unzip -p /tmp/run.zip
 ```
-
-如果已装官方 `gh` CLI（注意本仓库的 Cursor Cloud VM 里装的 `/usr/local/bin/gh` **不是** GitHub CLI，是另一个同名工具，调用会失败）：
 
 ```bash
 gh run list --limit 5
