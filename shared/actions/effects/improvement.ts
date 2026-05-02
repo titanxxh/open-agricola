@@ -15,6 +15,7 @@ import {
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
+import { isMajorCardId } from '../../cards/helpers/card-type'
 
 /** Cards that satisfy a Fireplace return requirement. */
 const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
@@ -57,13 +58,17 @@ const getPlayedCardsForCost = (
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 
-const parseImprovementChoice = (choice: string) => {
+const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | null; id: string } => {
   if (choice.startsWith('major:')) {
-    return { kind: 'major' as const, id: choice.replace('major:', '') }
+    return { kind: 'major', id: choice.replace('major:', '') }
   }
   if (choice.startsWith('minor:')) {
-    return { kind: 'minor' as const, id: choice.replace('minor:', '') }
+    return { kind: 'minor', id: choice.replace('minor:', '') }
   }
+  // Bare id — infer kind from which catalog the id lives in. Falls back to
+  // null for ids not (yet) registered (e.g. fixture/test ids resolved later).
+  if (isMajorCardId(choice)) return { kind: 'major', id: choice }
+  if (getMinorImprovement(choice)) return { kind: 'minor', id: choice }
   return { kind: null, id: choice }
 }
 
@@ -549,7 +554,7 @@ const playMajorImprovement = (
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   const improvement = getMajorCard(improvementId)
-  if (!improvement || !improvementId.startsWith('Major_')) {
+  if (!improvement) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
   if (!state.availableMajorImprovements.includes(improvement.id)) {
@@ -682,11 +687,11 @@ export const playImprovement = (
     const choiceIdx = parts[2]
     if (targetId && choiceIdx !== undefined) {
       const parsed = parseImprovementChoice(targetId)
-      if (parsed.kind === 'major' || parsed.id.startsWith('Major_')) {
+      if (parsed.kind === 'major') {
         return playMajorImprovement(
           state,
           player,
-          parsed.kind === 'major' ? parsed.id : parsed.id,
+          parsed.id,
           actionCardId,
           choiceIdx,
           suppressOnBuyEffects,
@@ -727,7 +732,7 @@ export const playImprovement = (
     )
   }
 
-  const majorImprovement = allowMajor && parsed.id.startsWith('Major_')
+  const majorImprovement = allowMajor && isMajorCardId(parsed.id)
     ? getMajorCard(parsed.id)
     : undefined
   if (majorImprovement) {
@@ -814,7 +819,7 @@ const canAffordInjectedImprovement = (
     if (!minor) return false
     return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
   }
-  if (parsed.id.startsWith('Major_')) {
+  if (isMajorCardId(parsed.id)) {
     return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
   }
   const minor = getMinorImprovement(parsed.id)

@@ -20,6 +20,7 @@ import {
 } from '../../cards/types'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
+import { isMajorCardId } from '../../cards/helpers/card-type'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -237,7 +238,7 @@ export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => 
 })
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {
-  if (cardId.startsWith('Major_')) {
+  if (isMajorCardId(cardId)) {
     const major = getMajorCard(cardId)
     if (major?.exchanges) return major.exchanges
   }
