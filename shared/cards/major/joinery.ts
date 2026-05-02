@@ -20,5 +20,5 @@ export const joinery: MajorCardEffect = {
       '7+': 3,
     },
   },
-  onHarvest: createSingleHarvestExchange('wood', { food: 2 }),
+  onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: 'Major_Joinery' }),
 }
