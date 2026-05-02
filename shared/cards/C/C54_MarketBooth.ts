@@ -33,7 +33,7 @@ export const C54_MarketBooth_impl = {
         type: 'seq',
         optional: true,
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
           {
             type: 'leaf',
             actionId: 'special-effect',

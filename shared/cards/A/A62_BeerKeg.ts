@@ -25,7 +25,7 @@ export const A62_BeerKeg_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -34,7 +34,7 @@ export const A62_BeerKeg_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 2 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
@@ -44,7 +44,7 @@ export const A62_BeerKeg_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 3 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 3 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },

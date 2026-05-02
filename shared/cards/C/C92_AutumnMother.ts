@@ -27,7 +27,7 @@ export const C92_AutumnMother_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { food: 3 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { food: 3 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID },
       ],
     }

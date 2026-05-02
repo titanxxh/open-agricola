@@ -25,7 +25,7 @@ export const E39_Paintbrush_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { clay: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -34,7 +34,7 @@ export const E39_Paintbrush_impl = {
       {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { clay: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',

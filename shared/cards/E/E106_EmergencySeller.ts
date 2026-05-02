@@ -32,28 +32,28 @@ export const E106_EmergencySeller_impl = {
         {
           type: 'seq' as const,
           children: [
-            { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { wood: 1 } },
+            { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { wood: 1 } },
             { type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID, params: { food: 2 } },
           ],
         },
         {
           type: 'seq' as const,
           children: [
-            { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { clay: 1 } },
+            { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { clay: 1 } },
             { type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID, params: { food: 2 } },
           ],
         },
         {
           type: 'seq' as const,
           children: [
-            { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { reed: 1 } },
+            { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { reed: 1 } },
             { type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID, params: { food: 3 } },
           ],
         },
         {
           type: 'seq' as const,
           children: [
-            { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { stone: 1 } },
+            { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { stone: 1 } },
             { type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID, params: { food: 3 } },
           ],
         },

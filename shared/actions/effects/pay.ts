@@ -23,6 +23,49 @@ export type PayParams = {
   includeReturnedCard?: boolean
 }
 
+const RESOURCE_KEYS = new Set([
+  'wood',
+  'clay',
+  'reed',
+  'stone',
+  'food',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+])
+
+const PAY_PARAM_KEYS = new Set([
+  'cost',
+  'costType',
+  'optionPrefix',
+  'paymentChoice',
+  'includeReturnedCard',
+])
+
+const looksLikeFlatResource = (
+  raw: Record<string, unknown> | undefined,
+): boolean => {
+  if (!raw) return false
+  const keys = Object.keys(raw)
+  if (keys.length === 0) return false
+  if (keys.some((k) => PAY_PARAM_KEYS.has(k))) return false
+  return keys.every((k) => RESOURCE_KEYS.has(k))
+}
+
+const normalizePayParams = (
+  raw: Record<string, unknown> | undefined,
+): PayParams | undefined => {
+  if (!raw) return undefined
+  if ('cost' in raw) return raw as unknown as PayParams
+  if (looksLikeFlatResource(raw)) {
+    return { cost: raw as Partial<Resource> }
+  }
+  return undefined
+}
+
 const buildSelectedResult = (
   solution: PaymentSolution,
   sourceCard: string | undefined,
@@ -75,14 +118,14 @@ export const payAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   costPreview: {
     getBaseCost: ({ params }) => {
-      const p = params as PayParams | undefined
+      const p = normalizePayParams(params)
       if (!p?.cost) return {}
       if (isComplexCost(p.cost)) return p.cost.fee ?? {}
       return p.cost
     },
   },
   execute: ({ player, params, sourceCard, state }) => {
-    const p = params as PayParams | undefined
+    const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
     if (isComplexCost(p.cost)) {
       const optionPrefix = p.optionPrefix ?? 'pay:generic'

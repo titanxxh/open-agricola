@@ -35,7 +35,7 @@ export const C124_StoneImporter_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { food: foodCost }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { food: foodCost }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'gain', params: { stone: 2 }, sourceCard: CARD_ID },
       ],
     }

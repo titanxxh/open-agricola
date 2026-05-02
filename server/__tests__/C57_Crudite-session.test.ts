@@ -56,7 +56,7 @@ describe('C57_Crudite', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ food: 3 })
     expect(children[1].actionId).toBe('gain')
     expect(children[1].params).toEqual({ vegetable: 1 })

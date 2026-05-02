@@ -50,7 +50,7 @@ describe('B63_Tasting session', () => {
       const options = resp.pending.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
-        o.value?.startsWith?.('pay-resources') ||
+        o.value?.startsWith?.('pay') ||
         o.value?.startsWith?.('exchange') ||
         o.value === '__accept__',
       )

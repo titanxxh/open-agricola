@@ -35,7 +35,7 @@ export const B89_Groom_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'pay-resources',
+          actionId: 'pay',
           params: { wood: 1 },
           sourceCard: CARD_ID,
         },

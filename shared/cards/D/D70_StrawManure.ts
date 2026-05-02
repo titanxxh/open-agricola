@@ -40,7 +40,7 @@ export const D70_StrawManure_impl = {
     const children: ActionFlow[] = [
       {
         type: 'leaf',
-        actionId: 'pay-resources',
+        actionId: 'pay',
         params: { grain: 1 },
         sourceCard: CARD_ID,
       },

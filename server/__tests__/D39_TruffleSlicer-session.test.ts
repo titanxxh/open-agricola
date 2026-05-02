@@ -86,7 +86,7 @@ describe('D39_TruffleSlicer', () => {
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ food: 1 })
     expect(children[1].actionId).toBe('bonus-vp')
     expect(children[1].sourceCard).toBe(CARD_ID)

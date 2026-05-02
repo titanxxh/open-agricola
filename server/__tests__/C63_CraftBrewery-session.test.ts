@@ -58,7 +58,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children.map((c) => (c as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual([
-      'pay-resources',
+      'pay',
       'gain',
       'bonus-vp',
       'bonus-vp',

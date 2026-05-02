@@ -36,7 +36,7 @@ export const A61_WinnowingFan_impl = {
         children.push({
           type: 'seq',
           children: [
-            { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'gain', params: { food }, sourceCard: CARD_ID },
           ],
           choiceLabelKey: 'ui.interactionResourceExchange',

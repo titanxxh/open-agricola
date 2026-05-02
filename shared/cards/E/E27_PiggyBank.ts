@@ -36,7 +36,7 @@ const anytimeListener: CardListenerRegistration = {
           },
           {
             type: 'leaf',
-            actionId: 'pay-resources',
+            actionId: 'pay',
             params: { food: FOOD_THRESHOLD },
             sourceCard: CARD_ID,
           },
@@ -110,7 +110,7 @@ export const E27_PiggyBank_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'pay-resources',
+          actionId: 'pay',
           params: { food: 1 },
           sourceCard: CARD_ID,
         },

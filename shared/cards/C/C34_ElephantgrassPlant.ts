@@ -26,7 +26,7 @@ export const C34_ElephantgrassPlant_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { reed: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { reed: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
       ],
     } satisfies ActionFlow
