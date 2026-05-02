@@ -47,6 +47,17 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 7 — §2.2 simplification re-validation audit（131 张 deep-audited, audit-only）**：
+  - 5 个 Phase-0 sub-agent 重建 wide-scan 90 名单（`audit-agent-b{6..10}.md` 已丢失）；5 个 Phase-1 sub-agent ≥120s/卡 5 维度 deep audit 131 张候选。Spot-check 1 张（B22）+ 系统性 caveat 分析。
+  - **Verdict 分布：** ✅ 29 / 🟡 27 / ⚠ 50 / ❌ 11 / 🔍 14。**`card_desc_audit.md §5.7` "0 ⚠/❌" 结论彻底错**——47% 的"simplification" 实际是真行为偏差。
+  - **结果：**
+    - 29 张 ✅ 移到 §2.0（previously misclassified, 现在确认对齐）
+    - 27 张 🟡 移到 §2.5 deliberate divergence（含 BGA banned 卡 C3/C125/D21 等）
+    - 61 张 P0/P1（11 ❌ + 50 ⚠）→ Sprint 7a backlog。**严重度 caveat：** Phase 1 prompt 未让 agent check BGA `banned` 字段；spot-check B22 显示 BGA banned + 我方 passing 的卡严重度高估。Sprint 7a Phase 0 必须 filter banned 后才能给真实 fix 数（预估 20-40 张实际可修）。
+    - 14 张 🔍 是 `card_desc_audit.md §4.6` 名单 typo（如 C70_StableExpert，BGA 实际 C70 是 LettucePatch；C88_Coppicer，BGA 是 CarpentersApprentice 等）+ 2 张 ID collision。已修正名单。
+  - **master-plan §0 update：** ⚠ residual `0 → 50`，❌ residual `0 → 11`。Sprint 7 line "未启动" → "audit done; spawned Sprint 7a"。本来期望 Sprint 7 关闭 §0 open question，实际暴露更多 deviation 反而推 §0 整体严格判定后退；但所有 deviation 现在是 actionable + 命名清晰，不是模糊的 "130 张 P3 简化"。
+  - Audit 报告：`docs/sprint-7-audit-report.md`。spec / plan：`docs/superpowers/specs/2026-05-02-sprint-7-audit-design.md` / `docs/superpowers/plans/2026-05-02-sprint-7-audit.md`。Sprint 7a follow-up spec stub：`docs/superpowers/specs/2026-05-03-sprint-7a-followup-design.md`。
+
 - **2026-05-02 Sprint 5e — Sprint 5d audit P1 follow-up（4 张 ⚠ 全部关闭）**：
   - **B163 Pastor**：加 `effect.onBuy` 复用 `evaluatePastorTrigger(state, ownerPlayer)` 共享谓词（rooms===2 + 无对手 2-rooms + !flagged），返回 `seq(gainLeaf({wood:3,clay:2,reed:1,stone:1}), set-flag)`。after-construct listener 同步重构走同一谓词。镜像 BGA `onBuy($p) { return $this->onAfterConstruct($p, []) }`。
   - **E161 ElderBaker**：加 `computeChoiceCandidates` listener on `actions:['minor-improvement']` 注入 `Major_StoneOven` 候选（D131_CraftsmanshipPromoter 模式）。affordability gating 通过现有 minor-improvement choice filter（同 D131）。`reaches` 字段加 `Major_StoneOven`。
@@ -253,29 +264,34 @@
 | D102 SampleStableMaker | return-home 阶段 optional：归还 1 个 stable（普通或 FarmHand）→ 1 wood + 1 grain + 1 food + optional minor improvement | 2026-04-24：复用 `shared/cards/helpers/stable-removal.ts` 的 `listReturnableStableTiles` + `removeStableOrFarmHandAtTile`；FarmHand 归还时只清 `cardStates.B85.extraData.position`，`flagged` 保留 |
 | E76 LumberPile | onBuy optional：归还至多 3 个 stable（普通或 FarmHand），每个 +3 wood | 2026-04-24：同上，走 `stable-removal` 共享 helper；"per returned stable" 语义对 FarmHand 同样适用 |
 
-### 2.2 🟡 简化实现（130 张：2026-04-28 深度 40 + 2026-04-29 wide-scan 90）
+### 2.2 🟡 简化实现（post Sprint 7 audit: **27 张 confirmed**）
 
-> 完整 verdict 段见 `docs/card_desc_audit.md` §4.6 + `docs/card_desc_audit.md` §3 + `output/tmp/audit-agent-b{1..10}.md`。
+> 2026-05-02 Sprint 7 audit re-validated all 130 candidates from the 2026-04-28 deep pool + 2026-04-29 wide-scan at ≥120s/卡 5 维度审查。结果颠覆了 §5.7 紧凑模式的"全 🟡"结论：47% 的 candidates 实际是真行为偏差。详见 `docs/sprint-7-audit-report.md`。
 
-> **2026-04-29 wide-scan 新增 90 张**（按 deck）：A=3 / B=17 / C=22 / D=35 / E=13。详见各 deck audit-agent-b{6..10}.md 的 🟡 节。
->
-> **系统性简化（多张共享同一根因）**：
-> - **D 牌组 getExchangeResources 简化（≥4 张：D35/D38/D45/D84）** — 只看 `player.resources.{animal}` 忽略场上动物（pasture/stable）。BGA 含场上+supply。**修复路线：建一个共享 helper `getEffectiveExchangeAnimals(player, kind)`**
-> - **C 牌组跨卡协作机制缺失（多张：C18/C25/C27/C49/C75/C84/C130）** — sharedScoring / forceSkip / computeReplace / farm-hand stable / Wolf 联动 / reorganize / hollow 二人版等机制
->
-> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / ~~A165~~ ✅ Sprint 2 PR-2A / ~~C62~~ ✅ Sprint 6e / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / ~~D131~~ ✅ Sprint 6d / ~~D157~~ ✅ Sprint 6a / ~~E58~~ ✅ Sprint 6d / ~~E134~~ ✅ Sprint 2 PR-2D / ~~E139~~ ✅ Sprint 6a / ~~E153~~ ✅ Sprint 6d / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修；D131 + E58 + E153 Sprint 6d 已修；C62 Sprint 6e 已修。剩余真实 stub: 0（§2.7 stub 维度全部归零；Sprint 7 P3 simplifications 仍按 master-plan §0 默认不做）。）
->
-> **2026-04-28 深度池 40 张**（保留以下）：
+**Post-audit 分类：**
 
-**按 deck 分组**（2026-04-28 审查）：
+| Verdict | 数量 | 去向 |
+| ------- | ---- | ---- |
+| ✅ 已对齐（误标） | 29 | §2.0 changelog（移出 §2.2） |
+| 🟡 simplification confirmed | **27** | §2.5 deliberate divergence |
+| ⚠ P1 行为偏差 | 50 | §2.3 / Sprint 7a fix backlog |
+| ❌ P0 行为偏差 | 11 | §2.3 / Sprint 7a fix backlog |
+| 🔍 名单 typo | 14 | 删除（如 C70_StableExpert，BGA 实际 C70 是 LettucePatch） |
+| **Total** | **131** | (deep-pool 40 + wide-scan 117 - 26 5d/5e/6d/6e overlaps) |
 
-| Deck | 张数 | 卡列表 |
-|---|---|---|
-| A | 2 | A132 Publican（缺 deferred feasibility check）、A19 Handplow（缺 round-track field token 可视化） |
-| B | 7 | B103 / B128 / B151 / B152 / B26 / B163 / B75 |
-| C | 9 | C71 / C117 / C120 / C135 / C145 / C146 / C70 / C88 / C89 / C164 |
-| D | 10 | D12 / D21 / D36 / D63 / D77 / D82 / D87 / D128 / D134 / D148 |
-| E | 12 | E30 / E36 / E49 / E66 / E72 / E73 / E91 / E112 / E118 / E132 / E148 / E161 |
+**🟡 confirmed 27 张（per `merged.jsonl` 的 simplificationReason 字段）：**
+
+- A-deck (1): A10_WoodenShed
+- B-deck (5): B104_SheepWalker / B129_Seatmate / B27_Toolbox / B33_Mantlepiece / B38_FutureBuildingSite (borderline — could promote to ✅ on retry)
+- C-deck (15): C117_Legworker / C120_AgriculturalLabourer / C125_Nightworker (BGA banned) / C154_TwinResearcher / C22_BasketChair / C24_BedintheGrainField / C25_SteamMachine / C3_CarriageTrip (BGA banned) / C42_RavenousHunger / C51_FishingNet / C67_MineralFeeder / C69_LandConsolidation / C72_FestivalPlanning / C8_PlantFertilizer / C93_InnerDistrictsDirector
+- D-deck (3): D101_SugarBaker / D115_FodderPlanter / D21_Underground (BGA banned) / D36_BreedRegistry
+- E-deck (2): E112_GrainThief / E78_SleightofHand
+
+每张的 simplification reason + 是否登记 §2.5 详见 §2.5 "2026-05-02 Sprint 7 audit-classified simplifications" 子节。
+
+**61 张 P0/P1 → Sprint 7a backlog**（caveat：Phase 1 audit 没 check BGA `banned` 字段，Sprint 7a Phase 0 必须 banned-filter；预估真实 fix list 20-40 张）。完整 ⚠/❌ 列表 + per-card BGA/ours quote 见 `docs/sprint-7-audit-report.md` § "Surprise deviations"。
+
+**stub 卡（已全部归零）**：~~A135~~ ✅ Sprint 4 PR-4A / ~~A165~~ ✅ Sprint 2 PR-2A / ~~C62~~ ✅ Sprint 6e / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / ~~D131~~ ✅ Sprint 6d / ~~D157~~ ✅ Sprint 6a / ~~E58~~ ✅ Sprint 6d / ~~E134~~ ✅ Sprint 2 PR-2D / ~~E139~~ ✅ Sprint 6a / ~~E153~~ ✅ Sprint 6d / ~~E155~~ ✅ Sprint 6c
 
 > **历史记录**（已迁入 §2.1）：
 
@@ -405,7 +421,7 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（13 张；2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement + 2026-05-02 Sprint 5e E72 ArtichokeField）
+### 2.5 🔀 刻意偏离 BGA（13 张 + 2026-05-02 Sprint 7 27 张 simplifications = 40 张）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -432,6 +448,40 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 
 > **历史记录**：~~E132 VeggieLover~~ 之前被误标为"刻意不同"。实际上它是 BGA 3+ 人卡（不是 5+），desc 与行为（harvest 1G+1V→6F、scoring 1/2/3 stack→2/4/6 VP）都已与 BGA 对齐。2026-04-17 移除。
+
+#### 2026-05-02 Sprint 7 audit-classified simplifications（27 张）
+
+> Sprint 7 audit 确认这 27 张是**可接受的简化**——核心行为对齐，仅放弃了某个 corner case。修复 ROI 低于代价。详见 `docs/sprint-7-audit-report.md` § "Confirmed simplifications"。每张 simplification reason 取自 `output/tmp/sprint-7-audit/merged.jsonl`（gitignored intermediate）。
+
+| 卡牌 | 简化内容 |
+|---|---|
+| A10_WoodenShed | Major-improvement-action gate 未严格强制（玩家可通过 minor 通道获得，rules text 已威慑） |
+| B104_SheepWalker | reorg pending 时 conditional exchange 可见性 + harvest reorganization enforcement 简化 |
+| B129_Seatmate | 3p 自由 / 4p 对座阻塞分类未实现（无 seat positions），4p 永远允许（严格强于 BGA） |
+| B27_Toolbox | 对手回合触发路径未建模；实际 timing 因 owner 自身 end-of-turn flag 持久而一致 |
+| B33_Mantlepiece | renovation-block 规则简化（石屋后通常不会再 renovate） |
+| B38_FutureBuildingSite | borderline — agent 标 "actually aligned"，可后续 retry promote ✅ |
+| C117_Legworker | computeArgs UI hint 未实现（玩家行动时仍获得 wood）；JobContract 互动因后者未实现而无影响 |
+| C120_AgriculturalLabourer | exchange-grain conversion + grain-multiplier-aware reap counting 简化（覆盖主流路径） |
+| C125_Nightworker | **BGA banned** — stub 简化可接受 |
+| C154_TwinResearcher | copse-add + 'hollow' (非 4p) 排除（依赖未发布的 spaces）；relies on extraVp |
+| C22_BasketChair | 同回合 replay guard + JobContract 假人清理简化（仅 corner case） |
+| C24_BedintheGrainField | BGA 允许 decline bonus family growth；ours 在有空间时 auto-fire |
+| C25_SteamMachine | adoptive worker forceSkip corner case 省略 |
+| C3_CarriageTrip | **BGA banned** — banned-from-supply + turn-id replay guard 简化 |
+| C42_RavenousHunger | place-farmer 不能限定到 accumulation spaces（玩家可用额外 worker 在任何 space） |
+| C51_FishingNet | "对手必须有 food before Fishing" 前置简化；transfer 改为 best-effort |
+| C67_MineralFeeder | reorganize-then-grain prompt corner case 省略 |
+| C69_LandConsolidation | TinsmithMaster / CowPatty reaction overlap guard 省略 |
+| C72_FestivalPlanning | PRIVATE_FIELD_PHASE trigger 语义未传播；reap 错为 optional（rare path） |
+| C8_PlantFertilizer | WOOD/STONE crop fields + Wood Field / Rock Garden grouping 未建模（rare expansion） |
+| C93_InnerDistrictsDirector | stone 来自无限通用 supply；积极放置策略影响小（玩家最多偏好略有不同） |
+| D101_SugarBaker | "1 food bonus 留在 action space 给下一访客" 刻意简化（food 直接消失） |
+| D115_FodderPlanter | silent-kill subtraction 取决于 harvestBreedSummary 语义；如已计入则等价 |
+| D21_Underground | **BGA banned** — Major Improvement action coverage + onBuy 'no farmer left' 简化 |
+| D36_BreedRegistry | Hut/StableShed 上的 cards-sheep + 非 'exchange' trigger 简化 |
+| E112_GrainThief | mid-reap mutation 可能影响其他 field-aware hooks；最终通过 restore 平衡 |
+| E78_SleightofHand | 单次 multi-pick 拆为 4 次 1:1 exchange；UX 不同但数学等价 |
 
 ### 2.6 ⏳ 待实现 / 待评估（1 张）
 
@@ -715,6 +765,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 6e (C62 CookeryExtension stub 补实现 + 2 处通用扩展: computeExchanges listener phase / pushExtraDataValue sideEffect kind) | 05-01 | +1 | 834 | 93.5% |
 | Sprint 5d (deferred audit & cleanup, 42 cards re-validated; 4 ✅-mark propagated; surfaced 4 P1 → Sprint 5e backlog) | 05-01 | 0 | 834 | 93.5% |
 | Sprint 5e (Sprint 5d audit P1 follow-up — 4 ⚠ closed: B163 effect.onBuy / E161 computeChoiceCandidates / E91 trade-applied gate + dispatchTradeAppliedListener / E72 verified equivalent → §2.5 demote) | 05-02 | 0 | 834 | 93.5% |
+| Sprint 7 (§2.2 simplification audit, 131 cards re-validated; 29 → §2.0 / 27 → §2.5 / 50 ⚠ + 11 ❌ → Sprint 7a backlog / 14 名单 typo) | 05-02 | 0 | 834 | 93.5% |
 
 ### 2026-04-17 Wave 1-9 明细
 
