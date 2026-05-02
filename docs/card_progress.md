@@ -47,21 +47,13 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-05-02 Sprint 7c — §2.5 simplification re-audit（audit-only，无代码变更）**：
-  - 27 张 Sprint 7 audit-classified simplifications 全部 source-verified（BGA `.php` + 我方 `.ts` 一对一 deep-dive）。Verdict 分布：**§2.0 aligned 6 张 / §2.5 keep 16 张 / §2.3 promote 5 张**。
-  - **6 张 demote 到本节（已对齐 / 数学等价）**：
-    - **B38_FutureBuildingSite** —— `computeLockedFarmTiles` 通用扩展点已经覆盖 plow/construct/fencing/stables 4 类事件（`shared/cards/card-effects.ts:495` + `farm-choice/farm-interaction/game-core.ts`），与 BGA 4 个 onPlayerAfter\* 完全等价。原 wide-scan reason 已自标 "borderline ✅ actually aligned"，本次 demote 确认。
-    - **C3_CarriageTrip** —— `setTurnIdNode()` 是 BGA 内部 turn 标记机制（防同 instance 重新 onBuy），我方 onBuy 单次执行，core flow（work-phase optional + place-farmer）等价。BGA banned 不变。
-    - **C22_BasketChair** —— 同回合 replay guard（BGA `canBePlayed` turnId）需要 BasketChair 作为 PlayerActionCard 安在卡面上才会触发；我方 onBuy 直接做 recall + place-farmer，replay 路径根本不存在。JobContract 假人 cleanup 因 JobContract 未实现，cleanup 是 vacuous no-op。
-    - **C117_Legworker** —— BGA `onPlayerComputeArgsPlaceFarmer` 把相邻空间标 `ignoreResources=true` 是客户端 UI hint（"提示玩家这格能拿 wood"），不影响游戏规则。我方 listener 在 after-place-farmer 同样发 wood，规则等价。
-    - **D115_FodderPlanter** —— BGA 用 `createdAnimals - silentKills`，我方用 `harvestBreedSummary.animalCount`。但 `breed.ts:40-46` 只在 `freeCapacity > 0` 时 +animalCount，根本不会 silent-kill；结果数学等价于 BGA `created - silentKills`。
-    - **E78_SleightofHand** —— BGA single multi-pick UI 与我方 4 次 1:1 sequential exchange 可达的 post-state 集合完全相同；玩家最优策略一致，数学等价。
-  - **5 张 promote 到 §2.3 真 fix backlog**（详见 §2.3）：A10_WoodenShed / B104_SheepWalker / C51_FishingNet / C125_Nightworker / D21_Recruitment。
-  - **16 张 §2.5 keep**：B27 / B33 / B129 / C8 / C24 / C25 / C42 / C67 / C69 / C72 / C93 / C120 / C154 / D36 / D101 / E112 —— 真 simplification 但 ROI 低（corner case / 依赖未实现 infra / 数学等价 / `bannedWeak`）。
-  - **wide-scan reason 错误统计**：7 张 reason 与实际不符（B38/C3/C22/C117/D115/E78 标 simplification 实际已对齐；D21 reason 写"Major Improvement action coverage"实际真问题是 prerequisite handler 缺失 —— `prerequisite: 'No People Left in the House'` 无对应 `registerPrerequisite` 注册）。
-  - **Sprint 7d 候选**：5 张 promote ≥ spec 阈值，建议 spawn Sprint 7d 处理。最便宜的两张（A10 actionType gate / D21 prerequisite handler）<30 min/张；C51 Fishing pre-condition 是规模最大但价值最高（多人玩法真规则 bypass）；C125 BGA banned，fix ROI 低，建议先 triage。
-  - **新发现 cross-cutting**：`prerequisite` 字段是双模（label-only string vs registered handler），D21 因仅设 label 不设 handler 导致 prereq 失效。下次审计可 grep 是否有其他 `prerequisite: '<string>'` 缺 `registerPrerequisite`。
-  - audit report：`docs/sprint-7c-audit-report.md`。spec：`docs/superpowers/specs/2026-05-02-sprint-7c-audit-design.md`。本次仅文档变更，无实现代码 / session test 改动。
+- **2026-05-02 Sprint 7d in-progress — §2.3 promoted fix（5 cards from 7c re-audit + D100 from 7b2）**：
+  - **D21 Recruitment** ✅ Sprint 7d — `registerPrerequisite('No People Left in the House', ...)`：返回 `workersAvailable === 0` 时 true。修 7c re-audit 发现的 prereq label-only bug。
+  - **D100 LordoftheManor** ✅ Sprint 7d — `standardCategories` 加 `'stables'`，让 4 fenced stables 也算 bonus 命中。
+  - **A10 WoodenShed** ✅ Sprint 7d — 加 `mustBePlayedViaMajorImprovementAction:true` field 守门 minor-improvement action 路径。
+  - **B104 SheepWalker** ✅ Sprint 7d — 新增 `CardEffect.enforceReorganizeOnLastHarvest?(state, player)` 通用 hook（mirrors BGA）；`breedAction.execute` 在 round=14 + sourceCard='harvest' + animalCount===0 时调 `shouldEnforceReorganizeOnLastHarvest(state, player)`，任意卡返 true 则 emit `animalReorg`。B104 hook 实现：`player.resources.sheep > 0`。Reorg-pending 期间隐藏 anytime exchange 已经天然成立（`buildAnytimeEntries` 在 `pending.type==='animalReorg'` 时返回 `[]`）。
+  - 余 C51 / C125 + prereq 双模扫描见后续 commit。
+  - spec：`docs/superpowers/specs/2026-05-02-sprint-7d-design.md`。
 
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
