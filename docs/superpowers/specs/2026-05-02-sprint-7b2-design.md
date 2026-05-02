@@ -27,34 +27,41 @@
 
 ## 3. Cards Scope
 
-### 3.1 真 fix (14 张)
+### 3.1 真 fix (17 张) — 不 demote BGA banned
 
-| Card | Audit Tag | 偏差摘要（来自 sprint-7-audit-report） | 估算 |
+**重要**：我们没有 `banned` 字段实现（owner 决议——A14 / Sprint 7a 已确认）。所有 BGA banned 卡也必须真实现对齐 BGA 行为。
+
+**偏差细节由 family agent 实施时深度调研**：sprint-7-audit-report.md 的"偏差摘要"是 wide-scan 阶段简略描述，已发现至少 1 处错误（B139 标"onBuy 类似 B106"实际是 onReturnHome 触发，与 onBuy 无关）。其他卡的偏差描述同样不可信。每张卡 family agent 必须：
+1. 读 BGA 源 `/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards/<deck>/<id>_*.php`
+2. 读现有 `shared/cards/<deck>/<id>_*.ts` + 历史 commit
+3. **自己确定真实偏差** + fix scope，不依赖 audit-report 摘要
+
+| Card | Audit Tag | 备注 | 估算 |
 | --- | --- | --- | --- |
-| **C135 Constable** | ❌ P0 | 缺 onBuy +1 wood；sharedScoring 降级 | 0.5d |
-| B139 ForestScientist | ⚠ P1 | onBuy 类似 B106 (onBuy 截断) | 0.5d |
-| B39 Loom | ⚠ P1 | harvest sheep→wood/food 数值差 | 0.5d |
-| B50 ButterChurn | ⚠ P1 | exchange parity | 0.5d |
-| B89 Groom | ⚠ P1 | 4 sheep 触发 timing | 1d |
-| C140 PackagingArtist | ⚠ P1 | 漏 reward / log | 0.5d |
-| C27 Blueprint | ⚠ P1 | 选 minor flow | 0.5d |
-| C52 HuntsmansHat | ⚠ P1 | 触发 timing | 0.5d |
+| **C135 Constable** | ❌ P0 | sharedScoring 类，可能含主路径 | 0.5d |
+| B139 ForestScientist | ⚠ P1 | onReturnHome 触发（**非 onBuy**） | 0.5d |
+| B39 Loom | ⚠ P1 | harvest 转换 | 0.5d |
+| B50 ButterChurn | ⚠ P1 | exchange 类 | 0.5d |
+| B89 Groom | ⚠ P1 | sheep trigger | 1d |
+| **B117 Informant** | ⚠ P1 | BGA banned 但我方需做；当前 stub 31 行 | 0.7d |
+| **B15 CarpentersBench** | ⚠ P1 | BGA banned 但我方需做；当前 61 行 | 0.7d |
+| C140 PackagingArtist | ⚠ P1 | reward / log 类 | 0.5d |
+| C27 Blueprint | ⚠ P1 | minor flow | 0.5d |
+| C52 HuntsmansHat | ⚠ P1 | trigger 类 | 0.5d |
+| **C63 CraftBrewery** | ⚠ P1 | BGA banned 但我方需做；Sprint 7a verify-only OK | 0.5d |
 | C80 RockyTerrain | ⚠ P1 | farm topology | 0.5d |
 | C94 StableCleaner | ⚠ P1 | flag-card flow | 0.5d |
-| D127 HardworkingMan | ⚠ P1 | onBuy 1 occupation 数值 | 0.5d |
-| E148 Lazybones | ⚠ P1 | round token 重置 | 1d |
-| E73 Scythe | ⚠ P1 | harvest grain bonus | 1d |
-| E83 ShepherdsWhistle | ⚠ P1 | sheep keeper trigger | 0.5d |
+| D127 HardworkingMan | ⚠ P1 | occupation 数值 | 0.5d |
+| E148 Lazybones | ⚠ P1 | round token | 1d |
+| E73 Scythe | ⚠ P1 | harvest grain | 1d |
+| E83 ShepherdsWhistle | ⚠ P1 | sheep keeper | 0.5d |
 
-合计 ~7.5 day。每张实施 agent 自己 BGA + 现有 ts 调研（仿 Sprint 7a family agent 模式）。
+合计 ~9 day。每张实施 agent 自己 BGA + 现有 ts 调研（仿 Sprint 7a family agent 模式）。
 
-### 3.2 Demote (6 张, docs only)
+### 3.2 Demote (3 张, docs only)
 
 | Card | 当前 | 目标 §  | 理由 |
 | --- | --- | --- | --- |
-| B117 Informant | ⚠ stub 35 行 | §2.5 (banned) | BGA `banned=true`，行为偏差不会触发 |
-| B15 CarpentersBench | ⚠ stub | §2.5 (banned) | 同上 |
-| C63 CraftBrewery | ⚠ verify-only OK (Sprint 7a) | §2.5 (banned) | 同上 |
 | B106 MoralCrusader | ⚠ verify-only OK (Sprint 7a) | §2.0 (aligned) | 7a 已确认行为对齐，audit 误报 |
 | B152 JuniorArtist | ⚠ Sprint 5 mech-A 已 jumpLeaf | §2.0 (aligned) | 同上 |
 | B133 VillagePeasant | ⚠ commit b064d2df 已 fix | §2.0 (aligned) | 04-29 已修，audit 未追上 |
@@ -73,10 +80,10 @@
 
 | Family | Agent | 分支 | 卡列表 | 估算 |
 | --- | --- | --- | --- | --- |
-| **F1** | P0 + B-deck (5) | sprint-7b2-f1 | C135 / B139 / B39 / B50 / B89 | ~3d |
-| **F2** | C-deck (5) | sprint-7b2-f2 | C140 / C27 / C52 / C80 / C94 | ~3d |
+| **F1** | P0 + B-deck (7) | sprint-7b2-f1 | C135 / B139 / B39 / B50 / B89 / **B117** / **B15** | ~3.5d |
+| **F2** | C-deck (6) | sprint-7b2-f2 | C140 / C27 / C52 / C80 / C94 / **C63** | ~3.5d |
 | **F3** | D + E-deck (4) | sprint-7b2-f3 | D127 / E148 / E73 / E83 | ~2d |
-| **F4** | docs + 复核 (7 项) | sprint-7b2-f4 | demote 6 张 + D100 复核 | ~1-2h |
+| **F4** | docs + 复核 (4 项) | sprint-7b2-f4 | demote 3 张 (B106/B152/B133 →§2.0) + D100 复核 | ~1h |
 
 ### 实施模式 per Family
 
@@ -132,8 +139,9 @@ fast + slow + lint + build 全绿（A4 baseline 当前已 pass，无 baseline fa
 ## 7. Risks
 
 1. **D74 已在 7b1 处理**：原 demote 列表含 D74 (banned)，但 7b1 真实迁移到 actions:['pay']。docs sync 时**不要**把 D74 demote。已从 7b2 demote 列表移除。
-2. **E148 round token reset**：E148 BGA 行为复杂（pre-placed stables on round 1 action spaces），fix 范围可能比"reset"暗示的更大，agent 调研发现工作量超 1d 时**defer**。
-3. **C135 sharedScoring 降级**：若发现需要新基建（per-bonus scoring tier），**defer 7c**。
+2. **B117/B15/C63 是 BGA banned 但我方需做**：我们 owner 决策不实现 banned 字段（A14 已登记 §2.5），所有 BGA banned 卡都正常发牌可被玩家抽到，必须按 BGA 真实行为对齐。这 3 张需要 agent 仔细读 BGA 源（不能跳过）。
+3. **E148 round token reset**：E148 BGA 行为复杂（pre-placed stables on round 1 action spaces），fix 范围可能比"reset"暗示的更大，agent 调研发现工作量超 1d 时**defer**。
+4. **C135 sharedScoring 降级**：若发现需要新基建（per-bonus scoring tier），**defer 7c**。
 
 ---
 
@@ -155,8 +163,8 @@ fast + slow + lint + build 全绿（A4 baseline 当前已 pass，无 baseline fa
 
 ## 10. Definition of Done
 
-- [ ] 14 张 fix 全部 commit + session test pass
-- [ ] 6 张 demote docs 同步（B117/B15/C63 →§2.5；B106/B152/B133 →§2.0）
+- [ ] 17 张 fix 全部 commit + session test pass（含 B117/B15/C63 BGA banned 也真实现）
+- [ ] 3 张 demote docs 同步（B106/B152/B133 →§2.0；不 demote BGA banned 类）
 - [ ] D100 复核完成（迁 §2.0 或补 fix）
 - [ ] §2.5 加 A4 deliberate divergence 行
 - [ ] `pnpm test:fast` + `pnpm test:slow` + `pnpm run lint` + `pnpm run build` 全绿
