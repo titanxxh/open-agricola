@@ -68,23 +68,39 @@ const computeCostsListener: CardListenerRegistration = {
  * After paying for construct/improvement/renovate: remove the top resource from
  * stack ONLY when this card's bonus actually fired during the payment.
  *
- * Bug fix: previously the listener popped unconditionally, so any
- * construct/improvement/renovate would drain the stack even when the cost did
- * not include the top resource (i.e., the bonus was rejected by the payment
- * solver). We gate on `player._activeActionBonusSources` — populated by
- * `executePaymentSolution` with bonus.sources of solutions that were used —
- * which is the canonical "this card's bonus was actually applied" signal.
+ * 7b1 migration: dual-path listener.
+ * - `actions: ['pay']` is the new path (improvement-any flow's pay leaf
+ *   triggers it via the after phase). Reads `context.result.extraData.bonusUsed`
+ *   from the pay leaf's transparent extra data.
+ * - `actions: ['construct', 'renovate-house']` is the legacy path (those
+ *   action definitions still call `executePaymentSolution` directly). Reads
+ *   `player._activeActionBonusSources` populated by that helper.
+ *
+ * Both paths gate on "this card's BonusModifier.sources actually fired"
+ * — the canonical signal that the discount was applied. Top-1 simplification
+ * preserved here; full BGA use-top-k upgrade is deferred to Task 2.9.
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
+  actions: ['pay', 'construct', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     if (stack.length === 0) return
-    const sources = context.player._activeActionBonusSources ?? []
-    if (!sources.includes(CARD_ID)) return
+    let fired = false
+    const result = context.result as
+      | { extraData?: { bonusUsed?: string[] } }
+      | undefined
+    const extraBonusUsed = result?.extraData?.bonusUsed
+    if (Array.isArray(extraBonusUsed) && extraBonusUsed.includes(CARD_ID)) {
+      fired = true
+    }
+    if (!fired) {
+      const sources = context.player._activeActionBonusSources ?? []
+      if (sources.includes(CARD_ID)) fired = true
+    }
+    if (!fired) return
 
     // Pop the top resource from the stack (it was used as a discount)
     stack.pop()
