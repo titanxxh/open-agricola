@@ -18,6 +18,7 @@ import {
   type ExchangeWindow,
 } from '../../cards/types'
 import { getMajorCardEffect } from '../../cards/major'
+import { collectComputeExchanges } from '../../cards/card-listeners'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -225,10 +226,16 @@ const playedCardIds = (player: PlayerState): readonly string[] => [
 /**
  * Scan all played cards for exchanges visible in the given window.
  * Returns Trade-shaped entries (sourceId always populated).
+ *
+ * If `state` is provided, also runs `computeExchanges` listeners and appends
+ * any runtime-derived trades (e.g. C62 CookeryExtension's doubled-food
+ * harvest derivations). Old call sites that don't pass state continue to see
+ * only metadata-driven trades.
  */
 export const getExchangesInWindow = (
   player: PlayerState,
   window: ExchangeWindow,
+  state?: GameState,
 ): Trade[] => {
   const out: Trade[] = []
   for (const cardId of playedCardIds(player)) {
@@ -237,6 +244,9 @@ export const getExchangesInWindow = (
         out.push(exchangeToTrade(ex, cardId))
       }
     }
+  }
+  if (state) {
+    out.push(...collectComputeExchanges(state, player, window))
   }
   return out
 }

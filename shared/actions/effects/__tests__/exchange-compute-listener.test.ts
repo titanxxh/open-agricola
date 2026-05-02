@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { collectComputeExchanges } from '../../../cards/card-listeners'
+import { getExchangesInWindow } from '../exchange'
 import type { GameState, PlayerState } from '../../../game/types'
 import type { CardExchange } from '../../../cards/types'
 import type { CardListenerRegistration } from '../../../cards/card-listeners'
@@ -104,6 +105,53 @@ describe('collectComputeExchanges', () => {
     const player = makeMinimalPlayer()
     const state = makeMinimalState(player)
     const out = collectComputeExchanges(state, player, 'anytime')
+    expect(out).toHaveLength(0)
+  })
+})
+
+describe('getExchangesInWindow with computeExchanges listener', () => {
+  let prev: ReturnType<typeof getActiveCardRegistry>
+
+  beforeEach(() => {
+    prev = getActiveCardRegistry()
+    const reg = new CardRegistry()
+    const listener: CardListenerRegistration = {
+      id: 'fake-card-compute-exchanges-listener-2',
+      phases: ['computeExchanges'],
+      handler: (ctx) => {
+        const window = (ctx.extraData as { window?: string } | undefined)?.window
+        if (window !== 'harvest') return
+        return {
+          extraExchanges: [
+            {
+              from: { vegetable: 1 },
+              to: { food: 4 },
+              triggers: ['harvest'],
+              sourceId: 'FAKE_CARD::derived-1',
+            } as CardExchange,
+          ],
+        }
+      },
+    }
+    reg.registerListener(listener)
+    setActiveCardRegistry(reg)
+  })
+
+  afterEach(() => {
+    setActiveCardRegistry(prev)
+  })
+
+  it('appends listener-injected trades when state is provided', () => {
+    const player = makeMinimalPlayer()
+    const state = makeMinimalState(player)
+    const out = getExchangesInWindow(player, 'harvest', state)
+    expect(out).toHaveLength(1)
+    expect(out[0].sourceId).toBe('FAKE_CARD::derived-1')
+  })
+
+  it('does not invoke listener when state is omitted', () => {
+    const player = makeMinimalPlayer()
+    const out = getExchangesInWindow(player, 'harvest')
     expect(out).toHaveLength(0)
   })
 })
