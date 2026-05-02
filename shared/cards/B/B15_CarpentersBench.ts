@@ -6,11 +6,20 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B15_CarpentersBench'
 
-// B15 Carpenter's Bench: After using a wood accumulation space, optionally build
-// exactly 1 pasture. One of the fences is free (provided by the BonusModifier).
+// B15 Carpenter's Bench: Immediately after each time you use a wood accumulation
+// space, you can use the taken wood (and only that) to build exactly 1 pasture.
+// One of the fences is free.
+// BGA L39-64 counts the wood meeples actually picked up from the space (n);
+// the resulting fence flow runs with max=n+1 and benchWood=n. Our listener
+// reads `result.resourcesGained.wood` to mirror "actually collected".
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
+
+const collectedWood = (context: CardListenerContext): number => {
+  if (context.result?.type !== 'ok') return 0
+  return context.result.resourcesGained?.wood ?? 0
+}
 
 const afterCollectListener: CardListenerRegistration = {
   id: 'B15-carpenters-bench-after-collect',
@@ -19,6 +28,8 @@ const afterCollectListener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
+    const n = collectedWood(context)
+    if (n <= 0) return
 
     return {
       flow: {
@@ -29,7 +40,15 @@ const afterCollectListener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'fence',
             sourceCard: CARD_ID,
-            actionContext: { trueAction: false },
+            // BGA L55-59 args: { CarpentersBench: true, costs: { WOOD => 1 },
+            // max: n+1, benchWood: n }. We pass max + benchWood through
+            // actionContext for the fence interaction; trueAction=false so the
+            // engine treats this as a card-driven side flow.
+            actionContext: {
+              trueAction: false,
+              max: n + 1,
+              benchWood: n,
+            },
           },
         ],
       },
