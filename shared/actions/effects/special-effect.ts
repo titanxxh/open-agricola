@@ -1,4 +1,4 @@
-import type { ActionDefinition, GameState, PlayerState } from '../../game/types'
+import type { ActionDefinition, GameState, PlayerState, Resource } from '../../game/types'
 import {
   setCardFlag,
   writeCardInfobox,
@@ -20,6 +20,13 @@ export type SpecialEffectParams =
   | { kind: 'set-infobox'; text: string }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
   | { kind: 'consume-fence'; count?: number }
+  | {
+      kind: 'move-resource-between-spaces'
+      fromSpaceId: string
+      toSpaceId: string
+      resource: keyof Resource
+      amount: number
+    }
 
 const resolveTargetPlayer = (
   state: GameState | undefined,
@@ -104,6 +111,22 @@ export const specialEffectAction: ActionDefinition = {
         if (removed < count) {
           return { type: 'fail', logKey: 'log.specialEffectFail' }
         }
+        return { type: 'ok' }
+      }
+      case 'move-resource-between-spaces': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const from = state.actionSpaces.find((s) => s.id === p.fromSpaceId)
+        const to = state.actionSpaces.find((s) => s.id === p.toSpaceId)
+        if (!from?.resources || !to?.resources) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        const have = (from.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
+        if (have < p.amount) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        ;(from.resources as Record<keyof Resource, number>)[p.resource] = have - p.amount
+        const dest = (to.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
+        ;(to.resources as Record<keyof Resource, number>)[p.resource] = dest + p.amount
         return { type: 'ok' }
       }
     }

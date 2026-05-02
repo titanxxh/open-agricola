@@ -6,19 +6,29 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E166_Roastmaster'
 
-// Each time you use Traveling Players or Fishing,
-// optionally move 1 food from that space to the other, then get 1 cattle.
-// Simplified: if the space has food available to move, gain 1 cattle.
-// (The food movement between spaces is not fully simulated.)
+// E166 Roastmaster: Each time you use Traveling Players or Fishing,
+// optionally move 1 food from that space to the other to get 1 cattle.
+//
+// BGA actually moves the food meeple between the two action cards before
+// gaining the cattle. We implement the same shape via the
+// `move-resource-between-spaces` SE kind (special-effect.ts).
+const PAIR: Record<string, string> = {
+  fishing: 'traveling-players',
+  'traveling-players': 'fishing',
+}
+
 const listener: CardListenerRegistration = {
   id: 'E166-roastmaster-before-place-farmer',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const spaceId = context.space?.id
-    if (spaceId !== 'traveling-players' && spaceId !== 'fishing') return
-    // Check if the current space has food to move
+    const placedSpaceId = context.space?.id
+    if (!placedSpaceId) return
+    const otherSpaceId = PAIR[placedSpaceId]
+    if (!otherSpaceId) return
+    if (!context.state.actionSpaces.find((s) => s.id === otherSpaceId)) return
+    // Need at least 1 food on the placed space to move
     const currentFood = context.space?.resources?.food ?? 0
     if (currentFood <= 0) return
     return {
@@ -26,6 +36,18 @@ const listener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: {
+              kind: 'move-resource-between-spaces',
+              fromSpaceId: placedSpaceId,
+              toSpaceId: otherSpaceId,
+              resource: 'food',
+              amount: 1,
+            },
+          },
           gainLeaf(CARD_ID, { cattle: 1 }),
         ],
       },
