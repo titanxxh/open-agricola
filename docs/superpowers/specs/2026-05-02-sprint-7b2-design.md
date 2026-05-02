@@ -25,6 +25,18 @@
 
 无新基建（计划保留）。所有 16 张 fix 落在已有扩展点（onBuy / harvest exchange / computeBonusScore / cardStates / futureMeeples / `'after'` listener / SE choice）。少量 simplification（C94 stable-cost / C27 trade-clone / C52 placeFarmerFlow）登记 §2.5，避免引入新基建。
 
+### 新增 helper（B39 / B50 共用）
+
+**`getAssignedAnimalsByType(player): Record<AnimalKey, number>`** — 按 animal type 计算"已放置到 zone"的动物数（pasture + house + stableAnimals + animal-holder cards 动态 zones，如 C148 持的 pig）。
+
+- **背景**：我方 `player.resources.{sheep,boar,cattle}` 是**聚合数**（reserve + placed），不等价 BGA `countAnimalsOnBoard()`（仅板上）。
+- **现状**：`game-core.ts:558` 已有 private `getAssignedAnimalCount`（合计 sum，不分 type，不含 holder zones），但 by-type + holder 缺。
+- **新 helper 范围**：
+  - 提取 `getAssignedAnimalCount` 为公共 helper（移到 `shared/game/player.ts`）
+  - 新增 `getAssignedAnimalsByType` 按 type 分类
+  - 加 holder zones 扫描（scan `player.cardStates` for `animalHolder` zone metadata；目前仅 C148）
+- **callsite**：B39/B50 共用；其他卡如发现也用 `resources.{type}` 错误聚合 sum，可同步修
+
 ---
 
 ## 3. Cards Scope
@@ -39,7 +51,7 @@
 | --- | --- | --- | --- | --- | --- |
 | **C135 Constable** ❌ P0 | `onBuy`：剩余完整轮数 1/3/6/9 时立即 1/2/3/4 wood（map 见 PHP L25–41）；`computeSpecialScore` 给"无任何负分项"玩家 +3 VP | 仅有 `computeBonusScore` (TS L20–24)，**`onBuy` wood 完全缺失** | 缺 onBuy gain wood；scoring 部分逻辑等价（已通过 ctx.categories 检测负分） | 加 `onBuy` 用 `state.round` 反推 `14-round`，gain wood map | 0.4d |
 | B139 ForestScientist | `onPlayerReturnHome`：当前轮所有 ActionCards 上 wood meeples 总和=0 时 +food (turn≥5→2 else 1) | TS L21–32 `onReturnHome` 同语义（actionSpaces.resources.wood 求和=0 即触发）；round≥5 阈值一致 | **已对齐 — audit 误报**（spec §3.1 注释也已澄清 trigger 是 onReturnHome） | demote 到 §3.2 §2.0 aligned | 0d (docs only) |
-| B39 Loom | `HarvestFieldPhase`：`countAnimalsOnBoard()[SHEEP]` 映射 [0,1,1,1,2,2,2,3]→food；`computeBonusScore` floor(sheep/3) | TS L7–12 用 `player.resources.sheep`（含 reserve）；map 等价；computeBonusScore 用 `player.resources.sheep / 3` | sheep 来源差：BGA 仅板上（pasture+stable+animal-holder），我方含 reserve | 改用 `countAnimalsOnBoard` 等价（pasture + stableAnimals + houseAnimal*）；helper 已存在或新建 | 0.4d |
+| B39 Loom | `HarvestFieldPhase`：`countAnimalsOnBoard()[SHEEP]` 映射 [0,1,1,1,2,2,2,3]→food；`computeBonusScore` floor(sheep/3) | TS L7–12 用 `player.resources.sheep`（含 reserve）；map 等价；computeBonusScore 用 `player.resources.sheep / 3` | sheep 来源差：BGA 仅板上（pasture+stable+animal-holder），我方含 reserve | 改用新 helper `getAssignedAnimalsByType(player).sheep`（见 §2 新增 helper） | 0.4d |
 | B50 ButterChurn | `HarvestFieldPhase`：sheep/3 + cattle/2 个 food，源同样是 `countAnimalsOnBoard()` | TS L21–32 用 `player.resources.{sheep,cattle}` | 同 B39 sheep/cattle 来源差 | 同 B39 helper 复用 | 0.3d |
 | B89 Groom | `onBuy` +1 wood；`StartOfTurn` & `getRoomType()=='roomStone'` → optional 1 stable，`args.costs={WOOD=>1, max=>1}` | TS L23–50：onBuy 已有；`onBeforeStartOfTurn` 显式 pay-resources(wood:1) 然后 stables(max:1)；多余 `wood<1` 阻断 | flow 用 explicit pay-resources 而非 stables 自带 cost；wood<1 阻断会导致 trigger 不出现，BGA 是 prompt 时再检查 | 改为 stables leaf with cost params；移除 wood<1 阻断 | 0.4d |
 | **B117 Informant** | `onBuy` +1 wood；`AfterWorkPhase` (work phase 全部完成、ReturnHome 之前)：`countReserveResource(STONE) > countReserveResource(CLAY)` → +1 wood | TS L21–29：onBuy 已有；`onBeforeReturnHome` 检查 `resources.stone > resources.clay` | 时机相近但**触发点定义不同**：BGA 是所有玩家 work phase 完结的瞬间（整桌共一次），我方 `onBeforeReturnHome` 是每玩家 return home 之前（每玩家各一次）；resources vs reserve 在我方 storage 等价（resources 即 reserve） | 需确认 onBeforeReturnHome 是否仅触发一次或按 owner 触发；如属"per-owner pre-return"则与 BGA "after work phase" 等价（仅 owner 自己结算），可能已对齐；待 family agent 写 session test 验证 | 0.5d (含验证) |
