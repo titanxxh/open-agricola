@@ -458,6 +458,7 @@ import { C59_SchnappsDistillery_impl } from './C/C59_SchnappsDistillery'
 import { C5_Remodeling_impl } from './C/C5_Remodeling'
 import { C60_SmallPottersOven_impl } from './C/C60_SmallPottersOven'
 import { C61_BeerStein_impl } from './C/C61_BeerStein'
+import { C62_CookeryExtension_impl } from './C/C62_CookeryExtension'
 import { C63_CraftBrewery_impl } from './C/C63_CraftBrewery'
 import { C64_CornSchnappsDistillery_impl } from './C/C64_CornSchnappsDistillery'
 import { C65_Granary_impl } from './C/C65_Granary'
@@ -1279,6 +1280,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C5_Remodeling': C5_Remodeling_impl,
   'C60_SmallPottersOven': C60_SmallPottersOven_impl,
   'C61_BeerStein': C61_BeerStein_impl,
+  'C62_CookeryExtension': C62_CookeryExtension_impl,
   'C63_CraftBrewery': C63_CraftBrewery_impl,
   'C64_CornSchnappsDistillery': C64_CornSchnappsDistillery_impl,
   'C65_Granary': C65_Granary_impl,
