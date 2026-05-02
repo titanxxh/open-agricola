@@ -182,6 +182,43 @@ describe('B152_JuniorArtist session', () => {
     expect(findJumpToLessons(flow)).toBe(true)
   })
 
+  it('4p variant: lessons-4 is among the jump candidates', () => {
+    const session = setup({
+      withCard: true,
+      food: 3,
+      occupationHand: ['B130_FullPeasant'],
+      travelingPlayersFood: 0,
+    })
+    const s = session.getState().state
+    // Confirm lessons-4 exists in 4p (otherwise this test is meaningless)
+    expect(s.actionSpaces.some((x) => x.id === 'lessons-4')).toBe(true)
+    const space = dayLaborerCtx(s)
+    const listener = getRegisteredCardListeners().find(
+      (l) => l.id === 'B152-junior-artist-after-place-farmer',
+    )!
+    const result = executeCardListener(listener, {
+      state: s,
+      player: s.players[0]!,
+      space,
+      actionId: 'place-farmer',
+      phase: 'after',
+    } as unknown as CardListenerContext)
+    expect(result).toBeDefined()
+
+    const findJumpToLessons4 = (node: ActionFlow): boolean => {
+      if (!node) return false
+      if (node.type === 'leaf' && node.actionId === 'place-farmer') {
+        const ctx = node.actionContext ?? {}
+        return ctx.viaCardJump === true && ctx.targetSpaceId === 'lessons-4'
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        return node.children.some((c) => findJumpToLessons4(c))
+      }
+      return false
+    }
+    expect(findJumpToLessons4(result!.flow as ActionFlow)).toBe(true)
+  })
+
   it('does not produce chain when no candidate target is reachable', () => {
     const session = setup({
       withCard: true,
