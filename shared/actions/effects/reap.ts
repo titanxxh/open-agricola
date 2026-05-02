@@ -32,6 +32,7 @@ export const reap = (
     resources: {},
     grainFields: 0,
     vegetableFields: 0,
+    harvestedPositions: [],
   }
   player.fields.forEach((field) => {
     const top = fieldTopStack(field)
@@ -44,6 +45,7 @@ export const reap = (
     } else {
       reapSummary.vegetableFields += 1
     }
+    reapSummary.harvestedPositions!.push({ row: field.row, col: field.col })
     top.remaining -= 1
     fieldPopIfDepleted(field)
   })
