@@ -54,7 +54,7 @@
   - **B104 SheepWalker** ✅ Sprint 7d — 新增 `CardEffect.enforceReorganizeOnLastHarvest?(state, player)` 通用 hook（mirrors BGA）；`breedAction.execute` 在 round=14 + sourceCard='harvest' + animalCount===0 时调 `shouldEnforceReorganizeOnLastHarvest(state, player)`，任意卡返 true 则 emit `animalReorg`。B104 hook 实现：`player.resources.sheep > 0`。Reorg-pending 期间隐藏 anytime exchange 已经天然成立（`buildAnytimeEntries` 在 `pending.type==='animalReorg'` 时返回 `[]`）。
   - **C51 FishingNet** ✅ Sprint 7d — 加 `isDoable` listener `actions:['collect','fishing'] scope:'opponent'`：opponent 持卡 + trigger player food < 1 → doable=false。新增 `GameCore.listenersVetoIsDoable(player, space)` helper：takeAction 入口尊重 listener-driven `doable:false` veto（mirrors BGA `transferOrLose` 拒绝整个 fishing action）。该 helper **不**调 `space.canBeExecutedByPlayer` / `applyIsDoableHooks`，避免破坏现有"OR-flow with all children currently undoable still enters skip choice" 语义。
   - **C125 Nightworker** ✅ Sprint 7d — 重写 `onRoundStart`：返回 optional `place-farmer` leaf with `actionContext.constraints = [<accumulation space ids>]`（building resources 玩家有 0 的）。`place-farmer.execute` 加 `actionContext.constraints` 字符串数组过滤 allowed placements。镜像 BGA `actChooseDay/Night` PLACE_FARMER + constraints 路径。Banned 字段我们仍未实施（与 A14 / C3 / D21 同口径，§2.5）。
-  - prereq 双模扫描见下一 commit。
+  - **prereq 双模扫描** ✅ Sprint 7d — 41 张候选登记入 §2.3 backlog（A 13 / B 11 / C 2 / D 5 / E 10）：grep `prerequisite: '<string>'` + 无 registerPrerequisite + generic-parser 不覆盖 + BGA 真有 isBuyable/canBePlayed → silently 视为通过。详见 §2.3 末尾"2026-05-02 Sprint 7d prereq 双模扫描"段。**不在 7d scope 内 fix**（避免 scope creep），后续 sprint 集中实施 ~1 day 工作量。
   - spec：`docs/superpowers/specs/2026-05-02-sprint-7d-design.md`。
 
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
@@ -417,17 +417,27 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
 
-**Sprint 7c re-audit promotion（5 张 §2.5 → §2.3，2026-05-02，Sprint 7d 候选）**：
+**2026-05-02 Sprint 7d prereq 双模扫描（spec §2 顺手扫描）— 41 张候选 backlog（不在 7d scope 内 fix）**：
 
-| 卡牌 | BGA 行为 | 我方现状 | 真规则 / 玩法影响 | 修复草图（est） |
-|---|---|---|---|---|
-| **A10_WoodenShed** | `isBuyable` 强制 actionType ∈ {Major, MajorOrMinor}（`A10_WoodenShed.php:43`）；卡 desc 也写"only via Major Improvement action" | prerequisite 仅校验 house wood，未限 actionType；玩家可走纯 Minor 通道获得 | desc 已写却不强制；玩家可在 Minor Improvement action（仅 Minor 空间）打出，违反明文规则 | `isBuyable` / `computeReplace` listener 检查 actionContext，纯 Minor channel reject。~30-50 LOC |
-| **B104_SheepWalker** | `getExchanges` 在 `reserve > 0` 时返回空（`B104_SheepWalker.php:38-44`）；`enforceReorganizeOnLastHarvest` 强制最后 harvest 重排 | exchange 始终可见；最后 harvest 不强制 reorg | 玩家可在 reorg pending 时把 sheep 直接换 pig/veg/stone（绕过喂养），或最后 harvest 不重排 sheep 直接保留 | 加 `getExchanges` filter 检查 `pendingAnimalReorg`；接入 reorg-finalisation hook（如已存在）。~50 LOC + reorg 闭环 |
-| **C51_FishingNet** | 用 `PAY` 让对手 fishing 前付 1 食物给 owner（`C51_FishingNet.php:41-58`）；食物 < 1 时 fishing 直接被阻 | listener 用 `gain { food: 1, payerId: opponent }` best-effort transfer，不阻止 fishing | 真规则差异：BGA 食物=0 时对手不能 fishing；我方仍允许（白拿累积 food）。多人玩法常见路径 | 改用 opponent place-farmer 上的 `computeCosts` listener 注入 `food: 1` blocking pay；fishing 在 food=0 时 isDoable=false。最大头 |
-| **C125_Nightworker** | onPlayerStartOfWork 给 optional `PLACE_FARMER` 限定 building-resource accumulation 空间（`C125_Nightworker.php:32-52`）——消耗 worker；`banned=true` | onRoundStart 直接 optional gain 全部 resources（不消耗 worker） | 巨大行为差异：免费 vs 占 worker。BGA banned 但我方 ship | 重写为 `place-farmer` action with constraints；触及 pre-work-phase placement 语义。BGA banned，先 triage ROI |
-| **D21_Recruitment** | onBuy 抛错若房屋仍有 farmer（`D21_Recruitment.php:32-37`）；replace-improvement on minor + Major Improvement 空间 | listener 已正确覆盖 minor + Major Improvement（`improvement-any`）；**`prerequisite: 'No People Left in the House'` 仅 label 字符串，无 `registerPrerequisite` 注册**——prereq 失效 | 卡可在不满足条件时打出（家中仍有 farmer 时）；wide-scan reason 写"Major Improvement coverage"实际是误报，真问题是 prereq handler | `registerPrerequisite('No People Left in the House', player => familySize(player) === player.rooms || player.rooms === 0)`。~5 LOC，最便宜 |
+我方 `prerequisite: '<string>'` label-only + 无对应 `registerPrerequisite` 注册 + `meetsCardPrerequisites` 的 generic patterns 不覆盖 + BGA 真有 `isBuyable` / `canBePlayed` 守卫 ⇒ silently 视为 prereq 满足，等价 D21 patten。
 
-详见 `docs/sprint-7c-audit-report.md` § 4 "Sprint 7d candidate"。
+下面是 7d 顺手 grep + BGA-spotcheck 出的待 register 候选（**NOT in 7d scope**，登记到 §2.3 backlog 等后续 sprint 处理）：
+
+A 牌组（13 张）: A13 RenovationCompany / A20 DoubleTurnPlow / A22 Telegram / A27 OvenSite / A30 BakingSheet / A33 BigCountry / A36 FacadesCarving / A3 PaperKnife / A40 PottersYard / A46 ClawKnife / A52 ThrowingAxe / A57 MilkingParlor / A68 AsparagusGift
+
+B 牌组（11 张）: B14 Hawktower / B22 WalkingBoots / B23 FinalScenario / B31 PotteryYard / B33 Mantlepiece / B38 FutureBuildingSite / B45 StrawberryPatch / B51 DiggingSpade / B52 GrowingFarm / B74 ThickForest
+
+C 牌组（2 张）: C20 MolePlow / C81 MaterialHub
+
+D 牌组（5 张）: D1 ZigzagHarrow / D22 WorkPermit / D47 Churchyard / D48 CivicFacade
+
+E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30 ChildsToy / E3 TeaTime / E41 MuddyWaters / E42 WaterGully / E43 BarnCats / E71 CowPatty
+
+**Label-only 但 BGA 也是 label-only**（不算 bug）: A44 PondHut / B49 Scales / D25 WitchesDanceFloor / D42 EducationBonus / E46 WaterlilyPond — BGA 没 `isBuyable` / `canBePlayed`，纯文案。
+
+**严重度评估**：所有 candidate 当前在 buyable 时**完全不验**，玩家可在条件不满足时打出。深度池方向（A33 BigCountry "All Farmyard Spaces Used" / E1 PoleBarns "15 Fences Built" / D47 Churchyard "10 Cards In Front of You"）影响最大；弱条件方向（A20 "Round 5 or Before" / B14 "Round 7 or Before" / B23 "Round 13 or Before" / B38 "Round 4 or Before"）受 maxRound 字段缺失影响（部分卡可能已用 maxRound——需逐张复核）。
+
+**实施建议**: ~1 day 工作量集中实施（每张卡 +1 行 registerPrerequisite + handler ~3-5 LOC + 单元测试 ~10 LOC）。已在系统中的 generic-pattern 解析器无须改动。
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
