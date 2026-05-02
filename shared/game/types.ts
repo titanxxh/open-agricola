@@ -77,7 +77,7 @@ export type Bonus = {
   conditions?: Record<string, number>
 }
 
-export type CostModifierType = 'construct' | 'renovation' | 'occupation' | 'fencing' | 'stables' | 'plow'
+export type CostModifierType = 'construct' | 'renovation' | 'occupation' | 'fencing' | 'stables' | 'plow' | 'major-improvement' | 'minor-improvement'
 
 export type TradeModifier = {
   type: 'trade'
@@ -180,6 +180,20 @@ export type PlayerState = {
    * attributing the `log.actionDetail` entry to the triggering card.
    */
   _activeActionBonusSources?: string[]
+  /**
+   * Session-transient scratchpad written by the `pay` action leaf and
+   * consumed by the immediately-following `apply-improvement` leaf. Holds
+   * `resourcesPaid`, `feeIndex`, and `returnedCardId` for the pending
+   * improvement build so that `activateCard(... 'onBuy', paymentInfo)` keeps
+   * receiving the same `PaymentInfo` it did under the legacy
+   * `playMajorImprovement` / `playMinorImprovement` mutate-in-place flow.
+   * Cleared by `apply-improvement` after read.
+   */
+  _pendingImprovementPaymentInfo?: {
+    resourcesPaid: Partial<Resource>
+    feeIndex?: number
+    returnedCardId?: string
+  }
 }
 
 export type FarmTilePosition = {
@@ -473,6 +487,18 @@ export type ActionDefinition = {
     context: ActionExecutionContext,
     choice: string,
   ) => ActionExecutionResult
+  /**
+   * Opt-out: when true the engine builds a bare ActionNode instead of the
+   * default `Sequence([ActionNode, ChoiceNode])` wrap that is normally
+   * triggered by the presence of `resolveChoice`. Used by leaf actions whose
+   * `execute` typically returns `ok` (so the paired ChoiceNode would dangle
+   * empty and block the seq), and which only emit `choice` for one specific
+   * branch (handled via the engine's fallback `pendingChoiceNodeId = node.id`
+   * path that already routes the player choice back through `resolveChoice`).
+   * Currently set on the `pay` leaf — typed-flat costs resolve eagerly while
+   * ComplexCost multi-solution still emits a payment choice.
+   */
+  skipChoiceWrap?: boolean
   /**
    * Opt-in: when defined, the engine bypasses `execute()` and instead builds a
    * choice from `getBaseChoiceOptions(ctx)` merged with hook-injected
