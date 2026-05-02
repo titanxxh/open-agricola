@@ -3,6 +3,8 @@ import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
 import type { ActionFlow, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'C1_Overhaul'
 const FLAG_KEY = 'c1Active'
@@ -63,6 +65,23 @@ const setExtraDataFlow = (key: string, value: unknown): ActionFlow => ({
   params: { kind: 'set-extra-data', key, value },
 })
 
+const C1FenceListener: CardListenerRegistration = {
+  id: 'C1-fence-discount',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    if (!isC1Active(ctx.player)) return
+    const cap = getC1MaxRebuild(ctx.player)
+    const params = ctx.params as { newFenceEdges?: string[] } | undefined
+    const newFenceEdges = params?.newFenceEdges
+    if (newFenceEdges === undefined) {
+      return { costs: { wood: -cap } }
+    }
+    return { costs: { wood: -Math.min(newFenceEdges.length, cap) } }
+  },
+}
+
 export const C1_Overhaul_impl = {
   effect: {
     id: CARD_ID,
@@ -97,5 +116,6 @@ export const C1_Overhaul_impl = {
       return getC1MaxRebuild(player)
     },
   },
+  listeners: [C1FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
