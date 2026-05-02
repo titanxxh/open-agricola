@@ -211,6 +211,16 @@ export type CardEffect = {
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
   /**
+   * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
+   * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
+   * even when no breeding produced a newborn — to give the rules system a
+   * chance to evict animals (e.g. SheepWalker's "must accommodate before
+   * exchange" implies the final-harvest rearrangement). Returning true makes
+   * `breedAction` emit an `animalReorg` result regardless of `animalCount`.
+   * Only consulted when `state.round === 14` and `sourceCard === 'harvest'`.
+   */
+  enforceReorganizeOnLastHarvest?: (state: GameState, player: PlayerState) => boolean
+  /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
    * so there is no overlap — once a card is played it moves out of the hand arrays
@@ -336,6 +346,41 @@ export const runAfterFeedHooks = (state: GameState, player: PlayerState): void =
 
 export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onBeforeEndGame')
+
+/**
+ * Returns true when any of the player's played cards demand a reorg even on
+ * the round-14 harvest with no newborn (e.g. B104 SheepWalker, B35 HookKnife,
+ * A153 PigOwner). Mirrors BGA's `enforceReorganizeOnLastHarvest` aggregation
+ * in `HarvestTrait::stHarvestBreed`.
+ */
+export const shouldEnforceReorganizeOnLastHarvest = (
+  state: GameState,
+  player: PlayerState,
+): boolean => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.enforceReorganizeOnLastHarvest
+    if (!handler) continue
+    try {
+      if (handler(state, player)) return true
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(
+          `[card-effects] custom card ${cardId} enforceReorganizeOnLastHarvest threw, skipping:`,
+          err,
+        )
+        continue
+      }
+      throw err
+    }
+  }
+  return false
+}
 
 /**
  * Run `onBeforePlayerTurn` listeners for every card the player owns and return
