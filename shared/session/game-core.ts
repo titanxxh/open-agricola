@@ -70,7 +70,8 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys, collectFenceDiscount, getCardEffect } from '../cards/card-effects.ts'
+import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { collectComputeCostsForFarmChoice } from '../cards/card-listeners.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
@@ -2733,6 +2734,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player)
+    const space = this.getSpaceById(this.activeSpaceId) ?? undefined
     const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
       costOverride: this.pending.costOverride,
       maxUnits:
@@ -2741,6 +2743,7 @@ export class GameCore {
           : undefined,
       paymentChoice: value,
       state: this.state,
+      space,
     })
     if (!result.ok) {
       return this.respond(false, result.error)
@@ -2783,10 +2786,10 @@ export class GameCore {
         const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
         const pendingFreeFences =
           readPendingFenceBonus(normalized)?.freeFences ?? 0
-        // Mirror applyFarmChoice: per-card hooks (E16, C1, C16…) extend the
-        // free-fence count via `computeFenceDiscount`, so payment preview must
-        // use the same total or `resolveTypedFlatPaymentSelection` will reject
-        // the payment for cards that bring wood costs to zero.
+        // Mirror applyFarmChoice: per-card listeners (E16, C1, C16…) extend the
+        // free-fence count via `computeCosts`, so payment preview must use the
+        // same total or `resolveTypedFlatPaymentSelection` will reject the
+        // payment for cards that bring wood costs to zero.
         const existingEdgeIdsForDiscount = new Set(
           (normalized.fenceSegments ?? []).map((seg) => seg.edge),
         )
@@ -2796,13 +2799,20 @@ export class GameCore {
         const newPalisadeEdgesPreview = safePalisadeEdges.filter(
           (e) => !existingEdgeIdsForDiscount.has(e),
         )
-        const hookFreeFences = collectFenceDiscount(this.state, normalized, {
-          newFenceEdges: newFenceEdgesPreview,
-          newPalisadeEdges: newPalisadeEdgesPreview,
-        })
+        const space = this.getSpaceById(this.activeSpaceId) ?? undefined
+        const fenceOverride = collectComputeCostsForFarmChoice(
+          this.state,
+          normalized,
+          'fence',
+          {
+            newFenceEdges: newFenceEdgesPreview,
+            newPalisadeEdges: newPalisadeEdgesPreview,
+          },
+          space,
+        )
+        const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
         const freeFences = pendingFreeFences + hookFreeFences
-        const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
-        const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
+        const adjustedExtraWood = extraWood ?? 0
         const validated = validateFenceSelection(
           normalized,
           safeEdges,
@@ -2859,6 +2869,7 @@ export class GameCore {
         }, {
           costOverride: override,
           state: this.state,
+          space,
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()
