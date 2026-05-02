@@ -10,15 +10,14 @@ const CARD_ID = 'C94_StableCleaner'
  * C94 Stable Cleaner — At any time, you can take the __Build Stables__ action
  * without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.
  *
- * BGA: isListeningTo returns !isFlagged; uses flagCard/unflagCard around stables action.
+ * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
- * CONCERN: The custom cost (1 wood + 1 food per stable vs 2 wood) cannot be applied
- * via computeCosts since buildStable() uses hardcoded payResources(player, {wood:2}).
- * The anytime action grants access to stables without placing a farmer, but the cost
- * reduction (1 wood + 1 food) is not applied — normal 2 wood cost applies.
- * Full implementation would require extending stables.ts for cost parameterization.
- *
- * Players: 1+.
+ * Implementation: anytime listener emits SEQ
+ *   set-flag → stables (with actionContext.costOverride { wood:-1, food:1 })
+ *   → unset-flag.
+ * `applyCostOverride` flips the base { wood:2 } to { wood:1, food:1 }; the
+ * existing stables farm-interaction / payment paths read the override
+ * naturally (no stables.ts changes needed).
  */
 const anytimeListener: CardListenerRegistration = {
   id: 'C94-stable-cleaner-anytime',
@@ -27,13 +26,19 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.stableTiles.length >= 4) return
-    if ((context.player.resources.wood ?? 0) < 2) return
+    if ((context.player.resources.wood ?? 0) < 1) return
+    if ((context.player.resources.food ?? 0) < 1) return
     return {
       flow: {
         type: 'seq',
         children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-          { type: 'leaf', actionId: 'stables', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'stables',
+            sourceCard: CARD_ID,
+            actionContext: { costOverride: { wood: -1, food: 1 }, trueAction: false },
+          },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       },
