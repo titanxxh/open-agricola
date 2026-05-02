@@ -1,11 +1,11 @@
 import type { ActionSpace, WorkerRef } from './types'
 
 /**
- * Normalize a legacy `takenBy` value to the new `WorkerRef[]` shape.
- * - `undefined` / `null` → `[]`
- * - `'playerId'` (legacy string) → `[{ playerId, workerId: '1' }]` (best-effort fallback;
- *   old snapshots will re-pin a worker on next placement)
- * - already-array → returned as-is
+ * Coerce a deserialized or test-fixture `takenBy` into a `WorkerRef[]`.
+ *
+ * Tests sometimes set `space.takenBy = playerId` for brevity (auto-pinned to
+ * worker '1'); this helper keeps that shorthand working when the value is
+ * piped through `loadState` / `rehydrateState`.
  */
 export const normalizeTakenBy = (value: unknown): WorkerRef[] => {
   if (!value) return []

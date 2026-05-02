@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
@@ -112,9 +112,6 @@ export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(
 
 export const isFixedDevRoom = (roomId: string): boolean =>
   FIXED_DEV_ROOM_IDS.has(roomId)
-
-/** One-shot list of room IDs from previous schemes that should be purged on startup. */
-const LEGACY_DEV_ROOM_IDS = ['dev'] as const
 
 const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
 
@@ -460,35 +457,7 @@ export const removePlayerFromRoom = (
   return 'remaining'
 }
 
-/** One-shot purge of legacy single-`dev` room data (predates dev2/dev3/dev4). */
-function purgeLegacyDevRooms(): void {
-  if (PERSIST_ROOMS === 'sqlite') {
-    try {
-      const db = getDb()
-      const placeholders = LEGACY_DEV_ROOM_IDS.map(() => '?').join(', ')
-      db.prepare(`DELETE FROM room_players WHERE room_id IN (${placeholders})`)
-        .run(...LEGACY_DEV_ROOM_IDS)
-      db.prepare(`DELETE FROM rooms WHERE id IN (${placeholders})`)
-        .run(...LEGACY_DEV_ROOM_IDS)
-    } catch (err) {
-      console.warn('[room-manager] purgeLegacyDevRooms (sqlite) failed:', err)
-    }
-  }
-  for (const legacyId of LEGACY_DEV_ROOM_IDS) {
-    try {
-      const filePath = getPersistedRoomFile(legacyId)
-      if (existsSync(filePath)) {
-        try {
-          writeFileSync(`${filePath}.legacy.bak`, readFileSync(filePath, 'utf-8'), 'utf-8')
-        } catch { /* ignore */ }
-        try { unlinkSync(filePath) } catch { /* ignore */ }
-      }
-    } catch { /* non-critical */ }
-  }
-}
-
 function ensurePersistentRooms(): void {
-  purgeLegacyDevRooms()
   for (const { id, playerCount } of FIXED_DEV_ROOMS) {
     if (rooms.has(id)) continue
     if (PERSIST_ROOMS === 'sqlite') {
