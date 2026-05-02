@@ -64,3 +64,16 @@ export const collectCardsAs = (
   }
   return [...seen]
 }
+
+/**
+ * `fireplaceIdentity` query — true for the Major Fireplace cards plus any
+ * minor declaring the marker (e.g. D25_WitchesDanceFloor). Used by the
+ * "return-a-Fireplace" cost slot machinery in payment / improvement so the
+ * cost handler does not need to enumerate Major_Fireplace1 / Major_Fireplace2
+ * explicitly.
+ */
+export const isFireplaceIdentityCard = (cardId: string): boolean => {
+  if (getMajorCard(cardId)?.fireplaceIdentity) return true
+  if (getRegisteredMinorImprovement(cardId)?.fireplaceIdentity) return true
+  return false
+}
