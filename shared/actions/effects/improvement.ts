@@ -1,7 +1,6 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
-import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { majorCardDefinitions } from '../../cards/major'
@@ -15,31 +14,23 @@ import {
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
-import { isMajorCardId } from '../../cards/helpers/card-type'
-
-/** Cards that satisfy a Fireplace return requirement. */
-const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
 /**
- * Returns the list of card IDs a player can use to satisfy a cost that requires
- * returning a Fireplace card. This includes both played major Fireplace cards
- * AND any minors with `fireplaceIdentity === true`.
+ * Returns the list of card IDs a player can use to satisfy a cost that
+ * requires returning a Fireplace card — any played card declaring
+ * `fireplaceIdentity` (Major Fireplace 1/2 plus any minor like D25 with the
+ * same marker).
  */
-const getFireplaceReturnPool = (player: PlayerState): string[] => {
-  const majorFireplaces = player.improvements.filter((id) =>
-    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
-  )
-  const minorFireplaces = player.minorPlayed.filter((id) => {
-    const card = getRegisteredMinorImprovement(id)
-    return !!card?.fireplaceIdentity
-  })
-  return [...majorFireplaces, ...minorFireplaces]
-}
+const getFireplaceReturnPool = (player: PlayerState): string[] => [
+  ...player.improvements.filter(isFireplaceIdentityCard),
+  ...player.minorPlayed.filter(isFireplaceIdentityCard),
+]
 
 /**
- * Returns the effective `playedCards` pool for cost resolution that may include
- * a Fireplace return. If the cost requires returning a Fireplace, include both
- * player.improvements AND any fireplaceIdentity minors.
+ * Returns the effective `playedCards` pool for cost resolution that may
+ * include a Fireplace return. If the cost requires returning a Fireplace,
+ * include both player.improvements AND any fireplaceIdentity minors.
  */
 const getPlayedCardsForCost = (
   player: PlayerState,
@@ -48,10 +39,7 @@ const getPlayedCardsForCost = (
   if (!cost || !isComplexCost(cost)) return player.improvements
   const list = cost.cards?.list
   if (!Array.isArray(list)) return player.improvements
-  const needsFireplace = list.some((id) =>
-    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
-  )
-  if (!needsFireplace) return player.improvements
+  if (!list.some(isFireplaceIdentityCard)) return player.improvements
   return getFireplaceReturnPool(player)
 }
 

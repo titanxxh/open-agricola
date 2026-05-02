@@ -17,27 +17,22 @@ import {
   convertResources,
   hasValidResources,
 } from '../effects/exchange'
-import { getRegisteredMinorImprovement } from '../../cards/types'
 import { recordPaymentStats } from '../../cards/helpers/payment-stats'
-
-const FIREPLACE_COST_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+import { isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
 /**
  * Returns true if a card in the player's hand satisfies a slot in the cost
- * list. Normal cards must appear verbatim in the list. Minor improvements with
- * `fireplaceIdentity === true` also satisfy any Fireplace-return cost slot.
+ * list. Normal cards must appear verbatim in the list. When the cost list
+ * names any `fireplaceIdentity` card, any other `fireplaceIdentity` card
+ * (Major Fireplace 1/2 or a minor like D25) also satisfies the slot.
  */
 const cardMatchesCostList = (
   cardId: string,
   costList: readonly string[],
 ): boolean => {
   if (costList.includes(cardId)) return true
-  const isFireplaceRequest = costList.some(
-    (id) => (FIREPLACE_COST_IDS as readonly string[]).includes(id),
-  )
-  if (isFireplaceRequest) {
-    const minor = getRegisteredMinorImprovement(cardId)
-    if (minor?.fireplaceIdentity) return true
+  if (costList.some(isFireplaceIdentityCard) && isFireplaceIdentityCard(cardId)) {
+    return true
   }
   return false
 }

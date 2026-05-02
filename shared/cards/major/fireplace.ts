@@ -10,6 +10,7 @@ export const fireplace1: MajorCardData = {
   extraVp: false,
   isCookery: true,
   isBaking: true,
+  fireplaceIdentity: true,
   desc: [
     '[Anytime]',
     '<VEGETABLE> <ARROW> 2<FOOD>      <PIG> <ARROW> 2<FOOD>',
