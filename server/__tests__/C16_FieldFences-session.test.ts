@@ -84,7 +84,7 @@ describe('C16 FieldFences session', () => {
     const session = setup({ wood: 3, withField: true })
     playC16(session)
 
-    let resp = session.commitFarmChoice(0, 'fence', {
+    const resp = session.commitFarmChoice(0, 'fence', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
