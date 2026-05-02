@@ -21,10 +21,9 @@ const FLAG_KEY = 'c16Active'
  *   1. `special-effect` → set `cardStates.C16_FieldFences.extraData.c16Active = true`
  *   2. `fencing` leaf
  *   3. `special-effect` → unset the flag
- * Discount is delivered through the existing `computeFenceDiscount` /
- * `computeFenceFreeAvailable` hooks, gated by the flag. This mirrors how
- * E16 BriarHedge handles "free border edges" but only while the
- * card-induced fencing flow is active.
+ * Discount is delivered through a `computeCosts` listener on `fence`,
+ * gated by the flag. This mirrors how E16 BriarHedge handles "free border
+ * edges" but only while the card-induced fencing flow is active.
  */
 const fieldEdgeIds = (fields: FarmTilePosition[]): Set<string> => {
   const edges = new Set<string>()

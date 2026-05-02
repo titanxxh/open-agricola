@@ -25,11 +25,11 @@ const MAX_REBUILD_KEY = 'c1MaxRebuild'
  *   - We use the existing `consume-fence` SE to raze (count=n) wood fences.
  *   - We set a `c1Active=true` flag and store `c1MaxRebuild = n+3` on the
  *     card state, then run a `fence` leaf, then clear the flag.
- *   - `computeFenceDiscount` while the flag is set returns
+ *   - A `computeCosts` listener on `fence`, gated by the flag, returns
  *     `min(newFenceEdges, c1MaxRebuild)` — every selected new fence is free
- *     (matches BGA `costs: WOOD => 0`) up to the rebuild cap.
- *   - `computeFenceFreeAvailable` returns `c1MaxRebuild` so the entry
- *     guard sees fencing as doable even with 0 wood.
+ *     (matches BGA `costs: WOOD => 0`) up to the rebuild cap. The same
+ *     listener feeds the `canStartFencing` entry guard so fencing is
+ *     doable even with 0 wood.
  *
  * Deliberate simplification (recorded in card_progress §刻意不同):
  *   - We do NOT enforce BGA's `min: n` (player can decline / build less);

@@ -2842,7 +2842,6 @@ export class GameCore {
             spaceId: this.activeSpaceId!,
             options: payment.options ?? [],
             promptKey: payment.promptKey,
-            costOverride: override,
             sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
@@ -2867,7 +2866,6 @@ export class GameCore {
           palisadeEdges: safePalisadeEdges,
           extraWood: extraWood ?? 0,
         }, {
-          costOverride: override,
           state: this.state,
           space,
         })
