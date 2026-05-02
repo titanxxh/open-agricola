@@ -130,7 +130,7 @@ describe('B152_JuniorArtist session', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    expect(flow.children[0].actionId).toBe('pay-resources')
+    expect(flow.children[0].actionId).toBe('pay')
 
     const findJumpToTp = (node: ActionFlow): boolean => {
       if (!node) return false

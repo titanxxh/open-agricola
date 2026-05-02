@@ -95,7 +95,7 @@ const getEffectPreviewSubtitle = (
 ): ReactNode => {
   switch (option.effectPreview?.kind) {
     case 'payment':
-      return translateCardText(locale, 'actions.pay-resources.name')
+      return translateCardText(locale, 'actions.pay.name')
     case 'resourceExchange':
       return translateCardText(locale, 'ui.interactionResourceExchange')
     default:

@@ -39,7 +39,7 @@ describe('C143_StoneBuyer session', () => {
     expect(flow!.type).toBe('seq')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(3)
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ food: 1 })
     expect(children[1].actionId).toBe('gain')
     expect(children[1].params).toEqual({ stone: 2 })

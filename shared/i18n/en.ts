@@ -475,7 +475,7 @@ export const en = {
     sow: { name: 'Sow', description: 'Sow in empty fields' },
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
     'anytime-reorg': { name: 'Reorganize Animals', description: 'Reorganize animals at any time' },
-    'pay-resources': { name: 'Pay Resources', description: 'Pay resources from your supply' },
+    'pay': { name: 'Pay Resources', description: 'Pay resources from your supply' },
     'return-to-space': { name: 'Return Resource', description: 'Return resources from your supply to the current action space' },
     'bonus-vp': { name: 'Gain Bonus VP', description: 'Gain 1 bonus victory point for the source card' },
     breed: { name: 'Breed', description: 'Breed animals (internal action used by harvest and breed-shaped cards)' },

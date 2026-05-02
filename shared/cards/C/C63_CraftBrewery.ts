@@ -27,7 +27,7 @@ export const C63_CraftBrewery_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'gain', params: { food: 4 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', params: {}, sourceCard: CARD_ID },

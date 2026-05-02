@@ -461,7 +461,7 @@ export class Engine {
   private getActionEffectPreview(node: ActionNode): ChoiceEffectPreview | undefined {
     if (node.effectPreview) return node.effectPreview
     const params = this.sanitizePreviewResources(node.params)
-    if (node.actionId === 'pay-resources') {
+    if (node.actionId === 'pay') {
       return { kind: 'payment', resourcesPaid: params }
     }
     if (node.actionId === 'gain') {
@@ -495,7 +495,7 @@ export class Engine {
     if (!actionNodes || actionNodes.length === 0) return undefined
     const [firstAction, ...restActions] = actionNodes
     if (
-      firstAction?.actionId === 'pay-resources' &&
+      firstAction?.actionId === 'pay' &&
       restActions.every((actionNode) => actionNode.actionId === 'gain' || actionNode.actionId === 'bonus-vp')
     ) {
       let resourcesGained: Partial<Resource> = {}

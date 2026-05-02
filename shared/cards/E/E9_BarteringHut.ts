@@ -20,10 +20,10 @@ export const E9_BarteringHut_impl = {
   onBuy: () => {
     const makeAnimalOption = (animal: 'sheep' | 'boar' | 'cattle', cost: number): ActionFlow => {
       const payChoices: ActionFlow[] = [
-        { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { wood: 1 } },
-        { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { clay: 1 } },
-        { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { reed: 1 } },
-        { type: 'leaf' as const, actionId: 'pay-resources', sourceCard: CARD_ID, params: { stone: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { wood: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { clay: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { reed: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { stone: 1 } },
       ]
       const paySteps: ActionFlow[] = Array.from({ length: cost }, () => ({
         type: 'xor' as const,

@@ -48,7 +48,7 @@ describe('B89_Groom session', () => {
     // Should contain pay-resources and stables children
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(2)
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ wood: 1 })
     expect(children[1].actionId).toBe('stables')
   })

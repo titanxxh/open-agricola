@@ -36,7 +36,7 @@ export const E142_Smuggler_impl = {
       singleOptions.push({
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { wood: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { wood: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -47,7 +47,7 @@ export const E142_Smuggler_impl = {
       singleOptions.push({
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -62,7 +62,7 @@ export const E142_Smuggler_impl = {
       children.push({
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { wood: 2 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { wood: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { grain: 2 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',
@@ -73,7 +73,7 @@ export const E142_Smuggler_impl = {
       children.push({
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'pay-resources', params: { grain: 2 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { grain: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { stone: 2 }, sourceCard: CARD_ID },
         ],
         choiceLabelKey: 'ui.interactionResourceExchange',

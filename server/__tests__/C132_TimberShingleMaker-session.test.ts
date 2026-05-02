@@ -75,7 +75,7 @@ describe('C132_TimberShingleMaker', () => {
 
     // First option: pay 1 wood, then increment-counter woodPlaced=1
     expect(children[0].type).toBe('seq')
-    expect(children[0].children[0].actionId).toBe('pay-resources')
+    expect(children[0].children[0].actionId).toBe('pay')
     expect(children[0].children[0].params).toEqual({ wood: 1 })
     expect(children[0].children[1].actionId).toBe('special-effect')
     expect(children[0].children[1].params).toMatchObject({ kind: 'increment-counter', key: 'woodPlaced', amount: 1 })

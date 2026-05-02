@@ -49,7 +49,7 @@ describe('C98_CubeCutter session', () => {
     expect(children).toHaveLength(2)
     // First child: pay wood+food
     expect(children[0].type).toBe('leaf')
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ wood: 1, food: 1 })
     // Second child: bonus-vp
     expect(children[1].type).toBe('leaf')

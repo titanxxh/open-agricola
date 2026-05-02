@@ -31,7 +31,7 @@ export const B101_FurnitureCarpenter_impl = {
         {
           type: 'seq' as const,
           children: [
-            { type: 'leaf' as const, actionId: 'pay-resources', params: { food: 2 }, sourceCard: CARD_ID },
+            { type: 'leaf' as const, actionId: 'pay', params: { food: 2 }, sourceCard: CARD_ID },
             { type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID },
           ],
           choiceLabelKey: 'ui.interactionResourceExchange',

@@ -32,7 +32,7 @@ export const D129_LumberVirtuoso_impl = {
       ? {
           type: 'seq',
           children: [
-            { type: 'leaf', actionId: 'pay-resources', sourceCard: CARD_ID, params: { wood: excessWood } },
+            { type: 'leaf', actionId: 'pay', sourceCard: CARD_ID, params: { wood: excessWood } },
             { type: 'leaf', actionId: 'stables', sourceCard: CARD_ID },
           ],
         }
@@ -45,7 +45,7 @@ export const D129_LumberVirtuoso_impl = {
         ? {
             type: 'seq',
             children: [
-              { type: 'leaf', actionId: 'pay-resources', sourceCard: CARD_ID, params: { wood: excessWood } },
+              { type: 'leaf', actionId: 'pay', sourceCard: CARD_ID, params: { wood: excessWood } },
               { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
             ],
           }

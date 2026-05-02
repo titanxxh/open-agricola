@@ -45,7 +45,7 @@ export const A36_FacadesCarving_impl = {
         children: [
           {
             type: 'leaf' as const,
-            actionId: 'pay-resources',
+            actionId: 'pay',
             sourceCard: CARD_ID,
             params: { food: i },
           },
