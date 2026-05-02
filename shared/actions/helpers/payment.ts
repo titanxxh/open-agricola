@@ -181,6 +181,7 @@ type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
+  bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
 
@@ -530,8 +531,14 @@ export const computeAllBuyableCombinations = (
     for (const tradeCombo of tradeCombos) {
       // Expand bonuses in BGA style: each bonus multiplies the path count.
       // Start with one path = baseFee with no bonuses applied.
-      type BonusPath = { cost: Partial<Resource>; sources: string[] }
-      let bonusPaths: BonusPath[] = [{ cost: baseFee, sources: [] }]
+      type BonusPath = {
+        cost: Partial<Resource>
+        sources: string[]
+        choiceIndices: Record<string, number>
+      }
+      let bonusPaths: BonusPath[] = [
+        { cost: baseFee, sources: [], choiceIndices: {} },
+      ]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
         // Bonus-level conditions: if not satisfied, the entire bonus is a
@@ -544,7 +551,11 @@ export const computeAllBuyableCombinations = (
         // If optional, include a "skip" path that keeps the existing costs.
         if (bonus.optional) {
           for (const path of bonusPaths) {
-            expanded.push({ cost: path.cost, sources: [...path.sources] })
+            expanded.push({
+              cost: path.cost,
+              sources: [...path.sources],
+              choiceIndices: { ...path.choiceIndices },
+            })
           }
         }
         // BonusChoice-level conditions: filter candidates whose conditions
@@ -554,15 +565,24 @@ export const computeAllBuyableCombinations = (
           discount: Partial<Resource>
           sources?: string[]
           conditions?: Record<string, number>
-        }[] =
-          bonus.choices ??
-          [{ discount: bonus.discount!, sources: bonus.sources }]
+          _origIndex: number
+        }[] = bonus.choices
+          ? bonus.choices.map((c, i) => ({ ...c, _origIndex: i }))
+          : [
+              {
+                discount: bonus.discount!,
+                sources: bonus.sources,
+                _origIndex: 0,
+              },
+            ]
         const candidates = rawCandidates.filter((c) =>
           evaluateConditions(player, c.conditions),
         )
         if (candidates.length === 0) {
           continue
         }
+        const isMultiChoice = (bonus.choices?.length ?? 0) > 0
+        const bonusKey = bonus.sources?.[0]
         for (const path of bonusPaths) {
           for (const candidate of candidates) {
             const nextCost = applyBonus(path.cost, candidate.discount)
@@ -572,19 +592,29 @@ export const computeAllBuyableCombinations = (
               ...(candidate.sources ?? []),
             ])
             const nextSources = [...combined]
-            expanded.push({ cost: nextCost, sources: nextSources })
+            const nextChoiceIndices =
+              isMultiChoice && bonusKey
+                ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
+                : { ...path.choiceIndices }
+            expanded.push({
+              cost: nextCost,
+              sources: nextSources,
+              choiceIndices: nextChoiceIndices,
+            })
           }
         }
         bonusPaths = expanded
       }
 
-      for (const { cost: effectiveCostFee, sources } of bonusPaths) {
+      for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
         if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
           const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
           rawSolutions.push({
             resourcesRemaining: remaining,
             tradesUsed: tradeCombo.tradesUsed,
             bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
+            bonusChoiceIndex:
+              Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
             feeIndex: baseFees.length > 1 ? feeIdx : undefined,
           })
         }
@@ -604,6 +634,7 @@ export const computeAllBuyableCombinations = (
       resourcesPaid,
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
+      bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
     }
 
