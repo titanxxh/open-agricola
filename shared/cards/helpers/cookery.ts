@@ -1,7 +1,7 @@
 import type { PlayerState } from '../../game/types'
 import type { CardExchange } from '../types'
 import { getRegisteredMinorImprovement } from '../types'
-import { getCardDefinition } from '../catalog'
+import { getMajorCard } from '../major'
 
 export type CookeryCardSummary = {
   id: string
@@ -18,7 +18,7 @@ export type CookeryCardSummary = {
 export const getPlayerCookeryCards = (player: PlayerState): CookeryCardSummary[] => {
   const out: CookeryCardSummary[] = []
   for (const cardId of player.improvements ?? []) {
-    const major = getCardDefinition(cardId)
+    const major = getMajorCard(cardId)
     if (major?.isCookery) out.push({ id: cardId, exchanges: major.exchanges })
   }
   for (const cardId of player.minorPlayed ?? []) {

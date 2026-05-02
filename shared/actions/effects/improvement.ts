@@ -5,7 +5,7 @@ import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { majorCardDefinitions } from '../../cards/major'
-import { getCardDefinition } from '../../cards/catalog'
+import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
@@ -205,7 +205,7 @@ const getMajorImprovementPreviewCost = (
     player,
     'improvement-any',
     improvementId,
-    () => getCardDefinition(improvementId)?.cost ?? null,
+    () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
   )
 }
@@ -548,7 +548,7 @@ const playMajorImprovement = (
   paymentChoice?: string,
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
-  const improvement = getCardDefinition(improvementId)
+  const improvement = getMajorCard(improvementId)
   if (!improvement || !improvementId.startsWith('Major_')) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
@@ -728,7 +728,7 @@ export const playImprovement = (
   }
 
   const majorImprovement = allowMajor && parsed.id.startsWith('Major_')
-    ? getCardDefinition(parsed.id)
+    ? getMajorCard(parsed.id)
     : undefined
   if (majorImprovement) {
     return playMajorImprovement(

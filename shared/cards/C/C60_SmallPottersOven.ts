@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
-import { getCardDefinition } from '../catalog'
+import { getMajorCard } from '../major'
 import { canAffordCost } from '../../actions/helpers/pay-helpers'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -13,7 +13,7 @@ const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
 const getAvailableOvenChoices = (context: CardListenerContext) =>
   OVEN_IDS.filter((id) => {
     if (!context.state.availableMajorImprovements.includes(id)) return false
-    const effect = getCardDefinition(id)
+    const effect = getMajorCard(id)
     if (!effect?.cost) return false
     return canAffordCost(context.player, effect.cost)
   })

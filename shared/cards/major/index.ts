@@ -26,6 +26,17 @@ const majorDefinitionMap = new Map<string, MajorCardData>(
   majorCardDefinitions.map((effect) => [effect.id, effect]),
 )
 
+/**
+ * Lightweight major-only lookup. Server paths use the unified
+ * `getCardDefinition` (which queries occupation / minor / major catalogs).
+ * Card / frontend code that only needs majors metadata should import this
+ * instead so vite tree-shaking can drop the rest of the catalog from the
+ * client bundle (`getCardDefinition` triggers all three card-data sources
+ * to be retained, ballooning the bundle).
+ */
+export const getMajorCard = (id: string): MajorCardData | undefined =>
+  majorDefinitionMap.get(id)
+
 const applyMajorEffectForImprovement = (
   state: GameState,
   player: PlayerState,
