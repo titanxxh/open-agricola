@@ -87,7 +87,7 @@ describe('dealHands — player-count filter (extra IDs)', () => {
   it('keeps an unrestricted extra minor id at any player count', () => {
     for (const pc of [1, 2, 3, 4]) {
       let appeared = false
-      for (let seed = 1; seed <= 30; seed += 1) {
+      for (let seed = 1; seed <= 100; seed += 1) {
         const { minorHands } = dealHands(pc, seed, [NO_RESTRICTION_ID], [])
         if (minorHands.some((h) => h.includes(NO_RESTRICTION_ID))) {
           appeared = true

@@ -1,13 +1,13 @@
 import { MinorImprovement } from '../types'
+import type { CardExchange } from '../types'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
+import type { CardImpl } from '../registry'
+import { getPlayerCookeryCards } from '../helpers/cookery'
 
 const CARD_ID = 'C62_CookeryExtension'
 
-// TODO: The original card dynamically doubles cooking exchanges from other cooking improvements
-// the player has in play, but only during harvest and limited to once per cooking improvement.
-// This requires dynamic exchange generation based on other played cards at harvest time,
-// which is not currently supported by our exchange system.
-// Full implementation would need: inspect player's played cooking improvements, generate
-// doubled harvest-only exchanges for each, with per-improvement usage flags.
+const VALID_FROM_RESOURCES: readonly string[] = ['vegetable', 'sheep', 'boar', 'cattle']
 
 export const C62_CookeryExtension = new MinorImprovement({
   id: CARD_ID,
@@ -19,5 +19,62 @@ export const C62_CookeryExtension = new MinorImprovement({
     'Each harvest, you can use each of your cooking improvements once to get double the amount of <FOOD> for 1 animal or <VEGETABLE>.',
   ],
   cost: { clay: 2 },
-  implemented: false,
+  implemented: true,
 })
+
+const computeExchangesListener: CardListenerRegistration = {
+  id: 'C62-cookery-extension-compute-exchanges',
+  cardIds: [CARD_ID],
+  phases: ['computeExchanges' as ActionHookPhase],
+  handler: (ctx) => {
+    const window = (ctx.extraData as { window?: string } | undefined)?.window
+    if (window !== 'harvest') return
+    const player = ctx.player
+    if (!player.minorPlayed?.includes(CARD_ID)) return
+
+    const used = (player.cardStates?.[CARD_ID]?.extraData?.usedCookeryIds ?? []) as string[]
+    const out: CardExchange[] = []
+
+    for (const cookery of getPlayerCookeryCards(player)) {
+      if (used.includes(cookery.id)) continue
+      for (const ex of cookery.exchanges ?? []) {
+        if (!ex.triggers?.includes('anytime')) continue
+        const fromKeys = Object.keys(ex.from ?? {})
+        if (fromKeys.length !== 1) continue
+        const fromKey = fromKeys[0]
+        if ((ex.from as Record<string, number>)[fromKey] !== 1) continue
+        if (!VALID_FROM_RESOURCES.includes(fromKey)) continue
+        out.push({
+          from: { ...ex.from },
+          to: { ...ex.to, food: (ex.to.food ?? 0) * 2 },
+          triggers: ['harvest'],
+          max: 1,
+          sourceId: `${CARD_ID}::${cookery.id}`,
+          sideEffect: {
+            type: 'pushExtraDataValue',
+            sourceCard: CARD_ID,
+            key: 'usedCookeryIds',
+            value: cookery.id,
+          },
+        })
+      }
+    }
+
+    if (out.length === 0) return
+    return { extraExchanges: out, sourceCard: CARD_ID }
+  },
+}
+
+export const C62_CookeryExtension_impl = {
+  effect: {
+    id: CARD_ID,
+    onStartHarvest: (_state, player) => {
+      player.cardStates ??= {}
+      player.cardStates[CARD_ID] ??= {} as never
+      const cs = player.cardStates[CARD_ID]
+      cs.extraData = { ...(cs.extraData ?? {}), usedCookeryIds: [] }
+      return
+    },
+  },
+  listeners: [computeExchangesListener],
+} satisfies CardImpl
