@@ -11,14 +11,20 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
 // E54 Contraband: Each time you play or build an improvement after this, you can pay 1 additional
 // building resource of a type in the printed cost to get 3 FOOD.
+//
+// 7b1 migration: listens on `actions: ['pay']` with costType=major/minor-improvement.
+// `context.sourceCard` carries the improvement id (set by improvement-any flow's
+// pay leaf to `parsed.id`). Old `actions: ['improvement-any']` path is retired.
 const listener: CardListenerRegistration = {
-  id: 'E54-contraband-after-improvement',
+  id: 'E54-contraband-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['pay'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const choice = context.choice ?? ''
-    const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
+    const ctx = context as unknown as { costType?: string }
+    const costType = ctx.costType
+    if (costType !== 'major-improvement' && costType !== 'minor-improvement') return
+    const builtId = context.sourceCard
     if (!builtId || builtId === CARD_ID) return
     // Get card cost to find valid resource types
     const card = getMinorImprovementCard(builtId)
