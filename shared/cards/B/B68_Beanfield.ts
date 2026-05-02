@@ -49,6 +49,7 @@ export const B68_Beanfield = new MinorImprovement({
   vp: 1,
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
+  isField: true,
 })
 
 export const B68_Beanfield_impl = {

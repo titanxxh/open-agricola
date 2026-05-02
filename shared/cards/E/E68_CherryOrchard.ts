@@ -44,6 +44,7 @@ export const E68_CherryOrchard = new MinorImprovement({
   desc: [
     'This card is a field that can only grow <WOOD>. During each harvest, you receive 1 <WOOD> from this card. When you harvest the last <WOOD>, you also receive 1 <VEGETABLE>.',
   ],
+  isField: true,
 })
 
 export const E68_CherryOrchard_impl = {
