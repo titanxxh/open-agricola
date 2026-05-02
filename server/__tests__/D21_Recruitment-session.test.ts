@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-
-import '../../shared/cards/D/D21_Recruitment'
+import { D21_Recruitment } from '../../shared/cards/D/D21_Recruitment'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 
 const CARD_ID = 'D21_Recruitment'
 
@@ -136,6 +137,25 @@ describe('D21_Recruitment session', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
+  })
+
+  describe('prerequisite "No People Left in the House"', () => {
+    it('blocks buy when at least one farmer is still at home', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      // Default fresh game: 2 active farmers, both at home → buy must be blocked
+      expect(meetsCardPrerequisites(player, D21_Recruitment, state.round, state)).toBe(false)
+    })
+
+    it('allows buy when all active farmers have been placed (no people left at home)', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      setActiveWorkerCount(player, 2)
+      markAllWorkersUsed(state, player)
+      expect(meetsCardPrerequisites(player, D21_Recruitment, state.round, state)).toBe(true)
+    })
   })
 
   it('computeReplace is silent when trueAction=false (nested card-triggered action)', () => {
