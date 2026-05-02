@@ -47,6 +47,12 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 7b2 F4 — D100 LordoftheManor 复核 verdict：仍需真 fix（推 Sprint 7d backlog §2.3）**：
+  - 对照 BGA `D100_LordoftheManor.php` `computeSpecialScore`：白名单 8 项 `['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'pigs', 'cattles', 'stables']`，每个 entry 的 `score == 4` 给 +1 bonus。Desc 文本明示"The bonus point is also awarded for 4 fenced stables."
+  - 我方 commit `1ecf951e` 后 `shared/cards/D/D100_LordoftheManor.ts:23` `standardCategories` 仅 7 项 **缺 `'stables'`**——与 BGA 行为偏差（4 fenced stables 应额外 +1 VP，目前漏算），且与 desc 直接矛盾。`pigs` BGA → `boars` 我方为命名差，等价。
+  - 元数据：BGA `extraVp = true` 我方未设；仅 UI 展示，不影响行为。
+  - **Verdict**：登记 §2.3 P2 backlog（≤5 行单字段 fix；不在 7b2 内做，留 Sprint 7d）。无代码改动；无现成 session test，新写测试也归 7d。
+
 - **2026-05-02 Sprint 7b2 F4 — B139 ForestScientist confirmed §2.0 aligned（onReturnHome aligned，audit 误报）**：
   - 对照 BGA `B139_ForestScientist.php`：`isListeningTo` 仅 `ReturnHome` 玩家事件；`onPlayerReturnHome` 扫所有 visible action cards 的 wood meeples，sum=0 时 `gainNode([FOOD => Globals::getTurn() >= 5 ? 2 : 1])`。
   - 我方 `shared/cards/B/B139_ForestScientist.ts:22` `effect.onReturnHome` 走 `state.actionSpaces.reduce(sum + s.resources.wood)`（语义等价 BGA per-card wood meeples），`state.round >= 5 ? 2 : 1`（`Globals::getTurn()` ≡ round 1..14，等价）。trigger 时机、wood 检测、food 数量、round≥5 阈值全部对齐。无代码改动。
@@ -416,6 +422,9 @@ The following cards remain in §2.3 unfixed after Sprint 5 PR-5. Each needs > 1 
 - ~~**E 牌组 wide-scan 4 张** (audit-agent-b10.md) — pending detailed listing; aggregated under "E 牌组其余 4 张待详细列"~~ — **Sprint 5d audit** re-validated 21-E-deck superset (absorbing original 4): 11 ✅ / 6 🟡 / 4 ⚠ (3 P1: **E72 ArtichokeField** / **E91 PlowBuilder** / **E161 ElderBaker** → Sprint 5e backlog; 1 P2: E95 → §2.4). **Sprint 5e (2026-05-02)**：E91 ✅ done (`trade-applied` listener + `cardStates.E91.extraData.usedJoinery` flag gate + `dispatchTradeAppliedListener` 通用扩展)；E161 ✅ done (`computeChoiceCandidates` listener inject Major_StoneOven, D131 模式)；~~E72~~ demoted to §2.5 (multi-harvest 总和与 BGA 完全等价，structural-but-equivalent). Original 4 names lost with `audit-agent-b10.md` but absorbed into superset. See `docs/sprint-5d-audit-report.md`.
 
 Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d audit** added 4 P1 fixes (B163/E72/E91/E161) to the queue via Sprint 5e — concrete, actionable, no longer aggregate. **Sprint 5e (2026-05-02) closed all 4** (3 fixed: B163/E91/E161; 1 demoted: E72). Sprint 5 deferred queue remaining size: **0 P1**, down from "15 cards / 11 wide-scan / 4 wide-scan" loose buckets via cumulative closure across 5/5b/5c/5e.
+
+**Sprint 7d backlog（2026-05-02 Sprint 7b2 F4 复核新发现，P2，单字段 fix）**：
+- **D100 LordoftheManor** — `shared/cards/D/D100_LordoftheManor.ts:23` `standardCategories` 仅 7 项，缺 `'stables'`。BGA `D100_LordoftheManor.php` 白名单 8 项含 `'stables'`，且 desc 文本明示 "The bonus point is also awarded for 4 fenced stables." 影响：4 fenced stables 应额外 +1 VP，目前漏算。Fix 范围：数组加 `'stables'` 一项（≤5 行）+ 新增 session test 覆盖 4-fenced-stable case。元数据：可同步补 `extraVp: true`（仅 UI）。
 
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
