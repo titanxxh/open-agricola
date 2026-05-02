@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { Bonus } from '../../game/types'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -36,10 +37,13 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0]) => {
 
 /**
  * computeCosts listener: for construct, improvement-any, minor-improvement, and renovate,
- * offer a discount from the top of the stack.
+ * offer a discount of the top resource from the stack as an optional bonus.
  *
- * We offer taking the topmost resource as a discount. If the top resource matches
- * something in the cost, it effectively reduces that cost by 1.
+ * Simplified vs BGA: BGA emits N choices (use top 0..N items). We emit a single
+ * optional choice for the top item only (deliberate divergence — see card_progress.md
+ * §2.5). Using the bonus framework (vs flat `costs`) routes through
+ * paymentSolution and populates `_activeActionBonusSources` so the after-pay
+ * listener pops only when the bonus actually fired.
  */
 const computeCostsListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-compute-costs',
@@ -50,15 +54,26 @@ const computeCostsListener: CardListenerRegistration = {
     const stack = getStack(context.player)
     if (stack.length === 0) return
 
-    // Offer a discount of the topmost resource
     const topResource = stack[stack.length - 1]!
-    return { costs: { [topResource]: -1 } }
+    const bonus: Bonus = {
+      discount: { [topResource]: 1 },
+      optional: true,
+      sources: [CARD_ID],
+    }
+    return { bonuses: [bonus] }
   },
 }
 
 /**
- * After paying for construct/improvement/renovate: remove the top resource from stack
- * if a discount was applied.
+ * After paying for construct/improvement/renovate: remove the top resource from
+ * stack ONLY when this card's bonus actually fired during the payment.
+ *
+ * Bug fix: previously the listener popped unconditionally, so any
+ * construct/improvement/renovate would drain the stack even when the cost did
+ * not include the top resource (i.e., the bonus was rejected by the payment
+ * solver). We gate on `player._activeActionBonusSources` — populated by
+ * `executePaymentSolution` with bonus.sources of solutions that were used —
+ * which is the canonical "this card's bonus was actually applied" signal.
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-after-pay',
@@ -68,6 +83,8 @@ const afterPayListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     if (stack.length === 0) return
+    const sources = context.player._activeActionBonusSources ?? []
+    if (!sources.includes(CARD_ID)) return
 
     // Pop the top resource from the stack (it was used as a discount)
     stack.pop()
