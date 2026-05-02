@@ -13,32 +13,13 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
  * Each time after you use an action space, you can take 1 building resource from
  * a building resource accumulation space with at least 4 building resources on it.
  *
- * BGA:
- * - afterPlaceFarmer: find all accumulation spaces with >= 4 building resources
- * - present XOR of choices to take 1 of available types
- * - takeFromSpace: decrements space resource, gives to player
- *
- * Implementation: Present xor of gain leaves. Each option also decrements the space resource.
- * Since we can't atomically modify the space in a leaf, we use a seq with a special
- * 'collect-from-space' leaf that subtracts from the space resource and gives to player.
- *
- * Simplification: since 'collect-from-space' doesn't exist as a leaf action,
- * we directly modify state in the handler and return a gain flow.
- * However, for xor choices we need each option to be different.
- * The simplest approach: build xor options with gain leaves, each labeled with the resource.
- * We subtract the resource from the space when the gain happens.
- * Problem: we can't know which option the player picks from the handler.
- *
- * Better approach: return each option as a gain leaf for each (space, resource) combo.
- * The subtraction from the space happens as a side effect in a before-hook.
- * Actually, the simplest is to just gain from general supply and not subtract from the space.
- * This is a minor deviation from BGA but keeps it simple.
- *
- * Even better approach: use a collect leaf (same as the standard collect action).
- * Actually, let's just directly give the resource. In practice, the building resource
- * accumulation spaces replenish every round anyway.
+ * BGA `A82_WorkCertificate::onPlayerAfterPlaceFarmer` collects all building
+ * resource accumulation spaces with >= 4 resources and presents an XOR. The
+ * `takeFromSpace` SE pulls one off the chosen space (decrementing the space's
+ * resource count) and gives it to the player. We use the canonical
+ * `take-from-space` leaf so the source space is properly decremented (BGA
+ * parity) instead of just gaining a resource from the supply.
  */
-
 const findChoices = (context: CardListenerContext): ActionFlow[] => {
   const choices: ActionFlow[] = []
   for (const space of context.state.actionSpaces) {
@@ -55,10 +36,9 @@ const findChoices = (context: CardListenerContext): ActionFlow[] => {
       if ((space.resources[r] ?? 0) <= 0) continue
       choices.push({
         type: 'leaf',
-        actionId: 'gain',
-        params: { [r]: 1 },
+        actionId: 'take-from-space',
         sourceCard: CARD_ID,
-        // Store spaceId in choiceLabelParams so we can identify it
+        actionContext: { spaceId: space.id, resource: r, amount: 1 },
         choiceLabelKey: 'ui.interactionTakeFromSpace',
         choiceLabelParams: { resource: r, spaceId: space.id, spaceName: space.nameKey },
       })
