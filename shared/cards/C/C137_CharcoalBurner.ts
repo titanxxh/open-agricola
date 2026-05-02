@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMinorImprovementCard } from '../catalog'
 import { getMajorCard } from '../major'
+import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C137_CharcoalBurner'
@@ -21,7 +22,7 @@ const CARD_ID = 'C137_CharcoalBurner'
  */
 
 const hasBakeCapability = (cardId: string): boolean => {
-  if (cardId.startsWith('Major_')) return getMajorCard(cardId)?.isBaking ?? false
+  if (isMajorCardId(cardId)) return getMajorCard(cardId)?.isBaking ?? false
   return getMinorImprovementCard(cardId)?.isBaking ?? false
 }
 

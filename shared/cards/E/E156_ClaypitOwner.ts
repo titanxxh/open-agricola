@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCard } from '../major'
+import { isMajorCardId } from '../helpers/card-type'
 import { isComplexCost } from '../../actions/helpers/payment'
 import type { CardImpl } from '../registry'
 
@@ -21,7 +22,7 @@ const CARD_ID = 'E156_ClaypitOwner'
  */
 
 const hasPrintedClayCost = (cardId: string): boolean => {
-  if (cardId.startsWith('Major_')) {
+  if (isMajorCardId(cardId)) {
     const major = getMajorCard(cardId)
     if (major?.cost) {
       const cost = major.cost
