@@ -1,6 +1,8 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../game/types'
 
 const CARD_ID = 'C16_FieldFences'
@@ -55,6 +57,26 @@ const setFlagFlow = (value: boolean): ActionFlow => ({
   params: { kind: 'set-extra-data', key: FLAG_KEY, value },
 })
 
+const C16FenceListener: CardListenerRegistration = {
+  id: 'C16-fence-discount',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    if (!isC16Active(ctx.player)) return
+    const fieldEdges = fieldEdgeIds(ctx.player.fields.map((f) => ({ row: f.row, col: f.col })))
+    const params = ctx.params as { newFenceEdges?: string[] } | undefined
+    const newFenceEdges = params?.newFenceEdges
+    if (newFenceEdges === undefined) {
+      const built = new Set((ctx.player.fenceSegments ?? []).map((s) => s.edge))
+      let n = 0
+      for (const edge of fieldEdges) if (!built.has(edge)) n += 1
+      return { costs: { wood: -n } }
+    }
+    return { costs: { wood: -newFenceEdges.filter((e) => fieldEdges.has(e)).length } }
+  },
+}
+
 export const C16_FieldFences_impl = {
   effect: {
     id: CARD_ID,
@@ -83,5 +105,6 @@ export const C16_FieldFences_impl = {
       return count
     },
   },
+  listeners: [C16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
