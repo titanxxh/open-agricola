@@ -507,7 +507,7 @@ export const InteractionBar = ({
               {isSelectingSow && sowErrorText ? (
                 <div className="interaction-error">{sowErrorText}</div>
               ) : null}
-              {pendingChoice.promptKey === 'ui.interactionCollectorSelect' ? (
+              {((pendingChoice.promptParams?.needed as number) ?? 0) > 1 ? (
                 <CollectorMultiSelect
                   locale={locale}
                   options={visibleOptions}
