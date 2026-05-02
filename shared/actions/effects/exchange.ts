@@ -18,7 +18,7 @@ import {
   type CardExchange,
   type ExchangeWindow,
 } from '../../cards/types'
-import { getMajorCardEffect } from '../../cards/major'
+import { getCardDefinition } from '../../cards/catalog'
 import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
@@ -237,8 +237,10 @@ export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => 
 })
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {
-  const major = getMajorCardEffect(cardId)
-  if (major?.exchanges) return major.exchanges
+  if (cardId.startsWith('Major_')) {
+    const major = getCardDefinition(cardId)
+    if (major?.exchanges) return major.exchanges
+  }
   const minor = getRegisteredMinorImprovement(cardId)
   if (minor?.exchanges) return minor.exchanges
   const occ = getRegisteredOccupation(cardId)

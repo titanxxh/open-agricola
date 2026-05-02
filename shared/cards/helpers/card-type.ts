@@ -1,5 +1,4 @@
 import type { PlayerState } from '../../game/types'
-import { getMajorCardEffect } from '../major'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
@@ -19,7 +18,7 @@ import {
  */
 
 const getPrimaryType = (cardId: string): CardType | null => {
-  if (getMajorCardEffect(cardId)) return 'major'
+  if (cardId.startsWith('Major_')) return 'major'
   if (getRegisteredMinorImprovement(cardId)) return 'minor'
   if (getRegisteredOccupation(cardId)) return 'occupation'
   return null

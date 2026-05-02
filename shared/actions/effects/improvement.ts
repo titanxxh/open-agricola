@@ -4,7 +4,8 @@ import { getMinorImprovement } from '../../game/minor-improvements'
 import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
-import { getMajorCardEffect, majorCardEffects } from '../../cards/major'
+import { majorCardEffects } from '../../cards/major'
+import { getCardDefinition } from '../../cards/catalog'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
@@ -204,7 +205,7 @@ const getMajorImprovementPreviewCost = (
     player,
     'improvement-any',
     improvementId,
-    () => getMajorCardEffect(improvementId)?.cost ?? null,
+    () => getCardDefinition(improvementId)?.cost ?? null,
     actionCardId,
   )
 }
@@ -547,8 +548,8 @@ const playMajorImprovement = (
   paymentChoice?: string,
   suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
-  const improvement = getMajorCardEffect(improvementId)
-  if (!improvement) {
+  const improvement = getCardDefinition(improvementId)
+  if (!improvement || !improvementId.startsWith('Major_')) {
     return { type: 'fail', logKey: 'log.improvementFail' }
   }
   if (!state.availableMajorImprovements.includes(improvement.id)) {
@@ -681,7 +682,7 @@ export const playImprovement = (
     const choiceIdx = parts[2]
     if (targetId && choiceIdx !== undefined) {
       const parsed = parseImprovementChoice(targetId)
-      if (parsed.kind === 'major' || getMajorCardEffect(parsed.id)) {
+      if (parsed.kind === 'major' || parsed.id.startsWith('Major_')) {
         return playMajorImprovement(
           state,
           player,
@@ -726,8 +727,8 @@ export const playImprovement = (
     )
   }
 
-  const majorImprovement = allowMajor
-    ? getMajorCardEffect(parsed.id)
+  const majorImprovement = allowMajor && parsed.id.startsWith('Major_')
+    ? getCardDefinition(parsed.id)
     : undefined
   if (majorImprovement) {
     return playMajorImprovement(
@@ -813,7 +814,7 @@ const canAffordInjectedImprovement = (
     if (!minor) return false
     return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
   }
-  if (getMajorCardEffect(parsed.id)) {
+  if (parsed.id.startsWith('Major_')) {
     return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
   }
   const minor = getMinorImprovement(parsed.id)

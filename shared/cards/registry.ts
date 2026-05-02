@@ -124,6 +124,19 @@ export class CardRegistry {
     }
   }
 
+  /**
+   * Register card effect bundles into the registry. Used to load majors
+   * (CardDefinition + CardEffect intersection) so getEffect resolves them
+   * after the legacy `getMajorCardEffect` fallback in card-effects.ts is
+   * removed. Each entry that has at least one CardEffect hook (anything
+   * besides id) is set as the effect for `entry.id`.
+   */
+  registerEffects(effects: readonly CardEffect[]): void {
+    for (const effect of effects) {
+      this.effectsByCard.set(effect.id, effect)
+    }
+  }
+
   /** Shallow clone: new CardRegistry with the same listener / effect / modifier entries. */
   clone(): CardRegistry {
     const copy = new CardRegistry()
