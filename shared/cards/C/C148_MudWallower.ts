@@ -78,11 +78,18 @@ export const C148_MudWallower_impl = {
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',
+      cardId: CARD_ID,
       capacity: held,
       animalType: 'boar',
       animalCount: 0,
     })
   },
+  /**
+   * BGA `Cards/C/C148_MudWallower.php::getInvalidAnimals` returns []:
+   * the held counter manages capacity; zone constraint is PIG-only via
+   * onPlayerComputeDropZones. Mirror BGA exactly.
+   */
+  getInvalidAnimals: () => [],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
