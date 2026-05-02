@@ -138,4 +138,76 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
     expect(isCardFlagged(p1, CARD_ID)).toBe(true)
   })
+
+  // E166 Roastmaster relies on this SE kind. The plan (Task 9, F9) calls out
+  // BGA's "actually move the food meeple" semantic — verify the source space
+  // truly decrements and the destination truly increments.
+  describe('move-resource-between-spaces (E166 BGA parity)', () => {
+    const makeSpace = (id: string, food: number): ActionSpace => ({
+      id,
+      nameKey: `actions.${id}.name`,
+      descriptionKey: `actions.${id}.description`,
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      } as Resource,
+      takenBy: [],
+    } as ActionSpace)
+
+    it('decrements source by amount and increments destination by the same amount', () => {
+      const p1 = makePlayer()
+      const fishing = makeSpace('fishing', 3)
+      const tp = makeSpace('traveling-players', 1)
+      const state = { actionSpaces: [fishing, tp], players: [p1] } as unknown as GameState
+
+      const result = specialEffectAction.execute({
+        state,
+        player: p1,
+        space: { id: 'special-effect' } as ActionSpace,
+        sourceCard: 'E166_Roastmaster',
+        params: {
+          kind: 'move-resource-between-spaces',
+          fromSpaceId: 'fishing',
+          toSpaceId: 'traveling-players',
+          resource: 'food',
+          amount: 1,
+        },
+      })
+
+      expect(result.type).toBe('ok')
+      expect(fishing.resources.food).toBe(2)
+      expect(tp.resources.food).toBe(2)
+      // Player resources unchanged: this is a meeple-move, not a gain.
+      expect(p1.resources.food).toBe(0)
+    })
+
+    it('fails when source has fewer than amount and leaves both spaces untouched', () => {
+      const p1 = makePlayer()
+      const fishing = makeSpace('fishing', 0)
+      const tp = makeSpace('traveling-players', 5)
+      const state = { actionSpaces: [fishing, tp], players: [p1] } as unknown as GameState
+
+      const result = specialEffectAction.execute({
+        state,
+        player: p1,
+        space: { id: 'special-effect' } as ActionSpace,
+        sourceCard: 'E166_Roastmaster',
+        params: {
+          kind: 'move-resource-between-spaces',
+          fromSpaceId: 'fishing',
+          toSpaceId: 'traveling-players',
+          resource: 'food',
+          amount: 1,
+        },
+      })
+
+      expect(result.type).toBe('fail')
+      expect(fishing.resources.food).toBe(0)
+      expect(tp.resources.food).toBe(5)
+    })
+  })
 })
