@@ -21,9 +21,3 @@ export type MajorCardData = CardDefinition &
     extraVp: boolean
     desc: string[]
   }
-
-/**
- * Back-compat type alias kept until Task 8 codemods all references and
- * removes both this alias and getMajorCardEffect.
- */
-export type MajorCardEffect = MajorCardData

@@ -5,7 +5,7 @@
  * Scans shared/cards/{A,B,C,D,E,major}/*.ts and extracts meta fields
  * from each card's constructor call (Occupation / MinorImprovement /
  * MajorImprovement / PlayerActionCard) and from major-literal exports
- * (`export const x: MajorCardEffect = {...}`).
+ * (`export const x: MajorCardData = {...}`).
  *
  * Output: public/cards-manifest.json
  */
@@ -108,11 +108,11 @@ function resolveIdentifierRefs(
   return value
 }
 
-/** Parse all `export const <name>: MajorCardEffect = {...}` literal vars. */
-function parseMajorCardEffectVars(
+/** Parse all `export const <name>: MajorCardData = {...}` literal vars. */
+function parseMajorCardDataVars(
   sf: ts.SourceFile,
 ): Array<{ varName: string; obj: Record<string, unknown> }> {
-  // Pass 1: collect every typed `MajorCardEffect` variable's literal object (with spread placeholders).
+  // Pass 1: collect every typed `MajorCardData` variable's literal object (with spread placeholders).
   type Entry = { varName: string; obj: Record<string, unknown>; spreads: string[] }
   const entries: Entry[] = []
 
@@ -124,7 +124,7 @@ function parseMajorCardEffectVars(
       if (!ts.isIdentifier(decl.name)) continue
       if (!decl.type) continue
       const typeText = decl.type.getText()
-      if (typeText !== 'MajorCardEffect') continue
+      if (typeText !== 'MajorCardData') continue
       if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
 
       const obj: Record<string, unknown> = {}
@@ -164,7 +164,7 @@ function parseMajorCardEffectVars(
   return resolved
 }
 
-/** Parse MajorCardEffect literal into a CardMeta. */
+/** Parse MajorCardData literal into a CardMeta. */
 function majorEffectObjectToMeta(
   obj: Record<string, unknown>,
 ): CardMeta | null {
@@ -255,8 +255,8 @@ export function parseCardFile(filePath: string): ParsedCardFile {
   }
   visit(sf)
 
-  // Pattern B: `export const x: MajorCardEffect = {...}`
-  const majorEffects = parseMajorCardEffectVars(sf)
+  // Pattern B: `export const x: MajorCardData = {...}`
+  const majorEffects = parseMajorCardDataVars(sf)
   for (const { obj } of majorEffects) {
     const meta = majorEffectObjectToMeta(obj)
     if (!meta) continue
