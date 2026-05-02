@@ -27,9 +27,17 @@ describe('improvement: pay fail idempotent', () => {
     if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
       state.availableMajorImprovements.push('Major_Fireplace1')
     }
-    // Drop minor hand so 0-cost minors don't slip into the choice list.
-    player.minorHand = []
     session.loadState(state)
+    // Drop minor hand AFTER loadState (loadState's normalizeState re-deals
+    // empty minorHand from the seed). Mutating the live state directly
+    // bypasses that.
+    session.getState().state.players[0]!.minorHand = []
+    session.getState().state.players[0]!.minorPlayed = []
+    session.getState().state.players[0]!.occupationHand = []
+    // Also zero opponent's hand so minor-improvement-card listeners that
+    // scope = 'any' / 'opponent' don't surprise us.
+    session.getState().state.players[1]!.minorHand = []
+    session.getState().state.players[1]!.minorPlayed = []
     const before = session.getState().state.players[0]!
     const beforeImprovements = [...before.improvements]
     const beforeMinorPlayed = [...before.minorPlayed]
