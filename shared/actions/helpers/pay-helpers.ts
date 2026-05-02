@@ -274,6 +274,7 @@ const normalizePaymentChoiceValue = (
 type ResolveCostPaymentSelectionOptions = {
   costType?: CostModifierType
   includeReturnedCard?: boolean
+  playedCards?: string[]
 }
 
 export const resolveCostPaymentSelection = (
@@ -295,7 +296,7 @@ export const resolveCostPaymentSelection = (
   const solutions = computeAllBuyableCombinations(
     player,
     normalizedCost,
-    undefined,
+    options.playedCards,
     options.costType,
   )
   return resolvePaymentSolutionSelection(

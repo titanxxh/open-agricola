@@ -475,6 +475,7 @@ export class Engine {
 
   private collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
     if (node instanceof ActionNode) return [node]
+    if (node instanceof ChoiceNode) return []
     if (node instanceof OptionalNode) {
       return this.collectOrderedActionNodes(node.child)
     }
@@ -642,7 +643,7 @@ export class Engine {
         flow.effectPreview,
       )
       const definition = this.registry.get(flow.actionId)
-      if (definition?.resolveChoice) {
+      if (definition?.resolveChoice && !definition.skipChoiceWrap) {
         const sequence = new SequenceNode(nextId(), [
           actionNode,
           new ChoiceNode(nextId(), []),

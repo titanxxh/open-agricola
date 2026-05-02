@@ -10,6 +10,7 @@ import { addCardResourcePaid } from '../../cards/helpers/card-state'
 import {
   canPayCost,
   canPayResources,
+  computeAllBuyableCombinations,
   executePaymentSolution,
   isComplexCost,
   payResources,
@@ -23,6 +24,7 @@ export type PayParams = {
   optionPrefix?: string
   paymentChoice?: string
   includeReturnedCard?: boolean
+  playedCards?: string[]
 }
 
 /**
@@ -65,6 +67,7 @@ const PAY_PARAM_KEYS = new Set([
   'optionPrefix',
   'paymentChoice',
   'includeReturnedCard',
+  'playedCards',
 ])
 
 const looksLikeFlatResource = (
@@ -99,6 +102,16 @@ const buildSelectedResult = (
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
+  }
+  // Hand the improvement-flow context to the next leaf (apply-improvement)
+  // so its onBuy listener can still receive a real `PaymentInfo` (returned
+  // card id is what C60_SmallPottersOven keys its 5-food gain on, etc.).
+  if (costType === 'major-improvement' || costType === 'minor-improvement') {
+    player._pendingImprovementPaymentInfo = {
+      resourcesPaid: solution.resourcesPaid,
+      feeIndex: solution.feeIndex,
+      returnedCardId: solution.cardUsed,
+    }
   }
   const resourcesPaid = solution.resourcesPaid
   if (sourceCard) {
@@ -141,6 +154,13 @@ export const payAction: ActionDefinition = {
   descriptionKey: 'actions.pay.description',
   roundAvailable: 1,
   gainPerRound: {},
+  // Typed-flat costs resolve eagerly inside execute() and return `ok`, so
+  // the default Sequence([ActionNode, ChoiceNode]) wrap would leave a
+  // dangling empty ChoiceNode that blocks the surrounding seq (D129 etc.).
+  // ComplexCost multi-solution emits a payment choice via the engine's
+  // fallback `pendingChoiceNodeId = node.id` path, which still routes the
+  // player choice back through resolveChoice.
+  skipChoiceWrap: true,
   canBeExecutedByPlayer: () => true,
   costPreview: {
     getBaseCost: ({ params }) => {
@@ -152,11 +172,22 @@ export const payAction: ActionDefinition = {
     // ComplexCost may be affordable only via bonus/trade variants. The default
     // `canPayResources(getBaseCost())` check would erroneously fail because it
     // ignores those alternatives. Explicitly route ComplexCost through
-    // `canPayCost` so multi-solution payments stay doable inside seq nodes.
+    // computeAllBuyableCombinations so multi-solution payments — including
+    // ones that require returning a card via cards.list — stay doable
+    // inside seq nodes.
     canExecute: ({ player, params }) => {
       const p = normalizePayParams(params)
       if (!p?.cost) return false
-      return canPayCost(player, p.cost, p.costType)
+      if (!isComplexCost(p.cost)) {
+        return canPayCost(player, p.cost, p.costType)
+      }
+      const solutions = computeAllBuyableCombinations(
+        player,
+        p.cost,
+        p.playedCards,
+        p.costType,
+      )
+      return solutions.length > 0
     },
   },
   execute: ({ player, params, sourceCard, state }) => {
@@ -170,7 +201,11 @@ export const payAction: ActionDefinition = {
         optionPrefix,
         p.paymentChoice,
         { type: 'fail', logKey: 'log.payFail' },
-        { costType: p.costType, includeReturnedCard: p.includeReturnedCard },
+        {
+          costType: p.costType,
+          includeReturnedCard: p.includeReturnedCard,
+          playedCards: p.playedCards,
+        },
       )
       if (selection.type !== 'selected') {
         return selection
@@ -215,14 +250,30 @@ export const payAction: ActionDefinition = {
       // and returned `ok`). Treat any stray invocation as a no-op success.
       return { type: 'ok' }
     }
+    // If the value isn't one of the payment-prefix options the player saw,
+    // assume it's a stale/improvement-level choice that landed here because
+    // game-core's pendingChoiceActionId now points at `pay` (vs the
+    // improvement-any it would point at in the legacy mutate-in-place path).
+    // Re-emit the same selectPayment prompt by re-invoking execute so the
+    // player can pick again, matching BGA's "missed the prompt → ask again"
+    // UX and keeping legacy D83-style upper-flow tests compatible.
     const optionPrefix = p.optionPrefix ?? 'pay:generic'
+    const choiceLooksLikePayment =
+      choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
+    if (!choiceLooksLikePayment) {
+      return payAction.execute({ player, params, sourceCard, state, space: undefined as never })
+    }
     const selection = resolveCostPaymentSelection(
       player,
       p.cost,
       optionPrefix,
       choice,
       { type: 'fail', logKey: 'log.payFail' },
-      { costType: p.costType, includeReturnedCard: p.includeReturnedCard },
+      {
+        costType: p.costType,
+        includeReturnedCard: p.includeReturnedCard,
+        playedCards: p.playedCards,
+      },
     )
     if (selection.type !== 'selected') {
       return selection
