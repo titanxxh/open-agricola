@@ -1,7 +1,7 @@
 # Bad Smell 清单：主路径中的单卡特殊逻辑
 
 > 调查日期：2026-05-02
-> 最近更新：2026-05-02（B 级 + card-type 工具统一已完成）
+> 最近更新：2026-05-02（A3 + B 级 + card-type 工具统一已完成）
 > 范围：`shared/`（不含 `cards/`、`i18n/`）、`server/`、`client/`
 > 目的：枚举主路径里"含特定卡牌字面量 / 为单卡而生"的所有点，作为后续 sprint 清理依据
 >
@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | A1 B30_WoodPalisades | ⏳ 待办 | 前后端三处字面量复制 |
 | A2 E148_Lazybones | ⏳ 待办 | 前端按卡名读 cardStates |
-| A3 Major_Fireplace | ⏳ 待办 | 已有 `fireplaceIdentity` marker，让 major 也声明即可 |
+| A3 Major_Fireplace | ✅ 已解决（`04945238`） | majors 自己声明 `fireplaceIdentity`，主路径走 `isFireplaceIdentityCard()` |
 | B 级 主路径 `Major_` 前缀 | ✅ 已解决（`74ff5231`） | 引入 `isMajorCardId` + 修 `parseImprovementChoice` bare 推断 |
 | 卡内 `Major_` 前缀残留 | ✅ 已解决（`35ed327e`） | B95/C137/D80/D117/E156 五处 |
 | `isMajorImprovement` / `alsoCountsAs` 双字段 | ✅ 已解决（`74656dd6`） | 字段合并到 `alsoCountsAs`，删除 `isEffectivelyMajor` 工具 |
@@ -55,7 +55,11 @@
 
 ---
 
-### A3. `Major_Fireplace1` / `Major_Fireplace2`（壁炉返还兼容池）
+### A3. `Major_Fireplace1` / `Major_Fireplace2`（壁炉返还兼容池） ✅ 已解决
+
+> 解决于 commit `04945238`。
+
+### 原问题
 
 | 位置 | 代码 |
 | --- | --- |
@@ -64,9 +68,16 @@
 | `shared/actions/effects/improvement.ts:20` | `const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const` |
 | 同上 `:27-55` | `getFireplaceReturnPool` / `getPlayedCardsForCost` 用此过滤 |
 
-**问题**：已经为 minor 抽出 `fireplaceIdentity`（D25_WitchesDanceFloor 用了），但 **major 自己的 ID 仍然硬编码**。机制半成品。
+`fireplaceIdentity` marker 当时只对 minor 生效（D25_WitchesDanceFloor），major 自己的 ID 仍硬编码——机制半成品。
 
-**建议修法**：让 Major Fireplace 1/2 的卡定义也声明 `fireplaceIdentity: true`，主路径只查字段即可，删掉两处 `FIREPLACE_*_IDS` 常量。
+### 解决方案
+
+- `shared/cards/major/fireplace.ts`：fireplace1 加 `fireplaceIdentity: true`（fireplace2 通过 spread 继承）
+- `shared/cards/helpers/card-type.ts` 新增 `isFireplaceIdentityCard(id)` 工具，聚合 majors + minors 查询
+- `shared/actions/effects/improvement.ts`：删 `FIREPLACE_MAJOR_IDS`，`getFireplaceReturnPool` / `getPlayedCardsForCost` 改用工具
+- `shared/actions/helpers/payment.ts`：删 `FIREPLACE_COST_IDS`，`cardMatchesCostList` 改用工具
+
+主路径再无 `Major_Fireplace*` 字面量；行为保持不变。
 
 ---
 
@@ -179,10 +190,9 @@
 
 ## 后续优先级
 
-1. **A3（Fireplace 字面量）**：通用 marker 已存在（`fireplaceIdentity`），最低成本就能消除。改完后 D25 同款机制完整。
-2. **A1（B30_WoodPalisades）**：前后端三处复制，新增 marker 字段后即可一并清掉，影响 fence 流程，需要回归测。
-3. **A2（E148_Lazybones）**：需要先设计通用 cardState schema，工作量最大。
-4. **C/D/E 级 + 边界 case**：低优先级，捎带清理。
+1. **A1（B30_WoodPalisades）**：前后端三处复制，新增 marker 字段后即可一并清掉，影响 fence 流程，需要回归测。
+2. **A2（E148_Lazybones）**：需要先设计通用 cardState schema，工作量最大。
+3. **C/D/E 级 + 边界 case**：低优先级，捎带清理。
 
 ---
 
@@ -197,7 +207,7 @@
 | 卡（含 dual-type）是否"算作"某类型 | `cardCountsAs(id, 'major')` | 同上 |
 | 玩家场上"算作"某类型的卡 | `collectCardsAs(player, 'major')` | 同上 |
 | 卡名翻译（自动选 i18n namespace） | `getAnyCardDisplayName(locale, id)` | `client/components/common/cardText.ts` |
-| Fireplace 兼容卡（满足返还需求） | minor 卡声明 `fireplaceIdentity: true` | （major 自身仍硬编码，见 A3） |
+| Fireplace 兼容卡（满足返还需求） | `isFireplaceIdentityCard(id)` | `shared/cards/helpers/card-type.ts` |
 
 声明字段：
 - `alsoCountsAs?: CardType[]` —— minor/occupation 也算作其它类型（dual-type）
