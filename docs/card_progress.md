@@ -39,7 +39,7 @@
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
 | ⚠ 行为偏差待修（§2.3） | 36 张（原 44；Sprint 2 已修 6 张：B116 / A165 / B133 / B14 / D138 / E134；Sprint 5c 完整对齐 A165 + B155） | 行为与 BGA 偏差，是 bug | 排期修 |
 | ❌ 数值/元数据待修（§2.4） | 55 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay + 2026-04-30 A14 banned 迁入 §2.5——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
-| 🔀 刻意偏离 BGA（§2.5） | 12 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
+| 🔀 刻意偏离 BGA（§2.5） | 14 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement + Sprint 7a-c1c16 C1 min:n / noWoodPalisades 2 项） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
 
@@ -60,13 +60,17 @@
     - F1 onBuy 截断 (7 实施 + 1 partial): C112 ✅（isDoable + 修 food→grain 方向）/ B22 ✅（fromSupply + markedSpaceId pattern + return-home cleanup, 移除 `passing:true`）/ C156 ✅（动态 N=cattle+1）/ C9 ✅（XOR filter + 移除 `passing:true`）/ E5 ✅（用 take-from-space leaf, 移除 `passing:true`）/ D74 ✅ verify-only（公式等价 BGA）/ C57 ✅（remove-field-crop SE）/ D1 partial（移除 `passing:true`，zigzag tile restriction 推 7b）
   - **新引入 SE kind**：`special-effect.remove-field-crop`（C57 + 通用）；`place-farmer.fromSupply + markedSpaceId` pattern（B22 + 通用）
   - **5 处 plan 错误**已纠正（hook 命名 / D134 flag scope / getInvalidAnimals 模式 / E87 push/pop scope / D82 cost type）
-  - **推 Sprint 7b 的 4 张 deferred**：C16 FieldFences（fence-validation per-edge cost override）/ C1 Overhaul（SE `raze-fences` + fence costs.wood / min/max）/ C6 StoneClearing（CropStack 'stone' kind + reap）/ C146 WorkshopAssistant（multi-select choice infra）—— 各需新基建，单独 brainstorm
+  - **推 Sprint 7b 的 4 张 deferred → 2 张归位 7a**：
+    - ✅ **C16 FieldFences**（2026-05-02 Sprint 7a-c1c16）—— 复用现有 `computeFenceDiscount` / `computeFenceFreeAvailable` hook + `cardStates.C16_FieldFences.extraData.c16Active` flag；onBuy SEQ optional [SE set, fence leaf, SE clear]。无新基建。
+    - ✅ **C1 Overhaul**（2026-05-02 Sprint 7a-c1c16）—— 复用 `consume-fence` SE（已有）+ `computeFenceDiscount` hook + 同款 cardState flag；记录 `c1MaxRebuild=n+3` 限制免费 fence 数。BGA `min:n` 与 `noWoodPalisades` 简化（见 §2.5）。无新基建。
+    - 仍推 7b：C6 StoneClearing（CropStack 'stone' kind + reap）/ C146 WorkshopAssistant（multi-select choice infra）—— 各需新基建，单独 brainstorm
+    - 主路径 latent fix：`commitFarmChoice` fence preview 现在调 `collectFenceDiscount`，让 hook 折扣在 payment-preview 阶段也生效（之前只 applyFarmChoice 阶段算，导致 wood=0 + hook discount=full 的 case 在 typed-flat-payment 错误地被 reject）。
   - **F11 one-pit 3 卡完成（2026-05-03 follow-up）**：
     - **B21 HayloftBarn**：when card emptied via grain gain, append `family-growth` leaf with `actionContext: { skipRoomCheck: true }` (Family Growth Even Without Room). Gated by `hasInactiveWorker` + family <= 4 (BGA `countFarmers <=4 && hasFarmerInReserve`). Both the after-grain-gain listener and onAfterReap path use the same `buildFlow` helper.
     - **C148 MudWallower**：add 2 `after` listeners (exchange / place-farmer with order=10) calling `syncHeldDownward(player)` — `held = min(held, player.resources.boar)`, only downward. Mirrors BGA `decreaseRoom` / `decreaseRoomAll` permanence: cap never grows back even after breeding raises pig count. Reorganize-only path (no place-farmer / exchange) deferred to 7b — no clean hookable phase yet (would require dispatcher change in `confirmAnimalReorg`).
     - **E123 ResourceHoarder**：fix over-pop bug — previously after-pay popped unconditionally on every construct/improvement/renovate, draining the stack even when the cost did not include the top resource. Switch computeCosts listener from flat `costs` override to optional `Bonus[]` with `sources: [CARD_ID]`. After-pay listener now gates pop on `_activeActionBonusSources` containing CARD_ID — the canonical "this card's bonus actually fired" signal. Deliberate divergence from BGA: BGA emits N choices (use top 0..N items); we emit only single "use top 1" option (deferred to 7b — see §2.5).
-  - **测试**：fast 1961 全绿 / slow 该批次 +5 例 / lint 0 errors / build 全绿
-  - Sprint 7a 仍在进行（F4 / F-zone / F7 / F5 / F6 / F9 / F10 / F3 共 ~30 张待修；F11 family 已收尾）。最终 PR 时再做 §2.2 / §2.3 / §0 完整 sync。
+  - **测试**：fast 1970 全绿 / slow 该批次 +30+ 例 / lint 0 errors / build 全绿
+  - Sprint 7a 收尾合并完成（4 family + C1+C16 撤回 deferred 已合并 sprint-7a-phase-1）。E123 多选 + C148 reorg sync 推 7b。
   - spec / plan：`docs/superpowers/specs/2026-05-03-sprint-7a-design.md` / `docs/superpowers/plans/2026-05-03-sprint-7a.md`
 
 - **2026-05-02 Sprint 7 — §2.2 simplification re-validation audit（131 张 deep-audited, audit-only）**：
@@ -443,7 +447,7 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 >
 > 后续修复流程：`scripts/audit-card-architecture.ts` 本地审计 + 对应 caller 迁移。
 
-### 2.5 🔀 刻意偏离 BGA（13 张 + 2026-05-02 Sprint 7 27 张 simplifications = 40 张）
+### 2.5 🔀 刻意偏离 BGA（13 张 + 2026-05-02 Sprint 7 27 张 simplifications + 2026-05-02 Sprint 7a-c1c16 2 项 = 42 张）
 
 > 这些卡 desc 与 BGA 一致，但实现选择刻意偏离 BGA 行为。每张都需写明**为什么不同**和**回归 BGA 的代价**。
 >
@@ -467,6 +471,8 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 | A22 Telegram extraPlacement leaf（2026-04-30 Sprint 5b 登记） | BGA `Telegram::activate()` 用 `flagCardNode + Engine::insertAsChild($flow)` 让玩家这一回合可多放一次 worker（玩家自己选何时放） | onBeforeStartOfTurn 直接弹 SEQ optional + place-farmer leaf with `actionContext.extraPlacement: true`，玩家立即响应；保留 `workersAvailable === 0` 守卫等价 BGA `hasFarmerInReserve` | 两者实际游戏效果等价（都让玩家多放一次 worker，不消耗 family pool），我方语义更紧凑；不影响动画 / 计分 / 跨卡交互 | 引入 `flagCardNode` 等价机制（按 round 段持续延迟插入节点），把 A22 切到 lazy-insertion 模式 |
 | E72 ArtichokeField Reap-event vs phase callback（2026-05-02 Sprint 5e demote） | BGA `isListeningTo` Reap event with `harvested >= 1` guard，`onPlayerAfterReap` 返回 `gainNode([FOOD => 1])`；one Reap event per harvest field phase per field | `effect.onHarvestFieldPhase` 在 `+1 crop` 之后直接 `+1 food`，跳过 Reap event 派发 | structural-but-equivalent：3 例 verification test（3-grain → 3 grain + 3 food / 2-veg → 2 veg + 2 food / 空 field → 0 food）证明每 harvest 食物输出与 BGA 完全等价；`harvested >= 1` 守卫由"crop.remaining > 0 才执行"等价覆盖；total 食物 / 跨 harvest 数 / 空 field 行为全部数学等同 | route +1 food through Reap dispatch path（与 B132 EstateMaster 共用）— 实现复杂度高、行为零差，不值得 |
 | E123 ResourceHoarder choice arity（2026-05-03 Sprint 7a F11 demote） | BGA `Utils::addBonusChoices` 输出 `0..N` 个选择（k=1..N 各对应"用 top k 个资源叠加折扣"）；玩家可一次用多个 top items 折抵复合 cost（如 wood+clay+stone=3 一次抵全部 top3） | computeCosts emit 单个 optional `Bonus` with `discount: { topResource: 1 }`（仅折抵 top 1）；after-pay 通过 `_activeActionBonusSources` 判断是否真用了 bonus 再 pop 1 | over-pop bug 已修复（不再无条件 pop）；BGA N-choice 需 PaymentSolution 携带 chosen choice index（基建变），改为 single-choice 简化以保零 bug；常见场景 cost=1 类资源时与 BGA 完全等价；多类资源 cost 时玩家失去"叠抵"机会（罕见多 top item 折扣场景） | 让 `BonusModifier.choices: BonusChoice[]` 在 paymentSolution 中保留 chosen index，after-pay 据此 pop k；该改造需变 `PaymentSolution.bonusUsed` 从 `string` 升级到结构化（cardId + choice index），并修跨 cards 的 `_activeActionBonusSources` 逻辑 — 推 7b |
+| C1 Overhaul `min: n` 不强制（2026-05-02 Sprint 7a-c1c16） | BGA `FENCING args { min: n }` 强制玩家至少重建 n 段 fence | 我们的 onBuy SEQ 是 `optional: true`，玩家可选不重建（甚至 0 段）；fence 最小段数仍由 `validateFenceSelection` 兜底（≥4 才能围出 pasture，否则 `NO_NEW_FENCES` 拒绝） | BGA 的"min: n"是补偿玩家被 raze 的 fence 数；省略后 worst case 是玩家"白买卡 / 白付 1 wood"，与玩家利益不冲突。fencing leaf 的 optional accept/decline + farmSelect cancel 已经覆盖了"完全跳过"路径 | 给 fencing leaf 加 `params.min` 字段，commitFarmChoice fence 分支拒绝 `newFenceEdges.length < min` —— 通用扩展但仅 C1 使用，YAGNI |
+| C1 Overhaul `noWoodPalisades` 不强制（2026-05-02 Sprint 7a-c1c16） | BGA `FENCING args { noWoodPalisades: true }` 在该 fencing 流程中禁用 B30 wood palisade 替换 | 我们 fencing leaf 不读 `noWoodPalisades`；如果玩家同时打了 B30 + C1，C1 触发的 fencing 仍允许 wood-palisade 替换 | C1 prereq "2 occupations"，B30 是另一张 minor，二者共存属罕见。Raze 阶段已显式只删除 type='fence' segments（保留 palisade），核心规则未破坏 | 给 fencing leaf 加 `params.allowPalisades=false` 覆盖 B30 默认，commitFarmChoice + applyFarmChoice 同步读 |
 
 > **Sprint 2.5 集体决策（2026-04-29）**：5 张 BeforeEndOfGame interactive 卡 BGA 行为是"玩家选 N 组/对/套"，TS 当前 auto-max。深度分析后发现这 5 张的选择空间都是**单调最优**——每多取一份选项都至少不亏 VP，且 reserved 资源在 scoring 阶段无其他用途。auto-max 与 BGA 玩家最优策略**数学等价**（C99 极少 ≤2 VP 偏差除外）。实施 interactive flow 需要 scoring-phase pending choice 机制扩展（仅服务这 5 张），ROI 远低于 Sprint 3-6 的真正必要修复。**owner 决策：登记刻意偏离，不实施**。详见 master-plan.md §8 Sprint 2.5 行。
 

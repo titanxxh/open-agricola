@@ -215,6 +215,21 @@ F0 helpers (含 onBeforePlayerTurn + getInvalidAnimals hook)
 - §2.4 微残（C13 discount stone:1 / D30 prereq）—— 单独 fix，不在 7a 范围
 - §2.6 D159 Reed Seller —— 需要 "可阻止行动 + 拍卖式选择" 系统，单独评估
 
+### Originally deferred → reclaimed in 7a follow-up
+
+中期发现这两张 deferred 实际**不需新基建**，复用现有 `computeFenceDiscount` hook + cardState flag 即可。在 Sprint 7a-c1c16 follow-up branch 完成（commit `b2113a39` C1 / `dd9db73f` C16 / `6c37a67d` payment-preview fix）。
+
+| 卡 | 原推迟理由（不再成立） | 实际方案 |
+|---|---|---|
+| C16 FieldFences | "fence-validation per-edge cost override" 需要新基建 | onBuy SEQ optional [SE set c16Active, fence leaf, SE clear]；`computeFenceDiscount` 在 flag 启动时数 `newFenceEdges` 中贴 field 的边数返回；entry-guard 用 `computeFenceFreeAvailable` 看 player.fields 旁未建 edge 数 |
+| C1 Overhaul | SE `raze-fences` + fence costs.wood / min/max 都要新建 | `consume-fence` SE 已存在（type='fence' only，保留 palisade）；`c1Active` + `c1MaxRebuild` flag 让 `computeFenceDiscount` 给所有 newFenceEdges 全免费（capped by maxRebuild）；BGA 的 `min:n` / `noWoodPalisades` 作为登记简化（§2.5）|
+
+附带 latent fix：`commitFarmChoice` fence 分支 payment preview 之前只用 `readPendingFenceBonus`，现在加上 `collectFenceDiscount` 让 hook discount 在 typed-flat-payment 阶段也算入，否则 wood=0 + 全免费 case 会被错误 reject。E16 测试同时通过 — 它原 case wood 总是 ≥ 真实 cost，没暴露这个 bug。
+
+仍推 7b：
+- **C6 StoneClearing** —— 需要 CropStack `'stone'` kind + reap pipeline（BGA `Field::pushStack(STONE)` 跨 reap 持续）
+- **C146 WorkshopAssistant** —— 需要"玩家选 N 对资源/卡"的 multi-select choice infra
+
 ## 7. Risk / open questions
 
 - **F11 复杂卡爆基建需求**：C146 pair-chooser SE / D74 wood-spent rollover / B161 computeArgsPlaceFarmer 可能引入新 hook phase 或 engine 改动。Implementation 时 fallback：基建大改的卡降级 §2.5 deliberate divergence + Sprint 7b。
