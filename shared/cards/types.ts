@@ -60,7 +60,6 @@ export type CardDefinition = {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
-  isMajorImprovement?: boolean
   alsoCountsAs?: CardType[]
   /** Majors-only: scoring tier table read by major-improvements scoring. */
   scoring?: {
@@ -128,7 +127,6 @@ export class CardBase {
   providesOccupation?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
-  isMajorImprovement?: boolean
   alsoCountsAs?: CardType[]
   scoring?: {
     resource: keyof Resource
@@ -173,7 +171,6 @@ export class CardBase {
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
-    if (this.isMajorImprovement) def.isMajorImprovement = this.isMajorImprovement
     if (this.alsoCountsAs) def.alsoCountsAs = this.alsoCountsAs
     if (this.locales) def.locales = this.locales
     return def
