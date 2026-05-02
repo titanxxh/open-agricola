@@ -47,6 +47,10 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-02 Sprint 7b2 F4 — B139 ForestScientist confirmed §2.0 aligned（onReturnHome aligned，audit 误报）**：
+  - 对照 BGA `B139_ForestScientist.php`：`isListeningTo` 仅 `ReturnHome` 玩家事件；`onPlayerReturnHome` 扫所有 visible action cards 的 wood meeples，sum=0 时 `gainNode([FOOD => Globals::getTurn() >= 5 ? 2 : 1])`。
+  - 我方 `shared/cards/B/B139_ForestScientist.ts:22` `effect.onReturnHome` 走 `state.actionSpaces.reduce(sum + s.resources.wood)`（语义等价 BGA per-card wood meeples），`state.round >= 5 ? 2 : 1`（`Globals::getTurn()` ≡ round 1..14，等价）。trigger 时机、wood 检测、food 数量、round≥5 阈值全部对齐。无代码改动。
+
 - **2026-05-02 Sprint 7b2 F4 — B133 VillagePeasant confirmed §2.0 aligned（commit b064d2df 已修）**：
   - 2026-04-29 commit `b064d2df` (Sprint 2 PR-2A) 通过新增 `onBeforeEndGame` hook 让 B133 在 scoring 启动前给 N 个 vegetable 资源（之前 `computePostScore` 直接返 N raw VP，与 BGA `onPlayerBeforeEndOfGame` 给资源不等价）。
   - 本次 family agent 复核：`pnpm exec vitest run server/__tests__/B133_VillagePeasant-session.test.ts --project slow` 现有用例全部通过；§2.3 line 340 早已标 ✅ Sprint 2 PR-2A，audit 残留 ⚠ 标签今日清除，确认归 §2.0 aligned。
