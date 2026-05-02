@@ -11,7 +11,8 @@ const CARD_ID = 'D80_BrickHammer'
 const getImprovementClayCost = (builtId: string): number => {
   const minor = getMinorImprovementCard(builtId)
   if (minor) {
-    return (minor.cost?.clay ?? 0) + (minor.altCosts?.reduce((m, c) => Math.max(m, c.clay ?? 0), 0) ?? 0)
+    const cost = minor.cost as { clay?: number } | undefined
+    return (cost?.clay ?? 0) + (minor.altCosts?.reduce((m, c) => Math.max(m, c.clay ?? 0), 0) ?? 0)
   }
   const major = getMajorCardEffect(builtId)
   if (major) {

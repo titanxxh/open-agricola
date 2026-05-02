@@ -1,7 +1,10 @@
-import type { MajorCardEffect } from './types'
+import type { MajorCardData } from './types'
 
-export const cookingHearth1: MajorCardEffect = {
+export const cookingHearth1: MajorCardData = {
   id: 'Major_CookingHearth1',
+  name: 'Cooking Hearth',
+  deck: 'major',
+  number: 3,
   cost: {
     fee: { clay: 4 },
     cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'] },
@@ -11,7 +14,7 @@ export const cookingHearth1: MajorCardEffect = {
   isCookery: true,
   isBaking: true,
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
-  description: [
+  desc: [
     '[Anytime]',
     '<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>',
     '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 4<FOOD>',
@@ -27,9 +30,10 @@ export const cookingHearth1: MajorCardEffect = {
   ],
 }
 
-export const cookingHearth2: MajorCardEffect = {
+export const cookingHearth2: MajorCardData = {
   ...cookingHearth1,
   id: 'Major_CookingHearth2',
+  number: 4,
   cost: {
     fee: { clay: 5 },
     cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'] },

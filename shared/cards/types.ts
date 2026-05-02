@@ -1,4 +1,4 @@
-import type { Resource, CostModifier, TradeSideEffect } from '../game/types'
+import type { Resource, CostModifier, TradeSideEffect, ComplexCost } from '../game/types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
@@ -37,7 +37,7 @@ export type CardDefinition = {
   number: number
   category?: string
   desc: string[]
-  cost?: Partial<Resource>
+  cost?: Partial<Resource> | ComplexCost
   altCosts?: Partial<Resource>[]
   vp?: number
   prerequisite?: string
@@ -62,6 +62,11 @@ export type CardDefinition = {
   mustBePlayedViaMinorAction?: boolean
   isMajorImprovement?: boolean
   alsoCountsAs?: CardType[]
+  /** Majors-only: scoring tier table read by major-improvements scoring. */
+  scoring?: {
+    resource: keyof Resource
+    map: Record<string, number>
+  }
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -100,7 +105,7 @@ export class CardBase {
   number!: number
   category?: string
   desc!: string[]
-  cost?: Partial<Resource>
+  cost?: Partial<Resource> | ComplexCost
   altCosts?: Partial<Resource>[]
   vp?: number
   prerequisite?: string
@@ -125,6 +130,10 @@ export class CardBase {
   mustBePlayedViaMinorAction?: boolean
   isMajorImprovement?: boolean
   alsoCountsAs?: CardType[]
+  scoring?: {
+    resource: keyof Resource
+    map: Record<string, number>
+  }
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {

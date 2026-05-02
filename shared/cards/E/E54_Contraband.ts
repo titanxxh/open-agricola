@@ -24,7 +24,9 @@ const listener: CardListenerRegistration = {
     const card = getMinorImprovementCard(builtId)
     if (!card) return
     const costResources = new Set<string>()
-    const allCosts = [card.cost, ...(card.altCosts ?? [])].filter(Boolean)
+    // Minor improvements only ever carry Partial<Resource> costs.
+    const cardCost = card.cost as Partial<Record<string, number>> | undefined
+    const allCosts = [cardCost, ...(card.altCosts ?? [])].filter(Boolean)
     for (const cost of allCosts) {
       for (const res of BUILDING_RESOURCES) {
         if ((cost![res] ?? 0) > 0) costResources.add(res)
