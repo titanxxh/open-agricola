@@ -80,6 +80,13 @@ export const E33_BeaverColony_impl = {
     blocked.blocked = true
     blocked.capacity = 0
   },
+  /**
+   * BGA `Models/PlayerBoard.php::getInvalidAnimals` (E33 branch):
+   * pasture-with-stable restriction. We enforce via `onComputeAnimalZones`
+   * setting cap=0 on the smallest stabled pasture, which forces overflow
+   * on reorg. Hook returns [] because the constraint is not card-zone-local.
+   */
+  getInvalidAnimals: () => [],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
