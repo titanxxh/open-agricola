@@ -1,6 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow, PlayerState } from '../../game/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../game/field'
@@ -12,9 +13,33 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: nu
   writeCardInfobox(player, CARD_ID, count > 0 ? `${count} Food` : 'Empty')
 }
 
+const familyGrowthLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'family-growth',
+  sourceCard: CARD_ID,
+  actionContext: { skipRoomCheck: true },
+})
+
+const hasInactiveWorker = (player: PlayerState) =>
+  player.workers.some((w) => !w.isActive)
+
+const buildFlow = (newCount: number, player: PlayerState): ActionFlow => {
+  const food = gainLeaf(CARD_ID, { food: 1 })
+  // BGA: when card just emptied AND player has farmer in reserve and family <= 4,
+  // grant family-growth-without-room.
+  if (newCount === 0 && hasInactiveWorker(player) && player.workers.filter((w) => w.isActive).length <= 4) {
+    return {
+      type: 'seq',
+      children: [food, familyGrowthLeaf()],
+    }
+  }
+  return food
+}
+
 /**
  * Detect grain gain from collect, gain, and receive actions.
  * When player obtains at least 1 grain, release 1 food from card.
+ * When the card empties, also grant a Family Growth Even without Room action.
  */
 const grainGainListener: CardListenerRegistration = {
   id: 'B21-hayloft-barn-after-grain-gain',
@@ -31,8 +56,7 @@ const grainGainListener: CardListenerRegistration = {
     const newCount = foodCount - 1
     writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
     updateInfobox(context.player, newCount)
-    // TODO: When foodCount reaches 0, grant Family Growth Even without Room action
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    return { flow: buildFlow(newCount, context.player), sourceCard: CARD_ID }
   },
 }
 
@@ -67,7 +91,7 @@ export const B21_HayloftBarn_impl = {
     const newCount = foodCount - 1
     writeCardExtraData(player, CARD_ID, 'foodCount', newCount)
     updateInfobox(player, newCount)
-    return gainLeaf(CARD_ID, { food: 1 })
+    return buildFlow(newCount, player)
   },
 },
   reaches: [] as readonly string[],

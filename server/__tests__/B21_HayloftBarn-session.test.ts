@@ -118,4 +118,43 @@ describe('B21_HayloftBarn session', () => {
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(2)
   })
+
+  it('when card empties via grain gain, triggers family growth without room', () => {
+    // Set up with foodCount=1 so the grain-seeds action drains it.
+    // Player has 2 active workers and 2 rooms, so a normal family growth
+    // would not be doable (no free room) — we expect skipRoomCheck to bypass.
+    const session = setup({ foodCount: 1 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    const foodBefore = player.resources.food
+    const familyBefore = player.workers.filter((w) => w.isActive).length
+    expect(familyBefore).toBe(2)
+    expect(player.rooms).toBe(2)
+
+    const resp = session.takeAction(0, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+
+    const updated = resp.state.players[0]!
+    // Card empty
+    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(0)
+    // Got the food (card released 1)
+    expect(updated.resources.food).toBe(foodBefore + 1)
+    // Family grew without room (now 3 active workers despite 2 rooms)
+    const familyAfter = updated.workers.filter((w) => w.isActive).length
+    expect(familyAfter).toBe(familyBefore + 1)
+  })
+
+  it('does not trigger family growth when card is not empty after gain', () => {
+    const session = setup({ foodCount: 4 })
+    const state = session.getState().state
+    const familyBefore = state.players[0]!.workers.filter((w) => w.isActive).length
+
+    const resp = session.takeAction(0, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+
+    const updated = resp.state.players[0]!
+    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(3)
+    // No new family member
+    expect(updated.workers.filter((w) => w.isActive).length).toBe(familyBefore)
+  })
 })
