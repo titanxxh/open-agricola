@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B95_MasterBricklayer'
@@ -19,7 +20,7 @@ const computeCostsListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Only applies to major improvements
     const cardId = context.cardId
-    if (!cardId || !cardId.startsWith('Major_')) return
+    if (!cardId || !isMajorCardId(cardId)) return
     const nbNewRooms = (context.player.rooms ?? 2) - 2
     if (nbNewRooms <= 0) return
     return { costs: { stone: -nbNewRooms } }
