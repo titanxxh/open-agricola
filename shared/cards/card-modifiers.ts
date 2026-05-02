@@ -1,29 +1,11 @@
 import type { CostModifier } from '../game/types'
-import { getOccupationCard } from './catalog'
-import { getMinorImprovementCard } from './catalog'
+import { getActiveCardRegistry } from './active-registry'
 
+/**
+ * Card modifier lookup. Reads from per-session active CardRegistry.
+ * GameCore constructor populates modifiersByCard via syncModifiersFromCatalog;
+ * custom-registry adds custom-card modifiers at runtime.
+ */
 export const getCardModifiers = (cardId: string): CostModifier[] => {
-  const occupation = getOccupationCard(cardId)
-  if (occupation) {
-    const modifiers = [
-      ...(occupation.modifiers ?? []),
-      ...(occupation.modifier ? [occupation.modifier] : []),
-    ]
-    if (modifiers.length > 0) {
-      return modifiers
-    }
-  }
-  
-  const minor = getMinorImprovementCard(cardId)
-  if (minor) {
-    const modifiers = [
-      ...(minor.modifiers ?? []),
-      ...(minor.modifier ? [minor.modifier] : []),
-    ]
-    if (modifiers.length > 0) {
-      return modifiers
-    }
-  }
-  
-  return []
+  return getActiveCardRegistry()?.getModifiers(cardId) ?? []
 }
