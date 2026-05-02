@@ -6,10 +6,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C15_Trellis'
 
 // C15 Trellis: Before using Pig Market, can take a fencing action (pay wood as usual).
+// BGA `onPlayerPlaceFarmer` is the before-event; ours runs on `before` phase to match.
 const listener: CardListenerRegistration = {
   id: 'C15-trellis-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'pig-market') return
