@@ -13,6 +13,7 @@ import { incPlacedFarmers } from '../../logic/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'
+import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
@@ -173,7 +174,7 @@ export const placeFarmerAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, actionContext }, choice) => {
     const allowOccupied = choice.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)
     const targetSpaceId = allowOccupied
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
@@ -182,6 +183,18 @@ export const placeFarmerAction: ActionDefinition = {
     if (!targetSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
     const placeResult = placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
+    // B22 WalkingBoots-style fromSupply + markForRemoval pattern: when a
+    // card pushes a temporary worker from supply and wants to retract it on
+    // the next return-home, record the chosen space id on the source card's
+    // extraData so the card's own onReturnHome listener can find the worker
+    // it placed (cardStates.<sourceCard>.extraData.markedSpaceId).
+    if (
+      sourceCard &&
+      actionContext?.fromSupply &&
+      actionContext?.markForRemoval
+    ) {
+      writeCardExtraData(player, sourceCard, 'markedSpaceId', targetSpaceId)
+    }
     const execResult = targetSpace.execute({ state, player, space: targetSpace })
     if (execResult.type === 'flow') return execResult
     return execResult

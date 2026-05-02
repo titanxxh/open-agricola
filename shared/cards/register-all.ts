@@ -183,6 +183,7 @@ import { B106_MoralCrusader_impl } from './B/B106_MoralCrusader'
 import { B107_Manservant_impl } from './B/B107_Manservant'
 import { B108_OvenFiringBoy_impl } from './B/B108_OvenFiringBoy'
 import { B109_PaperMaker_impl } from './B/B109_PaperMaker'
+import { B10_Caravan_impl } from './B/B10_Caravan'
 import { B110_Pavior_impl } from './B/B110_Pavior'
 import { B111_Rustic_impl } from './B/B111_Rustic'
 import { B112_Silokeeper_impl } from './B/B112_Silokeeper'
@@ -264,6 +265,7 @@ import { B29_CookeryLesson_impl } from './B/B29_CookeryLesson'
 import { B2_MiniPasture_impl } from './B/B2_MiniPasture'
 import { B30_WoodPalisades_impl } from './B/B30_WoodPalisades'
 import { B31_PotteryYard_impl } from './B/B31_PotteryYard'
+import { B32_Kettle_impl } from './B/B32_Kettle'
 import { B33_Mantlepiece_impl } from './B/B33_Mantlepiece'
 import { B34_SpecialFood_impl } from './B/B34_SpecialFood'
 import { B35_HookKnife_impl } from './B/B35_HookKnife'
@@ -1005,6 +1007,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B107_Manservant': B107_Manservant_impl,
   'B108_OvenFiringBoy': B108_OvenFiringBoy_impl,
   'B109_PaperMaker': B109_PaperMaker_impl,
+  'B10_Caravan': B10_Caravan_impl,
   'B110_Pavior': B110_Pavior_impl,
   'B111_Rustic': B111_Rustic_impl,
   'B112_Silokeeper': B112_Silokeeper_impl,
@@ -1086,6 +1089,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B2_MiniPasture': B2_MiniPasture_impl,
   'B30_WoodPalisades': B30_WoodPalisades_impl,
   'B31_PotteryYard': B31_PotteryYard_impl,
+  'B32_Kettle': B32_Kettle_impl,
   'B33_Mantlepiece': B33_Mantlepiece_impl,
   'B34_SpecialFood': B34_SpecialFood_impl,
   'B35_HookKnife': B35_HookKnife_impl,

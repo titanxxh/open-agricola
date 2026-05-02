@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { runCardListeners } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C53_GypsysCrock'
 
@@ -131,5 +132,38 @@ describe('C53_GypsysCrock session', () => {
 
     const player = resp.state.players[0]!
     expect(player.resources.food).toBe(0)
+  })
+
+  it('non-cooking source (E64 SimpleOven bake-bread) does NOT count toward C53 bonus', () => {
+    // SimpleOven exchanges 1 grain → 3 food via bake-bread (isBaking=true,
+    // isCookery is NOT set). The trade-applied event fires with sourceId
+    // 'E64_SimpleOven' which is not a cooking source — C53 must skip it.
+    // Use direct listener-fire path to keep the assertion focused.
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.minorPlayed.push('C53_GypsysCrock')
+    session.loadState(state)
+
+    // Synthesize the trade-applied event for a non-cooking source twice (so
+    // we'd cross the pair threshold if the filter were broken).
+    const fire = (sourceId: string, times: number) =>
+      runCardListeners({
+        state,
+        player,
+        space: { id: 'test' } as never,
+        actionId: 'trade-applied',
+        phase: 'immediatelyAfter',
+        extraData: { sourceId, times },
+      })
+    fire('E64_SimpleOven', 2)
+    // C53 counter must remain 0 (non-cooking source filtered out).
+    const cooked = player.cardStates?.['C53_GypsysCrock']?.extraData?.cookedCount
+    expect(cooked ?? 0).toBe(0)
+    // And cooking source increments correctly.
+    fire('Major_Fireplace1', 2)
+    const cookedAfter = player.cardStates?.['C53_GypsysCrock']?.extraData?.cookedCount
+    expect(cookedAfter).toBe(2)
   })
 })

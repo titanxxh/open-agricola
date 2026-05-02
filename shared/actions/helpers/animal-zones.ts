@@ -1,6 +1,6 @@
-import type { PlayerState, Pasture } from '../../game/types'
+import type { PlayerState, Pasture, GameState } from '../../game/types'
 import { positionKey } from '../../game/farm'
-import { getCardEffect } from '../../cards/card-effects'
+import { getCardEffect, type Meeple } from '../../cards/card-effects'
 
 export type AnimalZone = {
   id: string
@@ -89,6 +89,44 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
 
 export const getTotalAnimalCapacity = (player: PlayerState) =>
   computeAnimalZones(player).reduce((sum, zone) => sum + zone.capacity, 0)
+
+/**
+ * Expand an `(animalType, animalCount)` zone into a per-meeple list so it can
+ * be passed to `CardEffect.getInvalidAnimals`. If the zone has no animal
+ * data, returns an empty list.
+ */
+const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
+  const type = zone.animalType
+  const count = zone.animalCount ?? 0
+  if (!type || count <= 0) return []
+  if (type !== 'sheep' && type !== 'boar' && type !== 'cattle') return []
+  return Array.from({ length: count }, () => ({ type } as Meeple))
+}
+
+/**
+ * Run the owning card's `getInvalidAnimals` hook for a card-typed zone.
+ * Returns the meeples flagged invalid by the card. Returns an empty list if
+ * the zone is not card-typed or the card has no hook registered.
+ */
+export const computeInvalidAnimalsForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): Meeple[] => {
+  if (zone.zoneType !== 'card' || !zone.cardId) return []
+  const effect = getCardEffect(zone.cardId)
+  if (!effect?.getInvalidAnimals) return []
+  const meeples = expandZoneToMeeples(zone)
+  try {
+    return effect.getInvalidAnimals(player, zone, meeples, state)
+  } catch (err) {
+    if (zone.cardId.startsWith('CUSTOM_')) {
+      console.warn(`[animal-zones] custom card ${zone.cardId} getInvalidAnimals threw, skipping:`, err)
+      return []
+    }
+    throw err
+  }
+}
 
 export const enforceAnimalCapacity = (player: PlayerState) => {
   const zones = computeAnimalZones(player)
@@ -223,4 +261,17 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
   Object.values(stableAnimals).forEach((type) => {
     if (type === 'cattle') player.resources.cattle += 1
   })
+
+  // Per-card zone validation hook: BGA `getInvalidAnimals($zone, ...)`. We
+  // run this for each card-typed zone so card authors can mirror BGA's
+  // per-meeple constraint logic (e.g. C11 WildlifeReserve at most 1 of each
+  // animal type, C12 CattleFarm dynamic-cap = pasture count). Concrete
+  // resource adjustment on hook violations is per-card; the helper only
+  // surfaces the invalid list so cards can react in their own listeners.
+  const zonesForHook = computeAnimalZones(player)
+  const stateStub = {} as GameState
+  for (const zone of zonesForHook) {
+    if (zone.zoneType !== 'card') continue
+    computeInvalidAnimalsForZone(stateStub, player, zone)
+  }
 }

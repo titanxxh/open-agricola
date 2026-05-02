@@ -1,21 +1,39 @@
 import { MinorImprovement } from '../types'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { TradeModifier } from '../../game/types'
 
 const CARD_ID = 'E60_WorkingGloves'
 
-const computeCostsListener: CardListenerRegistration = {
-  id: 'E60-working-gloves-compute-costs-occupation',
-  cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['occupation', 'play-occupation'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
-    // Substitute up to 2 food with 1 building resource (simplified: -2 food discount)
-    return { costs: { food: -2 } }
-  },
-}
+/**
+ * E60 Working Gloves (MinorImprovement)
+ *
+ * BGA: When played, gain 1 food. Each time you pay an occupation cost, you can
+ * pay 1 building resource of your choice in place of (up to) 2 food.
+ *
+ * Implementation: 4 TradeModifier entries (one per building resource) with
+ * `from: { res: 1 }, to: { food: 2 }, max: 1`. `getModifiersForCostType(player,
+ * 'occupation')` exposes them; `computeAllBuyableCombinations` enumerates each
+ * trade alternative, producing base + 4 trade-alt PaymentSolutions per cost.
+ *
+ * Note (BGA divergence): BGA tags all 4 alts with `sources=[$this->id]` and
+ * `max=1` per alt. Strictly, BGA expects "at most one swap per occupation"
+ * (group-wise). Our trade pipeline lacks group-max, so 4 trades may stack
+ * (worst case: 4 building resources → 8 food). Practical impact small (the
+ * cheaper alt dominates in `keepOnlyOptimals`); follow-up if a real game
+ * surfaces a multi-stack mismatch.
+ */
+
+const buildingResources = ['wood', 'clay', 'reed', 'stone'] as const
+
+const E60_TRADE_MODIFIERS: TradeModifier[] = buildingResources.map((res) => ({
+  type: 'trade' as const,
+  cardId: CARD_ID,
+  appliesTo: ['occupation' as const],
+  from: { [res]: 1 } as TradeModifier['from'],
+  to: { food: 2 },
+  max: 1,
+}))
 
 export const E60_WorkingGloves = new MinorImprovement({
   id: CARD_ID,
@@ -27,13 +45,13 @@ export const E60_WorkingGloves = new MinorImprovement({
     'When you play this card, you get 1 <FOOD>. Each time you pay an occupation cost, you can pay 1 building resource of your choice in place of (up to) 2 <FOOD>.',
   ],
   cost: {},
+  modifiers: E60_TRADE_MODIFIERS,
 })
 
 export const E60_WorkingGloves_impl = {
-  listeners: [computeCostsListener],
   effect: {
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
-},
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

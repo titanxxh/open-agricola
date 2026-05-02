@@ -47,6 +47,24 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-03 Sprint 7a (in progress) — §2.2 audit followup, Phase A 完成**：
+  - **新基建（4 项）**：
+    - `pairedSpaceIdFor(state, baseId)` helper（`shared/cards/helpers/space-pairing.ts`）—— 4p 行动格变体解析，给 F9 5 卡用
+    - `take-from-space` ActionFlow leaf（`shared/actions/effects/internal/`）—— 从 action space 扣资源 + 加 player supply（A82/E5/C156 用）
+    - **`onBeforePlayerTurn` hook**（`CardEffect`，注意：原 plan 写 `onBeforeStartOfTurn` 与已存在的 round-start hook 冲突，已纠正）—— listener 返 `{skipTurn:true}` 时 game-core 跳过该玩家本次 turn；D134 用此修
+    - **`getInvalidAnimals` hook**（`CardEffect`）—— per-card zone 校验；非破坏性 dispatch（聚合动物模型无 instance id，单卡自取自管）；F-zone 11 卡待用
+  - **完成 16 卡 fix**（按 family）：
+    - F2 counter writes (4): C39 ✅ / C132 ✅ / D134 ✅（用 `onBeforePlayerTurn` hook）/ B132 ✅（4 saturation listeners）
+    - F12 (1): B10 ✅（`computeExtraRoomCapacity` hook）
+    - F8 chooseOne (4): E87 ✅（4-choice push/pop scope-gate）/ D82 ✅（setCardFlag + computeCosts on improvement cost）/ E60 ✅（4 trade-style modifiers, D117 pattern）/ C27 ✅ verify-only
+    - F1 onBuy 截断 (7 实施 + 1 partial): C112 ✅（isDoable + 修 food→grain 方向）/ B22 ✅（fromSupply + markedSpaceId pattern + return-home cleanup, 移除 `passing:true`）/ C156 ✅（动态 N=cattle+1）/ C9 ✅（XOR filter + 移除 `passing:true`）/ E5 ✅（用 take-from-space leaf, 移除 `passing:true`）/ D74 ✅ verify-only（公式等价 BGA）/ C57 ✅（remove-field-crop SE）/ D1 partial（移除 `passing:true`，zigzag tile restriction 推 7b）
+  - **新引入 SE kind**：`special-effect.remove-field-crop`（C57 + 通用）；`place-farmer.fromSupply + markedSpaceId` pattern（B22 + 通用）
+  - **5 处 plan 错误**已纠正（hook 命名 / D134 flag scope / getInvalidAnimals 模式 / E87 push/pop scope / D82 cost type）
+  - **推 Sprint 7b 的 4 张 deferred**：C16 FieldFences（fence-validation per-edge cost override）/ C1 Overhaul（SE `raze-fences` + fence costs.wood / min/max）/ C6 StoneClearing（CropStack 'stone' kind + reap）/ C146 WorkshopAssistant（multi-select choice infra）—— 各需新基建，单独 brainstorm
+  - **测试**：fast 1934 baseline 维持 / slow +34 例 / lint 0 errors / build 全绿
+  - Sprint 7a 仍在进行（F4 / F-zone / F7 / F5 / F6 / F9 / F10 / F11 / F3 共 ~40 张待修）。最终 PR 时再做 §2.2 / §2.3 / §0 完整 sync。
+  - spec / plan：`docs/superpowers/specs/2026-05-03-sprint-7a-design.md` / `docs/superpowers/plans/2026-05-03-sprint-7a.md`
+
 - **2026-05-02 Sprint 7 — §2.2 simplification re-validation audit（131 张 deep-audited, audit-only）**：
   - 5 个 Phase-0 sub-agent 重建 wide-scan 90 名单（`audit-agent-b{6..10}.md` 已丢失）；5 个 Phase-1 sub-agent ≥120s/卡 5 维度 deep audit 131 张候选。Spot-check 1 张（B22）+ 系统性 caveat 分析。
   - **Verdict 分布：** ✅ 29 / 🟡 27 / ⚠ 50 / ❌ 11 / 🔍 14。**`card_desc_audit.md §5.7` "0 ⚠/❌" 结论彻底错**——47% 的"simplification" 实际是真行为偏差。

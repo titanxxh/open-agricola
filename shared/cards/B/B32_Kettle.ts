@@ -1,11 +1,15 @@
 import { MinorImprovement } from '../types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B32_Kettle'
 
-// TODO: The original card awards 0/1/2 bonus VP when using the 1/3/5 grain tiers respectively.
-// Our exchange system does not support VP scoring on exchanges, so VP is omitted here.
-// The exchange rates for food are correct: 1 grain → 3 food, 3 grain → 4 food, 5 grain → 5 food.
-
+/**
+ * BGA: 3-grain trade gives +1 bonus VP, 5-grain trade gives +2 bonus VP.
+ * Implemented via per-trade `sideEffect: { type: 'bonusVp', amount: N }` —
+ * the engine accumulates amount × times into
+ * `cardStates[B32_Kettle].extraData.bonusVpEarned` and `computeBonusScore`
+ * reads it for the final score (mirrors E153 StoneSculptor pattern).
+ */
 export const B32_Kettle = new MinorImprovement({
   id: CARD_ID,
   name: 'Kettle',
@@ -15,9 +19,33 @@ export const B32_Kettle = new MinorImprovement({
   desc: ['At any time, you can exchange 1/3/5 <GRAIN> for 3/4/5 <FOOD> and 0/1/2 bonus <SCORE>.'],
   cost: { clay: 1 },
   prerequisite: '1 Grain Field',
+  extraVp: true,
   exchanges: [
-    { from: { grain: 1 }, to: { food: 3 }, triggers: ['anytime'] },
-    { from: { grain: 3 }, to: { food: 4 }, triggers: ['anytime'] },
-    { from: { grain: 5 }, to: { food: 5 }, triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 3 }, triggers: ['anytime'], sourceId: CARD_ID },
+    {
+      from: { grain: 3 },
+      to: { food: 4 },
+      triggers: ['anytime'],
+      sourceId: CARD_ID,
+      sideEffect: { type: 'bonusVp', amount: 1 },
+    },
+    {
+      from: { grain: 5 },
+      to: { food: 5 },
+      triggers: ['anytime'],
+      sourceId: CARD_ID,
+      sideEffect: { type: 'bonusVp', amount: 2 },
+    },
   ],
 })
+
+export const B32_Kettle_impl = {
+  effect: {
+    id: CARD_ID,
+    computeBonusScore: (_state, player): number => {
+      const earned = player.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned
+      return typeof earned === 'number' ? earned : 0
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
