@@ -198,7 +198,7 @@ export const reverseTrade = (trade: Trade): Trade => ({
 // Anytime Cookery Trades (metadata-driven)
 // ============================================
 
-const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
+export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
   from: ex.from,
   to: ex.to,
   max: ex.max,

@@ -1,7 +1,8 @@
-import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState } from '../game/types'
+import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState, Trade } from '../game/types'
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
+import { exchangeToTrade } from '../actions/effects/exchange'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -269,6 +270,43 @@ export const collectComputeChoiceCandidates = (
     })
     if (result?.extraOptions) {
       out.push(...result.extraOptions)
+    }
+  }
+  return out
+}
+
+/**
+ * Run `computeExchanges` phase listeners for a given exchange window and merge
+ * their `extraExchanges`. Generic extension point sister to
+ * `collectComputeChoiceCandidates`. Used by `getExchangesInWindow` so cards
+ * like C62 CookeryExtension can inject runtime-derived trades that depend on
+ * other played cards (e.g. C62 doubles food output of every isCookery card
+ * during harvest, with a per-cookery shared used flag).
+ *
+ * Each returned `CardExchange` is converted to a `Trade` via `exchangeToTrade`,
+ * with the listener's owning card id as fallback `sourceId`.
+ */
+export const collectComputeExchanges = (
+  state: GameState,
+  player: PlayerState,
+  window: string,
+): Trade[] => {
+  const baseCtx: CardListenerContext = {
+    state,
+    player,
+    actionId: 'compute-exchanges',
+    phase: 'computeExchanges' as ActionHookPhase,
+    extraData: { window },
+  } as unknown as CardListenerContext
+  const out: Trade[] = []
+  for (const matched of getMatchingListeners(baseCtx)) {
+    const result = executeCardListener(matched.registration, baseCtx, {
+      ownerPlayerId: matched.ownerPlayerId,
+    })
+    if (!result?.extraExchanges) continue
+    const ownerCardId = matched.registration.cardIds?.[0] ?? 'unknown'
+    for (const ex of result.extraExchanges) {
+      out.push(exchangeToTrade(ex, ownerCardId))
     }
   }
   return out
