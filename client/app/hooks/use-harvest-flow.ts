@@ -28,13 +28,6 @@ export type HarvestFeedOption = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
-  /**
-   * Compat fields kept during the D3 migration (Task 5 removes them). Filled
-   * only for single-input, food-output trades so legacy UI code that still
-   * reads `option.resourceKey` / `option.food` keeps working.
-   */
-  resourceKey?: keyof Resource
-  food?: number
 }
 
 export type HarvestContext = {
@@ -79,11 +72,6 @@ export const buildHarvestFeedOptions = (
     exchanges.forEach((ex, idx) => {
       if (!isHarvestFeedTrigger(ex)) return
       if (!playerCanAfford(player, ex)) return
-      const fromKeys = Object.keys(ex.from) as (keyof Resource)[]
-      const isSingleFoodTrade =
-        fromKeys.length === 1 &&
-        ((ex.from as Partial<Resource>)[fromKeys[0]!] ?? 0) === 1 &&
-        ((ex.to as Partial<Resource>).food ?? 0) > 0
       options.push({
         id: `${sourceId}-ex${idx}`,
         sourceName,
@@ -92,8 +80,6 @@ export const buildHarvestFeedOptions = (
         from: { ...ex.from },
         to: { ...ex.to },
         max: ex.max,
-        resourceKey: isSingleFoodTrade ? fromKeys[0]! : undefined,
-        food: isSingleFoodTrade ? ((ex.to as Partial<Resource>).food ?? 0) : undefined,
       })
     })
   }

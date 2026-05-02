@@ -1,4 +1,3 @@
-import type { Resource } from '../game/types'
 import type { StateUpdateEnvelope } from './game'
 import type { DraftMode, DraftPickPayload } from '../draft/types'
 
@@ -19,13 +18,11 @@ type ClientCommandBody =
   | {
       type: 'feed'
       selections: {
-        resourceKey?: keyof Resource
         count: number
-        food?: number
         sourceName?: string
-        sourceId?: string
-        /** Sprint 6a entry-index pointer; server applies bidirectionally. */
-        exchangeIndex?: number
+        sourceId: string
+        /** Entry-index pointer into card.exchanges[] (D3 unified path). */
+        exchangeIndex: number
       }[]
     }
   | {
