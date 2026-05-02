@@ -52,7 +52,8 @@
   - **D100 LordoftheManor** ✅ Sprint 7d — `standardCategories` 加 `'stables'`，让 4 fenced stables 也算 bonus 命中。
   - **A10 WoodenShed** ✅ Sprint 7d — 加 `mustBePlayedViaMajorImprovementAction:true` field 守门 minor-improvement action 路径。
   - **B104 SheepWalker** ✅ Sprint 7d — 新增 `CardEffect.enforceReorganizeOnLastHarvest?(state, player)` 通用 hook（mirrors BGA）；`breedAction.execute` 在 round=14 + sourceCard='harvest' + animalCount===0 时调 `shouldEnforceReorganizeOnLastHarvest(state, player)`，任意卡返 true 则 emit `animalReorg`。B104 hook 实现：`player.resources.sheep > 0`。Reorg-pending 期间隐藏 anytime exchange 已经天然成立（`buildAnytimeEntries` 在 `pending.type==='animalReorg'` 时返回 `[]`）。
-  - 余 C51 / C125 + prereq 双模扫描见后续 commit。
+  - **C51 FishingNet** ✅ Sprint 7d — 加 `isDoable` listener `actions:['collect','fishing'] scope:'opponent'`：opponent 持卡 + trigger player food < 1 → doable=false。新增 `GameCore.listenersVetoIsDoable(player, space)` helper：takeAction 入口尊重 listener-driven `doable:false` veto（mirrors BGA `transferOrLose` 拒绝整个 fishing action）。该 helper **不**调 `space.canBeExecutedByPlayer` / `applyIsDoableHooks`，避免破坏现有"OR-flow with all children currently undoable still enters skip choice" 语义。
+  - 余 C125 + prereq 双模扫描见后续 commit。
   - spec：`docs/superpowers/specs/2026-05-02-sprint-7d-design.md`。
 
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：

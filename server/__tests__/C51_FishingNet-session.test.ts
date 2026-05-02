@@ -177,6 +177,33 @@ describe('C51_FishingNet session', () => {
     expect(after.players[1]!.resources.food).toBe(opponentFoodBefore + 2 - 1)
   })
 
+  it('opponent without food cannot use fishing while owner has C51 (BGA transferOrLose)', () => {
+    const session = setup(1)
+    const s = session.getState().state
+    // Opponent has 0 food — by BGA rule, they cannot use Fishing.
+    s.players[1]!.resources.food = 0
+    session.loadState(s)
+
+    const resp = session.takeAction(1, 'fishing')
+    expect(resp.ok).toBe(false)
+    // Fishing space should still hold its accumulated food (untouched).
+    const after = session.getState().state
+    const fishingAfter = after.actionSpaces.find((sp) => sp.id === 'fishing')!
+    expect(fishingAfter.resources.food).toBe(2)
+    // Owner did not gain anything either.
+    expect(after.players[0]!.cardStates?.C51_FishingNet?.flagged).toBeFalsy()
+  })
+
+  it('owner with 0 food can still use fishing themselves (own card does not block)', () => {
+    const session = setup(0)
+    const s = session.getState().state
+    s.players[0]!.resources.food = 0
+    session.loadState(s)
+
+    const resp = session.takeAction(0, 'fishing')
+    expect(resp.ok).toBe(true)
+  })
+
   it('no extra food on fishing space when card is not flagged during return-home', () => {
     const session = new GameSession()
     const state = session.getState().state

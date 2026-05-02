@@ -1810,6 +1810,34 @@ export class GameCore {
     return this.respond()
   }
 
+  /**
+   * Returns true when at least one card listener for the `isDoable` phase
+   * explicitly vetoes the action (e.g. C51 FishingNet blocking opponent
+   * fishing on 0 food). Unlike the full `applyIsDoable` path, this skips
+   * `space.canBeExecutedByPlayer` and `applyIsDoableHooks` — those are
+   * conservative for OR-flow actions and would over-block normal cases like
+   * "OR(sow, bake-bread)" where every child is currently undoable but the
+   * engine still wants to enter and present a skip-only choice.
+   */
+  private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
+    const ctx: import('../cards/card-listeners.ts').CardListenerContext = {
+      state: this.state,
+      player,
+      space,
+      actionId: space.id,
+      phase: 'isDoable',
+      doable: true,
+    }
+    const matched = getMatchingListeners(ctx)
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, ctx, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (result && result.doable === false) return true
+    }
+    return false
+  }
+
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
     const openRound = roundOpen.get(space.id) ?? space.roundAvailable
     if (this.state.round < openRound) return false
@@ -1969,6 +1997,14 @@ export class GameCore {
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
       if (!allowed.some(a => a.spaceId === spaceId)) return this.respond(false, 'space unavailable')
+    }
+    // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
+    // opponents with 0 food). We only check listener-driven `doable: false`
+    // here — `space.canBeExecutedByPlayer` (which is conservatively false for
+    // OR-style flows whose every child is currently undoable) is intentionally
+    // skipped, so the existing fall-through-OR semantic in tests is preserved.
+    if (this.listenersVetoIsDoable(player, space)) {
+      return this.respond(false, 'space unavailable')
     }
 
     this.pushHistory(true)

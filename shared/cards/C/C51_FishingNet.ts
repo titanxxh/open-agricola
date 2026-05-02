@@ -44,6 +44,32 @@ const listener: CardListenerRegistration = {
   },
 }
 
+/**
+ * Part 2: BGA's Fishing Net uses `PAY` (must succeed) — when an opponent
+ * tries to use Fishing without food, the entire Fishing action fails.
+ * Mirror this by gating the inner `collect` action of the Fishing space via
+ * an `isDoable` listener: the engine's `ActionNode` for `collect` runs the
+ * isDoable hook before executing, and a `doable: false` result blocks the
+ * SEQ — leaving the worker un-placed and the space resources untouched.
+ *
+ * `getAvailableActions` (UI affordance) and the engine ActionNode dispatch
+ * (rule enforcement) both flow through `applyIsDoable`, so this single
+ * listener covers both UI greying and `takeAction` rejection without
+ * touching the main path.
+ */
+const isDoableListener: CardListenerRegistration = {
+  id: 'C51-fishing-net-isDoable',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['collect', 'fishing'],
+  scope: 'opponent',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.space?.id !== 'fishing') return
+    if (context.player.resources.food >= 1) return
+    return { doable: false }
+  },
+}
+
 export const C51_FishingNet = new MinorImprovement({
   id: CARD_ID,
   name: "Fishing Net",
@@ -56,7 +82,7 @@ export const C51_FishingNet = new MinorImprovement({
 })
 
 export const C51_FishingNet_impl = {
-  listeners: [listener],
+  listeners: [listener, isDoableListener],
   effect: {
   id: CARD_ID,
   onReturnHome: (state, player) => {
