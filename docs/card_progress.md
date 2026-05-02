@@ -16,11 +16,11 @@
 | A | 180 | 158 | 4 | 0 | 0 |
 | B | 180 | 159 | 0 | 0 | 0 |
 | C | 182 | 157 | 0 | 0 | 0 |
-| D | 181 | 160 | 1 | 0 | 0 |
-| E | 169 | 160 | 0 | 1 | 1 |
-| **总计** | **892** | **830** | **5** | **1** | **0** |
+| D | 181 | 161 | 1 | 0 | 0 |
+| E | 169 | 162 | 0 | 0 | 0 |
+| **总计** | **892** | **833** | **5** | **0** | **0** |
 
-**截至 2026-05-01 Sprint 6c：830/892 = 93.0%。**（Sprint 6c 新增 2 张：D94 HenpeckedHusband + E155 Visionary——D94 监听 construct after 触发 return-first-worker-home；E155 isDoable phase 拦截 round<11 + 任一对手未 grown 时的 family-growth。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139；同期重写 D92。同期登记 4 个通用机制：cookery exchange metadata 字段统一、harvest selector 通用化、family-growth 统一、special-effect mutation dispatcher。）
+**截至 2026-05-01 Sprint 6d：833/892 = 93.4%。**（Sprint 6d 新增 3 张：D131 CraftsmanshipPromoter（computeChoiceCandidates listener 注入 5 张 bottom-row major 候选）+ E58 LunchtimeBeer（onStartHarvest optional SEQ + special-effect set-extra-data passFieldAndBreedRound + game-core hasPassFieldAndBreed helper skip reap+breed）+ E153 StoneSculptor（CardExchange.triggers:['harvest'] + sideEffect:bonusVp + computeBonusScore 读 cardStates.bonusVpEarned）。同期登记 3 处通用扩展：Trade.sideEffect.bonusVp kind / harvest phase skip helper / minor-improvement listener candidate injection helper。Sprint 6c 新增 2 张：D94 HenpeckedHusband + E155 Visionary。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139；同期重写 D92。）
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -46,6 +46,18 @@
 ### 2.0 近期变更（changelog 入口）
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
+
+- **2026-05-01 Sprint 6d — D131 / E58 / E153 三张 stub 卡完整对齐 BGA + 3 处通用扩展 + §2.7 stub list 同步**：
+  - **D131 CraftsmanshipPromoter**：`computeChoiceCandidates` listener on `actions:['minor-improvement']` 注入 BGA 5 张 bottom-row major 候选（`Major_ClayOven` / `Major_StoneOven` / `Major_Joinery` / `Major_Pottery` / `Major_Basket`，列表来源 BGA `Improvement.php:112-119`）。`minor-improvement.execute` 加 `collectComputeChoiceCandidates` 调用合并 extraOptions + 新 helper `canAffordInjectedImprovement` 做 affordability 过滤；`resolveChoice` 改用 `playImprovement('any')` 自动处理 minor/major 双类型。`canBeExecutedByPlayer` 也 probe 注入候选。`onBuy` gain stone:1 保留。
+  - **E58 LunchtimeBeer**：`onStartHarvest` 现返 optional SEQ：`gainLeaf({food:1})` + `special-effect set-extra-data` 写 `cardStates.E58.extraData.passFieldAndBreedRound = round`。`game-core` 新 helper `hasPassFieldAndBreed(player)` 扫 cardStates 找 `extraData.passFieldAndBreedRound === currentRound`；`continueHarvestReap` 入口 skip flagged player 的 reap，`continueAfterFeedingPhase` 在构造 breed-leaf flow 前 filter harvestOrder by `!hasPassFieldAndBreed`。flag 在下个 round 自然失效，无需主动清。stage hook（`onHarvestFieldPhase` / `onAfterReap` / `onEndHarvestFieldPhase`）继续 fire（仅 reap + breed-leaf 跳过）。
+  - **E153 StoneSculptor**：exchanges metadata `triggers:['harvest']` + `sideEffect:{type:'bonusVp', amount:1}`；`effect.computeBonusScore` 读 `cardStates.E153.extraData.bonusVpEarned`。`game-core.confirmHarvestFeed` 在 bidirectional resource apply 之后 dispatch `applyTradeSideEffect` 完成 bonusVp 写入（同 work 路径 `executePaymentSolution` / `resolveExchangeChoice` 已落 sprint-5c sideEffect dispatch 保持一致）。
+  - **3 处通用扩展**：
+    1. `Trade.sideEffect.bonusVp` kind 接续 sprint-5c `drainSpace` dispatcher；`applyTradeSideEffect` 签名扩 `(state, player, eff, times, sourceCard)` — bonusVp case 写 `cardStates[sourceCard].extraData.bonusVpEarned += amount * times`。`exchange.resolveExchangeChoice` 同步加 sideEffect dispatch（之前仅 `executePaymentSolution` 内调用）。`CardExchange.sideEffect` 字段加在 `shared/cards/types.ts`，`exchangeToTrade` 透传到 Trade。
+    2. game-core `hasPassFieldAndBreed(player)` helper + harvest field/breeding phase 入口 skip 检查（continueHarvestReap + continueAfterFeedingPhase 入口前 filter harvestOrder）。round-scoped、自然失效。
+    3. `collectComputeChoiceCandidates(state, player, actionId)` 通用 helper in `shared/cards/card-listeners.ts` 跑 `computeChoiceCandidates` phase listeners 收集 `extraOptions`。`minor-improvement.execute` 调它合并候选 + affordability 过滤；`canBeExecutedByPlayer` 也 probe 让 action 在仅注入候选时仍可达。
+  - **测试**：D131 7 case（3 unit + 4 session integration）+ E58 7 case（2 onStartHarvest 结构 + 5 harvest skip integration 含跨 round 验证）+ E153 9 case（3 metadata + 2 computeBonusScore + 4 harvest integration）+ payment-trade-side-effect 单元 4 bonusVp + 4 drainSpace（保持）+ register-all 一致性自动 generate；fast 1911 全绿。
+  - **§2.7 stub list 同步**：A165 / E134 加 ✅ Sprint 2 标记（独立先行 commit）；D131 / E58 / E153 加 ✅ Sprint 6d 标记。剩余真实 stub：C62 已规划进 Sprint 6e。
+  - spec / plan：`docs/superpowers/specs/2026-05-01-sprint-6d-stubs-design.md` / `docs/superpowers/plans/2026-05-01-sprint-6d-stubs.md`。
 
 - **2026-05-01 Sprint 5c — A165 PigBreeder + B155 ArtTeacher 完整对齐 BGA + 4 处通用扩展**：
   - **A165 PigBreeder**：删 `effect.onRoundEnd` 直接 +=1，改用 `effect.onAfterRoundEnd` 返回 `breedLeaf(CARD_ID, ['boar'])`。`breedAction.execute` 在 boar+=1 后 return `{type:'animalReorg'}`，game-core line 1738 既有 stage-flow leaf 自动 pending → 玩家做 reorg。Engine `after` phase listener 在 leaf 完成时自然 fire（dispatcher.ts:222），actionContext 含 sourceCard='A165_PigBreeder' / animalTypes=['boar']，给 onBreed-aware 卡（含未来 ChampionBreeder 改写）提供事件链入口。
@@ -221,7 +233,7 @@
 > - **D 牌组 getExchangeResources 简化（≥4 张：D35/D38/D45/D84）** — 只看 `player.resources.{animal}` 忽略场上动物（pasture/stable）。BGA 含场上+supply。**修复路线：建一个共享 helper `getEffectiveExchangeAnimals(player, kind)`**
 > - **C 牌组跨卡协作机制缺失（多张：C18/C25/C27/C49/C75/C84/C130）** — sharedScoring / forceSkip / computeReplace / farm-hand stable / Wolf 联动 / reorganize / hollow 二人版等机制
 >
-> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / ~~A165~~ ✅ Sprint 2 PR-2A / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / D131 / ~~D157~~ ✅ Sprint 6a / E58 / ~~E134~~ ✅ Sprint 2 PR-2D / ~~E139~~ ✅ Sprint 6a / E153 / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修）
+> **stub 卡（≥15 张，含进 §2.6）**：~~A135~~ ✅ Sprint 4 PR-4A / ~~A165~~ ✅ Sprint 2 PR-2A / C62 / ~~C105~~ ✅ Sprint 6a / ~~C109~~ ✅ Sprint 6a / ~~C136~~ ✅ Sprint 4 PR-4A / ~~D62~~ ✅ Sprint 6a / ~~D94~~ ✅ Sprint 6c / ~~D108~~ ✅ Sprint 6a / ~~D131~~ ✅ Sprint 6d / ~~D157~~ ✅ Sprint 6a / ~~E58~~ ✅ Sprint 6d / ~~E134~~ ✅ Sprint 2 PR-2D / ~~E139~~ ✅ Sprint 6a / ~~E153~~ ✅ Sprint 6d / ~~E155~~ ✅ Sprint 6c（A135 sharedScoring + C136 sharedScoring 已实现，A165 Sprint 2 PR-2A 已修，E134 Sprint 2 PR-2D 已修，6 张 cookery / family / future-meeple stub Sprint 6a 已修；D92 ChildOmbudsman 同期重写；D94 + E155 Sprint 6c 已修；D131 + E58 + E153 Sprint 6d 已修。剩余真实 stub：C62。）
 >
 > **2026-04-28 深度池 40 张**（保留以下）：
 
@@ -485,6 +497,9 @@ These are all **bugs** (not deliberate divergences). Suggested next: pick a 4-da
 | **`family-growth` action 统一**（2026-04-30, Sprint 6a） | ✅ | 合并 `wishChildrenAction`（`'wish-children-growth'`）+ `growFamilyWithoutRoomAction`（`'grow-family-without-room'`）为单一 `familyGrowthAction`（`'family-growth'`）。`actionContext.skipRoomCheck: boolean` 控制 free-room 守卫（urgent space / E22 / C127 / B127 等紧急用法 set true）。BGA 对齐：BGA 也是单一 `WISHCHILDREN` action（urgent 通过 actionCardType 区分）。13+ caller 同步迁移：spaces (wish-children + urgent-wish-children) + 5 listener 卡 (E113 / E92 / E130 / E151 / D150) + 7 dispatch 卡 (E22 / C24 / C92 / C127 / B127 / D21 / D92)。Legacy actionId aliases 与 i18n key 保留兼容。 |
 | **`special-effect` mutation dispatcher**（2026-04-30, Sprint 6a） | ✅ | `shared/actions/effects/special-effect.ts` 从空 stub 升级为 4-kind discriminated union dispatcher：`increment-extra-data` / `set-extra-data` / `set-flag` / `set-infobox`。注册在 `internal-actions.ts`。语义：cards 需要从 ActionFlow 内 mutate `cardStates` 时（特别是 SEQ optional 子节点），应通过此 leaf；不要在 listener handler / execute callback 内直接调 `writeCardExtraData`/`setCardFlag`。原因：handler 内直接 mutate 会让 engine 看不到，破坏 SEQ optional accept/decline 语义。首个消费者：D92 ChildOmbudsman SEQ optional `[special-effect, family-growth]`。Follow-up cleanup：4 张已用卡（E149 / E38 / D134 / C104）现仍 handler-mutate cardStates，独立 sprint 跟进。 |
 | **`exchange` action 重命名 + `actionContext.tradeIds` filter**（2026-04-30, Sprint 5 mech-C） | ✅ | `shared/actions/effects/exchange.ts` 的 anytime exchange action id 从 `'anytime-exchange'` 重命名为 `'exchange'`（去前缀对齐 `reorganize`）；常量 `anytimeExchangeAction` 保留以减少 import churn。`execute` 接受 `actionContext.tradeIds?: string[]`：listener-triggered exchange leaf 通过 `actionContext: { tradeIds: ['CARD_ID'] }` 让 `buildExchangeOptions(player)` 输出 filter 后只保留 `option.sourceCard ∈ tradeIds` 的项（cancel 选项总是保留；若 filter 后只剩 cancel 返回 `fail` 不弹 prompt）。`getPlayerCookeryTrades` / `hasAffordableCookeryTrade` 同时读 `[...player.improvements, ...player.minorPlayed]`，让 minor 卡（如 E53）也能 contribute trade。trade 仍通过 `cookeryTrades: Record<cardId, Trade[]>` 全局注册，每条带 `sourceId` 标识 source 卡。消费者：E53 BoarSpear（注册 `{from:{boar:1}, to:{food:4}, sourceId:'E53_BoarSpear'}`，listener 在 `gain/collect/receive` after phase 弹 SEQ optional → exchange leaf with `tradeIds=['E53_BoarSpear']`）；命名重构覆盖 6 张卡 listener actions（E85/C53/B29/A48/D36/D56）。 |
+| **`Trade.sideEffect.bonusVp` kind + `CardExchange.sideEffect` propagation**（2026-05-01, Sprint 6d） | ✅ | 接续 Sprint 5c `drainSpace` dispatcher：`shared/game/types.ts` `TradeSideEffect` union 加 `{ type: 'bonusVp'; amount: number }`；`shared/cards/types.ts` `CardExchange.sideEffect?: TradeSideEffect`；`exchange.exchangeToTrade` 透传到 Trade。`applyTradeSideEffect` 签名扩 `(state, player, eff, times, sourceCard)` — bonusVp case 写 `cardStates[sourceCard].extraData.bonusVpEarned += amount * times`。Dispatch 路径覆盖三入口：`payment.executePaymentSolution`（work 路径，sprint-5c 已有）、`exchange.resolveExchangeChoice`（anytime 路径）、`game-core.confirmHarvestFeed`（harvest 路径）。E153 StoneSculptor 是首个 bonusVp 消费者，其 `effect.computeBonusScore` 读 cardStates.bonusVpEarned。 |
+| **`hasPassFieldAndBreed` helper + harvest field/breeding skip**（2026-05-01, Sprint 6d） | ✅ | `GameCore.hasPassFieldAndBreed(player)` 扫 `player.cardStates` 找 `extraData.passFieldAndBreedRound === state.round` 标记。`continueHarvestReap` 入口在 forEach 内 skip flagged player 的 reap；`continueAfterFeedingPhase` 在构造 breed-leaf flow 前 filter harvestOrder。flag 是 round-scoped，自然失效，无需主动清理。stage hook（onHarvestFieldPhase / onAfterReap / onEndHarvestFieldPhase / onEndHarvestFeedingPhase）继续 fire——只 skip reap 的资源动作和 breed leaf 的 +1。E58 LunchtimeBeer 是首个消费者：onStartHarvest 返 optional SEQ `[gainLeaf({food:1}), special-effect set-extra-data]`，accept 时写 round 标记。 |
+| **`collectComputeChoiceCandidates` helper + minor-improvement listener candidate injection**（2026-05-01, Sprint 6d） | ✅ | `shared/cards/card-listeners.ts` 新加 `collectComputeChoiceCandidates(state, player, actionId)` helper：跑 `computeChoiceCandidates` phase listeners 收集 `extraOptions`（与 engine `maybeBuildChoiceCandidates` 用的同一个 phase，但提供给 `execute()`-driven action 显式调用）。`minor-improvement.execute` 在 `buildPlayableMinorOptions` 之后调它合并候选 + 新内联 helper `canAffordInjectedImprovement` 做 affordability 过滤（识别 `major:` / `minor:` 前缀以及裸 id fallback）；`canBeExecutedByPlayer` 同步 probe 注入候选让 action 在仅注入候选时仍可达；`resolveChoice` 改用 `playImprovement('any')` 处理 minor/major 双类型。D131 CraftsmanshipPromoter 是首个消费者：listener 注入 5 张 BGA bottom-row major 候选 (`Major_ClayOven` / `Major_StoneOven` / `Major_Joinery` / `Major_Pottery` / `Major_Basket`)。 |
 
 ### 目录重组（PR-3）
 
@@ -663,6 +678,7 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 6a (cookery exchange metadata 化 + 6 张 stub 卡 + family-growth 统一 + special-effect dispatcher) | 04-30 | +6 | 828 | 92.8% |
 | Sprint 6b (effects/ cleanup + 6a follow-up: 4 batch + 2 收尾, 63→45 files) | 04-30 | 0 | 828 | 92.8% |
 | Sprint 6c (D94 HenpeckedHusband + E155 Visionary 两张 stub 补实现) | 05-01 | +2 | 830 | 93.0% |
+| Sprint 6d (D131 + E58 + E153 三张 stub 补实现 + 3 处通用扩展: Trade.sideEffect.bonusVp / harvest skip helper / minor-improvement candidate injection) | 05-01 | +3 | 833 | 93.4% |
 
 ### 2026-04-17 Wave 1-9 明细
 
