@@ -90,4 +90,38 @@ describe('C80_RockyTerrain', () => {
     expect(result).toBeUndefined()
   })
 
+  // BGA C80 also triggers after `improvement-any` and `occupation` actions
+  // when the played card is `isField()`. Our card model has no `isField`
+  // field — every BGA "field card" is implemented as a regular minor
+  // improvement / occupation here. The listeners are registered as
+  // architectural placeholders; they currently never fire because no card
+  // is annotated as `isField` (registered as §2.5 simplification).
+  it('field-card listener exists for improvement-any (placeholder)', () => {
+    const listener = findListener('C80-rocky-terrain-after-improvement-field-card')
+    expect(listener).toBeDefined()
+  })
+
+  it('field-card listener exists for occupation (placeholder)', () => {
+    const listener = findListener('C80-rocky-terrain-after-occupation-field-card')
+    expect(listener).toBeDefined()
+  })
+
+  it('improvement-any listener does NOT trigger (no isField cards in our model)', () => {
+    const listener = findListener('C80-rocky-terrain-after-improvement-field-card')!
+    const player = createPlayer()
+    player.resources.food = 3
+    const state = createState(player)
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      space: createSpace('improvement-any'),
+      actionId: 'improvement-any',
+      phase: 'after',
+      cardId: 'A123_FrameBuilder', // Some played card, not annotated isField
+      result: { type: 'ok' },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
+  })
 })
