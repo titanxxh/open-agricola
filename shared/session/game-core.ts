@@ -424,7 +424,7 @@ export class GameCore {
         flow.actionContext,
       )
       const def = this.registry.get(flow.actionId)
-      if (def?.resolveChoice) {
+      if (def?.resolveChoice && !def.skipChoiceWrap) {
         const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
           actionNode,
           new ChoiceNode(`choice-${flow.actionId}-${counter.value++}`, []),
