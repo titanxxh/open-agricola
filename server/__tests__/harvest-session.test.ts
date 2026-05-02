@@ -64,7 +64,7 @@ describe('harvest session flow', () => {
     expect(resp.pending.remaining).toBe(2)
 
     resp = session.confirmHarvestFeed(1, [
-      { resourceKey: 'grain', count: 1, food: 1, sourceName: '基础转化' },
+      { sourceId: '__basic__', exchangeIndex: 0, count: 1, sourceName: '基础转化' },
     ])
 
     expect(resp.pending.type).toBe('harvestFeed')
