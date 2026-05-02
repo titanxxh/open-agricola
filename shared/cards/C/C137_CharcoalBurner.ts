@@ -2,7 +2,8 @@ import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getCardDefinition } from '../catalog'
+import { getMinorImprovementCard } from '../catalog'
+import { getMajorCard } from '../major'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C137_CharcoalBurner'
@@ -20,7 +21,8 @@ const CARD_ID = 'C137_CharcoalBurner'
  */
 
 const hasBakeCapability = (cardId: string): boolean => {
-  return getCardDefinition(cardId)?.isBaking ?? false
+  if (cardId.startsWith('Major_')) return getMajorCard(cardId)?.isBaking ?? false
+  return getMinorImprovementCard(cardId)?.isBaking ?? false
 }
 
 const getBuiltCardId = (choice: string | undefined): string | undefined => {
