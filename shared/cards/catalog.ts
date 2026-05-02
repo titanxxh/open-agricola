@@ -5,6 +5,8 @@ import {
   Occupation,
   PlayerActionCard,
 } from './types'
+import type { CardDefinition } from './types'
+import { majorCardEffects } from './major'
 import { allCommunityCards } from './community/auto-catalog'
 import { A10_WoodenShed } from './A/A10_WoodenShed'
 import { A11_MudPatch } from './A/A11_MudPatch'
@@ -1844,6 +1846,22 @@ export const getMinorImprovementCard = (id: string) => {
 export const getOccupationCard = (id: string) => {
   return allOccupationCards.find((card) => card.id === id)
     ?? getCustomOccupation(id)
+}
+
+/**
+ * Unified lookup entry for any card definition (occupation / minor / major).
+ * Returns the CardDefinition view; for majors the underlying object is
+ * MajorCardData (a CardDefinition superset). Callers needing majors-only
+ * fields (e.g. `scoring`) may type-narrow via `as MajorCardData`.
+ *
+ * Replaces the role getMajorCardEffect played for metadata queries.
+ */
+export const getCardDefinition = (id: string): CardDefinition | undefined => {
+  return (
+    getMinorImprovementCard(id)
+    ?? getOccupationCard(id)
+    ?? majorCardEffects.find((c) => c.id === id)
+  )
 }
 
 // Install the lookups on `types.ts` so `getRegisteredMinorImprovement` /
