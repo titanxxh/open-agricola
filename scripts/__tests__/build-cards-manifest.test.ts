@@ -55,7 +55,7 @@ describe('buildCardsManifest — extended patterns', () => {
     expect(manifest['E999_FakeActionCard'].module).toMatch(/E\/E999_FakeActionCard$/)
   })
 
-  it('extracts base MajorCardEffect literal', () => {
+  it('extracts base MajorCardData literal', () => {
     const manifest = buildCardsManifest(extendedFixturesRoot)
     expect(manifest['Major_FakeOven1']).toBeDefined()
     const meta = manifest['Major_FakeOven1'].meta
@@ -70,7 +70,7 @@ describe('buildCardsManifest — extended patterns', () => {
     ])
   })
 
-  it('resolves spread-based MajorCardEffect variant and overrides', () => {
+  it('resolves spread-based MajorCardData variant and overrides', () => {
     const manifest = buildCardsManifest(extendedFixturesRoot)
     expect(manifest['Major_FakeOven2']).toBeDefined()
     const meta = manifest['Major_FakeOven2'].meta

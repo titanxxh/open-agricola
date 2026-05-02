@@ -68,7 +68,7 @@ import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
-import { majorCardEffects } from '../cards/major/index.ts'
+import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
@@ -326,7 +326,7 @@ export class GameCore {
     )
     // Register majors as effect bundles so getCardEffect resolves them after
     // the legacy getMajorCardEffect fallback is removed.
-    this.cardRegistry.registerEffects(majorCardEffects)
+    this.cardRegistry.registerEffects(majorCardDefinitions)
     setActiveCardRegistry(this.cardRegistry)
 
     // Register custom workshop cards into a per-session context (sandbox mode)
