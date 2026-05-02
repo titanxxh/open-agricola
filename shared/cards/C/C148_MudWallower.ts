@@ -1,6 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { PlayerState } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
@@ -49,6 +50,48 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
+/**
+ * Sync C148.held downward when player's pig count is below the cap.
+ *
+ * BGA: when pigs leave the card (via cooking/exchange, paying, reorganize),
+ * the card's capacity is permanently reduced (`decreaseRoom` / `decreaseRoomAll`).
+ * We approximate by syncing `held` to `min(held, player.resources.boar)` after
+ * actions that can move pigs off the card. The sync only goes downward — the
+ * cap never grows back even if pig count later rises (e.g., via breeding).
+ */
+const syncHeldDownward = (player: PlayerState) => {
+  const counters = player.cardStates?.[CARD_ID]?.counters
+  if (!counters) return
+  const held = counters.held ?? 0
+  if (held <= 0) return
+  const boars = player.resources.boar ?? 0
+  if (boars < held) {
+    counters.held = boars
+  }
+}
+
+const afterExchangeSyncListener: CardListenerRegistration = {
+  id: 'C148-mud-wallower-after-exchange',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['exchange'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    syncHeldDownward(context.player)
+  },
+}
+
+const syncHeldAfterPlaceFarmerListener: CardListenerRegistration = {
+  id: 'C148-mud-wallower-sync-held-after-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  // Order > 0 so it runs after the increment listener (which has default order 0).
+  order: 10,
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    syncHeldDownward(context.player)
+  },
+}
+
 export const C148_MudWallower = new Occupation({
   id: CARD_ID,
   name: 'Mud Wallower',
@@ -63,7 +106,7 @@ export const C148_MudWallower = new Occupation({
 })
 
 export const C148_MudWallower_impl = {
-  listeners: [afterPlaceFarmerListener],
+  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
