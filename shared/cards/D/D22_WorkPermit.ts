@@ -7,11 +7,25 @@ import {
   writeCardExtraData,
   writeCardInfobox,
 } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { workersAvailable } from '../../game/player'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D22_WorkPermit'
 const TARGET_ROUND_KEY = 'targetRound'
+
+// BGA isBuyable: (wood+stone+clay+reed) == 0 || !hasFarmerInReserve() → false
+registerPrerequisite('At Least 1 Building Resource', (player, state) => {
+  const totalBuildRes =
+    (player.resources.wood ?? 0)
+    + (player.resources.stone ?? 0)
+    + (player.resources.clay ?? 0)
+    + (player.resources.reed ?? 0)
+  if (totalBuildRes === 0) return false
+  if (!state) return true
+  return workersAvailable(state, player) > 0
+})
 
 export const D22_WorkPermit = new MinorImprovement({
   id: CARD_ID,
