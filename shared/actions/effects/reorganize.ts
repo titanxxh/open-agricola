@@ -74,6 +74,11 @@ export const reorganizeAction: ActionDefinition = {
   },
   execute: (ctx): ActionExecutionResult => {
     const trigger = (ctx.actionContext?.trigger as ReorganizeTrigger) ?? 'anytime'
+    // NOTE: zones are computed here at emit-time and travel inside `request`.
+    // However, GameCore.buildInteraction() in shared/session/game-core.ts still
+    // recomputes zones via buildAnimalReorgZones() during the transitional
+    // period. Task 6/7 will rewire GameCore to consume zones from the
+    // engineStack.peekInteraction()?.request, eliminating the duplicate compute.
     const zones = computeAnimalZones(ctx.player).map((zone) => ({
       id: zone.id,
       zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',

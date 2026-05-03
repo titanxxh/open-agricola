@@ -31,6 +31,7 @@ import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } 
 import { incCardUsed } from '../cards/helpers/card-state'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
+import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 
 type EngineContext = {
   state: GameState
@@ -1294,7 +1295,7 @@ export class Engine {
           // option is omitted for non-anytime triggers, mirroring the
           // pre-migration `buildOptions(trigger)` helper.
           const trigger =
-            (executionContext.actionContext?.trigger as string | undefined) ?? 'anytime'
+            (executionContext.actionContext?.trigger as ReorganizeTrigger | undefined) ?? 'anytime'
           const confirm: ActionChoiceOption = {
             value: 'confirm',
             labelKey: 'ui.interactionAnimalReorgConfirm',
@@ -1303,7 +1304,24 @@ export class Engine {
             trigger === 'anytime'
               ? [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
               : [confirm]
+        } else if (
+          result.request.kind === 'confirm-next-player' ||
+          result.request.kind === 'confirm-player-switch' ||
+          result.request.kind === 'feed'
+        ) {
+          // Task 9 will add explicit emitters for these kinds. Until then no
+          // current effect emits them, so they fall through to empty choices
+          // here. The exhaustive check below ensures any future kind added to
+          // InteractionRequest forces this branch to be revisited.
+          choiceOptions = []
         } else {
+          // Exhaustive check: every InteractionRequest kind must be handled
+          // above. If a new kind is added to InteractionRequest without
+          // updating this branch, the assignment below produces a typecheck
+          // failure here, signalling that Task 6/7 should have removed this
+          // shim OR the new kind needs an explicit branch.
+          const _exhaustive: never = result.request
+          void _exhaustive
           choiceOptions = []
         }
         const choiceNode = this.findPairedInteractionNode(node) ?? this.findInteractionNode(this.tree.root)
