@@ -4,7 +4,8 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
 import { applyFutureMeeples } from '../../shared/logic/state'
-import '../../shared/cards/B/B14_Hawktower'
+import { B14_Hawktower } from '../../shared/cards/B/B14_Hawktower'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B14_Hawktower'
 
@@ -123,5 +124,23 @@ describe('B14 Hawktower — session', () => {
         (e) => e.cardId === CARD_ID && e.playerId === player.id,
       ),
     ).toBe(false)
+  })
+
+  describe('prerequisite "Play in Round 7 or Before"', () => {
+    it('blocks when round > 7', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 8
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B14_Hawktower, state.round, state)).toBe(false)
+    })
+
+    it('allows when round <= 7', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 7
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B14_Hawktower, state.round, state)).toBe(true)
+    })
   })
 })
