@@ -1,8 +1,15 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { fieldHasCrop } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B45_StrawberryPatch'
+
+// BGA isBuyable: count(getVegetableFields()) < 2 → false
+registerPrerequisite('2 Vegetable Fields', (player) =>
+  player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length >= 2,
+)
 
 export const B45_StrawberryPatch = new MinorImprovement({
   id: CARD_ID,
