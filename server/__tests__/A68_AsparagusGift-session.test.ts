@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A68_AsparagusGift'
+import { A68_AsparagusGift } from '../../shared/cards/A/A68_AsparagusGift'
 import '../../shared/cards/B/B30_WoodPalisades'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'A68_AsparagusGift'
 const B30 = 'B30_WoodPalisades'
@@ -70,5 +71,23 @@ describe('A68 Asparagus Gift — session', () => {
 
     const player = resp.state.players[0]!
     expect(player.resources.vegetable).toBe(1)
+  })
+
+  describe('prerequisite "1 Unplanted Field"', () => {
+    it('blocks when player has no empty fields', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.fields = []
+      expect(meetsCardPrerequisites(player, A68_AsparagusGift, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has at least one empty field', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
+      expect(meetsCardPrerequisites(player, A68_AsparagusGift, state.round, state)).toBe(true)
+    })
   })
 })
