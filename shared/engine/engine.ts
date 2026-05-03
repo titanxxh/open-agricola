@@ -1281,6 +1281,66 @@ export class Engine {
       const duringActivateNodes = this.buildActivateCardNodes(
         duringPhase.matchedListeners, 'during', replacedActionId,
       )
+      if (result.type === 'request') {
+        node.resolve(result)
+        let choiceOptions: ActionChoiceOption[]
+        if (result.request.kind === 'choice') {
+          choiceOptions = result.request.options
+        } else if (result.request.kind === 'animal-reorg') {
+          // Compatibility shim until Task 6/7 lifts GameCore detection off
+          // pending.options. Re-emit confirm/cancel from the legacy 'choice'
+          // shape so GameCore's pending sub-flow surface (and tests that
+          // assert on `pending.options`) keep working unchanged. The cancel
+          // option is omitted for non-anytime triggers, mirroring the
+          // pre-migration `buildOptions(trigger)` helper.
+          const trigger =
+            (executionContext.actionContext?.trigger as string | undefined) ?? 'anytime'
+          const confirm: ActionChoiceOption = {
+            value: 'confirm',
+            labelKey: 'ui.interactionAnimalReorgConfirm',
+          }
+          choiceOptions =
+            trigger === 'anytime'
+              ? [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
+              : [confirm]
+        } else {
+          choiceOptions = []
+        }
+        const choiceNode = this.findPairedInteractionNode(node) ?? this.findInteractionNode(this.tree.root)
+        const targetNode = choiceNode ?? null
+        if (targetNode) {
+          targetNode.setChoice(result.promptKey, choiceOptions)
+          targetNode.request = result.request
+          this.pendingInteractionNodeId = targetNode.id
+          this.pendingInteractionActionId = replacedActionId
+          this.pendingInteractionOwnerNodeId = null
+        } else {
+          this.pendingInteractionNodeId = node.id
+          this.pendingInteractionActionId = replacedActionId
+          this.pendingInteractionOwnerNodeId = null
+        }
+        this.pendingInteractionContext = {
+          params: executionContext.params,
+          costs: executionContext.costs,
+          sourceCard: this.resolveChoiceSourceCard(
+            executionContext.sourceCard ?? result.sourceCard,
+            choiceOptions,
+          ),
+          actionContext: executionContext.actionContext,
+        }
+        if (duringActivateNodes.length > 0) {
+          this.tree.insertAfter(node.id, [...duringActivateNodes])
+        }
+        return {
+          type: 'choice',
+          nodeId: this.pendingInteractionNodeId ?? node.id,
+          choice: {
+            promptKey: result.promptKey,
+            promptParams: result.promptParams,
+            options: choiceOptions,
+          },
+        }
+      }
 if (result.type === 'choice') {
 node.resolve(result)
 if (!action.getBaseChoiceOptions) {
