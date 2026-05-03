@@ -16,7 +16,10 @@ import {
   payResources,
   returnCardToBoard,
 } from '../helpers/payment'
-import { resolveCostPaymentSelection } from '../helpers/pay-helpers'
+import {
+  payTypedFlatCost,
+  resolveCostPaymentSelection,
+} from '../helpers/pay-helpers'
 
 export type PayParams = {
   cost: Partial<Resource> | ComplexCost
@@ -103,10 +106,18 @@ const buildSelectedResult = (
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
-  // Hand the improvement-flow context to the next leaf (apply-improvement)
-  // so its onBuy listener can still receive a real `PaymentInfo` (returned
-  // card id is what C60_SmallPottersOven keys its 5-food gain on, etc.).
-  if (costType === 'major-improvement' || costType === 'minor-improvement') {
+  // Hand the wrapper-flow context to the next leaf (apply-improvement /
+  // apply-occupation-play) so its onBuy listener can still receive a real
+  // `PaymentInfo` (returned card id is what C60_SmallPottersOven keys its
+  // 5-food gain on, etc.) and so apply-* can echo `resourcesPaid` back into
+  // the canonical `log.playOccupation` / `log.playImprovement` log entries
+  // (D95 SiteManager scoping, log-cost attribution tests).
+  if (
+    costType === 'major-improvement'
+    || costType === 'minor-improvement'
+    || costType === 'occupation'
+    || costType === 'renovation'
+  ) {
     player._pendingImprovementPaymentInfo = {
       resourcesPaid: solution.resourcesPaid,
       feeIndex: solution.feeIndex,
@@ -220,6 +231,40 @@ export const payAction: ActionDefinition = {
       )
     }
     const flat = p.cost as Partial<Resource>
+    // 7b1: when a costType is set, route the flat cost through
+    // payTypedFlatCost so trade modifiers (A28 ForestSchool wood→food etc.)
+    // get the silent cost-replacement treatment they had in the legacy
+    // payCardPreviewCost path. Without this the flat branch would just
+    // attempt canPayResources(flat) and fail when the player can only
+    // afford the cost via a trade swap.
+    if (p.costType) {
+      const ok = payTypedFlatCost(player, flat, p.costType, state)
+      if (!ok) return { type: 'fail', logKey: 'log.payFail' }
+      if (
+        p.costType === 'major-improvement'
+        || p.costType === 'minor-improvement'
+        || p.costType === 'occupation'
+        || p.costType === 'renovation'
+      ) {
+        // Stash the typed-flat resourcesPaid for the downstream apply-* leaf
+        // so log.playOccupation / log.playImprovement can echo the actual
+        // post-trade cost (D95 SiteManager scoping etc.). The
+        // ComplexCost branch sets the same field in buildSelectedResult.
+        player._pendingImprovementPaymentInfo = {
+          resourcesPaid: flat,
+        }
+      }
+      if (sourceCard) {
+        addCardResourcePaid(player, sourceCard, flat)
+        return {
+          type: 'ok',
+          resourcesPaid: flat,
+          logKey: 'log.cardEffectPay',
+          logParams: { cost: flat, cardId: sourceCard },
+        }
+      }
+      return { type: 'ok', resourcesPaid: flat }
+    }
     if (!canPayResources(player, flat)) {
       return { type: 'fail', logKey: 'log.payFail' }
     }
