@@ -141,9 +141,20 @@ const finalizeFence = (
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   executeResolvedTypedFlatPayment(nextPlayer, payment, 'fencing')
-  consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
+  const consumed = consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
-  return { type: 'ok' }
+  // Mirror commitFarmChoice farmChoiceMeta -> engine resultOverride.extraData:
+  // listeners (E108, A83, …) read these from `context.result.extraData`.
+  const extraData: Record<string, unknown> = {
+    newFenceEdges: validated.newFenceEdges,
+    newPalisadeEdges: validated.newPalisadeEdges,
+    newPastures: validated.newPastures,
+  }
+  if (consumed) {
+    extraData.usedFreeFences = consumed.usedFreeFences
+    extraData.sourceCard = consumed.sourceCard
+  }
+  return { type: 'ok', extraData }
 }
 
 export const fenceAction: ActionDefinition = {

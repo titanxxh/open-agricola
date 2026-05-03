@@ -102,7 +102,7 @@ describe('C1 Overhaul session', () => {
 
     // Build 4 fences for free (wood was 0). Use tile (0,0) as a simple
     // 4-edge enclosure. Player has 0 wood — proving the discount is full.
-    const commit = session.commitFarmChoice(0, 'fence', {
+    const commit = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -131,7 +131,7 @@ describe('C1 Overhaul session', () => {
     const session = setup({ wood: 1, fences: 2 })
     const { resp } = playC1(session)
     expect(resp.ok).toBe(true)
-    const commit = session.commitFarmChoice(0, 'fence', {
+    const commit = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -143,7 +143,7 @@ describe('C1 Overhaul session', () => {
   it('after C1 fencing completes, the c1Active flag is cleared', () => {
     const session = setup({ wood: 1, fences: 2 })
     playC1(session)
-    let resp = session.commitFarmChoice(0, 'fence', {
+    let resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
