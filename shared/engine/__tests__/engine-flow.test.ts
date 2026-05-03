@@ -14,7 +14,7 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import {
   ActionNode,
-  ChoiceNode,
+  InteractionNode,
   OptionalNode,
   OrNode,
   ParallelNode,
@@ -135,7 +135,7 @@ describe('Engine flow nodes', () => {
     registry.register(buildRooms)
     registry.register(buildStables)
     const roomsAction = new ActionNode('action-rooms', buildRooms.id)
-    const roomsChoice = new ChoiceNode('choice-rooms', [])
+    const roomsChoice = new InteractionNode('choice-rooms', [])
     const roomsSeq = new SequenceNode('seq-rooms', [roomsAction, roomsChoice])
     const stablesAction = new ActionNode('action-stables', buildStables.id)
     const root = new OrNode('or-root', [roomsSeq, stablesAction])
@@ -240,7 +240,7 @@ describe('Engine flow nodes', () => {
     registry.register(skip)
     const plowSeq = new SequenceNode('seq-plow', [
       new ActionNode('action-plow', plow.id),
-      new ChoiceNode('choice-plow', []),
+      new InteractionNode('choice-plow', []),
     ])
     const root = new XorNode('xor-root', [
       plowSeq,

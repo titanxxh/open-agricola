@@ -57,6 +57,10 @@ export class EngineStack {
     return this.frames.length
   }
 
+  peekInteraction(): import('./nodes').InteractionNode | null {
+    return this.current()?.engine.peekInteraction() ?? null
+  }
+
   toCursor(): EngineStackCursor {
     return {
       frames: this.frames.map((f) => ({

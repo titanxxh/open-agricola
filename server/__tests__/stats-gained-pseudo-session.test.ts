@@ -27,16 +27,16 @@ describe('gained.field pseudo-stat', () => {
     expect(resp.ok).toBe(true)
 
     // Inject sourceCard onto the pending choice for this assertion. The
-    // engine-driven path reads sourceCard from `engine.pendingChoiceContext`
+    // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
     // (not the GameSession's `pending` mirror), so we patch both to keep this
     // test functional without a real plow-card scenario.
     const pending = session.getState().pending
     if (pending.type === 'choice') {
       pending.sourceCard = 'TEST_PlowCard'
     }
-    const engineRef = (session as unknown as { engine: { pendingChoiceContext: { sourceCard?: string } | null } }).engine
-    if (engineRef?.pendingChoiceContext) {
-      engineRef.pendingChoiceContext.sourceCard = 'TEST_PlowCard'
+    const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
+    if (engineRef?.pendingInteractionContext) {
+      engineRef.pendingInteractionContext.sourceCard = 'TEST_PlowCard'
     }
 
     const farmResp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
@@ -62,16 +62,16 @@ describe('gained.stable pseudo-stat', () => {
     expect(resp.ok).toBe(true)
 
     // Inject sourceCard onto the pending choice for this assertion. The
-    // engine-driven path reads sourceCard from `engine.pendingChoiceContext`
+    // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
     // (not the GameSession's `pending` mirror), so we patch both to keep this
     // test functional without a real stable-card scenario.
     const pending = session.getState().pending
     if (pending.type === 'choice') {
       pending.sourceCard = 'TEST_StableCard'
     }
-    const engineRef = (session as unknown as { engine: { pendingChoiceContext: { sourceCard?: string } | null } }).engine
-    if (engineRef?.pendingChoiceContext) {
-      engineRef.pendingChoiceContext.sourceCard = 'TEST_StableCard'
+    const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
+    if (engineRef?.pendingInteractionContext) {
+      engineRef.pendingInteractionContext.sourceCard = 'TEST_StableCard'
     }
 
     const farmResp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })

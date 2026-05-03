@@ -29,7 +29,7 @@ export const emitChoiceAction: ActionDefinition = {
     return { type: 'ok' }
   },
   /**
-   * Stub so the engine creates a paired ChoiceNode in buildFlowNode.
+   * Stub so the engine creates a paired InteractionNode in buildFlowNode.
    * The real resolution is done by the card's CardEffect.resolveChoice hook
    * which fires before this stub (in GameSession.resolvePendingChoice).
    */
